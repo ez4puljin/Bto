@@ -60,6 +60,22 @@ export interface SaleDocVoucher {
   amount: Decimal;
 }
 
+/**
+ * A bonus card member's part of a sale or a return (ADR-0112): on a SALE the money base, the tier's
+ * percent and the points earned and spent; on a RETURN the points given back and taken back; the
+ * lifetime spend's change either way.
+ */
+export interface SaleDocLoyalty {
+  memberId: number;
+  earnBase: Decimal;
+  percent: Decimal;
+  earned: Decimal;
+  spent: Decimal;
+  givenBack: Decimal;
+  clawback: Decimal;
+  spendDelta: Decimal;
+}
+
 /** What the edge knows of the e-Barimt receipt; never the lottery or the QR (ADR-0065). */
 export interface EbarimtFacts {
   status: EbarimtStatus;
@@ -88,6 +104,8 @@ export interface SaleDoc {
   customerId: number | null;
   /** The coupons and partner vouchers the till took (ADR-0110). */
   vouchers: SaleDocVoucher[];
+  /** The bonus card member's points (ADR-0112); null without a member. */
+  loyalty: SaleDocLoyalty | null;
   lines: SaleDocLine[];
   tenders: SaleDocTender[];
   subtotal: Decimal;

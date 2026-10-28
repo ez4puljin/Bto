@@ -6,6 +6,7 @@ import { Decimal } from '@tugeel/shared/money';
 import type {
   CreditCheckResponseWire,
   CustomerFeedResponseWire,
+  LoyaltyFeedResponseWire,
   SnapshotResponseWire,
   VoucherFeedResponseWire,
 } from '@tugeel/shared/pos';
@@ -20,6 +21,7 @@ import {
 import { CurrentEdge, EdgeTokenGuard } from '../guards/edge-token.guard';
 import { PosAcceptService } from '../services/pos-accept.service';
 import { PosCustomersService } from '../services/pos-customers.service';
+import { PosLoyaltyService } from '../services/pos-loyalty.service';
 import { PosVouchersService } from '../services/pos-vouchers.service';
 import { type EdgeNode, PosEdgeNodesService } from '../services/pos-edge-nodes.service';
 import { PosSettingsService } from '../services/pos-settings.service';
@@ -46,6 +48,7 @@ export class PosSyncController {
     private readonly snapshots: PosSnapshotService,
     private readonly customers: PosCustomersService,
     private readonly vouchers: PosVouchersService,
+    private readonly loyalty: PosLoyaltyService,
   ) {}
 
   /**
@@ -70,6 +73,19 @@ export class PosSyncController {
   @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
   async voucherFeed(@Query() query: SnapshotQueryDto): Promise<VoucherFeedResponseWire> {
     const feed = await this.vouchers.feed();
+    return query.since === feed.version
+      ? { changed: false, version: feed.version }
+      : { changed: true, feed };
+  }
+
+  /**
+   * The bonus card's members and tiers (ADR-0112), apart from the snapshot like the customers;
+   * `LoyaltyFeedResponseWire` of @tugeel/shared/pos.
+   */
+  @Get('loyalty')
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  async loyaltyFeed(@Query() query: SnapshotQueryDto): Promise<LoyaltyFeedResponseWire> {
+    const feed = await this.loyalty.feed();
     return query.since === feed.version
       ? { changed: false, version: feed.version }
       : { changed: true, feed };

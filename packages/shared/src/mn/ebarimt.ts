@@ -33,6 +33,13 @@ export type EbarimtPaymentCode = (typeof EBARIMT_PAYMENT_CODES)[number];
 export const VOUCHER_PAYMENT_CODE: EbarimtPaymentCode = 'CASH';
 
 /**
+ * The code a bonus card's points part of a till sale is sent under (ADR-0112): the receipt keeps
+ * the full price and the points are a payment (owner 2026-10-28). TODO-VERIFY with the accountant
+ * and ITC, like the voucher's.
+ */
+export const LOYALTY_PAYMENT_CODE: EbarimtPaymentCode = 'CASH';
+
+/**
  * PosAPI 3.0's tax types, one sub-receipt each; the catalog's `vat_type` values are the same
  * words. VAT_FREE and VAT_ZERO items name their `taxProductCode`.
  */

@@ -9,6 +9,7 @@ import {
   type EbarimtStatus,
   POSAPI_DATE_PATTERN,
   VOUCHER_PAYMENT_CODE,
+  LOYALTY_PAYMENT_CODE,
 } from '@tugeel/shared/mn';
 import { Decimal } from '@tugeel/shared/money';
 import type {
@@ -63,6 +64,8 @@ export interface IssueInput {
   transfer: Decimal;
   /** ADR-0110: what partner vouchers paid, sent under VOUCHER_PAYMENT_CODE. */
   voucher?: Decimal;
+  /** ADR-0112: what bonus points paid, sent under LOYALTY_PAYMENT_CODE. */
+  points?: Decimal;
   total: Decimal;
   vatTotal: Decimal;
 }
@@ -161,7 +164,7 @@ export class EbarimtService implements OnApplicationBootstrap {
       customerTin: input.customerTin,
       customerName: input.customerName,
       lines: input.lines,
-      payments: payments(input.cash, input.card, input.transfer, input.voucher),
+      payments: payments(input.cash, input.card, input.transfer, input.voucher, input.points),
       total: input.total,
       vatTotal: input.vatTotal,
     });
@@ -783,6 +786,7 @@ function payments(
   card: Decimal,
   transfer: Decimal,
   voucher: Decimal = new Decimal(0),
+  points: Decimal = new Decimal(0),
 ): { code: EbarimtPaymentCode; amount: string }[] {
   const sums = new Map<EbarimtPaymentCode, Decimal>([
     ['CASH', cash],
@@ -790,6 +794,7 @@ function payments(
     ['BANK_TRANSFER', transfer],
   ]);
   sums.set(VOUCHER_PAYMENT_CODE, (sums.get(VOUCHER_PAYMENT_CODE) ?? new Decimal(0)).plus(voucher));
+  sums.set(LOYALTY_PAYMENT_CODE, (sums.get(LOYALTY_PAYMENT_CODE) ?? new Decimal(0)).plus(points));
   return [...sums]
     .filter(([, amount]) => amount.gt(0))
     .map(([code, amount]) => ({ code, amount: amount.toFixed(2) }));

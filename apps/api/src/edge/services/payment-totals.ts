@@ -7,7 +7,7 @@ import type {
   TenderKind,
 } from '@tugeel/shared/pos';
 
-const KIND_ORDER: readonly TenderKind[] = ['CASH', 'CARD', 'TRANSFER', 'CREDIT'];
+const KIND_ORDER: readonly TenderKind[] = ['CASH', 'CARD', 'TRANSFER', 'CREDIT', 'POINTS'];
 
 /**
  * The money of these sales and returns by payment type (ADR-0111), in the till's order of the

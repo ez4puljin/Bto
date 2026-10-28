@@ -57,6 +57,7 @@ import {
 import { PosCashiersService } from './pos-cashiers.service';
 import { PosCustomersService } from './pos-customers.service';
 import { PosDayCountsService } from './pos-day-counts.service';
+import { PosLoyaltyService } from './pos-loyalty.service';
 import { PosPaymentTypesService } from './pos-payment-types.service';
 import type { EdgeNode } from './pos-edge-nodes.service';
 import { PosSettingsService } from './pos-settings.service';
@@ -105,6 +106,7 @@ export class PosAcceptService {
     private readonly vouchers: PosVouchersService,
     private readonly paymentTypes: PosPaymentTypesService,
     private readonly dayCounts: PosDayCountsService,
+    private readonly loyalty: PosLoyaltyService,
   ) {}
 
   /**
@@ -205,6 +207,8 @@ export class PosAcceptService {
     // ADR-0110: a sale's codes and the partners they bill, locked after the customer, before the shelf.
     const locked = await this.vouchers.lockForSaleInTx(tx, doc, soldDay);
     if (original) await this.checkVoucherRefund(tx, doc, original.sale);
+    // ADR-0112: the bonus card member, locked after the codes, before the shelf.
+    const member = await this.loyalty.lockForSaleInTx(tx, doc, original?.sale ?? null);
     const voucherTotal = doc.tenders
       .filter((tender) => tender.kind === 'VOUCHER')
       .reduce((sum, tender) => sum.plus(tender.amount), new Decimal(0));
@@ -369,6 +373,7 @@ export class PosAcceptService {
             locked,
           )
         : null;
+    const points = member ? await this.loyalty.recordInTx(tx, sale.id, member) : null;
     await this.tills.touchSale(till.id, doc.soldAt, tx);
     await this.audit.record(tx, actor, {
       action: 'ACCEPT',
@@ -402,6 +407,19 @@ export class PosAcceptService {
                 issue: use.issue,
               })),
               voucherInvoices: billed?.invoices ?? [],
+            }
+          : {}),
+        ...(member && doc.loyalty
+          ? {
+              loyalty: {
+                memberId: member.member.id,
+                earned: doc.loyalty.earned.toFixed(0),
+                spent: doc.loyalty.spent.toFixed(0),
+                givenBack: doc.loyalty.givenBack.toFixed(0),
+                clawback: doc.loyalty.clawback.toFixed(0),
+                balance: points?.balance.toFixed(0) ?? null,
+                issue: member.issue,
+              },
             }
           : {}),
       },
@@ -719,6 +737,7 @@ export class PosAcceptService {
       }
     });
     this.vouchers.checkShape(doc);
+    this.loyalty.checkShape(doc);
     const credits = doc.tenders.filter((tender) => tender.kind === 'CREDIT').length;
     if (credits > 1) throw invalid('tenders', 'credit', 'at most one CREDIT tender');
     if (credits > 0 !== (doc.customerId !== null)) {

@@ -15,7 +15,13 @@ import {
   VOUCHER_KINDS,
   VOUCHER_LIMITS,
   VOUCHER_STATUSES,
+  GENDERS,
+  LOYALTY_ENTRY_KINDS,
+  LOYALTY_ISSUES,
+  LOYALTY_LIMITS,
+  LOYALTY_MEMBER_STATUSES,
 } from '@tugeel/shared/pos';
+import { REG_NO_MAX_LENGTH } from '@tugeel/shared/taxpayer';
 import { PRICE_BASES } from '@tugeel/shared/pricing';
 import { type SQL, sql } from 'drizzle-orm';
 import {
@@ -316,6 +322,22 @@ export const posShifts = pgTable(
     transferRefunds: money('transfer_refunds')
       .notNull()
       .default(sql`0`),
+    /**
+     * ADR-0112: paid with bonus points and given back as points (the POINTS tenders), and the
+     * points its sales earned and its returns took back.
+     */
+    pointsSales: money('points_sales')
+      .notNull()
+      .default(sql`0`),
+    pointsRefunds: money('points_refunds')
+      .notNull()
+      .default(sql`0`),
+    pointsEarned: money('points_earned')
+      .notNull()
+      .default(sql`0`),
+    pointsClawback: money('points_clawback')
+      .notNull()
+      .default(sql`0`),
     /** The core's journal entry (`fin.journal_entries`, ADR-0089): a plain id. */
     journalEntryId: ref('journal_entry_id'),
     journalNumber: text('journal_number'),
@@ -348,7 +370,7 @@ export const posShifts = pgTable(
     ),
     check(
       'pos_shifts_money',
-      sql`${t.cashSales} >= 0 AND ${t.cashRefunds} >= 0 AND ${t.creditSales} >= 0 AND ${t.creditRefunds} >= 0 AND ${t.voucherSales} >= 0 AND ${t.transferSales} >= 0 AND ${t.transferRefunds} >= 0 AND ${t.cardSales} >= 0 AND ${t.cardRefunds} >= 0 AND ${t.salesTotal} >= 0 AND ${t.returnsTotal} >= 0 AND ${t.salesCount} >= 0 AND ${t.returnsCount} >= 0 AND (${t.countedCash} IS NULL OR ${t.countedCash} >= 0) AND (${t.floatKept} IS NULL OR ${t.floatKept} >= 0)`,
+      sql`${t.cashSales} >= 0 AND ${t.cashRefunds} >= 0 AND ${t.creditSales} >= 0 AND ${t.creditRefunds} >= 0 AND ${t.voucherSales} >= 0 AND ${t.transferSales} >= 0 AND ${t.transferRefunds} >= 0 AND ${t.pointsSales} >= 0 AND ${t.pointsRefunds} >= 0 AND ${t.pointsEarned} >= 0 AND ${t.pointsClawback} >= 0 AND ${t.cardSales} >= 0 AND ${t.cardRefunds} >= 0 AND ${t.salesTotal} >= 0 AND ${t.returnsTotal} >= 0 AND ${t.salesCount} >= 0 AND ${t.returnsCount} >= 0 AND (${t.countedCash} IS NULL OR ${t.countedCash} >= 0) AND (${t.floatKept} IS NULL OR ${t.floatKept} >= 0)`,
     ),
     check('pos_shifts_note', sql`${textLength(t.note, POS_LIMITS.maxNote)}`),
   ],
@@ -569,6 +591,7 @@ export const posTenders = pgTable(
     ),
     check('pos_tenders_kind', inList(t.kind, TENDER_KINDS)),
     check('pos_tenders_amount', sql`${t.amount} > 0`),
+    check('pos_tenders_points', sql`${t.kind} <> 'POINTS' OR ${t.amount} = trunc(${t.amount})`),
     check(
       'pos_tenders_cash',
       sql`(${t.kind} = 'CASH' AND (${t.tendered} IS NULL OR ${t.tendered} >= ${t.amount})) OR (${t.kind} <> 'CASH' AND ${t.tendered} IS NULL)`,
@@ -948,6 +971,187 @@ export const posSaleVouchers = pgTable(
     ),
     check(
       'pos_sale_vouchers_review',
+      sql`(${t.reviewedAt} IS NULL) = (${t.reviewedBy} IS NULL) AND (${t.reviewedAt} IS NULL OR ${t.issue} IS NOT NULL) AND (${textLength(t.reviewNote, POS_LIMITS.maxNote)})`,
+    ),
+  ],
+);
+
+/**
+ * The bonus card's tiers (ADR-0112): from a lifetime spend, a percentage of what a member pays
+ * comes back as points. The admin replaces the list as a whole; a tier is retired, never deleted.
+ * No tiers means nobody earns.
+ */
+export const posLoyaltyTiers = pgTable(
+  'pos_loyalty_tiers',
+  {
+    id: id(),
+    name: text('name').notNull(),
+    fromAmount: money('from_amount').notNull(),
+    percent: percent('percent').notNull(),
+    sort: smallint('sort').notNull(),
+    status: text('status', { enum: POS_STATUSES }).notNull().default('ACTIVE'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('pos_loyalty_tiers_from')
+      .on(t.fromAmount)
+      .where(sql`${t.status} = 'ACTIVE'`),
+    check('pos_loyalty_tiers_status', inList(t.status, POS_STATUSES)),
+    check(
+      'pos_loyalty_tiers_name',
+      sql`length(${t.name}) BETWEEN 1 AND ${lim(LOYALTY_LIMITS.maxTierName)}`,
+    ),
+    check(
+      'pos_loyalty_tiers_terms',
+      sql`${t.fromAmount} >= 0 AND ${t.fromAmount} = trunc(${t.fromAmount}) AND ${t.fromAmount} <= ${lim(LOYALTY_LIMITS.maxTierFrom)} AND ${t.percent} > 0 AND ${t.percent} <= 100`,
+    ),
+  ],
+);
+
+/**
+ * A bonus card member (ADR-0112): a person registered at the office, found at the till by the phone
+ * and spending with a four-digit PIN (its argon2 hash, keyed like a cashier's). `balance` and
+ * `lifetime_spend` are caches of the entries, written under the row's lock. Blocked, never deleted.
+ */
+export const posLoyaltyMembers = pgTable(
+  'pos_loyalty_members',
+  {
+    id: id(),
+    name: text('name').notNull(),
+    /** E.164, one member per phone. */
+    phone: text('phone').notNull(),
+    pinHash: text('pin_hash').notNull(),
+    /** Grows with every new PIN: the till's lock of the old one no longer applies. */
+    pinVersion: integer('pin_version').notNull().default(1),
+    pinSetAt: timestamp('pin_set_at', { withTimezone: true }).notNull().defaultNow(),
+    regNo: text('reg_no'),
+    birthDate: date('birth_date', { mode: 'string' }),
+    gender: text('gender', { enum: GENDERS }),
+    note: text('note'),
+    status: text('status', { enum: LOYALTY_MEMBER_STATUSES }).notNull().default('ACTIVE'),
+    balance: money('balance')
+      .notNull()
+      .default(sql`0`),
+    lifetimeSpend: money('lifetime_spend')
+      .notNull()
+      .default(sql`0`),
+    createdBy: userRef('created_by').notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('pos_loyalty_members_phone').on(t.phone),
+    index('pos_loyalty_members_name_idx').on(t.name, t.id),
+    check('pos_loyalty_members_status', inList(t.status, LOYALTY_MEMBER_STATUSES)),
+    check('pos_loyalty_members_gender', sql`${t.gender} IS NULL OR ${inList(t.gender, GENDERS)}`),
+    check('pos_loyalty_members_phone', sql`${t.phone} ~ '^[+]976[0-9]{8}$'`),
+    check(
+      'pos_loyalty_members_text',
+      sql`length(${t.name}) BETWEEN 1 AND ${lim(LOYALTY_LIMITS.maxName)} AND (${textLength(t.note, LOYALTY_LIMITS.maxNote)}) AND (${textLength(t.regNo, REG_NO_MAX_LENGTH)})`,
+    ),
+    check('pos_loyalty_members_pin', sql`length(${t.pinHash}) > 0 AND ${t.pinVersion} >= 1`),
+    check(
+      'pos_loyalty_members_money',
+      sql`${t.balance} = trunc(${t.balance}) AND ${t.lifetimeSpend} >= 0`,
+    ),
+  ],
+);
+
+/**
+ * A member's points history (ADR-0112), append-only: a sale's earn (with the spend it adds to the
+ * lifetime) and spend, a return's points taken back and given back, an admin's adjustment with its
+ * reason and journal entry. Σ points = the member's balance; Σ spend_delta = the lifetime spend.
+ */
+export const posLoyaltyEntries = pgTable(
+  'pos_loyalty_entries',
+  {
+    id: id(),
+    memberId: ref('member_id')
+      .notNull()
+      .references(() => posLoyaltyMembers.id),
+    kind: text('kind', { enum: LOYALTY_ENTRY_KINDS }).notNull(),
+    /** Signed whole points: + earned or given back or added, − spent or taken back or removed. */
+    points: money('points').notNull(),
+    spendDelta: money('spend_delta')
+      .notNull()
+      .default(sql`0`),
+    saleId: ref('sale_id').references(() => posSales.id),
+    /** The tier's percent an EARN applied. */
+    percent: percent('percent'),
+    reason: text('reason'),
+    /** An ADJUST's journal entry (`fin.journal_entries`): a plain id, no FK leaves `fin`. */
+    journalEntryId: ref('journal_entry_id'),
+    journalNumber: text('journal_number'),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('pos_loyalty_entries_member_idx').on(t.memberId, t.id),
+    index('pos_loyalty_entries_sale_idx').on(t.saleId),
+    check('pos_loyalty_entries_kind', inList(t.kind, LOYALTY_ENTRY_KINDS)),
+    check('pos_loyalty_entries_whole', sql`${t.points} = trunc(${t.points})`),
+    check(
+      'pos_loyalty_entries_sign',
+      sql`(${t.kind} = 'EARN' AND ${t.points} >= 0 AND ${t.spendDelta} >= 0) OR (${t.kind} = 'SPEND' AND ${t.points} < 0 AND ${t.spendDelta} = 0) OR (${t.kind} = 'RETURN_EARN' AND ${t.points} <= 0 AND ${t.spendDelta} <= 0) OR (${t.kind} = 'RETURN_SPEND' AND ${t.points} > 0 AND ${t.spendDelta} = 0) OR (${t.kind} = 'ADJUST' AND ${t.points} <> 0 AND ${t.spendDelta} = 0)`,
+    ),
+    check(
+      'pos_loyalty_entries_source',
+      sql`(${t.kind} = 'ADJUST') = (${t.saleId} IS NULL) AND (${t.kind} = 'ADJUST') = (${t.reason} IS NOT NULL) AND (${t.kind} = 'ADJUST') = (${t.createdBy} IS NOT NULL) AND (${t.kind} = 'EARN') = (${t.percent} IS NOT NULL) AND (${t.journalEntryId} IS NULL) = (${t.journalNumber} IS NULL) AND (${t.journalEntryId} IS NULL OR ${t.kind} = 'ADJUST') AND (${textLength(t.reason, LOYALTY_LIMITS.maxReason)})`,
+    ),
+  ],
+);
+
+/**
+ * A member's part of a till sale or return (ADR-0112), as the edge sent it: the money base, the
+ * tier's percent, the points earned, spent, given back and taken back; and what the centre found
+ * wrong (the card blocked, more spent than the balance it knows): the sale is kept and listed for
+ * «Шалгасан».
+ */
+export const posSaleLoyalty = pgTable(
+  'pos_sale_loyalty',
+  {
+    id: id(),
+    saleId: ref('sale_id')
+      .notNull()
+      .references(() => posSales.id),
+    memberId: ref('member_id')
+      .notNull()
+      .references(() => posLoyaltyMembers.id),
+    kind: text('kind', { enum: SALE_KINDS }).notNull(),
+    earnBase: money('earn_base').notNull(),
+    percent: percent('percent').notNull(),
+    earned: money('earned').notNull(),
+    spent: money('spent').notNull(),
+    givenBack: money('given_back').notNull(),
+    clawback: money('clawback').notNull(),
+    spendDelta: money('spend_delta').notNull(),
+    /** The member's balance after this document, as the centre counted it. */
+    balanceAfter: money('balance_after').notNull(),
+    issue: text('issue', { enum: LOYALTY_ISSUES }),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    reviewedBy: userRef('reviewed_by'),
+    reviewNote: text('review_note'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('pos_sale_loyalty_sale').on(t.saleId),
+    index('pos_sale_loyalty_member_idx').on(t.memberId, t.id),
+    index('pos_sale_loyalty_issue_idx')
+      .on(t.id)
+      .where(sql`${t.issue} IS NOT NULL AND ${t.reviewedAt} IS NULL`),
+    check('pos_sale_loyalty_kind', inList(t.kind, SALE_KINDS)),
+    check('pos_sale_loyalty_issue', sql`${t.issue} IS NULL OR ${inList(t.issue, LOYALTY_ISSUES)}`),
+    check(
+      'pos_sale_loyalty_money',
+      sql`${t.earnBase} >= 0 AND ${t.percent} >= 0 AND ${t.earned} >= 0 AND ${t.spent} >= 0 AND ${t.givenBack} >= 0 AND ${t.clawback} >= 0 AND ${t.earned} = trunc(${t.earned}) AND ${t.spent} = trunc(${t.spent}) AND ${t.givenBack} = trunc(${t.givenBack}) AND ${t.clawback} = trunc(${t.clawback}) AND ${t.balanceAfter} = trunc(${t.balanceAfter})`,
+    ),
+    check(
+      'pos_sale_loyalty_shape',
+      sql`(${t.kind} = 'SALE' AND ${t.givenBack} = 0 AND ${t.clawback} = 0 AND ${t.spendDelta} = ${t.earnBase}) OR (${t.kind} = 'RETURN' AND ${t.earned} = 0 AND ${t.spent} = 0 AND ${t.spendDelta} <= 0)`,
+    ),
+    check(
+      'pos_sale_loyalty_review',
       sql`(${t.reviewedAt} IS NULL) = (${t.reviewedBy} IS NULL) AND (${t.reviewedAt} IS NULL OR ${t.issue} IS NOT NULL) AND (${textLength(t.reviewNote, POS_LIMITS.maxNote)})`,
     ),
   ],

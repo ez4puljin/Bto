@@ -22,6 +22,7 @@ import { CustomersService } from '../../partners';
 import {
   posEdgeNodes,
   posSaleLines,
+  posSaleLoyalty,
   posSaleVouchers,
   posSales,
   posShifts,
@@ -236,6 +237,8 @@ export interface PosAttention {
   creditToCheck: number;
   /** Codes a till took that were used twice, stopped or out of date, not checked (ADR-0110). */
   vouchersToCheck: number;
+  /** Bonus card sales on a blocked card or past the balance, not checked yet (ADR-0112). */
+  loyaltyToCheck: number;
 }
 
 type ShiftRow = typeof posShifts.$inferSelect;
@@ -575,10 +578,15 @@ export class PosQueryService {
       .select({ count: sql<string>`count(*)` })
       .from(posSaleVouchers)
       .where(sql`${posSaleVouchers.issue} IS NOT NULL AND ${posSaleVouchers.reviewedAt} IS NULL`);
+    const [loyalty] = await this.db
+      .select({ count: sql<string>`count(*)` })
+      .from(posSaleLoyalty)
+      .where(sql`${posSaleLoyalty.issue} IS NOT NULL AND ${posSaleLoyalty.reviewedAt} IS NULL`);
     const int = (value: string | undefined) => Number.parseInt(value ?? '0', 10);
     return {
       creditToCheck: int(credit?.count),
       vouchersToCheck: int(vouchers?.count),
+      loyaltyToCheck: int(loyalty?.count),
       openShifts: int(shifts?.open),
       shiftsToHandOver: int(shifts?.closed),
       openShortfalls: int(shortfalls?.count),
@@ -629,6 +637,10 @@ export class PosQueryService {
               creditSales: row.creditSales,
               creditRefunds: row.creditRefunds,
               voucherSales: row.voucherSales,
+              pointsSales: row.pointsSales,
+              pointsRefunds: row.pointsRefunds,
+              pointsEarned: row.pointsEarned,
+              pointsClawback: row.pointsClawback,
               transferSales: row.transferSales,
               transferRefunds: row.transferRefunds,
             };

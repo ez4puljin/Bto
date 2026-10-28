@@ -93,7 +93,7 @@ describe('fin-bridge', () => {
       required_control: string;
       requires_tax_code: boolean;
     }>('SELECT code, required_control, requires_tax_code FROM fin.posting_keys ORDER BY code');
-    expect(keys).toHaveLength(34);
+    expect(keys).toHaveLength(36);
     expect(keys.filter((k) => k.requires_tax_code).map((k) => k.code)).toEqual([
       'CITY_TAX_OUTPUT',
       'VAT_INPUT',
@@ -469,6 +469,40 @@ describe('fin-bridge', () => {
       expect(
         await count(
           `fin.posting_rules WHERE posting_key IN ('VOUCHER_CLEARING', 'VOUCHER_BREAKAGE')`,
+        ),
+      ).toBe(2);
+    } finally {
+      await admin.query('ROLLBACK');
+    }
+  });
+
+  it('replays the bonus card’s accounts (0051_pos_loyalty data section)', async () => {
+    const file = join(__dirname, '../../src/db/migrations/0051_pos_loyalty.sql');
+    const text = readFileSync(file, 'utf8');
+    const statements = text
+      .slice(text.indexOf('-- pos_loyalty_data:begin'), text.indexOf('-- pos_loyalty_data:end'))
+      .split('--> statement-breakpoint')
+      .map((part) => part.trim())
+      .filter((part) => part.replace(/^--.*$/gm, '').trim().length > 0);
+    await admin.query('BEGIN');
+    try {
+      // A database of before ADR-0112: no bonus card accounts, keys or rules.
+      await admin.query('SET LOCAL session_replication_role = replica');
+      await admin.query(
+        `DELETE FROM fin.posting_rules WHERE posting_key IN ('LOYALTY_LIABILITY', 'LOYALTY_EXPENSE')`,
+      );
+      await admin.query(
+        `DELETE FROM fin.posting_keys WHERE code IN ('LOYALTY_LIABILITY', 'LOYALTY_EXPENSE')`,
+      );
+      await admin.query(`DELETE FROM fin.accounts WHERE code IN ('320301', '730301')`);
+      await admin.query('SET LOCAL session_replication_role = origin');
+      for (const statement of statements) await admin.query(statement);
+      for (const statement of statements) await admin.query(statement);
+      expect(await count(`fin.accounts WHERE code = '320301' AND kind = 'LIABILITY'`)).toBe(1);
+      expect(await count(`fin.accounts WHERE code = '730301' AND kind = 'EXPENSE'`)).toBe(1);
+      expect(
+        await count(
+          `fin.posting_rules WHERE posting_key IN ('LOYALTY_LIABILITY', 'LOYALTY_EXPENSE')`,
         ),
       ).toBe(2);
     } finally {

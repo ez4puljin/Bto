@@ -207,6 +207,9 @@ function ReturnsPanel(props: {
           {sale.withinWindow ? null : (
             <KioskAlert>{t('posKiosk.returns.outOfWindow', { days: sale.windowDays })}</KioskAlert>
           )}
+          {sale.loyalty ? (
+            <KioskAlert tone="info">{t('posKiosk.loyalty.returnNote')}</KioskAlert>
+          ) : null}
           <ul className="max-h-[min(22rem,45svh)] divide-y divide-border overflow-y-auto rounded-xl ring-1 ring-border">
             {sale.lines.map((line) => {
               const left = new Decimal(line.returnable);

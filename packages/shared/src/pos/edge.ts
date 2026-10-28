@@ -20,6 +20,7 @@ import type {
   TenderKind,
   VoidReason,
 } from './index';
+import type { LoyaltyMemberStatus } from './loyalty';
 import type { VoucherEffect, VoucherKind, VoucherRefusal } from './vouchers';
 
 /*
@@ -77,6 +78,23 @@ export interface SaleVoucherWire {
   amount: string;
 }
 
+/**
+ * A bonus card member's part of a sale or a return (ADR-0112). On a SALE: the money base it earned
+ * on, the tier's percent, the points earned and spent (its POINTS tender); `spendDelta` = the base.
+ * On a RETURN: the points given back (its POINTS tender), the earned points taken back, and
+ * `spendDelta` = minus the money returned. `earned` / `spent` are 0 on a return.
+ */
+export interface SaleLoyaltyWire {
+  memberId: number;
+  earnBase: string;
+  percent: string;
+  earned: string;
+  spent: string;
+  givenBack: string;
+  clawback: string;
+  spendDelta: string;
+}
+
 export interface EbarimtFactsWire {
   status: EbarimtStatus;
   ddtd: string | null;
@@ -106,6 +124,8 @@ export interface SaleDocWire {
   customerId?: number | null;
   /** The coupons and partner vouchers the till took (ADR-0110); absent from an older edge. */
   vouchers?: SaleVoucherWire[];
+  /** The bonus card member's points (ADR-0112); absent or null without a member. */
+  loyalty?: SaleLoyaltyWire | null;
   lines: SaleDocLineWire[];
   tenders: TenderWire[];
   subtotal: string;
@@ -403,6 +423,41 @@ export interface PosVoucherFeed {
 export type VoucherFeedResponseWire =
   { changed: true; feed: PosVoucherFeed } | { changed: false; version: string };
 
+/** A bonus card tier as the till applies it (ADR-0112). */
+export interface PosLoyaltyTierFacts {
+  id: number;
+  name: string;
+  fromAmount: string;
+  percent: string;
+}
+
+/**
+ * A bonus card member as the till knows it (ADR-0112): the PIN's argon2 hash (keyed with the POS
+ * pepper, like a cashier's), its version (a new PIN clears the till's lock), the balance and the
+ * lifetime spend as the centre counted them when the feed was built.
+ */
+export interface PosLoyaltyMemberFacts {
+  id: number;
+  name: string;
+  phone: string;
+  pinHash: string;
+  pinVersion: number;
+  status: LoyaltyMemberStatus;
+  balance: string;
+  lifetime: string;
+}
+
+/** The bonus card (`GET /api/v1/pos/sync/loyalty?since=`), apart from the snapshot. */
+export interface PosLoyaltyFeed {
+  version: string;
+  generatedAt: string;
+  tiers: PosLoyaltyTierFacts[];
+  members: PosLoyaltyMemberFacts[];
+}
+
+export type LoyaltyFeedResponseWire =
+  { changed: true; feed: PosLoyaltyFeed } | { changed: false; version: string };
+
 /**
  * `POST /api/v1/pos/sync/credit-check`: the centre's answer under the customer lock (ADR-0109 #7),
  * counting what this edge sold on credit and has not replayed yet.
@@ -600,6 +655,9 @@ export interface EdgeShiftSummary {
   creditRefunds?: string;
   /** ADR-0110: paid by partner vouchers; absent on older edges. */
   voucherSales?: string;
+  /** ADR-0112: paid with bonus points, and given back as points; absent on older edges. */
+  pointsSales?: string;
+  pointsRefunds?: string;
   /** ADR-0111: bank transfers; and every payment type's sales less refunds, in the till's order. */
   transferSales?: string;
   payments?: EdgePaymentTotal[];
@@ -763,6 +821,29 @@ export interface EdgeSaleRequest {
   codes?: string[];
   /** A supervisor's PIN, once for the sale's codes (required with codes). */
   voucherApproval?: EdgeApproval | null;
+  /**
+   * The bonus card member (ADR-0112), found by phone; `pin` is the member's own PIN, required when
+   * a POINTS tender spends points.
+   */
+  member?: { id: number; pin?: string | null } | null;
+}
+
+/** A bonus card member as the till shows it (ADR-0112), from the edge's feed and its own sales. */
+export interface EdgeMember {
+  id: number;
+  name: string;
+  /** The phone with its middle digits hidden. */
+  phone: string;
+  status: LoyaltyMemberStatus;
+  /** The points this edge may spend: the centre's balance and this edge's sales not yet counted. */
+  balance: string;
+  lifetime: string;
+  tier: { name: string; percent: string } | null;
+  nextTier: { name: string; percent: string; fromAmount: string; left: string } | null;
+}
+
+export interface EdgeMemberPinRequest {
+  pin: string;
 }
 
 /** A customer the till may sell to on credit (ADR-0109), from the edge's feed. */
@@ -853,6 +934,8 @@ export interface EdgeReturnSale {
   credit?: { customerName: string; left: string } | null;
   /** ADR-0110: a sale paid partly by vouchers gives back at most this (its cash and card left). */
   refundable?: string | null;
+  /** ADR-0112: a bonus card sale — its member and the points it spent and earned. */
+  loyalty?: { memberName: string; spent: string; earned: string } | null;
   lines: EdgeReturnableLine[];
 }
 
@@ -903,6 +986,21 @@ export interface EdgeReceipt {
   change: string;
   /** ADR-0110: the coupons and partner vouchers taken (amount = what each took off or paid). */
   vouchers?: { code: string; kind: VoucherKind; name: string; amount: string }[];
+  /**
+   * ADR-0112: the bonus card — the member, the tier the sale earned at, the points earned, spent,
+   * given back and taken back, and the balance after this document as the edge knows it.
+   */
+  loyalty?: {
+    memberName: string;
+    phone: string;
+    tierName: string | null;
+    percent: string;
+    earned: string;
+    spent: string;
+    givenBack: string;
+    clawback: string;
+    balance: string;
+  } | null;
   /**
    * A sale with credit (ADR-0109): the customer it is charged to and how much; printed as a credit
    * slip in two copies, without VAT, QR or lottery. Absent or null otherwise.

@@ -67,6 +67,8 @@ export const PERMISSIONS = [
   'pos.manage',
   'pos.till.operate',
   'pos.till.supervise',
+  // The bonus card (ADR-0112): registering members, their PINs, blocks and hand adjustments.
+  'pos.loyalty.manage',
   // App notices (ADR-0062 #5): writing, listing and withdrawing the notices the rep app shows.
   'notifications.send',
   // The customer app's home (ADR-0092 #9): banners, the segments it shows and category pictures.
@@ -127,6 +129,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'sales.orders.manage',
     'finance.read',
     'pos.read',
+    // The office registers bonus card members and resets their PINs (owner 2026-10-28, ADR-0112).
+    'pos.loyalty.manage',
   ],
   PROCUREMENT: [],
   // Warehouse staff count goods in and out but never see costs; an admin approves adjustments.

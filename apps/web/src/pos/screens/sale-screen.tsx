@@ -3,6 +3,7 @@ import { cleanBarcode } from '@tugeel/shared/gtin';
 import { Decimal } from '@tugeel/shared/money';
 import {
   type EdgeApproval,
+  type EdgeMember,
   type EdgeParkedBasket,
   type EdgeProductHit,
   type EdgePrintableReceipt,
@@ -18,6 +19,7 @@ import {
   Archive,
   ArchiveRestore,
   CalendarCheck,
+  Gift,
   History,
   ReceiptText,
   LayoutGrid,
@@ -69,6 +71,7 @@ import { ReceiptDialog } from '../components/receipt';
 import { usePrint } from '../components/print-context';
 import { ReturnsDialog } from '../components/returns-dialog';
 import { SearchDialog } from '../components/search-dialog';
+import { MemberDialog } from '../components/member-dialog';
 import { VoucherDialog } from '../components/voucher-dialog';
 import { edgeProblemOf } from '../edge-client';
 import { useCredentials, useKiosk } from '../kiosk-context';
@@ -91,13 +94,14 @@ type Dialogs =
   | 'ebarimt'
   | 'approval'
   | 'vouchers'
+  | 'member'
   | null;
 
 /**
  * The keys of the till's tools (ADR-0104); F12 would open the browser's tools, F6 its bar. F2: the
- * coupons and partner vouchers (ADR-0110).
+ * coupons and partner vouchers (ADR-0110). F3: the bonus card (ADR-0112).
  */
-const TOOL_KEYS = new Set(['F2', 'F4', 'F6', 'F7', 'F8', 'F9', 'F10', 'F12']);
+const TOOL_KEYS = new Set(['F2', 'F3', 'F4', 'F6', 'F7', 'F8', 'F9', 'F10', 'F12']);
 
 /**
  * The till's main screen (Erxes-like): the scanner always adds to the cart, «Бараа хайх (F6)»
@@ -139,6 +143,8 @@ export function SaleScreen(props: {
 
   // ADR-0110: the coupons and partner vouchers taken, in the order scanned; gone with the cart.
   const [codes, setCodes] = useState<string[]>([]);
+  // ADR-0112: the bonus card attached to the sale, until it is paid or cancelled.
+  const [member, setMember] = useState<EdgeMember | null>(null);
   const addCode = useVoucherAdd();
   const quote = useQuote(cart.wire, codes);
   const empty = cart.lines.length === 0;
@@ -222,7 +228,7 @@ export function SaleScreen(props: {
 
   const startPayment = useCallback(
     (data: EdgeQuoteResponse, given: EdgeApproval | null) => {
-      const key = JSON.stringify([cart.wire, codes]);
+      const key = JSON.stringify([cart.wire, codes, member?.id ?? null]);
       if (pending.current?.key !== key) pending.current = { key, clientId: randomUuid() };
       setAttempt({
         clientId: pending.current.clientId,
@@ -231,10 +237,11 @@ export function SaleScreen(props: {
         codes,
         vouchers: data.vouchers ?? [],
         voucherApproval: given,
+        member,
       });
       setDialog('pay');
     },
-    [cart.wire, codes],
+    [cart.wire, codes, member],
   );
 
   /**
@@ -269,6 +276,7 @@ export function SaleScreen(props: {
   const paid = (done: EdgePrintableReceipt) => {
     pending.current = null;
     setCodes([]);
+    setMember(null);
     cart.clear();
     setScanError(null);
     setReceipt(done);
@@ -360,6 +368,7 @@ export function SaleScreen(props: {
 
   const clearSale = useCallback(() => {
     setCodes([]);
+    setMember(null);
     cart.clear();
     pending.current = null;
     setScanError(null);
@@ -495,6 +504,7 @@ export function SaleScreen(props: {
         if (current.dialog !== null) return;
         setNotice(null);
         if (event.key === 'F6') setDialog('search');
+        else if (event.key === 'F3') setDialog('member');
         else if (event.key === 'F2') {
           if (current.cartEmpty) return;
           setDialog('vouchers');
@@ -794,6 +804,23 @@ export function SaleScreen(props: {
                 ? t('posKiosk.vouchers.buttonCount', { count: codes.length })
                 : t('posKiosk.vouchers.button')}
             </Button>
+            <Button
+              type="button"
+              variant={member ? 'secondary' : 'outline'}
+              className="col-span-2 h-11"
+              onMouseDown={keepFocus}
+              onClick={() => setDialog('member')}
+            >
+              <Gift />
+              <span className="truncate">
+                {member
+                  ? t('posKiosk.loyalty.buttonMember', {
+                      name: member.name,
+                      points: formatMnt(member.balance),
+                    })
+                  : t('posKiosk.loyalty.button')}
+              </span>
+            </Button>
           </div>
           <div className="mt-auto flex flex-col gap-3">
             <Button
@@ -835,6 +862,13 @@ export function SaleScreen(props: {
         codes={codes}
         onCodes={setCodes}
         onPay={(data) => openPayment(data)}
+        onClose={closeDialog}
+        onCloseAutoFocus={refocus}
+      />
+      <MemberDialog
+        open={dialog === 'member'}
+        member={member}
+        onAttach={setMember}
         onClose={closeDialog}
         onCloseAutoFocus={refocus}
       />

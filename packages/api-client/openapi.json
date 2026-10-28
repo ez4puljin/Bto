@@ -20986,6 +20986,693 @@
         ]
       }
     },
+    "/api/v1/pos/loyalty-members": {
+      "get": {
+        "operationId": "PosLoyaltyMembers_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "BLOCKED"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "A name, or digits of the phone",
+            "schema": {
+              "maxLength": 80,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoyaltyMemberPageDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      },
+      "post": {
+        "operationId": "PosLoyaltyMembers_register",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosLoyaltyMemberRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosLoyaltyMember"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/loyalty-members/{id}": {
+      "get": {
+        "operationId": "PosLoyaltyMembers_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosLoyaltyMember"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      },
+      "patch": {
+        "operationId": "PosLoyaltyMembers_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosLoyaltyMemberUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosLoyaltyMember"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/loyalty-members/{id}/entries": {
+      "get": {
+        "operationId": "PosLoyaltyMembers_entries",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoyaltyEntryPageDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/loyalty-members/{id}/pin": {
+      "post": {
+        "operationId": "PosLoyaltyMembers_setPin",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosLoyaltyMemberPin"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosLoyaltyMember"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A new four-digit PIN; the till's lock of the old one ends.",
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/loyalty-members/{id}/block": {
+      "post": {
+        "operationId": "PosLoyaltyMembers_block",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosLoyaltyMember"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/loyalty-members/{id}/unblock": {
+      "post": {
+        "operationId": "PosLoyaltyMembers_unblock",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosLoyaltyMember"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/loyalty-members/{id}/adjust": {
+      "post": {
+        "operationId": "PosLoyaltyMembers_adjust",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosLoyaltyAdjustment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosLoyaltyMember"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Points added or removed by hand with a reason, booked as a journal entry.",
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/loyalty-tiers": {
+      "get": {
+        "operationId": "PosLoyaltyTiers_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PosLoyaltyTier"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      },
+      "put": {
+        "operationId": "PosLoyaltyTiers_replace",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosLoyaltyTiersRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PosLoyaltyTier"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/sale-loyalty": {
+      "get": {
+        "operationId": "PosSaleLoyalty_toCheck",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PosSaleLoyalty"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/sale-loyalty/{id}/review": {
+      "post": {
+        "operationId": "PosSaleLoyalty_review",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosSaleLoyaltyReview"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosSaleLoyalty"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
     "/api/v1/pos/payment-types": {
       "get": {
         "operationId": "PosPaymentTypes_list",
@@ -21266,6 +21953,54 @@
           }
         ],
         "summary": "The credit check before a till's credit sale, under the customer's lock; writes nothing.",
+        "tags": [
+          "pos-sync"
+        ]
+      }
+    },
+    "/api/v1/pos/sync/loyalty": {
+      "get": {
+        "operationId": "PosSync_loyaltyFeed",
+        "parameters": [
+          {
+            "name": "since",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "edge-token": []
+          }
+        ],
+        "summary": "The bonus card's members and tiers (ADR-0112), apart from the snapshot like the customers;\n`LoyaltyFeedResponseWire` of @tugeel/shared/pos.",
         "tags": [
           "pos-sync"
         ]
@@ -25428,6 +26163,7 @@
           "pos.manage",
           "pos.till.operate",
           "pos.till.supervise",
+          "pos.loyalty.manage",
           "notifications.send",
           "customer.home.manage",
           "reports.view",
@@ -41157,7 +41893,9 @@
               "ISSUE_OTHER",
               "RETAINED_EARNINGS",
               "VOUCHER_CLEARING",
-              "VOUCHER_BREAKAGE"
+              "VOUCHER_BREAKAGE",
+              "LOYALTY_LIABILITY",
+              "LOYALTY_EXPENSE"
             ],
             "type": "string"
           },
@@ -41300,7 +42038,9 @@
               "ISSUE_OTHER",
               "RETAINED_EARNINGS",
               "VOUCHER_CLEARING",
-              "VOUCHER_BREAKAGE"
+              "VOUCHER_BREAKAGE",
+              "LOYALTY_LIABILITY",
+              "LOYALTY_EXPENSE"
             ],
             "type": "string",
             "description": "null takes the role away"
@@ -44125,7 +44865,8 @@
               "CARD",
               "TRANSFER",
               "CREDIT",
-              "VOUCHER"
+              "VOUCHER",
+              "POINTS"
             ],
             "type": "string"
           },
@@ -44764,7 +45505,8 @@
               "CARD",
               "TRANSFER",
               "CREDIT",
-              "VOUCHER"
+              "VOUCHER",
+              "POINTS"
             ],
             "type": "string"
           },
@@ -46160,6 +46902,537 @@
           }
         }
       },
+      "PosLoyaltyTierOfMember": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "percent": {
+            "type": "string",
+            "example": "1.00"
+          }
+        },
+        "required": [
+          "name",
+          "percent"
+        ]
+      },
+      "PosLoyaltyNextTier": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "percent": {
+            "type": "string",
+            "example": "2.00"
+          },
+          "fromAmount": {
+            "type": "string",
+            "example": "20000000.00"
+          },
+          "left": {
+            "type": "string",
+            "example": "1250000.00",
+            "description": "Spend left to reach it"
+          }
+        },
+        "required": [
+          "name",
+          "percent",
+          "fromAmount",
+          "left"
+        ]
+      },
+      "PosLoyaltyMember": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+97699112233"
+          },
+          "regNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "birthDate": {
+            "type": "string",
+            "nullable": true
+          },
+          "gender": {
+            "nullable": true,
+            "enum": [
+              "MALE",
+              "FEMALE"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "BLOCKED"
+            ],
+            "type": "string"
+          },
+          "balance": {
+            "type": "string",
+            "example": "12345.00"
+          },
+          "lifetimeSpend": {
+            "type": "string",
+            "example": "8750000.00"
+          },
+          "tier": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PosLoyaltyTierOfMember"
+              }
+            ]
+          },
+          "nextTier": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PosLoyaltyNextTier"
+              }
+            ]
+          },
+          "pinSetAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "phone",
+          "regNo",
+          "birthDate",
+          "gender",
+          "note",
+          "status",
+          "balance",
+          "lifetimeSpend",
+          "tier",
+          "nextTier",
+          "pinSetAt",
+          "createdAt",
+          "createdByName"
+        ]
+      },
+      "LoyaltyMemberPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosLoyaltyMember"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "PosLoyaltyMemberRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "example": "Батбаяр Дорж"
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 20,
+            "example": "99112233"
+          },
+          "regNo": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 20
+          },
+          "birthDate": {
+            "type": "string",
+            "nullable": true,
+            "example": "1990-05-01"
+          },
+          "gender": {
+            "nullable": true,
+            "enum": [
+              "MALE",
+              "FEMALE"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          },
+          "pin": {
+            "type": "string",
+            "example": "1234",
+            "description": "Four digits"
+          }
+        },
+        "required": [
+          "name",
+          "phone",
+          "pin"
+        ]
+      },
+      "PosLoyaltyMemberUpdate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "example": "Батбаяр Дорж"
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 20,
+            "example": "99112233"
+          },
+          "regNo": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 20
+          },
+          "birthDate": {
+            "type": "string",
+            "nullable": true,
+            "example": "1990-05-01"
+          },
+          "gender": {
+            "nullable": true,
+            "enum": [
+              "MALE",
+              "FEMALE"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "name",
+          "phone"
+        ]
+      },
+      "PosLoyaltyEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "enum": [
+              "EARN",
+              "SPEND",
+              "RETURN_EARN",
+              "RETURN_SPEND",
+              "ADJUST"
+            ],
+            "type": "string"
+          },
+          "points": {
+            "type": "string",
+            "example": "400.00"
+          },
+          "spendDelta": {
+            "type": "string",
+            "example": "40000.00"
+          },
+          "saleId": {
+            "type": "number",
+            "nullable": true
+          },
+          "saleNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "percent": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "journalNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "points",
+          "spendDelta",
+          "saleId",
+          "saleNumber",
+          "percent",
+          "reason",
+          "journalNumber",
+          "createdAt",
+          "createdByName"
+        ]
+      },
+      "LoyaltyEntryPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosLoyaltyEntry"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "PosLoyaltyMemberPin": {
+        "type": "object",
+        "properties": {
+          "pin": {
+            "type": "string",
+            "example": "1234"
+          }
+        },
+        "required": [
+          "pin"
+        ]
+      },
+      "PosLoyaltyAdjustment": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "string",
+            "example": "5000",
+            "description": "Whole points; negative removes"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "example": "Төрсөн өдрийн бэлэг"
+          }
+        },
+        "required": [
+          "points",
+          "reason"
+        ]
+      },
+      "PosLoyaltyTier": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string",
+            "example": "Мөнгөн"
+          },
+          "fromAmount": {
+            "type": "string",
+            "example": "10000000.00"
+          },
+          "percent": {
+            "type": "string",
+            "example": "1.50"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "fromAmount",
+          "percent"
+        ]
+      },
+      "LoyaltyTierInputDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Null adds a tier"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "example": "Мөнгөн"
+          },
+          "fromAmount": {
+            "type": "string",
+            "example": "10000000",
+            "description": "Lifetime spend from, whole MNT"
+          },
+          "percent": {
+            "type": "string",
+            "example": "1.5"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "fromAmount",
+          "percent"
+        ]
+      },
+      "PosLoyaltyTiersRequest": {
+        "type": "object",
+        "properties": {
+          "tiers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LoyaltyTierInputDto"
+            }
+          }
+        },
+        "required": [
+          "tiers"
+        ]
+      },
+      "PosSaleLoyalty": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "saleId": {
+            "type": "number"
+          },
+          "saleNumber": {
+            "type": "string"
+          },
+          "soldAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "enum": [
+              "SALE",
+              "RETURN"
+            ],
+            "type": "string"
+          },
+          "memberId": {
+            "type": "number"
+          },
+          "memberName": {
+            "type": "string"
+          },
+          "earned": {
+            "type": "string"
+          },
+          "spent": {
+            "type": "string"
+          },
+          "givenBack": {
+            "type": "string"
+          },
+          "clawback": {
+            "type": "string"
+          },
+          "balanceAfter": {
+            "type": "string"
+          },
+          "issue": {
+            "nullable": true,
+            "enum": [
+              "BLOCKED",
+              "OVERDRAWN"
+            ],
+            "type": "string"
+          },
+          "reviewedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "reviewNote": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "saleId",
+          "saleNumber",
+          "soldAt",
+          "kind",
+          "memberId",
+          "memberName",
+          "earned",
+          "spent",
+          "givenBack",
+          "clawback",
+          "balanceAfter",
+          "issue",
+          "reviewedAt",
+          "reviewNote"
+        ]
+      },
+      "PosSaleLoyaltyReview": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        }
+      },
       "PosPaymentType": {
         "type": "object",
         "properties": {
@@ -46278,6 +47551,10 @@
           "vouchersToCheck": {
             "type": "number",
             "description": "Codes used twice, stopped or out of date, not checked (ADR-0110)"
+          },
+          "loyaltyToCheck": {
+            "type": "number",
+            "description": "Bonus card sales on a blocked card or overdrawn (ADR-0112)"
           }
         },
         "required": [
@@ -46287,7 +47564,8 @@
           "rejections",
           "receiptsToCheck",
           "creditToCheck",
-          "vouchersToCheck"
+          "vouchersToCheck",
+          "loyaltyToCheck"
         ]
       },
       "PosDayCountRow": {
@@ -46491,7 +47769,8 @@
               "CARD",
               "TRANSFER",
               "CREDIT",
-              "VOUCHER"
+              "VOUCHER",
+              "POINTS"
             ],
             "type": "string"
           },
@@ -46574,6 +47853,54 @@
           "kind",
           "face",
           "amount"
+        ]
+      },
+      "SaleDocLoyaltyDto": {
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "earnBase": {
+            "type": "string",
+            "example": "40000"
+          },
+          "percent": {
+            "type": "string",
+            "example": "1"
+          },
+          "earned": {
+            "type": "string",
+            "example": "400"
+          },
+          "spent": {
+            "type": "string",
+            "example": "10000"
+          },
+          "givenBack": {
+            "type": "string",
+            "example": "0"
+          },
+          "clawback": {
+            "type": "string",
+            "example": "0"
+          },
+          "spendDelta": {
+            "type": "string",
+            "example": "40000",
+            "description": "Negative on a return"
+          }
+        },
+        "required": [
+          "memberId",
+          "earnBase",
+          "percent",
+          "earned",
+          "spent",
+          "givenBack",
+          "clawback",
+          "spendDelta"
         ]
       },
       "PosEbarimtFacts": {
@@ -46709,6 +48036,16 @@
             "items": {
               "$ref": "#/components/schemas/PosSaleDocVoucher"
             }
+          },
+          "loyalty": {
+            "nullable": true,
+            "description": "ADR-0112",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SaleDocLoyaltyDto"
+              }
+            ]
           },
           "subtotal": {
             "type": "string",
@@ -51861,6 +53198,14 @@
           "POS_VOUCHER_WITH_CREDIT",
           "POS_RETURN_VOUCHER_PART",
           "POS_VOUCHER_NOTHING_TO_CHECK",
+          "POS_MEMBER_NOT_FOUND",
+          "POS_MEMBER_BLOCKED",
+          "POS_MEMBER_PHONE_TAKEN",
+          "POS_MEMBER_PIN_INVALID",
+          "POS_MEMBER_LOCKED",
+          "POS_POINTS_INSUFFICIENT",
+          "POS_POINTS_WITH_CREDIT",
+          "POS_LOYALTY_NOTHING_TO_CHECK",
           "EBARIMT_LOOKUP_UNAVAILABLE",
           "EBARIMT_TAXPAYER_NOT_FOUND",
           "EBARIMT_RECEIPT_STATE_INVALID",

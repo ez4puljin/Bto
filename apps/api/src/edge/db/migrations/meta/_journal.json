@@ -43,6 +43,13 @@
       "when": 1793147019618,
       "tag": "0004_vouchers",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793155156832,
+      "tag": "0006_loyalty",
+      "breakpoints": true
     }
   ]
 }

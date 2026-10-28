@@ -51,6 +51,10 @@ export const CHART_ROLES = [
   // it over, and the unspent rest of a voucher the partner pays for. Temporary codes until D16.
   'VOUCHER_CLEARING',
   'VOUCHER_BREAKAGE',
+  // The bonus card (ADR-0112): the points members hold, owed as a payment at the till, and their
+  // cost when earned. Temporary codes until D16.
+  'LOYALTY_LIABILITY',
+  'LOYALTY_EXPENSE',
 ] as const;
 export type ChartRole = (typeof CHART_ROLES)[number];
 
@@ -103,4 +107,7 @@ export const CHART_TEMPLATE: readonly ChartTemplateAccount[] = [
   // The till's partner vouchers (ADR-0110; temporary codes, TODO-VERIFY D16).
   { code: '120303', kind: 'ASSET', role: 'VOUCHER_CLEARING' },
   { code: '511040', kind: 'INCOME', role: 'VOUCHER_BREAKAGE' },
+  // The bonus card (ADR-0112; temporary codes, TODO-VERIFY D16).
+  { code: '320301', kind: 'LIABILITY', role: 'LOYALTY_LIABILITY' },
+  { code: '730301', kind: 'EXPENSE', role: 'LOYALTY_EXPENSE' },
 ];

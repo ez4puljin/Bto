@@ -12,6 +12,7 @@ import { edgeState } from '../db/schema';
 import { EbarimtService } from '../ebarimt/ebarimt.service';
 import { CentralClient, CentralError } from './central.client';
 import { CustomerStore } from './customer.store';
+import { LoyaltyStore } from './loyalty.store';
 import { OutboxService } from './outbox.service';
 import { SnapshotStore } from './snapshot.store';
 import { VoucherStore } from './voucher.store';
@@ -53,6 +54,7 @@ export class SyncRunner implements OnApplicationBootstrap, OnApplicationShutdown
     private readonly ebarimt: EbarimtService,
     private readonly customers: CustomerStore,
     private readonly vouchers: VoucherStore,
+    private readonly loyalty: LoyaltyStore,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -103,6 +105,7 @@ export class SyncRunner implements OnApplicationBootstrap, OnApplicationShutdown
       await this.noteContact(null);
       await this.pullCustomersOnce();
       await this.pullVouchersOnce();
+      await this.pullLoyaltyOnce();
       return answer.changed ? 'changed' : 'unchanged';
     } catch (error: unknown) {
       await this.noteContact(describe(error));
@@ -130,6 +133,18 @@ export class SyncRunner implements OnApplicationBootstrap, OnApplicationShutdown
       return answer.changed ? 'changed' : 'unchanged';
     } catch (error: unknown) {
       this.logger.warn({ error: describe(error) }, 'voucher feed not pulled');
+      return 'failed';
+    }
+  }
+
+  /** The bonus card's members and tiers alone (ADR-0112); a failure leaves the last ones in force. */
+  async pullLoyaltyOnce(): Promise<'changed' | 'unchanged' | 'failed'> {
+    try {
+      const answer = await this.central.loyalty(this.loyalty.version());
+      await this.loyalty.apply(answer.changed ? answer.feed : null);
+      return answer.changed ? 'changed' : 'unchanged';
+    } catch (error: unknown) {
+      this.logger.warn({ error: describe(error) }, 'bonus card feed not pulled');
       return 'failed';
     }
   }

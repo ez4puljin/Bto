@@ -12,10 +12,14 @@ import {
   type EdgeReceipt,
   type EdgeSaleRequest,
   lineVat,
+  loyaltyEarnBase,
+  maskPhone,
+  pointsEarned,
   POS_LIMITS,
   type PosVoucherFacts,
   posSaleNumber,
   type SaleDocWire,
+  type SaleLoyaltyWire,
   saleDocLinesOf,
   saleTotals,
   type SnapshotProduct,
@@ -40,6 +44,7 @@ import { TaxpayerClient } from '../ebarimt/taxpayer.client';
 import { CreditGate } from './credit-gate.service';
 import { CustomerStore } from './customer.store';
 import { KioskAuthService } from './kiosk-auth.service';
+import { LoyaltyStore } from './loyalty.store';
 import { OutboxService } from './outbox.service';
 import { nextSequence } from './sequences';
 import { EdgeShiftsService } from './shifts.service';
@@ -71,6 +76,7 @@ export class CheckoutService {
     private readonly credit: CreditGate,
     private readonly vouchers: VoucherStore,
     private readonly auth: KioskAuthService,
+    private readonly loyalty: LoyaltyStore,
   ) {}
 
   /**
@@ -228,6 +234,18 @@ export class CheckoutService {
     if (tenders.credit.gt(0) && taken.paid.gt(0)) {
       throw new AppError('POS_VOUCHER_WITH_CREDIT', 'a partner voucher and credit together', {});
     }
+    // ADR-0112: the bonus card member; spending points needs the member's own PIN, and a card
+    // never goes with credit (owner 2026-10-28).
+    const member = request.member ? this.loyalty.active(request.member.id) : null;
+    if (tenders.points.gt(0) && !member) {
+      throw new AppError('VALIDATION_FAILED', 'points are spent from a member’s card');
+    }
+    if (member && tenders.credit.gt(0)) {
+      throw new AppError('POS_POINTS_WITH_CREDIT', 'a bonus card and credit together', {});
+    }
+    if (member && tenders.points.gt(0)) {
+      await this.loyalty.checkPin(member.id, request.member?.pin);
+    }
     const customer = tenders.credit.gt(0)
       ? await this.creditCustomer(request, tenders.credit)
       : null;
@@ -254,6 +272,7 @@ export class CheckoutService {
       const soldAt = new Date();
       const day = businessDate(soldAt);
       const number = posSaleNumber(tillCode, day, await nextSequence(tx, `SALE:${tillCode}`, day));
+      const points = member ? await this.memberPart(tx, member.id, tenders) : null;
       const doc: SaleDocWire = {
         clientId: request.clientId,
         kind: 'SALE',
@@ -270,6 +289,7 @@ export class CheckoutService {
         refundsSaleClientId: null,
         customerId: customer?.id ?? null,
         vouchers: taken.doc,
+        loyalty: points?.wire ?? null,
         lines,
         tenders: tenders.wire,
         subtotal: totals.subtotal.toFixed(2),
@@ -332,6 +352,7 @@ export class CheckoutService {
               amount: tenders.credit.toFixed(2),
             }
           : null,
+        loyalty: points?.receipt ?? null,
         title: settings.receiptTitle ?? null,
         footer: settings.receiptFooter ?? null,
         ebarimt: issues
@@ -352,6 +373,10 @@ export class CheckoutService {
         transferAmount: tenders.transfer,
         customerId: customer?.id ?? null,
         voucherAmount: taken.paid,
+        memberId: member?.id ?? null,
+        pointsAmount: tenders.points,
+        pointsDelta: points?.delta ?? new Decimal(0),
+        spendDelta: points?.spend ?? new Decimal(0),
         vatTotal: totals.vatTotal,
         doc,
         receipt,
@@ -369,6 +394,7 @@ export class CheckoutService {
           cash: tenders.cash,
           card: tenders.card,
           voucher: taken.paid,
+          points: tenders.points,
           transfer: tenders.transfer,
           total: totals.total,
           vatTotal: totals.vatTotal,
@@ -419,6 +445,59 @@ export class CheckoutService {
       coupons,
     });
     return { inputs, result };
+  }
+
+  /**
+   * A member's part of a sale (ADR-0112), under the member's lock: the points spent must be on the
+   * card as this edge counts it (two tills at once included); the tier comes from the lifetime
+   * spend before the sale, and the sale earns floor(base × percent) on its cash, card and transfer.
+   */
+  private async memberPart(
+    tx: EdgeTx,
+    memberId: number,
+    tenders: { wire: readonly TenderWire[]; points: Decimal },
+  ): Promise<{
+    wire: SaleLoyaltyWire;
+    receipt: NonNullable<EdgeReceipt['loyalty']>;
+    delta: Decimal;
+    spend: Decimal;
+  }> {
+    await this.loyalty.lock(tx, memberId);
+    const standing = await this.loyalty.standing(memberId, tx);
+    if (tenders.points.gt(standing.balance)) {
+      throw new AppError('POS_POINTS_INSUFFICIENT', `member ${memberId} has fewer points`, {
+        available: Decimal.max(standing.balance, 0).toFixed(0),
+      });
+    }
+    const base = loyaltyEarnBase(tenders.wire);
+    const percent = new Decimal(standing.tier?.percent ?? 0);
+    const earned = pointsEarned(base, percent);
+    const spent = tenders.points;
+    return {
+      wire: {
+        memberId,
+        earnBase: base.toFixed(2),
+        percent: percent.toFixed(2),
+        earned: earned.toFixed(2),
+        spent: spent.toFixed(2),
+        givenBack: '0.00',
+        clawback: '0.00',
+        spendDelta: base.toFixed(2),
+      },
+      receipt: {
+        memberName: standing.member.name,
+        phone: maskPhone(standing.member.phone),
+        tierName: standing.tier?.name ?? null,
+        percent: percent.toFixed(2),
+        earned: earned.toFixed(2),
+        spent: spent.toFixed(2),
+        givenBack: '0.00',
+        clawback: '0.00',
+        balance: standing.balance.minus(spent).plus(earned).toFixed(2),
+      },
+      delta: earned.minus(spent),
+      spend: base,
+    };
   }
 
   /** The supervisor who approved the sale's codes: required for every sale with one. */
@@ -490,6 +569,7 @@ export class CheckoutService {
     card: Decimal;
     transfer: Decimal;
     credit: Decimal;
+    points: Decimal;
     change: Decimal;
   } {
     // ADR-0110: nothing to tender when partner vouchers pay the whole sale.
@@ -507,6 +587,7 @@ export class CheckoutService {
       TRANSFER: new Decimal(0),
       CREDIT: new Decimal(0),
       VOUCHER: new Decimal(0),
+      POINTS: new Decimal(0),
     };
     let tendered = new Decimal(0);
     const wire = request.tenders.map((tender, index): TenderWire => {
@@ -521,6 +602,9 @@ export class CheckoutService {
       const amount = new Decimal(tender.amount);
       if (!amount.isFinite() || amount.isNegative() || amount.decimalPlaces() > 2) {
         throw new AppError('VALIDATION_FAILED', `bad tender amount ${tender.amount}`);
+      }
+      if (kind === 'POINTS' && !amount.isInteger()) {
+        throw new AppError('VALIDATION_FAILED', 'points are spent whole');
       }
       sums[kind] = sums[kind].plus(amount);
       const named = { paymentTypeId: type?.id ?? null, paymentTypeName: type?.name ?? null };
@@ -553,7 +637,10 @@ export class CheckoutService {
     if (wire.filter((tender) => tender.kind === 'CREDIT').length > 1) {
       throw new AppError('VALIDATION_FAILED', 'a sale has at most one credit part');
     }
-    const paid = sums.CASH.plus(sums.CARD).plus(sums.TRANSFER).plus(sums.CREDIT);
+    if (wire.filter((tender) => tender.kind === 'POINTS').length > 1) {
+      throw new AppError('VALIDATION_FAILED', 'a sale has at most one points part');
+    }
+    const paid = sums.CASH.plus(sums.CARD).plus(sums.TRANSFER).plus(sums.CREDIT).plus(sums.POINTS);
     if (!paid.eq(total)) {
       throw new AppError('POS_TOTALS_MISMATCH', 'the tenders do not make the total', {
         total: total.toFixed(2),
@@ -567,6 +654,7 @@ export class CheckoutService {
       card: sums.CARD,
       transfer: sums.TRANSFER,
       credit: sums.CREDIT,
+      points: sums.POINTS,
       change: tendered.minus(sums.CASH),
     };
   }

@@ -8,6 +8,7 @@ import type {
   SyncEventWire,
   SyncResponseWire,
   VoucherFeedResponseWire,
+  LoyaltyFeedResponseWire,
 } from '@tugeel/shared/pos';
 import { EdgeConfig } from '../config/edge-env';
 
@@ -51,6 +52,12 @@ export class CentralClient {
   vouchers(since: string | null): Promise<VoucherFeedResponseWire> {
     const query = since ? `?since=${encodeURIComponent(since)}` : '';
     return this.call<VoucherFeedResponseWire>('GET', `/vouchers${query}`);
+  }
+
+  /** ADR-0112: the bonus card's members and tiers, or only the version when `since` names it. */
+  loyalty(since: string | null): Promise<LoyaltyFeedResponseWire> {
+    const query = since ? `?since=${encodeURIComponent(since)}` : '';
+    return this.call<LoyaltyFeedResponseWire>('GET', `/loyalty${query}`);
   }
 
   /** The centre's credit check before a credit sale; a short wait, the till decides otherwise. */

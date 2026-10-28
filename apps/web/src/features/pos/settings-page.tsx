@@ -16,6 +16,7 @@ import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { type PosSettings, usePosMutations, usePosSettings } from './api';
+import { LoyaltyTiersCard } from './loyalty-tiers-card';
 import { PaymentTypesCard } from './payment-types-card';
 
 /**
@@ -38,6 +39,7 @@ export function PosSettingsPage() {
         />
       ) : null}
       <PaymentTypesCard />
+      <LoyaltyTiersCard />
     </div>
   );
 }
