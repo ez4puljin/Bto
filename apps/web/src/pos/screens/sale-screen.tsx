@@ -552,7 +552,7 @@ export function SaleScreen(props: {
               <Button
                 variant="outline"
                 size="icon-lg"
-                className="relative"
+                className="relative size-11"
                 aria-label={t('posKiosk.menu.label')}
                 title={t('posKiosk.menu.label')}
               >
@@ -566,27 +566,27 @@ export function SaleScreen(props: {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onCloseAutoFocus={refocus}>
-              <DropdownMenuItem className="h-10 text-[15px]" onSelect={() => setDialog('returns')}>
+              <DropdownMenuItem className="h-11 text-[15px]" onSelect={() => setDialog('returns')}>
                 <Undo2 />
                 {t('posKiosk.menu.returns')}
               </DropdownMenuItem>
-              <DropdownMenuItem className="h-10 text-[15px]" onSelect={() => setDialog('parked')}>
+              <DropdownMenuItem className="h-11 text-[15px]" onSelect={() => setDialog('parked')}>
                 <ArchiveRestore />
                 {t('posKiosk.menu.parked')}
               </DropdownMenuItem>
-              <DropdownMenuItem className="h-10 text-[15px]" onSelect={() => setDialog('history')}>
+              <DropdownMenuItem className="h-11 text-[15px]" onSelect={() => setDialog('history')}>
                 <History />
                 {t('posKiosk.menu.history')}
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="h-10 text-[15px]"
+                className="h-11 text-[15px]"
                 onSelect={() => setDialog('daySummary')}
               >
                 <CalendarCheck />
                 {t('posKiosk.menu.daySummary')}
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="h-10 text-[15px]"
+                className="h-11 text-[15px]"
                 onSelect={() => printTest(props.session.till.name, new Date().toISOString())}
               >
                 <Printer />
@@ -594,7 +594,7 @@ export function SaleScreen(props: {
               </DropdownMenuItem>
               {ebarimt?.provider === 'posapi' ? (
                 <DropdownMenuItem
-                  className="h-10 text-[15px]"
+                  className="h-11 text-[15px]"
                   onSelect={() => setDialog('ebarimt')}
                 >
                   <ReceiptText />
@@ -606,12 +606,12 @@ export function SaleScreen(props: {
                   ) : null}
                 </DropdownMenuItem>
               ) : null}
-              <DropdownMenuItem className="h-10 text-[15px]" onSelect={props.onCloseShift}>
+              <DropdownMenuItem className="h-11 text-[15px]" onSelect={props.onCloseShift}>
                 <LockKeyhole />
                 {t('posKiosk.menu.closeShift')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="h-10 text-[15px]" onSelect={props.onSignOut}>
+              <DropdownMenuItem className="h-11 text-[15px]" onSelect={props.onSignOut}>
                 <LogOut />
                 {t('posKiosk.menu.logout')}
               </DropdownMenuItem>
@@ -637,7 +637,7 @@ export function SaleScreen(props: {
                 placeholder={t('posKiosk.sale.scanPlaceholder')}
                 autoComplete="off"
                 spellCheck={false}
-                className="h-11 w-full rounded-lg border border-input bg-background pr-3 pl-10 font-mono text-base shadow-control outline-none placeholder:font-sans placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25"
+                className="h-11 w-full rounded-lg border border-input bg-background pr-3 pl-10 font-mono text-base shadow-control outline-none placeholder:font-sans placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring"
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={(event) => {
@@ -660,7 +660,7 @@ export function SaleScreen(props: {
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  className="text-destructive"
+                  className="size-11 text-destructive"
                   aria-label={t('common.close')}
                   title={t('common.close')}
                   onMouseDown={keepFocus}
@@ -693,9 +693,9 @@ export function SaleScreen(props: {
         </section>
         <aside
           aria-label={t('posKiosk.sale.totals')}
-          className="flex w-80 shrink-0 flex-col gap-3 xl:w-96"
+          className="flex min-h-0 w-80 shrink-0 flex-col gap-3 xl:w-96"
         >
-          <div className="space-y-3 rounded-xl bg-card p-5 shadow-card ring-1 ring-black/[0.06]">
+          <div className="shrink-0 space-y-3 rounded-xl bg-card p-5 shadow-card ring-1 ring-black/[0.06]">
             <div
               className={cn('space-y-1', fresh || cart.lines.length === 0 ? null : 'opacity-60')}
             >
@@ -744,85 +744,89 @@ export function SaleScreen(props: {
               </div>
             </dl>
           </div>
-          {quote.isError && cart.lines.length > 0 ? (
-            <KioskAlert>{problemText(quote.error)}</KioskAlert>
-          ) : unpriced ? (
-            <KioskAlert tone="warning">{t('posKiosk.sale.unpricedBlock')}</KioskAlert>
-          ) : null}
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11"
-              onMouseDown={keepFocus}
-              onClick={() => setDialog('quick')}
-            >
-              <LayoutGrid />
-              {t('posKiosk.sale.quick')}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11"
-              onMouseDown={keepFocus}
-              onClick={() => setDialog('price')}
-            >
-              <Tag />
-              {t('posKiosk.sale.priceCheck')}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11"
-              disabled={cart.lines.length === 0}
-              onMouseDown={keepFocus}
-              onClick={() => void park()}
-            >
-              <Archive />
-              {t('posKiosk.sale.park')}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11"
-              onMouseDown={keepFocus}
-              onClick={() => setDialog('parked')}
-            >
-              <ArchiveRestore />
-              {t('posKiosk.sale.parked', { count: parked.data?.length ?? 0 })}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="col-span-2 h-11"
-              disabled={cart.lines.length === 0}
-              onMouseDown={keepFocus}
-              onClick={() => setDialog('vouchers')}
-            >
-              <Ticket />
-              {codes.length > 0
-                ? t('posKiosk.vouchers.buttonCount', { count: codes.length })
-                : t('posKiosk.vouchers.button')}
-            </Button>
-            <Button
-              type="button"
-              variant={member ? 'secondary' : 'outline'}
-              className="col-span-2 h-11"
-              onMouseDown={keepFocus}
-              onClick={() => setDialog('member')}
-            >
-              <Gift />
-              <span className="truncate">
-                {member
-                  ? t('posKiosk.loyalty.buttonMember', {
-                      name: member.name,
-                      points: formatMnt(member.balance),
-                    })
-                  : t('posKiosk.loyalty.button')}
-              </span>
-            </Button>
+          {/* The alerts and the tools scroll on a short window, so «Төлбөр (F12)» stays in view
+              (ADR-0113). */}
+          <div className="-mx-1 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-1 [scrollbar-width:thin]">
+            {quote.isError && cart.lines.length > 0 ? (
+              <KioskAlert>{problemText(quote.error)}</KioskAlert>
+            ) : unpriced ? (
+              <KioskAlert tone="warning">{t('posKiosk.sale.unpricedBlock')}</KioskAlert>
+            ) : null}
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11"
+                onMouseDown={keepFocus}
+                onClick={() => setDialog('quick')}
+              >
+                <LayoutGrid />
+                {t('posKiosk.sale.quick')}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11"
+                onMouseDown={keepFocus}
+                onClick={() => setDialog('price')}
+              >
+                <Tag />
+                {t('posKiosk.sale.priceCheck')}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11"
+                disabled={cart.lines.length === 0}
+                onMouseDown={keepFocus}
+                onClick={() => void park()}
+              >
+                <Archive />
+                {t('posKiosk.sale.park')}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11"
+                onMouseDown={keepFocus}
+                onClick={() => setDialog('parked')}
+              >
+                <ArchiveRestore />
+                {t('posKiosk.sale.parked', { count: parked.data?.length ?? 0 })}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="col-span-2 h-11"
+                disabled={cart.lines.length === 0}
+                onMouseDown={keepFocus}
+                onClick={() => setDialog('vouchers')}
+              >
+                <Ticket />
+                {codes.length > 0
+                  ? t('posKiosk.vouchers.buttonCount', { count: codes.length })
+                  : t('posKiosk.vouchers.button')}
+              </Button>
+              <Button
+                type="button"
+                variant={member ? 'secondary' : 'outline'}
+                className="col-span-2 h-11"
+                onMouseDown={keepFocus}
+                onClick={() => setDialog('member')}
+              >
+                <Gift />
+                <span className="truncate">
+                  {member
+                    ? t('posKiosk.loyalty.buttonMember', {
+                        name: member.name,
+                        points: formatMnt(member.balance),
+                      })
+                    : t('posKiosk.loyalty.button')}
+                </span>
+              </Button>
+            </div>
           </div>
-          <div className="mt-auto flex flex-col gap-3">
+          <div className="flex shrink-0 flex-col gap-3">
             <Button
               type="button"
               variant="outline"

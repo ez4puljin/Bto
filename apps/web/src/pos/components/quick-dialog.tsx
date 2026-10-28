@@ -70,7 +70,7 @@ function QuickPanel({ onPick }: { onPick: (product: EdgeProductHit, unitId: numb
               role="tab"
               aria-selected={entry.id === group?.id}
               className={cn(
-                'h-10 rounded-full px-4 text-[15px] font-medium ring-1 ring-border transition-colors',
+                'h-11 rounded-full px-4 text-[15px] font-medium ring-1 ring-border transition-colors',
                 entry.id === group?.id
                   ? 'bg-primary text-primary-foreground ring-primary'
                   : 'bg-background hover:bg-accent',

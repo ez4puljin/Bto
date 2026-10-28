@@ -152,9 +152,10 @@ describe('kiosk: the sale screen', () => {
       { kind: 'CASH', paymentTypeId: null, amount: '5000.00', tendered: '10000.00' },
       { kind: 'CARD', paymentTypeId: null, amount: '2000.00', terminalId: null, rrn: null },
     ]);
-    expect(within(receipt).getByText(mn.pos.fields.change).nextElementSibling).toHaveTextContent(
-      '5,000₮',
-    );
+    // The change to hand back stands large above the receipt, and the receipt lists it too.
+    const [strip, line] = within(receipt).getAllByText(mn.pos.fields.change);
+    expect(strip?.nextElementSibling).toHaveTextContent('5,000₮');
+    expect(line?.nextElementSibling).toHaveTextContent('5,000₮');
   });
 
   it('keeps the client id when a payment is tried again', async () => {

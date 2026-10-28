@@ -135,6 +135,7 @@ function VoucherPanel(props: {
                 type="button"
                 variant="ghost"
                 size="icon-sm"
+                className="size-11"
                 aria-label={t('posKiosk.vouchers.remove', { code: formatVoucherCode(one.code) })}
                 title={t('posKiosk.vouchers.remove', { code: formatVoucherCode(one.code) })}
                 onClick={() => remove(one.code)}

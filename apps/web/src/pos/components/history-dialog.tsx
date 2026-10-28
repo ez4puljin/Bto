@@ -104,7 +104,7 @@ function HistoryPanel() {
             placeholder={t('posKiosk.history.searchPlaceholder')}
             autoComplete="off"
             spellCheck={false}
-            className="h-12 w-full rounded-lg border border-input bg-background pr-3 pl-10 font-mono text-base shadow-control outline-none placeholder:font-sans placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25"
+            className="h-12 w-full rounded-lg border border-input bg-background pr-3 pl-10 font-mono text-base shadow-control outline-none placeholder:font-sans placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring"
             value={q}
             onChange={(event) => setQ(event.target.value)}
           />

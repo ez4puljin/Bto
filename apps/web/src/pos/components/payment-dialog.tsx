@@ -376,6 +376,7 @@ function PaymentForm(props: {
           label={change.gt(0) ? t('posKiosk.pay.change') : t('posKiosk.pay.rows.remaining')}
           value={formatTugrik((change.gt(0) ? change : remaining).toFixed(2))}
           tone={change.gt(0) ? 'success' : remaining.gt(0) ? 'warning' : 'success'}
+          emphasis={change.gt(0)}
         />
       </dl>
 
@@ -417,7 +418,7 @@ function PaymentForm(props: {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-10"
+                      className="size-11"
                       aria-label={t('posKiosk.pay.rows.remove', { name: row.type.name })}
                       onClick={() => removeRow(row.key)}
                     >
@@ -436,7 +437,7 @@ function PaymentForm(props: {
                           type="button"
                           variant="outline"
                           onMouseDown={keepFocus}
-                          className="h-10 px-3 font-mono text-[15px]"
+                          className="h-11 px-3 font-mono text-[15px]"
                           onClick={() => updateRow(row.key, { amount: fieldMoney(amount) })}
                         >
                           {formatTugrik(amount.toFixed(2))}
@@ -451,7 +452,7 @@ function PaymentForm(props: {
                         placeholder={t('posKiosk.pay.terminalId')}
                         autoComplete="off"
                         maxLength={32}
-                        className="h-10"
+                        className="h-11"
                         value={row.terminalId}
                         onChange={(event) => updateRow(row.key, { terminalId: event.target.value })}
                       />
@@ -460,7 +461,7 @@ function PaymentForm(props: {
                         placeholder={t('posKiosk.pay.rrn')}
                         autoComplete="off"
                         maxLength={32}
-                        className="h-10"
+                        className="h-11"
                         value={row.rrn}
                         onChange={(event) => updateRow(row.key, { rrn: event.target.value })}
                       />
@@ -478,7 +479,7 @@ function PaymentForm(props: {
                         inputMode="numeric"
                         autoComplete="off"
                         maxLength={4}
-                        className="h-10 w-40 text-center font-mono text-lg tracking-[0.5em]"
+                        className="h-11 w-40 text-center font-mono text-lg tracking-[0.5em]"
                         value={pin}
                         onChange={(event) =>
                           setPin(event.target.value.replace(/[^0-9]/g, '').slice(0, 4))
@@ -547,6 +548,7 @@ function PaymentForm(props: {
               autoFocus
               variant={receiptType === 'B2C' ? 'default' : 'outline'}
               className="h-14 gap-2 text-base"
+              pending={sale.isPending && receiptType === 'B2C'}
               disabled={sale.isPending}
               onClick={() => {
                 setReceiptType('B2C');
@@ -572,7 +574,7 @@ function PaymentForm(props: {
           <Button
             type="button"
             variant="ghost"
-            className="h-10"
+            className="h-11"
             onClick={() => {
               setStep('rows');
               setReceiptType('B2C');
@@ -617,11 +619,21 @@ function PaymentForm(props: {
           {t('common.cancel')}
         </Button>
         {step === 'rows' ? (
-          <Button type="submit" className="h-11 px-6 text-base" disabled={!ready || sale.isPending}>
+          <Button
+            type="submit"
+            className="h-11 px-6 text-base"
+            pending={sale.isPending}
+            disabled={!ready}
+          >
             {sale.isPending ? t('posKiosk.pay.pending') : t('posKiosk.pay.print')}
           </Button>
         ) : receiptType === 'B2B' ? (
-          <Button type="submit" className="h-11 px-6 text-base" disabled={!buyer || sale.isPending}>
+          <Button
+            type="submit"
+            className="h-11 px-6 text-base"
+            pending={sale.isPending}
+            disabled={!buyer}
+          >
             {sale.isPending ? t('posKiosk.pay.pending') : t('posKiosk.pay.print')}
           </Button>
         ) : null}
@@ -635,6 +647,8 @@ function Figure(props: {
   label: string;
   value: string;
   strong?: boolean;
+  /** The change due: the largest figure, read at arm's length (ADR-0113). */
+  emphasis?: boolean;
   tone?: 'success' | 'warning';
 }) {
   return (
@@ -652,7 +666,7 @@ function Figure(props: {
       <dd
         className={cn(
           'font-mono font-semibold tracking-tight',
-          props.strong ? 'text-2xl' : 'text-xl',
+          props.emphasis ? 'text-3xl' : props.strong ? 'text-2xl' : 'text-xl',
         )}
       >
         {props.value}
@@ -701,7 +715,7 @@ function CustomerSection(props: {
           <Button
             type="button"
             variant="ghost"
-            className="h-10"
+            className="h-11"
             onClick={() => props.onChange(null)}
           >
             {t('posKiosk.pay.credit.change')}
@@ -812,7 +826,7 @@ function BuyerSection(props: {
           <Button
             type="button"
             variant="ghost"
-            className="h-10"
+            className="h-11"
             onClick={() => {
               props.onChange(null);
               setNo('');

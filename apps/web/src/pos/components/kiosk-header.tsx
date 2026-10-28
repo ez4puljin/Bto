@@ -1,6 +1,6 @@
 import type { EdgeSession } from '@tugeel/shared/pos';
 import { cn } from 'cn';
-import { UserRound } from 'lucide-react';
+import { TriangleAlert, UserRound } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BrandMark } from './layout';
@@ -63,33 +63,48 @@ export function KioskHeader(props: {
 }) {
   const { t } = useTranslation();
   const { session } = props;
+  const health = useHealth();
   return (
-    <header className="flex h-16 shrink-0 items-center gap-4 border-b border-border bg-background px-4">
-      <div className="flex min-w-0 items-center gap-3">
-        <BrandMark />
-        <div className="min-w-0 leading-tight">
-          <p className="truncate text-[15px] font-semibold">
-            {session.companyName ?? t('brand.company')}
-          </p>
-          <p className="truncate text-[13px] text-muted-foreground">
-            {t('posKiosk.header.till', { code: session.till.code, name: session.till.name })}
-          </p>
-        </div>
-      </div>
-      <div className="flex min-w-0 flex-1 justify-center">{props.center}</div>
-      <div className="flex shrink-0 items-center gap-3">
-        <StatusPill />
-        <div className="flex items-center gap-2">
-          <UserRound aria-hidden className="size-5 text-muted-foreground" />
-          <div className="leading-tight">
-            <p className="max-w-48 truncate text-[13px] font-semibold">
-              {session.cashier.fullName}
+    <>
+      <header className="flex h-16 shrink-0 items-center gap-4 border-b border-border bg-background px-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <BrandMark />
+          <div className="min-w-0 leading-tight">
+            <p className="truncate text-[15px] font-semibold">
+              {session.companyName ?? t('brand.company')}
             </p>
-            <p className="font-mono text-xs text-muted-foreground">{session.businessDate}</p>
+            <p className="truncate text-[13px] text-muted-foreground">
+              {t('posKiosk.header.till', { code: session.till.code, name: session.till.name })}
+            </p>
           </div>
         </div>
-        {props.actions}
-      </div>
-    </header>
+        <div className="flex min-w-0 flex-1 justify-center">{props.center}</div>
+        <div className="flex shrink-0 items-center gap-3">
+          <StatusPill />
+          <div className="flex items-center gap-2">
+            <UserRound aria-hidden className="size-5 text-muted-foreground" />
+            <div className="leading-tight">
+              <p className="max-w-48 truncate text-[13px] font-semibold">
+                {session.cashier.fullName}
+              </p>
+              <p className="font-mono text-xs text-muted-foreground">{session.businessDate}</p>
+            </div>
+          </div>
+          {props.actions}
+        </div>
+      </header>
+      {health.isError ? (
+        // Losing the store's own server stops every sale: a strip across the screen, not only the
+        // pill (ADR-0113). The pill's status line already announces it.
+        <div className="flex shrink-0 items-center gap-3 bg-destructive px-4 py-2.5 text-[15px] text-primary-foreground">
+          <TriangleAlert aria-hidden className="size-5 shrink-0" />
+          <p>
+            <span className="font-semibold">{t('posKiosk.status.edgeDown')}</span>
+            {' · '}
+            {t('posKiosk.status.edgeDownHint')}
+          </p>
+        </div>
+      ) : null}
+    </>
   );
 }

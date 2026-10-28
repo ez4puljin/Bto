@@ -125,17 +125,22 @@ function CartRow(
       onClick={() => props.onSelect(line.productUnitId)}
       className={cn(
         'border-b border-border/80 transition-colors last:border-0',
-        props.selected ? 'bg-secondary' : 'hover:bg-accent/70',
+        props.selected
+          ? 'bg-secondary shadow-[inset_4px_0_0_var(--primary)]'
+          : 'hover:bg-accent/70',
         quoted && !quoted.priced ? 'bg-warning-soft' : null,
       )}
     >
       <td className="h-14 pl-4 font-mono text-muted-foreground">{props.index + 1}</td>
       <td className="max-w-0 px-3 py-2">
-        <p className="truncate font-medium" title={line.name}>
+        <p className="line-clamp-2 font-medium break-words" title={line.name}>
           {line.name}
         </p>
-        <p className="truncate text-xs text-muted-foreground">
-          {line.sku} · {line.uomName}
+        <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[13px] text-muted-foreground">
+          <span className="shrink-0 rounded-full bg-fill px-2 font-medium text-foreground">
+            {line.uomName}
+          </span>
+          <span className="truncate">{line.sku}</span>
           {quoted?.priced && quoted.unitPrice !== null ? (
             <span className="font-mono xl:hidden">
               {' · '}
@@ -145,11 +150,12 @@ function CartRow(
         </p>
       </td>
       <td className="px-3 py-2">
-        <div className="flex items-center justify-center gap-1.5">
+        <div className="flex items-center justify-center gap-2">
           <Button
             type="button"
             variant="outline"
             size="icon-lg"
+            className="size-11"
             aria-label={t('posKiosk.sale.decrease', { name: label })}
             title={t('posKiosk.sale.decrease', { name: label })}
             disabled={!canDecrease(line.qty)}
@@ -166,7 +172,7 @@ function CartRow(
             aria-label={t('posKiosk.sale.qtyFor', { name: label })}
             inputMode="decimal"
             autoComplete="off"
-            className="h-10 w-20 rounded-lg border border-input bg-background px-2 text-center font-mono text-base font-semibold shadow-control outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25"
+            className="h-11 w-20 rounded-lg border border-input bg-background px-2 text-center font-mono text-base font-semibold shadow-control outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring"
             value={draft ?? formatQty(line.qty)}
             onFocus={(event) => {
               setDraft(line.qty);
@@ -196,6 +202,7 @@ function CartRow(
             type="button"
             variant="outline"
             size="icon-lg"
+            className="size-11"
             aria-label={t('posKiosk.sale.increase', { name: label })}
             title={t('posKiosk.sale.increase', { name: label })}
             onMouseDown={keepFocus}
@@ -251,7 +258,7 @@ function CartRow(
           type="button"
           variant="ghost"
           size="icon-lg"
-          className="text-muted-foreground hover:text-destructive"
+          className="size-11 text-muted-foreground hover:text-destructive"
           aria-label={t('posKiosk.sale.remove', { name: label })}
           title={t('posKiosk.sale.remove', { name: label })}
           onMouseDown={keepFocus}
