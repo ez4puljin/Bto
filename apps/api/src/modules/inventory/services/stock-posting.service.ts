@@ -867,6 +867,47 @@ export class StockPostingService implements OnModuleInit {
     return new Decimal(row?.value ?? 0);
   }
 
+  /**
+   * Each product's outflow per warehouse between two business dates, both included (ADR-0115, a
+   * purchase order's «last month»): wholesale deliveries less credit-note returns, plus transfers
+   * shipped to a supermarket (a STORE warehouse), in base units. Product → warehouse → quantity.
+   */
+  async outflow(
+    productIds: readonly number[],
+    from: string,
+    to: string,
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, Map<number, Decimal>>> {
+    const result = new Map<number, Map<number, Decimal>>();
+    const ids = [...new Set(productIds)];
+    if (ids.length === 0) return result;
+    const rows = await executor.execute<{ product_id: string; warehouse_id: string; qty: string }>(
+      sql`
+      SELECT l.product_id::text AS product_id, l.warehouse_id::text AS warehouse_id,
+             sum(-l.qty_base)::text AS qty
+        FROM stock_ledger l
+        LEFT JOIN transfers t ON l.doc_type = 'TR' AND t.id = l.doc_id
+        LEFT JOIN warehouses d ON d.id = t.dest_warehouse_id
+       WHERE l.product_id IN (${sql.join(
+         ids.map((id) => sql`${id}`),
+         sql`, `,
+       )})
+         AND l.effective_date BETWEEN ${from}::date AND ${to}::date
+         AND (l.movement_type = 'DELIVERY_ISSUE'
+              OR (l.movement_type = 'RETURN_IN' AND l.doc_type = 'CN')
+              OR (l.movement_type = 'TRANSFER_OUT' AND l.warehouse_id = t.source_warehouse_id
+                  AND d.kind = 'STORE'))
+       GROUP BY l.product_id, l.warehouse_id`,
+    );
+    for (const row of rows.rows) {
+      const productId = Number.parseInt(row.product_id, 10);
+      const byWarehouse = result.get(productId) ?? new Map<number, Decimal>();
+      byWarehouse.set(Number.parseInt(row.warehouse_id, 10), new Decimal(row.qty));
+      result.set(productId, byWarehouse);
+    }
+    return result;
+  }
+
   /** The latest costing of each line of a receipt (none for a receipt not costed yet). */
   async costingOf(docId: number, executor: Db | Tx = this.db): Promise<Map<number, Valuation>> {
     const rows = await executor

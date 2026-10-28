@@ -1,5 +1,6 @@
 import {
   ADJUSTMENT_REASON_CODES,
+  RECEIPT_ORIGINS,
   RECEIPT_PAYMENT_METHODS,
   BIN_TYPES,
   SELLABLE_BIN_TYPES,
@@ -28,7 +29,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { cost, factor, jsonValue, money, percent, qty } from '../../common/db/types';
 import { productUnits, products } from '../catalog/schema';
-import { users, warehouses } from '../identity/schema';
+import { files, users, warehouses } from '../identity/schema';
 import { customers, suppliers } from '../partners/schema';
 
 // Tables owned by the inventory module (docs/architecture.md §4, §5.1, §5.3; docs/modules/inventory.md;
@@ -298,8 +299,9 @@ const lineQtyColumns = () => ({
 /**
  * Goods receipts (GR-, ADR-0033, ADR-0078, ADR-0099): one supplier delivery note, counted and posted
  * at once into each line's bin; the lines may lie in several wholesale warehouses (each its product's
- * home). The delivery note's prices may be typed on the draft lines; a receipt priced in full is
- * costed at posting, else the accountant costs it afterwards. The cost history lives in
+ * home). The delivery note's prices may be typed on the draft lines; the keepers confirm the
+ * counted quantities per warehouse (the last confirmation posts) and the accountant then confirms
+ * the prices, which costs the receipt (ADR-0115). The cost history lives in
  * stock_valuation_adjustments; the payment method and account are facts for the books.
  */
 export const goodsReceipts = pgTable(
@@ -327,6 +329,16 @@ export const goodsReceipts = pgTable(
     moneyAccountId: integer('money_account_id'),
     /** VAT inside the delivery-note prices: the company rate when both sides pay VAT, else 0. */
     vatRatePct: percent('vat_rate_pct').notNull().default(zero),
+    /** The delivery note's total pieces (Σ base quantity), checked at the last confirmation. */
+    noteTotalQty: qty('note_total_qty'),
+    /** The delivery note's total amount, checked within 1₮ at the accountant's price check. */
+    noteTotalAmount: money('note_total_amount'),
+    /** An optional photo of the delivery note (file kind `inventory.receipt_note`). */
+    notePhotoFileId: ref('note_photo_file_id').references(() => files.id),
+    /** MANUAL (the window), IMPORT (a sheet) or ORDER (a purchase order's arrival, ADR-0115). */
+    origin: text('origin', { enum: RECEIPT_ORIGINS }).notNull().default('MANUAL'),
+    /** The purchase order's number of an ORDER receipt (procurement owns the link). */
+    originRef: text('origin_ref'),
     ...postingColumns(),
   },
   (t) => [
@@ -355,6 +367,13 @@ export const goodsReceipts = pgTable(
       sql`${t.paymentMethod} <> 'CREDIT' OR ${t.moneyAccountId} IS NULL`,
     ),
     check('goods_receipts_vat_rate', sql`${t.vatRatePct} >= 0 AND ${t.vatRatePct} < 100`),
+    check('goods_receipts_origin', inList(t.origin, RECEIPT_ORIGINS)),
+    check(
+      'goods_receipts_note_totals',
+      sql`(${t.noteTotalQty} IS NULL OR ${t.noteTotalQty} >= 0)
+        AND (${t.noteTotalAmount} IS NULL OR ${t.noteTotalAmount} >= 0)
+        AND (${t.originRef} IS NULL OR length(${t.originRef}) BETWEEN 1 AND 50)`,
+    ),
     check(
       'goods_receipts_texts',
       sql`(${t.supplierDocNo} IS NULL OR length(${t.supplierDocNo}) BETWEEN 1 AND 50)
@@ -388,6 +407,10 @@ export const goodsReceiptLines = pgTable(
     /** A new warehouse price per base unit (whole MNT, VAT included), put in force by the posting
      * from its business date (ADR-0099 #5); typed by price holders only. */
     salePrice: money('sale_price'),
+    /** What the purchase order expected, in the entered unit; NULL on a line not on the order. */
+    expectedQty: qty('expected_qty'),
+    /** When the keeper checked the arrived quantity (ADR-0115); NULL while it waits for a check. */
+    checkedAt: timestamp('checked_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -399,7 +422,13 @@ export const goodsReceiptLines = pgTable(
       'goods_receipt_lines_sale_price',
       sql`${t.salePrice} IS NULL OR (${t.salePrice} > 0 AND ${t.salePrice} = trunc(${t.salePrice}))`,
     ),
-    check('goods_receipt_lines_qty', sql`${t.enteredQty} > 0 AND ${t.qtyBase} > 0`),
+    // Zero means «ирээгүй»: only a line the purchase order expected may arrive empty (ADR-0115).
+    check(
+      'goods_receipt_lines_qty',
+      sql`${t.enteredQty} >= 0 AND ${t.qtyBase} >= 0 AND (${t.enteredQty} = 0) = (${t.qtyBase} = 0)
+        AND (${t.enteredQty} > 0 OR ${t.expectedQty} IS NOT NULL)
+        AND (${t.expectedQty} IS NULL OR ${t.expectedQty} > 0)`,
+    ),
     check(
       'goods_receipt_lines_price',
       sql`(${t.docAmount} IS NULL OR ${t.docAmount} >= 0)
@@ -407,6 +436,25 @@ export const goodsReceiptLines = pgTable(
         AND NOT (${t.freeGoods} AND ${t.docAmount} IS NOT NULL)`,
     ),
   ],
+);
+
+/**
+ * A keeper's confirmation of a receipt's lines in one warehouse (ADR-0115): the lines there are
+ * frozen; the last warehouse's confirmation posts the receipt.
+ */
+export const goodsReceiptConfirmations = pgTable(
+  'goods_receipt_confirmations',
+  {
+    receiptId: ref('receipt_id')
+      .notNull()
+      .references(() => goodsReceipts.id),
+    warehouseId: ref('warehouse_id')
+      .notNull()
+      .references(() => warehouses.id),
+    confirmedBy: userRef('confirmed_by'),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.receiptId, t.warehouseId] })],
 );
 
 /** What a receipt's discount applies to (ADR-0103). */

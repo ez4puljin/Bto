@@ -54,6 +54,13 @@ export const FILE_KINDS = {
     visibility: 'public',
     permissions: ['customer.home.manage'],
   },
+  /** A photo of a receipt's delivery note (ADR-0115), optional, private: seen by receipt and cost holders. */
+  'inventory.receipt_note': {
+    contentTypes: IMAGE_TYPES,
+    maxBytes: 5 * 1024 * 1024,
+    visibility: 'private',
+    permissions: ['inventory.receipts.manage', 'inventory.costs.manage'],
+  },
   /** An Excel sheet for the importer (ADR-0036): kept privately as the record of what was imported. */
   'imports.source': {
     contentTypes: [XLSX_CONTENT_TYPE],

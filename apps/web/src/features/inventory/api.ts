@@ -35,6 +35,8 @@ export type ReceiptUpdate = Schemas['ReceiptUpdateRequest'];
 export type ReceiptLineRequest = Schemas['ReceiptLineRequest'];
 export type ReceiptLineUpdate = Schemas['ReceiptLineUpdateRequest'];
 export type ReceiptCostRequest = Schemas['ReceiptCostRequest'];
+export type ReceiptCosting = Schemas['ReceiptCosting'];
+export type ReceiptCostingLine = Schemas['ReceiptCostingLine'];
 export type ReceiptStatus = ReceiptDetail['status'];
 export type ReceiptPaymentMethod = ReceiptDetail['paymentMethod'];
 export type ReceiptPaymentAccount = Schemas['ReceiptPaymentAccount'];
@@ -366,6 +368,20 @@ export function useLastReceiptPrices(productIds: readonly number[], enabled: boo
   });
 }
 
+/**
+ * A posted receipt's costing with each arrived line's previous price (ADR-0115): the accountant's
+ * price check (inventory.costs.manage).
+ */
+export function useReceiptCosting(id: number, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.receipts, id, 'costing'],
+    enabled,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/receipts/{id}/costing', { params: { path: { id } }, signal })),
+  });
+}
+
 /** The cash boxes and bank accounts a receipt paid at once may name (inventory.receipts.manage). */
 export function useReceiptPaymentAccounts(enabled = true) {
   const api = useApiClient();
@@ -525,6 +541,15 @@ export function useInventoryMutations() {
           }),
         ),
       onSuccess: receiptsChanged,
+    }),
+    withdrawReceiptConfirmation: useMutation({
+      mutationFn: async ({ id, warehouseId }: { id: number; warehouseId: number }) =>
+        unwrap(
+          await api.DELETE('/api/v1/receipts/{id}/confirmations/{warehouseId}', {
+            params: { path: { id, warehouseId } },
+          }),
+        ),
+      onSuccess: receiptLinesChanged,
     }),
     cancelReceipt: useMutation({
       mutationFn: async (id: number) =>

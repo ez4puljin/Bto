@@ -109,6 +109,19 @@ export interface PurchaseBooks {
 export const PURCHASE_BOOKS = Symbol('PURCHASE_BOOKS');
 
 /**
+ * What inventory tells procurement about a receipt a purchase order made (ADR-0115): the keepers'
+ * last confirmation posted it («Нягтлан шалгаж»), the accountant's price check costed it for the
+ * first time («Орлого авсан»). Procurement binds it with `useExisting`; inside the posting's or the
+ * costing's transaction; nothing happens when nothing is bound or the receipt has no order.
+ */
+export interface ReceiptProgress {
+  receiptPostedInTx(tx: Tx, actor: Actor, receiptId: number): Promise<void>;
+  receiptCostedInTx(tx: Tx, actor: Actor, receiptId: number): Promise<void>;
+}
+
+export const RECEIPT_PROGRESS = Symbol('RECEIPT_PROGRESS');
+
+/**
  * What a stock line does to the books (F4, ADR-0097; TODO-VERIFY D8): goods received (before or
  * with their bill), sold or taken back from a sale, lost or found, the opening stock, issued for an
  * expense type. Value-neutral moves (transfers, picks, bin moves) book only a non-zero remainder.

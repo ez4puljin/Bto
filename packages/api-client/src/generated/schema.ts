@@ -1856,6 +1856,23 @@ export interface paths {
         patch: operations["Receipts_update"];
         trace?: never;
     };
+    "/api/v1/receipts/{id}/note-photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The delivery note's photo (ADR-0115), streamed to receipt and cost holders. */
+        get: operations["Receipts_notePhoto"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/receipts/{id}/discounts": {
         parameters: {
             query?: never;
@@ -1898,9 +1915,29 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** DRAFT → POSTED; idempotent so a retried click never posts twice. */
+        /**
+         * The keeper's confirmation (ADR-0115): confirms the caller's warehouses of the receipt; the last
+         *     one posts it (DRAFT → POSTED). Idempotent so a retried click never confirms twice.
+         */
         post: operations["Receipts_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/receipts/{id}/confirmations/{warehouseId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Withdraws a warehouse's confirmation while the receipt is a draft (that warehouse's scope). */
+        delete: operations["Receipts_withdraw"];
         options?: never;
         head?: never;
         patch?: never;
@@ -6322,6 +6359,169 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/purchase-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PurchaseOrders_list"];
+        put?: never;
+        post: operations["PurchaseOrders_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchase-orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PurchaseOrders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["PurchaseOrders_update"];
+        trace?: never;
+    };
+    "/api/v1/purchase-orders/{id}/suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PurchaseOrders_addSuppliers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchase-orders/{id}/suppliers/{supplierId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["PurchaseOrders_removeSupplier"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchase-orders/{id}/suppliers/{supplierId}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** One status forward or back; «Ирсэн» makes the draft receipt. Idempotent: never twice. */
+        post: operations["PurchaseOrders_move"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchase-orders/{id}/suppliers/{supplierId}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PurchaseOrders_rows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchase-orders/{id}/suppliers/{supplierId}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Writes only the changed cells, each against the value the page opened with (ADR-0115). */
+        put: operations["PurchaseOrders_saveLines"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchase-orders/{id}/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The order sheets for the browser print (no PDF, ADR-0058). */
+        get: operations["PurchaseOrders_print"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/procurement/orderer-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SupplierOrderers_candidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/procurement/supplier-orderers/{supplierId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SupplierOrderers_get"];
+        put: operations["SupplierOrderers_set"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6399,7 +6599,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.rep" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "pos.loyalty.manage" | "notifications.send" | "customer.home.manage" | "reports.view" | "reports.margins.view";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "procurement.orders.read" | "procurement.orders.edit" | "procurement.orders.manage" | "procurement.prices.read" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.rep" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "pos.loyalty.manage" | "notifications.send" | "customer.home.manage" | "reports.view" | "reports.margins.view";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -6782,7 +6982,7 @@ export interface components {
         };
         FileUploadRequest: {
             /** @enum {string} */
-            kind: "catalog.product_image" | "catalog.product_thumb" | "notifications.notice_image" | "catalog.category_image" | "customer.banner_image" | "imports.source";
+            kind: "catalog.product_image" | "catalog.product_thumb" | "notifications.notice_image" | "catalog.category_image" | "customer.banner_image" | "inventory.receipt_note" | "imports.source";
             /** @example image/jpeg */
             contentType: string;
             sizeBytes: number;
@@ -8002,6 +8202,9 @@ export interface components {
             costingStatus: "PENDING" | "COSTED" | null;
             /** @enum {string} */
             paymentMethod: "CREDIT" | "CASH" | "BANK";
+            /** @enum {string} */
+            origin: "MANUAL" | "IMPORT" | "ORDER";
+            originRef: string | null;
             lineCount: number;
             /** @description The payable (cost holders only) */
             netAmount?: string | null;
@@ -8081,6 +8284,19 @@ export interface components {
             vatAmount?: string | null;
             /** @description Net amount less VAT */
             costAmount?: string | null;
+            /** @description What the purchase order expected, in the line’s unit (ADR-0115) */
+            expectedQty: string | null;
+            /**
+             * Format: date-time
+             * @description When the keeper checked the count; null while it waits
+             */
+            checkedAt: string | null;
+        };
+        ReceiptConfirmation: {
+            warehouseId: number;
+            confirmedBy: string | null;
+            /** Format: date-time */
+            confirmedAt: string;
         };
         ReceiptDiscount: {
             id: number;
@@ -8152,6 +8368,21 @@ export interface components {
             weightKg: string;
             /** @description Lines whose product has no weight */
             weightMissing: number;
+            /** @description Σ base quantity: checked against the note’s pieces */
+            qtyBase: string;
+            /** @description Lines waiting for the keeper’s check */
+            uncheckedLines: number;
+            /** @description The delivery note’s total pieces */
+            noteTotalQty: string | null;
+            /** @description The delivery note’s total amount */
+            noteTotalAmount: string | null;
+            hasNotePhoto: boolean;
+            /** @enum {string} */
+            origin: "MANUAL" | "IMPORT" | "ORDER";
+            /** @description The purchase order’s number */
+            originRef: string | null;
+            /** @description Warehouses whose keepers confirmed their lines */
+            confirmations: components["schemas"]["ReceiptConfirmation"][];
             /** @description Cost holders only */
             discounts?: components["schemas"]["ReceiptDiscount"][];
             /** @description Cost holders only */
@@ -8187,6 +8418,10 @@ export interface components {
             paymentMethod?: "CREDIT" | "CASH" | "BANK";
             /** @description Cash box or bank account */
             moneyAccountId?: number | null;
+            /** @description The delivery note’s total pieces (Σ base quantity), ADR-0115 */
+            noteTotalQty?: string | null;
+            /** @description The delivery note’s total amount, VAT in */
+            noteTotalAmount?: string | null;
             supplierId: number;
             lines?: components["schemas"]["ReceiptLineRequest"][];
         };
@@ -8202,7 +8437,13 @@ export interface components {
             paymentMethod?: "CREDIT" | "CASH" | "BANK";
             /** @description Cash box or bank account */
             moneyAccountId?: number | null;
+            /** @description The delivery note’s total pieces (Σ base quantity), ADR-0115 */
+            noteTotalQty?: string | null;
+            /** @description The delivery note’s total amount, VAT in */
+            noteTotalAmount?: string | null;
             supplierId?: number;
+            /** @description An uploaded photo of the delivery note (kind inventory.receipt_note); null removes */
+            notePhotoFileId?: number | null;
         };
         ReceiptDiscountRequest: {
             /** @enum {string} */
@@ -8236,6 +8477,15 @@ export interface components {
             /** @description Per base unit */
             unitCost: string | null;
             freeGoods: boolean;
+            /** @description The draft’s price per unit */
+            docUnitPrice: string | null;
+            /** @description The product’s price per this unit on the receipt posted before (ADR-0115) */
+            previousUnitPrice: string | null;
+            /** @description The same per base unit */
+            previousBasePrice: string | null;
+            /** Format: date */
+            previousDate: string | null;
+            previousSupplierName: string | null;
         };
         ReceiptCosting: {
             receiptId: number;
@@ -8256,6 +8506,10 @@ export interface components {
             total: string | null;
             /** @description Σ as typed */
             docTotal: string | null;
+            noteTotalQty: string | null;
+            noteTotalAmount: string | null;
+            hasNotePhoto: boolean;
+            /** @description The arrived lines */
             lines: components["schemas"]["ReceiptCostingLine"][];
         };
         ReceiptCostLineRequest: {
@@ -8278,10 +8532,15 @@ export interface components {
             discounts?: components["schemas"]["ReceiptDiscountRequest"][];
             /** @description The costing version the form was opened at */
             costingVersion: number;
+            /** @description Corrects the delivery note’s total amount; the payable must match it within 1₮ */
+            noteTotalAmount?: string;
             lines: components["schemas"]["ReceiptCostLineRequest"][];
         };
         ReceiptLineUpdateRequest: {
-            /** @example 3 */
+            /**
+             * @description The counted quantity; marks the line checked; 0 = did not arrive (order lines)
+             * @example 3
+             */
             enteredQty?: string;
             /** @description null clears the price */
             docUnitPrice?: string | null;
@@ -14288,8 +14547,199 @@ export interface components {
         SupplierEntries: {
             data: components["schemas"]["SupplierEntry"][];
         };
+        PurchaseOrderSummary: {
+            id: number;
+            number: string;
+            /** Format: date */
+            orderDate: string;
+            note: string | null;
+            /** @enum {string} */
+            status: "PREPARING" | "SENT" | "IN_TRANSIT" | "ARRIVED" | "ACCOUNTING" | "RECEIVED";
+            supplierCount: number;
+            supplierNames: string[];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PurchaseOrderPage: {
+            data: components["schemas"]["PurchaseOrderSummary"][];
+            nextCursor: string | null;
+        };
+        PurchaseOrderCreateRequest: {
+            /** Format: date */
+            orderDate?: string | null;
+            note?: string | null;
+            supplierIds: number[];
+        };
+        PurchaseOrderSupplier: {
+            supplierId: number;
+            supplierCode: string;
+            supplierName: string;
+            /** @enum {string} */
+            status: "PREPARING" | "SENT" | "IN_TRANSIT" | "ARRIVED" | "ACCOUNTING" | "RECEIVED";
+            /** Format: date-time */
+            statusChangedAt: string;
+            ordererId: number | null;
+            ordererName: string | null;
+            lineCount: number;
+            /** @description Σ ordered base quantity */
+            qtyBase: string;
+            /** @description Σ weight, kg (products with a weight) */
+            weightKg: string;
+            /** @description Σ ordered × last price per base unit (price readers) */
+            estimatedCost: string | null;
+            receiptId: number | null;
+            receiptNumber: string | null;
+            canEdit: boolean;
+            canMoveNext: boolean;
+            canMoveBack: boolean;
+        };
+        PurchaseOrderDetail: {
+            id: number;
+            /** @example PO-2026-000001 */
+            number: string;
+            /** Format: date */
+            orderDate: string;
+            note: string | null;
+            /**
+             * @description The lowest supplier status
+             * @enum {string}
+             */
+            status: "PREPARING" | "SENT" | "IN_TRANSIT" | "ARRIVED" | "ACCOUNTING" | "RECEIVED";
+            createdBy: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            suppliers: components["schemas"]["PurchaseOrderSupplier"][];
+        };
+        PurchaseOrderUpdateRequest: {
+            note?: string | null;
+        };
+        PurchaseOrderAddSuppliersRequest: {
+            supplierIds: number[];
+        };
+        PurchaseOrderMoveRequest: {
+            /**
+             * @description The next status, or the one before
+             * @enum {string}
+             */
+            to: "PREPARING" | "SENT" | "IN_TRANSIT" | "ARRIVED" | "ACCOUNTING" | "RECEIVED";
+        };
+        PurchaseOrderGridUnit: {
+            id: number;
+            name: string;
+            factor: string;
+            isBase: boolean;
+        };
+        PurchaseOrderGridLine: {
+            productUnitId: number;
+            qty: string;
+            qtyBase: string;
+        };
+        PurchaseOrderGridRow: {
+            productId: number;
+            sku: string;
+            name: string;
+            /** @description kg per base unit */
+            weightKg: string | null;
+            /** @description Base first, then by factor */
+            units: components["schemas"]["PurchaseOrderGridUnit"][];
+            homeWarehouseId: number | null;
+            homeWarehouseName: string | null;
+            /** @description On hand in the home warehouse, base units */
+            onHand: string;
+            /** @description The home warehouse’s minimum */
+            minQty: string | null;
+            /** @description Last month’s outflow from the home warehouse, base units */
+            lastMonthOut: string;
+            /** @description Last delivery-note price per base unit (price readers only) */
+            lastBasePrice?: string | null;
+            /** Format: date */
+            lastPriceDate?: string | null;
+            line: components["schemas"]["PurchaseOrderGridLine"] | null;
+            editable: boolean;
+        };
+        PurchaseOrderGridPage: {
+            data: components["schemas"]["PurchaseOrderGridRow"][];
+            nextCursor: string | null;
+            total: number;
+            /** Format: date */
+            outflowFrom: string;
+            /** Format: date */
+            outflowTo: string;
+        };
+        PurchaseOrderGridChange: {
+            productId: number;
+            /** @description The unit now (null with no quantity) */
+            productUnitId: number | null;
+            /** @description The quantity now; null or 0 removes */
+            qty: string | null;
+            /** @description The unit when the page opened (null: no line then) */
+            previousUnitId: number | null;
+            /** @description The quantity when the page opened */
+            previousQty: string | null;
+        };
+        PurchaseOrderGridSaveRequest: {
+            changes: components["schemas"]["PurchaseOrderGridChange"][];
+        };
+        PurchaseOrderGridConflict: {
+            productId: number;
+            productUnitId: number | null;
+            qty: string | null;
+        };
+        PurchaseOrderGridRefusal: {
+            productId: number;
+            /** @enum {string} */
+            reason: "SCOPE" | "NO_HOME" | "NOT_SUPPLIER";
+        };
+        PurchaseOrderGridSaveResult: {
+            applied: number;
+            /** @description Changed by someone else: skipped */
+            conflicts: components["schemas"]["PurchaseOrderGridConflict"][];
+            refused: components["schemas"]["PurchaseOrderGridRefusal"][];
+        };
+        PurchaseOrderSheetLine: {
+            productId: number;
+            sku: string;
+            name: string;
+            warehouseName: string | null;
+            unitName: string;
+            qty: string;
+            qtyBase: string;
+            baseUnitName: string;
+            /** @description kg of the line */
+            weightKg: string | null;
+        };
+        PurchaseOrderSheet: {
+            supplierId: number;
+            supplierName: string;
+            /** @enum {string} */
+            status: "PREPARING" | "SENT" | "IN_TRANSIT" | "ARRIVED" | "ACCOUNTING" | "RECEIVED";
+            ordererName: string | null;
+            lines: components["schemas"]["PurchaseOrderSheetLine"][];
+        };
+        PurchaseOrderPrint: {
+            number: string;
+            /** Format: date */
+            orderDate: string;
+            note: string | null;
+            sheets: components["schemas"]["PurchaseOrderSheet"][];
+        };
+        OrdererCandidate: {
+            id: number;
+            fullName: string;
+        };
+        SupplierOrderer: {
+            supplierId: number;
+            userId: number | null;
+            fullName: string | null;
+        };
+        SupplierOrdererRequest: {
+            /** @description null removes the orderer */
+            userId: number | null;
+        };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "PO_NOT_EDITABLE" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -19146,6 +19596,35 @@ export interface operations {
             };
         };
     };
+    Receipts_notePhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The photo */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Receipts_setDiscounts: {
         parameters: {
             query?: never;
@@ -19223,6 +19702,37 @@ export interface operations {
             };
             path: {
                 id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Receipts_withdraw: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                warehouseId: number;
             };
             cookie?: never;
         };
@@ -29599,6 +30109,443 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SupplierEntries"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PurchaseOrders_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                status?: "PREPARING" | "SENT" | "IN_TRANSIT" | "ARRIVED" | "ACCOUNTING" | "RECEIVED";
+                supplierId?: number;
+                /** @description Orders with a supplier the caller orders from */
+                mine?: boolean;
+                /** @description Order number */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PurchaseOrders_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseOrderCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PurchaseOrders_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PurchaseOrders_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseOrderUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PurchaseOrders_addSuppliers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseOrderAddSuppliersRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PurchaseOrders_removeSupplier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                supplierId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PurchaseOrders_move: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+                supplierId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseOrderMoveRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PurchaseOrders_rows: {
+        parameters: {
+            query?: {
+                /** @description Product code, name or barcode */
+                q?: string;
+                filter?: "ALL" | "ORDERED" | "BELOW_MIN";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+                supplierId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderGridPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PurchaseOrders_saveLines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                supplierId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseOrderGridSaveRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderGridSaveResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PurchaseOrders_print: {
+        parameters: {
+            query?: {
+                /** @description One supplier; all when absent */
+                supplierId?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderPrint"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SupplierOrderers_candidates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrdererCandidate"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SupplierOrderers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                supplierId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierOrderer"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SupplierOrderers_set: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                supplierId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierOrdererRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierOrderer"];
                 };
             };
             /** @description RFC 9457 problem details */

@@ -82,6 +82,11 @@
       "types": "./dist/imports/index.d.ts",
       "default": "./dist/imports/index.js"
     },
+    "./procurement": {
+      "@tugeel/source": "./src/procurement/index.ts",
+      "types": "./dist/procurement/index.d.ts",
+      "default": "./dist/procurement/index.js"
+    },
     "./pricing": {
       "@tugeel/source": "./src/pricing/index.ts",
       "types": "./dist/pricing/index.d.ts",

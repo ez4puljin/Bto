@@ -35,6 +35,13 @@ export const PERMISSIONS = [
   'inventory.costs.manage',
   'inventory.transfers.manage',
   'inventory.issues.manage',
+  // Purchase orders (ADR-0115): read; type quantities (the supplier's orderer, or a keeper for the
+  // own warehouse's products while «Бэлдэж»); every supplier, statuses and orderers; the last
+  // receipt price and the estimated cost beside each line.
+  'procurement.orders.read',
+  'procurement.orders.edit',
+  'procurement.orders.manage',
+  'procurement.prices.read',
   'imports.manage',
   'pricing.manage',
   'pricing.prices.manage',
@@ -127,12 +134,19 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'partners.customer_app.manage',
     'sales.orders.read',
     'sales.orders.manage',
+    'procurement.orders.read',
     'finance.read',
     'pos.read',
     // The office registers bonus card members and resets their PINs (owner 2026-10-28, ADR-0112).
     'pos.loyalty.manage',
   ],
-  PROCUREMENT: [],
+  // Purchase orders by supplier (ADR-0115): managers and senior staff hold this role.
+  PROCUREMENT: [
+    'procurement.orders.read',
+    'procurement.orders.edit',
+    'procurement.orders.manage',
+    'procurement.prices.read',
+  ],
   // Warehouse staff count goods in and out but never see costs; an admin approves adjustments.
   WAREHOUSE: [
     'inventory.locations.manage',
@@ -144,6 +158,9 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'inventory.issues.manage',
     'sales.orders.read',
     'sales.orders.pick',
+    // Keepers type their own warehouse's quantities into an order while «Бэлдэж» (ADR-0115).
+    'procurement.orders.read',
+    'procurement.orders.edit',
   ],
   // The accountant also types TINs the lookup cannot find (SPEC §5.3), sets credit terms, enters
   // the supplier prices of goods receipts (ADR-0033) and the products' e-Barimt data (ADR-0044).
@@ -155,6 +172,9 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'partners.customers.manage',
     'partners.credit.manage',
     'inventory.costs.manage',
+    // The price check compares a receipt with its order's last prices (ADR-0115).
+    'procurement.orders.read',
+    'procurement.prices.read',
     'sales.orders.read',
     // Finance I (ADR-0060): invoices, payments, credit notes and the journal are the accountant's.
     'finance.read',

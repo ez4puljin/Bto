@@ -7,7 +7,13 @@ import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/ca
 import { financeApi, setSetting } from '../harness/finance';
 import { bearer, login, seedUser } from '../harness/identity';
 import { importsApi, sheetOf } from '../harness/imports';
-import { expectReconciled, inventoryApi, type WarehouseJson } from '../harness/inventory';
+import {
+  costReceiptAsTyped,
+  expectReconciled,
+  inventoryApi,
+  postReceipt,
+  type WarehouseJson,
+} from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 import { pricingApi } from '../harness/pricing';
 
@@ -75,7 +81,7 @@ interface TermsJson {
 /**
  * The receipt window as one delivery note (ADR-0078, ADR-0099): prices typed on the draft by a
  * cost holder, VAT taken out for a VAT-paying supplier, the note's discount spread over its priced
- * lines, a fully priced receipt costed at posting, a line's new sale price put in force by the
+ * lines, a priced receipt costed only by the price check (ADR-0115), a line's new sale price put in force by the
  * posting, the last delivery-note prices, the payment method and account, and delivery notes
  * imported from a sheet as drafts into each product's home. Synthetic data only.
  */
@@ -106,8 +112,9 @@ describe('receipt prices and payment', () => {
     (await http().get(`/api/v1/receipts/${id}`).set(bearer(token)).expect(200)).body as ReceiptJson;
   const patchLine = (token: string, id: number, body: Record<string, unknown>) =>
     http().patch(`/api/v1/receipt-lines/${id}`).set(bearer(token)).send(body);
-  const post = (token: string, id: number) =>
-    http().post(`/api/v1/receipts/${id}/post`).set(bearer(token)).set(idempotency());
+  /** Types the note's totals from the lines and confirms (ADR-0115); asserts `status` (200). */
+  const post = (token: string, id: number, status = 200, amount?: string) =>
+    postReceipt(app, token, id, { status, ...(amount === undefined ? {} : { amount }) });
   /** Replaces a draft's discounts (ADR-0103). */
   const setDiscounts = (token: string, id: number, discounts: Record<string, unknown>[]) =>
     http().put(`/api/v1/receipts/${id}/discounts`).set(bearer(token)).send({ discounts });
@@ -120,10 +127,23 @@ describe('receipt prices and payment', () => {
   const posted = async (
     body: Record<string, unknown>,
     discounts: Record<string, unknown>[] = [],
+    amount?: string,
   ) => {
     const draft = (await create(admin, body).expect(201)).body as ReceiptJson;
     if (discounts.length > 0) await setDiscounts(admin, draft.id, discounts).expect(200);
-    return (await post(admin, draft.id).expect(200)).body as ReceiptJson;
+    return (await post(admin, draft.id, 200, amount)).body as ReceiptJson;
+  };
+  /**
+   * Posts a priced receipt, then prices it as typed: the posting no longer costs (ADR-0115), the
+   * accountant's price check does.
+   */
+  const costed = async (
+    body: Record<string, unknown>,
+    discounts: Record<string, unknown>[] = [],
+  ) => {
+    const receipt = await posted(body, discounts);
+    await costReceiptAsTyped(app, admin, receipt.id);
+    return get(admin, receipt.id);
   };
   const list = async (token: string, query: Record<string, unknown>) =>
     (
@@ -230,7 +250,7 @@ describe('receipt prices and payment', () => {
     await app.close();
   });
 
-  it('takes the VAT out of a VAT payer’s prices and costs a fully priced receipt at posting', async () => {
+  it('takes the VAT out of a VAT payer’s prices and costs a fully priced receipt at the price check', async () => {
     const draft = (
       await create(admin, {
         supplierId: vatSupplier,
@@ -273,8 +293,11 @@ describe('receipt prices and payment', () => {
       .body as ReceiptJson;
     expect(changed.lines[0]).toMatchObject({ docAmount: '39600.00', costAmount: '36000.00' });
 
-    const done = (await post(admin, draft.id).expect(200)).body as ReceiptJson;
-    expect(done).toMatchObject({ status: 'POSTED', costingStatus: 'COSTED', costingVersion: 1 });
+    // Fully priced, the posting still waits for the accountant's price check (ADR-0115).
+    const done = (await post(admin, draft.id)).body as ReceiptJson;
+    expect(done).toMatchObject({ status: 'POSTED', costingStatus: 'PENDING', costingVersion: 0 });
+    const checked = (await costReceiptAsTyped(app, admin, draft.id)).body as ReceiptJson;
+    expect(checked).toMatchObject({ costingStatus: 'COSTED', costingVersion: 1 });
     // 36 pieces at 36,000 ex-VAT: 1,000 each.
     expect(await avgOf(water.id)).toMatchObject({ on_hand: '36.000', avg_cost: '1000.0000' });
     const costing = (
@@ -295,7 +318,8 @@ describe('receipt prices and payment', () => {
     ).body as ReceiptJson;
     expect(draft).toMatchObject({ supplierVatPayer: false, vatRatePct: '0' });
     expect(draft.totals).toMatchObject({ docTotal: '25000.00', vatTotal: '0.00', pricedLines: 1 });
-    const done = (await post(admin, draft.id).expect(200)).body as ReceiptJson;
+    // The note's amount: the typed 25,000 and the 4,400 the accountant prices below.
+    const done = (await post(admin, draft.id, 200, '29400')).body as ReceiptJson;
     expect(done).toMatchObject({ costingStatus: 'PENDING', costingVersion: 0 });
     // The accountant's costing starts from the typed price and takes delivery-note amounts.
     const costing = (
@@ -340,9 +364,10 @@ describe('receipt prices and payment', () => {
     }).expect(403);
     // The discounts are cost data too.
     await setDiscounts(worker, draft.id, [{ kind: 'NOTE', pct: '5' }]).expect(403);
-    // An admin prices the same draft; the warehouse still sees no price after posting.
+    // An admin prices the same draft; the warehouse still sees no price after posting and costing.
     await patchLine(admin, line.id, { docAmount: '550' }).expect(200);
-    await post(worker, draft.id).expect(200);
+    await post(worker, draft.id);
+    await costReceiptAsTyped(app, admin, draft.id);
     const seen = await get(worker, draft.id);
     expect(seen).toMatchObject({ costingStatus: 'COSTED' });
     expect(JSON.stringify(seen)).not.toMatch(/docAmount|costAmount|netAmount|discount|totals/);
@@ -390,7 +415,10 @@ describe('receipt prices and payment', () => {
     };
     expect(draft.totals).toEqual(totals);
 
-    const done = (await post(admin, draft.id).expect(200)).body as ReceiptJson;
+    await post(admin, draft.id);
+    // The price check at the typed prices costs it with the draft's discount (ADR-0115).
+    await costReceiptAsTyped(app, admin, draft.id);
+    const done = await get(admin, draft.id);
     expect(done).toMatchObject({ costingStatus: 'COSTED', costingVersion: 1 });
     expect(done.totals).toEqual(totals);
     // The cost is the net amount less its VAT; the valuation keeps the gross and the share.
@@ -434,7 +462,8 @@ describe('receipt prices and payment', () => {
     ]);
     expect(draft.lines.map((line) => line.discountAmount)).toEqual(['33.34', '33.33', '33.33']);
     expect(draft.totals).toMatchObject({ discountTotal: '100.00', netTotal: '2900.00' });
-    await post(admin, draft.id).expect(200);
+    await post(admin, draft.id);
+    await costReceiptAsTyped(app, admin, draft.id);
     expect((await valuations(draft.id)).map((row) => row.amount)).toEqual([
       '966.66',
       '966.67',
@@ -460,20 +489,29 @@ describe('receipt prices and payment', () => {
       expect.objectContaining({ kind: 'NOTE', pct: null, amount: '200.00', total: null }),
     ]);
     expect(changed.totals).toMatchObject({ discountTotal: '0.00', discountTooLarge: true });
-    // 200 off a note of 150: the posting refuses it and changes nothing.
-    const tooLarge = await post(admin, small.id).expect(422);
+    // 200 off a note of 150: the keepers' posting no longer looks at prices (ADR-0115), the
+    // accountant's price check refuses it and changes nothing.
+    await post(admin, small.id);
+    const tooLarge = await costReceiptAsTyped(app, admin, small.id, { status: 422 });
     expect(tooLarge.body).toMatchObject({
       code: 'RECEIPT_DISCOUNT_TOO_LARGE',
       params: { discount: '200.00', total: '150.00', index: 0 },
     });
-    expect((await get(admin, small.id)).status).toBe('DRAFT');
-    await http().post(`/api/v1/receipts/${small.id}/cancel`).set(bearer(admin)).expect(200);
-
-    // So does the accountant's costing.
-    const pending = await posted({
-      supplierId: plainSupplier,
-      lines: [{ productUnitId: unitOf(juice, 'PCS').id, enteredQty: '1' }],
+    expect(await get(admin, small.id)).toMatchObject({
+      costingStatus: 'PENDING',
+      costingVersion: 0,
     });
+    expect(await valuations(small.id)).toEqual([]);
+
+    // So does a discount typed with the costing.
+    const pending = await posted(
+      {
+        supplierId: plainSupplier,
+        lines: [{ productUnitId: unitOf(juice, 'PCS').id, enteredQty: '1' }],
+      },
+      [],
+      '90',
+    );
     expect(pending.costingStatus).toBe('PENDING');
     const refused = await http()
       .put(`/api/v1/receipts/${pending.id}/costs`)
@@ -560,7 +598,7 @@ describe('receipt prices and payment', () => {
       .body as ReceiptJson;
     expect(typed.lines[0]?.salePrice).toBe('1200');
     expect((await view(water.id)).current).toMatchObject({ warehousePrice: '1000' });
-    await post(costClerk, draft.id).expect(200);
+    await post(costClerk, draft.id);
     // In force from the posting's day, with the profile and whole pack of the terms it replaces;
     // the terms already scheduled for tomorrow still follow.
     const after = await view(water.id);
@@ -593,7 +631,7 @@ describe('receipt prices and payment', () => {
         ],
       }).expect(201)
     ).body as ReceiptJson;
-    expect((await post(admin, clash.id).expect(422)).body).toMatchObject({
+    expect((await post(admin, clash.id, 422)).body).toMatchObject({
       code: 'VALIDATION_FAILED',
     });
     await http().post(`/api/v1/receipts/${clash.id}/cancel`).set(bearer(admin)).expect(200);
@@ -607,7 +645,7 @@ describe('receipt prices and payment', () => {
         lines: [{ productUnitId: unitOf(juice, 'PCS').id, enteredQty: '4', salePrice: '900' }],
       }).expect(201)
     ).body as ReceiptJson;
-    expect((await post(admin, bare.id).expect(409)).body).toMatchObject({
+    expect((await post(admin, bare.id, 409)).body).toMatchObject({
       code: 'SALE_PRICE_NO_TERMS',
       params: { productId: juice.id, product: 'Жүүс РП' },
     });
@@ -620,13 +658,13 @@ describe('receipt prices and payment', () => {
   it('reads each product’s newest posted delivery-note price and filters the list by product and date', async () => {
     const older = addDays(today, -5);
     const oldest = addDays(today, -10);
-    const first = await posted({
+    const first = await costed({
       supplierId: plainSupplier,
       supplierDocDate: older,
       lines: [{ productUnitId: unitOf(tea, 'PCS').id, enteredQty: '10', docAmount: '10000' }],
     });
     // The newest note: per box and per piece, before its discount.
-    const newest = await posted(
+    const newest = await costed(
       {
         supplierId: vatSupplier,
         supplierDocDate: today,
@@ -636,12 +674,12 @@ describe('receipt prices and payment', () => {
     );
     expect(newest.lines[0]?.warehouseId).toBe(wh2.id);
     // Posted later, but its note is older; a bonus and a draft carry no price.
-    const late = await posted({
+    const late = await costed({
       supplierId: plainSupplier,
       supplierDocDate: oldest,
       lines: [{ productUnitId: unitOf(tea, 'PCS').id, enteredQty: '1', docAmount: '999' }],
     });
-    const bonus = await posted({
+    const bonus = await costed({
       supplierId: plainSupplier,
       supplierDocDate: today,
       lines: [{ productUnitId: unitOf(tea, 'PCS').id, enteredQty: '1', freeGoods: true }],
@@ -768,7 +806,7 @@ describe('receipt prices and payment', () => {
     await create(admin, { ...base, paymentMethod: 'CASH', moneyAccountId: bank }).expect(422);
     const cash = (await create(admin, { ...base, paymentMethod: 'CASH' }).expect(201))
       .body as ReceiptJson;
-    const missing = await post(admin, cash.id).expect(422);
+    const missing = await post(admin, cash.id, 422);
     expect(missing.body).toMatchObject({ code: 'VALIDATION_FAILED' });
     const named = (
       await http()
@@ -778,7 +816,7 @@ describe('receipt prices and payment', () => {
         .expect(200)
     ).body as ReceiptJson;
     expect(named).toMatchObject({ paymentMethod: 'CASH', moneyAccountName: 'Касс РП' });
-    await post(admin, cash.id).expect(200);
+    await post(admin, cash.id);
     // Back to credit on another draft drops the account.
     const other = (
       await create(admin, { ...base, paymentMethod: 'BANK', moneyAccountId: bank }).expect(201)
@@ -928,7 +966,7 @@ describe('receipt prices and payment', () => {
     const { rows } = await sql.query<{ id: number }>(
       `SELECT id FROM goods_receipts WHERE supplier_doc_no = 'Z-5'`,
     );
-    await post(worker, rows[0]?.id ?? 0).expect(200);
+    await post(worker, rows[0]?.id ?? 0);
     const kept = await imports.revert(good.id);
     expect(kept.status).toBe('COMMITTED');
     expect(kept.lastError).toMatchObject({ code: 'IMPORT_REVERT_BLOCKED' });

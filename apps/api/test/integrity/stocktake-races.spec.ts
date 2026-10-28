@@ -8,7 +8,7 @@ import { StocktakesService } from '../../src/modules/inventory';
 import { connectAs, createHttpApp } from '../harness/apps';
 import { catalogApi, idempotency, unitOf } from '../harness/catalog';
 import { bearer, login, seedUser } from '../harness/identity';
-import { expectReconciled, inventoryApi, staffContext } from '../harness/inventory';
+import { expectReconciled, inventoryApi, postReceipt, staffContext } from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 
 /**
@@ -78,11 +78,7 @@ describe('integrity: stocktake races', () => {
       .set(idempotency())
       .send({ supplierId, lines: [{ productUnitId: unitId, enteredQty: '100' }] })
       .expect(201);
-    await http()
-      .post(`/api/v1/receipts/${(receipt.body as { id: number }).id}/post`)
-      .set(bearer(workerToken))
-      .set(idempotency())
-      .expect(200);
+    await postReceipt(app, workerToken, (receipt.body as { id: number }).id);
   });
   afterAll(async () => {
     await expectReconciled(app);

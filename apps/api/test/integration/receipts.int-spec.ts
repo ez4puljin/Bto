@@ -5,7 +5,12 @@ import request from 'supertest';
 import { connectAs, createHttpApp } from '../harness/apps';
 import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { bearer, login, seedUser } from '../harness/identity';
-import { expectReconciled, inventoryApi, type WarehouseJson } from '../harness/inventory';
+import {
+  expectReconciled,
+  inventoryApi,
+  postReceipt,
+  type WarehouseJson,
+} from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 
 interface LineJson {
@@ -59,8 +64,9 @@ describe('goods receipts', () => {
 
   const create = (token: string, body: Record<string, unknown>) =>
     http().post('/api/v1/receipts').set(bearer(token)).set(idempotency()).send(body);
-  const postReceipt = (token: string, id: number) =>
-    http().post(`/api/v1/receipts/${id}/post`).set(bearer(token)).set(idempotency());
+  /** Types the note's totals from the lines and confirms (ADR-0115); asserts `status`. */
+  const post = (token: string, id: number, status = 200, amount?: string) =>
+    postReceipt(app, token, id, { status, ...(amount === undefined ? {} : { amount }) });
   const stock = async (productId: number) => {
     const { rows } = await sql.query<{ on_hand: string; avg_cost: string }>(
       `SELECT on_hand, avg_cost FROM warehouse_stock WHERE product_id = $1`,
@@ -148,7 +154,7 @@ describe('goods receipts', () => {
       }),
     ]);
     expect(draft.warehouses).toEqual([{ id: wh1.id, name: wh1.name }]);
-    // Rice has no fixed shelf: it lands in its home's receiving area.
+    // Rice has no fixed shelf: the draft shows its home's receiving area (the posting moves it).
     const withRice = await http()
       .post(`/api/v1/receipts/${draft.id}/lines`)
       .set(bearer(worker))
@@ -174,7 +180,7 @@ describe('goods receipts', () => {
       .send({ enteredQty: '3' })
       .expect(200);
 
-    const posted = (await postReceipt(worker, draft.id).expect(200)).body as ReceiptJson;
+    const posted = (await post(worker, draft.id)).body as ReceiptJson;
     expect(posted).toMatchObject({
       status: 'POSTED',
       costingStatus: 'PENDING',
@@ -182,6 +188,9 @@ describe('goods receipts', () => {
     });
     expect(await stock(cola.id)).toMatchObject({ on_hand: '72.000' });
     expect(await stock(rice.id)).toMatchObject({ on_hand: '6.000' });
+    // Posted goods are on sale at once: the fixed shelf, else the sellable «Тавиургүй» shelf, never
+    // the receiving area (ADR-0115).
+    expect(posted.lines.map((line) => line.binCode)).toEqual(['A-01-01', 'NOSHELF']);
     const pending = await http()
       .get('/api/v1/receipts')
       .query({ costingPending: 'true' })
@@ -189,7 +198,7 @@ describe('goods receipts', () => {
       .expect(200);
     expect(pending.body.data).toEqual([expect.objectContaining({ id: draft.id, lineCount: 2 })]);
 
-    const again = await postReceipt(worker, draft.id).expect(409);
+    const again = await post(worker, draft.id, 409);
     expect(again.body.code).toBe('DOC_ALREADY_POSTED');
     await http()
       .post(`/api/v1/receipts/${draft.id}/lines`)
@@ -216,7 +225,7 @@ describe('goods receipts', () => {
     expect(await homeOf(loose.id)).toEqual([]);
     const draft = (await create(worker, { supplierId }).expect(201)).body as ReceiptJson;
     expect(draft.warehouses).toEqual([]);
-    expect((await postReceipt(worker, draft.id).expect(422)).body.code).toBe('VALIDATION_FAILED');
+    expect((await post(worker, draft.id, 422)).body.code).toBe('VALIDATION_FAILED');
     await create(accountant, { supplierId }).expect(403);
 
     // A home moved after the line was entered stops the posting.
@@ -229,7 +238,7 @@ describe('goods receipts', () => {
       }).expect(201)
     ).body as ReceiptJson;
     await inventoryApi(app, admin).setHome(moved.id, wh2.id);
-    expect((await postReceipt(worker, stale.id).expect(409)).body).toMatchObject({
+    expect((await post(worker, stale.id, 409)).body).toMatchObject({
       code: 'PRODUCT_NOT_IN_WAREHOUSE',
       params: { warehouse: wh2.name },
     });
@@ -248,7 +257,7 @@ describe('goods receipts', () => {
       .set(bearer(admin))
       .send({ status: 'INACTIVE' })
       .expect(200);
-    expect((await postReceipt(worker, late.id).expect(409)).body.code).toBe('SUPPLIER_INACTIVE');
+    expect((await post(worker, late.id, 409)).body.code).toBe('SUPPLIER_INACTIVE');
     await http().post(`/api/v1/receipts/${late.id}/cancel`).set(bearer(worker)).expect(200);
   });
 
@@ -271,7 +280,8 @@ describe('goods receipts', () => {
       }).expect(201)
     ).body as ReceiptJson;
     expect(receipt.lines.map((line) => line.binCode)).toEqual(['A-01-02', 'A-01-02']);
-    await postReceipt(worker, receipt.id).expect(200);
+    // The note's amount, which the accountant's price check must match (ADR-0115).
+    await post(worker, receipt.id, 200, '48000');
 
     const seen = await http().get(`/api/v1/receipts/${receipt.id}`).set(bearer(worker)).expect(200);
     expect(keysOf(seen.body).filter((key) => COST_KEYS.test(key))).toEqual([]);
@@ -291,12 +301,16 @@ describe('goods receipts', () => {
     expect(before.body).toMatchObject({ costingVersion: 0, costingStatus: 'PENDING', total: null });
     const [paid, bonus] = before.body.lines as { lineId: number; provisionalUnitCost: string }[];
     expect(paid?.provisionalUnitCost).toBe('0');
-    const cost = (version: number, lines: Record<string, unknown>[]) =>
+    const cost = (version: number, lines: Record<string, unknown>[], noteTotalAmount?: string) =>
       http()
         .put(`/api/v1/receipts/${receipt.id}/costs`)
         .set(bearer(accountant))
         .set(idempotency())
-        .send({ costingVersion: version, lines });
+        .send({
+          costingVersion: version,
+          lines,
+          ...(noteTotalAmount === undefined ? {} : { noteTotalAmount }),
+        });
     await cost(0, [{ lineId: paid?.lineId, unitPrice: '24000' }]).expect(422);
     const costed = await cost(0, [
       { lineId: paid?.lineId, unitPrice: '24000' },
@@ -318,10 +332,13 @@ describe('goods receipts', () => {
       code: 'CONFLICT',
       params: { costingVersion: 1 },
     });
-    await cost(1, [
+    // A recosting away from the note's amount is refused unless the note is corrected with it.
+    const recost = [
       { lineId: paid?.lineId, amount: '60000' },
       { lineId: bonus?.lineId, freeGoods: true },
-    ]).expect(200);
+    ];
+    expect((await cost(1, recost).expect(422)).body.code).toBe('RECEIPT_NOTE_AMOUNT_MISMATCH');
+    await cost(1, recost, '60000').expect(200);
     expect(await stock(tea.id)).toMatchObject({ avg_cost: '833.3334' });
     const { rows } = await sql.query(
       `SELECT version, amount, value_before, value_delta FROM stock_valuation_adjustments
@@ -362,7 +379,7 @@ describe('goods receipts', () => {
       .set(idempotency())
       .send({ factorToBase: '20' })
       .expect(201);
-    expect((await postReceipt(worker, draft.id).expect(409)).body.code).toBe('UNIT_SUPERSEDED');
+    expect((await post(worker, draft.id, 409)).body.code).toBe('UNIT_SUPERSEDED');
   });
 
   it('corrects the delivery note of a draft, never of a posted receipt (ADR-0047 #1)', async () => {
@@ -425,18 +442,18 @@ describe('goods receipts', () => {
       .set(bearer(worker))
       .send({ productUnitId: unitOf(rice, 'PCS').id, enteredQty: '1' })
       .expect(201);
-    await postReceipt(worker, draft.id).expect(200);
+    await post(worker, draft.id);
     expect((await patch(worker, { note: 'Хожуу' }).expect(409)).body.code).toBe(
       'DOC_ALREADY_POSTED',
     );
   });
 
-  it('receives one note into the home of each product, whoever posts it (ADR-0099 #1–#2)', async () => {
+  it('receives one note into the home of each product, each keeper confirming theirs (ADR-0099, ADR-0115)', async () => {
     const inventory = inventoryApi(app, admin);
     const flour = await product('20', 'Гурил');
     await inventory.homeShelf(flour.id, wh2.id, shelf('B-01-01'));
     const salt = await product('21', 'Давс 1кг');
-    // A clerk who writes only WH2 still receives the whole note.
+    // A clerk who writes only WH2 still types the whole note.
     const scoped = (
       await login(app, await seedUser(app, { roles: ['WAREHOUSE'], warehouseIds: [wh2.id] }))
     ).accessToken;
@@ -485,7 +502,22 @@ describe('goods receipts', () => {
     ]);
     const colaBefore = await stock(cola.id);
 
-    const posted = (await postReceipt(scoped, draft.id).expect(200)).body as ReceiptJson;
+    // Each keeper confirms the lines in their own warehouses; the last confirmation posts
+    // (ADR-0115).
+    const half = (await post(scoped, draft.id)).body as ReceiptJson & {
+      confirmations: { warehouseId: number }[];
+    };
+    expect(half).toMatchObject({ status: 'DRAFT', number: null });
+    expect(half.confirmations.map((row) => row.warehouseId)).toEqual([wh2.id]);
+    const posted = (await post(worker, draft.id)).body as ReceiptJson;
+    expect(posted.status).toBe('POSTED');
+    // The salt had no fixed shelf: it is on WH2's sellable «Тавиургүй» shelf.
+    expect(posted.lines.map((line) => [line.warehouseId, line.binCode])).toEqual([
+      [wh1.id, 'A-01-01'],
+      [wh2.id, 'B-01-01'],
+      [wh2.id, 'NOSHELF'],
+      [wh1.id, 'A-01-01'],
+    ]);
     expect(posted.number).toMatch(new RegExp(`^GR-${businessYear()}-\\d{6}$`));
     const ledger = await sql.query<{ warehouse_id: string; product_id: string; qty_base: string }>(
       `SELECT warehouse_id::text, product_id::text, qty_base::text FROM stock_ledger

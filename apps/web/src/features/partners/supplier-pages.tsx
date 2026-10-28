@@ -35,6 +35,7 @@ import {
   useSupplierProducts,
   useSuppliers,
 } from './api';
+import { SupplierOrdererCard } from '@/features/procurement/supplier-orderer-card';
 import { segmentParam } from '@/features/segments/segment-definition';
 import { SegmentFilter } from '@/features/segments/segment-filter';
 import { ContactsCard } from './contacts-card';
@@ -296,6 +297,7 @@ export function SupplierPage() {
             onDelete={(contactId) => mutations.deleteSupplierContact.mutateAsync(contactId)}
           />
           <SupplierProductsCard supplierId={id} />
+          <SupplierOrdererCard supplierId={id} />
         </div>
       </div>
     </div>

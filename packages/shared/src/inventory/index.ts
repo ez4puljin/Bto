@@ -408,6 +408,21 @@ export function canRecost(postedOn: string, today: string): boolean {
 export const RECEIPT_PAYMENT_METHODS = ['CREDIT', 'CASH', 'BANK'] as const;
 export type ReceiptPaymentMethod = (typeof RECEIPT_PAYMENT_METHODS)[number];
 
+/** Where a receipt came from (ADR-0115): typed in the window, a sheet import, a purchase order. */
+export const RECEIPT_ORIGINS = ['MANUAL', 'IMPORT', 'ORDER'] as const;
+export type ReceiptOrigin = (typeof RECEIPT_ORIGINS)[number];
+
+/**
+ * How far the payable may lie from the delivery note's total at the accountant's price check
+ * (ADR-0115, owner 2026-10-29): one tugrik, either way.
+ */
+export const RECEIPT_NOTE_AMOUNT_TOLERANCE = 1;
+
+/** The payable matches the delivery note's total within `RECEIPT_NOTE_AMOUNT_TOLERANCE`. */
+export function noteAmountMatches(payable: DecimalInput, noteTotal: DecimalInput): boolean {
+  return new Decimal(payable).minus(noteTotal).abs().lte(RECEIPT_NOTE_AMOUNT_TOLERANCE);
+}
+
 /**
  * The VAT inside a delivery-note amount at the receipt's rate (0 when the company or the supplier
  * is not a VAT payer), two decimals half up, the way invoices split their lines (ADR-0010 #4).

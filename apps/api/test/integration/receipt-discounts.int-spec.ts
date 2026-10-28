@@ -7,7 +7,13 @@ import { connectAs, createHttpApp } from '../harness/apps';
 import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { setSetting } from '../harness/finance';
 import { bearer, login, seedUser } from '../harness/identity';
-import { expectReconciled, inventoryApi, type WarehouseJson } from '../harness/inventory';
+import {
+  costReceiptAsTyped,
+  expectReconciled,
+  inventoryApi,
+  postReceipt,
+  type WarehouseJson,
+} from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 
 interface LineJson {
@@ -52,8 +58,9 @@ interface ProblemJson {
  * A receipt's discounts on chosen lines and on the whole note (ADR-0103): line discounts first,
  * each on the sum of its lines, then the note's on what remains; the books at the net; a re-costing
  * that replaces them books the difference; a discount larger than its lines is flagged on the draft
- * and refused at posting. The posting links each product to the supplier, and the line picker lists
- * a supplier's products. Synthetic data only.
+ * and refused by the accountant's price check, which alone costs a receipt (ADR-0115). The posting
+ * links each product to the supplier, and the line picker lists a supplier's products. Synthetic
+ * data only.
  */
 describe('receipt discounts and supplier products', () => {
   let app: NestExpressApplication;
@@ -79,8 +86,9 @@ describe('receipt discounts and supplier products', () => {
     (await http().get(`/api/v1/receipts/${id}`).set(bearer(token)).expect(200)).body as ReceiptJson;
   const setDiscounts = (id: number, discounts: Record<string, unknown>[], token = admin) =>
     http().put(`/api/v1/receipts/${id}/discounts`).set(bearer(token)).send({ discounts });
-  const post = (id: number) =>
-    http().post(`/api/v1/receipts/${id}/post`).set(bearer(admin)).set(idempotency());
+  /** Types the note's totals from the lines and confirms (ADR-0115); asserts `status` (200). */
+  const post = (id: number, status = 200, amount?: string) =>
+    postReceipt(app, admin, id, { status, ...(amount === undefined ? {} : { amount }) });
   const cancel = (id: number) =>
     http().post(`/api/v1/receipts/${id}/cancel`).set(bearer(admin)).expect(200);
   const line = (product: ProductJson, qty: string, price: Record<string, unknown> = {}) => ({
@@ -249,10 +257,14 @@ describe('receipt discounts and supplier products', () => {
     };
     expect(typed.totals).toEqual(totals);
 
-    const done = (await post(receipt.id).expect(200)).body as ReceiptJson;
-    expect(done).toMatchObject({ status: 'POSTED', costingStatus: 'COSTED', costingVersion: 1 });
+    // Priced in full, the posting still waits for the price check, which books it (ADR-0115).
+    const done = (await post(receipt.id)).body as ReceiptJson;
+    expect(done).toMatchObject({ status: 'POSTED', costingStatus: 'PENDING', costingVersion: 0 });
     expect(done.totals).toEqual(totals);
     expect(done.discounts?.map((row) => row.total)).toEqual(['1507.00', '3190.00', '770.00']);
+    expect(await linesOf('GOODS_RECEIPT', String(receipt.id))).toEqual({});
+    await costReceiptAsTyped(app, admin, receipt.id);
+    expect(await get(receipt.id)).toMatchObject({ costingStatus: 'COSTED', costingVersion: 1 });
     expect(await valuations(receipt.id)).toEqual([
       { version: 1, doc_amount: '26400.00', discount_amount: '3828.00', amount: '20520.00' },
       { version: 1, doc_amount: '5500.00', discount_amount: '1320.00', amount: '3800.00' },
@@ -286,6 +298,8 @@ describe('receipt discounts and supplier products', () => {
         .send({
           costingVersion: 1,
           discounts: [{ kind: 'NOTE', pct: '10' }],
+          // The note's amount corrected with it: the payable must match it (ADR-0115).
+          noteTotalAmount: '30690',
           lines: [
             { lineId: l1, amount: '26400' },
             { lineId: l2, amount: '5500' },
@@ -322,7 +336,7 @@ describe('receipt discounts and supplier products', () => {
     expect(after.discounts).toHaveLength(1);
   });
 
-  it('flags a discount larger than its lines on the draft and refuses it at posting', async () => {
+  it('flags a discount larger than its lines on the draft and refuses it at the price check', async () => {
     const receipt = await draft(plainSupplier, [line(juice, '1', { docAmount: '100' })]);
     const [only] = receipt.lines.map((row) => row.id);
     // Two line discounts together may not take a line below zero.
@@ -339,24 +353,46 @@ describe('receipt discounts and supplier products', () => {
     });
     expect(flagged.discounts?.map((row) => row.total)).toEqual([null, null]);
     expect(flagged.lines[0]).toMatchObject({ discountAmount: '0.00', netAmount: '100.00' });
-    expect((await post(receipt.id).expect(422)).body as ProblemJson).toMatchObject({
-      code: 'RECEIPT_DISCOUNT_TOO_LARGE',
-      params: { index: 1 },
-    });
     // A note discount above the note.
     const note = (await setDiscounts(receipt.id, [{ kind: 'NOTE', amount: '100.01' }]).expect(200))
       .body as ReceiptJson;
     expect(note.totals?.discountTooLarge).toBe(true);
-    expect((await post(receipt.id).expect(422)).body as ProblemJson).toMatchObject({
-      code: 'RECEIPT_DISCOUNT_TOO_LARGE',
-      params: { discount: '100.01', total: '100.00', index: 0 },
-    });
     // The whole note off fits.
     const whole = (await setDiscounts(receipt.id, [{ kind: 'NOTE', amount: '100' }]).expect(200))
       .body as ReceiptJson;
     expect(whole.totals).toMatchObject({ discountTooLarge: false, netTotal: '0.00' });
-    expect((await get(receipt.id)).status).toBe('DRAFT');
-    await cancel(receipt.id);
+
+    // The keepers' posting no longer looks at prices (ADR-0115); the price check refuses a
+    // discount too large and changes nothing.
+    await post(receipt.id);
+    const check = (discounts?: Record<string, unknown>[]) =>
+      http()
+        .put(`/api/v1/receipts/${receipt.id}/costs`)
+        .set(bearer(admin))
+        .set(idempotency())
+        .send({
+          costingVersion: 0,
+          ...(discounts === undefined ? {} : { discounts }),
+          lines: [{ lineId: only, amount: '100' }],
+        });
+    expect(
+      (
+        await check([
+          { kind: 'LINES', pct: '100', lineIds: [only] },
+          { kind: 'LINES', amount: '50', lineIds: [only] },
+        ]).expect(422)
+      ).body as ProblemJson,
+    ).toMatchObject({ code: 'RECEIPT_DISCOUNT_TOO_LARGE', params: { index: 1 } });
+    expect(
+      (await check([{ kind: 'NOTE', amount: '100.01' }]).expect(422)).body as ProblemJson,
+    ).toMatchObject({
+      code: 'RECEIPT_DISCOUNT_TOO_LARGE',
+      params: { discount: '100.01', total: '100.00', index: 0 },
+    });
+    expect(await get(receipt.id)).toMatchObject({ costingStatus: 'PENDING', costingVersion: 0 });
+    expect(await valuations(receipt.id)).toEqual([]);
+    // The draft's whole-note discount fits.
+    await check().expect(200);
   });
 
   it('checks the discounts it is given and keeps them for cost holders on drafts only', async () => {
@@ -406,7 +442,7 @@ describe('receipt discounts and supplier products', () => {
     expect((await get(receipt.id)).discounts).toHaveLength(1);
 
     // A posted receipt changes its discounts only through the costing.
-    await post(receipt.id).expect(200);
+    await post(receipt.id);
     expect(((await setDiscounts(receipt.id, []).expect(409)).body as ProblemJson).code).toBe(
       'DOC_ALREADY_POSTED',
     );
@@ -420,7 +456,8 @@ describe('receipt discounts and supplier products', () => {
       line(juice, '1'),
     ]);
     const [wasFree, wasPriced, unpriced] = receipt.lines.map((row) => row.id);
-    expect((await post(receipt.id).expect(200)).body).toMatchObject({ costingStatus: 'PENDING' });
+    // The note's amount is what the costing below makes payable (ADR-0115).
+    expect((await post(receipt.id, 200, '370')).body).toMatchObject({ costingStatus: 'PENDING' });
     const costs = (discounts: Record<string, unknown>[]) =>
       http()
         .put(`/api/v1/receipts/${receipt.id}/costs`)
@@ -529,7 +566,7 @@ describe('receipt discounts and supplier products', () => {
     ]);
     // A draft links nothing.
     expect(await linksOf(fresh.id)).toEqual([]);
-    expect((await post(receipt.id).expect(200)).body).toMatchObject({ costingStatus: 'PENDING' });
+    expect((await post(receipt.id)).body).toMatchObject({ costingStatus: 'PENDING' });
 
     // The first link of a product becomes its main supplier; a product with a main keeps it.
     expect(await linksOf(fresh.id)).toEqual([

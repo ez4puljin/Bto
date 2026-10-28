@@ -84,6 +84,10 @@ export function discountsOf(detail: Pick<ReceiptDetail, 'discounts'> | null): Di
 const discountsKey = (discounts: readonly DiscountDraft[]) =>
   JSON.stringify(discounts.map(toDiscountRequest));
 
+/** The lines that arrived (ADR-0115): a line marked «ирээгүй» takes no price. */
+export const arrivedLines = (detail: Pick<ReceiptDetail, 'lines'>) =>
+  detail.lines.filter((line) => !new Decimal(line.qtyBase).isZero());
+
 /** Whether a posted receipt's costs may still be changed (PENDING, or until `recostUntil`). */
 export function costsChangeable(detail: ReceiptDetail): boolean {
   return (
@@ -95,9 +99,10 @@ export function costsChangeable(detail: ReceiptDetail): boolean {
 }
 
 /**
- * The accountant's costs of a posted receipt (ADR-0033, ADR-0047 #1): the prices typed on the lines,
- * sent at once through PUT /costs; «Хадгалаад дараагийнх» then opens the next receipt waiting for
- * its costs. A new costing version (a save, someone else's) starts the fields afresh.
+ * The accountant's price check of a posted receipt (ADR-0033, ADR-0047 #1, ADR-0115): the prices of
+ * the arrived lines, sent at once through PUT /costs with the delivery note's total when it was
+ * corrected; «Батлаад дараагийнх» then opens the next receipt waiting for its check. A new costing
+ * version (a save, someone else's) starts the fields afresh.
  */
 export function usePostedCosts(detail: ReceiptDetail, enabled: boolean) {
   const { t } = useTranslation();
@@ -107,10 +112,13 @@ export function usePostedCosts(detail: ReceiptDetail, enabled: boolean) {
   const pendingReceipts = usePendingReceipts(enabled);
   const costed = detail.costingStatus === 'COSTED';
   const stamp = `${detail.status}:${detail.costingVersion}`;
+  const lines = useMemo(() => arrivedLines(detail), [detail]);
   const initial = useMemo(
-    () => Object.fromEntries(detail.lines.map((line) => [line.id, entryOfLine(line, costed)])),
-    [detail.lines, costed],
+    () => Object.fromEntries(lines.map((line) => [line.id, entryOfLine(line, costed)])),
+    [lines, costed],
   );
+  const savedNote = detail.noteTotalAmount ?? '';
+  const [noteAmount, setNoteAmount] = useState(savedNote);
   const [shownStamp, setShownStamp] = useState(stamp);
   const [entries, setEntries] = useState<Record<number, CostEntry>>({});
   const [saved, setSaved] = useState(false);
@@ -122,17 +130,21 @@ export function usePostedCosts(detail: ReceiptDetail, enabled: boolean) {
     setShownStamp(stamp);
     setEntries({});
     setDiscounts(savedDiscounts);
+    setNoteAmount(savedNote);
     setSaved(false);
   }
 
   const entry = (lineId: number) => entries[lineId] ?? initial[lineId] ?? EMPTY_ENTRY;
-  const amounts = detail.lines.map((line) => entryAmount(entry(line.id), line.enteredQty));
-  const complete = detail.lines.length > 0 && amounts.every((amount) => amount !== null);
+  const amounts = lines.map((line) => entryAmount(entry(line.id), line.enteredQty));
+  const complete = lines.length > 0 && amounts.every((amount) => amount !== null);
+  const typedNote = parseMoney(noteAmount);
+  const noteChanged = typedNote !== null && typedNote !== savedNote;
   const total = amounts.reduce<Decimal>((sum, amount) => sum.plus(amount ?? 0), new Decimal(0));
   const discountChanged = discountsKey(discounts) !== discountsKey(savedDiscounts);
   const dirty =
     discountChanged ||
-    detail.lines.some((line) => !sameEntry(entry(line.id), initial[line.id] ?? EMPTY_ENTRY));
+    noteChanged ||
+    lines.some((line) => !sameEntry(entry(line.id), initial[line.id] ?? EMPTY_ENTRY));
 
   // Navigate once the save has rendered, so the leave question no longer applies.
   useEffect(() => {
@@ -156,7 +168,8 @@ export function usePostedCosts(detail: ReceiptDetail, enabled: boolean) {
         body: {
           costingVersion: detail.costingVersion,
           ...(discountChanged ? { discounts: discounts.map(toDiscountRequest) } : {}),
-          lines: detail.lines.map((line) => {
+          ...(noteChanged ? { noteTotalAmount: typedNote } : {}),
+          lines: lines.map((line) => {
             const value = entry(line.id);
             if (value.free) return { lineId: line.id, freeGoods: true };
             const typed = parseMoney(value.value) ?? value.value.trim();
@@ -181,6 +194,8 @@ export function usePostedCosts(detail: ReceiptDetail, enabled: boolean) {
     discounts,
     changeDiscounts: setDiscounts,
     complete,
+    noteAmount,
+    changeNoteAmount: setNoteAmount,
     dirty,
     saved,
     total,

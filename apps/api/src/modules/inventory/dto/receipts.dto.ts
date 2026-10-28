@@ -16,8 +16,10 @@ import {
 } from 'class-validator';
 import {
   RECEIPT_DISCOUNT_KINDS,
+  RECEIPT_ORIGINS,
   RECEIPT_PAYMENT_METHODS,
   type ReceiptDiscountKind,
+  type ReceiptOrigin,
   type ReceiptPaymentMethod,
 } from '@tugeel/shared/inventory';
 import { PageQueryDto, queryIds } from '../../../common/pagination/page';
@@ -79,6 +81,26 @@ export class ReceiptLineDto {
   @ApiPropertyOptional({ type: String, nullable: true }) vatAmount?: string | null;
   @ApiPropertyOptional({ type: String, nullable: true, description: 'Net amount less VAT' })
   costAmount?: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'What the purchase order expected, in the line’s unit (ADR-0115)',
+  })
+  expectedQty: string | null;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'When the keeper checked the count; null while it waits',
+  })
+  checkedAt: string | null;
+}
+
+@ApiSchema({ name: 'ReceiptConfirmation' })
+export class ReceiptConfirmationDto {
+  @ApiProperty() warehouseId: number;
+  @ApiProperty({ type: String, nullable: true }) confirmedBy: string | null;
+  @ApiProperty({ type: String, format: 'date-time' }) confirmedAt: string;
 }
 
 @ApiSchema({ name: 'ReceiptTotals' })
@@ -186,6 +208,22 @@ export class ReceiptDetailDto {
   @ApiProperty({ type: [ReceiptLineDto] }) lines: ReceiptLineDto[];
   @ApiProperty({ description: 'Σ base qty × weight, kg (lines with a weight)' }) weightKg: string;
   @ApiProperty({ description: 'Lines whose product has no weight' }) weightMissing: number;
+  @ApiProperty({ description: 'Σ base quantity: checked against the note’s pieces' })
+  qtyBase: string;
+  @ApiProperty({ description: 'Lines waiting for the keeper’s check' }) uncheckedLines: number;
+  @ApiProperty({ type: String, nullable: true, description: 'The delivery note’s total pieces' })
+  noteTotalQty: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'The delivery note’s total amount' })
+  noteTotalAmount: string | null;
+  @ApiProperty() hasNotePhoto: boolean;
+  @ApiProperty({ enum: RECEIPT_ORIGINS }) origin: ReceiptOrigin;
+  @ApiProperty({ type: String, nullable: true, description: 'The purchase order’s number' })
+  originRef: string | null;
+  @ApiProperty({
+    type: [ReceiptConfirmationDto],
+    description: 'Warehouses whose keepers confirmed their lines',
+  })
+  confirmations: ReceiptConfirmationDto[];
   // Cost data: present only for holders of inventory.costs.manage.
   @ApiPropertyOptional({ type: [ReceiptDiscountDto], description: 'Cost holders only' })
   discounts?: ReceiptDiscountDto[];
@@ -204,6 +242,8 @@ export class ReceiptSummaryDto {
   @ApiProperty({ enum: RECEIPT_STATUSES }) status: ReceiptStatus;
   @ApiProperty({ enum: COSTING_STATUSES, nullable: true }) costingStatus: CostingStatus | null;
   @ApiProperty({ enum: RECEIPT_PAYMENT_METHODS }) paymentMethod: ReceiptPaymentMethod;
+  @ApiProperty({ enum: RECEIPT_ORIGINS }) origin: ReceiptOrigin;
+  @ApiProperty({ type: String, nullable: true }) originRef: string | null;
   @ApiProperty() lineCount: number;
   @ApiPropertyOptional({
     type: String,
@@ -335,6 +375,24 @@ class ReceiptHeaderFieldsDto {
   @IsInt()
   @Min(1)
   moneyAccountId?: number | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'The delivery note’s total pieces (Σ base quantity), ADR-0115',
+  })
+  @IsOptional()
+  @Matches(QTY)
+  noteTotalQty?: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'The delivery note’s total amount, VAT in',
+  })
+  @IsOptional()
+  @Matches(MONEY)
+  noteTotalAmount?: string | null;
 }
 
 @ApiSchema({ name: 'ReceiptCreateRequest' })
@@ -352,11 +410,26 @@ export class CreateReceiptDto extends ReceiptHeaderFieldsDto {
 @ApiSchema({ name: 'ReceiptUpdateRequest' })
 export class UpdateReceiptDto extends ReceiptHeaderFieldsDto {
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) supplierId?: number;
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'An uploaded photo of the delivery note (kind inventory.receipt_note); null removes',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  notePhotoFileId?: number | null;
 }
 
 @ApiSchema({ name: 'ReceiptLineUpdateRequest' })
 export class UpdateReceiptLineDto {
-  @ApiPropertyOptional({ example: '3' }) @IsOptional() @Matches(QTY) enteredQty?: string;
+  @ApiPropertyOptional({
+    example: '3',
+    description: 'The counted quantity; marks the line checked; 0 = did not arrive (order lines)',
+  })
+  @IsOptional()
+  @Matches(QTY)
+  enteredQty?: string;
   @ApiPropertyOptional({ type: String, nullable: true, description: 'null clears the price' })
   @IsOptional()
   @Matches(MONEY)
@@ -415,6 +488,12 @@ export class CostReceiptDto {
   @IsInt()
   @Min(0)
   costingVersion: number;
+  @ApiPropertyOptional({
+    description: 'Corrects the delivery note’s total amount; the payable must match it within 1₮',
+  })
+  @IsOptional()
+  @Matches(MONEY)
+  noteTotalAmount?: string;
   @ApiProperty({ type: [CostLineRequestDto] })
   @IsArray()
   @ArrayMaxSize(500)
@@ -442,6 +521,18 @@ export class CostedReceiptLineDto {
   @ApiProperty({ type: String, nullable: true, description: 'Per base unit' }) unitCost:
     string | null;
   @ApiProperty() freeGoods: boolean;
+  @ApiProperty({ type: String, nullable: true, description: 'The draft’s price per unit' })
+  docUnitPrice: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'The product’s price per this unit on the receipt posted before (ADR-0115)',
+  })
+  previousUnitPrice: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'The same per base unit' })
+  previousBasePrice: string | null;
+  @ApiProperty({ type: String, format: 'date', nullable: true }) previousDate: string | null;
+  @ApiProperty({ type: String, nullable: true }) previousSupplierName: string | null;
 }
 
 /** Costs of a receipt: only for holders of inventory.costs.manage. */
@@ -458,7 +549,11 @@ export class ReceiptCostingDto {
   @ApiProperty({ type: [ReceiptDiscountDto] }) discounts: ReceiptDiscountDto[];
   @ApiProperty({ type: String, nullable: true, description: 'Σ cost' }) total: string | null;
   @ApiProperty({ type: String, nullable: true, description: 'Σ as typed' }) docTotal: string | null;
-  @ApiProperty({ type: [CostedReceiptLineDto] }) lines: CostedReceiptLineDto[];
+  @ApiProperty({ type: String, nullable: true }) noteTotalQty: string | null;
+  @ApiProperty({ type: String, nullable: true }) noteTotalAmount: string | null;
+  @ApiProperty() hasNotePhoto: boolean;
+  @ApiProperty({ type: [CostedReceiptLineDto], description: 'The arrived lines' })
+  lines: CostedReceiptLineDto[];
 }
 
 export class LastReceiptPricesQueryDto {

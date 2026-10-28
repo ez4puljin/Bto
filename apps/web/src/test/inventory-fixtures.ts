@@ -102,6 +102,14 @@ export const DRAFT: Schemas['ReceiptDetail'] = {
   lines: [],
   weightKg: '0',
   weightMissing: 0,
+  qtyBase: '0',
+  uncheckedLines: 0,
+  noteTotalQty: null,
+  noteTotalAmount: null,
+  hasNotePhoto: false,
+  origin: 'MANUAL',
+  originRef: null,
+  confirmations: [],
 };
 export const BOX_LINE: Schemas['ReceiptLine'] = {
   id: 1,
@@ -120,6 +128,8 @@ export const BOX_LINE: Schemas['ReceiptLine'] = {
   lotId: null,
   weightKg: null,
   salePrice: null,
+  expectedQty: null,
+  checkedAt: STAMP,
 };
 
 export const calls = (fetchMock: ReturnType<typeof signedIn>, method: string, path: string) =>

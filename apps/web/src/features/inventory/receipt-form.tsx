@@ -2,7 +2,7 @@ import type { ProblemDetails } from '@tugeel/api-client';
 import { markupPct } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
-import { Pencil, Printer, Trash2 } from 'lucide-react';
+import { Check, Pencil, Printer, ScanBarcode, Trash2 } from 'lucide-react';
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
@@ -14,6 +14,7 @@ import { RowAction, RowActions } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { ProblemAlert } from '@/components/problem-alert';
 import { StickyActions } from '@/components/sticky-actions';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -40,14 +41,18 @@ import {
   type ReceiptLineUpdate,
   type ReceiptPaymentMethod,
   type ReceiptUpdate,
+  type ReceiptCostingLine,
   useInventoryMutations,
+  useReceiptCosting,
   useReceiptPaymentAccounts,
 } from './api';
 import { type CostEntry, parseMoney } from './helpers';
 import { PriceCells, ReceiptTotals } from './receipt-costing';
 import { ReceiptDiscountsCard } from './receipt-discounts';
 import { type PanelLine, ReceiptLinePanel } from './receipt-line-panel';
+import { ReceiptConfirmations, ReceiptNoteCard } from './receipt-note';
 import {
+  arrivedLines,
   costsChangeable,
   type DiscountDraft,
   discountsOf,
@@ -189,6 +194,11 @@ function LinesTable(props: {
   actions: boolean;
   selectedId?: number | null;
   onSelect?: (line: ReceiptLine) => void;
+  /** The price check (ADR-0115): each line's previous price and the unit price typed now. */
+  previous?: {
+    of: (line: ReceiptLine) => ReceiptCostingLine | undefined;
+    unitPrice: (line: ReceiptLine) => Decimal | null;
+  };
   cells: (
     line: ReceiptLine,
     name: string,
@@ -198,6 +208,7 @@ function LinesTable(props: {
   const productIds = [...new Set(props.lines.map((line) => line.productId))].slice(0, 200);
   const current = useCurrentPricesOf(productIds, productIds.length > 0);
   const priceOf = new Map((current.data ?? []).map((row) => [row.productId, row.warehousePrice]));
+  const expected = props.lines.some((line) => line.expectedQty !== null);
   return (
     <Table ref={props.table}>
       <TableHeader>
@@ -208,8 +219,17 @@ function LinesTable(props: {
           <TableHead>{t('inventory.warehouse')}</TableHead>
           <TableHead>{t('inventory.bin')}</TableHead>
           <TableHead>{t('inventory.unit')}</TableHead>
+          {expected ? (
+            <TableHead className="text-right">{t('inventory.receipt.receive.expected')}</TableHead>
+          ) : null}
           <TableHead className="text-right">{t('inventory.qty')}</TableHead>
           <TableHead className="text-right">{t('inventory.receipt.form.weightColumn')}</TableHead>
+          {props.prices && props.previous ? (
+            <>
+              <TableHead className="text-right">{t('inventory.receipt.check.previous')}</TableHead>
+              <TableHead className="text-right">{t('inventory.receipt.check.diff')}</TableHead>
+            </>
+          ) : null}
           {props.prices ? (
             <>
               <TableHead className="text-right">{t('inventory.receipt.form.unitPrice')}</TableHead>
@@ -259,6 +279,11 @@ function LinesTable(props: {
               <TableCell>{line.warehouseName}</TableCell>
               <TableCell className="font-mono">{line.binCode}</TableCell>
               <TableCell>{line.unitName}</TableCell>
+              {expected ? (
+                <TableCell className="text-right font-mono text-muted-foreground">
+                  {line.expectedQty === null ? t('common.none') : formatQty(line.expectedQty)}
+                </TableCell>
+              ) : null}
               <TableCell className="text-right font-mono">{formatQty(line.enteredQty)}</TableCell>
               <TableCell className="text-right font-mono">
                 {line.weightKg
@@ -267,6 +292,9 @@ function LinesTable(props: {
                     )
                   : t('common.none')}
               </TableCell>
+              {props.prices && props.previous ? (
+                <PreviousCells line={line} previous={props.previous} />
+              ) : null}
               {props.prices ? cells.prices : null}
               <TableCell className="text-right font-mono">
                 {sale === null ? (
@@ -290,6 +318,53 @@ function LinesTable(props: {
         })}
       </TableBody>
     </Table>
+  );
+}
+
+/**
+ * The price check's two cells (ADR-0115): the product's price on the receipt posted before this
+ * one (per this line's unit, with its date and supplier) and how far the typed price lies from it,
+ * highlighted when they differ.
+ */
+function PreviousCells(props: {
+  line: ReceiptLine;
+  previous: NonNullable<Parameters<typeof LinesTable>[0]['previous']>;
+}) {
+  const { t } = useTranslation();
+  const before = props.previous.of(props.line);
+  const now = props.previous.unitPrice(props.line);
+  const was = before?.previousUnitPrice == null ? null : new Decimal(before.previousUnitPrice);
+  const diff =
+    was === null || now === null || was.isZero() ? null : now.minus(was).dividedBy(was).times(100);
+  return (
+    <>
+      <TableCell
+        className="text-right font-mono"
+        title={
+          before?.previousDate
+            ? t('inventory.receipt.check.previousOf', {
+                date: before.previousDate,
+                supplier: before.previousSupplierName ?? '',
+              })
+            : undefined
+        }
+      >
+        {was === null ? t('common.none') : formatMnt(was.toString())}
+      </TableCell>
+      <TableCell className="text-right font-mono">
+        {diff === null ? (
+          t('common.none')
+        ) : diff.isZero() ? (
+          <span className="text-success">
+            <Check className="inline size-4" aria-hidden />
+          </span>
+        ) : (
+          <Badge variant={diff.gt(0) ? 'warning' : 'default'}>
+            {`${diff.gt(0) ? '+' : ''}${diff.toFixed(1)}%`}
+          </Badge>
+        )}
+      </TableCell>
+    </>
   );
 }
 
@@ -340,6 +415,25 @@ function ReceiptView({ detail }: { detail: ReceiptDetail }) {
   const changeable = canCost && costsChangeable(detail);
   const costs = usePostedCosts(detail, changeable);
   const table = useRef<HTMLTableElement>(null);
+  const checking = changeable && detail.costingStatus === 'PENDING';
+  const costing = useReceiptCosting(detail.id, canCost && detail.status === 'POSTED');
+  const previousOf = new Map((costing.data?.lines ?? []).map((line) => [line.lineId, line]));
+  const arrived = arrivedLines(detail);
+  const notArrived = detail.lines.length - arrived.length;
+  /** The unit price the line holds now: typed per unit, else its amount over the quantity. */
+  const unitPriceOf = (line: ReceiptLine): Decimal | null => {
+    const entry = changeable
+      ? costs.entry(line.id)
+      : entryOfLine(line, detail.costingStatus === 'COSTED');
+    if (entry.free || entry.value.trim() === '') return null;
+    const value = new Decimal(entry.value.trim().replace(',', '.'));
+    return entry.source === 'unitPrice' ? value : value.dividedBy(line.enteredQty);
+  };
+  const differing = arrived.filter((line) => {
+    const was = previousOf.get(line.id)?.previousUnitPrice;
+    const now = unitPriceOf(line);
+    return was != null && now !== null && !now.toDecimalPlaces(2).equals(was);
+  }).length;
 
   return (
     <>
@@ -349,7 +443,9 @@ function ReceiptView({ detail }: { detail: ReceiptDetail }) {
           <CardTitle id="receipt-lines-title">{t('inventory.receipt.form.linesTitle')}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          {changeable ? (
+          {checking ? (
+            <p className="text-[13px] text-muted-foreground">{t('inventory.receipt.check.hint')}</p>
+          ) : changeable ? (
             <p className="text-[13px] text-muted-foreground">
               {t('inventory.receipt.form.costHint')}
               {detail.costingStatus === 'COSTED' && detail.recostUntil
@@ -358,11 +454,17 @@ function ReceiptView({ detail }: { detail: ReceiptDetail }) {
             </p>
           ) : null}
           <ProblemAlert problem={costs.problem} />
+          {canCost && differing > 0 ? (
+            <p className="text-[13px] text-warning">
+              {t('inventory.receipt.check.differing', { count: differing })}
+            </p>
+          ) : null}
           <LinesTable
-            lines={detail.lines.filter((line) => !line.freeGoods)}
+            lines={arrived.filter((line) => !line.freeGoods)}
             table={table}
             prices={canCost}
             actions={false}
+            previous={{ of: (line) => previousOf.get(line.id), unitPrice: unitPriceOf }}
             cells={(line, name) => ({
               prices: (
                 <PriceCells
@@ -381,12 +483,18 @@ function ReceiptView({ detail }: { detail: ReceiptDetail }) {
               ),
             })}
           />
+          {notArrived > 0 ? (
+            <p className="text-[13px] text-muted-foreground">
+              {t('inventory.receipt.check.notArrived', { count: notArrived })}
+            </p>
+          ) : null}
           {canCost ? <ReceiptTotals detail={detail} /> : null}
+          {canCost ? <NoteAmountCheck detail={detail} costs={costs} editable={changeable} /> : null}
         </CardContent>
       </Card>
       {canCost ? (
         <ReceiptDiscountsCard
-          lines={detail.lines}
+          lines={arrived}
           discounts={changeable ? costs.discounts : discountsOf(detail)}
           editable={changeable}
           tooLarge={detail.totals?.discountTooLarge}
@@ -409,7 +517,9 @@ function ReceiptView({ detail }: { detail: ReceiptDetail }) {
               disabled={!costs.complete || costs.pending}
               onClick={() => costs.save(false)}
             >
-              {t('inventory.receipt.form.saveCosts')}
+              {checking
+                ? t('inventory.receipt.check.confirm')
+                : t('inventory.receipt.form.saveCosts')}
             </Button>
             <Button disabled={!costs.complete || costs.pending} onClick={() => costs.save(true)}>
               {t('inventory.costing.saveAndNext')}
@@ -424,6 +534,53 @@ function ReceiptView({ detail }: { detail: ReceiptDetail }) {
         leaveLabel={t('inventory.costing.leave')}
       />
     </>
+  );
+}
+
+/**
+ * The delivery note's total beside the payable (ADR-0115): the price check refuses a payable more
+ * than 1₮ from it; the accountant may correct the note's total here (sent with the prices).
+ */
+function NoteAmountCheck(props: {
+  detail: ReceiptDetail;
+  costs: ReturnType<typeof usePostedCosts>;
+  editable: boolean;
+}) {
+  const { t } = useTranslation();
+  const { detail, costs } = props;
+  const discount = new Decimal(detail.totals?.discountTotal ?? 0);
+  const payable = props.editable
+    ? costs.total.minus(discount)
+    : new Decimal(detail.totals?.netTotal ?? 0);
+  const typed = parseMoney(costs.noteAmount);
+  const diff = typed === null ? null : payable.minus(typed);
+  return (
+    <div className="flex flex-wrap items-end gap-3 text-sm">
+      <FormField label={t('inventory.receipt.check.noteAmountFor')} htmlFor="receipt-check-note">
+        <Input
+          id="receipt-check-note"
+          inputMode="decimal"
+          className="w-40 font-mono"
+          disabled={!props.editable}
+          value={costs.noteAmount}
+          onChange={(event) => costs.changeNoteAmount(event.target.value)}
+        />
+      </FormField>
+      <span className="pb-2 text-muted-foreground">
+        {t('inventory.receipt.check.payable')}:{' '}
+        <span className="font-mono">{formatMnt(payable.toString())}</span>
+      </span>
+      {diff === null ? null : diff.abs().lte(1) ? (
+        <Badge variant="success" className="mb-2">
+          <Check />
+          {t('inventory.receipt.check.amountMatch')}
+        </Badge>
+      ) : (
+        <Badge variant="warning" className="mb-2">
+          {t('inventory.receipt.check.amountMismatch', { diff: formatMnt(diff.toString()) })}
+        </Badge>
+      )}
+    </div>
   );
 }
 
@@ -621,7 +778,12 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
       try {
         const posted = await mutations.postReceipt.mutateAsync({ id, key: postKey });
         setConfirm(null);
-        toast.success(t('inventory.receipt.posted', { number: posted.number ?? '' }));
+        // The keeper confirms their warehouses; the last confirmation posts (ADR-0115).
+        toast.success(
+          posted.status === 'POSTED'
+            ? t('inventory.receipt.receive.posted', { number: posted.number ?? '' })
+            : t('inventory.receipt.receive.confirmed'),
+        );
       } catch (error) {
         // A missing or refused account belongs to its field in the header.
         const problem = problemFromError(error);
@@ -786,7 +948,9 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
           )}
         </div>
         <ProblemAlert problem={problemFromError(accounts.error)} onRetry={accounts.refetch} />
+        {detail ? <ReceiptConfirmations detail={detail} /> : null}
       </HeaderCard>
+      {detail ? <ReceiptNoteCard detail={detail} editable /> : null}
       <ReceiptLinePanel
         supplierId={supplier?.id}
         editing={editing}
@@ -884,15 +1048,25 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
         ) : (
           <>
             <PrintLinks id={detail.id} />
-            <Button
-              variant="ghost"
-              onClick={() => {
-                action.clear();
-                setConfirm('cancel');
-              }}
-            >
-              {t('inventory.receipt.cancel')}
-            </Button>
+            {detail.lines.some((line) => line.expectedQty !== null) ? (
+              <Button variant="outline" asChild>
+                <Link to={`/inventory/receipts/${detail.id}/receive`}>
+                  <ScanBarcode />
+                  {t('inventory.receipt.receive.open')}
+                </Link>
+              </Button>
+            ) : null}
+            {detail.origin === 'ORDER' ? null : (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  action.clear();
+                  setConfirm('cancel');
+                }}
+              >
+                {t('inventory.receipt.cancel')}
+              </Button>
+            )}
             <Button disabled={lines.length === 0} onClick={askPost}>
               {t('inventory.receipt.post')}
             </Button>

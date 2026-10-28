@@ -7,7 +7,12 @@ import request from 'supertest';
 import { createHttpApp } from '../harness/apps';
 import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { bearer, login, seedUser } from '../harness/identity';
-import { expectReconciled, inventoryApi, type WarehouseJson } from '../harness/inventory';
+import {
+  expectReconciled,
+  inventoryApi,
+  postReceipt,
+  type WarehouseJson,
+} from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 import { pricingApi } from '../harness/pricing';
 
@@ -172,11 +177,7 @@ describe('segments and filtered lists', () => {
         .set(idempotency())
         .send({ supplierId: msm, lines: [line] })
         .expect(201);
-      await http()
-        .post(`/api/v1/receipts/${(created.body as { id: number }).id}/post`)
-        .set(bearer(admin))
-        .set(idempotency())
-        .expect(200);
+      await postReceipt(app, admin, (created.body as { id: number }).id);
     }
 
     const pricing = pricingApi(app, admin);

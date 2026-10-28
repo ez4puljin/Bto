@@ -103,6 +103,8 @@ export function toReceiptLineDto(line: ReceiptLine, withCosts = false): ReceiptL
     lotId: line.lotId,
     weightKg: line.weightKg?.toFixed() ?? null,
     salePrice: line.salePrice?.toFixed(0) ?? null,
+    expectedQty: line.expectedQty?.toFixed() ?? null,
+    checkedAt: line.checkedAt?.toISOString() ?? null,
     ...(withCosts
       ? {
           docUnitPrice: line.docUnitPrice?.toFixed(2) ?? null,
@@ -145,6 +147,19 @@ export function toReceiptDetailDto(receipt: ReceiptDetail, withCosts = false): R
     lines: receipt.lines.map((line) => toReceiptLineDto(line, withCosts)),
     weightKg: receipt.totals.weightKg.toFixed(),
     weightMissing: receipt.totals.weightMissing,
+    qtyBase: receipt.totals.qtyBase.toFixed(),
+    uncheckedLines: receipt.totals.uncheckedLines,
+    // The note's totals are typed by the keeper from the paper: not cost data (ADR-0115).
+    noteTotalQty: receipt.noteTotalQty?.toFixed() ?? null,
+    noteTotalAmount: receipt.noteTotalAmount?.toFixed(2) ?? null,
+    hasNotePhoto: receipt.hasNotePhoto,
+    origin: receipt.origin,
+    originRef: receipt.originRef,
+    confirmations: receipt.confirmations.map((confirmation) => ({
+      warehouseId: confirmation.warehouseId,
+      confirmedBy: confirmation.confirmedBy,
+      confirmedAt: confirmation.confirmedAt.toISOString(),
+    })),
     ...(withCosts
       ? {
           discounts: receipt.discounts.map(toReceiptDiscountDto),
@@ -174,6 +189,8 @@ export function toReceiptSummaryDto(summary: ReceiptSummary, withCosts = false):
     status: summary.status,
     costingStatus: summary.costingStatus,
     paymentMethod: summary.paymentMethod,
+    origin: summary.origin,
+    originRef: summary.originRef,
     lineCount: summary.lineCount,
     ...(withCosts ? { netAmount: summary.netAmount?.toFixed(2) ?? null } : {}),
     effectiveDate: summary.effectiveDate,
@@ -205,6 +222,9 @@ export function toReceiptCostingDto(costing: ReceiptCosting): ReceiptCostingDto 
     discounts: costing.discounts.map(toReceiptDiscountDto),
     total: costing.total?.toFixed(2) ?? null,
     docTotal: costing.docTotal?.toFixed(2) ?? null,
+    noteTotalQty: costing.noteTotalQty?.toFixed() ?? null,
+    noteTotalAmount: costing.noteTotalAmount?.toFixed(2) ?? null,
+    hasNotePhoto: costing.hasNotePhoto,
     lines: costing.lines.map((line) => ({
       lineId: line.lineId,
       productId: line.productId,
@@ -218,6 +238,11 @@ export function toReceiptCostingDto(costing: ReceiptCosting): ReceiptCostingDto 
       discountAmount: line.discountAmount?.toFixed(2) ?? null,
       unitCost: line.unitCost?.toFixed() ?? null,
       freeGoods: line.freeGoods,
+      docUnitPrice: line.docUnitPrice?.toFixed(2) ?? null,
+      previousUnitPrice: line.previousUnitPrice?.toFixed(2) ?? null,
+      previousBasePrice: line.previousBasePrice?.toFixed(2) ?? null,
+      previousDate: line.previousDate,
+      previousSupplierName: line.previousSupplierName,
     })),
   };
 }

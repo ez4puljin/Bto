@@ -7,7 +7,7 @@ import { connectAs, createHttpApp } from '../harness/apps';
 import { idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { financeApi, type InvoiceJson, salesFlow } from '../harness/finance';
 import { bearer, login, seedUser } from '../harness/identity';
-import { expectReconciled, inventoryApi } from '../harness/inventory';
+import { expectReconciled, inventoryApi, postReceipt } from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 
 /**
@@ -195,11 +195,8 @@ describe('finance stock and cost', () => {
         })
         .expect(201)
     ).body as { id: number; lines: { id: number }[] };
-    await http()
-      .post(`/api/v1/receipts/${draft.id}/post`)
-      .set(bearer(admin))
-      .set(idempotency())
-      .expect(200);
+    // The note's amount is the price the accountant checks below (ADR-0115).
+    await postReceipt(app, admin, draft.id, { amount: '9000' });
     // In at the provisional cost (the average, 700).
     expect(await stockLines('GR', draft.id)).toEqual({
       '140101': '7000.00',

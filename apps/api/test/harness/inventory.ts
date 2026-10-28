@@ -4,7 +4,8 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import { SYSTEM_ROLE_PERMISSIONS, type SystemRole } from '@tugeel/shared/auth';
 import type { AuthContext } from '../../src/modules/identity';
-import { StockPostingService } from '../../src/modules/inventory';
+import { ReceiptsService, StockPostingService } from '../../src/modules/inventory';
+import { idempotency } from './catalog';
 import { bearer } from './identity';
 
 export interface BinJson {
@@ -106,6 +107,69 @@ export function inventoryApi(app: NestExpressApplication, token: string) {
         .expect(200);
     },
   };
+}
+
+/**
+ * Types a draft receipt's delivery-note totals from its own lines (ADR-0115: the pieces exactly,
+ * the amount its typed payable unless `amount` is given) and confirms it as the user behind
+ * `token` — the keepers' step, which posts it once every warehouse is confirmed. Every line must be
+ * checked (lines typed by hand are). Asserts `status` (200) and returns the response.
+ */
+export async function postReceipt(
+  app: NestExpressApplication,
+  token: string,
+  receiptId: number,
+  options: { status?: number; amount?: string; qty?: string } = {},
+): Promise<request.Response> {
+  const http = () => request(app.getHttpServer());
+  const draft = await app.get(ReceiptsService).get(receiptId);
+  if (draft.status === 'DRAFT') {
+    await http()
+      .patch(`/api/v1/receipts/${receiptId}`)
+      .set(bearer(token))
+      .send({
+        noteTotalQty: options.qty ?? draft.totals.qtyBase.toFixed(),
+        noteTotalAmount: options.amount ?? draft.totals.netTotal.toFixed(2),
+      })
+      .expect(200);
+  }
+  return http()
+    .post(`/api/v1/receipts/${receiptId}/post`)
+    .set(bearer(token))
+    .set(idempotency())
+    .expect(options.status ?? 200);
+}
+
+/**
+ * The accountant's price check at the prices typed on the draft (ADR-0115: what the keepers'
+ * posting used to cost at once): every arrived line at its typed amount, or as free goods. Asserts
+ * `status` (200) and returns the response.
+ */
+export async function costReceiptAsTyped(
+  app: NestExpressApplication,
+  token: string,
+  receiptId: number,
+  options: { status?: number; noteTotalAmount?: string } = {},
+): Promise<request.Response> {
+  const receipt = await app.get(ReceiptsService).get(receiptId);
+  return request(app.getHttpServer())
+    .put(`/api/v1/receipts/${receiptId}/costs`)
+    .set(bearer(token))
+    .set(idempotency())
+    .send({
+      costingVersion: receipt.costingVersion,
+      ...(options.noteTotalAmount === undefined
+        ? {}
+        : { noteTotalAmount: options.noteTotalAmount }),
+      lines: receipt.lines
+        .filter((line) => !line.qtyBase.isZero())
+        .map((line) =>
+          line.freeGoods
+            ? { lineId: line.id, freeGoods: true }
+            : { lineId: line.id, amount: (line.docAmount ?? line.qtyBase.times(0)).toFixed(2) },
+        ),
+    })
+    .expect(options.status ?? 200);
 }
 
 /** Fails the test unless the ledger and both balance caches agree (run after every inventory file). */
