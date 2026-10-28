@@ -87,6 +87,7 @@ import { AiReportsPage } from '@/features/ai/reports-page';
 import { BannersPage } from '@/features/customer-app/banners-page';
 import { CustomerAppPage } from '@/features/customer-app/customer-app-page';
 import { PosCashiersPage } from '@/features/pos/cashiers-page';
+import { PosLoyaltyMembersPage } from '@/features/pos/loyalty-members-page';
 import { PosQuickButtonsPage } from '@/features/pos/quick-buttons-page';
 import { PosSalesPage } from '@/features/pos/sales-page';
 import { PosSalePrintPage } from '@/features/pos/sale-print-page';
@@ -583,7 +584,7 @@ export function createAppRouter() {
   return createBrowserRouter(routes);
 }
 
-/** The «Супермаркет» pages (ADR-0063 #8): reads behind pos.read, the settings and the test till behind pos.manage. */
+/** The «Супермаркет» pages (ADR-0063 #8): reads behind pos.read, the settings and the test till behind pos.manage, the bonus card behind pos.loyalty.manage (ADR-0112). */
 function posRoutes(): RouteObject[] {
   const read = (element: ReactNode) => (
     <RequirePermission permission="pos.read">{element}</RequirePermission>
@@ -596,6 +597,15 @@ function posRoutes(): RouteObject[] {
     { path: 'pos/sales', handle: { width: 'wide' }, element: read(<PosSalesPage />) },
     { path: 'pos/voids', handle: { width: 'wide' }, element: read(<PosVoidsPage />) },
     { path: 'pos/vouchers', handle: { width: 'wide' }, element: read(<PosVouchersPage />) },
+    {
+      path: 'pos/members',
+      handle: { width: 'wide' },
+      element: (
+        <RequirePermission permission="pos.loyalty.manage">
+          <PosLoyaltyMembersPage />
+        </RequirePermission>
+      ),
+    },
     { path: 'pos/tills', handle: { width: 'wide' }, element: read(<PosTillsPage />) },
     { path: 'pos/cashiers', handle: { width: 'wide' }, element: read(<PosCashiersPage />) },
     {

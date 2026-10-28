@@ -197,6 +197,7 @@ export function ReceiptView({
           </>
         )}
       </dl>
+      {receipt.loyalty ? <LoyaltyBlock loyalty={receipt.loyalty} /> : null}
       {real ? <EbarimtBlock receipt={receipt} print={print} waiting={waiting} /> : null}
       {credit ? (
         <p className="border-t border-dashed border-input pt-6 font-sans text-xs">
@@ -257,13 +258,66 @@ function EbarimtBlock({
   );
 }
 
+/**
+ * The bonus card's part (ADR-0112): the member, the tier the sale earned at, the points earned,
+ * spent, given back and taken back, and the balance after it as the till counts it.
+ */
+function LoyaltyBlock({ loyalty }: { loyalty: NonNullable<EdgeReceipt['loyalty']> }) {
+  const { t } = useTranslation();
+  const rows: [string, string][] = [
+    [t('posKiosk.loyalty.receipt.earned'), `+${formatMnt(loyalty.earned)}`],
+    [t('posKiosk.loyalty.receipt.spent'), `−${formatMnt(loyalty.spent)}`],
+    [t('posKiosk.loyalty.receipt.givenBack'), `+${formatMnt(loyalty.givenBack)}`],
+    [t('posKiosk.loyalty.receipt.clawback'), `−${formatMnt(loyalty.clawback)}`],
+  ];
+  return (
+    <section
+      aria-label={t('posKiosk.loyalty.title')}
+      className="border-t border-dashed border-input pt-3"
+    >
+      <p className="font-sans font-semibold">
+        {t('posKiosk.loyalty.receipt.member', { name: loyalty.memberName, phone: loyalty.phone })}
+      </p>
+      {loyalty.tierName ? (
+        <p className="font-sans text-xs text-muted-foreground">
+          {t('posKiosk.loyalty.tier', {
+            name: loyalty.tierName,
+            percent: formatMnt(loyalty.percent),
+          })}
+        </p>
+      ) : null}
+      <dl className="grid grid-cols-[1fr_auto] gap-x-3">
+        {rows
+          .filter(
+            (_, index) =>
+              !new Decimal(
+                [loyalty.earned, loyalty.spent, loyalty.givenBack, loyalty.clawback][index] ?? 0,
+              ).isZero(),
+          )
+          .map(([label, value]) => (
+            <Fragment key={label}>
+              <dt>{label}</dt>
+              <dd className="text-right">{value}</dd>
+            </Fragment>
+          ))}
+        <dt className="font-sans font-semibold">{t('posKiosk.loyalty.receipt.balance')}</dt>
+        <dd className="text-right font-semibold">{formatMnt(loyalty.balance)}</dd>
+      </dl>
+    </section>
+  );
+}
+
 /** What a return paid back: off the customer's debt (a credit sale's) or in cash. */
 function RefundRow({ kind, amount }: { kind: string; amount: string }) {
   const { t } = useTranslation();
   return (
     <>
       <dt className="font-sans font-semibold">
-        {kind === 'CREDIT' ? t('posKiosk.receipt.creditRefund') : t('posKiosk.receipt.refund')}
+        {kind === 'CREDIT'
+          ? t('posKiosk.receipt.creditRefund')
+          : kind === 'POINTS'
+            ? t('posKiosk.receipt.pointsRefund')
+            : t('posKiosk.receipt.refund')}
       </dt>
       <dd className="text-right font-semibold">{formatTugrik(amount)}</dd>
     </>

@@ -680,7 +680,7 @@ export class PosLoyaltyService {
         });
       }
     }
-    const change = entries.reduce((sum, entry) => sum.plus(entry.points as Decimal), ZERO);
+    const change = entries.reduce((sum, entry) => sum.plus(entry.points), ZERO);
     const balance = member.balance.plus(change);
     const lifetimeSpend = member.lifetimeSpend.plus(loyalty.spendDelta);
     if (entries.length > 0) await tx.insert(posLoyaltyEntries).values(entries);

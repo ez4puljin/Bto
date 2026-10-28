@@ -4,6 +4,7 @@ import type {
   EdgeApproval,
   EdgeCartLine,
   EdgeCustomer,
+  EdgeMember,
   EdgePrintableReceipt,
   EdgeQuotedVoucher,
   EdgeSaleRequest,
@@ -19,6 +20,7 @@ import {
   Banknote,
   Building2,
   CreditCard,
+  Gift,
   HandCoins,
   Landmark,
   Search,
@@ -40,7 +42,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { formatTugrik } from '@/lib/money';
+import { formatMnt, formatTugrik } from '@/lib/money';
 import { useScanGuard } from '@/lib/scan/use-wedge-scanner';
 import { fieldMoney, moneyOrZero, quickCash, wireMoney } from '../amounts';
 import { edgeProblemOf } from '../edge-client';
@@ -60,6 +62,8 @@ export interface PaymentAttempt {
   codes?: readonly string[];
   vouchers?: readonly EdgeQuotedVoucher[];
   voucherApproval?: EdgeApproval | null;
+  /** ADR-0112: the bonus card member found by phone; points are spent with the member's PIN. */
+  member?: EdgeMember | null;
 }
 
 /** A way to pay as the till lists it; an edge older than ADR-0111 has kinds only (no id). */
@@ -128,6 +132,7 @@ const KIND_ICONS: Record<TenderKind, ReactNode> = {
   TRANSFER: <Landmark aria-hidden className="size-5" />,
   CREDIT: <HandCoins aria-hidden className="size-5" />,
   VOUCHER: <Ticket aria-hidden className="size-5" />,
+  POINTS: <Gift aria-hidden className="size-5" />,
 };
 
 /** The till's types; an older edge sends none, so its kinds stand in for them. */
@@ -154,7 +159,16 @@ function PaymentForm(props: {
   const vouchers = props.attempt.vouchers ?? [];
   // ADR-0110: no credit beside a partner voucher; partner vouchers may leave nothing to pay.
   const partnerPaid = vouchers.some((voucher) => voucher.kind === 'PARTNER');
-  const types = usePayTypes().filter((type) => !(partnerPaid && type.kind === 'CREDIT'));
+  // ADR-0112: a member pays with points (a row of its own) and never on credit.
+  const member = props.attempt.member ?? null;
+  const balance = member ? Decimal.max(new Decimal(member.balance).floor(), 0) : new Decimal(0);
+  const types = [
+    ...usePayTypes().filter((type) => !((partnerPaid || member) && type.kind === 'CREDIT')),
+    ...(member && balance.gt(0)
+      ? [{ id: null, name: t('pos.tenderKinds.POINTS'), kind: 'POINTS' as const }]
+      : []),
+  ];
+  const [pin, setPin] = useState('');
   const [rows, setRows] = useState<PayRow[]>([]);
   const [nextKey, setNextKey] = useState(1);
   const [step, setStep] = useState<'rows' | 'receipt'>('rows');
@@ -197,16 +211,31 @@ function PaymentForm(props: {
   const change = !nonCashOver && cashGiven.gt(cashDue) ? cashGiven.minus(cashDue) : new Decimal(0);
   const covered = valid && !nonCashOver && paid.gte(total) && (total.gt(0) || nothingDue);
   const creditReady = creditRow === null || (customer !== null && creditAmount.gt(0));
-  const ready = covered && creditReady && (rows.length > 0 || nothingDue);
+  const pointsRow = rows.find((row) => row.type.kind === 'POINTS') ?? null;
+  const pointsAmount = sumOf((row) => row.type.kind === 'POINTS');
+  // Whole points, at most the card's balance, with the member's four-digit PIN.
+  const pointsBad = pointsRow !== null && (!pointsAmount.isInteger() || pointsAmount.gt(balance));
+  const pointsReady = pointsRow === null || (!pointsBad && /^[0-9]{4}$/.test(pin));
+  const earnPercent = member?.tier ? new Decimal(member.tier.percent) : new Decimal(0);
+  const earnBase = Decimal.min(
+    Decimal.max(cashDue, 0).plus(
+      sumOf((row) => row.type.kind === 'CARD' || row.type.kind === 'TRANSFER'),
+    ),
+    Decimal.max(total.minus(pointsAmount), 0),
+  );
+  const toEarn = earnBase.times(earnPercent).dividedBy(100).floor();
+  const ready = covered && creditReady && pointsReady && (rows.length > 0 || nothingDue);
 
   const addRow = (type: PayType) => {
     if (type.kind === 'CREDIT' && creditRow) return;
+    if (type.kind === 'POINTS' && pointsRow) return;
+    const prefill = type.kind === 'POINTS' ? Decimal.min(remaining.floor(), balance) : remaining;
     setRows((current) => [
       ...current,
       {
         key: nextKey,
         type,
-        amount: remaining.gt(0) ? fieldMoney(remaining) : '',
+        amount: prefill.gt(0) ? fieldMoney(prefill) : '',
         terminalId: '',
         rrn: '',
       },
@@ -219,6 +248,7 @@ function PaymentForm(props: {
   const removeRow = (key: number) => {
     const removed = rows.find((row) => row.key === key);
     if (removed?.type.kind === 'CREDIT') setCustomer(null);
+    if (removed?.type.kind === 'POINTS') setPin('');
     setRows((current) => current.filter((row) => row.key !== key));
     setOverLimit(null);
   };
@@ -260,6 +290,7 @@ function PaymentForm(props: {
       buyer: !creditRow && type === 'B2B' && buyer ? { tin: buyer.tin } : null,
       customerId: creditRow ? (customer?.id ?? null) : null,
       ...(acceptOverLimit ? { acceptOverLimit: true } : {}),
+      ...(member ? { member: { id: member.id, pin: pointsRow ? pin : null } } : {}),
       ...(props.attempt.codes?.length
         ? {
             codes: [...props.attempt.codes],
@@ -317,6 +348,22 @@ function PaymentForm(props: {
             </li>
           ))}
         </ul>
+      ) : null}
+      {member ? (
+        <p className="flex items-center gap-2 rounded-xl bg-info-soft px-4 py-2 text-[15px]">
+          <Gift aria-hidden className="size-5 text-primary" />
+          <span className="min-w-0 flex-1 truncate">
+            {t('posKiosk.loyalty.payLine', {
+              name: member.name,
+              balance: formatMnt(member.balance),
+            })}
+          </span>
+          {toEarn.gt(0) ? (
+            <span className="font-semibold text-primary">
+              {t('posKiosk.loyalty.toEarn', { points: formatMnt(toEarn.toFixed(2)) })}
+            </span>
+          ) : null}
+        </p>
       ) : null}
       <dl className="grid grid-cols-3 gap-2">
         <Figure
@@ -422,6 +469,30 @@ function PaymentForm(props: {
                   {row.type.kind === 'CREDIT' ? (
                     <CustomerSection customer={customer} onChange={setCustomer} />
                   ) : null}
+                  {row.type.kind === 'POINTS' ? (
+                    <div className="flex items-center gap-3">
+                      <Input
+                        aria-label={t('posKiosk.loyalty.pin')}
+                        placeholder={t('posKiosk.loyalty.pin')}
+                        type="password"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        maxLength={4}
+                        className="h-10 w-40 text-center font-mono text-lg tracking-[0.5em]"
+                        value={pin}
+                        onChange={(event) =>
+                          setPin(event.target.value.replace(/[^0-9]/g, '').slice(0, 4))
+                        }
+                      />
+                      <span className="text-[13px] text-muted-foreground">
+                        {pointsBad
+                          ? t('posKiosk.loyalty.pointsBad', {
+                              balance: formatMnt(balance.toFixed(2)),
+                            })
+                          : t('posKiosk.loyalty.pinHint')}
+                      </span>
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -442,7 +513,10 @@ function PaymentForm(props: {
                     variant="outline"
                     onMouseDown={keepFocus}
                     className="h-12 justify-start gap-2 text-[15px] font-semibold"
-                    disabled={type.kind === 'CREDIT' && creditRow !== null}
+                    disabled={
+                      (type.kind === 'CREDIT' && creditRow !== null) ||
+                      (type.kind === 'POINTS' && pointsRow !== null)
+                    }
                     title={
                       type.kind === 'CREDIT' && creditRow
                         ? t('posKiosk.pay.rows.creditOnce')

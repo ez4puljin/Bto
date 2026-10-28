@@ -105,7 +105,7 @@ export class LoyaltyStore implements OnModuleInit {
     return this.view(await this.standing(member.id));
   }
 
-  async view(standing: MemberStanding): Promise<EdgeMember> {
+  view(standing: MemberStanding): EdgeMember {
     const next = nextTierOf(standing.lifetime, this.tiers());
     return {
       id: standing.member.id,

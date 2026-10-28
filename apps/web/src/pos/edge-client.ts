@@ -38,6 +38,7 @@ import {
   type EdgeVoidRequest,
   type EdgeVoidResponse,
   type EdgeVoucher,
+  type EdgeMember,
 } from '@tugeel/shared/pos';
 
 /** The bound browser's credential (ADR-0067): kept across restarts of the till PC. */
@@ -282,6 +283,12 @@ export class EdgeClient {
   /** ADR-0110: a scanned or typed coupon or partner voucher, as the till may take it today. */
   voucher(code: string, signal?: AbortSignal) {
     return this.request<EdgeVoucher>('GET', `/vouchers/${encodeURIComponent(code)}`, { signal });
+  }
+
+  /** ADR-0112: the bonus card member of a phone (the edge's feed, offline too). */
+  member(phone: string, signal?: AbortSignal) {
+    const query = new URLSearchParams({ phone }).toString();
+    return this.request<EdgeMember>('GET', `/members?${query}`, { signal });
   }
 
   /** ADR-0109: the customers a sale on credit may charge (the edge's feed, offline too). */
