@@ -20986,6 +20986,92 @@
         ]
       }
     },
+    "/api/v1/pos/payment-types": {
+      "get": {
+        "operationId": "PosPaymentTypes_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PosPaymentType"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      },
+      "put": {
+        "operationId": "PosPaymentTypes_replace",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosPaymentTypesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PosPaymentType"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
     "/api/v1/pos/attention": {
       "get": {
         "operationId": "PosAttention_attention",
@@ -20997,6 +21083,73 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PosAttention"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/day-counts": {
+      "get": {
+        "operationId": "PosDayCounts_list",
+        "parameters": [
+          {
+            "name": "tillId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PosDayCount"
+                  }
                 }
               }
             }
@@ -40985,6 +41138,7 @@
               "OTHER_EXPENSE",
               "POS_CASH",
               "CARD_CLEARING",
+              "TRANSFER_CLEARING",
               "POS_SALES",
               "CASH_VARIANCE",
               "AP",
@@ -41127,6 +41281,7 @@
               "OTHER_EXPENSE",
               "POS_CASH",
               "CARD_CLEARING",
+              "TRANSFER_CLEARING",
               "POS_SALES",
               "CASH_VARIANCE",
               "AP",
@@ -43722,6 +43877,11 @@
             "type": "number",
             "example": 9100
           },
+          "printerName": {
+            "type": "string",
+            "nullable": true,
+            "description": "ADR-0111: information only"
+          },
           "drawerKick": {
             "type": "boolean"
           },
@@ -43758,6 +43918,7 @@
           "name",
           "printerHost",
           "printerPort",
+          "printerName",
           "drawerKick",
           "status",
           "lastSaleAt",
@@ -43795,6 +43956,12 @@
             "maximum": 65535,
             "example": 9100
           },
+          "printerName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120,
+            "example": "XP-80C (USB)"
+          },
           "drawerKick": {
             "type": "boolean"
           }
@@ -43821,6 +43988,11 @@
             "type": "number",
             "minimum": 1,
             "maximum": 65535
+          },
+          "printerName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
           },
           "drawerKick": {
             "type": "boolean"
@@ -43936,6 +44108,44 @@
           "status"
         ]
       },
+      "PosShiftPayment": {
+        "type": "object",
+        "properties": {
+          "paymentTypeId": {
+            "type": "number",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "enum": [
+              "CASH",
+              "CARD",
+              "TRANSFER",
+              "CREDIT",
+              "VOUCHER"
+            ],
+            "type": "string"
+          },
+          "sales": {
+            "type": "string",
+            "example": "2515000.00"
+          },
+          "refunds": {
+            "type": "string",
+            "example": "0.00"
+          }
+        },
+        "required": [
+          "paymentTypeId",
+          "name",
+          "kind",
+          "sales",
+          "refunds"
+        ]
+      },
       "PosShift": {
         "type": "object",
         "properties": {
@@ -44047,6 +44257,22 @@
             "example": "0.00",
             "description": "ADR-0110: paid by partner vouchers"
           },
+          "transferSales": {
+            "type": "string",
+            "example": "0.00",
+            "description": "ADR-0111: bank transfers"
+          },
+          "transferRefunds": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "payments": {
+            "description": "On one shift’s read",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosShiftPayment"
+            }
+          },
           "salesTotal": {
             "type": "string",
             "example": "440000.00"
@@ -44117,6 +44343,8 @@
           "creditSales",
           "creditRefunds",
           "voucherSales",
+          "transferSales",
+          "transferRefunds",
           "salesTotal",
           "returnsTotal",
           "salesVat",
@@ -44534,10 +44762,20 @@
             "enum": [
               "CASH",
               "CARD",
+              "TRANSFER",
               "CREDIT",
               "VOUCHER"
             ],
             "type": "string"
+          },
+          "paymentTypeId": {
+            "type": "number",
+            "nullable": true
+          },
+          "paymentTypeName": {
+            "type": "string",
+            "nullable": true,
+            "example": "Khaanbank terminal"
           },
           "amount": {
             "type": "string",
@@ -44565,6 +44803,8 @@
           "id",
           "tenderNo",
           "kind",
+          "paymentTypeId",
+          "paymentTypeName",
           "amount",
           "tendered",
           "terminalId",
@@ -45007,7 +45247,8 @@
               "RETURN",
               "SHIFT_CLOSED",
               "RECEIPT_STATUS",
-              "VOID"
+              "VOID",
+              "DAY_COUNT"
             ],
             "type": "string"
           },
@@ -45086,7 +45327,8 @@
               "RETURN",
               "SHIFT_CLOSED",
               "RECEIPT_STATUS",
-              "VOID"
+              "VOID",
+              "DAY_COUNT"
             ],
             "type": "string"
           },
@@ -45918,6 +46160,98 @@
           }
         }
       },
+      "PosPaymentType": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string",
+            "example": "Khaanbank terminal"
+          },
+          "kind": {
+            "enum": [
+              "CASH",
+              "CARD",
+              "TRANSFER",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "sort": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "status",
+          "sort"
+        ]
+      },
+      "PosPaymentTypeInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Null adds a type"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "kind": {
+            "enum": [
+              "CASH",
+              "CARD",
+              "TRANSFER",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "status"
+        ]
+      },
+      "PosPaymentTypesRequest": {
+        "type": "object",
+        "properties": {
+          "types": {
+            "minItems": 1,
+            "description": "The whole list, in order",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosPaymentTypeInput"
+            }
+          }
+        },
+        "required": [
+          "types"
+        ]
+      },
       "PosAttention": {
         "type": "object",
         "properties": {
@@ -45954,6 +46288,84 @@
           "receiptsToCheck",
           "creditToCheck",
           "vouchersToCheck"
+        ]
+      },
+      "PosDayCountRow": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "number",
+            "enum": [
+              20000,
+              10000,
+              5000,
+              1000,
+              500,
+              100,
+              50
+            ],
+            "example": 20000
+          },
+          "count": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000,
+            "example": 12
+          }
+        },
+        "required": [
+          "note",
+          "count"
+        ]
+      },
+      "PosDayCount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "tillId": {
+            "type": "number"
+          },
+          "tillCode": {
+            "type": "string"
+          },
+          "day": {
+            "type": "string",
+            "example": "2026-10-27"
+          },
+          "cashierUserId": {
+            "type": "number"
+          },
+          "cashierName": {
+            "type": "string",
+            "nullable": true
+          },
+          "counts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosDayCountRow"
+            }
+          },
+          "total": {
+            "type": "string",
+            "example": "2515000.00"
+          },
+          "countedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "tillId",
+          "tillCode",
+          "day",
+          "cashierUserId",
+          "cashierName",
+          "counts",
+          "total",
+          "countedAt"
         ]
       },
       "PosCreditCheckRequest": {
@@ -46077,10 +46489,22 @@
             "enum": [
               "CASH",
               "CARD",
+              "TRANSFER",
               "CREDIT",
               "VOUCHER"
             ],
             "type": "string"
+          },
+          "paymentTypeId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "ADR-0111: the payment type"
+          },
+          "paymentTypeName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
           },
           "amount": {
             "type": "string",
@@ -46551,6 +46975,51 @@
           "total"
         ]
       },
+      "PosDayCountDoc": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tillCode": {
+            "type": "string",
+            "maxLength": 8,
+            "example": "К3"
+          },
+          "day": {
+            "type": "string",
+            "example": "2026-10-27"
+          },
+          "cashierUserId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "counts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosDayCountRow"
+            }
+          },
+          "total": {
+            "type": "string",
+            "example": "2515000.00"
+          },
+          "countedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "clientId",
+          "tillCode",
+          "day",
+          "cashierUserId",
+          "counts",
+          "total",
+          "countedAt"
+        ]
+      },
       "PosSyncEvent": {
         "type": "object",
         "properties": {
@@ -46562,7 +47031,8 @@
               "RETURN",
               "SHIFT_CLOSED",
               "RECEIPT_STATUS",
-              "VOID"
+              "VOID",
+              "DAY_COUNT"
             ],
             "type": "string"
           },
@@ -46588,6 +47058,9 @@
           },
           "voided": {
             "$ref": "#/components/schemas/PosVoidDoc"
+          },
+          "dayCount": {
+            "$ref": "#/components/schemas/PosDayCountDoc"
           }
         },
         "required": [
@@ -46768,8 +47241,8 @@
             "enum": [
               "CASH",
               "CARD",
-              "CREDIT",
-              "VOUCHER"
+              "TRANSFER",
+              "CREDIT"
             ],
             "type": "string"
           },

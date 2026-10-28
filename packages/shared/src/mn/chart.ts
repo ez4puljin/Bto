@@ -22,6 +22,8 @@ export const CHART_ROLES = [
   // bank settles it, the store's sales, and what a count missed or found.
   'POS_CASH',
   'CARD_CLEARING',
+  // ADR-0111: bank transfers at the till, until the accountant matches them with the statement.
+  'TRANSFER_CLEARING',
   'POS_SALES',
   'CASH_VARIANCE',
   // Payables (F3, ADR-0091): what the company owes its suppliers, the VAT inside its purchases,
@@ -77,6 +79,7 @@ export const CHART_TEMPLATE: readonly ChartTemplateAccount[] = [
   // The supermarket POS (ADR-0064 #2).
   { code: '100102', kind: 'ASSET', role: 'POS_CASH' },
   { code: '120301', kind: 'ASSET', role: 'CARD_CLEARING' },
+  { code: '120302', kind: 'ASSET', role: 'TRANSFER_CLEARING' },
   { code: '510102', kind: 'INCOME', role: 'POS_SALES' },
   { code: '740101', kind: 'EXPENSE', role: 'CASH_VARIANCE' },
   // Payables (F3, ADR-0091; temporary codes, TODO-VERIFY D16).

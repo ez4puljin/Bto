@@ -30,7 +30,7 @@ import {
   posTenders,
   posTills,
 } from '../schema';
-import { PosShiftsService, type ShiftTotals } from './pos-shifts.service';
+import { PosShiftsService, type ShiftPayment, type ShiftTotals } from './pos-shifts.service';
 
 export interface ShiftSummary extends ShiftTotals {
   id: number;
@@ -57,6 +57,8 @@ export interface ShiftSummary extends ShiftTotals {
   handoverNumber: string | null;
   handedOverAt: Date | null;
   handedOverByName: string | null;
+  /** ADR-0111: the money by payment type; on one shift's read only. */
+  payments?: ShiftPayment[];
 }
 
 export interface ShiftQuery {
@@ -141,6 +143,9 @@ export interface TenderView {
   id: number;
   tenderNo: number;
   kind: TenderKind;
+  /** ADR-0111: the payment type and its name then; null before it. */
+  paymentTypeId: number | null;
+  paymentTypeName: string | null;
   amount: Decimal;
   tendered: Decimal | null;
   terminalId: string | null;
@@ -276,7 +281,7 @@ export class PosQueryService {
     if (!row) throw notFound('pos_shift', id);
     const [summary] = await this.shiftSummaries([row]);
     if (!summary) throw notFound('pos_shift', id);
-    return summary;
+    return { ...summary, payments: await this.shifts.paymentsByType(id) };
   }
 
   async listSales(query: SaleQuery): Promise<{
@@ -399,6 +404,8 @@ export class PosQueryService {
         id: tender.id,
         tenderNo: tender.tenderNo,
         kind: tender.kind,
+        paymentTypeId: tender.paymentTypeId,
+        paymentTypeName: tender.paymentTypeName,
         amount: tender.amount,
         tendered: tender.tendered,
         terminalId: tender.terminalId,
@@ -622,6 +629,8 @@ export class PosQueryService {
               creditSales: row.creditSales,
               creditRefunds: row.creditRefunds,
               voucherSales: row.voucherSales,
+              transferSales: row.transferSales,
+              transferRefunds: row.transferRefunds,
             };
       result.push({
         ...totals,

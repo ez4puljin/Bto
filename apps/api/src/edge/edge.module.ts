@@ -25,6 +25,7 @@ import { EdgeReturnsService } from './services/returns.service';
 import { EdgeShiftsService } from './services/shifts.service';
 import { SnapshotStore } from './services/snapshot.store';
 import { SyncRunner } from './services/sync.runner';
+import { TillRecordsService } from './services/till-records.service';
 import { EdgeVoidsService } from './services/voids.service';
 
 /** Typed access to the edge's environment for every provider. */
@@ -76,6 +77,7 @@ export class EdgeModule {
         CustomerStore,
         VoucherStore,
         CreditGate,
+        TillRecordsService,
         CentralClient,
         OutboxService,
         SyncRunner,

@@ -525,6 +525,7 @@ function TillForm({
   const [name, setName] = useState(till?.name ?? '');
   const [printerHost, setPrinterHost] = useState(till?.printerHost ?? '');
   const [printerPort, setPrinterPort] = useState(String(till?.printerPort ?? 9100));
+  const [printerName, setPrinterName] = useState(till?.printerName ?? '');
   const [drawerKick, setDrawerKick] = useState(till?.drawerKick ?? true);
   const [status, setStatus] = useState<Till['status']>(till?.status ?? 'ACTIVE');
   const [checked, setChecked] = useState(false);
@@ -547,6 +548,7 @@ function TillForm({
             name: name.trim(),
             printerHost: printerHost.trim() || null,
             printerPort: port,
+            printerName: printerName.trim() || null,
             drawerKick,
             status,
           });
@@ -558,6 +560,7 @@ function TillForm({
             name: name.trim(),
             printerHost: printerHost.trim() || null,
             printerPort: port,
+            printerName: printerName.trim() || null,
             drawerKick,
           });
           toast.success(t('pos.tills.created'));
@@ -626,6 +629,18 @@ function TillForm({
             />
           </FormField>
         </div>
+        <FormField
+          label={t('pos.fields.printerName')}
+          htmlFor="till-printer-name"
+          hint={t('pos.tills.printerNameHint')}
+        >
+          <Input
+            id="till-printer-name"
+            value={printerName}
+            maxLength={120}
+            onChange={(event) => setPrinterName(event.target.value)}
+          />
+        </FormField>
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem]">
           <FormField label={t('pos.fields.printerHost')} htmlFor="till-printer">
             <Input

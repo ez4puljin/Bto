@@ -9,11 +9,35 @@ import { Decimal, type DecimalInput, toMoney } from '../money';
 
 /**
  * How a sale is paid at the till; no QPay (ADR-0080, SPEC §6.6 #4). CREDIT (ADR-0109) is the part a
- * registered customer owes: the centre invoices it, and the sale carries no e-Barimt. VOUCHER
- * (ADR-0110) is a partner voucher's part: the centre bills the partner its face value.
+ * registered customer owes: the centre invoices it, and the sale carries no e-Barimt. TRANSFER
+ * (ADR-0111) is a bank transfer the cashier saw arrive in the store's account. VOUCHER (ADR-0110)
+ * is a partner voucher's part: the centre bills the partner its face value.
  */
-export const TENDER_KINDS = ['CASH', 'CARD', 'CREDIT', 'VOUCHER'] as const;
+export const TENDER_KINDS = ['CASH', 'CARD', 'TRANSFER', 'CREDIT', 'VOUCHER'] as const;
 export type TenderKind = (typeof TENDER_KINDS)[number];
+
+/** The kinds an admin's payment type may have (ADR-0111); VOUCHER comes only from a scanned code. */
+export const PAYMENT_TYPE_KINDS = ['CASH', 'CARD', 'TRANSFER', 'CREDIT'] as const;
+export type PaymentTypeKind = (typeof PAYMENT_TYPE_KINDS)[number];
+
+/**
+ * The till's banknotes for the day summary's count (owner 2026-10-27, ADR-0111), largest first;
+ * the counts are only kept, they post nothing.
+ */
+export const DENOMINATIONS = [20_000, 10_000, 5_000, 1_000, 500, 100, 50] as const;
+export type Denomination = (typeof DENOMINATIONS)[number];
+
+export function isDenomination(value: unknown): value is Denomination {
+  return typeof value === 'number' && (DENOMINATIONS as readonly number[]).includes(value);
+}
+
+/** What the counted notes come to: Σ note × count. */
+export function denominationTotal(counts: readonly { note: number; count: number }[]): Decimal {
+  return counts.reduce(
+    (sum, row) => sum.plus(new Decimal(row.note).times(row.count)),
+    new Decimal(0),
+  );
+}
 
 /** A sale, or a return that names the sale it takes goods back from. */
 export const SALE_KINDS = ['SALE', 'RETURN'] as const;
@@ -35,6 +59,7 @@ export const POS_EVENT_KINDS = [
   'SHIFT_CLOSED',
   'RECEIPT_STATUS',
   'VOID',
+  'DAY_COUNT',
 ] as const;
 export type PosEventKind = (typeof POS_EVENT_KINDS)[number];
 
@@ -73,6 +98,10 @@ export const POS_LIMITS = {
   maxQuickGroups: 12,
   maxQuickButtons: 60,
   maxQuickLabel: 40,
+  /** ADR-0111: the till's payment types and a note's count on the day summary. */
+  maxPaymentTypes: 12,
+  maxPaymentTypeName: 40,
+  maxNoteCount: 100_000,
   /** A printed receipt's heading or closing line (ADR-0065). */
   maxReceiptText: 200,
   pairingCodeMinutes: 15,

@@ -59,6 +59,8 @@ export interface IssueInput {
   lines: EdgeReceiptLine[];
   cash: Decimal;
   card: Decimal;
+  /** ADR-0111: a bank transfer at the till (`BANK_TRANSFER`). */
+  transfer: Decimal;
   /** ADR-0110: what partner vouchers paid, sent under VOUCHER_PAYMENT_CODE. */
   voucher?: Decimal;
   total: Decimal;
@@ -159,7 +161,7 @@ export class EbarimtService implements OnApplicationBootstrap {
       customerTin: input.customerTin,
       customerName: input.customerName,
       lines: input.lines,
-      payments: payments(input.cash, input.card, input.voucher),
+      payments: payments(input.cash, input.card, input.transfer, input.voucher),
       total: input.total,
       vatTotal: input.vatTotal,
     });
@@ -230,15 +232,16 @@ export class EbarimtService implements OnApplicationBootstrap {
     }
     const total = kept.reduce((sum, line) => sum.plus(line.total), new Decimal(0));
     const vat = kept.reduce((sum, line) => sum.plus(line.vat), new Decimal(0));
-    const paidByCard = new Decimal(
-      first.payments?.find((payment) => payment.code === 'PAYMENT_CARD')?.amount ?? 0,
-    );
-    const card = Decimal.min(paidByCard, total);
+    // The card and transfer parts are kept up to the new total, the rest is cash.
+    const paidBy = (code: EbarimtPaymentCode) =>
+      new Decimal(first.payments?.find((payment) => payment.code === code)?.amount ?? 0);
+    const card = Decimal.min(paidBy('PAYMENT_CARD'), total);
+    const transfer = Decimal.min(paidBy('BANK_TRANSFER'), total.minus(card));
     await tx.insert(edgeReceipts).values({
       ...common,
       op: 'ISSUE',
       lines: kept,
-      payments: payments(total.minus(card), card),
+      payments: payments(total.minus(card).minus(transfer), card, transfer),
       total,
       vatTotal: vat,
     });
@@ -778,11 +781,13 @@ export class EbarimtService implements OnApplicationBootstrap {
 function payments(
   cash: Decimal,
   card: Decimal,
+  transfer: Decimal,
   voucher: Decimal = new Decimal(0),
 ): { code: EbarimtPaymentCode; amount: string }[] {
   const sums = new Map<EbarimtPaymentCode, Decimal>([
     ['CASH', cash],
     ['PAYMENT_CARD', card],
+    ['BANK_TRANSFER', transfer],
   ]);
   sums.set(VOUCHER_PAYMENT_CODE, (sums.get(VOUCHER_PAYMENT_CODE) ?? new Decimal(0)).plus(voucher));
   return [...sums]

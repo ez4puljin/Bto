@@ -6,6 +6,7 @@ import {
   RECEIPT_TYPES,
   SALE_KINDS,
   SHIFT_STATUSES,
+  PAYMENT_TYPE_KINDS,
   TENDER_KINDS,
   VOID_REASONS,
   VOUCHER_BATCH_STATUSES,
@@ -168,6 +169,11 @@ export const posTills = pgTable(
     printerHost: text('printer_host'),
     printerPort: integer('printer_port').notNull().default(9100),
     drawerKick: boolean('drawer_kick').notNull().default(true),
+    /**
+     * ADR-0111: the till PC's receipt printer as the admin noted it (information only: Chrome
+     * prints to the PC's Windows default printer with --kiosk-printing).
+     */
+    printerName: text('printer_name'),
     /** sha-256 of the one-time code a manager types to bind a browser to this till (S2). */
     pairingCodeHash: text('pairing_code_hash'),
     pairingExpiresAt: timestamp('pairing_expires_at', { withTimezone: true }),
@@ -303,6 +309,13 @@ export const posShifts = pgTable(
     voucherSales: money('voucher_sales')
       .notNull()
       .default(sql`0`),
+    /** ADR-0111: bank transfers taken (and given back) at the till. */
+    transferSales: money('transfer_sales')
+      .notNull()
+      .default(sql`0`),
+    transferRefunds: money('transfer_refunds')
+      .notNull()
+      .default(sql`0`),
     /** The core's journal entry (`fin.journal_entries`, ADR-0089): a plain id. */
     journalEntryId: ref('journal_entry_id'),
     journalNumber: text('journal_number'),
@@ -335,7 +348,7 @@ export const posShifts = pgTable(
     ),
     check(
       'pos_shifts_money',
-      sql`${t.cashSales} >= 0 AND ${t.cashRefunds} >= 0 AND ${t.creditSales} >= 0 AND ${t.creditRefunds} >= 0 AND ${t.voucherSales} >= 0 AND ${t.cardSales} >= 0 AND ${t.cardRefunds} >= 0 AND ${t.salesTotal} >= 0 AND ${t.returnsTotal} >= 0 AND ${t.salesCount} >= 0 AND ${t.returnsCount} >= 0 AND (${t.countedCash} IS NULL OR ${t.countedCash} >= 0) AND (${t.floatKept} IS NULL OR ${t.floatKept} >= 0)`,
+      sql`${t.cashSales} >= 0 AND ${t.cashRefunds} >= 0 AND ${t.creditSales} >= 0 AND ${t.creditRefunds} >= 0 AND ${t.voucherSales} >= 0 AND ${t.transferSales} >= 0 AND ${t.transferRefunds} >= 0 AND ${t.cardSales} >= 0 AND ${t.cardRefunds} >= 0 AND ${t.salesTotal} >= 0 AND ${t.returnsTotal} >= 0 AND ${t.salesCount} >= 0 AND ${t.returnsCount} >= 0 AND (${t.countedCash} IS NULL OR ${t.countedCash} >= 0) AND (${t.floatKept} IS NULL OR ${t.floatKept} >= 0)`,
     ),
     check('pos_shifts_note', sql`${textLength(t.note, POS_LIMITS.maxNote)}`),
   ],
@@ -534,6 +547,9 @@ export const posTenders = pgTable(
       .references(() => posSales.id),
     tenderNo: smallint('tender_no').notNull(),
     kind: text('kind', { enum: TENDER_KINDS }).notNull(),
+    /** ADR-0111: the admin's payment type the cashier chose and its name then; null before it. */
+    paymentTypeId: ref('payment_type_id').references((): AnyPgColumn => posPaymentTypes.id),
+    paymentTypeName: text('payment_type_name'),
     /** What this tender settles of the sale (a refund: what was given back). */
     amount: money('amount').notNull(),
     /** Cash handed over, at least `amount`; the difference is the change. */
@@ -547,6 +563,10 @@ export const posTenders = pgTable(
   (t) => [
     uniqueIndex('pos_tenders_sale_no').on(t.saleId, t.tenderNo),
     check('pos_tenders_voucher', sql`(${t.kind} = 'VOUCHER') = (${t.voucherId} IS NOT NULL)`),
+    check(
+      'pos_tenders_payment_type_name',
+      sql`(${t.paymentTypeId} IS NULL) = (${t.paymentTypeName} IS NULL) AND (${textLength(t.paymentTypeName, POS_LIMITS.maxPaymentTypeName)})`,
+    ),
     check('pos_tenders_kind', inList(t.kind, TENDER_KINDS)),
     check('pos_tenders_amount', sql`${t.amount} > 0`),
     check(
@@ -730,6 +750,70 @@ export const posVoidLines = pgTable(
     index('pos_void_lines_product_idx').on(t.productId),
     check('pos_void_lines_qty', sql`${t.qty} > 0`),
     check('pos_void_lines_money', sql`${t.unitPrice} >= 0 AND ${t.total} >= 0`),
+  ],
+);
+
+/**
+ * The ways to pay the admin offers at the till (ADR-0111), in the till's order: cash, a bank's card
+ * terminal, a bank transfer, credit. Never deleted (tenders name them): a type taken off the till
+ * is INACTIVE. At most one active CASH and one active CREDIT type.
+ */
+export const posPaymentTypes = pgTable(
+  'pos_payment_types',
+  {
+    id: id(),
+    name: text('name').notNull(),
+    kind: text('kind', { enum: PAYMENT_TYPE_KINDS }).notNull(),
+    sort: smallint('sort').notNull(),
+    status: text('status', { enum: POS_STATUSES }).notNull().default('ACTIVE'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('pos_payment_types_name').on(t.name),
+    uniqueIndex('pos_payment_types_one_cash')
+      .on(t.kind)
+      .where(sql`${t.status} = 'ACTIVE' AND ${t.kind} IN ('CASH', 'CREDIT')`),
+    check('pos_payment_types_kind', inList(t.kind, PAYMENT_TYPE_KINDS)),
+    check('pos_payment_types_status', inList(t.status, POS_STATUSES)),
+    check(
+      'pos_payment_types_name_length',
+      sql`length(${t.name}) BETWEEN 1 AND ${lim(POS_LIMITS.maxPaymentTypeName)}`,
+    ),
+    check('pos_payment_types_sort_range', sql`${t.sort} >= 0`),
+  ],
+);
+
+/**
+ * A till's banknote count for its day summary (ADR-0111, owner 2026-10-27): kept as counted, never
+ * posted; a recount is a new row, the latest of a till and day is the one shown. Append-only.
+ */
+export const posDayCounts = pgTable(
+  'pos_day_counts',
+  {
+    id: id(),
+    clientId: uuid('client_id').notNull(),
+    edgeNodeId: ref('edge_node_id')
+      .notNull()
+      .references(() => posEdgeNodes.id),
+    tillId: ref('till_id')
+      .notNull()
+      .references(() => posTills.id),
+    day: text('day').notNull(),
+    cashierUserId: ref('cashier_user_id')
+      .notNull()
+      .references(() => users.id),
+    /** [{ note, count }] for the notes counted, largest first. */
+    counts: jsonValue('counts').notNull(),
+    total: money('total').notNull(),
+    countedAt: timestamp('counted_at', { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('pos_day_counts_client').on(t.edgeNodeId, t.clientId),
+    index('pos_day_counts_till_day_idx').on(t.tillId, t.day, t.id),
+    check('pos_day_counts_day', sql`${t.day} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'`),
+    check('pos_day_counts_total', sql`${t.total} >= 0`),
   ],
 );
 

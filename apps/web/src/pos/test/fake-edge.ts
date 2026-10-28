@@ -2,6 +2,7 @@ import { Decimal } from '@tugeel/shared/money';
 import {
   EDGE_API_PREFIX,
   type EdgeCashier,
+  type EdgeDaySummary,
   type EdgeDeviceInfo,
   type EdgeHealth,
   type EdgePrintableReceipt,
@@ -228,6 +229,46 @@ export function printable(
   return { receipt, print, copy };
 }
 
+/** The till's day (ADR-0111) before any count: three payment types, the float plus cash sales. */
+export function daySummaryOf(day: string): EdgeDaySummary {
+  return {
+    tillCode: TILL.code,
+    tillName: TILL.name,
+    day,
+    startedAt: '2026-10-17T01:00:00.000Z',
+    salesCount: 3,
+    returnsCount: 1,
+    payments: [
+      {
+        paymentTypeId: 1,
+        name: 'Бэлэн мөнгө',
+        kind: 'CASH',
+        sales: '45000.00',
+        refunds: '3000.00',
+        net: '42000.00',
+      },
+      {
+        paymentTypeId: 2,
+        name: 'Карт',
+        kind: 'CARD',
+        sales: '18000.00',
+        refunds: '0.00',
+        net: '18000.00',
+      },
+      {
+        paymentTypeId: 3,
+        name: 'Хаан банк',
+        kind: 'TRANSFER',
+        sales: '5000.00',
+        refunds: '0.00',
+        net: '5000.00',
+      },
+    ],
+    expectedCash: '92000.00',
+    counted: null,
+  };
+}
+
 /** A paired till with a signed-in cashier and an open shift; `extra` replaces or adds routes. */
 export function storeRoutes(extra: Record<string, EdgeHandler> = {}): Record<string, EdgeHandler> {
   return {
@@ -244,6 +285,8 @@ export function storeRoutes(extra: Record<string, EdgeHandler> = {}): Record<str
     },
     'POST /sales': (call) => json(printable(receiptOf(call.body as EdgeSaleRequest))),
     'GET /sales/recent': () => json([]),
+    'GET /sales': () => json([]),
+    'GET /day-summary': (call) => json(daySummaryOf(call.url.searchParams.get('day') ?? '')),
     'GET /supervisors': () => json([SUPERVISOR]),
     'POST /voids': (call) => {
       const body = call.body as { clientId: string; approval: { pin: string } | null };

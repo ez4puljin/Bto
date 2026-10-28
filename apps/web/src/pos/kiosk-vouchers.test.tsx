@@ -7,6 +7,7 @@ import {
   type EdgeQuotedVoucher,
   type EdgeSaleRequest,
   formatVoucherCode,
+  type SnapshotPaymentType,
   voucherCodeOf,
 } from '@tugeel/shared/pos';
 import { describe, expect, it } from 'vitest';
@@ -19,12 +20,19 @@ import {
   MILK_BARCODE,
   problem,
   quoteOf,
+  SESSION,
   storeRoutes,
   SUPERVISOR,
 } from './test/fake-edge';
 import { renderKiosk } from './test/render-kiosk';
 
 const k = mn.posKiosk;
+const TYPES: SnapshotPaymentType[] = [
+  { id: 1, name: 'Бэлэн', kind: 'CASH' },
+  { id: 4, name: 'Зээл', kind: 'CREDIT' },
+];
+const typeButton = (pay: HTMLElement, name: string) =>
+  within(pay).queryByRole('button', { name: new RegExp(`^[0-9]+ ?${name}$`) });
 const COUPON = voucherCodeOf('COUPON', '000000000001');
 const VOUCHER = voucherCodeOf('PARTNER', '000000000002');
 const UNKNOWN = voucherCodeOf('COUPON', '999999999999');
@@ -85,6 +93,7 @@ function quoteWithCodes(request: EdgeQuoteRequest) {
 
 async function openSale(milks: number) {
   const routes: Record<string, EdgeHandler> = {
+    'GET /session': () => json({ ...SESSION, paymentTypes: TYPES }),
     'POST /quote': (call) => json(quoteWithCodes(call.body as EdgeQuoteRequest)),
     'POST /approvals/check': (call) => {
       const body = call.body as { pin: string };
@@ -136,15 +145,17 @@ describe('kiosk: coupons and partner vouchers (ADR-0110)', () => {
     expect(within(pay).getByText(k.vouchers.due)).toBeInTheDocument();
     expect(within(pay).getAllByText('1,300₮').length).toBeGreaterThan(0);
     // No credit beside a partner voucher.
-    expect(within(pay).queryByRole('radio', { name: k.pay.mode.CREDIT })).toBeNull();
-    await user.click(within(pay).getByRole('button', { name: k.pay.exact }));
-    await user.click(within(pay).getByRole('button', { name: k.pay.confirm }));
+    await waitFor(() => expect(typeButton(pay, 'Бэлэн')).not.toBeNull());
+    expect(typeButton(pay, 'Зээл')).toBeNull();
+    await user.click(typeButton(pay, 'Бэлэн') as HTMLElement);
+    await user.click(within(pay).getByRole('button', { name: k.pay.print }));
+    await user.click(within(pay).getByRole('button', { name: k.pay.receiptChoice.B2C }));
     await screen.findByRole('dialog', { name: k.receipt.title });
     const sale = edge.callsTo('POST /sales')[0]?.body as EdgeSaleRequest;
     expect(sale).toMatchObject({
       codes: [COUPON, VOUCHER],
       voucherApproval: { supervisorUserId: SUPERVISOR.userId, pin: '654321' },
-      tenders: [{ kind: 'CASH', amount: '1300.00', tendered: '1300.00' }],
+      tenders: [{ kind: 'CASH', paymentTypeId: 1, amount: '1300.00', tendered: '1300.00' }],
     });
   });
 
@@ -170,8 +181,9 @@ describe('kiosk: coupons and partner vouchers (ADR-0110)', () => {
     await user.click(within(dialog).getByRole('button', { name: k.vouchers.toPayment }));
     await approve(user);
     const pay = await screen.findByRole('dialog', { name: k.pay.title });
-    expect(within(pay).queryByRole('radiogroup', { name: k.pay.mode.title })).toBeNull();
-    await user.click(within(pay).getByRole('button', { name: k.pay.confirm }));
+    expect(within(pay).getByText(k.vouchers.allPaid)).toBeInTheDocument();
+    await user.click(within(pay).getByRole('button', { name: k.pay.print }));
+    await user.click(within(pay).getByRole('button', { name: k.pay.receiptChoice.B2C }));
     await screen.findByRole('dialog', { name: k.receipt.title });
     const sale = edge.callsTo('POST /sales')[0]?.body as EdgeSaleRequest;
     expect(sale).toMatchObject({ codes: [VOUCHER], tenders: [] });

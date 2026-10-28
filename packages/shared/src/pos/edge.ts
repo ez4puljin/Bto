@@ -51,6 +51,9 @@ export interface SaleDocLineWire {
 
 export interface TenderWire {
   kind: TenderKind;
+  /** ADR-0111: the admin's payment type the cashier chose and its name; absent on older edges. */
+  paymentTypeId?: number | null;
+  paymentTypeName?: string | null;
   amount: string;
   tendered: string | null;
   terminalId: string | null;
@@ -161,6 +164,18 @@ export interface VoidDocWire {
   total: string;
 }
 
+/** The till's banknote count for its day summary (ADR-0111): kept, never posted. */
+export interface DayCountDocWire {
+  clientId: string;
+  tillCode: string;
+  /** The Ulaanbaatar business day it counts. */
+  day: string;
+  cashierUserId: number;
+  counts: { note: number; count: number }[];
+  total: string;
+  countedAt: string;
+}
+
 /** What the edge learnt of a sale's (or a return's) receipt after it replayed it (ADR-0065). */
 export interface ReceiptStatusDocWire {
   saleClientId: string;
@@ -174,7 +189,8 @@ export type SyncEventWire =
   | { kind: 'SHIFT_OPENED'; clientId: string; shiftOpened: ShiftOpenDocWire }
   | { kind: 'SHIFT_CLOSED'; clientId: string; shiftClosed: ShiftCloseDocWire }
   | { kind: 'TILL_BOUND'; clientId: string; tillBound: TillBoundDocWire }
-  | { kind: 'RECEIPT_STATUS'; clientId: string; receiptStatus: ReceiptStatusDocWire };
+  | { kind: 'RECEIPT_STATUS'; clientId: string; receiptStatus: ReceiptStatusDocWire }
+  | { kind: 'DAY_COUNT'; clientId: string; dayCount: DayCountDocWire };
 
 export interface SyncOutcomeWire {
   clientId: string;
@@ -284,6 +300,13 @@ export interface SnapshotCashier {
   supervisor: boolean;
 }
 
+/** A way to pay the admin offers at the till (ADR-0111), in the order the till lists them. */
+export interface SnapshotPaymentType {
+  id: number;
+  name: string;
+  kind: TenderKind;
+}
+
 /** A quick button: a product unit the admin put on the till's F7 panel (ADR-0104). */
 export interface SnapshotQuickButton {
   productId: number;
@@ -320,6 +343,8 @@ export interface PosSnapshot {
   programs: SnapshotProgram[];
   /** The F7 panel's groups in order; absent in a snapshot taken before ADR-0104. */
   quickGroups?: SnapshotQuickGroup[];
+  /** ADR-0111: the active payment types in order; absent in a snapshot taken before it. */
+  paymentTypes?: SnapshotPaymentType[];
 }
 
 /**
@@ -575,6 +600,9 @@ export interface EdgeShiftSummary {
   creditRefunds?: string;
   /** ADR-0110: paid by partner vouchers; absent on older edges. */
   voucherSales?: string;
+  /** ADR-0111: bank transfers; and every payment type's sales less refunds, in the till's order. */
+  transferSales?: string;
+  payments?: EdgePaymentTotal[];
   expectedCash: string;
   closedAt: string | null;
   countedCash: string | null;
@@ -590,6 +618,8 @@ export interface EdgeSession {
   companyName: string | null;
   /** Whether a void or a return needs a supervisor's PIN (the store's settings, ADR-0104). */
   approvalRequired?: boolean;
+  /** ADR-0111: the payment types the till offers, in order; absent from an older edge. */
+  paymentTypes?: SnapshotPaymentType[];
 }
 
 export interface EdgeShiftOpenRequest {
@@ -700,6 +730,8 @@ export interface EdgeQuoteResponse {
 
 export interface EdgeTenderInput {
   kind: TenderKind;
+  /** ADR-0111: the payment type chosen; the edge takes the kind from it. */
+  paymentTypeId?: number | null;
   amount: string;
   /** Cash handed over; the change is what exceeds the amount. */
   tendered?: string | null;
@@ -861,7 +893,13 @@ export interface EdgeReceipt {
   discountTotal: string;
   total: string;
   vatTotal: string;
-  tenders: { kind: TenderKind; amount: string; tendered: string | null }[];
+  tenders: {
+    kind: TenderKind;
+    amount: string;
+    tendered: string | null;
+    /** ADR-0111: the payment type's name as printed; absent on older receipts. */
+    name?: string | null;
+  }[];
   change: string;
   /** ADR-0110: the coupons and partner vouchers taken (amount = what each took off or paid). */
   vouchers?: { code: string; kind: VoucherKind; name: string; amount: string }[];
@@ -916,6 +954,58 @@ export interface EdgePrintableReceipt {
   print: EdgePrintSecrets | null;
   /** Printed before, or the secrets are gone: «ХУУЛБАР». */
   copy: boolean;
+}
+
+/** One payment type's money on a shift or a day (ADR-0111). */
+export interface EdgePaymentTotal {
+  paymentTypeId: number | null;
+  name: string;
+  kind: TenderKind;
+  sales: string;
+  refunds: string;
+  net: string;
+}
+
+/** A sale or a return in the till's history (ADR-0111), newest first. */
+export interface EdgeSaleListItem {
+  clientId: string;
+  kind: SaleKind;
+  number: string;
+  soldAt: string;
+  total: string;
+  /** The payment types' names (or the kinds' on older sales). */
+  payments: string[];
+  customerName: string | null;
+  receiptType: ReceiptType | null;
+  ebarimtStatus: EbarimtStatus | null;
+}
+
+/** The till's day (ADR-0111): its money by payment type and the banknotes counted last. */
+export interface EdgeDaySummary {
+  tillCode: string;
+  tillName: string;
+  day: string;
+  /** When the day's first shift opened on this till; null without a shift. */
+  startedAt: string | null;
+  salesCount: number;
+  returnsCount: number;
+  payments: EdgePaymentTotal[];
+  /** The float of the day's first shift plus cash sales less cash refunds. */
+  expectedCash: string;
+  counted: {
+    clientId: string;
+    counts: { note: number; count: number }[];
+    total: string;
+    cashierName: string;
+    countedAt: string;
+  } | null;
+}
+
+export interface EdgeDayCountRequest {
+  /** A uuid drawn once per count: a repeated request keeps the same count. */
+  clientId: string;
+  day: string;
+  counts: { note: number; count: number }[];
 }
 
 /** A company found by its registration number or TIN (`api.ebarimt.mn`, online only). */

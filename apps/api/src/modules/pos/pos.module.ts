@@ -9,6 +9,7 @@ import { SalesModule } from '../sales';
 import {
   PosCashiersController,
   PosEdgeNodesController,
+  PosPaymentTypesController,
   PosQuickButtonsController,
   PosSettingsController,
   PosTillsController,
@@ -16,6 +17,7 @@ import {
 import { PosDevController } from './controllers/pos-dev.controller';
 import {
   PosAttentionController,
+  PosDayCountsController,
   PosRejectionsController,
   PosSalesController,
   PosShiftsController,
@@ -32,6 +34,8 @@ import { PinHasher } from './pin-hasher';
 import { PosAcceptService } from './services/pos-accept.service';
 import { PosCashiersService } from './services/pos-cashiers.service';
 import { PosCustomersService } from './services/pos-customers.service';
+import { PosDayCountsService } from './services/pos-day-counts.service';
+import { PosPaymentTypesService } from './services/pos-payment-types.service';
 import { PosDevService } from './services/pos-dev.service';
 import { PosEdgeNodesService } from './services/pos-edge-nodes.service';
 import { PosQueryService } from './services/pos-query.service';
@@ -55,6 +59,8 @@ const SERVICES = [
   PosQuickButtonsService,
   PosCustomersService,
   PosVouchersService,
+  PosPaymentTypesService,
+  PosDayCountsService,
   PosAcceptService,
   PosReplayService,
   PosQueryService,
@@ -98,7 +104,9 @@ export class PosModule {}
     PosQuickButtonsController,
     PosVoucherBatchesController,
     PosSaleVouchersController,
+    PosPaymentTypesController,
     PosAttentionController,
+    PosDayCountsController,
     PosSyncController,
     PosDevController,
   ],

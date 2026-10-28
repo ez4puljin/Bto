@@ -1,4 +1,4 @@
-# Runbook: a till's receipt printer and the store PosAPI (POS S3, ADR-0065)
+# Runbook: a till's receipt printer and the store PosAPI (POS S3, ADR-0065; USB printers ADR-0111)
 
 The kiosk prints each receipt with Chrome's own printing on the till's Windows PC, through the 80 mm printer's Windows driver. The e-Barimt comes from the store PosAPI on the LAN, called by the store edge.
 
@@ -14,7 +14,8 @@ The kiosk prints each receipt with Chrome's own printing on the till's Windows P
 
    A till is paired per address: `http://localhost:7400` and `http://<LAN address>:7400` are two different devices to the browser, so keep the shortcut's address (a new address asks for a fresh pairing code from «Супермаркет → Касс»). `--kiosk-printing` sends `window.print()` straight to the default printer. Chrome must be fully closed (also from the tray) before the shortcut is used, or the flag is ignored. `--kiosk` (full screen) may be added once the till is set up.
 4. Without the flag, Chrome's print dialog opens on every receipt: pick the 80 mm printer, «Margins: None», and print. This is the fallback when the default printer is another one.
-5. Test: sell with the fake provider (the receipt says «ТУРШИЛТЫН БАРИМТ»), check that the Mongolian letters (Ө, Ү) and the QR code print sharp. The cash drawer is opened with its key; nothing is sent to it.
+5. ADR-0111, a USB printer (the owner's tills): plug it in, install its driver, make it the default printer (step 2) and start the till only from the shortcut (step 3); «Хэвлэх» then prints at once with no window. Note the printer's name on the till in «Супермаркет → Касс» (`printer_name`, information only: Bto cannot choose a printer, Windows does). The till's menu «Хэвлэгч шалгах» prints a short test slip; the day summary («Өдрийн нэгтгэл») and the receipt copies from «Борлуулалтын түүх» print the same way.
+6. Test: sell with the fake provider (the receipt says «ТУРШИЛТЫН БАРИМТ»), check that the Mongolian letters (Ө, Ү) and the QR code print sharp. The cash drawer is opened with its key; nothing is sent to it.
 
 ## The edge and the store PosAPI
 

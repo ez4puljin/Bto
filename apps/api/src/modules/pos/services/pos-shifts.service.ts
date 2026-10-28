@@ -48,6 +48,18 @@ export interface ShiftTotals {
   creditRefunds: Decimal;
   /** ADR-0110: the VOUCHER tenders of the sales (a voucher's part is never refunded). */
   voucherSales: Decimal;
+  /** ADR-0111: bank transfers taken at the till, and given back. */
+  transferSales: Decimal;
+  transferRefunds: Decimal;
+}
+
+/** One payment type's money on a shift (ADR-0111), in the till's order; null type = older tenders. */
+export interface ShiftPayment {
+  paymentTypeId: number | null;
+  name: string | null;
+  kind: TenderKind;
+  sales: Decimal;
+  refunds: Decimal;
 }
 
 /**
@@ -62,6 +74,7 @@ export interface ShiftBooked {
   /** Cash taken by the invoiced sales less cash paid back by the credited returns. */
   cash: Decimal;
   card: Decimal;
+  transfer: Decimal;
 }
 
 const NOTHING_BOOKED: ShiftBooked = {
@@ -71,6 +84,7 @@ const NOTHING_BOOKED: ShiftBooked = {
   returnsVat: new Decimal(0),
   cash: new Decimal(0),
   card: new Decimal(0),
+  transfer: new Decimal(0),
 };
 
 export interface HandoverInput {
@@ -245,6 +259,8 @@ export class PosShiftsService {
         creditSales: totals.creditSales,
         creditRefunds: totals.creditRefunds,
         voucherSales: totals.voucherSales,
+        transferSales: totals.transferSales,
+        transferRefunds: totals.transferRefunds,
         journalEntryId: entry?.id ?? null,
         journalNumber: entry?.number ?? null,
         updatedAt: sql`now()`,
@@ -356,6 +372,8 @@ export class PosShiftsService {
         creditSales: tender('SALE', 'CREDIT'),
         creditRefunds: tender('RETURN', 'CREDIT'),
         voucherSales: tender('SALE', 'VOUCHER'),
+        transferSales: tender('SALE', 'TRANSFER'),
+        transferRefunds: tender('RETURN', 'TRANSFER'),
       })
       .from(posTenders)
       .innerJoin(posSales, eq(posSales.id, posTenders.saleId))
@@ -375,7 +393,34 @@ export class PosShiftsService {
       creditSales: money(tenders?.creditSales),
       creditRefunds: money(tenders?.creditRefunds),
       voucherSales: money(tenders?.voucherSales),
+      transferSales: money(tenders?.transferSales),
+      transferRefunds: money(tenders?.transferRefunds),
     };
+  }
+
+  /** The shift's money by payment type (ADR-0111): the till's lines of its Z. */
+  async paymentsByType(shiftId: number, executor: Db | Tx = this.db): Promise<ShiftPayment[]> {
+    const rows = await executor
+      .select({
+        paymentTypeId: posTenders.paymentTypeId,
+        name: sql<string | null>`max(${posTenders.paymentTypeName})`,
+        kind: posTenders.kind,
+        sales: sql<string>`coalesce(sum(${posTenders.amount}) FILTER (WHERE ${posSales.kind} = 'SALE'), 0)`,
+        refunds: sql<string>`coalesce(sum(${posTenders.amount}) FILTER (WHERE ${posSales.kind} = 'RETURN'), 0)`,
+        first: sql<number>`min(${posTenders.id})`,
+      })
+      .from(posTenders)
+      .innerJoin(posSales, eq(posSales.id, posTenders.saleId))
+      .where(eq(posSales.shiftId, shiftId))
+      .groupBy(posTenders.paymentTypeId, posTenders.kind)
+      .orderBy(sql`min(${posTenders.id})`);
+    return rows.map((row) => ({
+      paymentTypeId: row.paymentTypeId,
+      name: row.name,
+      kind: row.kind,
+      sales: new Decimal(row.sales),
+      refunds: new Decimal(row.refunds),
+    }));
   }
 
   /** The part of the shift its credit sales and returns booked themselves (ADR-0109). */
@@ -392,10 +437,10 @@ export class PosShiftsService {
       })
       .from(posSales)
       .where(eq(posSales.shiftId, shiftId));
-    const paid = (tenderKind: 'CASH' | 'CARD') =>
+    const paid = (tenderKind: 'CASH' | 'CARD' | 'TRANSFER') =>
       sql<string>`coalesce(sum(CASE WHEN ${posTenders.kind} = ${tenderKind} AND ${own} THEN (CASE WHEN ${posSales.kind} = 'SALE' THEN ${posTenders.amount} ELSE -${posTenders.amount} END) ELSE 0 END), 0)`;
     const [tenders] = await executor
-      .select({ cash: paid('CASH'), card: paid('CARD') })
+      .select({ cash: paid('CASH'), card: paid('CARD'), transfer: paid('TRANSFER') })
       .from(posTenders)
       .innerJoin(posSales, eq(posSales.id, posTenders.saleId))
       .where(eq(posSales.shiftId, shiftId));
@@ -407,6 +452,7 @@ export class PosShiftsService {
       returnsVat: money(header?.returnsVat),
       cash: money(tenders?.cash),
       card: money(tenders?.card),
+      transfer: money(tenders?.transfer),
     };
   }
 
@@ -524,7 +570,7 @@ export function shiftCloseLines(input: {
     ShiftTotals,
     'cardSales' | 'cardRefunds' | 'returnsTotal' | 'returnsVat' | 'salesTotal' | 'salesVat'
   > &
-    Partial<Pick<ShiftTotals, 'voucherSales'>>;
+    Partial<Pick<ShiftTotals, 'voucherSales' | 'transferSales' | 'transferRefunds'>>;
   booked?: ShiftBooked;
 }): JournalLineInput[] {
   const { totals } = input;
@@ -541,6 +587,12 @@ export function shiftCloseLines(input: {
       amount: totals.cardSales.minus(totals.cardRefunds).minus(booked.card),
     },
     { role: 'VOUCHER_CLEARING', amount: totals.voucherSales ?? ZERO },
+    {
+      role: 'TRANSFER_CLEARING',
+      amount: (totals.transferSales ?? ZERO)
+        .minus(totals.transferRefunds ?? ZERO)
+        .minus(booked.transfer),
+    },
     { role: 'CASH_VARIANCE', amount: input.variance.negated() },
     { role: 'SALES_RETURN', amount: returnsTotal.minus(returnsVat) },
     { role: 'POS_SALES', amount: salesTotal.minus(salesVat).negated() },

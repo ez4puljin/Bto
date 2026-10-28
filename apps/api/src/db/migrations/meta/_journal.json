@@ -341,7 +341,14 @@
     {
       "idx": 48,
       "version": "7",
-      "when": 1793098039000,
+      "when": 1793098127788,
+      "tag": "0050_pos_payment_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1793147018247,
       "tag": "0049_pos_vouchers",
       "breakpoints": true
     }

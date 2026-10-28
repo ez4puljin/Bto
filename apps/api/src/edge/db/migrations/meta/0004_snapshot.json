@@ -1,9 +1,98 @@
 {
-  "id": "74160d6b-9668-48e7-816b-ac19ce3a232a",
-  "prevId": "f4eca4c3-4e57-427f-8f96-24510c8526e4",
+  "id": "088ec7d3-3f0b-4f89-ad05-30646577acd0",
+  "prevId": "ddb30fdf-76c5-4bb8-a5b3-cc0929de93cf",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.edge_day_counts": {
+      "name": "edge_day_counts",
+      "schema": "",
+      "columns": {
+        "client_id": {
+          "name": "client_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "till_code": {
+          "name": "till_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day": {
+          "name": "day",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cashier_user_id": {
+          "name": "cashier_user_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cashier_name": {
+          "name": "cashier_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "counts": {
+          "name": "counts",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total": {
+          "name": "total",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "counted_at": {
+          "name": "counted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "edge_day_counts_till_day_idx": {
+          "name": "edge_day_counts_till_day_idx",
+          "columns": [
+            {
+              "expression": "till_code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "day",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "counted_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.edge_devices": {
       "name": "edge_devices",
       "schema": "",
@@ -648,6 +737,13 @@
         },
         "credit_amount": {
           "name": "credit_amount",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "transfer_amount": {
+          "name": "transfer_amount",
           "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": true,

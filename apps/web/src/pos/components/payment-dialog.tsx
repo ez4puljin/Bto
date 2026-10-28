@@ -10,20 +10,25 @@ import type {
   EdgeTaxpayer,
   EdgeTenderInput,
   ReceiptType,
+  SnapshotPaymentType,
+  TenderKind,
 } from '@tugeel/shared/pos';
 import { cn } from 'cn';
 import {
+  ArrowLeft,
   Banknote,
   Building2,
   CreditCard,
   HandCoins,
+  Landmark,
   Search,
-  Shuffle,
+  Ticket,
   TriangleAlert,
   User,
   UserRound,
+  X,
 } from 'lucide-react';
-import { type FormEvent, type ReactNode, useState } from 'react';
+import { type FormEvent, type KeyboardEvent, type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,7 +40,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { formatTugrik } from '@/lib/money';
 import { useScanGuard } from '@/lib/scan/use-wedge-scanner';
 import { fieldMoney, moneyOrZero, quickCash, wireMoney } from '../amounts';
@@ -43,6 +47,7 @@ import { edgeProblemOf } from '../edge-client';
 import { useKiosk } from '../kiosk-context';
 import { keepFocus, typeDigits } from '../keys';
 import { useProblemText } from '../messages';
+import { useSession } from '../queries';
 import { KioskAlert } from './layout';
 
 export interface PaymentAttempt {
@@ -57,14 +62,28 @@ export interface PaymentAttempt {
   voucherApproval?: EdgeApproval | null;
 }
 
-/** How the customer pays (ADR-0109): the cashier chooses it before the amounts. */
-const PAY_MODES = ['CASH', 'CARD', 'MIXED', 'CREDIT'] as const;
-type PayMode = (typeof PAY_MODES)[number];
+/** A way to pay as the till lists it; an edge older than ADR-0111 has kinds only (no id). */
+interface PayType {
+  id: number | null;
+  name: string;
+  kind: TenderKind;
+}
+
+/** One payment row the cashier added: its type, its amount, a card's slip facts. */
+interface PayRow {
+  key: number;
+  type: PayType;
+  amount: string;
+  terminalId: string;
+  rrn: string;
+}
 
 /**
- * «Төлбөр (F12)» (ADR-0109): the payment chosen first — cash with the quick notes, card, the two
- * mixed, or credit to a registered customer (part of it paid now if the customer wishes) — then
- * the receipt, «Хувь хүн» or «Байгууллага» (a sale with credit gets none); Enter pays.
+ * «Төлбөр (F12)» (ADR-0111, owner 2026-10-27): the admin's payment types as buttons (1–9 add the
+ * one in that place); each tap adds a row with what is left to pay, typed over as needed — cash may
+ * exceed it (the change), the rest may not; a CREDIT row needs its customer (ADR-0109). When the
+ * rows make the total, «Баримт хэвлэх» asks «Хувь хүн НӨАТ» or «Байгууллага НӨАТ» — a sale with
+ * credit prints its slip without VAT at once.
  */
 export function PaymentDialog(props: {
   open: boolean;
@@ -103,12 +122,26 @@ function ignoreScan(): void {
   // A scan during the payment is dropped; the cart is closed while the customer pays.
 }
 
-const MODE_ICONS: Record<PayMode, ReactNode> = {
+const KIND_ICONS: Record<TenderKind, ReactNode> = {
   CASH: <Banknote aria-hidden className="size-5" />,
   CARD: <CreditCard aria-hidden className="size-5" />,
-  MIXED: <Shuffle aria-hidden className="size-5" />,
+  TRANSFER: <Landmark aria-hidden className="size-5" />,
   CREDIT: <HandCoins aria-hidden className="size-5" />,
+  VOUCHER: <Ticket aria-hidden className="size-5" />,
 };
+
+/** The till's types; an older edge sends none, so its kinds stand in for them. */
+function usePayTypes(): PayType[] {
+  const { t } = useTranslation();
+  const session = useSession();
+  const types: readonly SnapshotPaymentType[] | undefined = session.data?.paymentTypes;
+  if (types && types.length > 0) return types.map((type) => ({ ...type }));
+  return (['CASH', 'CARD', 'CREDIT'] as const).map((kind) => ({
+    id: null,
+    name: t(`pos.tenderKinds.${kind}`),
+    kind,
+  }));
+}
 
 function PaymentForm(props: {
   attempt: PaymentAttempt;
@@ -118,14 +151,16 @@ function PaymentForm(props: {
   const { t } = useTranslation();
   const { client } = useKiosk();
   const problemText = useProblemText();
-  const [mode, setMode] = useState<PayMode>('CASH');
+  const vouchers = props.attempt.vouchers ?? [];
+  // ADR-0110: no credit beside a partner voucher; partner vouchers may leave nothing to pay.
+  const partnerPaid = vouchers.some((voucher) => voucher.kind === 'PARTNER');
+  const types = usePayTypes().filter((type) => !(partnerPaid && type.kind === 'CREDIT'));
+  const [rows, setRows] = useState<PayRow[]>([]);
+  const [nextKey, setNextKey] = useState(1);
+  const [step, setStep] = useState<'rows' | 'receipt'>('rows');
   const [receiptType, setReceiptType] = useState<ReceiptType>('B2C');
   const [buyer, setBuyer] = useState<EdgeTaxpayer | null>(null);
   const [customer, setCustomer] = useState<EdgeCustomer | null>(null);
-  const [cash, setCash] = useState('');
-  const [card, setCard] = useState('');
-  const [terminalId, setTerminalId] = useState('');
-  const [rrn, setRrn] = useState('');
   // The offline warning on a passed limit (ADR-0109 #7): the cashier goes on or not.
   const [overLimit, setOverLimit] = useState<string | null>(null);
   // A barcode scanned into an amount never becomes the amount, nor presses Enter (pays).
@@ -142,76 +177,88 @@ function PaymentForm(props: {
   });
 
   const total = new Decimal(props.attempt.total);
-  const vouchers = props.attempt.vouchers ?? [];
-  // ADR-0110: partner vouchers may pay it all (nothing left to tender), and never beside credit.
   const nothingDue = total.isZero() && vouchers.length > 0;
-  const partnerPaid = vouchers.some((voucher) => voucher.kind === 'PARTNER');
-  const credit = mode === 'CREDIT' && !nothingDue;
-  const takesCash = !nothingDue && (mode === 'CASH' || mode === 'MIXED' || credit);
-  const takesCard = !nothingDue && (mode === 'CARD' || mode === 'MIXED' || credit);
-  const cardAmount = mode === 'CARD' ? total : takesCard ? moneyOrZero(card) : new Decimal(0);
-  const cashAmount = takesCash ? moneyOrZero(cash) : new Decimal(0);
-  const cardOver = cardAmount !== null && cardAmount.gt(total);
-  // The cash part is what the card leaves (on credit: what the customer pays now in cash); the
-  // change is what the customer handed over beyond it.
-  const cashDue = credit
-    ? Decimal.min(cashAmount ?? new Decimal(0), total.minus(cardAmount ?? new Decimal(0)))
-    : cardAmount !== null && !cardOver
-      ? total.minus(cardAmount)
-      : total;
-  const creditAmount =
-    credit && cashAmount !== null && cardAmount !== null && !cardOver
-      ? Decimal.max(total.minus(cardAmount).minus(cashDue), 0)
-      : new Decimal(0);
-  const change =
-    !credit && cashAmount !== null && cashDue.gt(0) && cashAmount.gt(cashDue)
-      ? cashAmount.minus(cashDue)
-      : new Decimal(0);
-  const short =
-    !credit && cashAmount !== null && cardAmount !== null && !cardOver
-      ? Decimal.max(cashDue.minus(cashAmount), 0)
-      : null;
-  const amountsValid =
-    nothingDue ||
-    (total.gt(0) &&
-      cashAmount !== null &&
-      cardAmount !== null &&
-      !cardOver &&
-      (credit
-        ? creditAmount.gt(0) && cashAmount.lte(total.minus(cardAmount))
-        : cashAmount.plus(cardAmount).gte(total)));
-  const receiptValid = credit || receiptType === 'B2C' || buyer !== null;
-  const customerValid = !credit || (customer !== null && !customer.creditHold);
-  const valid = amountsValid && receiptValid && customerValid;
-  const quick = quickCash(cashDue);
+  const amounts = rows.map((row) => moneyOrZero(row.amount));
+  const valid = amounts.every((amount) => amount !== null);
+  const sumOf = (pick: (row: PayRow) => boolean) =>
+    rows.reduce(
+      (sum, row, index) => (pick(row) ? sum.plus(amounts[index] ?? 0) : sum),
+      new Decimal(0),
+    );
+  const cashGiven = sumOf((row) => row.type.kind === 'CASH');
+  const nonCash = sumOf((row) => row.type.kind !== 'CASH');
+  const creditRow = rows.find((row) => row.type.kind === 'CREDIT') ?? null;
+  const creditAmount = sumOf((row) => row.type.kind === 'CREDIT');
+  const paid = cashGiven.plus(nonCash);
+  const remaining = Decimal.max(total.minus(paid), 0);
+  // Only cash may be more than its share: the rest of the rows never pass the total.
+  const nonCashOver = nonCash.gt(total);
+  const cashDue = Decimal.max(total.minus(nonCash), 0);
+  const change = !nonCashOver && cashGiven.gt(cashDue) ? cashGiven.minus(cashDue) : new Decimal(0);
+  const covered = valid && !nonCashOver && paid.gte(total) && (total.gt(0) || nothingDue);
+  const creditReady = creditRow === null || (customer !== null && creditAmount.gt(0));
+  const ready = covered && creditReady && (rows.length > 0 || nothingDue);
 
-  const pay = (acceptOverLimit: boolean) => {
-    if (!valid || sale.isPending || cashAmount === null || cardAmount === null) return;
-    const tenders: EdgeTenderInput[] = [];
-    if (cashDue.gt(0)) {
-      tenders.push({
+  const addRow = (type: PayType) => {
+    if (type.kind === 'CREDIT' && creditRow) return;
+    setRows((current) => [
+      ...current,
+      {
+        key: nextKey,
+        type,
+        amount: remaining.gt(0) ? fieldMoney(remaining) : '',
+        terminalId: '',
+        rrn: '',
+      },
+    ]);
+    setNextKey((key) => key + 1);
+    setOverLimit(null);
+  };
+  const updateRow = (key: number, patch: Partial<PayRow>) =>
+    setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+  const removeRow = (key: number) => {
+    const removed = rows.find((row) => row.key === key);
+    if (removed?.type.kind === 'CREDIT') setCustomer(null);
+    setRows((current) => current.filter((row) => row.key !== key));
+    setOverLimit(null);
+  };
+
+  const tenders = (): EdgeTenderInput[] => {
+    const list: EdgeTenderInput[] = [];
+    // The cash rows are one tender: what the cash pays and what was handed over.
+    const cashType = rows.find((row) => row.type.kind === 'CASH')?.type ?? null;
+    if (cashType && cashDue.gt(0)) {
+      list.push({
         kind: 'CASH',
+        paymentTypeId: cashType.id,
         amount: wireMoney(cashDue),
-        tendered: wireMoney(credit ? cashDue : cashAmount),
+        tendered: wireMoney(cashGiven),
       });
     }
-    if (cardAmount.gt(0)) {
-      tenders.push({
-        kind: 'CARD',
-        amount: wireMoney(cardAmount),
-        terminalId: terminalId.trim() || null,
-        rrn: rrn.trim() || null,
+    rows.forEach((row, index) => {
+      const amount = amounts[index];
+      if (row.type.kind === 'CASH' || !amount || !amount.gt(0)) return;
+      list.push({
+        kind: row.type.kind,
+        paymentTypeId: row.type.id,
+        amount: wireMoney(amount),
+        ...(row.type.kind === 'CARD'
+          ? { terminalId: row.terminalId.trim() || null, rrn: row.rrn.trim() || null }
+          : {}),
       });
-    }
-    if (credit) tenders.push({ kind: 'CREDIT', amount: wireMoney(creditAmount) });
+    });
+    return list;
+  };
+  const pay = (type: ReceiptType, acceptOverLimit = false) => {
+    if (!ready || sale.isPending) return;
     setOverLimit(null);
     sale.mutate({
       clientId: props.attempt.clientId,
       lines: [...props.attempt.lines],
-      tenders,
-      receiptType: credit ? 'B2C' : receiptType,
-      buyer: !credit && receiptType === 'B2B' && buyer ? { tin: buyer.tin } : null,
-      customerId: credit ? (customer?.id ?? null) : null,
+      tenders: tenders(),
+      receiptType: creditRow ? 'B2C' : type,
+      buyer: !creditRow && type === 'B2B' && buyer ? { tin: buyer.tin } : null,
+      customerId: creditRow ? (customer?.id ?? null) : null,
       ...(acceptOverLimit ? { acceptOverLimit: true } : {}),
       ...(props.attempt.codes?.length
         ? {
@@ -220,6 +267,27 @@ function PaymentForm(props: {
           }
         : {}),
     });
+  };
+  // «Баримт хэвлэх»: with credit the slip prints at once; otherwise the receipt is chosen first.
+  const printReceipt = () => {
+    if (!ready || sale.isPending) return;
+    if (creditRow) pay('B2C');
+    else setStep('receipt');
+  };
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (step === 'rows') printReceipt();
+    else if (receiptType === 'B2C' || buyer) pay(receiptType);
+  };
+  // 1–9 add the type in that place while no field has the focus.
+  const onKeyDown = (event: KeyboardEvent<HTMLFormElement>) => {
+    if (step !== 'rows' || event.target instanceof HTMLInputElement) return;
+    const place = /^[1-9]$/.test(event.key) ? Number.parseInt(event.key, 10) - 1 : -1;
+    const type = types[place];
+    if (type) {
+      event.preventDefault();
+      addRow(type);
+    }
   };
   // The credit check's refusal in the till's words (the generic message speaks of an order).
   const saleProblem = (error: unknown) => {
@@ -235,22 +303,9 @@ function PaymentForm(props: {
     }
     return problemText(error);
   };
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    pay(false);
-  };
 
   return (
-    <form className="grid gap-4" onSubmit={submit} noValidate>
-      <div className="flex items-baseline justify-between rounded-xl bg-canvas px-4 py-3">
-        <span className="text-[15px] font-medium text-muted-foreground">
-          {vouchers.length > 0 ? t('posKiosk.vouchers.due') : t('posKiosk.pay.total')}
-        </span>
-        <span className="font-mono text-3xl font-semibold tracking-tight">
-          {formatTugrik(props.attempt.total)}
-        </span>
-      </div>
-
+    <form className="grid gap-4" onSubmit={submit} onKeyDown={onKeyDown} noValidate>
       {vouchers.length > 0 ? (
         <ul aria-label={t('posKiosk.vouchers.taken')} className="space-y-1 text-[15px]">
           {vouchers.map((voucher) => (
@@ -263,223 +318,204 @@ function PaymentForm(props: {
           ))}
         </ul>
       ) : null}
-
-      {nothingDue ? null : (
-        <Segmented
-          label={t('posKiosk.pay.mode.title')}
-          value={mode}
-          options={PAY_MODES.filter((value) => !(partnerPaid && value === 'CREDIT')).map(
-            (value) => ({
-              value,
-              label: t(`posKiosk.pay.mode.${value}`),
-              icon: MODE_ICONS[value],
-            }),
-          )}
-          onChange={(value) => {
-            setMode(value);
-            setCash('');
-            setCard('');
-            setOverLimit(null);
-          }}
+      <dl className="grid grid-cols-3 gap-2">
+        <Figure
+          label={vouchers.length > 0 ? t('posKiosk.vouchers.due') : t('posKiosk.pay.total')}
+          value={formatTugrik(props.attempt.total)}
+          strong
         />
-      )}
+        <Figure label={t('posKiosk.pay.rows.paid')} value={formatTugrik(paid.toFixed(2))} />
+        <Figure
+          label={change.gt(0) ? t('posKiosk.pay.change') : t('posKiosk.pay.rows.remaining')}
+          value={formatTugrik((change.gt(0) ? change : remaining).toFixed(2))}
+          tone={change.gt(0) ? 'success' : remaining.gt(0) ? 'warning' : 'success'}
+        />
+      </dl>
 
-      {credit ? <CustomerSection customer={customer} onChange={setCustomer} /> : null}
-
-      {takesCash ? (
-        <section aria-labelledby="pay-cash-title" className="space-y-2">
-          <h3 id="pay-cash-title" className="flex items-center gap-2 text-[15px] font-semibold">
-            <Banknote aria-hidden className="size-5 text-success" />
-            {credit ? t('posKiosk.pay.credit.cashPart') : t('pos.tenderKinds.CASH')}
-          </h3>
-          <Label htmlFor="pay-cash" className="sr-only">
-            {credit ? t('posKiosk.pay.credit.cashPart') : t('posKiosk.pay.cashReceived')}
-          </Label>
-          <Input
-            id="pay-cash"
-            autoFocus={!credit}
-            inputMode="decimal"
-            autoComplete="off"
-            placeholder={credit ? t('posKiosk.pay.credit.paidNow') : t('posKiosk.pay.cashReceived')}
-            className={cn(
-              'text-right font-mono',
-              credit ? 'h-12 text-xl md:text-xl' : 'h-14 text-2xl md:text-2xl',
-            )}
-            value={cash}
-            aria-invalid={cashAmount === null}
-            onChange={(event) => setCash(event.target.value)}
-            onKeyDown={(event) => {
-              guard(event, cash, setCash);
-              if (!event.defaultPrevented) typeDigits(event, cash, setCash);
-            }}
-          />
-          {credit ? null : (
-            <div role="group" aria-label={t('posKiosk.pay.quick')} className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onMouseDown={keepFocus}
-                className="h-11 px-4 text-[15px]"
-                disabled={cashDue.lte(0)}
-                onClick={() => setCash(fieldMoney(cashDue))}
-              >
-                {t('posKiosk.pay.exact')}
-              </Button>
-              {quick.map((amount) => (
-                <Button
-                  key={amount.toFixed(2)}
-                  type="button"
-                  variant="outline"
-                  onMouseDown={keepFocus}
-                  className="h-11 px-4 font-mono text-[15px]"
-                  onClick={() => setCash(fieldMoney(amount))}
-                >
-                  {formatTugrik(amount.toFixed(2))}
-                </Button>
-              ))}
-            </div>
-          )}
-        </section>
-      ) : null}
-
-      {takesCard ? (
-        <section aria-labelledby="pay-card-title" className="space-y-2">
-          <h3 id="pay-card-title" className="flex items-center gap-2 text-[15px] font-semibold">
-            <CreditCard aria-hidden className="size-5 text-link" />
-            {credit ? t('posKiosk.pay.credit.cardPart') : t('pos.tenderKinds.CARD')}
-          </h3>
-          {mode === 'CARD' ? (
-            <p className="flex items-baseline justify-between rounded-xl bg-canvas px-4 py-2">
-              <span className="text-[15px] text-muted-foreground">
-                {t('posKiosk.pay.cardAmount')}
-              </span>
-              <span className="font-mono text-xl font-semibold">
-                {formatTugrik(props.attempt.total)}
-              </span>
+      {step === 'rows' && nothingDue ? (
+        <p className="rounded-xl bg-success-soft px-4 py-3 text-[15px] text-success">
+          {t('posKiosk.vouchers.allPaid')}
+        </p>
+      ) : step === 'rows' ? (
+        <>
+          {rows.length === 0 ? (
+            <p className="rounded-xl bg-canvas px-4 py-3 text-[15px] text-muted-foreground">
+              {t('posKiosk.pay.rows.empty')}
             </p>
           ) : (
-            <div className="flex gap-2">
-              <Label htmlFor="pay-card" className="sr-only">
-                {t('posKiosk.pay.cardAmount')}
-              </Label>
-              <Input
-                id="pay-card"
-                inputMode="decimal"
-                autoComplete="off"
-                placeholder={t('posKiosk.pay.cardAmount')}
-                className="h-12 flex-1 text-right font-mono text-xl md:text-xl"
-                value={card}
-                aria-invalid={cardAmount === null || cardOver}
-                aria-describedby={cardOver ? 'pay-card-error' : undefined}
-                onChange={(event) => setCard(event.target.value)}
-                onKeyDown={(event) => {
-                  guard(event, card, setCard);
-                  if (!event.defaultPrevented) typeDigits(event, card, setCard);
-                }}
-              />
-              {credit ? null : (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onMouseDown={keepFocus}
-                  className="h-12 px-4 text-[15px]"
-                  onClick={() => {
-                    const paidCash =
-                      cashAmount !== null ? Decimal.min(cashAmount, total) : new Decimal(0);
-                    setCard(fieldMoney(total.minus(paidCash)));
-                  }}
-                >
-                  {t('posKiosk.pay.cardRest')}
-                </Button>
-              )}
+            <ul className="space-y-2" aria-label={t('posKiosk.pay.rows.add')}>
+              {rows.map((row, index) => (
+                <li key={row.key} className="space-y-2 rounded-xl bg-canvas p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="flex min-w-0 flex-1 items-center gap-2 text-[15px] font-semibold">
+                      {KIND_ICONS[row.type.kind]}
+                      <span className="truncate">{row.type.name}</span>
+                    </span>
+                    <Input
+                      autoFocus={index === rows.length - 1}
+                      aria-label={t('posKiosk.pay.rows.amount', { name: row.type.name })}
+                      inputMode="decimal"
+                      autoComplete="off"
+                      className="h-12 w-48 text-right font-mono text-xl md:text-xl"
+                      value={row.amount}
+                      aria-invalid={amounts[index] === null}
+                      onChange={(event) => updateRow(row.key, { amount: event.target.value })}
+                      onKeyDown={(event) => {
+                        const set = (value: string) => updateRow(row.key, { amount: value });
+                        guard(event, row.amount, set);
+                        if (!event.defaultPrevented) typeDigits(event, row.amount, set);
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-10"
+                      aria-label={t('posKiosk.pay.rows.remove', { name: row.type.name })}
+                      onClick={() => removeRow(row.key)}
+                    >
+                      <X />
+                    </Button>
+                  </div>
+                  {row.type.kind === 'CASH' ? (
+                    <div
+                      role="group"
+                      aria-label={t('posKiosk.pay.quick')}
+                      className="flex flex-wrap gap-2"
+                    >
+                      {quickCash(cashDue).map((amount) => (
+                        <Button
+                          key={amount.toFixed(2)}
+                          type="button"
+                          variant="outline"
+                          onMouseDown={keepFocus}
+                          className="h-10 px-3 font-mono text-[15px]"
+                          onClick={() => updateRow(row.key, { amount: fieldMoney(amount) })}
+                        >
+                          {formatTugrik(amount.toFixed(2))}
+                        </Button>
+                      ))}
+                    </div>
+                  ) : null}
+                  {row.type.kind === 'CARD' ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        aria-label={t('posKiosk.pay.terminalId')}
+                        placeholder={t('posKiosk.pay.terminalId')}
+                        autoComplete="off"
+                        maxLength={32}
+                        className="h-10"
+                        value={row.terminalId}
+                        onChange={(event) => updateRow(row.key, { terminalId: event.target.value })}
+                      />
+                      <Input
+                        aria-label={t('posKiosk.pay.rrn')}
+                        placeholder={t('posKiosk.pay.rrn')}
+                        autoComplete="off"
+                        maxLength={32}
+                        className="h-10"
+                        value={row.rrn}
+                        onChange={(event) => updateRow(row.key, { rrn: event.target.value })}
+                      />
+                    </div>
+                  ) : null}
+                  {row.type.kind === 'CREDIT' ? (
+                    <CustomerSection customer={customer} onChange={setCustomer} />
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {types.length === 0 ? (
+            <KioskAlert>{t('posKiosk.pay.rows.noTypes')}</KioskAlert>
+          ) : (
+            <div role="group" aria-label={t('posKiosk.pay.rows.add')} className="space-y-1.5">
+              <p className="text-[13px] font-medium text-muted-foreground">
+                {t('posKiosk.pay.rows.add')}
+              </p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {types.map((type, index) => (
+                  <Button
+                    key={type.id ?? type.kind}
+                    type="button"
+                    variant="outline"
+                    onMouseDown={keepFocus}
+                    className="h-12 justify-start gap-2 text-[15px] font-semibold"
+                    disabled={type.kind === 'CREDIT' && creditRow !== null}
+                    title={
+                      type.kind === 'CREDIT' && creditRow
+                        ? t('posKiosk.pay.rows.creditOnce')
+                        : undefined
+                    }
+                    onClick={() => addRow(type)}
+                  >
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {String(index + 1)}
+                    </span>
+                    {KIND_ICONS[type.kind]}
+                    <span className="truncate">{type.name}</span>
+                  </Button>
+                ))}
+              </div>
             </div>
           )}
-          {cardOver ? (
-            <p id="pay-card-error" className="text-sm text-destructive">
-              {t('posKiosk.pay.cardTooMuch')}
-            </p>
-          ) : null}
-          <div className="grid grid-cols-2 gap-2">
-            <Input
-              aria-label={t('posKiosk.pay.terminalId')}
-              placeholder={t('posKiosk.pay.terminalId')}
-              autoComplete="off"
-              maxLength={40}
-              className="h-10"
-              value={terminalId}
-              onChange={(event) => setTerminalId(event.target.value)}
-            />
-            <Input
-              aria-label={t('posKiosk.pay.rrn')}
-              placeholder={t('posKiosk.pay.rrn')}
-              autoComplete="off"
-              maxLength={40}
-              className="h-10"
-              value={rrn}
-              onChange={(event) => setRrn(event.target.value)}
-            />
-          </div>
-        </section>
-      ) : null}
-
-      {credit ? (
-        <p className="rounded-xl bg-canvas px-4 py-3 text-[15px] text-muted-foreground">
-          {t('posKiosk.pay.receiptType.none')}
-        </p>
+          {nonCashOver ? <KioskAlert>{t('posKiosk.pay.rows.over')}</KioskAlert> : null}
+        </>
       ) : (
-        <div className="space-y-2">
-          <Segmented
-            label={t('posKiosk.pay.receiptType.title')}
-            value={receiptType}
-            options={[
-              {
-                value: 'B2C' as const,
-                label: t('posKiosk.pay.receiptType.B2C'),
-                icon: <UserRound aria-hidden className="size-5" />,
-              },
-              {
-                value: 'B2B' as const,
-                label: t('posKiosk.pay.receiptType.B2B'),
-                icon: <Building2 aria-hidden className="size-5" />,
-              },
-            ]}
-            onChange={(value) => {
-              setReceiptType(value);
-              if (value === 'B2C') setBuyer(null);
-            }}
-          />
+        <section aria-labelledby="pay-receipt-title" className="space-y-3">
+          <h3 id="pay-receipt-title" className="text-[15px] font-semibold">
+            {t('posKiosk.pay.receiptChoice.title')}
+          </h3>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              autoFocus
+              variant={receiptType === 'B2C' ? 'default' : 'outline'}
+              className="h-14 gap-2 text-base"
+              disabled={sale.isPending}
+              onClick={() => {
+                setReceiptType('B2C');
+                setBuyer(null);
+                pay('B2C');
+              }}
+            >
+              <UserRound aria-hidden className="size-5" />
+              {t('posKiosk.pay.receiptChoice.B2C')}
+            </Button>
+            <Button
+              type="button"
+              variant={receiptType === 'B2B' ? 'default' : 'outline'}
+              className="h-14 gap-2 text-base"
+              disabled={sale.isPending}
+              onClick={() => setReceiptType('B2B')}
+            >
+              <Building2 aria-hidden className="size-5" />
+              {t('posKiosk.pay.receiptChoice.B2B')}
+            </Button>
+          </div>
           {receiptType === 'B2B' ? <BuyerSection buyer={buyer} onChange={setBuyer} /> : null}
-        </div>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-10"
+            onClick={() => {
+              setStep('rows');
+              setReceiptType('B2C');
+              setBuyer(null);
+            }}
+          >
+            <ArrowLeft />
+            {t('posKiosk.pay.receiptChoice.back')}
+          </Button>
+        </section>
       )}
 
-      {credit ? (
-        <div
-          role="status"
-          className="flex items-baseline justify-between rounded-xl bg-warning-soft px-4 py-3 text-warning"
-        >
-          <span className="text-[15px] font-medium">{t('posKiosk.pay.credit.amount')}</span>
-          <span className="font-mono text-3xl font-semibold tracking-tight">
-            {formatTugrik(creditAmount.toFixed(2))}
-          </span>
-        </div>
-      ) : nothingDue ? null : (
-        <div
-          role="status"
-          className={cn(
-            'flex items-baseline justify-between rounded-xl px-4 py-3',
-            short !== null && short.gt(0)
-              ? 'bg-warning-soft text-warning'
-              : 'bg-success-soft text-success',
-          )}
-        >
-          <span className="text-[15px] font-medium">
-            {short !== null && short.gt(0) ? t('posKiosk.pay.short') : t('posKiosk.pay.change')}
-          </span>
-          <span className="font-mono text-3xl font-semibold tracking-tight">
-            {formatTugrik((short !== null && short.gt(0) ? short : change).toFixed(2))}
-          </span>
-        </div>
-      )}
+      {creditRow && step === 'rows' ? (
+        <p className="rounded-xl bg-warning-soft px-4 py-3 text-[15px] text-warning">
+          {t('posKiosk.pay.receiptChoice.noVat')}
+        </p>
+      ) : null}
 
       {overLimit !== null ? (
         <div role="alert" className="space-y-2 rounded-xl bg-warning-soft p-3 text-warning">
@@ -493,7 +529,7 @@ function PaymentForm(props: {
             variant="outline"
             className="h-11"
             disabled={sale.isPending}
-            onClick={() => pay(true)}
+            onClick={() => pay('B2C', true)}
           >
             {t('posKiosk.pay.credit.overLimitConfirm')}
           </Button>
@@ -506,48 +542,47 @@ function PaymentForm(props: {
         <Button type="button" variant="ghost" className="h-11" onClick={props.onCancel}>
           {t('common.cancel')}
         </Button>
-        <Button type="submit" className="h-11 px-6 text-base" disabled={!valid || sale.isPending}>
-          {sale.isPending ? t('posKiosk.pay.pending') : t('posKiosk.pay.confirm')}
-        </Button>
+        {step === 'rows' ? (
+          <Button type="submit" className="h-11 px-6 text-base" disabled={!ready || sale.isPending}>
+            {sale.isPending ? t('posKiosk.pay.pending') : t('posKiosk.pay.print')}
+          </Button>
+        ) : receiptType === 'B2B' ? (
+          <Button type="submit" className="h-11 px-6 text-base" disabled={!buyer || sale.isPending}>
+            {sale.isPending ? t('posKiosk.pay.pending') : t('posKiosk.pay.print')}
+          </Button>
+        ) : null}
       </DialogFooter>
     </form>
   );
 }
 
-/** A row of large choice buttons, one pressed (a radio group for screen readers). */
-function Segmented<T extends string>(props: {
+/** One figure of the payment's head: what is due, what the rows pay, what is left or the change. */
+function Figure(props: {
   label: string;
-  value: T;
-  options: { value: T; label: string; icon: ReactNode }[];
-  onChange: (value: T) => void;
+  value: string;
+  strong?: boolean;
+  tone?: 'success' | 'warning';
 }) {
   return (
-    <div role="radiogroup" aria-label={props.label} className="space-y-1.5">
-      <p className="text-[13px] font-medium text-muted-foreground">{props.label}</p>
-      <div className="grid auto-cols-fr grid-flow-col gap-2">
-        {props.options.map((option) => {
-          const checked = option.value === props.value;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              role="radio"
-              aria-checked={checked}
-              onMouseDown={keepFocus}
-              onClick={() => props.onChange(option.value)}
-              className={cn(
-                'flex h-12 items-center justify-center gap-2 rounded-xl border text-[15px] font-semibold transition-colors',
-                checked
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-input bg-background hover:bg-muted',
-              )}
-            >
-              {option.icon}
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
+    <div
+      className={cn(
+        'rounded-xl px-3 py-2',
+        props.tone === 'success'
+          ? 'bg-success-soft text-success'
+          : props.tone === 'warning'
+            ? 'bg-warning-soft text-warning'
+            : 'bg-canvas',
+      )}
+    >
+      <dt className="text-[13px] font-medium">{props.label}</dt>
+      <dd
+        className={cn(
+          'font-mono font-semibold tracking-tight',
+          props.strong ? 'text-2xl' : 'text-xl',
+        )}
+      >
+        {props.value}
+      </dd>
     </div>
   );
 }

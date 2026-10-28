@@ -56,6 +56,8 @@ import {
 } from '../schema';
 import { PosCashiersService } from './pos-cashiers.service';
 import { PosCustomersService } from './pos-customers.service';
+import { PosDayCountsService } from './pos-day-counts.service';
+import { PosPaymentTypesService } from './pos-payment-types.service';
 import type { EdgeNode } from './pos-edge-nodes.service';
 import { PosSettingsService } from './pos-settings.service';
 import { PosShiftsService } from './pos-shifts.service';
@@ -101,6 +103,8 @@ export class PosAcceptService {
     private readonly credit: PosCustomersService,
     private readonly books: PosCreditService,
     private readonly vouchers: PosVouchersService,
+    private readonly paymentTypes: PosPaymentTypesService,
+    private readonly dayCounts: PosDayCountsService,
   ) {}
 
   /**
@@ -161,6 +165,8 @@ export class PosAcceptService {
         return this.recordTillBound(tx, actor, node, event.payload);
       case 'VOID':
         return this.voids.acceptVoid(tx, actor, node, event.payload);
+      case 'DAY_COUNT':
+        return this.dayCounts.acceptDayCount(tx, actor, node, event.payload);
     }
   }
 
@@ -187,6 +193,7 @@ export class PosAcceptService {
       }
     }
     const soldDay = businessDate(doc.soldAt);
+    const paymentNames = await this.checkPaymentTypes(tx, doc);
     const products = await this.productsOf(tx, doc.lines);
     await this.checkUnits(tx, doc.lines);
     await this.checkMoney(tx, doc, soldDay, products);
@@ -294,6 +301,9 @@ export class PosAcceptService {
         saleId: sale.id,
         tenderNo: index + 1,
         kind: tender.kind,
+        paymentTypeId: tender.paymentTypeId,
+        paymentTypeName:
+          tender.paymentTypeId === null ? null : (paymentNames.get(tender.paymentTypeId) ?? null),
         amount: tender.amount,
         tendered: tender.tendered,
         terminalId: tender.terminalId,
@@ -523,6 +533,32 @@ export class PosAcceptService {
     };
   }
 
+  /**
+   * The payment types the tenders name (ADR-0111): each one known and of the tender's kind (an
+   * INACTIVE type still counts: the till sold with the list it had). The name kept is the till's,
+   * else the type's current one.
+   */
+  private async checkPaymentTypes(tx: Tx, doc: SaleDoc): Promise<Map<number, string>> {
+    const ids = doc.tenders.flatMap((tender) =>
+      tender.paymentTypeId === null ? [] : [tender.paymentTypeId],
+    );
+    const types = await this.paymentTypes.byIds(ids, tx);
+    const names = new Map<number, string>();
+    doc.tenders.forEach((tender, index) => {
+      if (tender.paymentTypeId === null) return;
+      const type = types.get(tender.paymentTypeId);
+      if (!type) {
+        throw invalid(`tenders[${index}].paymentTypeId`, 'exists', 'a payment type of the store');
+      }
+      if (type.kind !== tender.kind) {
+        throw invalid(`tenders[${index}].paymentTypeId`, 'kind', `a ${tender.kind} payment type`);
+      }
+      const named = tender.paymentTypeName?.trim();
+      names.set(type.id, named ? named.slice(0, POS_LIMITS.maxPaymentTypeName) : type.name);
+    });
+    return names;
+  }
+
   /** The invoice of a credit sale, or the credit note of its return, in this transaction. */
   private async bookCredit(
     tx: Tx,
@@ -534,7 +570,7 @@ export class PosAcceptService {
     credit: Decimal,
     original: { sale: SaleRow; lines: Map<number, LineRow> } | null,
   ): Promise<{ number: string }> {
-    const paid = (kind: 'CASH' | 'CARD') =>
+    const paid = (kind: 'CASH' | 'CARD' | 'TRANSFER') =>
       doc.tenders
         .filter((tender) => tender.kind === kind)
         .reduce((sum, tender) => sum.plus(tender.amount), new Decimal(0));
@@ -590,6 +626,7 @@ export class PosAcceptService {
       credit,
       cash: paid('CASH'),
       card: paid('CARD'),
+      transfer: paid('TRANSFER'),
     });
     await tx
       .update(posSales)

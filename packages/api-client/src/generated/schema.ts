@@ -5020,6 +5020,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pos/payment-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosPaymentTypes_list"];
+        put: operations["PosPaymentTypes_replace"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pos/attention": {
         parameters: {
             query?: never;
@@ -5028,6 +5044,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["PosAttention_attention"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/day-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosDayCounts_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10799,7 +10831,7 @@ export interface components {
             /** @enum {string} */
             kind: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
             /** @enum {string|null} */
-            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | "RETAINED_EARNINGS" | "VOUCHER_CLEARING" | "VOUCHER_BREAKAGE" | null;
+            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "TRANSFER_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | "RETAINED_EARNINGS" | "VOUCHER_CLEARING" | "VOUCHER_BREAKAGE" | null;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
             /**
@@ -10839,7 +10871,7 @@ export interface components {
              * @description null takes the role away
              * @enum {string|null}
              */
-            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | "RETAINED_EARNINGS" | "VOUCHER_CLEARING" | "VOUCHER_BREAKAGE" | null;
+            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "TRANSFER_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | "RETAINED_EARNINGS" | "VOUCHER_CLEARING" | "VOUCHER_BREAKAGE" | null;
         };
         AccountLedgerLine: {
             id: number;
@@ -11637,6 +11669,8 @@ export interface components {
             printerHost: string | null;
             /** @example 9100 */
             printerPort: number;
+            /** @description ADR-0111: information only */
+            printerName: string | null;
             drawerKick: boolean;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
@@ -11661,12 +11695,15 @@ export interface components {
             printerHost?: string | null;
             /** @example 9100 */
             printerPort?: number;
+            /** @example XP-80C (USB) */
+            printerName?: string | null;
             drawerKick?: boolean;
         };
         PosTillPatch: {
             name?: string;
             printerHost?: string | null;
             printerPort?: number;
+            printerName?: string | null;
             drawerKick?: boolean;
             /** @enum {string} */
             status?: "ACTIVE" | "INACTIVE";
@@ -11705,6 +11742,16 @@ export interface components {
         PosCashierStatusRequest: {
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
+        };
+        PosShiftPayment: {
+            paymentTypeId: number | null;
+            name: string | null;
+            /** @enum {string} */
+            kind: "CASH" | "CARD" | "TRANSFER" | "CREDIT" | "VOUCHER";
+            /** @example 2515000.00 */
+            sales: string;
+            /** @example 0.00 */
+            refunds: string;
         };
         PosShift: {
             id: number;
@@ -11756,6 +11803,15 @@ export interface components {
              * @example 0.00
              */
             voucherSales: string;
+            /**
+             * @description ADR-0111: bank transfers
+             * @example 0.00
+             */
+            transferSales: string;
+            /** @example 0.00 */
+            transferRefunds: string;
+            /** @description On one shift’s read */
+            payments?: components["schemas"]["PosShiftPayment"][];
             /** @example 440000.00 */
             salesTotal: string;
             /** @example 0.00 */
@@ -11897,7 +11953,10 @@ export interface components {
             id: number;
             tenderNo: number;
             /** @enum {string} */
-            kind: "CASH" | "CARD" | "CREDIT" | "VOUCHER";
+            kind: "CASH" | "CARD" | "TRANSFER" | "CREDIT" | "VOUCHER";
+            paymentTypeId: number | null;
+            /** @example Khaanbank terminal */
+            paymentTypeName: string | null;
             /** @example 12000.00 */
             amount: string;
             /** @example 20000.00 */
@@ -12023,7 +12082,7 @@ export interface components {
             edgeNodeCode: string;
             clientId: string;
             /** @enum {string} */
-            kind: "TILL_BOUND" | "SHIFT_OPENED" | "SALE" | "RETURN" | "SHIFT_CLOSED" | "RECEIPT_STATUS" | "VOID";
+            kind: "TILL_BOUND" | "SHIFT_OPENED" | "SALE" | "RETURN" | "SHIFT_CLOSED" | "RECEIPT_STATUS" | "VOID" | "DAY_COUNT";
             /** @example POS_TOTALS_MISMATCH */
             code: string;
             params: {
@@ -12046,7 +12105,7 @@ export interface components {
             /** Format: uuid */
             clientId: string;
             /** @enum {string} */
-            kind: "TILL_BOUND" | "SHIFT_OPENED" | "SALE" | "RETURN" | "SHIFT_CLOSED" | "RECEIPT_STATUS" | "VOID";
+            kind: "TILL_BOUND" | "SHIFT_OPENED" | "SALE" | "RETURN" | "SHIFT_CLOSED" | "RECEIPT_STATUS" | "VOID" | "DAY_COUNT";
             /** @enum {string} */
             status: "APPLIED" | "DUPLICATE" | "REJECTED";
             id: number | null;
@@ -12273,6 +12332,29 @@ export interface components {
         PosVoucherReviewRequest: {
             note?: string | null;
         };
+        PosPaymentType: {
+            id: number;
+            /** @example Khaanbank terminal */
+            name: string;
+            /** @enum {string} */
+            kind: "CASH" | "CARD" | "TRANSFER" | "CREDIT";
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            sort: number;
+        };
+        PosPaymentTypeInput: {
+            /** @description Null adds a type */
+            id: number | null;
+            name: string;
+            /** @enum {string} */
+            kind: "CASH" | "CARD" | "TRANSFER" | "CREDIT";
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+        };
+        PosPaymentTypesRequest: {
+            /** @description The whole list, in order */
+            types: components["schemas"]["PosPaymentTypeInput"][];
+        };
         PosAttention: {
             openShifts: number;
             shiftsToHandOver: number;
@@ -12284,6 +12366,29 @@ export interface components {
             creditToCheck: number;
             /** @description Codes used twice, stopped or out of date, not checked (ADR-0110) */
             vouchersToCheck: number;
+        };
+        PosDayCountRow: {
+            /**
+             * @example 20000
+             * @enum {number}
+             */
+            note: 20000 | 10000 | 5000 | 1000 | 500 | 100 | 50;
+            /** @example 12 */
+            count: number;
+        };
+        PosDayCount: {
+            id: number;
+            tillId: number;
+            tillCode: string;
+            /** @example 2026-10-27 */
+            day: string;
+            cashierUserId: number;
+            cashierName: string | null;
+            counts: components["schemas"]["PosDayCountRow"][];
+            /** @example 2515000.00 */
+            total: string;
+            /** Format: date-time */
+            countedAt: string;
         };
         PosCreditCheckRequest: {
             customerId: number;
@@ -12325,7 +12430,10 @@ export interface components {
         };
         PosSaleDocTender: {
             /** @enum {string} */
-            kind: "CASH" | "CARD" | "CREDIT" | "VOUCHER";
+            kind: "CASH" | "CARD" | "TRANSFER" | "CREDIT" | "VOUCHER";
+            /** @description ADR-0111: the payment type */
+            paymentTypeId?: number | null;
+            paymentTypeName?: string | null;
             /** @example 12000 */
             amount: string;
             /** @example 20000 */
@@ -12467,9 +12575,23 @@ export interface components {
             /** @example 7000 */
             total: string;
         };
+        PosDayCountDoc: {
+            /** Format: uuid */
+            clientId: string;
+            /** @example К3 */
+            tillCode: string;
+            /** @example 2026-10-27 */
+            day: string;
+            cashierUserId: number;
+            counts: components["schemas"]["PosDayCountRow"][];
+            /** @example 2515000.00 */
+            total: string;
+            /** Format: date-time */
+            countedAt: string;
+        };
         PosSyncEvent: {
             /** @enum {string} */
-            kind: "TILL_BOUND" | "SHIFT_OPENED" | "SALE" | "RETURN" | "SHIFT_CLOSED" | "RECEIPT_STATUS" | "VOID";
+            kind: "TILL_BOUND" | "SHIFT_OPENED" | "SALE" | "RETURN" | "SHIFT_CLOSED" | "RECEIPT_STATUS" | "VOID" | "DAY_COUNT";
             /**
              * Format: uuid
              * @description The document’s id; a batch never repeats one
@@ -12481,6 +12603,7 @@ export interface components {
             receiptStatus?: components["schemas"]["PosReceiptStatusDoc"];
             tillBound?: components["schemas"]["PosTillBoundDoc"];
             voided?: components["schemas"]["PosVoidDoc"];
+            dayCount?: components["schemas"]["PosDayCountDoc"];
         };
         PosSyncBatch: {
             /** @description In the order they happened */
@@ -12527,7 +12650,7 @@ export interface components {
         };
         PosDevTender: {
             /** @enum {string} */
-            kind: "CASH" | "CARD" | "CREDIT" | "VOUCHER";
+            kind: "CASH" | "CARD" | "TRANSFER" | "CREDIT";
             /** @example 12000 */
             amount: string;
             /** @example 20000 */
@@ -26318,6 +26441,66 @@ export interface operations {
             };
         };
     };
+    PosPaymentTypes_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosPaymentType"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosPaymentTypes_replace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosPaymentTypesRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosPaymentType"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     PosAttention_attention: {
         parameters: {
             query?: never;
@@ -26333,6 +26516,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PosAttention"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosDayCounts_list: {
+        parameters: {
+            query?: {
+                tillId?: number;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosDayCount"][];
                 };
             };
             /** @description RFC 9457 problem details */

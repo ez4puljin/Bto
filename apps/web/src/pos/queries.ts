@@ -1,5 +1,11 @@
-import { QueryClient, keepPreviousData, useQuery } from '@tanstack/react-query';
-import type { EdgeCartLine } from '@tugeel/shared/pos';
+import {
+  QueryClient,
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import type { EdgeCartLine, EdgeDayCountRequest } from '@tugeel/shared/pos';
 import { EdgeError } from './edge-client';
 import { useCredentials, useKiosk } from './kiosk-context';
 
@@ -32,6 +38,10 @@ export const kioskKeys = {
   device: (epoch: number) => ['kiosk', epoch, 'device'] as const,
   session: (epoch: number) => ['kiosk', epoch, 'session'] as const,
   recent: (epoch: number) => ['kiosk', epoch, 'recent'] as const,
+  /** Below `recent`: a sale or a return refreshes every day's history with it. */
+  history: (epoch: number, day: string, q: string) =>
+    ['kiosk', epoch, 'recent', 'history', day, q] as const,
+  daySummary: (epoch: number, day: string) => ['kiosk', epoch, 'day-summary', day] as const,
   quickButtons: (epoch: number) => ['kiosk', epoch, 'quick-buttons'] as const,
   supervisors: (epoch: number) => ['kiosk', epoch, 'supervisors'] as const,
   parked: (epoch: number) => ['kiosk', epoch, 'parked'] as const,
@@ -77,14 +87,38 @@ export function useSession() {
   });
 }
 
-export function useRecentSales(enabled: boolean) {
+/** «Борлуулалтын түүх» (ADR-0111): the till's sales and returns of `day`, narrowed by number. */
+export function useSalesHistory(day: string, q: string) {
   const { client } = useKiosk();
   const { epoch } = useCredentials();
   return useQuery({
-    queryKey: kioskKeys.recent(epoch),
-    queryFn: ({ signal }) => client.recentSales(signal),
-    enabled,
+    queryKey: kioskKeys.history(epoch, day, q),
+    queryFn: ({ signal }) => client.sales(day, q || undefined, signal),
+    placeholderData: keepPreviousData,
     staleTime: 0,
+  });
+}
+
+/** «Өдрийн нэгтгэл» (ADR-0111): the till's money of `day` by payment type and its count. */
+export function useDaySummary(day: string) {
+  const { client } = useKiosk();
+  const { epoch } = useCredentials();
+  return useQuery({
+    queryKey: kioskKeys.daySummary(epoch, day),
+    queryFn: ({ signal }) => client.daySummary(day, signal),
+    staleTime: 0,
+  });
+}
+
+/** Records the banknotes handed over; the edge's answer replaces the day's summary. */
+export function useCountDay() {
+  const { client } = useKiosk();
+  const { epoch } = useCredentials();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: EdgeDayCountRequest) => client.countDay(body),
+    onSuccess: (summary) =>
+      queryClient.setQueryData(kioskKeys.daySummary(epoch, summary.day), summary),
   });
 }
 

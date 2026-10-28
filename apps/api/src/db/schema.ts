@@ -100,7 +100,9 @@ export {
 } from '../modules/finance/schema';
 export {
   posCashiers,
+  posDayCounts,
   posEdgeNodes,
+  posPaymentTypes,
   posQuickButtons,
   posQuickGroups,
   posSaleLines,

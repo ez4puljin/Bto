@@ -4,6 +4,8 @@ import { Decimal } from '@tugeel/shared/money';
 import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
 import {
   CreditReviewDto,
+  DayCountDto,
+  DayCountsQueryDto,
   HandoverRequestDto,
   PosAttentionDto,
   RejectionListQueryDto,
@@ -23,6 +25,7 @@ import {
   VoidListQueryDto,
   VoidPageDto,
 } from '../dto/pos.dto';
+import { PosDayCountsService } from '../services/pos-day-counts.service';
 import { PosQueryService } from '../services/pos-query.service';
 import { PosReplayService } from '../services/pos-replay.service';
 import { PosShiftsService } from '../services/pos-shifts.service';
@@ -215,5 +218,23 @@ export class PosVoidsController {
   @ApiOkResponse({ type: VoidDetailDto })
   async get(@Param('id', ParseIntPipe) id: number): Promise<VoidDetailDto> {
     return voidDetailDto(await this.voids.get(id));
+  }
+}
+
+/** The tills' banknote counts of their day summaries (ADR-0111): kept as counted. */
+@ApiTags('pos')
+@Controller('pos/day-counts')
+export class PosDayCountsController {
+  constructor(private readonly dayCounts: PosDayCountsService) {}
+
+  @Get()
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: [DayCountDto] })
+  async list(@Query() query: DayCountsQueryDto): Promise<DayCountDto[]> {
+    return (await this.dayCounts.list(query)).map((row) => ({
+      ...row,
+      total: row.total.toFixed(2),
+      countedAt: row.countedAt.toISOString(),
+    }));
   }
 }

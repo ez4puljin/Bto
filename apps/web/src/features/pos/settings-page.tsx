@@ -16,6 +16,7 @@ import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { type PosSettings, usePosMutations, usePosSettings } from './api';
+import { PaymentTypesCard } from './payment-types-card';
 
 /**
  * «Тохиргоо» of the supermarket (ADR-0063 #2): the store, the hand-over box, the rules; the printed
@@ -36,6 +37,7 @@ export function PosSettingsPage() {
           edit={(close) => <SettingsForm settings={settings.data} onClose={close} />}
         />
       ) : null}
+      <PaymentTypesCard />
     </div>
   );
 }

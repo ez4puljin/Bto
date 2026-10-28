@@ -17,12 +17,14 @@ import { cn } from 'cn';
 import {
   Archive,
   ArchiveRestore,
+  CalendarCheck,
   History,
   ReceiptText,
   LayoutGrid,
   LockKeyhole,
   LogOut,
   Menu,
+  Printer,
   ScanBarcode,
   Search,
   Tag,
@@ -54,7 +56,9 @@ import { randomUuid } from '@/lib/uuid';
 import { type Cart, type CartLine, canDecrease } from '../cart';
 import { type ApprovalRequest, ApprovalDialog } from '../components/approval-dialog';
 import { CartTable } from '../components/cart-table';
+import { DaySummaryDialog } from '../components/day-summary-dialog';
 import { EbarimtDialog } from '../components/ebarimt-dialog';
+import { HistoryDialog } from '../components/history-dialog';
 import { KioskHeader } from '../components/kiosk-header';
 import { KioskAlert } from '../components/layout';
 import { type PaymentAttempt, PaymentDialog } from '../components/payment-dialog';
@@ -63,7 +67,6 @@ import { PriceCheckDialog } from '../components/price-check-dialog';
 import { QuickDialog } from '../components/quick-dialog';
 import { ReceiptDialog } from '../components/receipt';
 import { usePrint } from '../components/print-context';
-import { RecentDialog } from '../components/recent-dialog';
 import { ReturnsDialog } from '../components/returns-dialog';
 import { SearchDialog } from '../components/search-dialog';
 import { VoucherDialog } from '../components/voucher-dialog';
@@ -79,7 +82,8 @@ type Dialogs =
   | 'pay'
   | 'receipt'
   | 'cancel'
-  | 'recent'
+  | 'history'
+  | 'daySummary'
   | 'quick'
   | 'price'
   | 'parked'
@@ -122,7 +126,7 @@ export function SaleScreen(props: {
   const [dialog, setDialog] = useState<Dialogs>(null);
   const [attempt, setAttempt] = useState<PaymentAttempt | null>(null);
   const [receipt, setReceipt] = useState<EdgePrintableReceipt | null>(null);
-  const { print } = usePrint();
+  const { print, printTest } = usePrint();
   const health = useHealth();
   const ebarimt = health.data?.ebarimt;
   const ebarimtCount = ebarimt ? ebarimt.ready + ebarimt.attention : 0;
@@ -560,9 +564,23 @@ export function SaleScreen(props: {
                 <ArchiveRestore />
                 {t('posKiosk.menu.parked')}
               </DropdownMenuItem>
-              <DropdownMenuItem className="h-10 text-[15px]" onSelect={() => setDialog('recent')}>
+              <DropdownMenuItem className="h-10 text-[15px]" onSelect={() => setDialog('history')}>
                 <History />
-                {t('posKiosk.menu.recent')}
+                {t('posKiosk.menu.history')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="h-10 text-[15px]"
+                onSelect={() => setDialog('daySummary')}
+              >
+                <CalendarCheck />
+                {t('posKiosk.menu.daySummary')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="h-10 text-[15px]"
+                onSelect={() => printTest(props.session.till.name, new Date().toISOString())}
+              >
+                <Printer />
+                {t('posKiosk.menu.printTest')}
               </DropdownMenuItem>
               {ebarimt?.provider === 'posapi' ? (
                 <DropdownMenuItem
@@ -834,7 +852,12 @@ export function SaleScreen(props: {
         onClose={closeDialog}
         onCloseAutoFocus={refocus}
       />
-      <RecentDialog open={dialog === 'recent'} onClose={closeDialog} onCloseAutoFocus={refocus} />
+      <HistoryDialog open={dialog === 'history'} onClose={closeDialog} onCloseAutoFocus={refocus} />
+      <DaySummaryDialog
+        open={dialog === 'daySummary'}
+        onClose={closeDialog}
+        onCloseAutoFocus={refocus}
+      />
       <EbarimtDialog
         open={dialog === 'ebarimt'}
         approvalRequired={approvalRequired}
