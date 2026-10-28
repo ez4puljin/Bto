@@ -25,6 +25,8 @@ export function SupplierPicker(props: {
    * receipt window, ADR-0078); otherwise they stay listed below it.
    */
   floating?: boolean;
+  /** A pill in a list's filter bar, like `ProductSearch variant="filter"` (ADR-0113). */
+  variant?: 'filter';
 }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
@@ -80,13 +82,14 @@ export function SupplierPicker(props: {
         id={props.id}
         type="search"
         autoComplete="off"
+        className={props.variant === 'filter' ? 'h-8 rounded-full pl-3 md:text-[13px]' : undefined}
         placeholder={t('partners.supplierPicker.search')}
         aria-invalid={props.invalid ? true : undefined}
         aria-describedby={props.describedBy}
         value={search}
         onChange={(event) => setSearch(event.target.value)}
       />
-      <ProblemAlert problem={problemFromError(suppliers.error)} />
+      <ProblemAlert problem={problemFromError(suppliers.error)} onRetry={suppliers.refetch} />
       {!open ? null : rows.length > 0 ? (
         <ul
           className={

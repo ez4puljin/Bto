@@ -7,7 +7,7 @@ import { useApiClient } from '@/app/api-client-context';
 import { useHasPermission } from '@/app/auth-context';
 import { NativeSelect } from '@/components/native-select';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useBarcodeLookup, useProductLookup } from '@/features/catalog/api';
@@ -365,7 +365,9 @@ export function ReceiptLinePanel(props: {
 
   const field = (label: string, id: string, control: ReactNode, hint?: ReactNode) => (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id} title={label} className="block truncate leading-snug">
+        {label}
+      </Label>
       {control}
       {hint ? (
         <p id={`${id}-hint`} className="truncate text-xs text-muted-foreground">
@@ -386,321 +388,299 @@ export function ReceiptLinePanel(props: {
               ? t('inventory.receipt.panel.editTitle')
               : t('inventory.receipt.panel.title')}
         </CardTitle>
+        {props.supplierId !== undefined && !product ? (
+          <CardAction>
+            <div
+              role="radiogroup"
+              aria-label={t('inventory.receipt.panel.scope')}
+              className="inline-flex w-fit rounded-full border border-border p-0.5 text-[13px]"
+            >
+              {(['supplier', 'all'] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={scope === value}
+                  className="rounded-full px-3 py-1 font-medium text-muted-foreground aria-checked:bg-secondary aria-checked:text-secondary-foreground"
+                  onClick={() => {
+                    setScope(value);
+                    setHighlight(0);
+                    searchRef.current?.focus();
+                  }}
+                >
+                  {t(`inventory.receipt.panel.scopes.${value}`)}
+                </button>
+              ))}
+            </div>
+          </CardAction>
+        ) : null}
       </CardHeader>
       <CardContent ref={root} className="flex flex-col gap-3">
-        {props.supplierId !== undefined && !product ? (
-          <div
-            role="radiogroup"
-            aria-label={t('inventory.receipt.panel.scope')}
-            className="inline-flex w-fit rounded-full border border-border p-0.5 text-[13px]"
-          >
-            {(['supplier', 'all'] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                role="radio"
-                aria-checked={scope === value}
-                className="rounded-full px-3 py-1 font-medium text-muted-foreground aria-checked:bg-secondary aria-checked:text-secondary-foreground"
-                onClick={() => {
-                  setScope(value);
-                  setHighlight(0);
-                  searchRef.current?.focus();
-                }}
-              >
-                {t(`inventory.receipt.panel.scopes.${value}`)}
-              </button>
-            ))}
-          </div>
-        ) : null}
-        <div className="grid gap-x-3 gap-y-3 sm:grid-cols-2 lg:grid-cols-[minmax(16rem,2.4fr)_minmax(7rem,1fr)_minmax(6rem,0.8fr)_minmax(7rem,1fr)_minmax(7rem,1fr)_minmax(7rem,1fr)]">
-          {field(
-            t('inventory.product'),
-            `${ids}-product`,
-            product ? (
-              <div className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-input bg-muted/40 px-3 text-sm">
-                <span className="shrink-0 font-mono text-[13px] text-muted-foreground">
-                  {product.sku}
-                </span>
-                <span className="min-w-0 flex-1 truncate" title={product.name}>
-                  {product.name}
-                </span>
-                {editing ? null : (
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    aria-label={t('inventory.receipt.panel.changeProduct')}
-                    onClick={reset}
-                  >
-                    {t('inventory.receipt.panel.change')}
-                  </Button>
-                )}
-                {/* Keeps the chain's first stop while a product is chosen. */}
-                <input
-                  ref={searchRef}
-                  id={`${ids}-product`}
-                  aria-label={t('inventory.productSearch')}
-                  className="sr-only"
-                  readOnly
-                  onKeyDown={onEnter}
-                />
-              </div>
-            ) : (
-              <Popover.Root open={open && (matches.length > 0 || nothing)}>
-                <Popover.Anchor asChild>
-                  <Input
+        {/* The fields and the add button in one row on a desktop (ADR-0113), so the lines start
+            high; the button is outline: the window's one blue button is its step («Батлах»). */}
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
+          <div className="grid min-w-0 flex-1 gap-x-3 gap-y-3 sm:grid-cols-2 lg:grid-cols-[minmax(16rem,2.4fr)_minmax(7rem,1fr)_minmax(6rem,0.8fr)_minmax(7rem,1fr)_minmax(7rem,1fr)_minmax(7rem,1fr)]">
+            {field(
+              t('inventory.product'),
+              `${ids}-product`,
+              product ? (
+                <div className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-input bg-muted/40 px-3 text-sm">
+                  <span className="shrink-0 font-mono text-[13px] text-muted-foreground">
+                    {product.sku}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate" title={product.name}>
+                    {product.name}
+                  </span>
+                  {editing ? null : (
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      aria-label={t('inventory.receipt.panel.changeProduct')}
+                      onClick={reset}
+                    >
+                      {t('inventory.receipt.panel.change')}
+                    </Button>
+                  )}
+                  {/* Keeps the chain's first stop while a product is chosen. */}
+                  <input
                     ref={searchRef}
                     id={`${ids}-product`}
-                    type="search"
-                    autoComplete="off"
-                    placeholder={
-                      bySupplier
-                        ? t('inventory.receipt.panel.supplierSearch')
-                        : t('inventory.productSearchPlaceholder')
-                    }
-                    aria-controls={open ? `${ids}-matches` : undefined}
-                    aria-activedescendant={
-                      open && matches.length > 0 ? `${ids}-match-${active}` : undefined
-                    }
-                    value={search}
-                    onFocus={() => setOpen(true)}
-                    onBlur={() => setOpen(false)}
-                    onChange={(event) => {
-                      setSearch(event.target.value);
-                      setHighlight(0);
-                      setOpen(true);
-                    }}
-                    onKeyDown={(event) => {
-                      guard(event, search, setSearch);
-                      if (event.defaultPrevented) return;
-                      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                        if (matches.length === 0) return;
-                        event.preventDefault();
-                        const step = event.key === 'ArrowDown' ? 1 : -1;
-                        setHighlight((active + step + matches.length) % matches.length);
-                      } else if (event.key === 'Enter') {
-                        event.preventDefault();
-                        const chosen = matches[active];
-                        if (chosen) {
-                          setQty('1');
-                          setEntry(START);
-                          setSale('');
-                          chooseProduct(chosen);
-                        } else if (typed) {
-                          // A code typed by hand: looked up as a barcode or product code.
-                          onScan(typed);
+                    aria-label={t('inventory.productSearch')}
+                    className="sr-only"
+                    readOnly
+                    onKeyDown={onEnter}
+                  />
+                </div>
+              ) : (
+                <Popover.Root open={open && (matches.length > 0 || nothing)}>
+                  <Popover.Anchor asChild>
+                    <Input
+                      ref={searchRef}
+                      id={`${ids}-product`}
+                      type="search"
+                      autoComplete="off"
+                      placeholder={
+                        bySupplier
+                          ? t('inventory.receipt.panel.supplierSearch')
+                          : t('inventory.productSearchPlaceholder')
+                      }
+                      aria-controls={open ? `${ids}-matches` : undefined}
+                      aria-activedescendant={
+                        open && matches.length > 0 ? `${ids}-match-${active}` : undefined
+                      }
+                      value={search}
+                      onFocus={() => setOpen(true)}
+                      onBlur={() => setOpen(false)}
+                      onChange={(event) => {
+                        setSearch(event.target.value);
+                        setHighlight(0);
+                        setOpen(true);
+                      }}
+                      onKeyDown={(event) => {
+                        guard(event, search, setSearch);
+                        if (event.defaultPrevented) return;
+                        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                          if (matches.length === 0) return;
+                          event.preventDefault();
+                          const step = event.key === 'ArrowDown' ? 1 : -1;
+                          setHighlight((active + step + matches.length) % matches.length);
+                        } else if (event.key === 'Enter') {
+                          event.preventDefault();
+                          const chosen = matches[active];
+                          if (chosen) {
+                            setQty('1');
+                            setEntry(START);
+                            setSale('');
+                            chooseProduct(chosen);
+                          } else if (typed) {
+                            // A code typed by hand: looked up as a barcode or product code.
+                            onScan(typed);
+                            setSearch('');
+                          }
+                        } else if (event.key === 'Escape') {
                           setSearch('');
                         }
-                      } else if (event.key === 'Escape') {
-                        setSearch('');
-                      }
-                    }}
-                  />
-                </Popover.Anchor>
-                <Popover.Portal>
-                  <Popover.Content
-                    align="start"
-                    sideOffset={4}
-                    onOpenAutoFocus={(event) => event.preventDefault()}
-                    onCloseAutoFocus={(event) => event.preventDefault()}
-                    className="z-50 w-(--radix-popover-trigger-width) max-w-[min(40rem,var(--radix-popover-content-available-width))] min-w-80 overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-popover"
-                  >
-                    {matches.length === 0 ? (
-                      <p className="px-3 py-2 text-sm text-muted-foreground">
-                        {t('inventory.noProducts')}
-                      </p>
-                    ) : (
-                      <ul
-                        id={`${ids}-matches`}
-                        role="listbox"
-                        className="flex max-h-96 flex-col overflow-y-auto"
-                      >
-                        {matches.map((match, position) => (
-                          <li
-                            key={match.id}
-                            id={`${ids}-match-${position}`}
-                            role="option"
-                            aria-selected={position === active}
-                            data-active={position === active ? 'true' : undefined}
-                            className="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm hover:bg-accent data-[active=true]:bg-accent"
-                            onMouseEnter={() => setHighlight(position)}
-                            // Before the box's blur closes the list.
-                            onMouseDown={(event) => {
-                              event.preventDefault();
-                              setQty('1');
-                              setEntry(START);
-                              setSale('');
-                              chooseProduct(match);
-                            }}
-                          >
-                            <span className="shrink-0 font-mono text-[13px] text-muted-foreground">
-                              {match.sku}
-                            </span>
-                            <span className="min-w-0 flex-1 truncate">{match.name}</span>
-                            <span className="shrink-0 text-[13px] text-muted-foreground">
-                              {match.units.map((candidate) => candidate.uomName).join(' / ')}
-                              {match.weightKg
-                                ? ` · ${t('inventory.receipt.form.weight', { kg: formatQty(match.weightKg) })}`
-                                : null}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </Popover.Content>
-                </Popover.Portal>
-              </Popover.Root>
-            ),
-          )}
-          {field(
-            t('inventory.unit'),
-            `${ids}-unit`,
-            <NativeSelect
-              ref={unitRef}
-              id={`${ids}-unit`}
-              disabled={!product || editing !== null || (product?.units.length ?? 0) < 2}
-              value={unitId ?? ''}
-              onChange={(event) => setUnitId(Number.parseInt(event.target.value, 10))}
-              onKeyDown={onEnter}
-            >
-              {(product?.units ?? []).map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>
-                  {candidate.isBase
-                    ? candidate.uomName
-                    : t('inventory.receipt.panel.unitOption', {
-                        unit: candidate.uomName,
-                        factor: formatQty(candidate.factorToBase),
-                      })}
-                </option>
-              ))}
-            </NativeSelect>,
-          )}
-          {field(
-            t('inventory.qty'),
-            `${ids}-qty`,
-            <Input
-              ref={qtyRef}
-              id={`${ids}-qty`}
-              inputMode="decimal"
-              autoComplete="off"
-              className="text-right font-mono"
-              value={qty}
-              onChange={(event) => setQty(event.target.value)}
-              onKeyDown={(event) => {
-                guard(event, qty, setQty);
-                if (!event.defaultPrevented) onEnter(event);
-              }}
-            />,
-          )}
-          {canCost
-            ? field(
-                t('inventory.receipt.form.unitPrice'),
-                `${ids}-price`,
-                <Input
-                  ref={priceRef}
-                  id={`${ids}-price`}
-                  inputMode="decimal"
-                  autoComplete="off"
-                  className="text-right font-mono"
-                  disabled={entry.free}
-                  value={entry.source === 'unitPrice' ? entry.value : ''}
-                  placeholder={
-                    entry.source === 'amount' && amount !== null && qtyValue && !entry.free
-                      ? formatMnt(amount.dividedBy(qtyValue).toDecimalPlaces(2).toString())
-                      : undefined
-                  }
-                  onChange={(event) =>
-                    setEntry({ source: 'unitPrice', value: event.target.value, free: false })
-                  }
-                  onKeyDown={(event) => {
-                    guard(event, entry.value, (value) => setEntry({ ...entry, value }));
-                    if (!event.defaultPrevented) onEnter(event);
-                  }}
-                />,
-                lastPrice
-                  ? t('inventory.receipt.panel.lastPriceHint', {
-                      price: formatMnt(lastPrice.unitPrice),
-                      unit: lastPrice.unitName,
-                      date: lastPrice.date,
-                    })
-                  : undefined,
-              )
-            : null}
-          {canCost
-            ? field(
-                t('inventory.receipt.form.amount'),
-                `${ids}-amount`,
-                <Input
-                  ref={amountRef}
-                  id={`${ids}-amount`}
-                  inputMode="decimal"
-                  autoComplete="off"
-                  className="text-right font-mono"
-                  disabled={entry.free}
-                  value={entry.source === 'amount' ? entry.value : ''}
-                  placeholder={
-                    entry.source === 'unitPrice' && amount !== null
-                      ? formatMnt(amount.toString())
-                      : undefined
-                  }
-                  onChange={(event) =>
-                    setEntry({ source: 'amount', value: event.target.value, free: false })
-                  }
-                  onKeyDown={(event) => {
-                    guard(event, entry.value, (value) => setEntry({ ...entry, value }));
-                    if (!event.defaultPrevented) onEnter(event);
-                  }}
-                />,
-              )
-            : null}
-          {canPrice
-            ? field(
-                t('inventory.receipt.panel.salePrice'),
-                `${ids}-sale`,
-                <Input
-                  ref={saleRef}
-                  id={`${ids}-sale`}
-                  inputMode="numeric"
-                  autoComplete="off"
-                  className="text-right font-mono"
-                  value={sale}
-                  placeholder={salePrice ? formatMnt(salePrice) : undefined}
-                  onChange={(event) => setSale(event.target.value)}
-                  onKeyDown={(event) => {
-                    guard(event, sale, setSale);
-                    if (!event.defaultPrevented) onEnter(event);
-                  }}
-                />,
-              )
-            : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-          {homeless ? (
-            <div className="flex items-center gap-2">
-              <Label htmlFor={`${ids}-home`} className="text-warning">
-                {t('inventory.receipt.panel.homeLabel')}
-              </Label>
+                      }}
+                    />
+                  </Popover.Anchor>
+                  <Popover.Portal>
+                    <Popover.Content
+                      align="start"
+                      sideOffset={4}
+                      onOpenAutoFocus={(event) => event.preventDefault()}
+                      onCloseAutoFocus={(event) => event.preventDefault()}
+                      className="z-50 w-(--radix-popover-trigger-width) max-w-[min(40rem,var(--radix-popover-content-available-width))] min-w-80 overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-popover"
+                    >
+                      {matches.length === 0 ? (
+                        <p className="px-3 py-2 text-sm text-muted-foreground">
+                          {t('inventory.noProducts')}
+                        </p>
+                      ) : (
+                        <ul
+                          id={`${ids}-matches`}
+                          role="listbox"
+                          className="flex max-h-96 flex-col overflow-y-auto"
+                        >
+                          {matches.map((match, position) => (
+                            <li
+                              key={match.id}
+                              id={`${ids}-match-${position}`}
+                              role="option"
+                              aria-selected={position === active}
+                              data-active={position === active ? 'true' : undefined}
+                              className="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm hover:bg-accent data-[active=true]:bg-accent"
+                              onMouseEnter={() => setHighlight(position)}
+                              // Before the box's blur closes the list.
+                              onMouseDown={(event) => {
+                                event.preventDefault();
+                                setQty('1');
+                                setEntry(START);
+                                setSale('');
+                                chooseProduct(match);
+                              }}
+                            >
+                              <span className="shrink-0 font-mono text-[13px] text-muted-foreground">
+                                {match.sku}
+                              </span>
+                              <span className="min-w-0 flex-1 truncate">{match.name}</span>
+                              <span className="shrink-0 text-[13px] text-muted-foreground">
+                                {match.units.map((candidate) => candidate.uomName).join(' / ')}
+                                {match.weightKg
+                                  ? ` · ${t('inventory.receipt.form.weight', { kg: formatQty(match.weightKg) })}`
+                                  : null}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </Popover.Content>
+                  </Popover.Portal>
+                </Popover.Root>
+              ),
+            )}
+            {field(
+              t('inventory.unit'),
+              `${ids}-unit`,
               <NativeSelect
-                ref={warehouseRef}
-                id={`${ids}-home`}
-                className="w-56"
-                value={warehouseId ?? ''}
-                onChange={(event) =>
-                  setWarehouseId(
-                    event.target.value ? Number.parseInt(event.target.value, 10) : undefined,
-                  )
-                }
+                ref={unitRef}
+                id={`${ids}-unit`}
+                disabled={!product || editing !== null || (product?.units.length ?? 0) < 2}
+                value={unitId ?? ''}
+                onChange={(event) => setUnitId(Number.parseInt(event.target.value, 10))}
                 onKeyDown={onEnter}
               >
-                <option value="">{t('inventory.pickWarehouse')}</option>
-                {warehouses.options.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.name}
+                {(product?.units ?? []).map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.isBase
+                      ? candidate.uomName
+                      : t('inventory.receipt.panel.unitOption', {
+                          unit: candidate.uomName,
+                          factor: formatQty(candidate.factorToBase),
+                        })}
                   </option>
                 ))}
-              </NativeSelect>
-            </div>
-          ) : null}
-          <div className="ml-auto flex items-center gap-2">
+              </NativeSelect>,
+            )}
+            {field(
+              t('inventory.qty'),
+              `${ids}-qty`,
+              <Input
+                ref={qtyRef}
+                id={`${ids}-qty`}
+                inputMode="decimal"
+                autoComplete="off"
+                className="text-right font-mono"
+                value={qty}
+                onChange={(event) => setQty(event.target.value)}
+                onKeyDown={(event) => {
+                  guard(event, qty, setQty);
+                  if (!event.defaultPrevented) onEnter(event);
+                }}
+              />,
+            )}
+            {canCost
+              ? field(
+                  t('inventory.receipt.form.unitPrice'),
+                  `${ids}-price`,
+                  <Input
+                    ref={priceRef}
+                    id={`${ids}-price`}
+                    inputMode="decimal"
+                    autoComplete="off"
+                    className="text-right font-mono"
+                    disabled={entry.free}
+                    value={entry.source === 'unitPrice' ? entry.value : ''}
+                    placeholder={
+                      entry.source === 'amount' && amount !== null && qtyValue && !entry.free
+                        ? formatMnt(amount.dividedBy(qtyValue).toDecimalPlaces(2).toString())
+                        : undefined
+                    }
+                    onChange={(event) =>
+                      setEntry({ source: 'unitPrice', value: event.target.value, free: false })
+                    }
+                    onKeyDown={(event) => {
+                      guard(event, entry.value, (value) => setEntry({ ...entry, value }));
+                      if (!event.defaultPrevented) onEnter(event);
+                    }}
+                  />,
+                  lastPrice
+                    ? t('inventory.receipt.panel.lastPriceHint', {
+                        price: formatMnt(lastPrice.unitPrice),
+                        unit: lastPrice.unitName,
+                        date: lastPrice.date,
+                      })
+                    : undefined,
+                )
+              : null}
+            {canCost
+              ? field(
+                  t('inventory.receipt.form.amount'),
+                  `${ids}-amount`,
+                  <Input
+                    ref={amountRef}
+                    id={`${ids}-amount`}
+                    inputMode="decimal"
+                    autoComplete="off"
+                    className="text-right font-mono"
+                    disabled={entry.free}
+                    value={entry.source === 'amount' ? entry.value : ''}
+                    placeholder={
+                      entry.source === 'unitPrice' && amount !== null
+                        ? formatMnt(amount.toString())
+                        : undefined
+                    }
+                    onChange={(event) =>
+                      setEntry({ source: 'amount', value: event.target.value, free: false })
+                    }
+                    onKeyDown={(event) => {
+                      guard(event, entry.value, (value) => setEntry({ ...entry, value }));
+                      if (!event.defaultPrevented) onEnter(event);
+                    }}
+                  />,
+                )
+              : null}
+            {canPrice
+              ? field(
+                  t('inventory.receipt.panel.salePrice'),
+                  `${ids}-sale`,
+                  <Input
+                    ref={saleRef}
+                    id={`${ids}-sale`}
+                    inputMode="numeric"
+                    autoComplete="off"
+                    className="text-right font-mono"
+                    value={sale}
+                    placeholder={salePrice ? formatMnt(salePrice) : undefined}
+                    onChange={(event) => setSale(event.target.value)}
+                    onKeyDown={(event) => {
+                      guard(event, sale, setSale);
+                      if (!event.defaultPrevented) onEnter(event);
+                    }}
+                  />,
+                )
+              : null}
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-2 xl:pt-[25px]">
             {props.onClose ? (
               <Button variant="ghost" onClick={props.onClose}>
                 {t('common.cancel')}
@@ -711,11 +691,37 @@ export function ReceiptLinePanel(props: {
                 {t('common.cancel')}
               </Button>
             ) : null}
-            <Button disabled={props.pending} onClick={() => void submit()}>
+            <Button variant="outline" pending={props.pending} onClick={() => void submit()}>
               {editing ? t('common.save') : t('inventory.add')}
             </Button>
           </div>
         </div>
+        {homeless ? (
+          <div className="flex items-center gap-2">
+            <Label htmlFor={`${ids}-home`} className="text-warning">
+              {t('inventory.receipt.panel.homeLabel')}
+            </Label>
+            <NativeSelect
+              ref={warehouseRef}
+              id={`${ids}-home`}
+              className="w-56"
+              value={warehouseId ?? ''}
+              onChange={(event) =>
+                setWarehouseId(
+                  event.target.value ? Number.parseInt(event.target.value, 10) : undefined,
+                )
+              }
+              onKeyDown={onEnter}
+            >
+              <option value="">{t('inventory.pickWarehouse')}</option>
+              {warehouses.options.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+            </NativeSelect>
+          </div>
+        ) : null}
         {product ? (
           <dl
             aria-label={t('inventory.receipt.panel.infoLabel')}

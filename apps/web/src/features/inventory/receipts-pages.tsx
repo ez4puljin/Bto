@@ -138,12 +138,13 @@ export function ReceiptsPage() {
             {supplier.data?.name ?? t('common.loading')}
           </FilterChip>
         ) : (
-          <div className="w-full sm:w-64">
+          <div className="w-full sm:w-56">
             <label htmlFor="receipts-supplier" className="sr-only">
               {t('inventory.receipts.supplier')}
             </label>
             <SupplierPicker
               floating
+              variant="filter"
               id="receipts-supplier"
               value={null}
               onChange={(picked) => setParam('supplierId', picked ? String(picked.id) : '')}
@@ -200,7 +201,7 @@ export function ReceiptsPage() {
           />
         ) : null}
       </FilterBar>
-      <ProblemAlert problem={problemFromError(receipts.error)} />
+      <ProblemAlert problem={problemFromError(receipts.error)} onRetry={receipts.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>
