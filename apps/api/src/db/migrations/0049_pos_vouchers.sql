@@ -103,7 +103,7 @@ REVOKE DELETE, TRUNCATE ON "pos_voucher_batches", "pos_vouchers", "pos_sale_vouc
 INSERT INTO fin.accounts (company_id, code, name, kind, normal_side, control)
   SELECT c.id, v.code, v.name, v.kind, v.side, 'NONE'
     FROM fin.companies c
-    CROSS JOIN (VALUES ('120302', 'Ваучерын тооцоо', 'ASSET', 'DEBIT'),
+    CROSS JOIN (VALUES ('120303', 'Ваучерын тооцоо', 'ASSET', 'DEBIT'),
                        ('511040', 'Ваучерын ашиглагдаагүй үлдэгдлийн орлого', 'INCOME', 'CREDIT'))
       AS v(code, name, kind, side)
    WHERE c.code = 'BO'
@@ -119,7 +119,7 @@ INSERT INTO fin.posting_keys (company_id, code, required_control, requires_tax_c
 INSERT INTO fin.posting_rules (company_id, posting_key, account_id, effective_from)
   SELECT c.id, k.key, a.id, DATE '2000-01-01'
     FROM fin.companies c
-    CROSS JOIN (VALUES ('VOUCHER_CLEARING', '120302'), ('VOUCHER_BREAKAGE', '511040')) AS k(key, code)
+    CROSS JOIN (VALUES ('VOUCHER_CLEARING', '120303'), ('VOUCHER_BREAKAGE', '511040')) AS k(key, code)
     JOIN fin.accounts a ON a.company_id = c.id AND a.code = k.code
    WHERE c.code = 'BO'
      AND NOT EXISTS (SELECT 1 FROM fin.posting_rules r

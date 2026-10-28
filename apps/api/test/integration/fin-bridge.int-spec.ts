@@ -460,11 +460,11 @@ describe('fin-bridge', () => {
       await admin.query(
         `DELETE FROM fin.posting_keys WHERE code IN ('VOUCHER_CLEARING', 'VOUCHER_BREAKAGE')`,
       );
-      await admin.query(`DELETE FROM fin.accounts WHERE code IN ('120302', '511040')`);
+      await admin.query(`DELETE FROM fin.accounts WHERE code IN ('120303', '511040')`);
       await admin.query('SET LOCAL session_replication_role = origin');
       for (const statement of statements) await admin.query(statement);
       for (const statement of statements) await admin.query(statement);
-      expect(await count(`fin.accounts WHERE code = '120302' AND kind = 'ASSET'`)).toBe(1);
+      expect(await count(`fin.accounts WHERE code = '120303' AND kind = 'ASSET'`)).toBe(1);
       expect(await count(`fin.accounts WHERE code = '511040' AND kind = 'INCOME'`)).toBe(1);
       expect(
         await count(

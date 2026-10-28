@@ -77,7 +77,7 @@ The owner's answers, in five rounds on 2026-10-27:
    - An unknown code or a face value that differs from its batch is a permanent rejection.
    - `pos_sales.voucher_total` keeps the vouchers' part (CHECK: SALE only, never with credit). `pos_tenders.voucher_id` names the code (CHECK: VOUCHER ⇔ a code).
 7. **The books** (temporary codes until D16; **TODO-VERIFY** with the accountant).
-   - The sale stays a till sale, booked at the shift's close. The close gains Dr **VOUCHER_CLEARING** (120302 «Ваучерын тооцоо») for the vouchers' tenders (`pos_shifts.voucher_sales`).
+   - The sale stays a till sale, booked at the shift's close. The close gains Dr **VOUCHER_CLEARING** (120303 «Ваучерын тооцоо») for the vouchers' tenders (`pos_shifts.voucher_sales`).
    - Per sale and partner, `PosVoucherBillingService.chargeInTx` writes one **lineless invoice** for the full face value, due on the partner's settlement day, with no VAT and the codes in its note. It is posted as `BTO.SALES_INVOICE`:
      - Dr AR (the open item);
      - Cr VOUCHER_CLEARING for what was used;

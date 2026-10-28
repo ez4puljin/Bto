@@ -263,8 +263,8 @@ describe('pos coupons and partner vouchers', () => {
       .body as EdgePrintableReceipt;
     expect(mixed.receipt).toMatchObject({ total: '11700.00', change: '300.00' });
     expect(mixed.receipt.tenders).toEqual([
-      { kind: 'CASH', amount: '6700.00', tendered: '7000.00' },
-      { kind: 'VOUCHER', amount: '5000.00', tendered: null },
+      { kind: 'CASH', name: 'Бэлэн', amount: '6700.00', tendered: '7000.00' },
+      { kind: 'VOUCHER', name: null, amount: '5000.00', tendered: null },
     ]);
     expect(mixed.receipt.vouchers?.map((one) => [one.kind, one.amount])).toEqual([
       ['COUPON', '1300.00'],
@@ -319,8 +319,8 @@ describe('pos coupons and partner vouchers', () => {
     ).body as EdgePrintableReceipt;
     expect(whole.receipt.total).toBe('9100.00');
     expect(whole.receipt.tenders).toEqual([
-      { kind: 'VOUCHER', amount: '5000.00', tendered: null },
-      { kind: 'VOUCHER', amount: '4100.00', tendered: null },
+      { kind: 'VOUCHER', name: null, amount: '5000.00', tendered: null },
+      { kind: 'VOUCHER', name: null, amount: '4100.00', tendered: null },
     ]);
     // Coupons first, whatever the order scanned: 1 300 − 500 − 10 %, the voucher pays the rest.
     const third = await kiosk
@@ -417,7 +417,7 @@ describe('pos coupons and partner vouchers', () => {
     const shift = shifts.data.find((row) => row.number === closed.number);
     expect(shift).toMatchObject({ status: 'CLOSED', variance: '0.00' });
     expect((shift as unknown as { voucherSales: string }).voucherSales).toBe('14100.00');
-    const clearing = await finance.account('120302');
+    const clearing = await finance.account('120303');
     expect(new Decimal(clearing.debit).toFixed(2)).toBe('14100.00');
     expect(new Decimal(clearing.balance).toFixed(2)).toBe('0.00');
   });

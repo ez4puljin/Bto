@@ -101,6 +101,6 @@ export const CHART_TEMPLATE: readonly ChartTemplateAccount[] = [
   // The year close (F6, ADR-0105; a temporary code, TODO-VERIFY D16).
   { code: '340101', kind: 'EQUITY', role: 'RETAINED_EARNINGS' },
   // The till's partner vouchers (ADR-0110; temporary codes, TODO-VERIFY D16).
-  { code: '120302', kind: 'ASSET', role: 'VOUCHER_CLEARING' },
+  { code: '120303', kind: 'ASSET', role: 'VOUCHER_CLEARING' },
   { code: '511040', kind: 'INCOME', role: 'VOUCHER_BREAKAGE' },
 ];
