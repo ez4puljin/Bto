@@ -6,7 +6,7 @@
 | Date | 2026-10-13 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0037 #4 (rows of lists with a record page lose their «Засах» / «Харах» button); ADR-0011 (the web font is Inter; PDFs keep Noto Sans) |
-| Amended by | ADR-0113 (four colour tokens darkened to WCAG AA, solid focus rings); ADR-0043 (settings-style forms, switches and row actions); ADR-0047 (#5: the home page shows attention tiles from `GET /<module>/attention`; #8: receipts are created in a dialog too); ADR-0053 (#3: the recently opened pages are kept per user in each browser, `tugeel.recent.v1:<userId>`) |
+| Amended by | ADR-0114 (the menu moves to a top bar of seven modules; the sidebar becomes a drawer); ADR-0113 (four colour tokens darkened to WCAG AA, solid focus rings); ADR-0043 (settings-style forms, switches and row actions); ADR-0047 (#5: the home page shows attention tiles from `GET /<module>/attention`; #8: receipts are created in a dialog too); ADR-0053 (#3: the recently opened pages are kept per user in each browser, `tugeel.recent.v1:<userId>`) |
 | Errata | 2026-10-13: #11 now describes the aimag map that was built; the first text described an earlier hand-drawn border |
 
 ## Context

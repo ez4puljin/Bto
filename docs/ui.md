@@ -8,7 +8,7 @@ How screens are built in `apps/web` (ADR-0042, desktop density and widths ADR-00
 |---|---|---|
 | `canvas` (`bg-canvas`) | `#F2F2F7` | the page behind the cards (body, main) |
 | `background`, `card`, `popover` | white | cards, inputs, outline buttons, menus |
-| `sidebar` | `#F9F9FB` | the menu |
+| `sidebar` | `#F9F9FB` | the «Бүх цэс» drawer |
 | `foreground` / `muted-foreground` | `#1D1D1F` / `#636366` | text / secondary text (4.5:1 or more on white, the canvas, `accent` and `fill`; ADR-0113) |
 | `primary`, `primary-hover` | `#0071E3`, `#0066CC` | **fills only**: the main button, checked boxes, focus rings, icons |
 | `link` (`text-link`) | `#0066CC` | **blue text**: links, the active menu entry, active filter pills, info badges |
@@ -139,7 +139,20 @@ Feature pieces other screens reuse (ADR-0044, ADR-0047):
 - **Printable page** (`/sales/orders/:id/print/:kind`, and `/sales/print/:kind?ids=` for up to 100 documents, one per sheet with `break-after-page`): a route outside the shell that renders documents for paper (`max-w-3xl`, plain tables, `print:hidden` buttons «Хэвлэх» / «Хаах») and calls `window.print()` once its documents and the warehouse names arrived (a later render never cancels the pending print); opened in a new tab from the app, never generated on the server. **Two papers** (ADR-0058): «A4 | 80 мм» (`PrintFormatToggle`, a `SegmentedControl` with `name` «Цаасны хэмжээ») stands before every print button and on the page (one `PrintFrame` for every printable page, «Хэвлэх» enabled once the document is in, ADR-0066); the computer keeps the choice for all its users (`tugeel.printFormat.v1`), the URL's `?format=a4|80mm` wins. A4 sets `@page { size: A4; margin: 12mm }`; the roll sets `@page { margin: 0 }` without a size (the printer's driver gives the paper), a 72 mm column at 12 px, black only (no grey text, no backgrounds: thermal printers fade them and browsers skip them), rows instead of table columns, solid and dashed rules between the parts.
 - **Tool page** (barcode lookup, price calculator): a `PageHeader`, then cards: the input card with an icon and a hint, the result card with its next step («Бараа нээх»), earlier results in a `ListCard`. Counts on a report page are tiles (green with «Бүрэн» at zero, amber while something is missing); on the e-Barimt report they are toggles that filter the list (`?gap=`), and a bulk assignment opens from the header as a dialog, so the list starts near the top (ADR-0066). The price calculator keeps the list, the date and the search on one row and «Тооцоолох» in the card's header; Enter in a quantity calculates; the totals are the table's footer cells.
 - **Conversation page** (`/ai`, ADR-0045). The open conversation is in the URL (`?c=`). Its steps form an ordered list: the question as a tinted bubble on the right, the answer as a card (summary as plain text, never markdown; the table; «Excel татах», «Тайлан болгох»; the folded SQL). The question box sits under the list: Enter sends, Shift+Enter starts a new line, «Бодож байна…» while waiting, one `Idempotency-Key` per question kept for a retry, and `IDEMPOTENCY_KEY_IN_PROGRESS` reads as «still working», not as an error. The history is a side column on `lg` and follows the conversation on phones; the conversation column stops at 64rem and the question box floats at the foot of the window (its errors inside it; toasts rise above it through `--sticky-actions-space`), ADR-0066. Rows are never stored: older steps fetch theirs again with «Хүснэгтийг харуулах». An empty page shows example questions (they fill the box) and what can be asked; a conversation opened by its link shows an outline while it loads, never the examples. A saved report (`/ai/reports`, «Ажиллуулах») opens its rows in a `RecordSheet` (the report's name, author · date, «Excel татах» in the header).
-- **Home page.** From `xl` two columns (ADR-0066): on the left the greeting, «Анхаарах» and the quick actions as compact tiles (56px, at least 12rem wide); on the right (22rem) the recent pages. «Анхаарах»: one tile per count above zero of the work waiting for this person (`ATTENTION_TILES`, read from `GET /inventory/attention` and `GET /pricing/attention` only when the user holds a tile's permission; «99+» at the cap; nothing while loading, after an error or when nothing waits), each opening its list already filtered. Then the quick actions (each behind every right it needs: to do the thing and to open its page; «Захиалга авах» and «Төлбөр бүртгэх» joined the warehouse ones) and the recent pages: this user's own in this browser (`tugeel.recent.v1:<userId>`, ADR-0053), only those the user may open; the Ctrl/⌘+K search lists the same ones.
+- **The shell** (ADR-0114): a sticky white top bar. From the left:
+  - ⋮⋮ «Бүх цэс», the drawer of every page, `inert` while closed;
+  - the brand;
+  - from `lg`, the business modules (`NAV_MODULES`) as `DropdownMenu`s with one column per group and «Бүх хуудас» at the foot; the open page's module is tinted `secondary`.
+
+  At the right: search (a pill from `xl`), ☆ favourites, 🔔 the inbox, ✨ the assistant, ⚙ «Систем» and the account avatar. A new menu group must join a module (a test checks).
+- **Favourites:** ☆ beside a menu page's title (`PageHeader`, `aria-pressed`). They are kept per user in this browser (`tugeel.favorites.v1:<userId>`, at most 12 menu paths) and listed under the bar's ☆.
+- **Home page** (ADR-0114, width `full`): a centred `max-w-[61rem]` column with:
+  - the date, the greeting and one line;
+  - «Анхаарах» (one row per count above zero, from `ATTENTION_TILES`, read only for a tile's permission, «99+» at the cap; a calm line once every count says nothing waits; nothing while loading or after an error) and «Мэдэгдэл» (the bell's newest lines) as two cards of equal height;
+  - «Модулиуд» and «Хэрэгсэл», icon tiles opening the module pages.
+
+  The quick actions and the recent pages (`tugeel.recent.v1:<userId>`, ADR-0053) live in the Ctrl/⌘+K search and the module pages.
+- **Module page** (`/m/:module`, width `wide`): the module's attention tiles, its quick actions (each behind every right it needs) and one section per group with tiles of its pages; a module the user cannot open is not found.
 - **Report page and dashboard** (`/reports/*`, ADR-0108): KPI tiles with the change against the same days a month and a year earlier (▲/▼ coloured by whether the change is good: sales and profit up `success`, receivables up `destructive`, stock neutral; «—» without a base), charts from **Recharts** only (pinned in CLAUDE.md; series colours as `var(--…)` tokens, never a literal; a fixed height, the width from the card), the report's list in a `ListCard scroll` whose rows open a drill sheet of the documents, «Excel» and «Хэвлэх» in the header, «Шинэчлэх» with the time the totals are as of. Costs, profit and margins only with `reports.margins.view`: hide the tile or column, never show a blank figure. One column on a phone.
 - **Spacing under the title.** `PageHeader` brings its own 16px. Never make it the first child of a flex column with a gap (the two add up to 36px): wrap the page in `space-y-4` or a plain `div` (a source test, `components/page-layout.test.ts`, guards it).
 - **A new menu page** also needs its route's width (`handle: { width }`; `app/page-widths.test.ts` fails without it).
@@ -165,7 +178,7 @@ Feature pieces other screens reuse (ADR-0044, ADR-0047):
 
 ## 6. Tests (Vitest, `apps/web/src/test/render-app.tsx`)
 
-- The menu: `findSidebar()` / `getSidebar()`. Deeper pages also have a breadcrumb `navigation`.
+- The menu: `findSidebar()` / `getSidebar()` find the drawer, whose links stay in the DOM while it is closed (`inert`). The top bar's modules are a `navigation` named «Модулиуд»; open a module with its button and read the `menu`. Pages also have a breadcrumb `navigation`.
 - Dialogs: click the header button (or render `path + '?new=1'`), then `within(await screen.findByRole('dialog'))`.
 - Read-first cards: the card is a `region` named by its title. Edit with the button `` `${mn.common.edit}: ${title}` ``.
 - Switches: `getByRole('switch', { name })`, `toBeChecked()`. «⋯» menus: click the button named «{item}: үйлдэл», then `findByRole('menuitem', { name })`. Icon buttons keep their text names, so `getByRole('button', { name })` finds them.
@@ -180,7 +193,7 @@ Feature pieces other screens reuse (ADR-0044, ADR-0047):
 ## 7. Name and sign-in
 
 - On screen the system is **Bto** (`app.name`), «Дотоод систем», «© 2026 Бүтэн-Оргил ХХК-ийн өмч» (`brand.*`). The code keeps `tugeel`.
-- The mark is a blue rounded square with a white «B» (first letter of `app.name`), in the sidebar and on the sign-in pages.
+- The mark is a blue rounded square with a white «B» (first letter of `app.name`), in the top bar, the drawer and on the sign-in pages.
 - `features/auth/auth-layout.tsx` splits the sign-in and password-setup pages: on the left `MongoliaMap` (every aimag's border from `mongolia-aimags.ts`, generated by `tools/maps/ne-aimags.cjs` from Natural Earth; Khövsgöl lit for «Оргил Бөөний төв» in Mörön, Övörkhangai for «Боломж бөөний төв» in Kharkhorin, Ulaanbaatar in gold; keyframes `bto-*` in `index.css`), on the right the form; on phones only the form.
 
 ## 8. Accessibility
