@@ -117,7 +117,7 @@ export function CategoriesPage() {
           ) : null
         }
       />
-      <ProblemAlert problem={problemFromError(categories.error)} />
+      <ProblemAlert problem={problemFromError(categories.error)} onRetry={categories.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>
@@ -574,7 +574,7 @@ export function UomsPage() {
           ) : null
         }
       />
-      <ProblemAlert problem={problemFromError(uoms.error)} />
+      <ProblemAlert problem={problemFromError(uoms.error)} onRetry={uoms.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>

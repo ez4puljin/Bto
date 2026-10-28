@@ -89,7 +89,7 @@ function KpiTile(props: {
         {props.to ? (
           <Link
             to={props.to}
-            className="outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-3 focus-visible:after:ring-ring/30"
+            className="outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring"
           >
             {props.title}
           </Link>

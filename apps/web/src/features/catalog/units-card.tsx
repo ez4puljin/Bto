@@ -52,7 +52,7 @@ import { barcodeKey } from './barcodes';
 import { FACTOR } from './product-schema';
 
 /** A barcode's small tags («Үндсэн», «Дотоод»), so a code and its tags share one line. */
-const TAG = 'h-5 px-1.5 text-[11px]';
+const TAG = 'h-5 px-1.5 text-xs';
 
 /** A barcode asked about before it is deleted, with the unit whose scan button gets the focus. */
 interface BarcodeTarget {
@@ -132,7 +132,7 @@ export function UnitsCard({ product, canManage }: { product: ProductDetail; canM
           <div
             aria-hidden
             className={cn(
-              'hidden gap-4 border-b border-border/80 bg-muted/60 px-3.5 py-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase sm:grid',
+              'hidden gap-4 border-b border-border/80 bg-muted/60 px-3.5 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase sm:grid',
               columns,
             )}
           >

@@ -100,7 +100,7 @@ export function AuditPage() {
         />
         <DateFilter label={t('audit.to')} value={filter.to} onChange={(to) => setParam('to', to)} />
       </FilterBar>
-      <ProblemAlert problem={problemFromError(audit.error)} />
+      <ProblemAlert problem={problemFromError(audit.error)} onRetry={audit.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>

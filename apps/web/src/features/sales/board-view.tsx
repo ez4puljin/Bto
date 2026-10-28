@@ -391,7 +391,7 @@ function Card({
     <article
       draggable={targets.length > 0}
       aria-label={title}
-      className="shrink-0 cursor-pointer rounded-lg border border-border bg-card p-3 text-sm shadow-card transition-shadow hover:shadow-popover has-[button:focus-visible]:ring-2 has-[button:focus-visible]:ring-ring/30"
+      className="shrink-0 cursor-pointer rounded-lg border border-border bg-card p-3 text-sm shadow-card transition-shadow hover:shadow-popover has-[button:focus-visible]:ring-2 has-[button:focus-visible]:ring-ring"
       onClick={(event) => {
         if (opensCard(event)) onOpen();
       }}

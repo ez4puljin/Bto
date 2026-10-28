@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react';
+import { type ReactNode, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FieldError } from '@/components/field-error';
 import { Button } from '@/components/ui/button';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { isValidationMessage } from '@/lib/forms';
 import { cn } from '@/lib/utils';
 
 /*
@@ -13,6 +14,39 @@ import { cn } from '@/lib/utils';
  * actions at the foot, «Болих» then the main button on the right. The read view (`FieldList`)
  * uses the same rows, so reading and editing line up.
  */
+
+/**
+ * Ties a row's hint and error to its control (ADR-0113): the element whose id is `htmlFor` gets
+ * `aria-describedby` naming them (ids the control set itself are kept) and `aria-invalid` while
+ * an error shows. Done on the element, so any control with that id is covered (inputs, selects,
+ * pickers) without the callers passing props.
+ */
+function useDescribedBy(htmlFor: string | undefined, hint: boolean, error: boolean) {
+  useLayoutEffect(() => {
+    if (!htmlFor) return;
+    const control = document.getElementById(htmlFor);
+    if (!control) return;
+    const ours = [`${htmlFor}-hint`, `${htmlFor}-error`];
+    const own = [hint ? ours[0] : null, error ? ours[1] : null].filter(
+      (id): id is string => id !== null && id !== undefined,
+    );
+    const kept = (control.getAttribute('aria-describedby') ?? '')
+      .split(/\s+/)
+      .filter((id) => id && !ours.includes(id));
+    const next = [...kept, ...own];
+    if (next.length > 0) control.setAttribute('aria-describedby', next.join(' '));
+    else control.removeAttribute('aria-describedby');
+    const hadInvalid = control.hasAttribute('aria-invalid');
+    if (error) control.setAttribute('aria-invalid', 'true');
+    return () => {
+      if (error && !hadInvalid) control.removeAttribute('aria-invalid');
+    };
+  });
+}
+
+function describedId(htmlFor: string | undefined, part: 'hint' | 'error') {
+  return htmlFor ? `${htmlFor}-${part}` : undefined;
+}
 
 /** A titled group of rows inside a hairline box. */
 export function FormSection(props: {
@@ -28,7 +62,7 @@ export function FormSection(props: {
         <div className="flex items-end justify-between gap-3 px-1">
           <div className="min-w-0">
             {props.title ? (
-              <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+              <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                 {props.title}
               </h3>
             ) : null}
@@ -59,6 +93,7 @@ export function FormRow(props: {
   align?: 'start' | 'center';
   children: ReactNode;
 }) {
+  useDescribedBy(props.htmlFor, Boolean(props.hint), isValidationMessage(props.error));
   return (
     <div className="@container">
       <div
@@ -80,8 +115,12 @@ export function FormRow(props: {
         </Label>
         <div className="flex min-w-0 flex-col gap-1.5">
           {props.children}
-          {props.hint ? <p className="text-xs text-muted-foreground">{props.hint}</p> : null}
-          <FieldError message={props.error} />
+          {props.hint ? (
+            <p id={describedId(props.htmlFor, 'hint')} className="text-xs text-muted-foreground">
+              {props.hint}
+            </p>
+          ) : null}
+          <FieldError message={props.error} id={describedId(props.htmlFor, 'error')} />
         </div>
       </div>
     </div>
@@ -96,12 +135,17 @@ export function FormField(props: {
   error?: string | undefined;
   children: ReactNode;
 }) {
+  useDescribedBy(props.htmlFor, Boolean(props.hint), isValidationMessage(props.error));
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={props.htmlFor}>{props.label}</Label>
       {props.children}
-      {props.hint ? <p className="text-xs text-muted-foreground">{props.hint}</p> : null}
-      <FieldError message={props.error} />
+      {props.hint ? (
+        <p id={describedId(props.htmlFor, 'hint')} className="text-xs text-muted-foreground">
+          {props.hint}
+        </p>
+      ) : null}
+      <FieldError message={props.error} id={describedId(props.htmlFor, 'error')} />
     </div>
   );
 }
@@ -128,7 +172,7 @@ export function DialogFormFooter(props: {
       <Button type="button" variant="ghost" onClick={props.onCancel}>
         {t('common.cancel')}
       </Button>
-      <Button type="submit" disabled={props.pending || props.disabled}>
+      <Button type="submit" pending={props.pending} disabled={props.disabled}>
         {props.submitLabel ?? t('common.save')}
       </Button>
     </DialogFooter>

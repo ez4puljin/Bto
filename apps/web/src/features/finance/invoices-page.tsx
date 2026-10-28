@@ -103,7 +103,7 @@ export function InvoicesPage() {
           onTo={(value) => setParam('to', value)}
         />
       </FilterBar>
-      <ProblemAlert problem={problemFromError(invoices.error)} />
+      <ProblemAlert problem={problemFromError(invoices.error)} onRetry={invoices.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>

@@ -91,7 +91,7 @@ export function DiscountProgramsPage() {
           }
         />
       </FilterBar>
-      <ProblemAlert problem={problemFromError(programs.error)} />
+      <ProblemAlert problem={problemFromError(programs.error)} onRetry={programs.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>

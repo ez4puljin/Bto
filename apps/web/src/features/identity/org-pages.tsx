@@ -103,7 +103,7 @@ export function BranchesPage() {
           ) : null
         }
       />
-      <ProblemAlert problem={problemFromError(branches.error)} />
+      <ProblemAlert problem={problemFromError(branches.error)} onRetry={branches.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>
@@ -302,7 +302,7 @@ export function WarehousesPage() {
           ) : null
         }
       />
-      <ProblemAlert problem={problemFromError(warehouses.error)} />
+      <ProblemAlert problem={problemFromError(warehouses.error)} onRetry={warehouses.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>

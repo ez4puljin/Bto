@@ -152,7 +152,7 @@ function EntriesSheet(props: {
             ]}
           />
         ) : null}
-        <ProblemAlert problem={problemFromError(entries.error)} />
+        <ProblemAlert problem={problemFromError(entries.error)} onRetry={entries.refetch} />
         {entries.data && entries.data.data.length === 0 ? (
           <EmptyState title={t(`${columns}.empty`)} />
         ) : (

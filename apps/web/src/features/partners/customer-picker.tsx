@@ -73,7 +73,7 @@ export function CustomerPicker(props: {
         value={search}
         onChange={(event) => setSearch(event.target.value)}
       />
-      <ProblemAlert problem={problemFromError(customers.error)} />
+      <ProblemAlert problem={problemFromError(customers.error)} onRetry={customers.refetch} />
       {rows.length > 0 ? (
         <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border">
           {rows.map((customer) => (

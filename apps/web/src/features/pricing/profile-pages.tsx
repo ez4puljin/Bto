@@ -85,7 +85,7 @@ export function PriceProfilesPage() {
           }
         />
       </FilterBar>
-      <ProblemAlert problem={problemFromError(profiles.error)} />
+      <ProblemAlert problem={problemFromError(profiles.error)} onRetry={profiles.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>

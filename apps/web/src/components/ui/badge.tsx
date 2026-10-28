@@ -7,7 +7,7 @@ import { Slot } from "radix-ui"
 // blue "in progress" pill, `secondary` the neutral one; success / warning / destructive carry
 // meaning (done, needs attention, refused or broken).
 const badgeVariants = cva(
-  "group/badge inline-flex h-5.5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 [&>svg]:pointer-events-none [&>svg]:size-3!",
+  "group/badge inline-flex h-5.5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 [&>svg]:pointer-events-none [&>svg]:size-3!",
   {
     variants: {
       variant: {
@@ -16,7 +16,7 @@ const badgeVariants = cva(
         success: "bg-success-soft text-success",
         warning: "bg-warning-soft text-warning",
         destructive:
-          "bg-danger-soft text-destructive focus-visible:ring-destructive/20 [a]:hover:bg-destructive/15",
+          "bg-danger-soft text-destructive focus-visible:ring-destructive [a]:hover:bg-destructive/15",
         outline:
           "border-border text-muted-foreground [a]:hover:bg-accent [a]:hover:text-foreground",
         ghost: "text-muted-foreground hover:bg-accent",

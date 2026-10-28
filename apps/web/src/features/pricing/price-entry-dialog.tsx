@@ -308,7 +308,7 @@ function PriceEntryForm(props: {
           aria-label={t('pricing.dialog.preview')}
           className="flex flex-col gap-2 rounded-xl bg-muted/70 p-3"
         >
-          <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+          <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             {t('pricing.dialog.preview')}
           </h3>
           {preview ? (

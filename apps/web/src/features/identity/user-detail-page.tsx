@@ -67,7 +67,7 @@ export function UserDetailPage() {
       <div>
         <PageHeader title={t('users.detail.title')} />
         {user.isError ? (
-          <ProblemAlert problem={problemFromError(user.error)} />
+          <ProblemAlert problem={problemFromError(user.error)} onRetry={user.refetch} />
         ) : (
           <p role="status" className="text-sm text-muted-foreground">
             {t('common.loading')}

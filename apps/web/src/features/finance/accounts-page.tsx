@@ -104,7 +104,7 @@ export function AccountsPage() {
         accounts={rows}
         onClose={() => setIssueAccounts(false)}
       />
-      <ProblemAlert problem={problemFromError(accounts.error)} />
+      <ProblemAlert problem={problemFromError(accounts.error)} onRetry={accounts.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>

@@ -107,7 +107,7 @@ export function Sidebar(props: {
       <div className="shrink-0 px-3 pb-2">
         <button
           type="button"
-          className="flex h-8 w-full items-center gap-2 rounded-lg bg-black/[0.05] px-2.5 text-[13px] text-muted-foreground transition-colors hover:bg-black/[0.08] focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:outline-none"
+          className="flex h-8 w-full items-center gap-2 rounded-lg bg-black/[0.05] px-2.5 text-[13px] text-muted-foreground transition-colors hover:bg-black/[0.08] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none"
           aria-keyshortcuts="Control+K Meta+K"
           onClick={props.onSearch}
         >
@@ -115,7 +115,7 @@ export function Sidebar(props: {
           <span className="flex-1 text-left">{t('shell.search')}</span>
           <kbd
             aria-hidden
-            className="rounded border border-black/10 bg-background px-1 font-sans text-[11px] text-muted-foreground"
+            className="rounded border border-black/10 bg-background px-1 font-sans text-xs text-muted-foreground"
           >
             {t(isMac ? 'shell.shortcutMac' : 'shell.shortcut')}
           </kbd>
@@ -138,7 +138,7 @@ export function Sidebar(props: {
             onOpenChange={(open) => setOpen(group.label, open)}
             className="mt-3"
           >
-            <Collapsible.Trigger className="group/trigger flex w-full items-center justify-between rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:outline-none">
+            <Collapsible.Trigger className="group/trigger flex w-full items-center justify-between rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none">
               {t(group.label)}
               <ChevronDown
                 aria-hidden
@@ -181,6 +181,7 @@ function AccountMenu() {
   const { me } = state;
   const initials = me.fullName
     .split(/\s+/u)
+    .map((word) => word.replace(/[^\p{L}\p{N}]/gu, ''))
     .filter(Boolean)
     .slice(0, 2)
     .map((word) => word.charAt(0).toUpperCase())
@@ -197,7 +198,7 @@ function AccountMenu() {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-black/[0.04] focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:outline-none aria-expanded:bg-black/[0.04]"
+            className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-black/[0.04] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none aria-expanded:bg-black/[0.04]"
           >
             <span
               aria-hidden

@@ -104,7 +104,7 @@ export function BinMovesPage() {
       <h2 className="mb-2 text-[15px] font-semibold tracking-tight">
         {t('inventory.moves.history')}
       </h2>
-      <ProblemAlert problem={problemFromError(moves.error)} />
+      <ProblemAlert problem={problemFromError(moves.error)} onRetry={moves.refetch} />
       <ListCard>
         <Table>
           <TableHeader>

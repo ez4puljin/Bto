@@ -124,7 +124,7 @@ export function CustomerLedgerPage() {
             </span>
           ) : null}
         </FilterBar>
-        <ProblemAlert problem={problemFromError(ledger.error)} />
+        <ProblemAlert problem={problemFromError(ledger.error)} onRetry={ledger.refetch} />
         <ListCard scroll>
           <Table>
             <TableHeader>
@@ -268,7 +268,7 @@ export function BalanceCard({
           <div role="group" className="flex flex-col gap-1.5" aria-labelledby={`${titleId}-aging`}>
             <h3
               id={`${titleId}-aging`}
-              className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase"
+              className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
             >
               {t('finance.balances.aging')}
             </h3>

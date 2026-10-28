@@ -102,7 +102,7 @@ export function FieldList(props: {
       {props.title || props.description ? (
         <div className="px-1">
           {props.title ? (
-            <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+            <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               {props.title}
             </h3>
           ) : null}

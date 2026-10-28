@@ -86,7 +86,7 @@ export function RolesPage() {
           ) : null
         }
       />
-      <ProblemAlert problem={problemFromError(roles.error)} />
+      <ProblemAlert problem={problemFromError(roles.error)} onRetry={roles.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>

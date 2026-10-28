@@ -160,7 +160,7 @@ export function PosVouchersPage() {
           ))}
         </NativeSelect>
       </FilterBar>
-      <ProblemAlert problem={problemFromError(batches.error)} />
+      <ProblemAlert problem={problemFromError(batches.error)} onRetry={batches.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>
@@ -545,7 +545,7 @@ function VoucherBatchPanel({ batchId, onClose }: { batchId: number | null; onClo
       badges={detail ? <VoucherStatusBadge status={detail.status} /> : null}
       actions={detail ? <PanelActions batch={detail} /> : null}
     >
-      <ProblemAlert problem={problemFromError(batch.error)} />
+      <ProblemAlert problem={problemFromError(batch.error)} onRetry={batch.refetch} />
       {detail ? <BatchBody batch={detail} /> : null}
     </RecordSheet>
   );

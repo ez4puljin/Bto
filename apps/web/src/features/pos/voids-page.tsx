@@ -128,7 +128,7 @@ export function PosVoidsPage() {
           />
         </div>
       </FilterBar>
-      <ProblemAlert problem={problemFromError(voids.error)} />
+      <ProblemAlert problem={problemFromError(voids.error)} onRetry={voids.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>
@@ -214,7 +214,7 @@ function VoidPanel({ voidId, onClose }: { voidId: number | null; onClose: () => 
       }
       badges={detail ? <VoidReasonBadge reason={detail.reason} /> : null}
     >
-      <ProblemAlert problem={problemFromError(entry.error)} />
+      <ProblemAlert problem={problemFromError(entry.error)} onRetry={entry.refetch} />
       {detail ? <VoidBody entry={detail} /> : null}
     </RecordSheet>
   );

@@ -114,6 +114,12 @@ function HeaderCard(props: { children: ReactNode; note?: ReactNode }) {
 }
 
 const HEADER_GRID = 'grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4';
+/**
+ * The draft's six fields (date, supplier, delivery note, note, payment, account) in one row from
+ * `xl`, so a 1366 laptop shows the first lines (ADR-0113).
+ */
+const EDITOR_GRID =
+  'grid gap-x-3 gap-y-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[9.5rem_minmax(13rem,2fr)_minmax(7rem,1fr)_minmax(8rem,1.2fr)_minmax(10rem,1fr)_minmax(8.5rem,1fr)]';
 
 /** «Үнэ НӨАТ-тэй (10%)…», for cost holders, when the supplier's prices carry VAT. */
 function VatNote({ detail }: { detail: ReceiptDetail | null }) {
@@ -669,7 +675,7 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
     <>
       <HeaderCard note={<VatNote detail={detail} />}>
         <ProblemAlert problem={generalProblem(headerProblem)} />
-        <div className={HEADER_GRID}>
+        <div className={EDITOR_GRID}>
           <FormField
             label={t('inventory.receipt.form.date')}
             htmlFor="receipt-date"
@@ -779,7 +785,7 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
             </FormField>
           )}
         </div>
-        <ProblemAlert problem={problemFromError(accounts.error)} />
+        <ProblemAlert problem={problemFromError(accounts.error)} onRetry={accounts.refetch} />
       </HeaderCard>
       <ReceiptLinePanel
         supplierId={supplier?.id}

@@ -131,7 +131,7 @@ export function JournalPage() {
           onTo={(value) => setParam('to', value)}
         />
       </FilterBar>
-      <ProblemAlert problem={problemFromError(journal.error)} />
+      <ProblemAlert problem={problemFromError(journal.error)} onRetry={journal.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>
@@ -219,7 +219,7 @@ export function JournalEntryPanel({
       badges={detail ? <SourceBadge source={detail.source} /> : null}
       actions={detail ? <EntryActions entry={detail} /> : null}
     >
-      <ProblemAlert problem={problemFromError(entry.error)} />
+      <ProblemAlert problem={problemFromError(entry.error)} onRetry={entry.refetch} />
       {detail ? <EntryBody entry={detail} /> : null}
     </RecordSheet>
   );

@@ -413,7 +413,8 @@ function UnitChoice(props: {
     if (only) onChoose(buttonOf(product, only));
   }, [only, onChoose, product]);
 
-  if (detail.error) return <ProblemAlert problem={problemFromError(detail.error)} />;
+  if (detail.error)
+    return <ProblemAlert problem={problemFromError(detail.error)} onRetry={detail.refetch} />;
   if (units.length < 2) return null;
   return (
     <div className="flex flex-wrap items-center gap-2">

@@ -109,13 +109,13 @@ export function DefinitionText(props: { entity: SegmentEntity; definition: Segme
       {definition.groups.map((group, index) => (
         <Fragment key={index}>
           {index > 0 ? (
-            <p className="px-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+            <p className="px-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               {t(`segments.join.${definition.match}`)}
             </p>
           ) : null}
           <div className="flex flex-col gap-1.5 rounded-lg border border-border/80 p-3">
             {definition.groups.length > 1 ? (
-              <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+              <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                 {t('segments.group', { n: index + 1 })}
               </p>
             ) : null}

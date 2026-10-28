@@ -65,6 +65,9 @@ const HEADER_CODES = new Set([
   'WAREHOUSE_KIND_NOT_ALLOWED',
 ]);
 const HEADER_GRID = 'grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3';
+/** The draft's fields in one row from `xl`, so a 1366 laptop shows the first lines (ADR-0113). */
+const EDITOR_GRID =
+  'grid gap-x-3 gap-y-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[9.5rem_minmax(9rem,1fr)_minmax(11rem,1fr)_minmax(22rem,2fr)_minmax(6rem,1fr)]';
 
 /** A chosen recipient record (a user, a customer or a supplier) as the header keeps it. */
 interface Picked {
@@ -350,7 +353,7 @@ function LookupPicker(props: {
         value={search}
         onChange={(event) => setSearch(event.target.value)}
       />
-      <ProblemAlert problem={problemFromError(query.error)} />
+      <ProblemAlert problem={problemFromError(query.error)} onRetry={query.refetch} />
       {!focused || query.isPending ? null : rows.length > 0 ? (
         <ul className="absolute inset-x-0 top-full z-30 mt-1 flex max-h-72 flex-col divide-y divide-border overflow-y-auto rounded-lg border border-border bg-popover shadow-popover">
           {rows.slice(0, 8).map((row) => (
@@ -840,7 +843,7 @@ function DraftEditor(props: {
             problemFromError(types.error)
           }
         />
-        <div className={HEADER_GRID}>
+        <div className={EDITOR_GRID}>
           <FormField label={t('inventory.date')} htmlFor="issue-date" error={dateError}>
             <Input
               id="issue-date"
@@ -910,7 +913,7 @@ function DraftEditor(props: {
               ))}
             </NativeSelect>
           </FormField>
-          <div className="sm:col-span-2">
+          <div className="sm:col-span-2 xl:col-span-1">
             <FormField
               label={t('inventory.issues.recipient')}
               htmlFor="issue-recipient"
@@ -1084,7 +1087,7 @@ function DraftEditor(props: {
       </Card>
       <StickyActions summary={t('inventory.linesCount', { count: lines.length })}>
         {detail === null ? (
-          <Button type="button" disabled={mutations.create.isPending} onClick={saveNew}>
+          <Button type="button" pending={mutations.create.isPending} onClick={saveNew}>
             {t('common.save')}
           </Button>
         ) : (

@@ -101,7 +101,7 @@ export function ImportsPage() {
       <h2 className="mt-6 mb-2.5 text-[15px] leading-tight font-semibold tracking-tight">
         {t('imports.history')}
       </h2>
-      <ProblemAlert problem={problemFromError(imports.error)} />
+      <ProblemAlert problem={problemFromError(imports.error)} onRetry={imports.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>
@@ -573,7 +573,7 @@ function RowsTable({ job, filter }: { job: ImportJob; filter: RowFilter }) {
   const data = rows.data?.pages.flatMap((page) => page.data) ?? [];
   return (
     <>
-      <ProblemAlert problem={problemFromError(rows.error)} />
+      <ProblemAlert problem={problemFromError(rows.error)} onRetry={rows.refetch} />
       <ListCard>
         <Table>
           <TableHeader>

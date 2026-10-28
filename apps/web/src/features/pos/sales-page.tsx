@@ -147,7 +147,7 @@ export function PosSalesPage() {
           />
         </div>
       </FilterBar>
-      <ProblemAlert problem={problemFromError(sales.error)} />
+      <ProblemAlert problem={problemFromError(sales.error)} onRetry={sales.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>

@@ -144,7 +144,7 @@ export function AdjustmentsPage() {
           ))}
         </NativeSelect>
       </FilterBar>
-      <ProblemAlert problem={problemFromError(adjustments.error)} />
+      <ProblemAlert problem={problemFromError(adjustments.error)} onRetry={adjustments.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>

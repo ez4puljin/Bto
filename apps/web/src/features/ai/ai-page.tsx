@@ -194,7 +194,10 @@ export function AiPage() {
         </section>
 
         <section aria-label={t('ai.title')} className="order-1 min-w-0 space-y-4 lg:order-2">
-          <ProblemAlert problem={problemFromError(conversation.error)} />
+          <ProblemAlert
+            problem={problemFromError(conversation.error)}
+            onRetry={conversation.refetch}
+          />
           {loadingConversation ? (
             // An opened conversation loads: its outline, never the empty page's examples.
             <div role="status" className="space-y-4">

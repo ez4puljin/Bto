@@ -64,7 +64,7 @@ export function InvoicePanel({
       }
       actions={detail ? <PanelActions invoice={detail} /> : null}
     >
-      <ProblemAlert problem={problemFromError(invoice.error)} />
+      <ProblemAlert problem={problemFromError(invoice.error)} onRetry={invoice.refetch} />
       {detail ? <InvoiceBody invoice={detail} /> : null}
     </RecordSheet>
   );

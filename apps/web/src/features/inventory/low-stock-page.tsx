@@ -136,7 +136,7 @@ export function LowStockPage() {
         </ListCard>
       ) : (
         <>
-          <ProblemAlert problem={problemFromError(low.error)} />
+          <ProblemAlert problem={problemFromError(low.error)} onRetry={low.refetch} />
           <ListCard scroll>
             <Table>
               <TableHeader>

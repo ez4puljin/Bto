@@ -85,7 +85,7 @@ export function ReceiptView({
         ) : null}
         {credit && copyLabel ? <p className="font-sans text-xs">{copyLabel}</p> : null}
         {facts.mode === 'TEST' && credit === null ? (
-          <p className="rounded-md bg-warning-soft px-2 py-1 font-sans text-xs font-semibold text-warning">
+          <p className="rounded-md bg-warning-soft px-2 py-1 font-sans text-sm font-semibold tracking-wide text-warning">
             {t('posKiosk.receipt.test')}
           </p>
         ) : null}
@@ -387,6 +387,15 @@ export function ReceiptDialog(props: {
                 : null}
           </DialogDescription>
         </DialogHeader>
+        {receipt && !refund && new Decimal(receipt.change).gt(0) ? (
+          // The change to hand back, large above the receipt (ADR-0113).
+          <p className="flex items-baseline justify-between rounded-xl bg-success-soft px-4 py-3 text-success">
+            <span className="text-[15px] font-medium">{t('posKiosk.pay.change')}</span>
+            <span className="font-mono text-3xl font-semibold tracking-tight">
+              {formatTugrik(receipt.change)}
+            </span>
+          </p>
+        ) : null}
         {receipt && props.printable ? (
           <ReceiptView
             receipt={receipt}

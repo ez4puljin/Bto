@@ -49,7 +49,7 @@ export function CashPage() {
   return (
     <div className="space-y-4">
       <PageHeader title={t('finance.cash.title')} />
-      <ProblemAlert problem={problemFromError(accounts.error)} />
+      <ProblemAlert problem={problemFromError(accounts.error)} onRetry={accounts.refetch} />
       {accounts.data && accounts.data.length === 0 ? (
         <ListCard>
           <EmptyState icon={WalletCards} title={t('finance.cash.noAccounts')} />
@@ -103,7 +103,7 @@ export function CashPage() {
               </span>
             ) : null}
           </FilterBar>
-          <ProblemAlert problem={problemFromError(book.error)} />
+          <ProblemAlert problem={problemFromError(book.error)} onRetry={book.refetch} />
           <ListCard scroll>
             <Table>
               <TableHeader>

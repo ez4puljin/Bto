@@ -298,7 +298,7 @@ function Palette({ close }: { close: () => void }) {
           </p>
         ) : null}
       </div>
-      <div className="border-t bg-muted/50 px-4 py-2 text-[11px] text-muted-foreground">
+      <div className="border-t bg-muted/50 px-4 py-2 text-xs text-muted-foreground">
         {t('palette.hint')}
       </div>
     </DialogContent>

@@ -85,7 +85,7 @@ export function StockPage() {
           onCheckedChange={(checked) => setParam('all', checked ? '' : '1')}
         />
       </FilterBar>
-      <ProblemAlert problem={problemFromError(stock.error)} />
+      <ProblemAlert problem={problemFromError(stock.error)} onRetry={stock.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>

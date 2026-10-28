@@ -17,7 +17,7 @@ export function NativeSelect({
     <select
       data-active={variant === 'filter' && narrowing ? 'true' : undefined}
       className={cn(
-        'native-select outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-50',
+        'native-select outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
         variant === 'filter'
           ? 'h-8 w-auto max-w-64 truncate rounded-full border border-border bg-background pl-3 text-[13px] font-medium shadow-control hover:bg-accent data-[active=true]:border-transparent data-[active=true]:bg-secondary data-[active=true]:text-secondary-foreground'
           : 'h-9 w-full rounded-lg border border-input bg-background pl-3 text-base shadow-control md:text-sm',

@@ -154,7 +154,7 @@ export function IssuesPage() {
           ))}
         </NativeSelect>
       </FilterBar>
-      <ProblemAlert problem={problemFromError(issues.error)} />
+      <ProblemAlert problem={problemFromError(issues.error)} onRetry={issues.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>

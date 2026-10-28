@@ -32,7 +32,8 @@ export function PaymentTypesCard() {
   const { t } = useTranslation();
   const types = usePaymentTypes();
   const canManage = useHasPermission('pos.manage');
-  if (types.error) return <ProblemAlert problem={problemFromError(types.error)} />;
+  if (types.error)
+    return <ProblemAlert problem={problemFromError(types.error)} onRetry={types.refetch} />;
   if (!types.data) return null;
   const data = types.data;
   return (

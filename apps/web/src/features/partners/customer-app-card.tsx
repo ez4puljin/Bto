@@ -97,7 +97,7 @@ export function CustomerAppCard({ customerId }: { customerId: number }) {
         ) : null}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <ProblemAlert problem={problemFromError(account.error)} />
+        <ProblemAlert problem={problemFromError(account.error)} onRetry={account.refetch} />
         {account.isPending ? (
           <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
         ) : null}

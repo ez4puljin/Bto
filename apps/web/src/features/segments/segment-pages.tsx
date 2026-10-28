@@ -208,7 +208,7 @@ export function SegmentPage() {
     return (
       <div className="max-w-3xl">
         <PageHeader title={t('segments.title')} />
-        <ProblemAlert problem={problemFromError(segment.error)} />
+        <ProblemAlert problem={problemFromError(segment.error)} onRetry={segment.refetch} />
         {segment.isPending ? (
           <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
         ) : null}
@@ -263,7 +263,7 @@ export function SegmentPage() {
           </>
         }
       />
-      <ProblemAlert problem={problemFromError(counts.error)} />
+      <ProblemAlert problem={problemFromError(counts.error)} onRetry={counts.refetch} />
       <Card>
         <CardHeader>
           <CardTitle>
@@ -422,7 +422,7 @@ function EditSegment({ id }: { id: number }) {
         title={data ? data.name : t('segments.edit')}
         crumbs={data ? [{ label: data.name, to: `/segments/${data.id}` }] : []}
       />
-      <ProblemAlert problem={problemFromError(segment.error)} />
+      <ProblemAlert problem={problemFromError(segment.error)} onRetry={segment.refetch} />
       {data ? (
         <SegmentForm entity={data.entity} definition={data.definition} segment={data} />
       ) : segment.isPending ? (

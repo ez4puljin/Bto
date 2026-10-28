@@ -51,7 +51,7 @@ export function SettingsPage() {
   return (
     <div>
       <PageHeader title={t('settings.title')} description={t('settings.hint')} />
-      <ProblemAlert problem={problemFromError(settings.error)} />
+      <ProblemAlert problem={problemFromError(settings.error)} onRetry={settings.refetch} />
       <div className="grid gap-4 lg:grid-cols-2">
         {(settings.data ?? []).map((view) => (
           <SettingCard key={view.key} view={view} />

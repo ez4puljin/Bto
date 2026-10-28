@@ -60,7 +60,8 @@ export function LoyaltyTiersCard() {
   const { t } = useTranslation();
   const tiers = useLoyaltyTiers();
   const canManage = useHasPermission('pos.manage');
-  if (tiers.error) return <ProblemAlert problem={problemFromError(tiers.error)} />;
+  if (tiers.error)
+    return <ProblemAlert problem={problemFromError(tiers.error)} onRetry={tiers.refetch} />;
   if (!tiers.data) return null;
   const data = tiers.data;
   return (
