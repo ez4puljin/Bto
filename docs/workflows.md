@@ -44,11 +44,21 @@ Recorded with the owner on 2026-10-28.
 - **Damage charged to a person.** This belongs to the issue side: a charge to a staff member, driver or other person at the sale price, creating a receivable.
 - **Receipts only in Bto: the consequence.** Stock and payables then live in Bto alone. Sales and other stock movements still recorded in erxes or Erkhet would no longer meet these receipts, so neither system's stock would be right. The supplier payables and their payments would also have to be in Bto. Before the trial, the next round must settle where stock leaves today (sales, issues, the supermarket) and how that reaches Bto.
 
+### Answers (owner, 2026-10-28, round 3)
+
+1. **The scan is not in Butenorgil.** Butenorgil holds the orders. The keeper's scan against the expected quantities and the accountant's price check happen on the draft receipt in Erkhet.
+2. **Where things are recorded.** erxes is used **only for sales**. It syncs to Erkhet. Every receipt, issue, cash and bank transaction, and the stock balances are kept **only in Erkhet**.
+3. **Decided by the owner:** the **big path**. Ordering and receiving are built in Bto itself, with Butenorgil's «Захиалга» menu as the reference. The alternative was feeding Butenorgil's orders into Bto as draft receipts.
+4. **Decided by the owner:** the trial runs **only in Bto's development environment**, with test receipts. No real business transaction is entered in Bto as well. The double-books problem above therefore does not arise during the trial.
+
+### The first slice, as now understood
+
+Purchase order (Butenorgil's «Захиалга» as the reference) → draft receipt → the keeper scans against the expected quantities, corrects them or marks «ирээгүй» → the accountant confirms each line's price against the previous one → the payable. Received stock is sellable without shelves. Procurement was planned for delivery 8, so this brings it forward.
+
 ### Open questions (TODO-VERIFY)
 
-- Is the barcode scan today done in Butenorgil's receiving screen? (owner)
 - Does the driver's fee go into the goods' cost? (accountant)
-- Where is stock taken out today (wholesale sales, issues, the supermarket till), and in which system? (owner)
+- The ordering details in Butenorgil's «Захиалга» (statuses, brands, trucks, who does what): read from its code, then confirmed with the owner.
 
 ## 2. Goods issue («Зарлага»)
 
