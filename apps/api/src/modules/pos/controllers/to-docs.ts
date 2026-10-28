@@ -74,6 +74,8 @@ export function toSaleDoc(dto: SaleDocDto): SaleDoc {
     })),
     tenders: dto.tenders.map((tender) => ({
       kind: tender.kind,
+      paymentTypeId: orNull(tender.paymentTypeId),
+      paymentTypeName: orNull(tender.paymentTypeName),
       amount: dec(tender.amount),
       tendered: decOrNull(tender.tendered),
       terminalId: orNull(tender.terminalId),
@@ -194,6 +196,25 @@ export function toSyncEvent(dto: SyncEventDto, index: number): SyncEvent {
         throw invalid(`${path}.voided.clientId`, 'clientId', 'matches the event');
       }
       return { kind: dto.kind, clientId: dto.clientId, payload: doc };
+    }
+    case 'DAY_COUNT': {
+      const body = need(dto.dayCount, 'dayCount');
+      if (body.clientId !== dto.clientId) {
+        throw invalid(`${path}.dayCount.clientId`, 'clientId', 'matches the event');
+      }
+      return {
+        kind: dto.kind,
+        clientId: dto.clientId,
+        payload: {
+          clientId: body.clientId,
+          tillCode: body.tillCode,
+          day: body.day,
+          cashierUserId: body.cashierUserId,
+          counts: body.counts.map((row) => ({ note: row.note, count: row.count })),
+          total: dec(body.total),
+          countedAt: new Date(body.countedAt),
+        },
+      };
     }
   }
 }

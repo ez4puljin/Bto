@@ -2,6 +2,7 @@ import { Decimal } from '@tugeel/shared/money';
 import { type PosEventKind, VOID_REASONS, type VoidReason } from '@tugeel/shared/pos';
 import { invalid } from '../../common/errors/app-error';
 import type {
+  DayCountDoc,
   EbarimtFacts,
   ReceiptStatusDoc,
   SaleDoc,
@@ -56,6 +57,12 @@ export function encodeEvent(event: SyncEvent): Json {
           unitPrice: money(line.unitPrice),
           total: money(line.total),
         })),
+      };
+    case 'DAY_COUNT':
+      return {
+        ...event.payload,
+        total: money(event.payload.total),
+        countedAt: stamp(event.payload.countedAt),
       };
   }
 }
@@ -170,6 +177,23 @@ export function decodeEvent(kind: PosEventKind, clientId: string, payload: unkno
         } satisfies VoidDoc,
       };
     }
+    case 'DAY_COUNT':
+      return {
+        kind,
+        clientId,
+        payload: {
+          clientId: str(json.clientId),
+          tillCode: str(json.tillCode),
+          day: str(json.day),
+          cashierUserId: int(json.cashierUserId),
+          counts: list(json.counts).map((raw) => {
+            const row = asObject(raw);
+            return { note: int(row.note), count: int(row.count) };
+          }),
+          total: dec(json.total),
+          countedAt: date(json.countedAt),
+        } satisfies DayCountDoc,
+      };
   }
 }
 
@@ -223,11 +247,18 @@ function decodeSale(json: Json): SaleDoc {
     tenders: list(json.tenders).map((raw) => {
       const tender = asObject(raw);
       const tenderKind = str(tender.kind);
-      if (tenderKind !== 'CASH' && tenderKind !== 'CARD' && tenderKind !== 'CREDIT') {
-        throw invalid('tenders.kind', 'enum', 'CASH, CARD or CREDIT');
+      if (
+        tenderKind !== 'CASH' &&
+        tenderKind !== 'CARD' &&
+        tenderKind !== 'TRANSFER' &&
+        tenderKind !== 'CREDIT'
+      ) {
+        throw invalid('tenders.kind', 'enum', 'CASH, CARD, TRANSFER or CREDIT');
       }
       return {
         kind: tenderKind,
+        paymentTypeId: optInt(tender.paymentTypeId),
+        paymentTypeName: optStr(tender.paymentTypeName),
         amount: dec(tender.amount),
         tendered:
           tender.tendered === null || tender.tendered === undefined ? null : dec(tender.tendered),

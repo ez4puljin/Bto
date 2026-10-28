@@ -21,6 +21,7 @@ import type {
   EdgeLoginResponse,
   EdgeCartLine,
   EdgeCustomer,
+  EdgeDaySummary,
   EdgePairResponse,
   EdgeParkedBasket,
   EdgePrintableReceipt,
@@ -29,6 +30,7 @@ import type {
   EdgeQuoteResponse,
   EdgeReceipt,
   EdgeReturnSale,
+  EdgeSaleListItem,
   EdgeSession,
   EdgeShiftSummary,
   EdgeSupervisor,
@@ -51,6 +53,8 @@ import {
   QuoteDto,
   ReturnDto,
   ReturnSaleQueryDto,
+  DayCountRequestDto,
+  DayQueryDto,
   SaleDto,
   SearchQueryDto,
   ShiftCloseDto,
@@ -70,6 +74,7 @@ import {
 } from '../guards/kiosk.guard';
 import { CheckoutService } from '../services/checkout.service';
 import { CustomerStore } from '../services/customer.store';
+import { TillRecordsService } from '../services/till-records.service';
 import { DevicesService } from '../services/devices.service';
 import { KioskAuthService } from '../services/kiosk-auth.service';
 import { OutboxService } from '../services/outbox.service';
@@ -105,6 +110,7 @@ export class KioskController {
     private readonly ebarimt: EbarimtService,
     private readonly taxpayers: TaxpayerClient,
     private readonly customers: CustomerStore,
+    private readonly records: TillRecordsService,
   ) {}
 
   @Get('health')
@@ -187,6 +193,7 @@ export class KioskController {
       businessDate: businessDate(),
       companyName: loaded.snapshot.company.name,
       approvalRequired: loaded.snapshot.settings.supervisorRequired,
+      paymentTypes: loaded.snapshot.paymentTypes ?? [],
     };
   }
 
@@ -242,6 +249,27 @@ export class KioskController {
   @Get('customers/:id')
   customer(@Param('id', ParseIntPipe) id: number): Promise<EdgeCustomer> {
     return this.customers.one(id);
+  }
+
+  /** ADR-0111: this till's sales and returns of a day, newest first. */
+  @Get('sales')
+  sales(@Kiosk() kiosk: KioskContext, @Query() query: DayQueryDto): Promise<EdgeSaleListItem[]> {
+    return this.records.sales(kiosk.device.tillCode, query.day, query.q);
+  }
+
+  /** ADR-0111: this till's day summary: money by payment type, the banknotes counted last. */
+  @Get('day-summary')
+  daySummary(@Kiosk() kiosk: KioskContext, @Query() query: DayQueryDto): Promise<EdgeDaySummary> {
+    return this.records.daySummary(kiosk.device.tillCode, query.day);
+  }
+
+  @Post('day-summary')
+  @HttpCode(200)
+  countDay(
+    @Kiosk() kiosk: KioskContext,
+    @Body() body: DayCountRequestDto,
+  ): Promise<EdgeDaySummary> {
+    return this.records.count(kiosk.device.tillCode, cashierOf(kiosk), body);
   }
 
   @Get('sales/recent')

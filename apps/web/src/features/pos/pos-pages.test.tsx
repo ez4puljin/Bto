@@ -105,6 +105,7 @@ describe('supermarket pages (ADR-0063 #8)', () => {
       name: 'Касс 2',
       printerHost: '192.168.1.32',
       printerPort: 9100,
+      printerName: null,
       drawerKick: true,
     });
     expect(await screen.findByText(mn.pos.tills.created)).toBeInTheDocument();

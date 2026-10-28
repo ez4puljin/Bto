@@ -26,7 +26,7 @@ import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
-import { type Shift, usePosMutations, useShift } from './api';
+import { type Shift, useDayCounts, usePosMutations, useShift } from './api';
 import { ShiftStatusBadge } from './badges';
 
 const MONEY = /^\d{1,12}(\.\d{1,2})?$/;
@@ -155,6 +155,7 @@ function ShiftBody({ shift }: { shift: Shift }) {
             [t('pos.fields.salesVat'), formatTugrik(shift.salesVat)],
             [t('pos.fields.cardSales'), formatTugrik(shift.cardSales)],
             [t('pos.fields.creditSales'), formatTugrik(shift.creditSales)],
+            [t('pos.fields.transferSales'), formatTugrik(shift.transferSales)],
             [t('pos.fields.returnsCount'), formatCount(shift.returnsCount)],
             [t('pos.fields.returnsTotal'), formatTugrik(shift.returnsTotal)],
             [t('pos.fields.returnsVat'), formatTugrik(shift.returnsVat)],
@@ -163,6 +164,22 @@ function ShiftBody({ shift }: { shift: Shift }) {
           ]}
         />
       </PanelSection>
+      {shift.payments && shift.payments.length > 0 ? (
+        <PanelSection title={t('pos.shifts.sections.payments')}>
+          <TotalsGrid
+            items={shift.payments.map((payment): [string, string] => [
+              payment.name ?? t(`pos.tenderKinds.${payment.kind}`),
+              payment.refunds === '0.00'
+                ? formatTugrik(payment.sales)
+                : t('pos.shifts.paymentNet', {
+                    sales: formatTugrik(payment.sales),
+                    refunds: formatTugrik(payment.refunds),
+                  }),
+            ])}
+          />
+        </PanelSection>
+      ) : null}
+      <DayCountSection tillId={shift.tillId} day={businessDate(new Date(shift.openedAt))} />
       <PanelSection title={t('pos.shifts.sections.cash')}>
         <TotalsGrid
           items={[
@@ -318,5 +335,35 @@ function HandoverDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * The till's banknote count of the shift's day (ADR-0111): the latest one the cashier printed
+ * with the day summary, kept and never posted.
+ */
+function DayCountSection({ tillId, day }: { tillId: number; day: string }) {
+  const { t } = useTranslation();
+  const counts = useDayCounts({ tillId, day });
+  const latest = counts.data?.[0];
+  if (!latest) return null;
+  return (
+    <PanelSection title={t('pos.shifts.sections.dayCount')}>
+      <TotalsGrid
+        items={[
+          ...latest.counts.map((row): [string, string] => [
+            formatTugrik(String(row.note)),
+            t('pos.shifts.noteCount', { count: row.count }),
+          ]),
+          [t('pos.shifts.dayCountTotal'), formatTugrik(latest.total)],
+          [
+            t('pos.shifts.dayCountBy'),
+            [latest.cashierName, formatUbDateTime(Date.parse(latest.countedAt))]
+              .filter(Boolean)
+              .join(' · '),
+          ],
+        ]}
+      />
+    </PanelSection>
   );
 }

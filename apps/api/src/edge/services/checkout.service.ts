@@ -23,7 +23,7 @@ import { type QuoteLineInput, type QuoteResult, resolveQuote } from '@tugeel/sha
 import { matchesQuery, matchesStrictly, queryTerms } from '@tugeel/shared/text';
 import { businessDate } from '@tugeel/shared/time';
 import { and, desc, eq } from 'drizzle-orm';
-import { AppError, notFound } from '../../common/errors/app-error';
+import { AppError, invalid, notFound } from '../../common/errors/app-error';
 import { EDGE_DB, type EdgeDb, inEdgeTransaction } from '../db/edge-db';
 import { edgeSales } from '../db/schema';
 import { EbarimtService } from '../ebarimt/ebarimt.service';
@@ -187,7 +187,7 @@ export class CheckoutService {
       lineVat,
     );
     const totals = saleTotals(lines);
-    const tenders = this.tenders(request, totals.total);
+    const tenders = this.tenders(loaded, request, totals.total);
     const customer = tenders.credit.gt(0)
       ? await this.creditCustomer(request, tenders.credit)
       : null;
@@ -274,6 +274,7 @@ export class CheckoutService {
           kind: tender.kind,
           amount: tender.amount,
           tendered: tender.tendered,
+          name: tender.paymentTypeName ?? null,
         })),
         change: tenders.change.toFixed(2),
         credit: customer
@@ -301,6 +302,7 @@ export class CheckoutService {
         cashAmount: tenders.cash,
         cardAmount: tenders.card,
         creditAmount: tenders.credit,
+        transferAmount: tenders.transfer,
         customerId: customer?.id ?? null,
         vatTotal: totals.vatTotal,
         doc,
@@ -317,6 +319,7 @@ export class CheckoutService {
           lines: this.ebarimt.linesOf(doc, loaded),
           cash: tenders.cash,
           card: tenders.card,
+          transfer: tenders.transfer,
           total: totals.total,
           vatTotal: totals.vatTotal,
         });
@@ -380,37 +383,57 @@ export class CheckoutService {
   }
 
   /**
-   * Cash, card and credit as entered: their amounts must make the total; cash may exceed it (the
-   * change). At most one CREDIT part (ADR-0109).
+   * The payment rows as entered (ADR-0111): each names the admin's payment type, whose kind it
+   * takes (an older kiosk sends the kind alone: the first active type of it, if any); their
+   * amounts must make the total; cash may exceed it (the change); at most one CREDIT part.
    */
   private tenders(
+    loaded: LoadedSnapshot,
     request: EdgeSaleRequest,
     total: Decimal,
-  ): { wire: TenderWire[]; cash: Decimal; card: Decimal; credit: Decimal; change: Decimal } {
+  ): {
+    wire: TenderWire[];
+    cash: Decimal;
+    card: Decimal;
+    transfer: Decimal;
+    credit: Decimal;
+    change: Decimal;
+  } {
     if (request.tenders.length === 0 || request.tenders.length > POS_LIMITS.maxTenders) {
       throw new AppError('VALIDATION_FAILED', 'a sale is paid by one to a few tenders');
     }
-    if (request.tenders.filter((tender) => tender.kind === 'CREDIT').length > 1) {
-      throw new AppError('VALIDATION_FAILED', 'a sale has at most one credit part');
-    }
-    let cash = new Decimal(0);
-    let card = new Decimal(0);
-    let credit = new Decimal(0);
+    const types = loaded.snapshot.paymentTypes ?? [];
+    const sums = {
+      CASH: new Decimal(0),
+      CARD: new Decimal(0),
+      TRANSFER: new Decimal(0),
+      CREDIT: new Decimal(0),
+    };
     let tendered = new Decimal(0);
-    const wire = request.tenders.map((tender): TenderWire => {
+    const wire = request.tenders.map((tender, index): TenderWire => {
+      const type =
+        tender.paymentTypeId !== undefined && tender.paymentTypeId !== null
+          ? types.find((entry) => entry.id === tender.paymentTypeId)
+          : types.find((entry) => entry.kind === tender.kind);
+      if (tender.paymentTypeId && !type) {
+        throw invalid(`tenders[${index}].paymentTypeId`, 'exists', 'a payment type of the till');
+      }
+      const kind = type?.kind ?? tender.kind;
       const amount = new Decimal(tender.amount);
       if (!amount.isFinite() || amount.isNegative() || amount.decimalPlaces() > 2) {
         throw new AppError('VALIDATION_FAILED', `bad tender amount ${tender.amount}`);
       }
-      if (tender.kind === 'CASH') {
+      sums[kind] = sums[kind].plus(amount);
+      const named = { paymentTypeId: type?.id ?? null, paymentTypeName: type?.name ?? null };
+      if (kind === 'CASH') {
         const given = tender.tendered ? new Decimal(tender.tendered) : amount;
         if (!given.isFinite() || given.lt(amount)) {
           throw new AppError('VALIDATION_FAILED', 'the cash handed over is less than its amount');
         }
-        cash = cash.plus(amount);
         tendered = tendered.plus(given);
         return {
-          kind: 'CASH',
+          kind,
+          ...named,
           amount: amount.toFixed(2),
           tendered: given.toFixed(2),
           terminalId: null,
@@ -418,28 +441,20 @@ export class CheckoutService {
           maskedPan: null,
         };
       }
-      if (tender.kind === 'CREDIT') {
-        credit = credit.plus(amount);
-        return {
-          kind: 'CREDIT',
-          amount: amount.toFixed(2),
-          tendered: null,
-          terminalId: null,
-          rrn: null,
-          maskedPan: null,
-        };
-      }
-      card = card.plus(amount);
       return {
-        kind: 'CARD',
+        kind,
+        ...named,
         amount: amount.toFixed(2),
         tendered: null,
-        terminalId: tender.terminalId?.trim() || null,
-        rrn: tender.rrn?.trim() || null,
+        terminalId: kind === 'CARD' ? tender.terminalId?.trim() || null : null,
+        rrn: kind === 'CARD' ? tender.rrn?.trim() || null : null,
         maskedPan: null,
       };
     });
-    const paid = cash.plus(card).plus(credit);
+    if (wire.filter((tender) => tender.kind === 'CREDIT').length > 1) {
+      throw new AppError('VALIDATION_FAILED', 'a sale has at most one credit part');
+    }
+    const paid = sums.CASH.plus(sums.CARD).plus(sums.TRANSFER).plus(sums.CREDIT);
     if (!paid.eq(total)) {
       throw new AppError('POS_TOTALS_MISMATCH', 'the tenders do not make the total', {
         total: total.toFixed(2),
@@ -449,10 +464,11 @@ export class CheckoutService {
     // A zero part is no tender (the centre wants every amount positive).
     return {
       wire: wire.filter((tender) => new Decimal(tender.amount).gt(0)),
-      cash,
-      card,
-      credit,
-      change: tendered.minus(cash),
+      cash: sums.CASH,
+      card: sums.CARD,
+      transfer: sums.TRANSFER,
+      credit: sums.CREDIT,
+      change: tendered.minus(sums.CASH),
     };
   }
 

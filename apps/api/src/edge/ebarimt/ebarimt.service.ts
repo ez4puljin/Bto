@@ -58,6 +58,8 @@ export interface IssueInput {
   lines: EdgeReceiptLine[];
   cash: Decimal;
   card: Decimal;
+  /** ADR-0111: a bank transfer at the till (`BANK_TRANSFER`). */
+  transfer: Decimal;
   total: Decimal;
   vatTotal: Decimal;
 }
@@ -156,7 +158,7 @@ export class EbarimtService implements OnApplicationBootstrap {
       customerTin: input.customerTin,
       customerName: input.customerName,
       lines: input.lines,
-      payments: payments(input.cash, input.card),
+      payments: payments(input.cash, input.card, input.transfer),
       total: input.total,
       vatTotal: input.vatTotal,
     });
@@ -227,15 +229,16 @@ export class EbarimtService implements OnApplicationBootstrap {
     }
     const total = kept.reduce((sum, line) => sum.plus(line.total), new Decimal(0));
     const vat = kept.reduce((sum, line) => sum.plus(line.vat), new Decimal(0));
-    const paidByCard = new Decimal(
-      first.payments?.find((payment) => payment.code === 'PAYMENT_CARD')?.amount ?? 0,
-    );
-    const card = Decimal.min(paidByCard, total);
+    // The card and transfer parts are kept up to the new total, the rest is cash.
+    const paidBy = (code: EbarimtPaymentCode) =>
+      new Decimal(first.payments?.find((payment) => payment.code === code)?.amount ?? 0);
+    const card = Decimal.min(paidBy('PAYMENT_CARD'), total);
+    const transfer = Decimal.min(paidBy('BANK_TRANSFER'), total.minus(card));
     await tx.insert(edgeReceipts).values({
       ...common,
       op: 'ISSUE',
       lines: kept,
-      payments: payments(total.minus(card), card),
+      payments: payments(total.minus(card).minus(transfer), card, transfer),
       total,
       vatTotal: vat,
     });
@@ -772,10 +775,15 @@ export class EbarimtService implements OnApplicationBootstrap {
   }
 }
 
-function payments(cash: Decimal, card: Decimal): { code: EbarimtPaymentCode; amount: string }[] {
+function payments(
+  cash: Decimal,
+  card: Decimal,
+  transfer: Decimal,
+): { code: EbarimtPaymentCode; amount: string }[] {
   return [
     { code: 'CASH' as const, amount: cash.toFixed(2) },
     { code: 'PAYMENT_CARD' as const, amount: card.toFixed(2) },
+    { code: 'BANK_TRANSFER' as const, amount: transfer.toFixed(2) },
   ].filter((payment) => new Decimal(payment.amount).gt(0));
 }
 

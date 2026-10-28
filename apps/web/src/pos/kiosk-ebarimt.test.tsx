@@ -85,7 +85,9 @@ async function payExact(user: ReturnType<typeof userEvent.setup>) {
   await waitFor(() => expect(screen.getByTestId('sale-total')).toHaveTextContent('3,500₮'));
   await user.keyboard('{F12}');
   const pay = await screen.findByRole('dialog', { name: k.pay.title });
-  await user.click(within(pay).getByRole('button', { name: k.pay.exact }));
+  // One cash row for the total, then «Баримт хэвлэх»: the receipt is chosen next.
+  await user.keyboard('1');
+  await user.keyboard('{Enter}');
   return pay;
 }
 
@@ -147,11 +149,11 @@ describe('kiosk: e-Barimt and printing (ADR-0065)', () => {
     );
     const user = userEvent.setup();
     const pay = await payExact(user);
-    await user.click(within(pay).getByRole('radio', { name: k.pay.receiptType.B2B }));
+    await user.click(within(pay).getByRole('button', { name: k.pay.receiptChoice.B2B }));
     await user.type(within(pay).getByLabelText(k.pay.buyer.number), '1234567{Enter}');
     expect(await within(pay).findByText(BUYER.name)).toBeInTheDocument();
     expect(edge.callsTo('POST /sales')).toHaveLength(0);
-    await user.click(within(pay).getByRole('button', { name: k.pay.confirm }));
+    await user.click(within(pay).getByRole('button', { name: k.pay.print }));
     const dialog = await screen.findByRole('dialog', { name: k.receipt.title });
     const sale = edge.callsTo('POST /sales')[0]?.body as EdgeSaleRequest;
     expect(sale.buyer).toEqual({ tin: COMPANY_TIN });
@@ -164,7 +166,7 @@ describe('kiosk: e-Barimt and printing (ADR-0065)', () => {
     );
     const user = userEvent.setup();
     const pay = await payExact(user);
-    await user.click(within(pay).getByRole('radio', { name: k.pay.receiptType.B2B }));
+    await user.click(within(pay).getByRole('button', { name: k.pay.receiptChoice.B2B }));
     await user.type(within(pay).getByLabelText(k.pay.buyer.number), '1234567');
     await user.click(within(pay).getByRole('button', { name: k.pay.buyer.find }));
     expect(await within(pay).findByRole('alert')).toHaveTextContent(

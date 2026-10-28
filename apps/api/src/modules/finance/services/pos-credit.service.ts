@@ -54,6 +54,8 @@ export interface PosCreditSale {
   /** The part paid at the till, booked here instead of the shift's close. */
   cash: Decimal;
   card: Decimal;
+  /** ADR-0111: a bank transfer the till took. */
+  transfer: Decimal;
 }
 
 /** A till's return of a credit sale: off the customer's debt first, the rest paid back in cash. */
@@ -91,11 +93,11 @@ export class PosCreditService {
     sale: PosCreditSale,
   ): Promise<{ invoiceId: number; number: string }> {
     if (!sale.credit.gt(0)) throw new Error('a credit sale owes something');
-    if (!sale.credit.plus(sale.cash).plus(sale.card).eq(sale.total)) {
+    if (!sale.credit.plus(sale.cash).plus(sale.card).plus(sale.transfer).eq(sale.total)) {
       throw new AppError('POS_TOTALS_MISMATCH', 'the tenders do not make the total', {
         field: 'tenders',
         expected: sale.total.toFixed(2),
-        got: sale.credit.plus(sale.cash).plus(sale.card).toFixed(2),
+        got: sale.credit.plus(sale.cash).plus(sale.card).plus(sale.transfer).toFixed(2),
       });
     }
     const today = businessDate();
@@ -371,6 +373,7 @@ export function posSaleEntryLines(sale: {
   credit: Decimal;
   cash: Decimal;
   card: Decimal;
+  transfer: Decimal;
   dueDate: string;
 }): RoleLine[] {
   const zero = new Decimal(0);
@@ -385,6 +388,9 @@ export function posSaleEntryLines(sale: {
   ];
   if (sale.cash.gt(0)) lines.push({ role: 'POS_CASH', debit: sale.cash, credit: zero });
   if (sale.card.gt(0)) lines.push({ role: 'CARD_CLEARING', debit: sale.card, credit: zero });
+  if (sale.transfer.gt(0)) {
+    lines.push({ role: 'TRANSFER_CLEARING', debit: sale.transfer, credit: zero });
+  }
   if (net.gt(0)) lines.push({ role: 'POS_SALES', debit: zero, credit: net });
   if (sale.vatTotal.gt(0)) {
     lines.push({ role: 'VAT_PAYABLE', debit: zero, credit: sale.vatTotal, taxBase: net });

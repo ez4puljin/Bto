@@ -66,7 +66,7 @@ export const cashierDto = (cashier: Cashier): CashierDto => ({
   lockedUntil: isoOrNull(cashier.lockedUntil),
 });
 
-export const shiftDto = (shift: ShiftSummary): ShiftDto => ({
+export const shiftDto = ({ payments, ...shift }: ShiftSummary): ShiftDto => ({
   ...shift,
   openedAt: iso(shift.openedAt),
   openingFloat: money(shift.openingFloat),
@@ -81,6 +81,17 @@ export const shiftDto = (shift: ShiftSummary): ShiftDto => ({
   cardRefunds: money(shift.cardRefunds),
   creditSales: money(shift.creditSales),
   creditRefunds: money(shift.creditRefunds),
+  transferSales: money(shift.transferSales),
+  transferRefunds: money(shift.transferRefunds),
+  ...(payments
+    ? {
+        payments: payments.map((payment) => ({
+          ...payment,
+          sales: money(payment.sales),
+          refunds: money(payment.refunds),
+        })),
+      }
+    : {}),
   salesTotal: money(shift.salesTotal),
   returnsTotal: money(shift.returnsTotal),
   salesVat: money(shift.salesVat),

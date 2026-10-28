@@ -17,6 +17,8 @@ export interface Till {
   name: string;
   printerHost: string | null;
   printerPort: number;
+  /** ADR-0111: the till PC's printer as the admin noted it (information only). */
+  printerName: string | null;
   drawerKick: boolean;
   status: PosStatus;
   lastSaleAt: Date | null;
@@ -31,6 +33,7 @@ export interface TillInput {
   name: string;
   printerHost: string | null;
   printerPort?: number;
+  printerName?: string | null;
   drawerKick?: boolean;
 }
 
@@ -38,6 +41,7 @@ export interface TillPatch {
   name?: string;
   printerHost?: string | null;
   printerPort?: number;
+  printerName?: string | null;
   drawerKick?: boolean;
   status?: PosStatus;
 }
@@ -98,6 +102,7 @@ export class PosTillsService {
           name,
           printerHost,
           printerPort: input.printerPort ?? 9100,
+          printerName: input.printerName?.trim() || null,
           drawerKick: input.drawerKick ?? true,
         })
         .onConflictDoNothing({ target: [posTills.edgeNodeId, posTills.code] })
@@ -121,6 +126,9 @@ export class PosTillsService {
         ...(patch.name !== undefined ? { name: cleanName(patch.name) } : {}),
         ...(patch.printerHost !== undefined ? { printerHost: cleanHost(patch.printerHost) } : {}),
         ...(patch.printerPort !== undefined ? { printerPort: patch.printerPort } : {}),
+        ...(patch.printerName !== undefined
+          ? { printerName: patch.printerName?.trim() || null }
+          : {}),
         ...(patch.drawerKick !== undefined ? { drawerKick: patch.drawerKick } : {}),
         ...(patch.status !== undefined ? { status: patch.status } : {}),
       };
@@ -136,6 +144,7 @@ export class PosTillsService {
           name: before.name,
           printerHost: before.printerHost,
           printerPort: before.printerPort,
+          printerName: before.printerName,
           drawerKick: before.drawerKick,
           status: before.status,
         },
@@ -200,6 +209,7 @@ function view(row: TillRow): Till {
     name: row.name,
     printerHost: row.printerHost,
     printerPort: row.printerPort,
+    printerName: row.printerName,
     drawerKick: row.drawerKick,
     status: row.status,
     lastSaleAt: row.lastSaleAt,

@@ -39,6 +39,9 @@ export type QuickButtonsRequest = Schemas['PosQuickButtonsRequest'];
 export type Void = Schemas['PosVoid'];
 export type VoidDetail = Schemas['PosVoidDetail'];
 export type VoidReason = Void['reason'];
+export type PaymentType = Schemas['PosPaymentType'];
+export type PaymentTypesRequest = Schemas['PosPaymentTypesRequest'];
+export type DayCount = Schemas['PosDayCount'];
 
 /** Idempotent routes take the key from the caller: one key per user intent (ADR-0004). */
 type Keyed<T> = T & { key: string };
@@ -54,6 +57,8 @@ export const POS_KEYS = {
   rejections: ['pos', 'rejections'] as const,
   quickButtons: ['pos', 'quick-buttons'] as const,
   voids: ['pos', 'voids'] as const,
+  paymentTypes: ['pos', 'payment-types'] as const,
+  dayCounts: ['pos', 'day-counts'] as const,
 };
 
 export function usePosSettings(options: { enabled?: boolean } = {}) {
@@ -188,6 +193,33 @@ export function useShortfalls(filter: { productId?: number; resolved?: boolean }
 }
 
 /** The till's F7 panel (ADR-0104): the groups and their buttons, in order. */
+/** ADR-0111: the ways to pay at the till, in the till's order (inactive ones too). */
+export function usePaymentTypes() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: POS_KEYS.paymentTypes,
+    queryFn: async ({ signal }) => unwrap(await api.GET('/api/v1/pos/payment-types', { signal })),
+  });
+}
+
+/** ADR-0111: a till's banknote counts of a day (every recount, newest first). */
+export function useDayCounts(filter: { tillId: number; day: string } | null) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...POS_KEYS.dayCounts, filter],
+    enabled: filter !== null,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/pos/day-counts', {
+          params: {
+            query: filter ? { tillId: filter.tillId, from: filter.day, to: filter.day } : {},
+          },
+          signal,
+        }),
+      ),
+  });
+}
+
 export function useQuickButtons() {
   const api = useApiClient();
   return useQuery({
@@ -343,6 +375,11 @@ export function usePosMutations() {
           }),
         ),
       onSuccess: () => refresh(POS_KEYS.sales, ATTENTION_KEY),
+    }),
+    savePaymentTypes: useMutation({
+      mutationFn: async (body: PaymentTypesRequest) =>
+        unwrap(await api.PUT('/api/v1/pos/payment-types', { body })),
+      onSuccess: (types) => queryClient.setQueryData(POS_KEYS.paymentTypes, types),
     }),
     saveQuickButtons: useMutation({
       mutationFn: async (body: QuickButtonsRequest) =>

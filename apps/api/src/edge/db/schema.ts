@@ -139,6 +139,10 @@ export const edgeSales = pgTable(
     creditAmount: money('credit_amount')
       .notNull()
       .default(sql`0`),
+    /** ADR-0111: the part paid by bank transfer. */
+    transferAmount: money('transfer_amount')
+      .notNull()
+      .default(sql`0`),
     customerId: bigint('customer_id', { mode: 'number' }),
     vatTotal: money('vat_total').notNull(),
     doc: jsonValue('doc').$type<SaleDocWire>().notNull(),
@@ -312,3 +316,22 @@ export const edgePinAttempts = pgTable('edge_pin_attempts', {
   failedCount: integer('failed_count').notNull().default(0),
   lockedUntil: timestamp('locked_until', { withTimezone: true }),
 });
+
+/**
+ * A till's banknote count for its day summary (ADR-0111): kept as counted and replayed to the
+ * centre as a DAY_COUNT document; a recount is a new row, the latest of a till and day is shown.
+ */
+export const edgeDayCounts = pgTable(
+  'edge_day_counts',
+  {
+    clientId: uuid('client_id').primaryKey(),
+    tillCode: text('till_code').notNull(),
+    day: text('day').notNull(),
+    cashierUserId: bigint('cashier_user_id', { mode: 'number' }).notNull(),
+    cashierName: text('cashier_name').notNull(),
+    counts: jsonValue('counts').$type<{ note: number; count: number }[]>().notNull(),
+    total: money('total').notNull(),
+    countedAt: timestamp('counted_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [index('edge_day_counts_till_day_idx').on(t.tillCode, t.day, t.countedAt)],
+);

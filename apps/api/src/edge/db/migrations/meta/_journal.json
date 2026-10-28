@@ -29,6 +29,13 @@
       "when": 1793083243338,
       "tag": "0003_credit",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793098592491,
+      "tag": "0005_day_counts",
+      "breakpoints": true
     }
   ]
 }

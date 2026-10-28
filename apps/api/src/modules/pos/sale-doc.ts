@@ -38,6 +38,9 @@ export interface SaleDocLine {
 
 export interface SaleDocTender {
   kind: TenderKind;
+  /** ADR-0111: the admin's payment type and its name as the till had it; null from older edges. */
+  paymentTypeId: number | null;
+  paymentTypeName: string | null;
   amount: Decimal;
   tendered: Decimal | null;
   terminalId: string | null;
@@ -133,13 +136,25 @@ export interface VoidDoc {
   total: Decimal;
 }
 
+/** A till's banknote count for its day summary (ADR-0111): kept, never posted. */
+export interface DayCountDoc {
+  clientId: string;
+  tillCode: string;
+  day: string;
+  cashierUserId: number;
+  counts: { note: number; count: number }[];
+  total: Decimal;
+  countedAt: Date;
+}
+
 export type SyncEvent =
   | { kind: 'SALE' | 'RETURN'; clientId: string; payload: SaleDoc }
   | { kind: 'VOID'; clientId: string; payload: VoidDoc }
   | { kind: 'SHIFT_OPENED'; clientId: string; payload: ShiftOpenDoc }
   | { kind: 'SHIFT_CLOSED'; clientId: string; payload: ShiftCloseDoc }
   | { kind: 'RECEIPT_STATUS'; clientId: string; payload: ReceiptStatusDoc }
-  | { kind: 'TILL_BOUND'; clientId: string; payload: TillBoundDoc };
+  | { kind: 'TILL_BOUND'; clientId: string; payload: TillBoundDoc }
+  | { kind: 'DAY_COUNT'; clientId: string; payload: DayCountDoc };
 
 export interface SyncOutcome {
   clientId: string;
