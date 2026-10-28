@@ -27,14 +27,28 @@ Recorded with the owner on 2026-10-28.
 | Each product in its warehouse, no shelves                | A line goes to its product's home warehouse (ADR-0099). Bto still puts it on the product's fixed shelf, else RECEIVING, and RECEIVING is **not sellable** (`isSellableBinType`). A product with no fixed shelf cannot be sold until someone moves it.                                                                                     | differs         |
 | Erkhet is the only tool                                  | Bto would replace Erkhet's receipts. Finance still runs on Erkhet until go-live, so the trial needs an answer on double entry.                                                                                                                                                  | open            |
 
-### Open questions (TODO-VERIFY, owner unless noted)
+### Answers (owner, 2026-10-28, round 2)
 
-- Who creates the draft receipt today, and from what (an Erkhet order, Butenorgil's purchase orders, Excel)?
-- When arrivals differ from the draft (short, extra, a product not on the note), what does the keeper do?
-- Does the accountant confirm **every** receipt's prices, even when the draft already holds them?
-- Damage sold to the person at fault: is that person staff, the driver or the supplier? At which price (cost or sale price)?
-- The truck driver's fee: who pays it, and does it go into the goods' cost?
-- During the trial, are receipts entered in both Erkhet and Bto?
+1. **Where the draft comes from.** Butenorgil's «Захиалга» menu, the purchase orders. Butenorgil (ez4puljin/Butenorgil) also has receiving sessions with confirmation per brand, a price-review flag per line, trucks per order, and an export to Erkhet's Excel and import queue (`backend/app/api/purchase_orders.py`, `receivings.py`, `erkhet_import`). Today the ordering and receiving work therefore runs in Butenorgil, and Erkhet holds the result.
+2. **Differences on arrival.** Scanning a product's barcode shows the quantity expected for it. The keeper corrects it when it differs, or marks the product as «ирээгүй» (did not arrive).
+3. **Price check.** The draft shows the price of the product's previous receipt. The accountant compares each product's new delivery-note price with the draft's, confirms it, and changes it when it differs. Every receipt goes through this step.
+4. **Damage.** The person at fault is a staff member, the driver or someone else. They pay the price in the program (the sale price).
+5. **Truck driver's fee.** The company pays it. Whether it goes into the goods' cost is still open (accountant).
+6. **Trial.** From the trial on, receipts are taken **only in Bto**. Nothing is entered in Erkhet.
+
+### What the answers change
+
+- **Scan against expected quantities.** The receipt draft needs an expected quantity per line next to the arrived quantity, a barcode scan that jumps to the line, and «ирээгүй». Today Bto has one quantity per line.
+- **The accountant's price step on every receipt.** The keeper's posting must leave the prices waiting for the accountant, even when the draft holds prices. The accountant then sees each line's previous price next to the new one, confirms it or changes it, and only that makes the payable. Today a priced draft becomes the bill at the keeper's posting (ADR-0091).
+- **Shelves.** With no shelves in use, received stock must be sellable at once. One default shelf per warehouse would do this, for example the existing «Тавиургүй» `NOSHELF`.
+- **Damage charged to a person.** This belongs to the issue side: a charge to a staff member, driver or other person at the sale price, creating a receivable.
+- **Receipts only in Bto: the consequence.** Stock and payables then live in Bto alone. Sales and other stock movements still recorded in erxes or Erkhet would no longer meet these receipts, so neither system's stock would be right. The supplier payables and their payments would also have to be in Bto. Before the trial, the next round must settle where stock leaves today (sales, issues, the supermarket) and how that reaches Bto.
+
+### Open questions (TODO-VERIFY)
+
+- Is the barcode scan today done in Butenorgil's receiving screen? (owner)
+- Does the driver's fee go into the goods' cost? (accountant)
+- Where is stock taken out today (wholesale sales, issues, the supermarket till), and in which system? (owner)
 
 ## 2. Goods issue («Зарлага»)
 
