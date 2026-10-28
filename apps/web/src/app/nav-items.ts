@@ -67,7 +67,7 @@ import {
   Scale,
 } from 'lucide-react';
 
-type NavKey = `nav.${Exclude<keyof (typeof mn)['nav'], 'groups' | 'menu' | 'account'>}`;
+type NavKey = `nav.${Exclude<keyof (typeof mn)['nav'], 'groups' | 'modules' | 'menu' | 'account'>}`;
 type NavGroupKey = `nav.groups.${keyof (typeof mn)['nav']['groups']}`;
 type QuickActionKey = `home.actions.${keyof (typeof mn)['home']['actions']}`;
 type AttentionLabel = `home.attention.${keyof (typeof mn)['home']['attention']}`;
@@ -432,15 +432,89 @@ export function visibleNav(permissions: readonly Permission[]): NavGroup[] {
   })).filter((group) => group.items.length > 0);
 }
 
+export type ModuleKey =
+  'sales' | 'inventory' | 'catalog' | 'partners' | 'finance' | 'pos' | 'system' | 'ai';
+
+export interface NavModule {
+  key: ModuleKey;
+  label: `nav.modules.${ModuleKey}`;
+  icon: LucideIcon;
+  /** The menu groups the module holds, in the menu's order. */
+  groups: readonly NavGroupKey[];
+  /** Shown on the top bar's right as an icon (⚙, ✨) instead of among the modules (ADR-0114). */
+  tool?: boolean;
+}
+
 /**
- * Where a path sits in the menu: the group and the entry whose page it is or lies below (the
- * longest matching entry), `exact` on the entry's own (list) page. Searched in the whole menu, so a
- * transfer opened by its link still knows it belongs to «Шилжүүлэг». Feeds the breadcrumb trail
- * and the recent pages (ADR-0042).
+ * The top bar's modules (ADR-0114): the menu groups gathered into seven areas so they fit one line
+ * at 1366 px — «Бараа» holds the catalogue, prices and segments, «Санхүү» the books and the
+ * reports. «Систем» and the assistant are tools at the bar's right. Every group belongs to exactly
+ * one module (a test proves it).
+ */
+export const NAV_MODULES: readonly NavModule[] = [
+  { key: 'sales', label: 'nav.modules.sales', icon: ShoppingCart, groups: ['nav.groups.sales'] },
+  {
+    key: 'inventory',
+    label: 'nav.modules.inventory',
+    icon: Warehouse,
+    groups: ['nav.groups.inventory'],
+  },
+  {
+    key: 'catalog',
+    label: 'nav.modules.catalog',
+    icon: Package,
+    groups: ['nav.groups.catalog', 'nav.groups.pricing', 'nav.groups.segments'],
+  },
+  { key: 'partners', label: 'nav.modules.partners', icon: Users, groups: ['nav.groups.partners'] },
+  {
+    key: 'finance',
+    label: 'nav.modules.finance',
+    icon: Landmark,
+    groups: ['nav.groups.finance', 'nav.groups.reports'],
+  },
+  { key: 'pos', label: 'nav.modules.pos', icon: Store, groups: ['nav.groups.pos'] },
+  {
+    key: 'system',
+    label: 'nav.modules.system',
+    icon: Settings,
+    groups: ['nav.groups.system'],
+    tool: true,
+  },
+  { key: 'ai', label: 'nav.modules.ai', icon: Sparkles, groups: ['nav.groups.ai'], tool: true },
+];
+
+/** A module with the groups and entries a user with these permissions sees in it. */
+export interface VisibleModule extends NavModule {
+  sections: NavGroup[];
+}
+
+/** The modules a user sees: those with at least one permitted page. */
+export function visibleModules(permissions: readonly Permission[]): VisibleModule[] {
+  const groups = visibleNav(permissions);
+  return NAV_MODULES.map((module) => ({
+    ...module,
+    sections: groups.filter((group) => module.groups.includes(group.label)),
+  })).filter((module) => module.sections.length > 0);
+}
+
+/** A module's own page, listing its pages (ADR-0114). */
+export const modulePath = (key: ModuleKey) => `/m/${key}`;
+
+export function moduleOfGroup(group: NavGroupKey): NavModule {
+  const found = NAV_MODULES.find((module) => module.groups.includes(group));
+  if (!found) throw new Error(`menu group ${group} has no module`);
+  return found;
+}
+
+/**
+ * Where a path sits in the menu: the module, the group and the entry whose page it is or lies
+ * below (the longest matching entry), `exact` on the entry's own (list) page. Searched in the whole
+ * menu, so a transfer opened by its link still knows it belongs to «Шилжүүлэг». Feeds the
+ * breadcrumb trail, the lit module of the top bar and the recent pages (ADR-0042, ADR-0114).
  */
 export function navTrail(
   pathname: string,
-): { group: NavGroup; item: NavItem; exact: boolean } | null {
+): { module: NavModule; group: NavGroup; item: NavItem; exact: boolean } | null {
   let best: { group: NavGroup; item: NavItem; length: number } | null = null;
   for (const group of NAV_GROUPS) {
     for (const item of group.items) {
@@ -452,7 +526,14 @@ export function navTrail(
       }
     }
   }
-  return best ? { group: best.group, item: best.item, exact: pathname === best.item.to } : null;
+  return best
+    ? {
+        module: moduleOfGroup(best.group.label),
+        group: best.group,
+        item: best.item,
+        exact: pathname === best.item.to,
+      }
+    : null;
 }
 
 export interface QuickAction {

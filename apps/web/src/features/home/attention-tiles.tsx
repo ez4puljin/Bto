@@ -1,19 +1,23 @@
 import type { Permission } from '@tugeel/shared/auth';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
-import { ATTENTION_TILES, type AttentionTile } from '@/app/nav-items';
+import { ATTENTION_TILES, type AttentionTile, type ModuleKey, navTrail } from '@/app/nav-items';
 import { useFinanceAttention } from '@/features/finance/api';
 import { usePosAttention } from '@/features/pos/api';
 import { useInventoryAttention, usePricingAttention } from './api';
 
 /**
- * «Анхаарах» (ADR-0047 #7): the work waiting for this person, one tile per count above zero, each
- * opening its list already filtered; as many tiles in a row as the column holds (ADR-0066). Nothing
- * shows while the counts load, after an error, or when nothing waits.
+ * «Анхаарах» (ADR-0047 #7): the work waiting for this person, one entry per count above zero, each
+ * opening its list already filtered; `only` keeps the tiles of one module (its page, ADR-0114).
+ * `settled` once every count it asked for has come back.
  */
-export function AttentionTiles({ permissions }: { permissions: readonly Permission[] }) {
-  const { t } = useTranslation();
-  const tiles = ATTENTION_TILES.filter((tile) => permissions.includes(tile.permission));
+function useAttention(permissions: readonly Permission[], only?: ModuleKey) {
+  const tiles = ATTENTION_TILES.filter(
+    (tile) =>
+      permissions.includes(tile.permission) &&
+      (only === undefined || navTrail(tile.to.split('?')[0]!)?.module.key === only),
+  );
   const inventory = useInventoryAttention(
     tiles.some(
       (tile) =>
@@ -32,6 +36,26 @@ export function AttentionTiles({ permissions }: { permissions: readonly Permissi
     const counted = countOf(tile, inventory.data, pricing.data, finance.data, pos.data);
     return counted && counted.count > 0 ? [{ tile, ...counted }] : [];
   });
+  // Every count it asked for has come back (a query it never asked for stays idle).
+  const settled = [inventory, pricing, finance, pos].every(
+    (query) => query.isSuccess || (query.isPending && query.fetchStatus === 'idle'),
+  );
+  return { shown, settled };
+}
+
+/**
+ * The attention counts as tiles, as many in a row as the column holds (ADR-0066); a module's page
+ * shows its own. Nothing shows while the counts load, after an error, or when nothing waits.
+ */
+export function AttentionTiles({
+  permissions,
+  only,
+}: {
+  permissions: readonly Permission[];
+  only?: ModuleKey;
+}) {
+  const { t } = useTranslation();
+  const { shown } = useAttention(permissions, only);
   if (shown.length === 0) return null;
 
   return (
@@ -41,7 +65,7 @@ export function AttentionTiles({ permissions }: { permissions: readonly Permissi
       </h2>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(14rem,1fr))]">
         {shown.map(({ tile, count, cap, to }) => {
-          const text = count >= cap ? t('home.attention.more', { count: cap - 1 }) : String(count);
+          const text = countText(t, count, cap);
           const label = t(tile.label);
           return (
             <Link
@@ -65,6 +89,52 @@ export function AttentionTiles({ permissions }: { permissions: readonly Permissi
       </div>
     </section>
   );
+}
+
+/**
+ * The home page's «Анхаарах» card body (ADR-0114): one row per waiting count, the count at the
+ * end, or a calm line once every count says nothing waits (nothing while loading or after an
+ * error).
+ */
+export function AttentionRows({ permissions }: { permissions: readonly Permission[] }) {
+  const { t } = useTranslation();
+  const { shown, settled } = useAttention(permissions);
+  if (shown.length === 0) {
+    return !settled ? null : (
+      <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+        {t('home.nothingWaiting')}
+      </p>
+    );
+  }
+  return (
+    <ul>
+      {shown.map(({ tile, count, cap, to }) => {
+        const text = countText(t, count, cap);
+        const label = t(tile.label);
+        return (
+          <li key={tile.count} className="border-b border-border/80 last:border-0">
+            <Link
+              to={to}
+              aria-label={`${label}: ${text}`}
+              className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-accent/70"
+            >
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-warning-soft text-warning">
+                <tile.icon aria-hidden className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
+              <span className="shrink-0 rounded-full bg-fill px-2 py-0.5 font-mono text-[13px] font-semibold">
+                {text}
+              </span>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function countText(t: TFunction, count: number, cap: number) {
+  return count >= cap ? t('home.attention.more', { count: cap - 1 }) : String(count);
 }
 
 /** A tile's count, its cap and where it leads; null while its endpoint has no answer. */

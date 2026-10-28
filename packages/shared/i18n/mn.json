@@ -27,6 +27,16 @@
       "pos": "Супермаркет",
       "reports": "Тайлан"
     },
+    "modules": {
+      "sales": "Борлуулалт",
+      "inventory": "Агуулах",
+      "catalog": "Бараа",
+      "partners": "Харилцагч",
+      "finance": "Санхүү",
+      "pos": "Супермаркет",
+      "system": "Систем",
+      "ai": "AI туслах"
+    },
     "products": "Бараа",
     "categories": "Ангилал",
     "uoms": "Хэмжих нэгж",
@@ -3023,7 +3033,19 @@
     "shortcut": "Ctrl K",
     "shortcutMac": "⌘K",
     "closeMenu": "Цэс хаах",
-    "userMenu": "Хэрэглэгчийн цэс"
+    "userMenu": "Хэрэглэгчийн цэс",
+    "modules": "Модулиуд",
+    "allPages": "Бүх цэс",
+    "seeModule": "Бүх хуудас",
+    "favorites": "Дуртай хуудсууд",
+    "addFavorite": "Дуртайд нэмэх",
+    "removeFavorite": "Дуртайгаас хасах",
+    "noFavorites": "Хуудасны гарчгийн хажуух ☆ дээр дарж дуртай хуудсаа нэмнэ.",
+    "notifications": "Мэдэгдэл",
+    "notificationsUnread": "Мэдэгдэл, {{count}} уншаагүй",
+    "noNotifications": "Шинэ мэдэгдэл алга",
+    "orderSold": "{{number}} захиалга зарагдлаа",
+    "orderSoldTo": "{{customer}} · {{total}}"
   },
   "palette": {
     "title": "Хурдан хайлт",
@@ -3043,6 +3065,10 @@
   },
   "home": {
     "greeting": "Сайн байна уу, {{name}}",
+    "subtitle": "Өнөөдөр таныг хүлээж буй ажил.",
+    "modules": "Модулиуд",
+    "tools": "Хэрэгсэл",
+    "nothingWaiting": "Одоогоор анхаарах ажил алга.",
     "quickActions": "Түргэн үйлдэл",
     "recent": "Сүүлд нээсэн",
     "actions": {

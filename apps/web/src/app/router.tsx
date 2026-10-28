@@ -56,6 +56,7 @@ import {
   SuppliersPage,
 } from '@/features/partners/supplier-pages';
 import { HomePage } from '@/features/home/home-page';
+import { ModulePage } from '@/features/home/module-page';
 import { AiPage } from '@/features/ai/ai-page';
 import { AccountLedgerPage, AccountsPage } from '@/features/finance/accounts-page';
 import { OpeningCheckPage, OpeningCheckPrintPage } from '@/features/finance/opening-check-pages';
@@ -235,7 +236,8 @@ export const routes: RouteObject[] = [
         // A page that fails renders its error inside the shell, so the menu stays (ADR-0042).
         errorElement: <RouteErrorBoundary />,
         children: [
-          { index: true, element: <HomePage />, handle: { width: 'wide' } },
+          { index: true, element: <HomePage />, handle: { width: 'full' } },
+          { path: 'm/:module', handle: { width: 'wide' }, element: <ModulePage /> },
           ...financeRoutes(),
           ...reportRoutes(),
           ...posRoutes(),
