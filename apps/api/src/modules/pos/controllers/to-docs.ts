@@ -90,6 +90,18 @@ export function toSaleDoc(dto: SaleDocDto): SaleDoc {
       face: dec(voucher.face),
       amount: dec(voucher.amount),
     })),
+    loyalty: dto.loyalty
+      ? {
+          memberId: dto.loyalty.memberId,
+          earnBase: dec(dto.loyalty.earnBase),
+          percent: dec(dto.loyalty.percent),
+          earned: dec(dto.loyalty.earned),
+          spent: dec(dto.loyalty.spent),
+          givenBack: dec(dto.loyalty.givenBack),
+          clawback: dec(dto.loyalty.clawback),
+          spendDelta: dec(dto.loyalty.spendDelta),
+        }
+      : null,
     subtotal: dec(dto.subtotal),
     discountTotal: dec(dto.discountTotal),
     total: dec(dto.total),

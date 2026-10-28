@@ -119,6 +119,39 @@ describe('pos guards', () => {
     ).toBe('23514');
   });
 
+  it('keeps the bonus card’s history append-only and its points whole (ADR-0112, 0051)', async () => {
+    for (const table of ['pos_loyalty_members', 'pos_loyalty_tiers', 'pos_sale_loyalty']) {
+      expect(await sqlStateOf(asApp.query(`DELETE FROM ${table}`))).toBe('42501');
+      expect(await sqlStateOf(asApp.query(`TRUNCATE ${table} CASCADE`))).toBe('42501');
+    }
+    expect(await sqlStateOf(asApp.query('DELETE FROM pos_loyalty_entries'))).toBe('42501');
+    expect(await sqlStateOf(asApp.query('UPDATE pos_loyalty_entries SET points = 0'))).toBe(
+      '42501',
+    );
+    const triggers = await migrator.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM pg_trigger
+        WHERE tgrelid = 'pos_loyalty_entries'::regclass AND NOT tgisinternal`,
+    );
+    expect(triggers.rows[0]?.count).toBe('2');
+    // A phone in E.164, points whole on a POINTS tender.
+    expect(
+      await sqlStateOf(
+        migrator.query(
+          `INSERT INTO pos_loyalty_members (name, phone, pin_hash, created_by)
+           VALUES ('Туршилт', '99112233', 'x', (SELECT min(id) FROM users))`,
+        ),
+      ),
+    ).toBe('23514');
+    expect(
+      await sqlStateOf(
+        migrator.query(
+          `INSERT INTO pos_tenders (sale_id, tender_no, kind, amount) VALUES ($1, 9, 'POINTS', 1.5)`,
+          [saleId],
+        ),
+      ),
+    ).toBe('23514');
+  });
+
   it('has no column for a lottery or a QR', async () => {
     const columns = await migrator.query<{ column_name: string }>(
       `SELECT column_name FROM information_schema.columns

@@ -103,6 +103,18 @@ function encodeSale(doc: SaleDoc): Json {
       face: money(voucher.face),
       amount: money(voucher.amount),
     })),
+    loyalty: doc.loyalty
+      ? {
+          memberId: doc.loyalty.memberId,
+          earnBase: money(doc.loyalty.earnBase),
+          percent: money(doc.loyalty.percent),
+          earned: money(doc.loyalty.earned),
+          spent: money(doc.loyalty.spent),
+          givenBack: money(doc.loyalty.givenBack),
+          clawback: money(doc.loyalty.clawback),
+          spendDelta: money(doc.loyalty.spendDelta),
+        }
+      : null,
   };
 }
 
@@ -259,7 +271,7 @@ function decodeSale(json: Json): SaleDoc {
       const tender = asObject(raw);
       const tenderKind = str(tender.kind);
       if (!(TENDER_KINDS as readonly string[]).includes(tenderKind)) {
-        throw invalid('tenders.kind', 'enum', 'CASH, CARD, TRANSFER, CREDIT or VOUCHER');
+        throw invalid('tenders.kind', 'enum', 'CASH, CARD, TRANSFER, CREDIT, VOUCHER or POINTS');
       }
       return {
         kind: tenderKind as TenderKind,
@@ -288,6 +300,7 @@ function decodeSale(json: Json): SaleDoc {
         amount: dec(voucher.amount),
       };
     }),
+    loyalty: decodeLoyalty(json.loyalty),
     subtotal: dec(json.subtotal),
     discountTotal: dec(json.discountTotal),
     total: dec(json.total),
@@ -363,4 +376,20 @@ function date(value: unknown): Date {
   const parsed = new Date(str(value));
   if (Number.isNaN(parsed.getTime())) throw invalid('payload', 'date', 'an ISO instant');
   return parsed;
+}
+
+/** A sale's bonus card part (ADR-0112); absent from a document written before it. */
+function decodeLoyalty(raw: unknown): SaleDoc['loyalty'] {
+  if (raw === null || raw === undefined) return null;
+  const loyalty = asObject(raw);
+  return {
+    memberId: int(loyalty.memberId),
+    earnBase: dec(loyalty.earnBase),
+    percent: dec(loyalty.percent),
+    earned: dec(loyalty.earned),
+    spent: dec(loyalty.spent),
+    givenBack: dec(loyalty.givenBack),
+    clawback: dec(loyalty.clawback),
+    spendDelta: dec(loyalty.spendDelta),
+  };
 }

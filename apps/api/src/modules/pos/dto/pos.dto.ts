@@ -52,6 +52,7 @@ import { PageQueryDto } from '../../../common/pagination/page';
 import { VAT_TYPES, type VatType } from '../../catalog';
 
 const MONEY = /^\d{1,12}(\.\d{1,2})?$/;
+const SIGNED_MONEY = /^-?\d{1,12}(\.\d{1,2})?$/;
 const QTY = /^\d{1,11}(\.\d{1,3})?$/;
 const FACTOR = /^\d{1,12}(\.\d{1,6})?$/;
 const PERCENT = /^\d{1,3}(\.\d{1,2})?$/;
@@ -673,6 +674,8 @@ export class PosAttentionDto {
   creditToCheck: number;
   @ApiProperty({ description: 'Codes used twice, stopped or out of date, not checked (ADR-0110)' })
   vouchersToCheck: number;
+  @ApiProperty({ description: 'Bonus card sales on a blocked card or overdrawn (ADR-0112)' })
+  loyaltyToCheck: number;
 }
 
 @ApiSchema({ name: 'PosDayCountRow' })
@@ -856,6 +859,21 @@ export class SaleDocVoucherDto {
   @ApiProperty({ example: '42000' }) @IsString() @Matches(MONEY) amount: string;
 }
 
+/** A bonus card member's part of a sale or a return (ADR-0112). */
+export class SaleDocLoyaltyDto {
+  @ApiProperty() @IsInt() @Min(1) memberId: number;
+  @ApiProperty({ example: '40000' }) @IsString() @Matches(MONEY) earnBase: string;
+  @ApiProperty({ example: '1' }) @IsString() @Matches(MONEY) percent: string;
+  @ApiProperty({ example: '400' }) @IsString() @Matches(MONEY) earned: string;
+  @ApiProperty({ example: '10000' }) @IsString() @Matches(MONEY) spent: string;
+  @ApiProperty({ example: '0' }) @IsString() @Matches(MONEY) givenBack: string;
+  @ApiProperty({ example: '0' }) @IsString() @Matches(MONEY) clawback: string;
+  @ApiProperty({ example: '40000', description: 'Negative on a return' })
+  @IsString()
+  @Matches(SIGNED_MONEY)
+  spendDelta: string;
+}
+
 @ApiSchema({ name: 'PosSaleDoc' })
 export class SaleDocDto {
   @ApiProperty({ format: 'uuid' }) @IsUUID() clientId: string;
@@ -930,6 +948,11 @@ export class SaleDocDto {
   @ValidateNested({ each: true })
   @Type(() => SaleDocVoucherDto)
   vouchers?: SaleDocVoucherDto[];
+  @ApiPropertyOptional({ type: SaleDocLoyaltyDto, nullable: true, description: 'ADR-0112' })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SaleDocLoyaltyDto)
+  loyalty?: SaleDocLoyaltyDto | null;
   @ApiProperty({ example: '12000' }) @IsString() @Matches(MONEY) subtotal: string;
   @ApiProperty({ example: '0' }) @IsString() @Matches(MONEY) discountTotal: string;
   @ApiProperty({ example: '12000' }) @IsString() @Matches(MONEY) total: string;

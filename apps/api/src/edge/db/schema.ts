@@ -3,6 +3,7 @@ import type {
   EdgeCartLine,
   EdgeReceipt,
   PosCustomerFeed,
+  PosLoyaltyFeed,
   PosSnapshot,
   PosVoucherFeed,
   ReceiptType,
@@ -65,6 +66,10 @@ export const edgeState = pgTable(
     vouchersVersion: text('vouchers_version'),
     vouchers: jsonValue('vouchers').$type<PosVoucherFeed | null>(),
     vouchersPulledAt: timestamp('vouchers_pulled_at', { withTimezone: true }),
+    /** ADR-0112: the bonus card's members and tiers, as the centre's feed last answered. */
+    loyaltyVersion: text('loyalty_version'),
+    loyalty: jsonValue('loyalty').$type<PosLoyaltyFeed | null>(),
+    loyaltyPulledAt: timestamp('loyalty_pulled_at', { withTimezone: true }),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [check('edge_state_single_row', sql`${t.id} = 1`)],
@@ -154,6 +159,21 @@ export const edgeSales = pgTable(
     voucherAmount: money('voucher_amount')
       .notNull()
       .default(sql`0`),
+    /**
+     * ADR-0112: the bonus card member, the points paid with (a return: given back as points), the
+     * change to the balance (earned − spent, a return: given back − taken back) and to the
+     * lifetime spend — what the centre has not counted until the document is replayed.
+     */
+    memberId: bigint('member_id', { mode: 'number' }),
+    pointsAmount: money('points_amount')
+      .notNull()
+      .default(sql`0`),
+    pointsDelta: money('points_delta')
+      .notNull()
+      .default(sql`0`),
+    spendDelta: money('spend_delta')
+      .notNull()
+      .default(sql`0`),
     vatTotal: money('vat_total').notNull(),
     doc: jsonValue('doc').$type<SaleDocWire>().notNull(),
     receipt: jsonValue('receipt').$type<EdgeReceipt>().notNull(),
@@ -165,6 +185,11 @@ export const edgeSales = pgTable(
     index('edge_sales_refunds_idx').on(t.refundsClientId),
     check('edge_sales_kind', sql`${t.kind} IN ('SALE', 'RETURN')`),
     index('edge_sales_customer_idx').on(t.customerId),
+    index('edge_sales_member_idx').on(t.memberId),
+    check(
+      'edge_sales_points',
+      sql`${t.pointsAmount} >= 0 AND (${t.memberId} IS NOT NULL OR (${t.pointsAmount} = 0 AND ${t.pointsDelta} = 0 AND ${t.spendDelta} = 0))`,
+    ),
     check(
       'edge_sales_credit',
       sql`${t.creditAmount} >= 0 AND (${t.creditAmount} = 0 OR ${t.customerId} IS NOT NULL)`,
@@ -342,6 +367,17 @@ export const edgeVoucherUses = pgTable(
     check('edge_voucher_uses_amount', sql`${t.amount} >= 0`),
   ],
 );
+
+/**
+ * Wrong bonus card PINs per member on this edge (ADR-0112): five in a row lock the card for 15
+ * minutes; a new PIN from the office (a higher version) starts again.
+ */
+export const edgeMemberPinAttempts = pgTable('edge_member_pin_attempts', {
+  memberId: bigint('member_id', { mode: 'number' }).primaryKey(),
+  pinVersion: integer('pin_version').notNull(),
+  failedCount: integer('failed_count').notNull().default(0),
+  lockedUntil: timestamp('locked_until', { withTimezone: true }),
+});
 
 /** Wrong PINs per cashier on this edge: five in a row lock the cashier for a minute. */
 export const edgePinAttempts = pgTable('edge_pin_attempts', {

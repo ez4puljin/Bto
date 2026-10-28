@@ -118,6 +118,26 @@ export class SaleDto {
   @ValidateNested()
   @Type(() => ApprovalDto)
   voucherApproval?: ApprovalDto | null;
+
+  /** ADR-0112: the bonus card member, and the member's PIN when points are spent. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SaleMemberDto)
+  member?: SaleMemberDto | null;
+}
+
+export class SaleMemberDto {
+  @IsInt() @Min(1) id: number;
+  @IsOptional() @IsString() @MaxLength(8) pin?: string | null;
+}
+
+/** ADR-0112: a member found by the phone the cashier typed. */
+export class MemberQueryDto {
+  @IsString() @MaxLength(20) phone: string;
+}
+
+export class MemberPinDto {
+  @IsString() @MaxLength(8) pin: string;
 }
 
 export class BuyerDto {

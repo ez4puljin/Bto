@@ -130,6 +130,9 @@ export const POSTING_KEY_OF_ROLE: Readonly<Record<GlRole, PostingKeySpec>> = {
   // bill credits it and the unspent rest.
   VOUCHER_CLEARING: key('VOUCHER_CLEARING'),
   VOUCHER_BREAKAGE: key('VOUCHER_BREAKAGE'),
+  // The bonus card (ADR-0112): earned points credit the liability, spent ones debit it.
+  LOYALTY_LIABILITY: key('LOYALTY_LIABILITY'),
+  LOYALTY_EXPENSE: key('LOYALTY_EXPENSE'),
 };
 
 /** The key of a typed journal line: the accountant names the account (F2, ADR-0090). */

@@ -351,6 +351,13 @@
       "when": 1793147018247,
       "tag": "0049_pos_vouchers",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1793154566219,
+      "tag": "0051_pos_loyalty",
+      "breakpoints": true
     }
   ]
 }

@@ -17,6 +17,7 @@ import { CheckoutService } from './services/checkout.service';
 import { CreditGate } from './services/credit-gate.service';
 import { CustomerStore } from './services/customer.store';
 import { VoucherStore } from './services/voucher.store';
+import { LoyaltyStore } from './services/loyalty.store';
 import { DevicesService } from './services/devices.service';
 import { KioskAuthService } from './services/kiosk-auth.service';
 import { OutboxService } from './services/outbox.service';
@@ -76,6 +77,7 @@ export class EdgeModule {
         SnapshotStore,
         CustomerStore,
         VoucherStore,
+        LoyaltyStore,
         CreditGate,
         TillRecordsService,
         CentralClient,

@@ -21,6 +21,7 @@ import type {
   EdgeLoginResponse,
   EdgeCartLine,
   EdgeCustomer,
+  EdgeMember,
   EdgeVoucher,
   EdgeDaySummary,
   EdgePairResponse,
@@ -58,6 +59,8 @@ import {
   ReturnSaleQueryDto,
   DayCountRequestDto,
   DayQueryDto,
+  MemberPinDto,
+  MemberQueryDto,
   SaleDto,
   SearchQueryDto,
   ShiftCloseDto,
@@ -77,6 +80,7 @@ import {
 } from '../guards/kiosk.guard';
 import { CheckoutService } from '../services/checkout.service';
 import { CustomerStore } from '../services/customer.store';
+import { LoyaltyStore } from '../services/loyalty.store';
 import { VoucherStore } from '../services/voucher.store';
 import { TillRecordsService } from '../services/till-records.service';
 import { DevicesService } from '../services/devices.service';
@@ -115,6 +119,7 @@ export class KioskController {
     private readonly taxpayers: TaxpayerClient,
     private readonly customers: CustomerStore,
     private readonly vouchers: VoucherStore,
+    private readonly loyalty: LoyaltyStore,
     private readonly records: TillRecordsService,
   ) {}
 
@@ -260,6 +265,26 @@ export class KioskController {
   @Get('customers/:id')
   customer(@Param('id', ParseIntPipe) id: number): Promise<EdgeCustomer> {
     return this.customers.one(id);
+  }
+
+  /** ADR-0112: the bonus card member of a phone, with the points this edge may spend. */
+  @Get('members')
+  member(@Query() query: MemberQueryDto): Promise<EdgeMember> {
+    return this.loyalty.byPhoneView(query.phone);
+  }
+
+  /**
+   * ADR-0112: the member's own PIN checked before the payment; the sale checks it again. Five
+   * wrong ones in a row lock the card for 15 minutes.
+   */
+  @Post('members/:id/pin-check')
+  @HttpCode(200)
+  async checkMemberPin(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: MemberPinDto,
+  ): Promise<{ ok: true }> {
+    await this.loyalty.checkPin(id, body.pin);
+    return { ok: true };
   }
 
   /** ADR-0111: this till's sales and returns of a day, newest first. */

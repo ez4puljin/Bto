@@ -167,6 +167,8 @@ export class EdgeShiftsService {
         transfer: sql<string>`coalesce(sum(${edgeSales.transferAmount}) FILTER (WHERE ${sale}), 0)::text`,
         creditRefunds: sql<string>`coalesce(sum(${edgeSales.creditAmount}) FILTER (WHERE ${refund}), 0)::text`,
         vouchers: sql<string>`coalesce(sum(${edgeSales.voucherAmount}) FILTER (WHERE ${sale}), 0)::text`,
+        points: sql<string>`coalesce(sum(${edgeSales.pointsAmount}) FILTER (WHERE ${sale}), 0)::text`,
+        pointsRefunds: sql<string>`coalesce(sum(${edgeSales.pointsAmount}) FILTER (WHERE ${refund}), 0)::text`,
       })
       .from(edgeSales)
       .where(eq(edgeSales.shiftClientId, shift.clientId));
@@ -194,6 +196,8 @@ export class EdgeShiftsService {
       creditSales: new Decimal(totals?.credit ?? '0').toFixed(2),
       creditRefunds: new Decimal(totals?.creditRefunds ?? '0').toFixed(2),
       voucherSales: new Decimal(totals?.vouchers ?? '0').toFixed(2),
+      pointsSales: new Decimal(totals?.points ?? '0').toFixed(2),
+      pointsRefunds: new Decimal(totals?.pointsRefunds ?? '0').toFixed(2),
       transferSales: new Decimal(totals?.transfer ?? '0').toFixed(2),
       payments: paymentTotalsOf(
         await this.db

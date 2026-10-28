@@ -7,11 +7,14 @@ import {
   type EdgeReturnSale,
   lineMoney,
   lineVat,
+  loyaltyReturn,
+  maskPhone,
   posSaleNumber,
   refundSplit,
   voucherSaleRefundable,
   type SaleDocLineWire,
   type SaleDocWire,
+  type SaleLoyaltyWire,
   saleTotals,
   type TenderWire,
   tillCodeLookKey,
@@ -23,6 +26,7 @@ import { AppError, invalid } from '../../common/errors/app-error';
 import { EDGE_DB, type EdgeDb, type EdgeTx, inEdgeTransaction } from '../db/edge-db';
 import { edgeSales } from '../db/schema';
 import { KioskAuthService } from './kiosk-auth.service';
+import { LoyaltyStore } from './loyalty.store';
 import { EbarimtService } from '../ebarimt/ebarimt.service';
 import { OutboxService } from './outbox.service';
 import { nextSequence } from './sequences';
@@ -52,6 +56,7 @@ export class EdgeReturnsService {
     private readonly shifts: EdgeShiftsService,
     private readonly outbox: OutboxService,
     private readonly ebarimt: EbarimtService,
+    private readonly loyalty: LoyaltyStore,
   ) {}
 
   /** A sale by its receipt number, «K1-…» typed on a Latin keyboard included. */
@@ -90,6 +95,13 @@ export class EdgeReturnsService {
         : null,
       refundable: sale.voucherAmount.gt(0)
         ? (await this.voucherRefundable(this.db, sale)).toFixed(2)
+        : null,
+      loyalty: sale.doc.loyalty
+        ? {
+            memberName: sale.receipt.loyalty?.memberName ?? '',
+            spent: sale.doc.loyalty.spent,
+            earned: sale.doc.loyalty.earned,
+          }
         : null,
       lines: sale.doc.lines.map((line, index) => {
         const shown = sale.receipt.lines[index];
@@ -214,7 +226,23 @@ export class EdgeReturnsService {
             total: totals.total,
           })
         : { credit: new Decimal(0), cash: totals.total };
+      // ADR-0112: a bonus card sale gives its spent points back first, as points; the earned ones
+      // go back by the share of the money returned (owner 2026-10-28).
+      const card = sale.doc.loyalty ? await this.cardReturn(tx, sale, totals.total) : null;
+      if (card) split.cash = card.split.money;
       const tenders: TenderWire[] = [
+        ...(card && card.split.givenBack.gt(0)
+          ? [
+              {
+                kind: 'POINTS' as const,
+                amount: card.split.givenBack.toFixed(2),
+                tendered: null,
+                terminalId: null,
+                rrn: null,
+                maskedPan: null,
+              },
+            ]
+          : []),
         ...(split.credit.gt(0)
           ? [
               {
@@ -262,6 +290,7 @@ export class EdgeReturnsService {
         consumerNo: null,
         refundsSaleClientId: sale.clientId,
         customerId,
+        loyalty: card?.wire ?? null,
         lines,
         // Returns are paid back in cash (owner 2026-10-23), a credit sale's off its debt first.
         tenders,
@@ -309,6 +338,7 @@ export class EdgeReturnsService {
           split.credit.gt(0) && sale.receipt.credit
             ? { ...sale.receipt.credit, amount: split.credit.toFixed(2) }
             : null,
+        loyalty: card?.receipt ?? null,
         title: loaded.snapshot.settings.receiptTitle ?? null,
         footer: loaded.snapshot.settings.receiptFooter ?? null,
         ebarimt:
@@ -337,6 +367,10 @@ export class EdgeReturnsService {
         cardAmount: new Decimal(0),
         creditAmount: split.credit,
         customerId,
+        memberId: sale.memberId,
+        pointsAmount: card?.split.givenBack ?? new Decimal(0),
+        pointsDelta: card ? card.split.givenBack.minus(card.split.clawback) : new Decimal(0),
+        spendDelta: card?.split.spendDelta ?? new Decimal(0),
         vatTotal: totals.vatTotal,
         doc,
         receipt,
@@ -347,6 +381,66 @@ export class EdgeReturnsService {
       }
       return receipt;
     });
+  }
+
+  /**
+   * How a return settles a bonus card sale (ADR-0112): `loyaltyReturn` from the sale's member part
+   * and its earlier returns', under the member's lock, with the card's balance after it.
+   */
+  private async cardReturn(
+    tx: EdgeTx,
+    sale: SaleRow,
+    refund: Decimal,
+  ): Promise<{
+    split: ReturnType<typeof loyaltyReturn>;
+    wire: SaleLoyaltyWire;
+    receipt: NonNullable<EdgeReceipt['loyalty']>;
+  } | null> {
+    const sold = sale.doc.loyalty;
+    if (!sold) return null;
+    await this.loyalty.lock(tx, sold.memberId);
+    const earlier = await tx
+      .select({ doc: edgeSales.doc })
+      .from(edgeSales)
+      .where(and(eq(edgeSales.refundsClientId, sale.clientId), eq(edgeSales.kind, 'RETURN')));
+    const before = earlier.reduce(
+      (sum, row) => ({
+        givenBack: sum.givenBack.plus(row.doc.loyalty?.givenBack ?? 0),
+        clawedBack: sum.clawedBack.plus(row.doc.loyalty?.clawback ?? 0),
+        money: sum.money.minus(row.doc.loyalty?.spendDelta ?? 0),
+      }),
+      { givenBack: new Decimal(0), clawedBack: new Decimal(0), money: new Decimal(0) },
+    );
+    const split = loyaltyReturn({
+      refund,
+      sale: { earned: sold.earned, spent: sold.spent, earnBase: sold.earnBase },
+      previous: before,
+    });
+    const standing = await this.loyalty.standing(sold.memberId, tx);
+    return {
+      split,
+      wire: {
+        memberId: sold.memberId,
+        earnBase: '0.00',
+        percent: sold.percent,
+        earned: '0.00',
+        spent: '0.00',
+        givenBack: split.givenBack.toFixed(2),
+        clawback: split.clawback.toFixed(2),
+        spendDelta: split.spendDelta.toFixed(2),
+      },
+      receipt: {
+        memberName: standing.member.name,
+        phone: maskPhone(standing.member.phone),
+        tierName: standing.tier?.name ?? null,
+        percent: sold.percent,
+        earned: '0.00',
+        spent: '0.00',
+        givenBack: split.givenBack.toFixed(2),
+        clawback: split.clawback.toFixed(2),
+        balance: standing.balance.plus(split.givenBack).minus(split.clawback).toFixed(2),
+      },
+    };
   }
 
   /** What a sale partly paid by vouchers may still give back: its cash and card, less returns. */

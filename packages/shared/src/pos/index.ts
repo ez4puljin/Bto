@@ -11,12 +11,16 @@ import { Decimal, type DecimalInput, toMoney } from '../money';
  * How a sale is paid at the till; no QPay (ADR-0080, SPEC §6.6 #4). CREDIT (ADR-0109) is the part a
  * registered customer owes: the centre invoices it, and the sale carries no e-Barimt. TRANSFER
  * (ADR-0111) is a bank transfer the cashier saw arrive in the store's account. VOUCHER (ADR-0110)
- * is a partner voucher's part: the centre bills the partner its face value.
+ * is a partner voucher's part: the centre bills the partner its face value. POINTS (ADR-0112) is
+ * the part a bonus card member pays with points; on a return it is the points given back.
  */
-export const TENDER_KINDS = ['CASH', 'CARD', 'TRANSFER', 'CREDIT', 'VOUCHER'] as const;
+export const TENDER_KINDS = ['CASH', 'CARD', 'TRANSFER', 'CREDIT', 'VOUCHER', 'POINTS'] as const;
 export type TenderKind = (typeof TENDER_KINDS)[number];
 
-/** The kinds an admin's payment type may have (ADR-0111); VOUCHER comes only from a scanned code. */
+/**
+ * The kinds an admin's payment type may have (ADR-0111); VOUCHER comes only from a scanned code and
+ * POINTS only from a member's card (ADR-0112).
+ */
 export const PAYMENT_TYPE_KINDS = ['CASH', 'CARD', 'TRANSFER', 'CREDIT'] as const;
 export type PaymentTypeKind = (typeof PAYMENT_TYPE_KINDS)[number];
 
@@ -286,6 +290,9 @@ export function parseEdgeToken(value: string): { nodeId: number; secret: string 
 
 // The till's coupons and partner vouchers (ADR-0110).
 export * from './vouchers';
+
+// The bonus card: members, tiers and points (ADR-0112).
+export * from './loyalty';
 
 // The store edge: sync, snapshot and kiosk shapes (ADR-0067).
 export * from './edge';

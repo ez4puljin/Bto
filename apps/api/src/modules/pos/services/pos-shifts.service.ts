@@ -23,7 +23,7 @@ import {
 } from '../../finance';
 import { type Actor, AuditService, type AuthContext, UserNamesService } from '../../identity';
 import type { Accepted, ShiftCloseDoc, ShiftOpenDoc } from '../sale-doc';
-import { posEdgeNodes, posSales, posShifts, posTenders } from '../schema';
+import { posEdgeNodes, posSaleLoyalty, posSales, posShifts, posTenders } from '../schema';
 import type { EdgeNode } from './pos-edge-nodes.service';
 import { PosCashiersService } from './pos-cashiers.service';
 import { PosSettingsService } from './pos-settings.service';
@@ -51,6 +51,14 @@ export interface ShiftTotals {
   /** ADR-0111: bank transfers taken at the till, and given back. */
   transferSales: Decimal;
   transferRefunds: Decimal;
+  /**
+   * ADR-0112: the POINTS tenders of the sales and of the returns (points given back), and the
+   * points the sales earned and the returns took back.
+   */
+  pointsSales: Decimal;
+  pointsRefunds: Decimal;
+  pointsEarned: Decimal;
+  pointsClawback: Decimal;
 }
 
 /** One payment type's money on a shift (ADR-0111), in the till's order; null type = older tenders. */
@@ -261,6 +269,10 @@ export class PosShiftsService {
         voucherSales: totals.voucherSales,
         transferSales: totals.transferSales,
         transferRefunds: totals.transferRefunds,
+        pointsSales: totals.pointsSales,
+        pointsRefunds: totals.pointsRefunds,
+        pointsEarned: totals.pointsEarned,
+        pointsClawback: totals.pointsClawback,
         journalEntryId: entry?.id ?? null,
         journalNumber: entry?.number ?? null,
         updatedAt: sql`now()`,
@@ -374,9 +386,19 @@ export class PosShiftsService {
         voucherSales: tender('SALE', 'VOUCHER'),
         transferSales: tender('SALE', 'TRANSFER'),
         transferRefunds: tender('RETURN', 'TRANSFER'),
+        pointsSales: tender('SALE', 'POINTS'),
+        pointsRefunds: tender('RETURN', 'POINTS'),
       })
       .from(posTenders)
       .innerJoin(posSales, eq(posSales.id, posTenders.saleId))
+      .where(eq(posSales.shiftId, shiftId));
+    const [points] = await executor
+      .select({
+        earned: sql<string>`coalesce(sum(${posSaleLoyalty.earned}), 0)`,
+        clawback: sql<string>`coalesce(sum(${posSaleLoyalty.clawback}), 0)`,
+      })
+      .from(posSaleLoyalty)
+      .innerJoin(posSales, eq(posSales.id, posSaleLoyalty.saleId))
       .where(eq(posSales.shiftId, shiftId));
     const money = (value: string | undefined) => new Decimal(value ?? '0');
     return {
@@ -395,6 +417,10 @@ export class PosShiftsService {
       voucherSales: money(tenders?.voucherSales),
       transferSales: money(tenders?.transferSales),
       transferRefunds: money(tenders?.transferRefunds),
+      pointsSales: money(tenders?.pointsSales),
+      pointsRefunds: money(tenders?.pointsRefunds),
+      pointsEarned: money(points?.earned),
+      pointsClawback: money(points?.clawback),
     };
   }
 
@@ -560,7 +586,10 @@ export class PosShiftsService {
  * ADR-0109: what the credit sales and their returns booked on their own invoices and credit notes
  * (their revenue, VAT, and the cash and card the till took or paid back for them) is left out;
  * the counted cash, the expected cash and the variance are the drawer's, unchanged. ADR-0110: Dr
- * VOUCHER_CLEARING for what partner vouchers paid; each partner's bill credits it.
+ * VOUCHER_CLEARING for what partner vouchers paid; each partner's bill credits it. ADR-0112 (the
+ * bonus card, TODO-VERIFY D16): Dr LOYALTY_LIABILITY for the points spent and Cr for the points
+ * given back; the points earned Dr LOYALTY_EXPENSE / Cr LOYALTY_LIABILITY, those taken back the
+ * reverse.
  */
 export function shiftCloseLines(input: {
   openingFloat: Decimal;
@@ -570,7 +599,18 @@ export function shiftCloseLines(input: {
     ShiftTotals,
     'cardSales' | 'cardRefunds' | 'returnsTotal' | 'returnsVat' | 'salesTotal' | 'salesVat'
   > &
-    Partial<Pick<ShiftTotals, 'voucherSales' | 'transferSales' | 'transferRefunds'>>;
+    Partial<
+      Pick<
+        ShiftTotals,
+        | 'voucherSales'
+        | 'transferSales'
+        | 'transferRefunds'
+        | 'pointsSales'
+        | 'pointsRefunds'
+        | 'pointsEarned'
+        | 'pointsClawback'
+      >
+    >;
   booked?: ShiftBooked;
 }): JournalLineInput[] {
   const { totals } = input;
@@ -587,6 +627,17 @@ export function shiftCloseLines(input: {
       amount: totals.cardSales.minus(totals.cardRefunds).minus(booked.card),
     },
     { role: 'VOUCHER_CLEARING', amount: totals.voucherSales ?? ZERO },
+    {
+      role: 'LOYALTY_LIABILITY',
+      amount: (totals.pointsSales ?? ZERO)
+        .minus(totals.pointsRefunds ?? ZERO)
+        .minus(totals.pointsEarned ?? ZERO)
+        .plus(totals.pointsClawback ?? ZERO),
+    },
+    {
+      role: 'LOYALTY_EXPENSE',
+      amount: (totals.pointsEarned ?? ZERO).minus(totals.pointsClawback ?? ZERO),
+    },
     {
       role: 'TRANSFER_CLEARING',
       amount: (totals.transferSales ?? ZERO)

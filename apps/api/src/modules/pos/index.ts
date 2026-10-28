@@ -7,6 +7,7 @@ export type {
   ReceiptStatusDoc,
   SaleDoc,
   SaleDocLine,
+  SaleDocLoyalty,
   SaleDocTender,
   SaleDocVoucher,
   ShiftCloseDoc,
@@ -20,6 +21,13 @@ export type {
 export { PosAcceptService } from './services/pos-accept.service';
 export { type Cashier, PosCashiersService } from './services/pos-cashiers.service';
 export { PosDevService } from './services/pos-dev.service';
+export {
+  type LoyaltyTier,
+  type MemberEntryView,
+  type MemberView,
+  PosLoyaltyService,
+  type SaleLoyaltyView,
+} from './services/pos-loyalty.service';
 export {
   type EdgeNode,
   type EdgeNodeInput,
