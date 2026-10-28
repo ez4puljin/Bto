@@ -296,7 +296,7 @@ function Receiving({ detail }: { detail: ReceiptDetail }) {
       >
         <Button variant="outline" asChild>
           <Link to={`/inventory/receipts/${detail.id}`}>
-            {t('inventory.receipt.form.linesTitle')}
+            {t('inventory.receipt.receive.document')}
           </Link>
         </Button>
         <Button
