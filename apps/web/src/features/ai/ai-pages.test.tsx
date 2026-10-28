@@ -89,14 +89,17 @@ describe('AI assistant pages (ADR-0045)', () => {
       'href',
       '/ai/reports',
     );
-    expect(await screen.findByRole('link', { name: mn.home.actions.askAi })).toBeInTheDocument();
+    // The top bar's ✨ (ADR-0114).
+    expect(
+      await within(screen.getByRole('banner')).findByRole('link', { name: mn.nav.modules.ai }),
+    ).toHaveAttribute('href', '/ai');
   });
 
   it('hides the assistant from people without ai.ask', async () => {
     renderApp('/', signedIn(WORKER_ME, AI_ROUTES));
     const menu = await findSidebar();
     expect(within(menu).queryByRole('link', { name: mn.nav.aiAssistant })).toBeNull();
-    expect(screen.queryByRole('link', { name: mn.home.actions.askAi })).toBeNull();
+    expect(screen.queryByRole('link', { name: mn.nav.modules.ai })).toBeNull();
   });
 
   it('explains what to set while the assistant is not configured', async () => {

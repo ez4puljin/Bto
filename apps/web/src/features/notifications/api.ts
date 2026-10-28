@@ -2,6 +2,7 @@ import {
   keepPreviousData,
   useInfiniteQuery,
   useMutation,
+  useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
 import { type components, idempotencyKey } from '@tugeel/api-client';
@@ -56,4 +57,48 @@ export function useNoticeMutations() {
       onSuccess: invalidate,
     }),
   };
+}
+
+export type MyNotice = Schemas['MyNotice'];
+export type MyNotification = Schemas['MyNotification'];
+
+/** The signed-in user's own inbox (ADR-0062 #3), the web's bell since ADR-0114. */
+export const INBOX_KEY = ['notifications', 'mine'] as const;
+
+/** The running notices and the unread count: read every minute and on return to the window. */
+export function useInboxSummary() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...INBOX_KEY, 'summary'],
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/me/notifications/summary', { signal })),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+/** The newest own notifications (a sold order), first page only. */
+export function useInboxItems(enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...INBOX_KEY, 'items'],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/me/notifications', { params: { query: { limit: 20 } }, signal }),
+      ),
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+/** Marks notices and own notifications read; the bell follows at once. */
+export function useMarkInboxRead() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: { noticeIds?: number[]; notificationIds?: number[] }) =>
+      unwrap(await api.POST('/api/v1/me/notifications/read', { body: ids })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: INBOX_KEY }),
+  });
 }

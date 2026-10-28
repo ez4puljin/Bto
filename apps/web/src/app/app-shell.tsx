@@ -1,22 +1,19 @@
-import { Menu, Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useMatches } from 'react-router';
 import { useAuthState } from '@/app/auth-context';
 import { CommandPalette } from '@/app/command-palette';
 import { navTrail } from '@/app/nav-items';
 import { PAGE_WIDTHS, type PageWidth, widthOf } from '@/app/page-width';
 import { Sidebar } from '@/app/sidebar';
-import { Button } from '@/components/ui/button';
+import { TopBar } from '@/app/top-bar';
 import { rememberRecentPage } from '@/lib/recent-pages';
 
 /**
- * The frame of every signed-in page (ADR-0042): the sidebar menu on the grey canvas, the page in
- * its route's width (ADR-0066), the Ctrl/⌘+K search and, on phones, a
- * slim top bar whose menu button slides the sidebar in. The shell itself makes no API calls.
+ * The frame of every signed-in page (ADR-0042, ADR-0114): the top bar with the modules, the page
+ * in its route's width (ADR-0066) on the grey canvas, the Ctrl/⌘+K search and the «Бүх цэс»
+ * drawer the bar's ⋮⋮ slides in. The shell's only API call is the bar's bell.
  */
 export function AppShell() {
-  const { t } = useTranslation();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -50,7 +47,7 @@ export function AppShell() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  // The phone drawer: Escape closes it; focus moves into it and back to the menu button.
+  // The drawer: Escape closes it; focus moves into it and back to the menu button.
   useEffect(() => {
     if (!menuOpen) return;
     firstLink.current?.focus();
@@ -71,39 +68,21 @@ export function AppShell() {
   };
 
   return (
-    <div className="min-h-svh bg-canvas md:flex">
-      <header className="sticky top-0 z-40 flex h-13 items-center gap-1 border-b border-sidebar-border bg-sidebar/90 px-2 backdrop-blur-md md:hidden print:hidden">
-        <Button
-          ref={menuButton}
-          variant="ghost"
-          size="icon"
-          aria-label={t('nav.menu')}
-          aria-controls="app-sidebar"
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((open) => !open)}
-        >
-          <Menu />
-        </Button>
-        <span className="flex-1 truncate text-[15px] font-semibold tracking-tight">
-          {t('app.name')}
-        </span>
-        <Button variant="ghost" size="icon" aria-label={t('palette.title')} onClick={openSearch}>
-          <Search />
-        </Button>
-      </header>
+    <div className="flex min-h-svh flex-col bg-canvas">
+      <TopBar
+        menuOpen={menuOpen}
+        onMenu={() => setMenuOpen((open) => !open)}
+        onSearch={openSearch}
+        menuButtonRef={menuButton}
+      />
       {menuOpen ? (
         <div
           aria-hidden
-          className="fixed inset-0 z-40 bg-black/30 md:hidden"
+          className="fixed inset-0 z-40 bg-black/30"
           onClick={() => setMenuOpen(false)}
         />
       ) : null}
-      <Sidebar
-        open={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        onSearch={openSearch}
-        firstLinkRef={firstLink}
-      />
+      <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} firstLinkRef={firstLink} />
       <main
         inert={menuOpen ? true : undefined}
         className="min-w-0 flex-1 px-4 pt-5 pb-10 md:px-8 print:p-0"

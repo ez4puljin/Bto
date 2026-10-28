@@ -78,7 +78,16 @@ describe('«Анхаарах» tiles (ADR-0047 #7)', () => {
     expect(calls(quiet, 'GET', '/api/v1/inventory/attention')).toHaveLength(0);
   });
 
-  it('shows nothing when nothing waits or the counts fail', async () => {
+  it('says so when nothing waits, and claims nothing when the counts fail', async () => {
+    renderApp(
+      '/',
+      signedIn(WAREHOUSE_ME, { 'GET /api/v1/inventory/attention': () => json(NOTHING) }),
+    );
+    const quiet = within(await tiles());
+    expect(await quiet.findByText(mn.home.nothingWaiting)).toBeInTheDocument();
+    expect(quiet.queryAllByRole('link')).toHaveLength(0);
+    cleanup();
+
     const fetchMock = signedIn(WAREHOUSE_ME, {
       'GET /api/v1/inventory/attention': () => problem('INTERNAL', 500),
     });
@@ -86,7 +95,9 @@ describe('«Анхаарах» tiles (ADR-0047 #7)', () => {
     await waitFor(() =>
       expect(calls(fetchMock, 'GET', '/api/v1/inventory/attention').length).toBeGreaterThan(0),
     );
-    expect(screen.queryByRole('region', { name: mn.home.attention.title })).toBeNull();
+    const failed = within(await tiles());
+    expect(failed.queryAllByRole('link')).toHaveLength(0);
+    expect(failed.queryByText(mn.home.nothingWaiting)).toBeNull();
   });
 });
 

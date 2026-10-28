@@ -2,7 +2,8 @@ import { act, cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { NAV_GROUPS, navTrail, QUICK_ACTIONS } from '@/app/nav-items';
+import { NAV_GROUPS, NAV_MODULES, navTrail, QUICK_ACTIONS } from '@/app/nav-items';
+import { readFavoritePages, setFavoritePage } from '@/lib/favorite-pages';
 import { MAX_RECENT, readRecentPages, rememberRecentPage } from '@/lib/recent-pages';
 import { clearToasts, dismissToast, getToasts, toast } from '@/lib/toast';
 import { ADMIN_ME, findSidebar, json, renderApp, signedIn, WORKER_ME } from '@/test/render-app';
@@ -85,44 +86,40 @@ describe('toasts', () => {
   });
 });
 
-describe('home page', () => {
-  it('greets by the given name and offers only the actions the user may take', async () => {
+describe('home page (ADR-0114)', () => {
+  it('greets by the given name and shows only the modules the user may open', async () => {
     renderApp('/', signedIn(WORKER_ME));
     expect(
       await screen.findByRole('heading', { name: mn.home.greeting.replace('{{name}}', 'Дорж') }),
     ).toBeInTheDocument();
-    const actions = within(screen.getByRole('region', { name: mn.home.quickActions }));
-    expect(actions.getByRole('link', { name: mn.home.actions.scan })).toHaveAttribute(
+    const modules = within(screen.getByRole('region', { name: mn.home.modules }));
+    expect(modules.getByRole('link', { name: mn.nav.modules.inventory })).toHaveAttribute(
       'href',
-      '/catalog/scan',
+      '/m/inventory',
     );
-    expect(actions.getByRole('link', { name: mn.home.actions.quote })).toBeInTheDocument();
-    expect(actions.queryByRole('link', { name: mn.home.actions.newReceipt })).toBeNull();
-    expect(actions.queryByRole('link', { name: mn.home.actions.newProduct })).toBeNull();
-    expect(actions.queryByRole('link', { name: mn.home.actions.newOrder })).toBeNull();
-    expect(actions.queryByRole('link', { name: mn.home.actions.recordPayment })).toBeNull();
+    expect(modules.getByRole('link', { name: mn.nav.modules.catalog })).toBeInTheDocument();
+    // Without the rights, no sales board, no finance and no supermarket.
+    expect(modules.queryByRole('link', { name: mn.nav.modules.sales })).toBeNull();
+    expect(modules.queryByRole('link', { name: mn.nav.modules.finance })).toBeNull();
+    expect(modules.queryByRole('link', { name: mn.nav.modules.pos })).toBeNull();
+    expect(screen.queryByRole('link', { name: mn.nav.modules.ai })).toBeNull();
+    expect(
+      await within(screen.getByRole('region', { name: mn.shell.notifications })).findByText(
+        mn.shell.noNotifications,
+      ),
+    ).toBeInTheDocument();
   });
 
-  it('gives an admin every shortcut, the create ones opening their dialogs', async () => {
+  it('gives an admin every module and the tools', async () => {
     renderApp('/', signedIn(ADMIN_ME));
-    const actions = within(await screen.findByRole('region', { name: mn.home.quickActions }));
-    expect(actions.getAllByRole('link')).toHaveLength(9);
-    expect(actions.getByRole('link', { name: mn.home.actions.askAi })).toHaveAttribute(
+    const modules = within(await screen.findByRole('region', { name: mn.home.modules }));
+    expect(modules.getAllByRole('link')).toHaveLength(6);
+    const tools = within(screen.getByRole('region', { name: mn.home.tools }));
+    expect(tools.getByRole('link', { name: mn.nav.modules.system })).toHaveAttribute(
       'href',
-      '/ai',
+      '/m/system',
     );
-    expect(actions.getByRole('link', { name: mn.home.actions.newTransfer })).toHaveAttribute(
-      'href',
-      '/inventory/transfers?new=1',
-    );
-    expect(actions.getByRole('link', { name: mn.home.actions.newOrder })).toHaveAttribute(
-      'href',
-      '/sales/boards?new=1',
-    );
-    expect(actions.getByRole('link', { name: mn.home.actions.recordPayment })).toHaveAttribute(
-      'href',
-      '/finance/payments?new=1',
-    );
+    expect(tools.getByRole('link', { name: mn.nav.modules.ai })).toHaveAttribute('href', '/m/ai');
   });
 
   it('never names a shortcut like a menu entry (docs/ui.md §5)', () => {
@@ -130,6 +127,150 @@ describe('home page', () => {
       key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], mn);
     const menu = NAV_GROUPS.flatMap((group) => group.items.map((item) => text(item.label)));
     for (const action of QUICK_ACTIONS) expect(menu).not.toContain(text(action.label));
+  });
+});
+
+describe('modules (ADR-0114)', () => {
+  it('puts every menu group in exactly one module', () => {
+    for (const group of NAV_GROUPS) {
+      expect(NAV_MODULES.filter((module) => module.groups.includes(group.label))).toHaveLength(1);
+    }
+    expect(navTrail('/pricing/quote')?.module.key).toBe('catalog');
+    expect(navTrail('/reports/aging')?.module.key).toBe('finance');
+  });
+
+  it('opens a module from the top bar and lists its pages on its own page', async () => {
+    const user = userEvent.setup();
+    const { router } = renderApp('/', signedIn(ADMIN_ME));
+    const bar = within(await screen.findByRole('navigation', { name: mn.shell.modules }));
+    await user.click(bar.getByRole('button', { name: mn.nav.modules.catalog }));
+    const menu = within(await screen.findByRole('menu'));
+    expect(menu.getByText(mn.nav.groups.pricing)).toBeInTheDocument();
+    expect(menu.getByRole('menuitem', { name: mn.nav.discounts })).toHaveAttribute(
+      'href',
+      '/pricing/discounts',
+    );
+    await user.click(menu.getByRole('menuitem', { name: mn.shell.seeModule }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/m/catalog'));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: mn.nav.modules.catalog }),
+    ).toBeInTheDocument();
+    const pricing = within(screen.getByRole('region', { name: mn.nav.groups.pricing }));
+    expect(pricing.getByRole('link', { name: mn.nav.discounts })).toHaveAttribute(
+      'href',
+      '/pricing/discounts',
+    );
+    // The module's shortcuts come with it.
+    expect(screen.getByRole('link', { name: mn.home.actions.newProduct })).toBeInTheDocument();
+  });
+
+  it('knows no module the user may not open', async () => {
+    renderApp('/m/finance', signedIn(WORKER_ME));
+    expect(await screen.findByRole('heading', { level: 1 })).not.toHaveTextContent(
+      mn.nav.modules.finance,
+    );
+    cleanup();
+    renderApp('/m/nothing', signedIn(ADMIN_ME));
+    expect(await screen.findByRole('heading', { level: 1 })).not.toHaveTextContent(
+      mn.nav.modules.finance,
+    );
+  });
+
+  it('keeps the closed drawer out of the keyboard order', async () => {
+    const user = userEvent.setup();
+    renderApp('/', signedIn(ADMIN_ME));
+    const drawer = (await findSidebar()).closest('aside');
+    expect(drawer).toHaveAttribute('inert');
+    await user.click(screen.getByRole('button', { name: mn.nav.menu }));
+    expect(drawer).not.toHaveAttribute('inert');
+  });
+});
+
+describe('favourites (ADR-0114)', () => {
+  it('stars a menu page from its title and lists it under the star', async () => {
+    const user = userEvent.setup();
+    renderApp('/inventory/stock', signedIn(ADMIN_ME));
+    await user.click(await screen.findByRole('button', { name: mn.shell.addFavorite }));
+    expect(screen.getByRole('button', { name: mn.shell.removeFavorite })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(readFavoritePages(ADMIN_ME.id)).toEqual(['/inventory/stock']);
+    await user.click(screen.getByRole('button', { name: mn.shell.favorites }));
+    const menu = within(await screen.findByRole('menu'));
+    expect(menu.getByRole('menuitem', { name: new RegExp(mn.nav.stock) })).toHaveAttribute(
+      'href',
+      '/inventory/stock',
+    );
+  });
+
+  it('keeps menu paths only, per user, and survives a broken storage', () => {
+    setFavoritePage(1, '/catalog/products', true);
+    setFavoritePage(1, '/pricing/quote', true);
+    setFavoritePage(2, '/inventory/stock', true);
+    setFavoritePage(1, '/catalog/products', false);
+    expect(readFavoritePages(1)).toEqual(['/pricing/quote']);
+    expect(readFavoritePages(2)).toEqual(['/inventory/stock']);
+    localStorage.setItem('tugeel.favorites.v1:3', '{not json');
+    expect(readFavoritePages(3)).toEqual([]);
+  });
+});
+
+describe('notifications bell (ADR-0114)', () => {
+  it('shows the unread count and marks the lines read when opened', async () => {
+    const user = userEvent.setup();
+    const fetchMock = signedIn(ADMIN_ME, {
+      'GET /api/v1/me/notifications/summary': () =>
+        json({
+          unread: 2,
+          notices: [
+            {
+              id: 5,
+              kind: 'NEWS',
+              title: 'Шинэ үнэ',
+              body: '',
+              imageUrl: null,
+              popup: false,
+              validFrom: '2026-10-28',
+              validTo: null,
+              productIds: [],
+              read: false,
+              createdAt: '2026-10-28T02:00:00.000Z',
+            },
+          ],
+        }),
+      'GET /api/v1/me/notifications': () =>
+        page([
+          {
+            id: 9,
+            kind: 'ORDER_SOLD',
+            orderId: 31,
+            orderNumber: '20261028_0004',
+            customerName: 'Дэлгүүр',
+            orderTotal: '120000',
+            invoiceNumber: null,
+            read: false,
+            createdAt: '2026-10-28T03:00:00.000Z',
+          },
+        ]),
+      'POST /api/v1/me/notifications/read': () => json({ notices: 1, notifications: 1 }),
+    });
+    renderApp('/', fetchMock);
+    const bell = await screen.findByRole('button', {
+      name: mn.shell.notificationsUnread.replace('{{count}}', '2'),
+    });
+    await user.click(bell);
+    const menu = within(await screen.findByRole('menu'));
+    expect(menu.getByText('Шинэ үнэ')).toBeInTheDocument();
+    expect(
+      menu.getByText(mn.shell.orderSold.replace('{{number}}', '20261028_0004')),
+    ).toBeInTheDocument();
+    const readCall = () =>
+      fetchMock.mock.calls.find(
+        ([request]) => new URL(request.url).pathname === '/api/v1/me/notifications/read',
+      );
+    await waitFor(() => expect(readCall()).toBeDefined());
+    expect(await readCall()![0].clone().json()).toEqual({ noticeIds: [5], notificationIds: [9] });
   });
 });
 

@@ -1,24 +1,13 @@
-import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, ChevronsUpDown, House, LogOut, Search, UserRound, X } from 'lucide-react';
+import { ChevronDown, House, X } from 'lucide-react';
 import { Collapsible } from 'radix-ui';
 import { type Ref, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, NavLink, useLocation, useNavigate } from 'react-router';
-import { useAuthSession, useAuthState } from '@/app/auth-context';
+import { Link, NavLink, useLocation } from 'react-router';
+import { useAuthState } from '@/app/auth-context';
 import { navTrail, visibleNav } from '@/app/nav-items';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useCollapsedGroups } from '@/lib/use-collapsed-groups';
-
-const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
 const itemClass = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -29,16 +18,15 @@ const itemClass = ({ isActive }: { isActive: boolean }) =>
   );
 
 /**
- * The menu (ADR-0042): the brand, the search button (Ctrl/⌘+K), «Нүүр», the permitted groups with
- * an icon per page (each group folds, remembered in this browser per user) and the account menu.
- * Exactly one entry is lit: the page's own, or the list a deeper page belongs to (`navTrail`), and
- * it is scrolled into view (ADR-0066). On a phone the same element slides in as a drawer; there is
- * only ever one menu landmark.
+ * «Бүх цэс» (ADR-0042, a drawer since ADR-0114): the brand, «Нүүр» and the permitted groups with an
+ * icon per page (each group folds, remembered in this browser per user), sliding in from the top
+ * bar's ⋮⋮ at every width. Exactly one entry is lit: the page's own, or the list a deeper page
+ * belongs to (`navTrail`), and it is scrolled into view (ADR-0066). While closed it is inert and
+ * hidden, so its links are never in the keyboard order.
  */
 export function Sidebar(props: {
   open: boolean;
   onClose: () => void;
-  onSearch: () => void;
   firstLinkRef: Ref<HTMLAnchorElement>;
 }) {
   const { t } = useTranslation();
@@ -76,16 +64,14 @@ export function Sidebar(props: {
   return (
     <aside
       id="app-sidebar"
+      inert={props.open ? undefined : true}
       className={cn(
-        'fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-sidebar-border bg-sidebar transition-transform duration-200 md:sticky md:top-0 md:z-auto md:h-svh md:w-62 md:max-w-none md:translate-x-0 print:hidden',
-        props.open ? 'translate-x-0 shadow-dialog md:shadow-none' : '-translate-x-full',
+        'fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-sidebar-border bg-sidebar transition-[translate,visibility] duration-200 print:hidden',
+        props.open ? 'visible translate-x-0 shadow-dialog' : 'invisible -translate-x-full',
       )}
     >
       <div className="flex h-14 shrink-0 items-center gap-2 px-4">
-        <Link
-          to="/"
-          className="flex min-w-0 items-center gap-2 rounded-md text-[17px] font-semibold tracking-tight"
-        >
+        <span className="flex min-w-0 items-center gap-2 text-[17px] font-semibold tracking-tight">
           <span
             aria-hidden
             className="grid size-7 shrink-0 place-items-center rounded-lg bg-primary text-sm font-bold text-primary-foreground"
@@ -93,33 +79,16 @@ export function Sidebar(props: {
             {t('app.name').charAt(0)}
           </span>
           {t('app.name')}
-        </Link>
+        </span>
         <Button
           variant="ghost"
           size="icon-sm"
-          className="ml-auto md:hidden"
+          className="ml-auto"
           aria-label={t('shell.closeMenu')}
           onClick={props.onClose}
         >
           <X />
         </Button>
-      </div>
-      <div className="shrink-0 px-3 pb-2">
-        <button
-          type="button"
-          className="flex h-8 w-full items-center gap-2 rounded-lg bg-black/[0.05] px-2.5 text-[13px] text-muted-foreground transition-colors hover:bg-black/[0.08] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none"
-          aria-keyshortcuts="Control+K Meta+K"
-          onClick={props.onSearch}
-        >
-          <Search aria-hidden className="size-4" />
-          <span className="flex-1 text-left">{t('shell.search')}</span>
-          <kbd
-            aria-hidden
-            className="rounded border border-black/10 bg-background px-1 font-sans text-xs text-muted-foreground"
-          >
-            {t(isMac ? 'shell.shortcutMac' : 'shell.shortcut')}
-          </kbd>
-        </button>
       </div>
       <nav
         ref={navRef}
@@ -165,68 +134,6 @@ export function Sidebar(props: {
           </Collapsible.Root>
         ))}
       </nav>
-      <AccountMenu />
     </aside>
-  );
-}
-
-/** The signed-in user at the foot of the menu; the trigger's name is exactly the full name. */
-function AccountMenu() {
-  const { t } = useTranslation();
-  const session = useAuthSession();
-  const state = useAuthState();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  if (state.status !== 'authenticated') return null;
-  const { me } = state;
-  const initials = me.fullName
-    .split(/\s+/u)
-    .map((word) => word.replace(/[^\p{L}\p{N}]/gu, ''))
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word.charAt(0).toUpperCase())
-    .join('');
-  const logout = async () => {
-    await session.logout();
-    queryClient.clear();
-    await navigate('/login?reason=logout', { replace: true });
-  };
-
-  return (
-    <div className="shrink-0 border-t border-sidebar-border p-2">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-black/[0.04] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none aria-expanded:bg-black/[0.04]"
-          >
-            <span
-              aria-hidden
-              className="grid size-8 shrink-0 place-items-center rounded-full bg-secondary text-xs font-semibold text-secondary-foreground"
-            >
-              {initials}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{me.fullName}</span>
-            <ChevronsUpDown aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          side="top"
-          align="start"
-          className="w-(--radix-dropdown-menu-trigger-width) min-w-56"
-        >
-          <DropdownMenuLabel>{me.username}</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => void navigate('/account')}>
-            <UserRound />
-            {t('nav.account')}
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => void logout()}>
-            <LogOut />
-            {t('auth.logout')}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
   );
 }
