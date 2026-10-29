@@ -412,11 +412,17 @@ export const goodsReceiptLines = pgTable(
     expectedQty: qty('expected_qty'),
     /** When the keeper checked the arrived quantity (ADR-0115); NULL while it waits for a check. */
     checkedAt: timestamp('checked_at', { withTimezone: true }),
+    /** The keeper's note on a difference between the expected and the arrived quantity (ADR-0118 #5). */
+    note: text('note'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     index('goods_receipt_lines_receipt_idx').on(t.receiptId, t.id),
+    check(
+      'goods_receipt_lines_note',
+      sql`${t.note} IS NULL OR length(${t.note}) BETWEEN 1 AND 500`,
+    ),
     index('goods_receipt_lines_warehouse_idx').on(t.warehouseId, t.receiptId),
     index('goods_receipt_lines_product_idx').on(t.productId, t.id),
     check(

@@ -45,12 +45,16 @@ export const purchaseOrders = pgTable(
     note: text('note'),
     status: text('status', { enum: PO_SUPPLIER_STATUSES }).notNull().default('PREPARING'),
     createdBy: userRef('created_by'),
+    /** Set by a manager once the order is received (or nothing was ordered); hidden from the list (ADR-0118 #7). */
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    archivedBy: userRef('archived_by'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     unique('purchase_orders_number_key').on(t.number),
     index('purchase_orders_status_idx').on(t.status, t.id),
+    index('purchase_orders_archived_idx').on(t.archivedAt, t.id),
     check('purchase_orders_status', inList(t.status, PO_SUPPLIER_STATUSES)),
     check('purchase_orders_note', sql`${t.note} IS NULL OR length(${t.note}) BETWEEN 1 AND 500`),
   ],
@@ -106,6 +110,12 @@ export const purchaseOrderLines = pgTable(
     qty: qty('qty').notNull(),
     factorSnapshot: factor('factor_snapshot').notNull(),
     qtyBase: qty('qty_base').notNull(),
+    /**
+     * What the supplier shipped, in the line's unit, typed in «Ачигдаж байна» (ADR-0118 #1): NULL
+     * until typed (the receipt then expects the ordered quantity); 0 = not shipped, left out of
+     * the receipt.
+     */
+    shippedQty: qty('shipped_qty'),
     updatedBy: userRef('updated_by'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -114,6 +124,7 @@ export const purchaseOrderLines = pgTable(
     unique('purchase_order_lines_key').on(t.orderSupplierId, t.productId),
     index('purchase_order_lines_product_idx').on(t.productId),
     check('purchase_order_lines_qty', sql`${t.qty} > 0 AND ${t.qtyBase} > 0`),
+    check('purchase_order_lines_shipped', sql`${t.shippedQty} IS NULL OR ${t.shippedQty} >= 0`),
   ],
 );
 

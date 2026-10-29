@@ -12,6 +12,7 @@ import {
   Matches,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import {
@@ -94,6 +95,12 @@ export class ReceiptLineDto {
     description: 'When the keeper checked the count; null while it waits',
   })
   checkedAt: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'The keeper’s note on a difference (ADR-0118)',
+  })
+  note: string | null;
 }
 
 @ApiSchema({ name: 'ReceiptConfirmation' })
@@ -431,6 +438,25 @@ export class UpdateReceiptLineDto {
   @IsOptional()
   @Matches(QTY)
   enteredQty?: string;
+  @ApiPropertyOptional({
+    example: '50',
+    description:
+      'The counted quantity in base units (boxes × pieces, ADR-0118); marks the line checked. Not with enteredQty',
+  })
+  @IsOptional()
+  @Matches(QTY)
+  arrivedQtyBase?: string;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    maxLength: 500,
+    description: 'The keeper’s note on a difference; null clears it',
+  })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(500)
+  note?: string | null;
   @ApiPropertyOptional({ type: String, nullable: true, description: 'null clears the price' })
   @IsOptional()
   @Matches(MONEY)

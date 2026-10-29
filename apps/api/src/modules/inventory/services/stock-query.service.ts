@@ -487,6 +487,15 @@ export class StockQueryService {
     return this.posting.outflow(productIds, from, to);
   }
 
+  /** The outflow per calendar month (ADR-0118): product → warehouse → `YYYY-MM` → base quantity. */
+  outflowByMonth(
+    productIds: readonly number[],
+    from: string,
+    to: string,
+  ): Promise<Map<number, Map<number, Map<string, Decimal>>>> {
+    return this.posting.outflowByMonth(productIds, from, to);
+  }
+
   /** Warehouse balances per product (warehouses holding or reserving none left out). */
   balancesOf(productIds: readonly number[]): Promise<Map<number, WarehouseBalance[]>> {
     return this.balances(productIds);

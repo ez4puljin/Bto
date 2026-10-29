@@ -1,4 +1,5 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { XLSX_CONTENT_TYPE } from '@tugeel/shared/files';
 import { businessYear } from '@tugeel/shared/time';
 import type { Client } from 'pg';
 import request from 'supertest';
@@ -13,9 +14,16 @@ interface SupplierJson {
   status: string;
   ordererId: number | null;
   lineCount: number;
+  shippedBase: string;
+  arrivedBase: string | null;
   estimatedCost: string | null;
+  finalAmount: string | null;
+  priceDiffCount: number | null;
   receiptId: number | null;
   canEdit: boolean;
+  canShip: boolean;
+  canCount: boolean;
+  canPrice: boolean;
   canMoveNext: boolean;
   canMoveBack: boolean;
 }
@@ -23,6 +31,9 @@ interface OrderJson {
   id: number;
   number: string;
   status: string;
+  updatedAt: string;
+  archivedAt: string | null;
+  canArchive: boolean;
   suppliers: SupplierJson[];
 }
 interface RowJson {
@@ -32,17 +43,39 @@ interface RowJson {
   onHand: string;
   minQty: string | null;
   lastMonthOut: string;
+  sales: { avg12: string; avg3: string; lastMonth: string; sameMonthLastYear: string };
   lastBasePrice?: string | null;
-  line: { productUnitId: number; qty: string; qtyBase: string } | null;
+  line: { productUnitId: number; qty: string; qtyBase: string; shippedQty: string | null } | null;
   editable: boolean;
+  canShip: boolean;
+  receipt: {
+    lineId: number;
+    expectedBase: string | null;
+    arrivedBase: string | null;
+    note: string | null;
+    confirmed: boolean;
+    canCount: boolean;
+    previousUnitPrice?: string | null;
+  } | null;
+  extra: boolean;
+}
+interface RowsJson {
+  data: RowJson[];
+  total: number;
+  rights: { order: boolean; shipped: boolean; count: boolean; price: boolean };
+  receipt: { id: number; costingVersion: number } | null;
+  extra: RowJson[];
 }
 interface ReceiptLineJson {
   id: number;
   productId: number;
+  productUnitId: number;
   warehouseId: number;
   enteredQty: string;
+  qtyBase: string;
   expectedQty: string | null;
   checkedAt: string | null;
+  note: string | null;
   binCode: string;
   docUnitPrice?: string | null;
 }
@@ -56,14 +89,28 @@ interface ReceiptJson {
   confirmations: { warehouseId: number }[];
   lines: ReceiptLineJson[];
 }
+interface HistoryJson {
+  data: {
+    kind: string;
+    userId: number | null;
+    productId: number | null;
+    supplierId: number | null;
+    from: string | null;
+    to: string | null;
+    detail: string | null;
+  }[];
+  nextCursor: string | null;
+}
 
 /**
- * Purchase orders → receipts (slice 1, ADR-0115): an order by supplier, quantities typed by the
- * orderer, a manager or a keeper (own warehouse, «Бэлдэж» only), saved cell by cell against the
- * value the page opened with; «Ирсэн» makes a draft receipt expecting the ordered quantities at
- * the last prices; each warehouse's keeper checks and confirms their lines, the last confirmation
- * posts onto the sellable «Тавиургүй» shelf; only the accountant's price check (within 1₮ of the
- * delivery note) makes the supplier's bill. Synthetic data only.
+ * Purchase orders → receipts (slice 1, ADR-0115; slice 1b, ADR-0118): an order by supplier,
+ * quantities typed by the orderer, a manager or a keeper (own warehouse, «Бэлдэж» only), saved
+ * cell by cell against the value the page opened with; the shipped quantities typed in «Ачигдаж
+ * байна»; «Ирсэн» makes a draft receipt expecting the shipped quantities at the last prices; each
+ * warehouse's keeper counts (boxes × pieces on the order page, or the scanner screen) and confirms
+ * their lines, the last confirmation posts onto the sellable «Тавиургүй» shelf; only the
+ * accountant's price check (within 1₮ of the delivery note) makes the supplier's bill; the history
+ * shows every step; a received order is archived. Synthetic data only.
  */
 describe('purchase orders and receiving', () => {
   let app: NestExpressApplication;
@@ -74,6 +121,7 @@ describe('purchase orders and receiving', () => {
   let ordererId: number;
   let keeper1: string;
   let keeper2: string;
+  let keeper2Id: number;
   let accountant: string;
   let office: string;
   let wh1: WarehouseJson;
@@ -100,10 +148,20 @@ describe('purchase orders and receiving', () => {
         .get(`/api/v1/purchase-orders/${id}/suppliers/${supplierId}/rows${query}`)
         .set(bearer(token))
         .expect(200)
-    ).body as { data: RowJson[]; total: number };
+    ).body as RowsJson;
+  const rowOf = (page: RowsJson, productId: number) => {
+    const row = page.data.find((candidate) => candidate.productId === productId);
+    if (!row) throw new Error(`no row of ${productId}`);
+    return row;
+  };
   const save = (token: string, id: number, supplierId: number, changes: unknown[]) =>
     http()
       .put(`/api/v1/purchase-orders/${id}/suppliers/${supplierId}/lines`)
+      .set(bearer(token))
+      .send({ changes });
+  const arrivals = (token: string, id: number, supplierId: number, changes: unknown[]) =>
+    http()
+      .put(`/api/v1/purchase-orders/${id}/suppliers/${supplierId}/arrivals`)
       .set(bearer(token))
       .send({ changes });
   const move = (token: string, id: number, supplierId: number, to: string) =>
@@ -123,6 +181,13 @@ describe('purchase orders and receiving', () => {
     http().patch(`/api/v1/receipt-lines/${lineId}`).set(bearer(token)).send({ enteredQty });
   const confirm = (token: string, id: number) =>
     http().post(`/api/v1/receipts/${id}/post`).set(bearer(token)).set(idempotency());
+  const history = async (token: string, id: number, query = '') =>
+    (
+      await http()
+        .get(`/api/v1/purchase-orders/${id}/history${query}`)
+        .set(bearer(token))
+        .expect(200)
+    ).body as HistoryJson;
   const sellable = async (productId: number, warehouseId: number) =>
     (
       await sql.query<{ sellable_on_hand: string }>(
@@ -139,6 +204,13 @@ describe('purchase orders and receiving', () => {
           .expect(200)
       ).body as { balance: string }
     ).balance;
+  const ordered = (product: ProductJson, qty: string, unit = 'PCS') => ({
+    productId: product.id,
+    productUnitId: unitOf(product, unit).id,
+    qty,
+    previousUnitId: null,
+    previousQty: null,
+  });
 
   beforeAll(async () => {
     app = await createHttpApp();
@@ -156,7 +228,9 @@ describe('purchase orders and receiving', () => {
     orderer = ordererUser.token;
     ordererId = ordererUser.id;
     keeper1 = (await as(['WAREHOUSE'], [wh1.id])).token;
-    keeper2 = (await as(['WAREHOUSE'], [wh2.id])).token;
+    const keeper2User = await as(['WAREHOUSE'], [wh2.id]);
+    keeper2 = keeper2User.token;
+    keeper2Id = keeper2User.id;
     accountant = (await as(['ACCOUNTANT'])).token;
     office = (await as(['OFFICE'])).token;
     const partners = partnersApi(app, admin);
@@ -255,6 +329,7 @@ describe('purchase orders and receiving', () => {
     ).body as OrderJson;
     expect(created.number).toMatch(new RegExp(`^PO-${businessYear()}-\\d{6}$`));
     expect(created.status).toBe('PREPARING');
+    expect(created.canArchive).toBe(true); // nothing ordered yet
     const id = created.id;
 
     // The grid lists the supplier's main products with what Bto knows beside them.
@@ -262,86 +337,66 @@ describe('purchase orders and receiving', () => {
     expect(grid.data.map((row) => row.productId).sort()).toEqual(
       [juice.id, flour.id, salt.id].sort(),
     );
-    const juiceRow = grid.data.find((row) => row.productId === juice.id);
+    expect(grid.rights).toEqual({ order: true, shipped: false, count: false, price: false });
+    expect(grid.receipt).toBeNull();
+    const juiceRow = rowOf(grid, juice.id);
     expect(juiceRow).toMatchObject({
       homeWarehouseId: wh1.id,
       onHand: '10',
       minQty: '30',
       lastMonthOut: '0',
+      sales: { avg12: '0', avg3: '0', lastMonth: '0', sameMonthLastYear: '0' },
       lastBasePrice: '1200.00',
       line: null,
       editable: true,
+      canShip: false,
+      receipt: null,
+      extra: false,
     });
-    // Keepers never see prices; the below-minimum filter keeps juice (10 < 30).
+    // Keepers never see prices; the below-minimum filter keeps juice (10 < 30); the warehouse filter PW2 keeps salt.
     expect((await rows(keeper1, id, supplierA)).data[0]).not.toHaveProperty('lastBasePrice');
     expect((await rows(manager, id, supplierA, '?filter=BELOW_MIN')).data).toHaveLength(1);
+    expect(
+      (await rows(manager, id, supplierA, `?warehouseId=${wh2.id}`)).data.map((r) => r.productId),
+    ).toEqual([salt.id]);
 
     const box = unitOf(juice, 'BOX').id;
+    const before = (await order(manager, id)).updatedAt;
     // The orderer types juice in boxes; keeper 2 types salt (their warehouse) but not flour.
     expect(
-      (
-        await save(orderer, id, supplierA, [
-          {
-            productId: juice.id,
-            productUnitId: box,
-            qty: '5',
-            previousUnitId: null,
-            previousQty: null,
-          },
-        ]).expect(200)
-      ).body,
+      (await save(orderer, id, supplierA, [ordered(juice, '5', 'BOX')]).expect(200)).body,
     ).toEqual({ applied: 1, conflicts: [], refused: [] });
     expect(
-      (
-        await save(keeper2, id, supplierA, [
-          {
-            productId: salt.id,
-            productUnitId: unitOf(salt, 'PCS').id,
-            qty: '40',
-            previousUnitId: null,
-            previousQty: null,
-          },
-          {
-            productId: flour.id,
-            productUnitId: unitOf(flour, 'PCS').id,
-            qty: '20',
-            previousUnitId: null,
-            previousQty: null,
-          },
-        ]).expect(200)
-      ).body,
+      (await save(keeper2, id, supplierA, [ordered(salt, '40'), ordered(flour, '20')]).expect(200))
+        .body,
     ).toEqual({ applied: 1, conflicts: [], refused: [{ productId: flour.id, reason: 'SCOPE' }] });
     // A stale page: the manager opened juice empty and is skipped, the orderer's 5 boxes stay.
     expect(
       (
         await save(manager, id, supplierA, [
-          {
-            productId: juice.id,
-            productUnitId: box,
-            qty: '9',
-            previousUnitId: null,
-            previousQty: null,
-          },
-          {
-            productId: flour.id,
-            productUnitId: unitOf(flour, 'PCS').id,
-            qty: '20',
-            previousUnitId: null,
-            previousQty: null,
-          },
+          ordered(juice, '9', 'BOX'),
+          ordered(flour, '20'),
         ]).expect(200)
       ).body,
     ).toEqual({
       applied: 1,
-      conflicts: [{ productId: juice.id, productUnitId: box, qty: '5' }],
+      conflicts: [{ productId: juice.id, field: 'ORDERED', productUnitId: box, qty: '5' }],
       refused: [],
     });
+    // The version the page polls moved with the saves.
+    const version = (
+      await http().get(`/api/v1/purchase-orders/${id}/version`).set(bearer(office)).expect(200)
+    ).body as { updatedAt: string; receiptsUpdatedAt: string | null };
+    expect(version.updatedAt > before).toBe(true);
+    expect(version.receiptsUpdatedAt).toBeNull();
     let detail = supplierOf(await order(manager, id), supplierA);
     expect(detail).toMatchObject({ lineCount: 3, ordererId, canEdit: true, canMoveNext: true });
     // Estimated cost: 60 juice × 1,200₮ (the others have no price yet).
     expect(detail.estimatedCost).toBe('72000.00');
+    expect((await order(manager, id)).canArchive).toBe(false);
 
-    // «Илгээсэн»: keepers may no longer type, the orderer still may; nobody but a manager steps back.
+    // «Илгээсэн»: keepers may no longer type, the orderer still may; nobody but a manager steps back;
+    // shipped quantities are not taken yet.
     await move(orderer, id, supplierA, 'SENT').expect(200);
     await save(keeper2, id, supplierA, [
       {
@@ -353,32 +408,125 @@ describe('purchase orders and receiving', () => {
       },
     ]).expect(409);
     await move(orderer, id, supplierA, 'PREPARING').expect(403);
+    const shipped = (qty: string | null, previousQty: string | null = null) => ({
+      productId: juice.id,
+      field: 'SHIPPED',
+      productUnitId: null,
+      qty,
+      previousUnitId: null,
+      previousQty,
+    });
+    expect(
+      ((await save(orderer, id, supplierA, [shipped('4')]).expect(409)).body as { params: unknown })
+        .params,
+    ).toMatchObject({ reason: 'SHIPPED' });
+
+    // «Ачигдаж байна»: the orderer types what the supplier shipped (4 of the 5 boxes of juice);
+    // a keeper may not; a stale shipped cell is a conflict; a product not ordered is refused.
+    await move(orderer, id, supplierA, 'SHIPPING').expect(200);
+    expect((await rows(orderer, id, supplierA)).rights).toMatchObject({
+      order: true,
+      shipped: true,
+    });
+    await save(keeper2, id, supplierA, [shipped('3')]).expect(409);
+    expect(
+      (
+        await save(orderer, id, supplierA, [
+          shipped('4'),
+          { ...shipped('1'), productId: soap.id },
+        ]).expect(200)
+      ).body,
+    ).toEqual({ applied: 1, conflicts: [], refused: [{ productId: soap.id, reason: 'NO_LINE' }] });
+    expect((await save(orderer, id, supplierA, [shipped('3')]).expect(200)).body).toEqual({
+      applied: 0,
+      conflicts: [{ productId: juice.id, field: 'SHIPPED', productUnitId: box, qty: '4' }],
+      refused: [],
+    });
+    expect(rowOf(await rows(manager, id, supplierA), juice.id).line?.shippedQty).toBe('4');
+    expect(supplierOf(await order(manager, id), supplierA).shippedBase).toBe('48');
     await move(orderer, id, supplierA, 'IN_TRANSIT').expect(200);
     // An empty supplier cannot move on; the order shows the lowest status.
     await move(manager, id, supplierB, 'SENT').expect(409);
     expect((await order(manager, id)).status).toBe('PREPARING');
 
-    // «Ирсэн» makes the draft receipt: the ordered quantities expected, the last prices filled in.
+    // «Ирсэн» makes the draft receipt: the shipped quantity expected (the ordered one where none
+    // was typed), the last prices filled in.
     await move(orderer, id, supplierA, 'ARRIVED').expect(200);
     detail = supplierOf(await order(manager, id), supplierA);
     expect(detail.status).toBe('ARRIVED');
+    expect(detail.arrivedBase).toBe('0');
     const receiptId = detail.receiptId as number;
     let draft = await receipt(admin, receiptId);
     expect(draft).toMatchObject({ status: 'DRAFT', origin: 'ORDER', originRef: created.number });
-    expect(lineOf(draft, juice.id)).toMatchObject({
-      expectedQty: '5',
+    const juiceLine = lineOf(draft, juice.id);
+    expect(juiceLine).toMatchObject({
+      expectedQty: '4',
       enteredQty: '0',
       checkedAt: null,
       warehouseId: wh1.id,
       docUnitPrice: '14400.00',
+      note: null,
     });
+    expect(lineOf(draft, salt.id).expectedQty).toBe('40');
     // The order's draft is cancelled only through the order.
     await http().post(`/api/v1/receipts/${receiptId}/cancel`).set(bearer(admin)).expect(409);
 
-    // Keeper 1 checks their lines; keeper 2 has not counted salt yet.
-    await count(keeper1, lineOf(draft, juice.id).id, '4').expect(200);
+    // On the order page: keeper 1 counts juice as 4 boxes + 2 loose pieces (50) with a note on the
+    // difference; the line is now counted in pieces, its expectation and price converted.
+    const page1 = await rows(keeper1, id, supplierA);
+    expect(page1.rights).toMatchObject({ order: false, shipped: false, count: true, price: false });
+    expect(page1.receipt).toMatchObject({ id: receiptId, costingVersion: 0 });
+    expect(rowOf(page1, juice.id).receipt).toMatchObject({
+      lineId: juiceLine.id,
+      expectedBase: '48',
+      arrivedBase: null,
+      canCount: true,
+    });
+    expect(rowOf(await rows(keeper2, id, supplierA), juice.id).receipt?.canCount).toBe(false);
+    expect(
+      (
+        await arrivals(keeper1, id, supplierA, [
+          {
+            lineId: juiceLine.id,
+            arrivedQtyBase: '50',
+            note: 'Нэг хайрцаг задгай ирсэн',
+            previousArrivedQtyBase: null,
+          },
+        ]).expect(200)
+      ).body,
+    ).toEqual({ applied: 1, conflicts: [], refused: [] });
+    draft = await receipt(admin, receiptId);
+    expect(lineOf(draft, juice.id)).toMatchObject({
+      productUnitId: unitOf(juice, 'PCS').id,
+      enteredQty: '50',
+      qtyBase: '50',
+      expectedQty: '48',
+      docUnitPrice: '1200.00',
+      note: 'Нэг хайрцаг задгай ирсэн',
+    });
+    expect(lineOf(draft, juice.id).checkedAt).not.toBeNull();
+    // Keeper 2 may not count PW1's line; a stale page is told what the line holds now.
+    expect(
+      (
+        await arrivals(keeper2, id, supplierA, [
+          { lineId: juiceLine.id, arrivedQtyBase: '49', previousArrivedQtyBase: null },
+        ]).expect(200)
+      ).body,
+    ).toEqual({ applied: 0, conflicts: [], refused: [{ lineId: juiceLine.id, reason: 'SCOPE' }] });
+    expect(
+      (
+        await arrivals(keeper1, id, supplierA, [
+          { lineId: juiceLine.id, arrivedQtyBase: '49', previousArrivedQtyBase: null },
+        ]).expect(200)
+      ).body,
+    ).toEqual({
+      applied: 0,
+      conflicts: [{ lineId: juiceLine.id, arrivedQtyBase: '50', note: 'Нэг хайрцаг задгай ирсэн' }],
+      refused: [],
+    });
+    // Keeper 1's other line comes through the scanner screen: flour «ирээгүй».
     await confirm(keeper1, receiptId).expect(409); // flour unchecked
-    await count(keeper1, lineOf(draft, flour.id).id, '0').expect(200); // «ирээгүй»
+    await count(keeper1, lineOf(draft, flour.id).id, '0').expect(200);
     await http()
       .patch(`/api/v1/receipts/${receiptId}`)
       .set(bearer(keeper1))
@@ -387,35 +535,59 @@ describe('purchase orders and receiving', () => {
     draft = (await confirm(keeper1, receiptId).expect(200)).body as ReceiptJson;
     expect(draft.status).toBe('DRAFT');
     expect(draft.confirmations.map((row) => row.warehouseId)).toEqual([wh1.id]);
-    // PW1's lines are frozen now.
+    // PW1's lines are frozen now, on both screens.
     await count(keeper1, lineOf(draft, juice.id).id, '5').expect(409);
+    expect(
+      (
+        await arrivals(keeper1, id, supplierA, [
+          { lineId: juiceLine.id, arrivedQtyBase: '50', previousArrivedQtyBase: '50' },
+        ]).expect(200)
+      ).body,
+    ).toEqual({
+      applied: 0,
+      conflicts: [],
+      refused: [{ lineId: juiceLine.id, reason: 'CONFIRMED' }],
+    });
 
-    // Keeper 2's count: 35 salt, plus a product not on the order scanned in.
-    await count(keeper2, lineOf(draft, salt.id).id, '35').expect(200);
+    // A manager counts any line: 35 salt; keeper 2 scans in a product not on the order.
+    expect(
+      (
+        await arrivals(manager, id, supplierA, [
+          { lineId: lineOf(draft, salt.id).id, arrivedQtyBase: '35', previousArrivedQtyBase: null },
+        ]).expect(200)
+      ).body,
+    ).toMatchObject({ applied: 1 });
     await http()
       .post(`/api/v1/receipts/${receiptId}/lines`)
       .set(bearer(keeper2))
       .send({ productUnitId: unitOf(soap, 'PCS').id, enteredQty: '6' })
       .expect(201);
-    // The note says 83 pieces; 48 + 35 + 6 = 89 are counted.
+    const page2 = await rows(manager, id, supplierA);
+    expect(page2.extra.map((row) => [row.productId, row.extra])).toEqual([[soap.id, true]]);
+    expect(supplierOf(await order(manager, id), supplierA).arrivedBase).toBe('91');
+    // The note says 83 pieces; 50 + 35 + 6 = 91 are counted.
     expect(((await confirm(keeper2, receiptId).expect(422)).body as { code: string }).code).toBe(
       'RECEIPT_NOTE_QTY_MISMATCH',
     );
     await http()
       .patch(`/api/v1/receipts/${receiptId}`)
       .set(bearer(keeper2))
-      .send({ noteTotalQty: '89' })
+      .send({ noteTotalQty: '91' })
       .expect(200);
     const posted = (await confirm(keeper2, receiptId).expect(200)).body as ReceiptJson;
     expect(posted).toMatchObject({ status: 'POSTED', costingStatus: 'PENDING' });
     // On sale at once, on the «Тавиургүй» shelf; nothing booked for the supplier yet.
     expect(lineOf(posted, juice.id).binCode).toBe('NOSHELF');
-    expect(await sellable(juice.id, wh1.id)).toBe('58.000');
+    expect(await sellable(juice.id, wh1.id)).toBe('60.000');
     expect(await sellable(salt.id, wh2.id)).toBe('35.000');
     expect(supplierOf(await order(manager, id), supplierA).status).toBe('ACCOUNTING');
     expect(await supplierBalance(supplierA)).toBe('12000.00');
 
-    // The accountant's price check: the previous price beside the new one.
+    // The accountant's price check, from the order page: the previous price beside the new one.
+    const page3 = await rows(accountant, id, supplierA);
+    expect(page3.rights).toMatchObject({ count: false, price: true });
+    expect(rowOf(page3, juice.id).receipt?.previousUnitPrice).toBe('1200.00');
+    expect(page3.receipt?.costingVersion).toBe(0);
     const costing = (
       await http().get(`/api/v1/receipts/${receiptId}/costing`).set(bearer(accountant)).expect(200)
     ).body as {
@@ -423,9 +595,6 @@ describe('purchase orders and receiving', () => {
     };
     expect(costing.lines.map((line) => line.productId).sort()).toEqual(
       [juice.id, salt.id, soap.id].sort(),
-    );
-    expect(costing.lines.find((line) => line.productId === juice.id)?.previousUnitPrice).toBe(
-      '14400.00',
     );
     const lineId = (productId: number) =>
       costing.lines.find((line) => line.productId === productId)?.lineId;
@@ -457,11 +626,124 @@ describe('purchase orders and receiving', () => {
       .set(idempotency())
       .send({ ...prices('3000'), noteTotalAmount: '60600.50' })
       .expect(200);
-    expect(supplierOf(await order(manager, id), supplierA).status).toBe('RECEIVED');
+    detail = supplierOf(await order(accountant, id), supplierA);
+    expect(detail).toMatchObject({
+      status: 'RECEIVED',
+      finalAmount: '60600.00',
+      priceDiffCount: 1, // juice: 1,152₮ a piece against 1,200₮ before
+      canPrice: false,
+    });
     // The bill: 12,000 before plus 60,600 now.
     expect(await supplierBalance(supplierA)).toBe('72600.00');
     // Supplier B is still «Бэлдэж»: the order stays there.
     expect((await order(office, id)).status).toBe('PREPARING');
+
+    // The history holds every step, newest first, and filters by product and by user.
+    const all = await history(office, id);
+    const kinds = all.data.map((row) => row.kind);
+    for (const kind of [
+      'CREATED',
+      'ORDER_QTY',
+      'STATUS',
+      'SHIPPED_QTY',
+      'ARRIVED_QTY',
+      'LINE_NOTE',
+      'LINE_ADDED',
+      'RECEIPT_CONFIRMED',
+      'RECEIPT_POSTED',
+      'PRICES',
+    ]) {
+      expect(kinds).toContain(kind);
+    }
+    expect(all.data.filter((row) => row.kind === 'STATUS')).toHaveLength(6);
+    expect(
+      all.data.find((row) => row.kind === 'SHIPPED_QTY' && row.productId === juice.id),
+    ).toMatchObject({ from: null, to: expect.stringMatching(/^4 /) as string });
+    expect(
+      all.data.filter((row) => row.kind === 'ARRIVED_QTY').map((row) => [row.productId, row.to]),
+    ).toEqual(
+      expect.arrayContaining([
+        [juice.id, '50'],
+        [flour.id, '0'],
+        [salt.id, '35'],
+      ]),
+    );
+    const juiceHistory = await history(office, id, `?productId=${juice.id}`);
+    expect(juiceHistory.data.length).toBeGreaterThan(0);
+    expect(juiceHistory.data.every((row) => row.productId === juice.id)).toBe(true);
+    expect(juiceHistory.data.map((row) => row.kind)).toEqual(
+      expect.arrayContaining(['ORDER_QTY', 'SHIPPED_QTY', 'ARRIVED_QTY', 'LINE_NOTE', 'PRICES']),
+    );
+    const keeper2History = await history(office, id, `?userId=${keeper2Id}`);
+    expect(keeper2History.data.every((row) => row.userId === keeper2Id)).toBe(true);
+    expect(keeper2History.data.map((row) => row.kind)).toEqual(
+      expect.arrayContaining(['ORDER_QTY', 'LINE_ADDED', 'RECEIPT_CONFIRMED', 'RECEIPT_POSTED']),
+    );
+    // The two Excel files.
+    for (const path of ['history.xlsx', 'export.xlsx']) {
+      const file = await http()
+        .get(`/api/v1/purchase-orders/${id}/${path}`)
+        .set(bearer(accountant))
+        .buffer(true)
+        .parse((res, done) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (chunk: Buffer) => chunks.push(chunk));
+          res.on('end', () => done(null, Buffer.concat(chunks)));
+        })
+        .expect(200);
+      expect(file.headers['content-type']).toContain(XLSX_CONTENT_TYPE);
+      expect((file.body as Buffer).length).toBeGreaterThan(1000);
+    }
+
+    // Archiving waits for the whole order: supplier B still prepares, so it is refused; without
+    // supplier B the order is received, archived, out of the list, and back again.
+    expect(
+      (
+        (
+          await http()
+            .post(`/api/v1/purchase-orders/${id}/archive`)
+            .set(bearer(manager))
+            .set(idempotency())
+            .expect(409)
+        ).body as { code: string }
+      ).code,
+    ).toBe('PO_NOT_ARCHIVABLE');
+    await http()
+      .delete(`/api/v1/purchase-orders/${id}/suppliers/${supplierB}`)
+      .set(bearer(manager))
+      .expect(200);
+    expect((await order(manager, id)).status).toBe('RECEIVED');
+    await http()
+      .post(`/api/v1/purchase-orders/${id}/archive`)
+      .set(bearer(office))
+      .set(idempotency())
+      .expect(403);
+    const archived = (
+      await http()
+        .post(`/api/v1/purchase-orders/${id}/archive`)
+        .set(bearer(manager))
+        .set(idempotency())
+        .expect(200)
+    ).body as OrderJson;
+    expect(archived.archivedAt).not.toBeNull();
+    expect(archived.suppliers[0]?.canMoveBack).toBe(false);
+    const listed = async (query: string) =>
+      (
+        (await http().get(`/api/v1/purchase-orders${query}`).set(bearer(office)).expect(200))
+          .body as { data: { id: number }[] }
+      ).data.map((row) => row.id);
+    expect(await listed('')).not.toContain(id);
+    expect(await listed('?archived=true')).toContain(id);
+    await http()
+      .post(`/api/v1/purchase-orders/${id}/unarchive`)
+      .set(bearer(manager))
+      .set(idempotency())
+      .expect(200);
+    expect(await listed('')).toContain(id);
+    expect((await history(office, id)).data.slice(0, 2).map((row) => row.kind)).toEqual([
+      'UNARCHIVED',
+      'ARCHIVED',
+    ]);
   });
 
   it('steps back from «Ирсэн» by cancelling the untouched draft, never after a confirmation', async () => {
@@ -474,18 +756,27 @@ describe('purchase orders and receiving', () => {
         .expect(201)
     ).body as OrderJson;
     await save(manager, created.id, supplierA, [
+      ordered(salt, '10'),
+      ordered(juice, '1', 'BOX'),
+    ]).expect(200);
+    await move(manager, created.id, supplierA, 'SENT').expect(200);
+    await move(manager, created.id, supplierA, 'SHIPPING').expect(200);
+    // Juice was not shipped at all: it is left out of the receipt.
+    await save(manager, created.id, supplierA, [
       {
-        productId: salt.id,
-        productUnitId: unitOf(salt, 'PCS').id,
-        qty: '10',
+        productId: juice.id,
+        field: 'SHIPPED',
+        productUnitId: null,
+        qty: '0',
         previousUnitId: null,
         previousQty: null,
       },
     ]).expect(200);
-    for (const to of ['SENT', 'IN_TRANSIT', 'ARRIVED']) {
+    for (const to of ['IN_TRANSIT', 'ARRIVED']) {
       await move(manager, created.id, supplierA, to).expect(200);
     }
     const first = supplierOf(await order(manager, created.id), supplierA).receiptId as number;
+    expect((await receipt(admin, first)).lines.map((line) => line.productId)).toEqual([salt.id]);
     await move(manager, created.id, supplierA, 'IN_TRANSIT').expect(200);
     expect((await receipt(admin, first)).status).toBe('CANCELLED');
     await move(manager, created.id, supplierA, 'ARRIVED').expect(200);
@@ -502,5 +793,34 @@ describe('purchase orders and receiving', () => {
     // Posted now: the order can no longer step back.
     await move(manager, created.id, supplierA, 'ARRIVED').expect(409);
     expect(supplierOf(await order(manager, created.id), supplierA).status).toBe('ACCOUNTING');
+  });
+
+  it('refuses «Ирсэн» when the supplier shipped nothing at all', async () => {
+    const created = (
+      await http()
+        .post('/api/v1/purchase-orders')
+        .set(bearer(manager))
+        .set(idempotency())
+        .send({ supplierIds: [supplierA] })
+        .expect(201)
+    ).body as OrderJson;
+    await save(manager, created.id, supplierA, [ordered(salt, '3')]).expect(200);
+    for (const to of ['SENT', 'SHIPPING'])
+      await move(manager, created.id, supplierA, to).expect(200);
+    await save(manager, created.id, supplierA, [
+      {
+        productId: salt.id,
+        field: 'SHIPPED',
+        productUnitId: null,
+        qty: '0',
+        previousUnitId: null,
+        previousQty: null,
+      },
+    ]).expect(200);
+    await move(manager, created.id, supplierA, 'IN_TRANSIT').expect(200);
+    expect(
+      ((await move(manager, created.id, supplierA, 'ARRIVED').expect(409)).body as { code: string })
+        .code,
+    ).toBe('PO_SUPPLIER_EMPTY');
   });
 });

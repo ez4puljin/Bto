@@ -51,6 +51,7 @@ import { UsersService } from './services/users.service';
 import { StorageUrlSigner } from './storage/url-signer';
 
 const CORE_SERVICES = [
+  AuditQueryService,
   AuditService,
   CustomerAccountsService,
   CustomerLoginLimiter,
@@ -129,7 +130,6 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
   providers: [
     IdentityBootstrap,
     AccessService,
-    AuditQueryService,
     AuthService,
     CustomerAccessService,
     CustomerAuthService,

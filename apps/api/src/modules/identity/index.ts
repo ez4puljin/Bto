@@ -22,6 +22,11 @@ export { IdempotencyKey, Idempotent } from './interceptors/idempotency.intercept
 export type { CustomerUserStatus } from './schema';
 export { type AuditEntry, AuditService } from './services/audit.service';
 export {
+  AuditQueryService,
+  type AuditRow,
+  type AuditTargets,
+} from './services/audit-query.service';
+export {
   type CustomerAccountView,
   CustomerAccountsService,
 } from './services/customer-accounts.service';

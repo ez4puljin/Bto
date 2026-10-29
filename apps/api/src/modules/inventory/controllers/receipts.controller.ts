@@ -307,6 +307,10 @@ export class ReceiptLinesController {
     return detail(ctx)(
       await this.receipts.updateLine(ctx, id, {
         ...(body.enteredQty === undefined ? {} : { enteredQty: new Decimal(body.enteredQty) }),
+        ...(body.arrivedQtyBase === undefined
+          ? {}
+          : { arrivedQtyBase: new Decimal(body.arrivedQtyBase) }),
+        ...(body.note === undefined ? {} : { note: body.note }),
         ...(body.docUnitPrice === undefined ? {} : { docUnitPrice: money(body.docUnitPrice) }),
         ...(body.docAmount === undefined ? {} : { docAmount: money(body.docAmount) }),
         ...(body.freeGoods === undefined ? {} : { freeGoods: body.freeGoods }),
