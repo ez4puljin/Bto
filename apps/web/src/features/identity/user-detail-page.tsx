@@ -325,11 +325,11 @@ function UserFacts({ detail }: { detail: UserDetail }) {
       <FieldList
         title={t('users.form.sectionAccount')}
         items={[
+          { label: t('users.form.fullName'), value: detail.fullName },
           {
             label: t('users.form.username'),
             value: <span className="font-mono">{detail.username}</span>,
           },
-          { label: t('users.form.fullName'), value: detail.fullName },
           { label: t('users.form.phone'), value: detail.phone ? localPhone(detail.phone) : null },
         ]}
       />
@@ -350,8 +350,8 @@ function UserFacts({ detail }: { detail: UserDetail }) {
           ...(everywhere
             ? [{ label: t('users.form.scopes'), value: t('users.form.scopeAll') }]
             : [
-                { label: t('users.form.scopeBranches'), value: branchNames || null },
                 { label: t('users.form.scopeWarehouses'), value: warehouseNames || null },
+                { label: t('users.form.scopeBranches'), value: branchNames || null },
               ]),
         ]}
       />

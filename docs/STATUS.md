@@ -138,6 +138,9 @@ When an answer arrives: write the date and the answer in this table, update SPEC
 
 ## Next session
 
+**Staff registration from «Харилцагч» (light change, 2026-10-29, branch `claude/partners-staff-entry`, no migration, no ADR; `docs/modules/identity.md` §9):** `/users` moved from «Систем» to the «Харилцагч» group as «Ажилтан» (a tile on `/m/partners`, the top bar's menu, the search); the users pages say «Ажилтан»; the create dialog reads full name → username → roles (a hint names the seeded roles of a rep, a store seller and a keeper) → warehouses; the code dialog adds the hand-over words (`/set-password`, then the app).
+Owner's clicks on dev (an ADMIN login): home tile «Харилцагч» → tile «Ажилтан» (also the top bar's «Харилцагч» menu and Ctrl+K «Ажилтан») → «Ажилтан бүртгэх» → name, username, tick «Борлуулалтын төлөөлөгч», save → the code dialog shows the code and the hand-over words → the user's page → «Нууц үгийн код олгох» still works; «Систем» ⚙ lists «Дүрүүд» first, no users entry.
+
 **Slices 2 (transfers, ADR-0116, migration `0053_transfer_requests`, branch `claude/slice2-transfers`, a pull request for «Bto удирдлага») and 3 (issues «Зарлага», ADR-0117, migration `0054_issues_confirmed`, merged as PR #36) are built (2026-10-29).** Slice 2 merged main after slice 3: `0053` is journal idx 52 and `0054` idx 53, its snapshot regenerated over 0053's. `pnpm check` green on each branch; nothing migrated on `bto_main` from a worktree.
 
 Slice 2 merged as PR #37 `91b053f`. Done by «Bto удирдлага» on 2026-10-29, after both merges:

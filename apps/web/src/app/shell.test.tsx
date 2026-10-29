@@ -139,6 +139,27 @@ describe('modules (ADR-0114)', () => {
     expect(navTrail('/reports/aging')?.module.key).toBe('finance');
   });
 
+  it('registers staff from «Харилцагч»: the tile, the menu entry, the trail (owner 2026-10-29)', async () => {
+    expect(navTrail('/users/7')).toMatchObject({
+      module: { key: 'partners' },
+      group: { label: 'nav.groups.partners' },
+      item: { to: '/users', label: 'nav.staff' },
+      exact: false,
+    });
+    const systemGroup = NAV_GROUPS.find((group) => group.label === 'nav.groups.system');
+    expect(systemGroup?.items.map((item) => item.to)).not.toContain('/users');
+
+    const user = userEvent.setup();
+    renderApp('/m/partners', signedIn(ADMIN_ME));
+    const partners = within(await screen.findByRole('region', { name: mn.nav.groups.partners }));
+    expect(partners.getByRole('link', { name: mn.nav.staff })).toHaveAttribute('href', '/users');
+    expect(partners.getByRole('link', { name: mn.nav.customers })).toBeInTheDocument();
+    const bar = within(screen.getByRole('navigation', { name: mn.shell.modules }));
+    await user.click(bar.getByRole('button', { name: mn.nav.modules.partners }));
+    const menu = within(await screen.findByRole('menu'));
+    expect(menu.getByRole('menuitem', { name: mn.nav.staff })).toHaveAttribute('href', '/users');
+  });
+
   it('opens a module from the top bar and lists its pages on its own page', async () => {
     const user = userEvent.setup();
     const { router } = renderApp('/', signedIn(ADMIN_ME));
