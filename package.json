@@ -17,6 +17,7 @@
   },
   "scripts": {
     "check": "pnpm run ts:single-version && pnpm run format:check && pnpm run build:packages && pnpm run lint && pnpm run lint:guards && pnpm run typecheck && pnpm run core:standalone && pnpm run gen:api:check && pnpm run db:check && pnpm run test && pnpm run test:integration && pnpm run test:integrity && pnpm run build",
+    "check:quick": "pnpm run build:packages && pnpm run typecheck && pnpm run lint && pnpm run test",
     "ts:single-version": "node scripts/ts-single-version.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

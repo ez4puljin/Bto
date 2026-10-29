@@ -10,14 +10,13 @@ Repo `tugeel`, packages `@tugeel/*`. On screen the system is called **Bto** (Б�
 
 ## Start of every session
 
-1. Read `docs/STATUS.md`: current state, module table, pending decisions, the "Next session" prompt.
-2. Read `docs/SPEC.md` §8 (definition of done + cut line; delivery 1 only — later deliveries use their §9.3 row, the §5 acceptance criteria and the STATUS row), §4 (glossary) and §6 (business rules).
-3. Read `docs/architecture.md` §0 (decision summary, pins), §4 (module ownership) and §12 (conventions, ALWAYS/NEVER),
-   plus the §5 subsection of the module being built.
-4. Read the ADRs listed for the module in `docs/STATUS.md`; never re-argue an Accepted ADR, write a superseding one instead.
-5. Work on ONE module per session; start every implementation session in plan mode.
-6. On a `TODO-VERIFY` item: stop and ask the owner; never resolve a business unknown by guessing.
-7. Before finishing: `pnpm check` green, `docs/modules/<module>.md` current, `docs/STATUS.md` updated with a fresh next-session prompt.
+Pace since 2026-10-29 (ADR-0120): build fast, the owner tests by hand on the development server, fix from what is seen; automated tests stay where stock, money or rights move.
+
+1. Read `docs/STATUS.md` (current state, the "Next session" prompt) and the brief you were given. For a **guarded** change (stock, money, identity, migrations — ADR-0120 #1) also read `docs/architecture.md` §4, §12 and the module's §5 subsection, `docs/modules/<module>.md` and the ADRs the brief names; never re-argue an Accepted ADR, write a superseding one instead. A **light** change (screens, menus, lists, prints, texts) reads `docs/ui.md` and the screen's code.
+2. One slice or screen per session, in its own worktree; start an implementation session in plan mode when the change is guarded or the brief leaves a design choice open.
+3. On a `TODO-VERIFY` item: stop and ask the owner; never resolve a business unknown by guessing. Interview rounds are for new modules; an existing screen is changed from what the owner says after trying it.
+4. Before the pull request: `pnpm check:quick` green (packages, typecheck, lint, unit); a guarded change also runs its integration and integrity suites locally once. The full `pnpm check` is CI's job on the pull request.
+5. Before finishing: `docs/STATUS.md` gets up to three lines (what changed, what the owner clicks on dev, with the test logins' names); a guarded change keeps `docs/modules/<module>.md` current and writes an ADR only when a rule, a structure, a flow or a right changed.
 
 ## Stack and pinned versions
 
@@ -71,13 +70,14 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): producti
 | `pnpm edge:up` / `pnpm edge:down` / `pnpm edge:logs` | the store edge in Docker (ADR-0067; `deploy/edge/.env` from `.env.example`): its PostgreSQL, the edge replaying to the dev api, the till kiosk on `http://<LAN address>:7400`; never touches the tugeel PostgreSQL container |
 | `pnpm --filter @tugeel/api db:migrate:edge` / `edge:dev` | the edge without Docker (`apps/api/.env.edge`): migrate its database / watch it on port 3400; the kiosk is then `http://localhost:5173/pos.html` (not started by `pnpm dev`) |
 | `pnpm core:standalone` | the Finance Core compiled alone, its file list checked against `tools/finance-core/whitelist.mjs` (ADR-0069 #8); part of `pnpm check` |
+| `pnpm check:quick` | build packages → typecheck → eslint → unit (Jest + Vitest): the check before a pull request (ADR-0120); CI runs the full `pnpm check` |
 | `pnpm check` | ts:single-version → prettier → build packages → eslint → lint-guard self-test → typecheck → core:standalone → gen:api freshness → drizzle-kit check → unit (Jest + Vitest) → integration → integrity (`--runInBand`) → build |
 | `pnpm gen:api` | export OpenAPI from the api build and regenerate `packages/api-client`; commit the result |
 | `pnpm ui:shots -- --out tmp/ui-shots/<name> [--only <regex>]` | with `pnpm dev` running: pictures of every route at 1366×633, 1536×730 and 1920×969 in a headless Chrome or Edge, with layout measurements and a gallery (ADR-0066); signs in with a dev login from a gitignored file (`--logins`), never printed |
 | `pnpm ci:rehearse` / `pnpm docker:build` | run the CI check job in Linux Docker against HEAD / build both images |
 | `pnpm mobile:apk [-- --variant customer]` | a release APK built on this PC: the staff app, or «Bto300» with `--variant customer` (`apps/mobile/variants.json`, ADR-0085) (JDK 17 and the Android SDK in `C:\Android`, a robocopy mirror in `C:\Android\m`; ~10 min, never while `pnpm check` runs); `BTO_SERVER=http://<LAN address>:<port>` sets the server the app starts with; the APK lands in `apps/mobile/build/apk/` (ADR-0061, `docs/modules/mobile.md` §9) |
 
-**`pnpm check` green is the definition of done.** CI runs the same command with a `postgres:18` service; nothing merges red. `apps/api/.env` comes from `apps/api/.env.example` (gitignored).
+**Definition of done (ADR-0120):** `pnpm check:quick` green before the pull request, CI's full `pnpm check` green before the merge (it runs the same command with a `postgres:18` service; nothing merges red), and the owner's walk on the development server. A guarded change (stock, money, identity, migrations) also keeps its integration and integrity suites green locally. `apps/api/.env` comes from `apps/api/.env.example` (gitignored).
 
 ## Conventions (full text in `docs/architecture.md` §6 and §12)
 
