@@ -280,4 +280,4 @@ The owner wrote a user guide of Butenorgil's «Захиалга» menu (kept in 
 8. **Also in:** the order's **history screen** (who, when, which product, from → to, filter by user / supplier / product, Excel), the order's **Excel**, **archiving** finished orders out of the list.
 9. **Not in:** the dashboard, trucks and capacity (a slice of their own), the «Ороогүй бараа» basket dialog (the grid lists every main product), a supervisor role or forced status jumps, products of another supplier in a supplier's group, orders for the stores («Заал») from suppliers — the last two wait for the owner's word.
 
-Reserved for the build: ADR-0118 and migration `0055` (branch `claude/slice1b-order-detail`); it starts when one of the two running slices has opened its PR.
+**Built 2026-10-29** as ADR-0118 with migration `0055_po_detail` on branch `claude/slice1b-order-detail` (`docs/modules/procurement.md`). Assumptions stated there: a shipped quantity of 0 leaves the line out of the receipt; a count with loose pieces is kept in pieces on the receipt line; an order is archivable when received, or when nothing is ordered on any supplier.

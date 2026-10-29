@@ -9,7 +9,7 @@ import {
   previousPoStatus,
 } from '@tugeel/shared/procurement';
 import { businessDate, businessYear } from '@tugeel/shared/time';
-import { and, desc, eq, ilike, inArray, lt, type SQL, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNotNull, isNull, lt, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { escapeLike } from '../../../common/db/like';
@@ -25,7 +25,12 @@ import {
   NumberingService,
   UserNamesService,
 } from '../../identity';
-import { ProductLocationsService, ReceiptsService } from '../../inventory';
+import {
+  ProductLocationsService,
+  type ReceiptCosting,
+  type ReceiptDetail,
+  ReceiptsService,
+} from '../../inventory';
 import { SuppliersService } from '../../partners';
 import {
   purchaseOrderLines,
@@ -35,8 +40,12 @@ import {
 } from '../schema';
 import {
   assertManage,
+  canCount,
+  canPrice,
+  canShip,
   editRight,
   lockOrderSupplier,
+  MANAGE,
   mayMove,
   ordererOf,
   type OrderRow,
@@ -63,13 +72,29 @@ export interface PurchaseOrderSupplierView {
   lineCount: number;
   qtyBase: Decimal;
   weightKg: Decimal;
+  /** Σ shipped quantity in base units (lines with a shipped quantity typed). */
+  shippedBase: Decimal;
+  /** Σ counted base quantity of the receipt's lines (null before the receipt). */
+  arrivedBase: Decimal | null;
+  /** Receipt lines still waiting for the keeper's count. */
+  uncheckedLines: number;
   /** Σ ordered base quantity × each product's last receipt price per base unit (price readers). */
   estimatedCost: Decimal | null;
+  /** The receipt's payable so far (price readers; null before the receipt). */
+  finalAmount: Decimal | null;
+  /** Lines whose price differs from the product's previous one (price readers, posted receipt). */
+  priceDiffCount: number | null;
+  /** The delivery note's totals as typed on the receipt. */
+  noteTotalQty: Decimal | null;
+  noteTotalAmount: Decimal | null;
   /** The draft or posted receipt from «Ирсэн» on. */
   receiptId: number | null;
   receiptNumber: string | null;
   /** What the caller may do now. */
   canEdit: boolean;
+  canShip: boolean;
+  canCount: boolean;
+  canPrice: boolean;
   canMoveNext: boolean;
   canMoveBack: boolean;
 }
@@ -83,6 +108,10 @@ export interface PurchaseOrderDetail {
   createdBy: string | null;
   createdAt: Date;
   updatedAt: Date;
+  archivedAt: Date | null;
+  archivedBy: string | null;
+  /** A manager may archive it now (received, or nothing ordered). */
+  canArchive: boolean;
   suppliers: PurchaseOrderSupplierView[];
 }
 
@@ -94,6 +123,7 @@ export interface PurchaseOrderSummary {
   status: PoSupplierStatus;
   supplierCount: number;
   supplierNames: string[];
+  archivedAt: Date | null;
   createdAt: Date;
 }
 
@@ -102,19 +132,30 @@ export interface PurchaseOrderQuery {
   supplierId?: number;
   /** Orders holding a supplier the caller orders from. */
   mine?: boolean;
+  /** Archived orders only (default: the live ones). */
+  archived?: boolean;
   q?: string;
   cursor?: string;
   limit?: number;
 }
 
+/** What the page polls to learn that someone else changed the order (ADR-0118 #3). */
+export interface PurchaseOrderVersion {
+  updatedAt: Date;
+  /** The latest change of any of its receipts (null before the first receipt). */
+  receiptsUpdatedAt: Date | null;
+}
+
 /**
- * Purchase orders (ADR-0115): one order holds several suppliers, each with its own status; the
- * order shows the lowest. Managers create orders and add or remove suppliers; a manager or the
- * supplier's orderer moves it through «Бэлдэж» → «Илгээсэн» → «Замд» → «Ирсэн», where its draft
- * goods receipt is made with the ordered quantities expected and the last prices filled in; only a
- * manager steps back, from «Ирсэн» only while no keeper confirmed the receipt. The receipt's
- * keepers and accountant move it on («Нягтлан шалгаж», «Орлого авсан») through the inventory hook
- * (`OrderProgressService`). Every write locks the order first, then its supplier rows.
+ * Purchase orders (ADR-0115, ADR-0118): one order holds several suppliers, each with its own
+ * status; the order shows the lowest. Managers create orders and add or remove suppliers; a
+ * manager or the supplier's orderer moves it through «Бэлдэж» → «Илгээсэн» → «Ачигдаж байна» →
+ * «Замд» → «Ирсэн», where its draft goods receipt is made expecting the shipped quantities (the
+ * ordered ones where none was typed) with the last prices filled in; only a manager steps back,
+ * from «Ирсэн» only while no keeper confirmed the receipt. The receipt's keepers and accountant
+ * move it on («Нягтлан шалгаж», «Орлого авсан») through the inventory hook
+ * (`OrderProgressService`). Managers archive a received order out of the list. Every write locks
+ * the order first, then its supplier rows.
  */
 @Injectable()
 export class PurchaseOrdersService {
@@ -259,9 +300,10 @@ export class PurchaseOrdersService {
   }
 
   /**
-   * Moves a supplier one status forward or back (ADR-0115). «Ирсэн» makes its draft receipt; back
-   * from «Ирсэн» cancels it, refused once a keeper confirmed a warehouse. The receipt's own steps
-   * (ACCOUNTING, RECEIVED) are never set here.
+   * Moves a supplier one status forward or back (ADR-0115, ADR-0118). «Ирсэн» makes its draft
+   * receipt expecting the shipped quantities (the ordered ones where none was typed; a line
+   * shipped as 0 is left out); back from «Ирсэн» cancels it, refused once a keeper confirmed a
+   * warehouse. The receipt's own steps (ACCOUNTING, RECEIVED) are never set here.
    */
   move(
     ctx: AuthContext,
@@ -292,7 +334,7 @@ export class PurchaseOrdersService {
       const ordererId = await ordererOf(tx, supplierId);
       if (!mayMove(ctx, ordererId, back)) {
         throw new AppError('FORBIDDEN', 'the supplier is moved by a manager or its orderer', {
-          permission: 'procurement.orders.manage',
+          permission: MANAGE,
         });
       }
       if (back && peek.status === 'ARRIVED' && peek.receiptId !== null) {
@@ -303,6 +345,9 @@ export class PurchaseOrdersService {
         throw new AppError('CONFLICT', `supplier ${supplierId} moved meanwhile`, {
           status: supplier.status,
         });
+      }
+      if (order.archivedAt !== null) {
+        throw new AppError('PO_STATUS_INVALID', `order ${id} is archived`, { status: 'ARCHIVED' });
       }
       let receiptId: number | null =
         back && supplier.status === 'ARRIVED' ? null : supplier.receiptId;
@@ -330,6 +375,50 @@ export class PurchaseOrdersService {
         after: { status: to, receiptId },
       });
       await this.refreshStatus(tx, id);
+      return this.get(ctx, id, tx);
+    });
+  }
+
+  /** Takes a finished order out of the list (ADR-0118 #7): received, or nothing ordered. */
+  archive(ctx: AuthContext, id: number): Promise<PurchaseOrderDetail> {
+    assertManage(ctx);
+    return inTransaction(this.db, async (tx) => {
+      const order = await this.lockOrder(tx, id);
+      if (order.archivedAt !== null) return this.get(ctx, id, tx);
+      if (!(await this.archivable(tx, order))) {
+        throw new AppError('PO_NOT_ARCHIVABLE', `order ${id} is not finished`, {
+          status: order.status,
+        });
+      }
+      await tx
+        .update(purchaseOrders)
+        .set({ archivedAt: sql`now()`, archivedBy: actorUserId(ctx), updatedAt: sql`now()` })
+        .where(eq(purchaseOrders.id, id));
+      await this.audit.record(tx, ctx, {
+        action: 'ARCHIVE',
+        entity: 'purchase_orders',
+        entityId: id,
+        after: { archived: true },
+      });
+      return this.get(ctx, id, tx);
+    });
+  }
+
+  unarchive(ctx: AuthContext, id: number): Promise<PurchaseOrderDetail> {
+    assertManage(ctx);
+    return inTransaction(this.db, async (tx) => {
+      const order = await this.lockOrder(tx, id);
+      if (order.archivedAt === null) return this.get(ctx, id, tx);
+      await tx
+        .update(purchaseOrders)
+        .set({ archivedAt: null, archivedBy: null, updatedAt: sql`now()` })
+        .where(eq(purchaseOrders.id, id));
+      await this.audit.record(tx, ctx, {
+        action: 'UNARCHIVE',
+        entity: 'purchase_orders',
+        entityId: id,
+        after: { archived: false },
+      });
       return this.get(ctx, id, tx);
     });
   }
@@ -388,7 +477,8 @@ export class PurchaseOrdersService {
         product.weightKg,
       ]),
     );
-    const prices = ctx.permissions.has(PRICES)
+    const withPrices = ctx.permissions.has(PRICES);
+    const prices = withPrices
       ? new Map(
           (await this.receipts.lastPrices(productIds, {}, executor)).map((price) => [
             price.productId,
@@ -396,20 +486,27 @@ export class PurchaseOrdersService {
           ]),
         )
       : null;
-    const names = await this.userNames.namesOf([
-      ...orderers.values(),
-      ...(order.createdBy === null ? [] : [order.createdBy]),
-    ]);
-    const receiptNumbers = new Map<number, string | null>();
+    const names = await this.userNames.namesOf(
+      [
+        ...orderers.values(),
+        ...(order.createdBy === null ? [] : [order.createdBy]),
+        ...(order.archivedBy === null ? [] : [order.archivedBy]),
+      ],
+      executor,
+    );
+    const receipts = new Map<number, { detail: ReceiptDetail; costing: ReceiptCosting | null }>();
     for (const row of rows) {
       if (row.receiptId !== null) {
-        receiptNumbers.set(
-          row.receiptId,
-          (await this.receipts.get(row.receiptId, executor)).number,
-        );
+        const detail = await this.receipts.get(row.receiptId, executor);
+        const costing =
+          withPrices && detail.status === 'POSTED'
+            ? await this.receipts.costing(row.receiptId, executor)
+            : null;
+        receipts.set(row.receiptId, { detail, costing });
       }
     }
     const zero = new Decimal(0);
+    const manage = ctx.permissions.has(MANAGE);
     return {
       id: order.id,
       number: order.number,
@@ -419,11 +516,17 @@ export class PurchaseOrdersService {
       createdBy: order.createdBy === null ? null : (names.get(order.createdBy) ?? null),
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
+      archivedAt: order.archivedAt,
+      archivedBy: order.archivedBy === null ? null : (names.get(order.archivedBy) ?? null),
+      canArchive:
+        manage && order.archivedAt === null && (order.status === 'RECEIVED' || lines.length === 0),
       suppliers: rows
         .map((row) => {
           const own = lines.filter((line) => line.orderSupplierId === row.id);
           const ordererId = orderers.get(row.supplierId) ?? null;
           const supplier = suppliers.get(row.supplierId);
+          const receipt = row.receiptId === null ? undefined : receipts.get(row.receiptId);
+          const detail = receipt?.detail;
           return {
             supplierId: row.supplierId,
             supplierCode: supplier?.code ?? '',
@@ -438,6 +541,22 @@ export class PurchaseOrdersService {
               const weight = weights.get(line.productId);
               return weight ? sum.plus(weight.times(line.qtyBase)) : sum;
             }, zero),
+            shippedBase: own.reduce(
+              (sum, line) =>
+                line.shippedQty === null
+                  ? sum
+                  : sum.plus(line.shippedQty.times(line.factorSnapshot)),
+              zero,
+            ),
+            arrivedBase: detail
+              ? detail.lines.reduce(
+                  (sum, line) => (line.checkedAt === null ? sum : sum.plus(line.qtyBase)),
+                  zero,
+                )
+              : null,
+            uncheckedLines: detail
+              ? detail.lines.filter((line) => line.checkedAt === null).length
+              : 0,
             estimatedCost: prices
               ? own
                   .reduce((sum, line) => {
@@ -446,16 +565,53 @@ export class PurchaseOrdersService {
                   }, zero)
                   .toDecimalPlaces(2)
               : null,
+            finalAmount: withPrices && detail ? detail.totals.netTotal : null,
+            priceDiffCount: receipt?.costing ? priceDifferences(receipt.costing) : null,
+            noteTotalQty: detail?.noteTotalQty ?? null,
+            noteTotalAmount: detail?.noteTotalAmount ?? null,
             receiptId: row.receiptId,
-            receiptNumber:
-              row.receiptId === null ? null : (receiptNumbers.get(row.receiptId) ?? null),
+            receiptNumber: detail?.number ?? null,
             canEdit: editRight(ctx, row.status, ordererId) !== null,
-            canMoveNext: nextPoStatus(row.status) !== null && mayMove(ctx, ordererId, false),
-            canMoveBack: previousPoStatus(row.status) !== null && mayMove(ctx, ordererId, true),
+            canShip: canShip(ctx, row.status, ordererId),
+            canCount:
+              detail?.status === 'DRAFT' &&
+              detail.lines.some((line) => canCount(ctx, row.status, line.warehouseId)),
+            canPrice: canPrice(ctx, row.status) && detail?.status === 'POSTED',
+            canMoveNext:
+              order.archivedAt === null &&
+              nextPoStatus(row.status) !== null &&
+              mayMove(ctx, ordererId, false),
+            canMoveBack:
+              order.archivedAt === null &&
+              previousPoStatus(row.status) !== null &&
+              mayMove(ctx, ordererId, true),
           };
         })
         .sort((a, b) => a.supplierName.localeCompare(b.supplierName)),
     };
+  }
+
+  /** The stamps the page compares to learn about another user's change (ADR-0118 #3). */
+  async version(id: number): Promise<PurchaseOrderVersion> {
+    const [order] = await this.db
+      .select({ updatedAt: purchaseOrders.updatedAt })
+      .from(purchaseOrders)
+      .where(eq(purchaseOrders.id, id));
+    if (!order) throw notFound('purchase order', id);
+    const rows = await this.db
+      .select({ receiptId: purchaseOrderSuppliers.receiptId })
+      .from(purchaseOrderSuppliers)
+      .where(
+        and(eq(purchaseOrderSuppliers.orderId, id), isNotNull(purchaseOrderSuppliers.receiptId)),
+      );
+    const stamps = await this.receipts.updatedAtOf(
+      rows.flatMap((row) => (row.receiptId === null ? [] : [row.receiptId])),
+    );
+    let latest: Date | null = null;
+    for (const stamp of stamps.values()) {
+      if (latest === null || stamp > latest) latest = stamp;
+    }
+    return { updatedAt: order.updatedAt, receiptsUpdatedAt: latest };
   }
 
   async list(
@@ -466,6 +622,9 @@ export class PurchaseOrdersService {
     const filters: SQL[] = [];
     // Spelled out: Drizzle leaves the columns of a single-table select unqualified.
     if (query.status) filters.push(eq(purchaseOrders.status, query.status));
+    filters.push(
+      query.archived ? isNotNull(purchaseOrders.archivedAt) : isNull(purchaseOrders.archivedAt),
+    );
     if (query.supplierId) {
       filters.push(
         sql`EXISTS (SELECT 1 FROM purchase_order_suppliers s WHERE s.order_id = purchase_orders.id AND s.supplier_id = ${query.supplierId})`,
@@ -520,6 +679,7 @@ export class PurchaseOrdersService {
           supplierNames: own
             .map((link) => names.get(link.supplierId) ?? '')
             .sort((a, b) => a.localeCompare(b)),
+          archivedAt: row.archivedAt,
           createdAt: row.createdAt,
         };
       }),
@@ -539,9 +699,24 @@ export class PurchaseOrdersService {
       .where(eq(purchaseOrders.id, orderId));
   }
 
+  /** Received in full, or nothing ordered on any supplier (ADR-0118 #7). */
+  private async archivable(tx: Tx, order: OrderRow): Promise<boolean> {
+    if (order.status === 'RECEIVED') return true;
+    const [row] = await tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(purchaseOrderLines)
+      .innerJoin(
+        purchaseOrderSuppliers,
+        eq(purchaseOrderSuppliers.id, purchaseOrderLines.orderSupplierId),
+      )
+      .where(eq(purchaseOrderSuppliers.orderId, order.id));
+    return (row?.count ?? 0) === 0;
+  }
+
   /**
-   * The supplier's draft receipt at «Ирсэн» (ADR-0115): one per supplier, each ordered line
-   * expected in its unit with its product's last delivery-note price filled in (per that unit).
+   * The supplier's draft receipt at «Ирсэн» (ADR-0115, ADR-0118 #1): one per supplier, each line
+   * expected in its unit as shipped (as ordered where nothing was typed), with its product's last
+   * delivery-note price filled in (per that unit). A line shipped as 0 is left out.
    */
   private async makeReceipt(
     tx: Tx,
@@ -549,11 +724,16 @@ export class PurchaseOrdersService {
     order: OrderRow,
     supplier: OrderSupplierRow,
   ): Promise<number> {
-    const lines = await tx
-      .select()
-      .from(purchaseOrderLines)
-      .where(eq(purchaseOrderLines.orderSupplierId, supplier.id))
-      .orderBy(purchaseOrderLines.id);
+    const lines = (
+      await tx
+        .select()
+        .from(purchaseOrderLines)
+        .where(eq(purchaseOrderLines.orderSupplierId, supplier.id))
+        .orderBy(purchaseOrderLines.id)
+    ).filter((line) => line.shippedQty === null || !line.shippedQty.isZero());
+    if (lines.length === 0) {
+      throw new AppError('PO_SUPPLIER_EMPTY', `supplier ${supplier.supplierId} shipped nothing`);
+    }
     const prices = new Map(
       (
         await this.receipts.lastPrices(
@@ -580,10 +760,11 @@ export class PurchaseOrdersService {
       originRef: order.number,
       lines: lines.map((line) => {
         const base = prices.get(line.productId);
+        const expected = line.shippedQty ?? line.qty;
         return {
           productUnitId: line.productUnitId,
-          enteredQty: line.qty,
-          expectedQty: line.qty,
+          enteredQty: expected,
+          expectedQty: expected,
           ...(base ? { docUnitPrice: base.times(line.factorSnapshot).toDecimalPlaces(2) } : {}),
         };
       }),
@@ -607,6 +788,20 @@ export class PurchaseOrdersService {
       .where(eq(purchaseOrderLines.orderSupplierId, orderSupplierId));
     return row?.count ?? 0;
   }
+}
+
+/** Lines whose price (typed, else the draft's) differs from the product's previous one. */
+function priceDifferences(costing: ReceiptCosting): number {
+  let count = 0;
+  for (const line of costing.lines) {
+    if (line.previousUnitPrice === null || line.freeGoods) continue;
+    const typed =
+      line.docAmount !== null && !line.enteredQty.isZero()
+        ? line.docAmount.div(line.enteredQty).toDecimalPlaces(2)
+        : line.docUnitPrice;
+    if (typed !== null && !typed.equals(line.previousUnitPrice)) count += 1;
+  }
+  return count;
 }
 
 function uniqueSuppliers(ids: readonly number[]): number[] {

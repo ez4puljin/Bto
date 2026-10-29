@@ -7,6 +7,7 @@ import {
   PurchaseOrdersController,
   SupplierOrderersController,
 } from './controllers/purchase-orders.controller';
+import { OrderHistoryService } from './services/order-history.service';
 import { OrderProgressService } from './services/order-progress.service';
 import { PurchaseOrderGridService } from './services/purchase-order-grid.service';
 import { PurchaseOrdersService } from './services/purchase-orders.service';
@@ -24,12 +25,14 @@ import { SupplierOrderersService } from './services/supplier-orderers.service';
     PurchaseOrderGridService,
     SupplierOrderersService,
     OrderProgressService,
+    OrderHistoryService,
     { provide: RECEIPT_PROGRESS, useExisting: OrderProgressService },
   ],
   exports: [
     PurchaseOrdersService,
     PurchaseOrderGridService,
     SupplierOrderersService,
+    OrderHistoryService,
     RECEIPT_PROGRESS,
   ],
 })

@@ -26349,6 +26349,7 @@
               "enum": [
                 "PREPARING",
                 "SENT",
+                "SHIPPING",
                 "IN_TRANSIT",
                 "ARRIVED",
                 "ACCOUNTING",
@@ -26370,6 +26371,15 @@
             "required": false,
             "in": "query",
             "description": "Orders with a supplier the caller orders from",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "description": "Archived orders only (default: the live ones)",
             "schema": {
               "type": "boolean"
             }
@@ -26569,6 +26579,52 @@
         ]
       }
     },
+    "/api/v1/purchase-orders/{id}/version": {
+      "get": {
+        "operationId": "PurchaseOrders_version",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderVersion"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The stamps the page polls to show «Өөр хэрэглэгч энэ захиалгыг шинэчиллээ» (ADR-0118 #3).",
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
     "/api/v1/purchase-orders/{id}/suppliers": {
       "post": {
         "operationId": "PurchaseOrders_addSuppliers",
@@ -26642,6 +26698,115 @@
             "in": "path",
             "schema": {
               "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
+    "/api/v1/purchase-orders/{id}/archive": {
+      "post": {
+        "operationId": "PurchaseOrders_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Takes a finished order out of the list (ADR-0118 #7); a repeated click changes nothing.",
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
+    "/api/v1/purchase-orders/{id}/unarchive": {
+      "post": {
+        "operationId": "PurchaseOrders_unarchive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -26794,6 +26959,16 @@
             }
           },
           {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "description": "Rows whose home warehouse is this one",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
             "name": "cursor",
             "required": false,
             "in": "query",
@@ -26903,7 +27078,302 @@
             "bearer": []
           }
         ],
-        "summary": "Writes only the changed cells, each against the value the page opened with (ADR-0115).",
+        "summary": "Writes only the changed cells, each against the value the page opened with (ADR-0115): the\nordered quantities, and the shipped ones in «Ачигдаж байна» (ADR-0118 #1).",
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
+    "/api/v1/purchase-orders/{id}/suppliers/{supplierId}/arrivals": {
+      "put": {
+        "operationId": "PurchaseOrders_saveArrivals",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurchaseOrderArrivalsSaveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderArrivalsSaveResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The keepers' counts typed on the order page in «Ирсэн» (ADR-0118 #5): boxes × pieces as a base\nquantity and a note on a difference, each line against the count the page opened with. The\nservice checks the caller's warehouse per line (a manager counts every line).",
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
+    "/api/v1/purchase-orders/{id}/history": {
+      "get": {
+        "operationId": "PurchaseOrders_history",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderHistoryPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The order's history (ADR-0118 #6): who changed what, newest first.",
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
+    "/api/v1/purchase-orders/{id}/history.xlsx": {
+      "get": {
+        "operationId": "PurchaseOrders_historyExcel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
+    "/api/v1/purchase-orders/{id}/export.xlsx": {
+      "get": {
+        "operationId": "PurchaseOrders_exportExcel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The order as one sheet (ADR-0118 #7): every supplier's lines with what was ordered, shipped and arrived.",
         "tags": [
           "procurement"
         ]
@@ -33441,6 +33911,11 @@
             "nullable": true,
             "format": "date-time",
             "description": "When the keeper checked the count; null while it waits"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "description": "The keeper’s note on a difference (ADR-0118)"
           }
         },
         "required": [
@@ -33461,7 +33936,8 @@
           "weightKg",
           "salePrice",
           "expectedQty",
-          "checkedAt"
+          "checkedAt",
+          "note"
         ]
       },
       "ReceiptConfirmation": {
@@ -34245,6 +34721,17 @@
             "type": "string",
             "example": "3",
             "description": "The counted quantity; marks the line checked; 0 = did not arrive (order lines)"
+          },
+          "arrivedQtyBase": {
+            "type": "string",
+            "example": "50",
+            "description": "The counted quantity in base units (boxes × pieces, ADR-0118); marks the line checked. Not with enteredQty"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500,
+            "description": "The keeper’s note on a difference; null clears it"
           },
           "docUnitPrice": {
             "type": "string",
@@ -54776,6 +55263,7 @@
             "enum": [
               "PREPARING",
               "SENT",
+              "SHIPPING",
               "IN_TRANSIT",
               "ARRIVED",
               "ACCOUNTING",
@@ -54792,6 +55280,11 @@
               "type": "string"
             }
           },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -54805,6 +55298,7 @@
           "status",
           "supplierCount",
           "supplierNames",
+          "archivedAt",
           "createdAt"
         ]
       },
@@ -54869,6 +55363,7 @@
             "enum": [
               "PREPARING",
               "SENT",
+              "SHIPPING",
               "IN_TRANSIT",
               "ARRIVED",
               "ACCOUNTING",
@@ -54899,10 +55394,41 @@
             "type": "string",
             "description": "Σ weight, kg (products with a weight)"
           },
+          "shippedBase": {
+            "type": "string",
+            "description": "Σ shipped quantity, base units (lines typed at «Ачигдаж»)"
+          },
+          "arrivedBase": {
+            "type": "string",
+            "nullable": true,
+            "description": "Σ counted base quantity of the receipt (null before the receipt)"
+          },
+          "uncheckedLines": {
+            "type": "number",
+            "description": "Receipt lines not yet counted"
+          },
           "estimatedCost": {
             "type": "string",
             "nullable": true,
             "description": "Σ ordered × last price per base unit (price readers)"
+          },
+          "finalAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "The receipt’s payable so far (price readers; null before the receipt)"
+          },
+          "priceDiffCount": {
+            "type": "number",
+            "nullable": true,
+            "description": "Lines priced differently from the product’s previous price (posted receipt, price readers)"
+          },
+          "noteTotalQty": {
+            "type": "string",
+            "nullable": true
+          },
+          "noteTotalAmount": {
+            "type": "string",
+            "nullable": true
           },
           "receiptId": {
             "type": "number",
@@ -54914,6 +55440,18 @@
           },
           "canEdit": {
             "type": "boolean"
+          },
+          "canShip": {
+            "type": "boolean",
+            "description": "May type the shipped quantities now"
+          },
+          "canCount": {
+            "type": "boolean",
+            "description": "May type a count on at least one line now"
+          },
+          "canPrice": {
+            "type": "boolean",
+            "description": "May run the price check now"
           },
           "canMoveNext": {
             "type": "boolean"
@@ -54933,10 +55471,20 @@
           "lineCount",
           "qtyBase",
           "weightKg",
+          "shippedBase",
+          "arrivedBase",
+          "uncheckedLines",
           "estimatedCost",
+          "finalAmount",
+          "priceDiffCount",
+          "noteTotalQty",
+          "noteTotalAmount",
           "receiptId",
           "receiptNumber",
           "canEdit",
+          "canShip",
+          "canCount",
+          "canPrice",
           "canMoveNext",
           "canMoveBack"
         ]
@@ -54963,6 +55511,7 @@
             "enum": [
               "PREPARING",
               "SENT",
+              "SHIPPING",
               "IN_TRANSIT",
               "ARRIVED",
               "ACCOUNTING",
@@ -54983,6 +55532,19 @@
             "type": "string",
             "format": "date-time"
           },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "archivedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "canArchive": {
+            "type": "boolean",
+            "description": "A manager may archive it now"
+          },
           "suppliers": {
             "type": "array",
             "items": {
@@ -54999,7 +55561,28 @@
           "createdBy",
           "createdAt",
           "updatedAt",
+          "archivedAt",
+          "archivedBy",
+          "canArchive",
           "suppliers"
+        ]
+      },
+      "PurchaseOrderVersion": {
+        "type": "object",
+        "properties": {
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "receiptsUpdatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "updatedAt",
+          "receiptsUpdatedAt"
         ]
       },
       "PurchaseOrderUpdateRequest": {
@@ -55035,6 +55618,7 @@
             "enum": [
               "PREPARING",
               "SENT",
+              "SHIPPING",
               "IN_TRANSIT",
               "ARRIVED",
               "ACCOUNTING",
@@ -55071,6 +55655,32 @@
           "isBase"
         ]
       },
+      "PurchaseOrderGridSales": {
+        "type": "object",
+        "properties": {
+          "avg12": {
+            "type": "string",
+            "description": "Average outflow per month over the last 12 months, base units"
+          },
+          "avg3": {
+            "type": "string",
+            "description": "Average over the last 3 months"
+          },
+          "lastMonth": {
+            "type": "string"
+          },
+          "sameMonthLastYear": {
+            "type": "string",
+            "description": "This month last year"
+          }
+        },
+        "required": [
+          "avg12",
+          "avg3",
+          "lastMonth",
+          "sameMonthLastYear"
+        ]
+      },
       "PurchaseOrderGridLine": {
         "type": "object",
         "properties": {
@@ -55082,12 +55692,96 @@
           },
           "qtyBase": {
             "type": "string"
+          },
+          "shippedQty": {
+            "type": "string",
+            "nullable": true,
+            "description": "What the supplier shipped, in the line’s unit; null until typed"
           }
         },
         "required": [
           "productUnitId",
           "qty",
-          "qtyBase"
+          "qtyBase",
+          "shippedQty"
+        ]
+      },
+      "PurchaseOrderGridReceiptLine": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "unitName": {
+            "type": "string",
+            "description": "The receipt line’s unit (pieces once counted in pieces)"
+          },
+          "factor": {
+            "type": "string",
+            "description": "Pieces per that unit"
+          },
+          "expectedBase": {
+            "type": "string",
+            "nullable": true,
+            "description": "Expected, base units"
+          },
+          "arrivedBase": {
+            "type": "string",
+            "nullable": true,
+            "description": "Counted, base units; null while unchecked"
+          },
+          "checkedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "confirmed": {
+            "type": "boolean",
+            "description": "The line’s warehouse is confirmed (frozen)"
+          },
+          "canCount": {
+            "type": "boolean",
+            "description": "The caller may type this count now"
+          },
+          "docUnitPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "Cost holders only"
+          },
+          "docAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Cost holders only"
+          },
+          "previousUnitPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "The product’s price on the receipt before, per this unit (posted, cost holders)"
+          },
+          "previousDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          }
+        },
+        "required": [
+          "lineId",
+          "warehouseId",
+          "unitName",
+          "factor",
+          "expectedBase",
+          "arrivedBase",
+          "checkedAt",
+          "note",
+          "confirmed",
+          "canCount"
         ]
       },
       "PurchaseOrderGridRow": {
@@ -55135,6 +55829,9 @@
             "type": "string",
             "description": "Last month’s outflow from the home warehouse, base units"
           },
+          "sales": {
+            "$ref": "#/components/schemas/PurchaseOrderGridSales"
+          },
           "lastBasePrice": {
             "type": "string",
             "nullable": true,
@@ -55155,7 +55852,25 @@
             ]
           },
           "editable": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "May the caller change the ordered quantity now"
+          },
+          "canShip": {
+            "type": "boolean",
+            "description": "May the caller type the shipped quantity now"
+          },
+          "receipt": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PurchaseOrderGridReceiptLine"
+              }
+            ]
+          },
+          "extra": {
+            "type": "boolean",
+            "description": "A receipt line of a product not on the order"
           }
         },
         "required": [
@@ -55169,8 +55884,81 @@
           "onHand",
           "minQty",
           "lastMonthOut",
+          "sales",
           "line",
-          "editable"
+          "editable",
+          "canShip",
+          "receipt",
+          "extra"
+        ]
+      },
+      "PurchaseOrderGridRights": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "boolean"
+          },
+          "shipped": {
+            "type": "boolean"
+          },
+          "count": {
+            "type": "boolean"
+          },
+          "price": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "order",
+          "shipped",
+          "count",
+          "price"
+        ]
+      },
+      "PurchaseOrderGridReceipt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "POSTED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "costingVersion": {
+            "type": "number"
+          },
+          "noteTotalQty": {
+            "type": "string",
+            "nullable": true
+          },
+          "noteTotalAmount": {
+            "type": "string",
+            "nullable": true
+          },
+          "confirmedWarehouseIds": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "costingVersion",
+          "noteTotalQty",
+          "noteTotalAmount",
+          "confirmedWarehouseIds"
         ]
       },
       "PurchaseOrderGridPage": {
@@ -55196,6 +55984,33 @@
           "outflowTo": {
             "type": "string",
             "format": "date"
+          },
+          "salesFrom": {
+            "type": "string",
+            "description": "YYYY-MM, the first of the 12 sales months"
+          },
+          "salesTo": {
+            "type": "string",
+            "description": "YYYY-MM, the last one"
+          },
+          "rights": {
+            "$ref": "#/components/schemas/PurchaseOrderGridRights"
+          },
+          "receipt": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PurchaseOrderGridReceipt"
+              }
+            ]
+          },
+          "extra": {
+            "description": "Receipt lines of products not in the grid (first page only)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderGridRow"
+            }
           }
         },
         "required": [
@@ -55203,7 +56018,12 @@
           "nextCursor",
           "total",
           "outflowFrom",
-          "outflowTo"
+          "outflowTo",
+          "salesFrom",
+          "salesTo",
+          "rights",
+          "receipt",
+          "extra"
         ]
       },
       "PurchaseOrderGridChange": {
@@ -55213,22 +56033,30 @@
             "type": "number",
             "minimum": 1
           },
+          "field": {
+            "enum": [
+              "ORDERED",
+              "SHIPPED"
+            ],
+            "type": "string",
+            "description": "ORDERED (default): the ordered quantity; SHIPPED: the shipped one («Ачигдаж»)"
+          },
           "productUnitId": {
             "type": "number",
             "nullable": true,
             "minimum": 1,
-            "description": "The unit now (null with no quantity)"
+            "description": "The unit now (null with no quantity; ignored for SHIPPED)"
           },
           "qty": {
             "type": "string",
             "nullable": true,
-            "description": "The quantity now; null or 0 removes"
+            "description": "The quantity now; null or 0 removes an ordered line, null clears a shipped one"
           },
           "previousUnitId": {
             "type": "number",
             "nullable": true,
             "minimum": 1,
-            "description": "The unit when the page opened (null: no line then)"
+            "description": "The unit when the page opened (null: no line then; ignored for SHIPPED)"
           },
           "previousQty": {
             "type": "string",
@@ -55265,6 +56093,13 @@
           "productId": {
             "type": "number"
           },
+          "field": {
+            "enum": [
+              "ORDERED",
+              "SHIPPED"
+            ],
+            "type": "string"
+          },
           "productUnitId": {
             "type": "number",
             "nullable": true
@@ -55276,6 +56111,7 @@
         },
         "required": [
           "productId",
+          "field",
           "productUnitId",
           "qty"
         ]
@@ -55290,7 +56126,8 @@
             "enum": [
               "SCOPE",
               "NO_HOME",
-              "NOT_SUPPLIER"
+              "NOT_SUPPLIER",
+              "NO_LINE"
             ],
             "type": "string"
           }
@@ -55324,6 +56161,225 @@
           "applied",
           "conflicts",
           "refused"
+        ]
+      },
+      "PurchaseOrderArrivalChange": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The receipt line"
+          },
+          "arrivedQtyBase": {
+            "type": "string",
+            "description": "The counted quantity in base units (boxes × pieces); absent when only the note changes"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "previousArrivedQtyBase": {
+            "type": "string",
+            "nullable": true,
+            "description": "The count when the page opened (null while unchecked)"
+          }
+        },
+        "required": [
+          "lineId",
+          "previousArrivedQtyBase"
+        ]
+      },
+      "PurchaseOrderArrivalsSaveRequest": {
+        "type": "object",
+        "properties": {
+          "changes": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderArrivalChange"
+            }
+          }
+        },
+        "required": [
+          "changes"
+        ]
+      },
+      "PurchaseOrderArrivalConflict": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number"
+          },
+          "arrivedQtyBase": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "lineId",
+          "arrivedQtyBase",
+          "note"
+        ]
+      },
+      "PurchaseOrderArrivalRefusal": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number"
+          },
+          "reason": {
+            "enum": [
+              "SCOPE",
+              "CONFIRMED",
+              "NOT_FOUND"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "lineId",
+          "reason"
+        ]
+      },
+      "PurchaseOrderArrivalsSaveResult": {
+        "type": "object",
+        "properties": {
+          "applied": {
+            "type": "number"
+          },
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderArrivalConflict"
+            }
+          },
+          "refused": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderArrivalRefusal"
+            }
+          }
+        },
+        "required": [
+          "applied",
+          "conflicts",
+          "refused"
+        ]
+      },
+      "PurchaseOrderHistoryRow": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "userId": {
+            "type": "number",
+            "nullable": true
+          },
+          "userName": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "enum": [
+              "CREATED",
+              "NOTE",
+              "SUPPLIERS_ADDED",
+              "SUPPLIER_REMOVED",
+              "STATUS",
+              "ORDER_QTY",
+              "SHIPPED_QTY",
+              "ARRIVED_QTY",
+              "LINE_NOTE",
+              "LINE_ADDED",
+              "LINE_REMOVED",
+              "RECEIPT_CONFIRMED",
+              "RECEIPT_WITHDRAWN",
+              "RECEIPT_POSTED",
+              "RECEIPT_CANCELLED",
+              "PRICES",
+              "ARCHIVED",
+              "UNARCHIVED"
+            ],
+            "type": "string"
+          },
+          "supplierId": {
+            "type": "number",
+            "nullable": true
+          },
+          "supplierName": {
+            "type": "string",
+            "nullable": true
+          },
+          "productId": {
+            "type": "number",
+            "nullable": true
+          },
+          "productSku": {
+            "type": "string",
+            "nullable": true
+          },
+          "productName": {
+            "type": "string",
+            "nullable": true
+          },
+          "from": {
+            "type": "string",
+            "nullable": true,
+            "description": "Before (a status code for STATUS)"
+          },
+          "to": {
+            "type": "string",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "userId",
+          "userName",
+          "kind",
+          "supplierId",
+          "supplierName",
+          "productId",
+          "productSku",
+          "productName",
+          "from",
+          "to",
+          "detail"
+        ]
+      },
+      "PurchaseOrderHistoryPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderHistoryRow"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
         ]
       },
       "PurchaseOrderSheetLine": {
@@ -55385,6 +56441,7 @@
             "enum": [
               "PREPARING",
               "SENT",
+              "SHIPPING",
               "IN_TRANSIT",
               "ARRIVED",
               "ACCOUNTING",
@@ -55573,6 +56630,7 @@
           "ISSUE_RECIPIENT_KIND",
           "ISSUE_CORRECTION_OPEN",
           "ISSUE_NOT_SENT",
+          "PO_NOT_ARCHIVABLE",
           "PO_NOT_EDITABLE",
           "PO_SUPPLIER_EMPTY",
           "PO_STATUS_INVALID",

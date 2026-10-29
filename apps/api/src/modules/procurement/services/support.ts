@@ -1,4 +1,8 @@
-import { PO_EDITABLE_STATUSES, type PoSupplierStatus } from '@tugeel/shared/procurement';
+import {
+  PO_EDITABLE_STATUSES,
+  PO_SHIPPING_STATUS,
+  type PoSupplierStatus,
+} from '@tugeel/shared/procurement';
 import { eq } from 'drizzle-orm';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { AppError, notFound } from '../../../common/errors/app-error';
@@ -9,6 +13,9 @@ export const READ = 'procurement.orders.read';
 export const EDIT = 'procurement.orders.edit';
 export const MANAGE = 'procurement.orders.manage';
 export const PRICES = 'procurement.prices.read';
+/** Inventory's rights the order page leans on (ADR-0118): the keeper's count and the price check. */
+export const RECEIPTS = 'inventory.receipts.manage';
+export const COSTS = 'inventory.costs.manage';
 
 export type OrderRow = typeof purchaseOrders.$inferSelect;
 export type OrderSupplierRow = typeof purchaseOrderSuppliers.$inferSelect;
@@ -44,10 +51,10 @@ export async function ordererOf(tx: Db | Tx, supplierId: number): Promise<number
 }
 
 /**
- * Who may type a supplier's quantities (owner 2026-10-29, ADR-0115): a manager, or the supplier's
- * orderer, up to «Замд» — every product; anyone else with the edit right only in «Бэлдэж», only
- * for products whose home warehouse is in their scope. `all`: every product of the supplier;
- * `ownWarehouses`: only those; null: none.
+ * Who may type a supplier's quantities (owner 2026-10-29, ADR-0115, ADR-0118): a manager, or the
+ * supplier's orderer, up to «Замд» — every product; anyone else with the edit right only in
+ * «Бэлдэж», only for products whose home warehouse is in their scope. `all`: every product of the
+ * supplier; `ownWarehouses`: only those; null: none.
  */
 export type EditRight = { all: true } | { all: false; ownWarehouses: true } | null;
 
@@ -61,6 +68,32 @@ export function editRight(
   if (!ctx.permissions.has(EDIT)) return null;
   if (ordererId === ctx.userId) return { all: true };
   return status === 'PREPARING' ? { all: false, ownWarehouses: true } : null;
+}
+
+/** The shipped quantities (ADR-0118 #1): a manager or the orderer, in «Ачигдаж байна» only. */
+export function canShip(
+  ctx: AuthContext,
+  status: PoSupplierStatus,
+  ordererId: number | null,
+): boolean {
+  if (status !== PO_SHIPPING_STATUS) return false;
+  if (ctx.permissions.has(MANAGE)) return true;
+  return ctx.permissions.has(EDIT) && ordererId === ctx.userId;
+}
+
+/**
+ * The arrived quantity of a receipt line on the order page (ADR-0118 #5): in «Ирсэн», a manager
+ * for every line, a receipt holder for the lines of a warehouse in their write scope.
+ */
+export function canCount(ctx: AuthContext, status: PoSupplierStatus, warehouseId: number): boolean {
+  if (status !== 'ARRIVED') return false;
+  if (ctx.permissions.has(MANAGE)) return true;
+  return ctx.permissions.has(RECEIPTS) && canWriteHome(ctx, warehouseId);
+}
+
+/** The price check on the order page (ADR-0118 #5): a cost holder in «Нягтлан шалгаж». */
+export function canPrice(ctx: AuthContext, status: PoSupplierStatus): boolean {
+  return status === 'ACCOUNTING' && ctx.permissions.has(COSTS);
 }
 
 /** May this person move the supplier (managers, and the orderer for the forward steps)? */

@@ -954,6 +954,54 @@ export class StockPostingService implements OnModuleInit {
     return result;
   }
 
+  /**
+   * The same outflow split by calendar month (`YYYY-MM` of the business date): product →
+   * warehouse → month → base quantity. The purchase order's sales averages (ADR-0118 #5).
+   */
+  async outflowByMonth(
+    productIds: readonly number[],
+    from: string,
+    to: string,
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, Map<number, Map<string, Decimal>>>> {
+    const result = new Map<number, Map<number, Map<string, Decimal>>>();
+    const ids = [...new Set(productIds)];
+    if (ids.length === 0) return result;
+    const rows = await executor.execute<{
+      product_id: string;
+      warehouse_id: string;
+      month: string;
+      qty: string;
+    }>(
+      sql`
+      SELECT l.product_id::text AS product_id, l.warehouse_id::text AS warehouse_id,
+             to_char(l.effective_date, 'YYYY-MM') AS month, sum(-l.qty_base)::text AS qty
+        FROM stock_ledger l
+        LEFT JOIN transfers t ON l.doc_type = 'TR' AND t.id = l.doc_id
+        LEFT JOIN warehouses d ON d.id = t.dest_warehouse_id
+       WHERE l.product_id IN (${sql.join(
+         ids.map((id) => sql`${id}`),
+         sql`, `,
+       )})
+         AND l.effective_date BETWEEN ${from}::date AND ${to}::date
+         AND (l.movement_type = 'DELIVERY_ISSUE'
+              OR (l.movement_type = 'RETURN_IN' AND l.doc_type = 'CN')
+              OR (l.movement_type = 'TRANSFER_OUT' AND l.warehouse_id = t.source_warehouse_id
+                  AND d.kind = 'STORE'))
+       GROUP BY l.product_id, l.warehouse_id, to_char(l.effective_date, 'YYYY-MM')`,
+    );
+    for (const row of rows.rows) {
+      const productId = Number.parseInt(row.product_id, 10);
+      const warehouseId = Number.parseInt(row.warehouse_id, 10);
+      const byWarehouse = result.get(productId) ?? new Map<number, Map<string, Decimal>>();
+      const byMonth = byWarehouse.get(warehouseId) ?? new Map<string, Decimal>();
+      byMonth.set(row.month, new Decimal(row.qty));
+      byWarehouse.set(warehouseId, byMonth);
+      result.set(productId, byWarehouse);
+    }
+    return result;
+  }
+
   /** The latest costing of each line of a receipt (none for a receipt not costed yet). */
   async costingOf(docId: number, executor: Db | Tx = this.db): Promise<Map<number, Valuation>> {
     const rows = await executor

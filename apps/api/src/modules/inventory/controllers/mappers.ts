@@ -105,6 +105,7 @@ export function toReceiptLineDto(line: ReceiptLine, withCosts = false): ReceiptL
     salePrice: line.salePrice?.toFixed(0) ?? null,
     expectedQty: line.expectedQty?.toFixed() ?? null,
     checkedAt: line.checkedAt?.toISOString() ?? null,
+    note: line.note,
     ...(withCosts
       ? {
           docUnitPrice: line.docUnitPrice?.toFixed(2) ?? null,
