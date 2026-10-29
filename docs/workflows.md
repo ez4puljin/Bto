@@ -257,3 +257,27 @@ One question round before the build, run beside slice 2 as the owner asked for t
 9. Write-offs and damage (question 4 in §2) are not designed here; they are booked as ordinary issue types.
 
 Reserved for the build: ADR-0117 and migration `0054` (branch `claude/slice3-issues`). Slices 2 and 3 both touch `inventory`: whichever merges second merges main again and puts its journal entry last.
+
+## 7. Slice 1b scope: the order's detail page as in Butenorgil (owner, 2026-10-29)
+
+The owner wrote a user guide of Butenorgil's «Захиалга» menu (kept in `tmp/`, not in the repository) and compared it with slice 1. Already in Bto: suppliers with their own statuses and the lowest shown, the orderer, box ordering with stock / minimum / last price / estimated cost, the stale-page protection, the printed sheet, receiving against the order with «ирээгүй» and extra lines by scan, the accountant's price check with the previous price beside. Gone by design: the master, stock and sales file imports, the live Erkhet stock, the ERP import and its double-receipt guard (Bto keeps the books itself).
+
+**The owner's main want: Butenorgil's detail page** — one page per order with every supplier's products in one table and every stage's columns side by side, from ordering to the price check, instead of today's three places (order grid, receiving screen, receipt window).
+
+**Decided (every item was the proposal; 1–3 the owner's explicit yes):**
+1. **«Ачигдаж байна» status and the «Ачигдсан» column** come back (7 statuses: Бэлдэж → Илгээсэн → Ачигдаж → Замд → Ирсэн → Нягтлан шалгаж → Орлого авсан). The manager or the orderer types the supplier's shipped quantities at «Ачигдаж»; receiving then expects the shipped quantity (the ordered one when none was typed).
+2. **Keepers' typing rights stay**: their own warehouse's rows, the order quantity in «Бэлдэж» only, the arrived quantity in «Ирсэн» only.
+3. **The list opens the detail page directly** (no dashboard).
+4. **Header:** date, number, status, the status steps as circles (done / current / next), buttons Хадгалах · Хэвлэх · Түүх · Excel · one step back (manager). A yellow bar «Өөр хэрэглэгч энэ захиалгыг шинэчиллээ» with «Дахин ачаалах» when another user changed the order; the page never refreshes on its own while someone types.
+5. **Filter row:** supplier, warehouse, code / name search, «Захиалах ёстой» (below the minimum), «Зөвхөн захиалсан», «Багана» (column groups hidden per user; the columns a stage requires cannot be hidden).
+6. **Supplier header row:** name, status, «→ дараагийн шат», «N захиалаагүй», boxes · kg, the orderer, «Захиалгад байхгүй бараа нэмэх» at «Ирсэн».
+7. **Columns by stage:**
+   - ordering: stock at the home warehouse (boxes and pieces under it), box size, unit weight, **Захиалах** in boxes (pieces and kg computed), 12-month average, 3-month average, last month, the same month last year, the last price, the estimated amount;
+   - shipping: **Ачигдсан**;
+   - receiving: **Ирсэн as boxes × pieces**, the difference, a **note** shown only on a difference; typed by the keeper for their own warehouse, written to the receipt lines (the keeper's scanner screen stays and writes the same lines);
+   - the price check: **unit price**, amount, the price difference with «Хуучин» under it, typed by the accountant at «Нягтлан шалгаж»; saving runs the price check and creates the payable;
+   - a red «Захиалах» badge in the name cell below the minimum; the footer with boxes, kg, the estimated and the final amounts and «N бараа дээр үнэ зөрсөн».
+8. **Also in:** the order's **history screen** (who, when, which product, from → to, filter by user / supplier / product, Excel), the order's **Excel**, **archiving** finished orders out of the list.
+9. **Not in:** the dashboard, trucks and capacity (a slice of their own), the «Ороогүй бараа» basket dialog (the grid lists every main product), a supervisor role or forced status jumps, products of another supplier in a supplier's group, orders for the stores («Заал») from suppliers — the last two wait for the owner's word.
+
+Reserved for the build: ADR-0118 and migration `0055` (branch `claude/slice1b-order-detail`); it starts when one of the two running slices has opened its PR.
