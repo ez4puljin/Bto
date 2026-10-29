@@ -7,7 +7,7 @@ import { Animated, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatMnt } from '../format/format';
 import { colors, fonts, radii, shadows, spacing, tabular, type } from '../theme/tokens';
-import { Segmented } from '../ui/controls';
+import { PillButton, Segmented } from '../ui/controls';
 import { Keypad } from '../ui/keypad';
 import { Text } from '../ui/text';
 import { useUnitOptions } from './unit-options';
@@ -46,6 +46,7 @@ export function KeypadSheet({
   onDigits,
   conversion,
   note,
+  extra,
   onDone,
   onCancel,
 }: {
@@ -62,6 +63,8 @@ export function KeypadSheet({
   conversion: string;
   /** A warning under the box (a shortage, «Зарим нь хойшилж магадгүй»); null for none. */
   note: string | null;
+  /** A second answer above the keys («Ирээгүй» when receiving a transfer, ADR-0116 #4). */
+  extra?: { label: string; onPress: () => void };
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -153,6 +156,16 @@ export function KeypadSheet({
         </View>
         {note ? <Text style={styles.short}>{note}</Text> : null}
         <View style={styles.grow} />
+        {extra ? (
+          <View style={styles.extra}>
+            <PillButton
+              title={extra.label}
+              variant="destructive"
+              height={44}
+              onPress={extra.onPress}
+            />
+          </View>
+        ) : null}
         <Keypad
           onDigit={(digit) =>
             onDigits((current) => {
@@ -231,6 +244,7 @@ const styles = StyleSheet.create({
   caret: { width: 3, height: 40, borderRadius: 2, backgroundColor: colors.primary },
   unitWord: { ...type.title3, fontFamily: fonts.regular, color: colors.muted },
   conversion: { ...type.row, color: colors.label2 },
+  extra: { marginHorizontal: 20, marginBottom: spacing.md },
   short: {
     ...type.chip,
     marginTop: 10,

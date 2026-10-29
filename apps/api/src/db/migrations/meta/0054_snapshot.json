@@ -1,6 +1,6 @@
 {
-  "id": "21827eee-3067-40b9-bac6-10fdad702b09",
-  "prevId": "f85009dc-c007-47e1-93c3-f19910a4a069",
+  "id": "8e350702-82fc-42da-80e3-817c6ee4f2ae",
+  "prevId": "a99772de-6fe2-4d39-ac2b-8cdc5e72a65d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -24992,6 +24992,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "counted_qty_base": {
+          "name": "counted_qty_base",
+          "type": "numeric(14, 3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "counted_at": {
+          "name": "counted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "received_qty_base": {
           "name": "received_qty_base",
           "type": "numeric(14, 3)",
@@ -25009,6 +25021,13 @@
           "type": "bigint",
           "primaryKey": false,
           "notNull": false
+        },
+        "unrequested": {
+          "name": "unrequested",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -25144,7 +25163,165 @@
       "checkConstraints": {
         "transfer_lines_qty": {
           "name": "transfer_lines_qty",
-          "value": "\"transfer_lines\".\"request_factor\" > 0 AND \"transfer_lines\".\"requested_qty\" > 0\n        AND (\"transfer_lines\".\"shipped_qty_base\" IS NULL OR \"transfer_lines\".\"shipped_qty_base\" >= 0)\n        AND (\"transfer_lines\".\"received_qty_base\" IS NULL OR (\"transfer_lines\".\"shipped_qty_base\" IS NOT NULL AND \"transfer_lines\".\"received_qty_base\" >= 0))"
+          "value": "\"transfer_lines\".\"request_factor\" > 0\n        AND (\"transfer_lines\".\"requested_qty\" > 0 OR \"transfer_lines\".\"unrequested\")\n        AND (NOT \"transfer_lines\".\"unrequested\" OR (\"transfer_lines\".\"requested_qty\" = 0 AND \"transfer_lines\".\"shipped_qty_base\" = 0))\n        AND (\"transfer_lines\".\"shipped_qty_base\" IS NULL OR \"transfer_lines\".\"shipped_qty_base\" >= 0)\n        AND (\"transfer_lines\".\"received_qty_base\" IS NULL OR (\"transfer_lines\".\"shipped_qty_base\" IS NOT NULL AND \"transfer_lines\".\"received_qty_base\" >= 0))\n        AND (\"transfer_lines\".\"counted_qty_base\" IS NULL OR (\"transfer_lines\".\"shipped_qty_base\" IS NOT NULL AND \"transfer_lines\".\"counted_qty_base\" >= 0))\n        AND ((\"transfer_lines\".\"counted_qty_base\" IS NULL) = (\"transfer_lines\".\"counted_at\" IS NULL))"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.transfer_requests": {
+      "name": "transfer_requests",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "transfer_requests_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "dest_warehouse_id": {
+          "name": "dest_warehouse_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'DRAFT'"
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requested_at": {
+          "name": "requested_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requested_by": {
+          "name": "requested_by",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "transfer_requests_dest_idx": {
+          "name": "transfer_requests_dest_idx",
+          "columns": [
+            {
+              "expression": "dest_warehouse_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "transfer_requests_dest_warehouse_id_warehouses_id_fk": {
+          "name": "transfer_requests_dest_warehouse_id_warehouses_id_fk",
+          "tableFrom": "transfer_requests",
+          "tableTo": "warehouses",
+          "columnsFrom": [
+            "dest_warehouse_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transfer_requests_requested_by_users_id_fk": {
+          "name": "transfer_requests_requested_by_users_id_fk",
+          "tableFrom": "transfer_requests",
+          "tableTo": "users",
+          "columnsFrom": [
+            "requested_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transfer_requests_created_by_users_id_fk": {
+          "name": "transfer_requests_created_by_users_id_fk",
+          "tableFrom": "transfer_requests",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "transfer_requests_status": {
+          "name": "transfer_requests_status",
+          "value": "\"transfer_requests\".\"status\" IN ('DRAFT', 'REQUESTED', 'SHIPPED', 'COUNTED', 'RECEIVED', 'CANCELLED')"
+        },
+        "transfer_requests_note": {
+          "name": "transfer_requests_note",
+          "value": "\"transfer_requests\".\"note\" IS NULL OR length(\"transfer_requests\".\"note\") BETWEEN 1 AND 500"
         }
       },
       "isRLSEnabled": false
@@ -25181,6 +25358,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "request_id": {
+          "name": "request_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
         },
         "source_warehouse_id": {
           "name": "source_warehouse_id",
@@ -25234,6 +25417,24 @@
         "ship_date": {
           "name": "ship_date",
           "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "counted_at": {
+          "name": "counted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "counted_by": {
+          "name": "counted_by",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "count_return_reason": {
+          "name": "count_return_reason",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -25348,9 +25549,37 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "transfers_request_idx": {
+          "name": "transfers_request_idx",
+          "columns": [
+            {
+              "expression": "request_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
+        "transfers_request_id_transfer_requests_id_fk": {
+          "name": "transfers_request_id_transfer_requests_id_fk",
+          "tableFrom": "transfers",
+          "tableTo": "transfer_requests",
+          "columnsFrom": [
+            "request_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
         "transfers_source_warehouse_id_warehouses_id_fk": {
           "name": "transfers_source_warehouse_id_warehouses_id_fk",
           "tableFrom": "transfers",
@@ -25396,6 +25625,19 @@
           "tableTo": "users",
           "columnsFrom": [
             "shipped_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transfers_counted_by_users_id_fk": {
+          "name": "transfers_counted_by_users_id_fk",
+          "tableFrom": "transfers",
+          "tableTo": "users",
+          "columnsFrom": [
+            "counted_by"
           ],
           "columnsTo": [
             "id"
@@ -25461,7 +25703,7 @@
         },
         "transfers_status": {
           "name": "transfers_status",
-          "value": "\"transfers\".\"status\" IN ('DRAFT', 'REQUESTED', 'SHIPPED', 'RECEIVED', 'CANCELLED')"
+          "value": "\"transfers\".\"status\" IN ('DRAFT', 'REQUESTED', 'SHIPPED', 'COUNTED', 'RECEIVED', 'CANCELLED')"
         },
         "transfers_warehouses": {
           "name": "transfers_warehouses",
@@ -25469,7 +25711,7 @@
         },
         "transfers_number": {
           "name": "transfers_number",
-          "value": "(\"transfers\".\"status\" <> 'DRAFT' OR \"transfers\".\"number\" IS NULL OR \"transfers\".\"origin\" = 'REQUEST')\n        AND (\"transfers\".\"status\" NOT IN ('REQUESTED', 'SHIPPED', 'RECEIVED') OR \"transfers\".\"number\" IS NOT NULL)"
+          "value": "(\"transfers\".\"status\" <> 'DRAFT' OR \"transfers\".\"number\" IS NULL OR \"transfers\".\"origin\" = 'REQUEST')\n        AND (\"transfers\".\"status\" NOT IN ('REQUESTED', 'SHIPPED', 'COUNTED', 'RECEIVED') OR \"transfers\".\"number\" IS NOT NULL)"
         },
         "transfers_requested": {
           "name": "transfers_requested",
@@ -25477,7 +25719,15 @@
         },
         "transfers_shipped": {
           "name": "transfers_shipped",
-          "value": "(\"transfers\".\"status\" IN ('SHIPPED', 'RECEIVED'))\n        = (\"transfers\".\"shipped_at\" IS NOT NULL AND \"transfers\".\"ship_date\" IS NOT NULL)"
+          "value": "(\"transfers\".\"status\" IN ('SHIPPED', 'COUNTED', 'RECEIVED'))\n        = (\"transfers\".\"shipped_at\" IS NOT NULL AND \"transfers\".\"ship_date\" IS NOT NULL)"
+        },
+        "transfers_counted": {
+          "name": "transfers_counted",
+          "value": "(\"transfers\".\"status\" <> 'COUNTED' OR \"transfers\".\"counted_at\" IS NOT NULL)\n        AND (\"transfers\".\"status\" NOT IN ('DRAFT', 'REQUESTED', 'SHIPPED') OR \"transfers\".\"counted_at\" IS NULL)\n        AND (\"transfers\".\"origin\" = 'REQUEST' OR (\"transfers\".\"counted_at\" IS NULL AND \"transfers\".\"count_return_reason\" IS NULL))\n        AND (\"transfers\".\"count_return_reason\" IS NULL OR length(\"transfers\".\"count_return_reason\") BETWEEN 1 AND 300)"
+        },
+        "transfers_request": {
+          "name": "transfers_request",
+          "value": "\"transfers\".\"request_id\" IS NULL OR \"transfers\".\"origin\" = 'REQUEST'"
         },
         "transfers_received": {
           "name": "transfers_received",

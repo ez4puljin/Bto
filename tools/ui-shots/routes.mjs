@@ -161,9 +161,9 @@ export const ROUTES = [
   { area: 'ai', name: 'ai-conversation', path: '/ai?c={conversation}' },
   { area: 'ai', name: 'ai-reports', path: '/ai/reports' },
 
-  { area: 'system', name: 'users', path: '/users' },
-  { area: 'system', name: 'users-new', path: '/users?new=1', dialog: true },
-  { area: 'system', name: 'user', path: '/users/{user}' },
+  { area: 'partners', name: 'users', path: '/users' },
+  { area: 'partners', name: 'users-new', path: '/users?new=1', dialog: true },
+  { area: 'partners', name: 'user', path: '/users/{user}' },
   { area: 'system', name: 'roles', path: '/roles' },
   { area: 'system', name: 'roles-new', path: '/roles?new=1', dialog: true },
   { area: 'system', name: 'branches', path: '/branches' },

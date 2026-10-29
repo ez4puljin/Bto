@@ -916,7 +916,9 @@ export class StockPostingService implements OnModuleInit {
   /**
    * Each product's outflow per warehouse between two business dates, both included (ADR-0115, a
    * purchase order's «last month»): wholesale deliveries less credit-note returns, plus transfers
-   * shipped to a supermarket (a STORE warehouse), in base units. Product → warehouse → quantity.
+   * shipped to a supermarket (a STORE warehouse), and at a store its till sales less the till's
+   * returns (ADR-0116, a transfer request's «last month»), in base units. Product → warehouse →
+   * quantity.
    */
   async outflow(
     productIds: readonly number[],
@@ -940,7 +942,8 @@ export class StockPostingService implements OnModuleInit {
        )})
          AND l.effective_date BETWEEN ${from}::date AND ${to}::date
          AND (l.movement_type = 'DELIVERY_ISSUE'
-              OR (l.movement_type = 'RETURN_IN' AND l.doc_type = 'CN')
+              OR (l.movement_type = 'RETURN_IN' AND l.doc_type IN ('CN', 'POS'))
+              OR l.movement_type = 'POS_SALE'
               OR (l.movement_type = 'TRANSFER_OUT' AND l.warehouse_id = t.source_warehouse_id
                   AND d.kind = 'STORE'))
        GROUP BY l.product_id, l.warehouse_id`,

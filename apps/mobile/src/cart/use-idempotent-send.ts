@@ -13,12 +13,23 @@ export type PostOrder<B, O> = (
   key: string,
 ) => Promise<{ data?: O; error?: unknown; response: Response }>;
 
+/** Where a pending send lives: the shop's (the cart) by default, or another store's. */
+export interface PendingStore {
+  pending: PendingSend | null;
+  /** Resolves once stored: the send waits for it before the request leaves. */
+  setPending: (pending: PendingSend | null) => Promise<void>;
+  /** The document arrived: what the store clears (the cart dispatches «sent»). */
+  onSent: () => void;
+}
+
 export interface IdempotentSendOptions<B, O> {
   /** The cart's order body; null when it cannot be sent (the staff app without a stage). */
   bodyOf: () => B | null;
   post: PostOrder<B, O>;
   /** After an order arrived: what to refresh. */
   afterSent: () => Promise<void>;
+  /** The pending send's home; the shop's (ShopProvider) when left out. */
+  store?: PendingStore;
 }
 
 export interface Sender<O> {
@@ -34,17 +45,27 @@ const WAITS = 4;
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** The shop's pending send: the cart's (ADR-0061 #8). */
+function useShopStore(): PendingStore {
+  const { dispatch, pending, setPending } = useShop();
+  return { pending, setPending, onSent: () => dispatch({ type: 'sent' }) };
+}
+
 /**
- * Sends the cart as an order in either app (ADR-0061 #8, ADR-0079 #5): the pending send (its key and
- * body) is stored before the request leaves; a send with no answer keeps it, so «Дахин илгээх»
- * repeats the same key and the server replays its order instead of creating a second one.
+ * Sends the cart as an order in either app (ADR-0061 #8, ADR-0079 #5), or a transfer request
+ * (ADR-0116) with its own store: the pending send (its key and body) is stored before the request
+ * leaves; a send with no answer keeps it, so «Дахин илгээх» repeats the same key and the server
+ * replays its document instead of creating a second one.
  */
 export function useIdempotentSend<B, O>({
   bodyOf,
   post: postOrder,
   afterSent,
+  store,
 }: IdempotentSendOptions<B, O>): Sender<O> {
-  const { dispatch, pending, setPending } = useShop();
+  // Both are hooks; which one is used never changes within a screen.
+  const own = useShopStore();
+  const { pending, setPending, onSent } = store ?? own;
   const [sending, setSending] = useState(false);
 
   const post = async (send: PendingSend): Promise<SendResult<O>> => {
@@ -76,7 +97,7 @@ export function useIdempotentSend<B, O>({
     if (result.kind === 'unknown') return;
     await setPending(null);
     if (result.kind === 'sent') {
-      dispatch({ type: 'sent' });
+      onSent();
       await afterSent();
     }
   };

@@ -10,4 +10,4 @@ CREATE INDEX "purchase_orders_archived_idx" ON "purchase_orders" USING btree ("a
 ALTER TABLE "goods_receipt_lines" ADD CONSTRAINT "goods_receipt_lines_note" CHECK ("goods_receipt_lines"."note" IS NULL OR length("goods_receipt_lines"."note") BETWEEN 1 AND 500);--> statement-breakpoint
 ALTER TABLE "purchase_order_lines" ADD CONSTRAINT "purchase_order_lines_shipped" CHECK ("purchase_order_lines"."shipped_qty" IS NULL OR "purchase_order_lines"."shipped_qty" >= 0);--> statement-breakpoint
 ALTER TABLE "purchase_order_suppliers" ADD CONSTRAINT "purchase_order_suppliers_status" CHECK ("purchase_order_suppliers"."status" IN ('PREPARING', 'SENT', 'SHIPPING', 'IN_TRANSIT', 'ARRIVED', 'ACCOUNTING', 'RECEIVED'));--> statement-breakpoint
-ALTER TABLE "purchase_orders" ADD CONSTRAINT "purchase_orders_status" CHECK ("purchase_orders"."status" IN ('PREPARING', 'SENT', 'SHIPPING', 'IN_TRANSIT', 'ARRIVED', 'ACCOUNTING', 'RECEIVED'));
+ALTER TABLE "purchase_orders" ADD CONSTRAINT "purchase_orders_status" CHECK ("purchase_orders"."status" IN ('PREPARING', 'SENT', 'SHIPPING', 'IN_TRANSIT', 'ARRIVED', 'ACCOUNTING', 'RECEIVED'));--> statement-breakpoint

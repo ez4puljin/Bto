@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { CustomerPrincipal, Me } from '../api/session';
-import { phaseOf } from './phase';
+import { isRep, mayRequestTransfers, phaseOf } from './phase';
 
 const rep = { id: 7, permissions: ['sales.orders.rep'] } as unknown as Me;
 const office = { id: 8, permissions: ['sales.orders.read'] } as unknown as Me;
+const seller = { id: 9, permissions: ['inventory.transfers.manage'] } as unknown as Me;
+const both = {
+  id: 10,
+  permissions: ['sales.orders.rep', 'inventory.transfers.manage'],
+} as unknown as Me;
 const store = { accountId: 12, store: { customerId: 40 } } as unknown as CustomerPrincipal;
 
 describe('the phases of the two apps', () => {
@@ -19,5 +24,20 @@ describe('the phases of the two apps', () => {
     expect(phaseOf('http://pc:3300', { status: 'signedIn', me: rep, userId: 7 })).toBe('app');
     expect(phaseOf('http://pc:3300', { status: 'signedIn', me: office, userId: 8 })).toBe('notRep');
     expect(phaseOf('http://pc:3300', { status: 'signedIn', me: store, userId: 12 })).toBe('app');
+  });
+
+  it('lets a store seller with only the transfer right in (ADR-0116), but not an office user', () => {
+    expect(phaseOf('http://pc:3300', { status: 'signedIn', me: seller, userId: 9 })).toBe('app');
+    expect(isRep(seller)).toBe(false);
+    expect(mayRequestTransfers(seller)).toBe(true);
+    expect(isRep(office)).toBe(false);
+    expect(mayRequestTransfers(office)).toBe(false);
+  });
+
+  it('tells a rep who also requests transfers from one who does not', () => {
+    expect(isRep(both)).toBe(true);
+    expect(mayRequestTransfers(both)).toBe(true);
+    expect(isRep(rep)).toBe(true);
+    expect(mayRequestTransfers(rep)).toBe(false);
   });
 });

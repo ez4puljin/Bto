@@ -8,6 +8,7 @@ import {
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsIn,
   IsInt,
@@ -16,6 +17,7 @@ import {
   Matches,
   MaxLength,
   Min,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 import { PageQueryDto } from '../../../common/pagination/page';
@@ -39,6 +41,16 @@ export class TransferLineDto {
   @ApiProperty({ example: 'ширхэг' }) baseUnitName: string;
   @ApiProperty({ type: String, nullable: true, example: '120', description: 'Base units' })
   shippedQtyBase: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: '118',
+    description: 'What the destination counted, base units (null until counted; 0 = none arrived)',
+  })
+  countedQtyBase: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) countedAt: string | null;
+  @ApiProperty({ description: 'Found at the destination without being asked for (requested 0)' })
+  unrequested: boolean;
   @ApiProperty({ type: String, nullable: true, example: '118', description: 'Base units' })
   receivedQtyBase: string | null;
   @ApiProperty({
@@ -63,12 +75,31 @@ export class TransferDetailDto {
   @ApiProperty({ type: String, nullable: true, example: 'TR-2026-000001' }) number: string | null;
   @ApiProperty({ enum: TRANSFER_ORIGINS }) origin: TransferOrigin;
   @ApiProperty({ enum: TRANSFER_STATUSES }) status: TransferStatus;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'The request this group belongs to (every REQUEST has one; a PUSH none)',
+  })
+  requestId: number | null;
   @ApiProperty() sourceWarehouseId: number;
   @ApiProperty() destWarehouseId: number;
   @ApiProperty({ type: String, nullable: true }) note: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) requestedAt: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) shippedAt: string | null;
   @ApiProperty({ type: String, format: 'date', nullable: true }) shipDate: string | null;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'The destination finished its count (COUNTED)',
+  })
+  countedAt: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Why the source sent the count back, while the destination counts again',
+  })
+  countReturnReason: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) receivedAt: string | null;
   @ApiProperty({ type: String, format: 'date', nullable: true }) receiveDate: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) cancelledAt: string | null;
@@ -84,6 +115,7 @@ export class TransferSummaryDto {
   @ApiProperty({ type: String, nullable: true }) number: string | null;
   @ApiProperty({ enum: TRANSFER_ORIGINS }) origin: TransferOrigin;
   @ApiProperty({ enum: TRANSFER_STATUSES }) status: TransferStatus;
+  @ApiProperty({ type: Number, nullable: true }) requestId: number | null;
   @ApiProperty() sourceWarehouseId: number;
   @ApiProperty() destWarehouseId: number;
   @ApiProperty() lineCount: number;
@@ -113,6 +145,12 @@ export class TransferListQueryDto extends PageQueryDto {
   @IsOptional()
   @IsIn(TRANSFER_STATUSES)
   status?: TransferStatus;
+  @ApiPropertyOptional({ description: 'The groups of one request' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  requestId?: number;
 }
 
 @ApiSchema({ name: 'TransferLineRequest' })
@@ -198,6 +236,54 @@ export class TransferCountsDto {
   @ValidateNested({ each: true })
   @Type(() => TransferCountDto)
   lines?: TransferCountDto[];
+}
+
+@ApiSchema({ name: 'TransferCountEntry' })
+export class TransferCountEntryDto {
+  @ApiProperty() @IsInt() @Min(1) lineId: number;
+  @ApiPropertyOptional({ description: 'A current unit of the product; default the line’s unit' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  productUnitId?: number;
+  @ApiProperty({ example: '5', description: 'In that unit; 0 = nothing arrived («ирээгүй»)' })
+  @Matches(QTY)
+  qty: string;
+  @ApiPropertyOptional({ description: 'The destination shelf the goods were put on, as scanned' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  binId?: number;
+}
+
+@ApiSchema({ name: 'TransferSaveCountsRequest' })
+export class SaveTransferCountsDto {
+  @ApiProperty({ type: [TransferCountEntryDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_TRANSFER_LINES)
+  @ValidateNested({ each: true })
+  @Type(() => TransferCountEntryDto)
+  entries: TransferCountEntryDto[];
+}
+
+@ApiSchema({ name: 'TransferUnrequestedLineRequest' })
+export class UnrequestedLineDto {
+  @ApiProperty() @IsInt() @Min(1) productId: number;
+  @ApiProperty({ description: 'The scanned unit' }) @IsInt() @Min(1) productUnitId: number;
+  @ApiProperty({ example: '2', description: 'What arrived, in that unit' })
+  @Matches(QTY)
+  qty: string;
+}
+
+@ApiSchema({ name: 'TransferReturnCountRequest' })
+export class ReturnCountDto {
+  @ApiProperty({ maxLength: 300, description: 'Why the count goes back to the destination' })
+  @Transform(trimmed)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(300)
+  reason: string;
 }
 
 @ApiSchema({ name: 'TransferCancelRequest' })

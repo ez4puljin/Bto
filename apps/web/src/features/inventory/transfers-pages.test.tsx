@@ -36,7 +36,8 @@ const STORE: Schemas['Warehouse'] = {
   name: 'Супермаркет',
   kind: 'STORE',
 };
-const warehouses = () => list([WH1, STORE]);
+const WH2: Schemas['Warehouse'] = { ...WH1, id: 3, code: 'WH2', name: 'Зааланд ирдэг' };
+const warehouses = () => list([WH1, STORE, WH2]);
 
 /** The supermarket's sales clerk: transfers only, for the store alone. */
 const CLERK_ME: Me = {
@@ -130,6 +131,9 @@ const COLA_LINE: Schemas['TransferLine'] = {
   baseUnitId: 70,
   baseUnitName: 'ш',
   shippedQtyBase: null,
+  countedQtyBase: null,
+  countedAt: null,
+  unrequested: false,
   receivedQtyBase: null,
   fromBinId: 31,
   fromBinCode: 'A-01-03',
@@ -155,12 +159,15 @@ const DRAFT: Schemas['TransferDetail'] = {
   number: null,
   origin: 'REQUEST',
   status: 'DRAFT',
+  requestId: null,
   sourceWarehouseId: WH1.id,
   destWarehouseId: STORE.id,
   note: null,
   requestedAt: null,
   shippedAt: null,
   shipDate: null,
+  countedAt: null,
+  countReturnReason: null,
   receivedAt: null,
   receiveDate: null,
   cancelledAt: null,
@@ -479,63 +486,297 @@ describe('shipping', () => {
     );
     await waitFor(() => expect(localStorage.getItem(key)).toBeNull());
   }, 20_000);
+
+  it('lands a product scan on its line and shows what was asked (ADR-0116)', async () => {
+    const requested: Schemas['TransferDetail'] = {
+      ...DRAFT,
+      status: 'REQUESTED',
+      number: 'TR-2026-000001',
+      requestedAt: STAMP,
+      lines: [COLA_LINE, WATER_LINE],
+    };
+    const fetchMock = signedIn(WAREHOUSE_ME, {
+      'GET /api/v1/warehouses': warehouses,
+      'GET /api/v1/transfers/7': () => json(requested),
+      'GET /api/v1/bins/lookup': () => problem('NOT_FOUND', 404),
+      'GET /api/v1/barcodes/4006381333931': () => json(COLA_BOX),
+    });
+    renderApp('/inventory/transfers/7', fetchMock);
+    const user = userEvent.setup();
+    const scan = await screen.findByRole('textbox', { name: mn.inventory.scanLabel });
+    await user.type(scan, '4006381333931{Enter}');
+    expect(await screen.findByText('Кока кола: хүссэн 1 хайрцаг')).toBeInTheDocument();
+    expect(
+      screen.getByRole('textbox', { name: `${mn.inventory.transfer.toShip}: ${COLA.name}` }),
+    ).toHaveFocus();
+  }, 15_000);
 });
 
-describe('receiving', () => {
-  it('counts in the unit shipped and shows what goes back to the sender before receiving', async () => {
-    const shipped: Schemas['TransferDetail'] = {
-      ...DRAFT,
-      status: 'SHIPPED',
-      number: 'TR-2026-000001',
-      shipDate: '2026-10-11',
-      lines: [
-        {
-          ...COLA_LINE,
-          requestedQty: '2',
-          shippedQtyBase: '48',
-          toBinId: 50,
-          toBinCode: 'SALESFLOOR',
-        },
-      ],
-    };
+describe('counting a request at the store (ADR-0116)', () => {
+  const shipped: Schemas['TransferDetail'] = {
+    ...DRAFT,
+    status: 'SHIPPED',
+    number: 'TR-2026-000001',
+    requestId: 3,
+    requestedAt: STAMP,
+    shipDate: '2026-10-11',
+    lines: [
+      {
+        ...COLA_LINE,
+        requestedQty: '2',
+        shippedQtyBase: '48',
+        toBinId: 50,
+        toBinCode: 'SALESFLOOR',
+      },
+    ],
+  };
+  const sibling: Schemas['TransferDetail'] = {
+    ...DRAFT,
+    id: 8,
+    status: 'REQUESTED',
+    number: 'TR-2026-000002',
+    requestId: 3,
+    sourceWarehouseId: WH2.id,
+    requestedAt: STAMP,
+    lines: [WATER_LINE],
+  };
+  const request: Schemas['TransferRequestDetail'] = {
+    id: 3,
+    destWarehouseId: STORE.id,
+    destWarehouseName: STORE.name,
+    status: 'REQUESTED',
+    note: 'Баасан гарагийн нөхөн дүүргэлт',
+    requestedAt: STAMP,
+    createdAt: STAMP,
+    updatedAt: STAMP,
+    groups: [
+      { ...shipped, sourceWarehouseName: WH1.name },
+      { ...sibling, sourceWarehouseName: WH2.name },
+    ],
+  };
+
+  it('saves each count as it is typed, links the other groups and finishes with the differences listed', async () => {
     const fetchMock = signedIn(CLERK_ME, {
       'GET /api/v1/warehouses': warehouses,
       'GET /api/v1/transfers/7': () => json(shipped),
-      'POST /api/v1/transfers/7/receive': () => json({ ...shipped, status: 'RECEIVED' }),
+      'GET /api/v1/transfer-requests/3': () => json(request),
+      'PUT /api/v1/transfers/7/counts': () =>
+        json({
+          ...shipped,
+          lines: [{ ...shipped.lines[0]!, countedQtyBase: '36', countedAt: STAMP }],
+        }),
+      'POST /api/v1/transfers/7/finish-count': () =>
+        json({ ...shipped, status: 'COUNTED', countedAt: STAMP }),
     });
     renderApp('/inventory/transfers/7', fetchMock);
     const user = userEvent.setup();
     const arrived = await screen.findByRole('textbox', {
       name: `${mn.inventory.transfer.arrived}: ${COLA.name}`,
     });
-    expect(arrived).toHaveValue('2');
-    await user.clear(arrived);
+    // Nothing is counted yet: the field starts empty and the step waits.
+    expect(arrived).toHaveValue('');
+    const finish = screen.getByRole('button', { name: mn.inventory.transfer.finishCount });
+    expect(finish).toBeDisabled();
+    expect(screen.getByRole('link', { name: /TR-2026-000002/ })).toHaveAttribute(
+      'href',
+      '/inventory/transfers/8',
+    );
+    expect(screen.getByText(/Баасан гарагийн нөхөн дүүргэлт/)).toBeInTheDocument();
+
     await user.type(arrived, '1.5');
     expect(await screen.findByText('-12 ш')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: mn.inventory.transfer.receive }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'PUT', '/api/v1/transfers/7/counts')).toHaveLength(1),
+    );
+    expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/transfers/7/counts')[0])).toEqual({
+      entries: [{ lineId: 1, productUnitId: 77, qty: '1.5', binId: 50 }],
+    });
+    await waitFor(() => expect(finish).toBeEnabled());
+    await user.click(finish);
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(/Кока кола: 12 ш дутуу/)).toBeInTheDocument();
-    await user.click(within(dialog).getByRole('button', { name: mn.inventory.transfer.receive }));
-    await waitFor(() =>
-      expect(calls(fetchMock, 'POST', '/api/v1/transfers/7/receive')).toHaveLength(1),
+    await user.click(
+      within(dialog).getByRole('button', { name: mn.inventory.transfer.finishCount }),
     );
-    const post = calls(fetchMock, 'POST', '/api/v1/transfers/7/receive')[0];
-    expect(await bodyOf(post)).toEqual({
-      lines: [{ lineId: 1, productUnitId: 77, qty: '1.5', binId: 50 }],
-    });
-    expect(post!.headers.get('Idempotency-Key')).toMatch(UUID);
-  });
+    await waitFor(() =>
+      expect(calls(fetchMock, 'POST', '/api/v1/transfers/7/finish-count')).toHaveLength(1),
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent('TR-2026-000001');
+  }, 15_000);
 
+  it('marks a line «Ирээгүй» and adds a product that was not asked for after a question', async () => {
+    const fetchMock = signedIn(CLERK_ME, {
+      'GET /api/v1/warehouses': warehouses,
+      'GET /api/v1/transfers/7': () => json(shipped),
+      'GET /api/v1/transfer-requests/3': () => json(request),
+      'GET /api/v1/bins/lookup': () => problem('NOT_FOUND', 404),
+      'GET /api/v1/barcodes/5449000000996': () => json(WATER_PCS),
+      'PUT /api/v1/transfers/7/counts': () => json(shipped),
+      'POST /api/v1/transfers/7/count-lines': () =>
+        json({
+          ...shipped,
+          lines: [
+            ...shipped.lines,
+            {
+              ...WATER_LINE,
+              id: 9,
+              requestedQty: '0',
+              shippedQtyBase: '0',
+              countedQtyBase: '3',
+              countedAt: STAMP,
+              unrequested: true,
+            },
+          ],
+        }),
+    });
+    renderApp('/inventory/transfers/7', fetchMock);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: mn.inventory.transfer.notArrived }));
+    expect(
+      screen.getByRole('textbox', { name: `${mn.inventory.transfer.arrived}: ${COLA.name}` }),
+    ).toHaveValue('0');
+    await waitFor(() =>
+      expect(calls(fetchMock, 'PUT', '/api/v1/transfers/7/counts')).toHaveLength(1),
+    );
+    expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/transfers/7/counts')[0])).toEqual({
+      entries: [{ lineId: 1, productUnitId: 77, qty: '0', binId: 50 }],
+    });
+
+    const scan = screen.getByRole('textbox', { name: mn.inventory.scanLabel });
+    await user.type(scan, '5449000000996{Enter}');
+    const dialog = within(await screen.findByRole('dialog'));
+    const add = dialog.getByRole('button', { name: mn.inventory.transfer.addExtra });
+    expect(add).toBeDisabled();
+    await user.type(
+      dialog.getByLabelText(mn.inventory.transfer.addExtraQty.replace('{{unit}}', 'ш')),
+      '3',
+    );
+    await user.click(add);
+    await waitFor(() =>
+      expect(calls(fetchMock, 'POST', '/api/v1/transfers/7/count-lines')).toHaveLength(1),
+    );
+    const post = calls(fetchMock, 'POST', '/api/v1/transfers/7/count-lines')[0];
+    expect(await bodyOf(post)).toEqual({ productId: WATER.id, productUnitId: 80, qty: '3' });
+    expect(post!.headers.get('Idempotency-Key')).toMatch(UUID);
+  }, 15_000);
+});
+
+describe('the keeper confirms the count (ADR-0116)', () => {
+  const counted: Schemas['TransferDetail'] = {
+    ...DRAFT,
+    status: 'COUNTED',
+    number: 'TR-2026-000001',
+    requestId: 3,
+    requestedAt: STAMP,
+    shipDate: '2026-10-11',
+    countedAt: STAMP,
+    lines: [
+      {
+        ...COLA_LINE,
+        requestedQty: '2',
+        shippedQtyBase: '48',
+        countedQtyBase: '36',
+        countedAt: STAMP,
+        toBinId: 50,
+        toBinCode: 'SALESFLOOR',
+      },
+      {
+        ...WATER_LINE,
+        id: 9,
+        requestedQty: '0',
+        shippedQtyBase: '0',
+        countedQtyBase: '3',
+        countedAt: STAMP,
+        unrequested: true,
+        toBinId: 50,
+        toBinCode: 'SALESFLOOR',
+      },
+    ],
+  };
+  const request: Schemas['TransferRequestDetail'] = {
+    id: 3,
+    destWarehouseId: STORE.id,
+    destWarehouseName: STORE.name,
+    status: 'COUNTED',
+    note: null,
+    requestedAt: STAMP,
+    createdAt: STAMP,
+    updatedAt: STAMP,
+    groups: [{ ...counted, sourceWarehouseName: WH1.name }],
+  };
+
+  it('shows the differences and posts the receipt once on «Батлах»', async () => {
+    const fetchMock = signedIn(WAREHOUSE_ME, {
+      'GET /api/v1/warehouses': warehouses,
+      'GET /api/v1/transfers/7': () => json(counted),
+      'GET /api/v1/transfer-requests/3': () => json(request),
+      'POST /api/v1/transfers/7/confirm': () =>
+        json({ ...counted, status: 'RECEIVED', receiveDate: '2026-10-12' }),
+    });
+    renderApp('/inventory/transfers/7', fetchMock);
+    const user = userEvent.setup();
+    expect(await screen.findByText(mn.inventory.transfer.confirmTitle)).toBeInTheDocument();
+    expect(screen.getByText('-12 ш')).toBeInTheDocument();
+    expect(screen.getByText('+3 ш')).toBeInTheDocument();
+    expect(screen.getAllByText(mn.inventory.transfer.unrequested).length).toBeGreaterThan(0);
+    expect(screen.getByText(/A-01-03 буцна/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: mn.inventory.transfer.confirm }));
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByText(/Кока кола: 12 ш дутуу/)).toBeInTheDocument();
+    expect(dialog.getByText(/Ус: 3 ш илүү/)).toBeInTheDocument();
+    await user.click(dialog.getByRole('button', { name: mn.inventory.transfer.confirm }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'POST', '/api/v1/transfers/7/confirm')).toHaveLength(1),
+    );
+    expect(
+      calls(fetchMock, 'POST', '/api/v1/transfers/7/confirm')[0]!.headers.get('Idempotency-Key'),
+    ).toMatch(UUID);
+    expect(await screen.findByRole('status')).toHaveTextContent('TR-2026-000001');
+  }, 15_000);
+
+  it('sends the count back to the store with a reason', async () => {
+    const fetchMock = signedIn(WAREHOUSE_ME, {
+      'GET /api/v1/warehouses': warehouses,
+      'GET /api/v1/transfers/7': () => json(counted),
+      'GET /api/v1/transfer-requests/3': () => json(request),
+      'POST /api/v1/transfers/7/return-count': () =>
+        json({ ...counted, status: 'SHIPPED', countedAt: null, countReturnReason: 'Дахин тоол' }),
+    });
+    renderApp('/inventory/transfers/7', fetchMock);
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole('button', { name: mn.inventory.transfer.returnCount }),
+    );
+    const dialog = within(await screen.findByRole('dialog'));
+    const send = dialog.getByRole('button', { name: mn.inventory.transfer.returnCount });
+    expect(send).toBeDisabled();
+    await user.type(dialog.getByLabelText(mn.inventory.transfer.returnReason), 'Дахин тоол');
+    await user.click(send);
+    await waitFor(() =>
+      expect(calls(fetchMock, 'POST', '/api/v1/transfers/7/return-count')).toHaveLength(1),
+    );
+    expect(await bodyOf(calls(fetchMock, 'POST', '/api/v1/transfers/7/return-count')[0])).toEqual({
+      reason: 'Дахин тоол',
+    });
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      mn.inventory.transfer.returnedToast,
+    );
+  }, 15_000);
+});
+
+describe('receiving a push', () => {
   it('receives a transfer without differences at once', async () => {
     const shipped: Schemas['TransferDetail'] = {
       ...DRAFT,
+      origin: 'PUSH',
+      sourceWarehouseId: STORE.id,
+      destWarehouseId: WH1.id,
       status: 'SHIPPED',
       number: 'TR-2026-000001',
       shipDate: '2026-10-11',
-      lines: [{ ...COLA_LINE, shippedQtyBase: '24', toBinId: 50, toBinCode: 'SALESFLOOR' }],
+      lines: [{ ...COLA_LINE, shippedQtyBase: '24', toBinId: 31, toBinCode: 'A-01-03' }],
     };
-    const fetchMock = signedIn(CLERK_ME, {
+    const fetchMock = signedIn(WAREHOUSE_ME, {
       'GET /api/v1/warehouses': warehouses,
       'GET /api/v1/transfers/7': () => json(shipped),
       'POST /api/v1/transfers/7/receive': () => json({ ...shipped, status: 'RECEIVED' }),

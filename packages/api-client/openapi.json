@@ -10361,6 +10361,580 @@
         ]
       }
     },
+    "/api/v1/transfer-requests/context": {
+      "get": {
+        "operationId": "TransferRequests_context",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferRequestContext"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfer-requests/rows": {
+      "get": {
+        "operationId": "TransferRequests_rows",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "query",
+            "description": "The store the request is for",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "requestId",
+            "required": false,
+            "in": "query",
+            "description": "Show this request’s lines beside the products",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "filter",
+            "required": false,
+            "in": "query",
+            "description": "REQUESTED: only the request’s products",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "REQUESTED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferRequestRowsPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfer-requests": {
+      "get": {
+        "operationId": "TransferRequests_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "description": "The store; without it, the caller’s own warehouses",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "REQUESTED",
+                "SHIPPED",
+                "COUNTED",
+                "RECEIVED",
+                "CANCELLED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferRequestPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "operationId": "TransferRequests_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferRequestCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferRequestDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfer-requests/{id}": {
+      "get": {
+        "operationId": "TransferRequests_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferRequestDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "patch": {
+        "operationId": "TransferRequests_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferRequestUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferRequestDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfer-requests/{id}/lines": {
+      "put": {
+        "operationId": "TransferRequests_saveLines",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferRequestSaveLinesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferRequestSaveResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Writes only the changed cells, each against the value the page opened with.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfer-requests/{id}/request": {
+      "post": {
+        "operationId": "TransferRequests_request",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferRequestDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "DRAFT → REQUESTED: every group is sent and numbered.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfer-requests/{id}/reopen": {
+      "post": {
+        "operationId": "TransferRequests_reopen",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferRequestDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every REQUESTED group back to DRAFT for editing (ADR-0046).",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfer-requests/{id}/cancel": {
+      "post": {
+        "operationId": "TransferRequests_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferRequestCancelRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferRequestDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The store withdraws the whole request while nothing is shipped.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/transfers": {
       "get": {
         "operationId": "Transfers_list",
@@ -10417,9 +10991,20 @@
                 "DRAFT",
                 "REQUESTED",
                 "SHIPPED",
+                "COUNTED",
                 "RECEIVED",
                 "CANCELLED"
               ]
+            }
+          },
+          {
+            "name": "requestId",
+            "required": false,
+            "in": "query",
+            "description": "The groups of one request",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
             }
           }
         ],
@@ -10878,7 +11463,285 @@
             "bearer": []
           }
         ],
-        "summary": "The destination counts what arrived; differences go back to the sender (ADR-0035).",
+        "summary": "The destination receives a push in one step; differences go back to the sender (ADR-0035). A\nrequest is counted, then confirmed by the source (ADR-0116): `DOC_STATE_INVALID` here.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfers/{id}/counts": {
+      "put": {
+        "operationId": "Transfers_saveCounts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferSaveCountsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The destination's counts on a shipped request, saved line by line (ADR-0116 #4).",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfers/{id}/count-lines": {
+      "post": {
+        "operationId": "Transfers_addCountLine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferUnrequestedLineRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A product found at the destination that was not asked for (ADR-0116 #5).",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfers/{id}/finish-count": {
+      "post": {
+        "operationId": "Transfers_finishCount",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "SHIPPED → COUNTED by the destination: every line counted or «ирээгүй» (ADR-0116 #4).",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfers/{id}/return-count": {
+      "post": {
+        "operationId": "Transfers_returnCount",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferReturnCountRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "COUNTED → SHIPPED by the source, with a reason: the destination counts again (ADR-0116 #6).",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfers/{id}/confirm": {
+      "post": {
+        "operationId": "Transfers_confirm",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "COUNTED → RECEIVED by the source: the receipt is posted with what was counted (ADR-0116 #6).",
         "tags": [
           "inventory"
         ]
@@ -36486,53 +37349,225 @@
           }
         }
       },
-      "TransferSummary": {
+      "TransferRequestContext": {
+        "type": "object",
+        "properties": {
+          "storeWarehouses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "number"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ]
+            },
+            "description": "The STORE warehouses the caller may request for"
+          },
+          "today": {
+            "type": "string",
+            "format": "date",
+            "description": "The server’s business date"
+          }
+        },
+        "required": [
+          "storeWarehouses",
+          "today"
+        ]
+      },
+      "TransferRequestRowUnit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "description": "The product unit id"
+          },
+          "name": {
+            "type": "string",
+            "example": "хайрцаг"
+          },
+          "uomCode": {
+            "type": "string",
+            "nullable": true,
+            "example": "BOX"
+          },
+          "factor": {
+            "type": "string",
+            "example": "24",
+            "description": "Base units per unit"
+          },
+          "isBase": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "uomCode",
+          "factor",
+          "isBase"
+        ]
+      },
+      "TransferRequestRowLine": {
+        "type": "object",
+        "properties": {
+          "transferId": {
+            "type": "number"
+          },
+          "lineId": {
+            "type": "number"
+          },
+          "productUnitId": {
+            "type": "number"
+          },
+          "qty": {
+            "type": "string",
+            "example": "3",
+            "description": "In that unit"
+          }
+        },
+        "required": [
+          "transferId",
+          "lineId",
+          "productUnitId",
+          "qty"
+        ]
+      },
+      "TransferRequestRow": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "thumbUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "units": {
+            "description": "Current units, base first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferRequestRowUnit"
+            }
+          },
+          "homeWarehouseId": {
+            "type": "number",
+            "nullable": true
+          },
+          "homeWarehouseName": {
+            "type": "string",
+            "nullable": true
+          },
+          "homeOnHand": {
+            "type": "string",
+            "example": "240",
+            "description": "On hand in the home warehouse, base units"
+          },
+          "storeOnHand": {
+            "type": "string",
+            "example": "12",
+            "description": "On hand at the store, base units"
+          },
+          "lastMonthOut": {
+            "type": "string",
+            "example": "96",
+            "description": "Last calendar month’s till sales at the store, base units"
+          },
+          "line": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransferRequestRowLine"
+              }
+            ]
+          }
+        },
+        "required": [
+          "productId",
+          "sku",
+          "name",
+          "thumbUrl",
+          "units",
+          "homeWarehouseId",
+          "homeWarehouseName",
+          "homeOnHand",
+          "storeOnHand",
+          "lastMonthOut",
+          "line"
+        ]
+      },
+      "TransferRequestRowsPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferRequestRow"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number"
+          },
+          "outflowFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "outflowTo": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor",
+          "total",
+          "outflowFrom",
+          "outflowTo"
+        ]
+      },
+      "TransferRequestSummary": {
         "type": "object",
         "properties": {
           "id": {
             "type": "number"
           },
-          "number": {
-            "type": "string",
-            "nullable": true
-          },
-          "origin": {
-            "enum": [
-              "REQUEST",
-              "PUSH"
-            ],
-            "type": "string"
+          "destWarehouseId": {
+            "type": "number"
           },
           "status": {
             "enum": [
               "DRAFT",
               "REQUESTED",
               "SHIPPED",
+              "COUNTED",
               "RECEIVED",
               "CANCELLED"
             ],
             "type": "string"
           },
-          "sourceWarehouseId": {
-            "type": "number"
-          },
-          "destWarehouseId": {
-            "type": "number"
-          },
-          "lineCount": {
-            "type": "number"
+          "note": {
+            "type": "string",
+            "nullable": true
           },
           "requestedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "shippedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "receivedAt": {
             "type": "string",
             "nullable": true,
             "format": "date-time"
@@ -36540,29 +37575,45 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "groupCount": {
+            "type": "number"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "numbers": {
+            "description": "The groups’ TR- numbers, by group",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
           "id",
-          "number",
-          "origin",
-          "status",
-          "sourceWarehouseId",
           "destWarehouseId",
-          "lineCount",
+          "status",
+          "note",
           "requestedAt",
-          "shippedAt",
-          "receivedAt",
-          "createdAt"
+          "createdAt",
+          "updatedAt",
+          "groupCount",
+          "lineCount",
+          "numbers"
         ]
       },
-      "TransferPage": {
+      "TransferRequestPage": {
         "type": "object",
         "properties": {
           "data": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/TransferSummary"
+              "$ref": "#/components/schemas/TransferRequestSummary"
             }
           },
           "nextCursor": {
@@ -36621,6 +37672,21 @@
             "example": "120",
             "description": "Base units"
           },
+          "countedQtyBase": {
+            "type": "string",
+            "nullable": true,
+            "example": "118",
+            "description": "What the destination counted, base units (null until counted; 0 = none arrived)"
+          },
+          "countedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "unrequested": {
+            "type": "boolean",
+            "description": "Found at the destination without being asked for (requested 0)"
+          },
           "receivedQtyBase": {
             "type": "string",
             "nullable": true,
@@ -36660,6 +37726,9 @@
           "baseUnitId",
           "baseUnitName",
           "shippedQtyBase",
+          "countedQtyBase",
+          "countedAt",
+          "unrequested",
           "receivedQtyBase",
           "fromBinId",
           "fromBinCode",
@@ -36667,7 +37736,7 @@
           "toBinCode"
         ]
       },
-      "TransferDetail": {
+      "TransferRequestGroup": {
         "type": "object",
         "properties": {
           "id": {
@@ -36690,10 +37759,16 @@
               "DRAFT",
               "REQUESTED",
               "SHIPPED",
+              "COUNTED",
               "RECEIVED",
               "CANCELLED"
             ],
             "type": "string"
+          },
+          "requestId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The request this group belongs to (every REQUEST has one; a PUSH none)"
           },
           "sourceWarehouseId": {
             "type": "number"
@@ -36719,6 +37794,494 @@
             "type": "string",
             "nullable": true,
             "format": "date"
+          },
+          "countedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "The destination finished its count (COUNTED)"
+          },
+          "countReturnReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Why the source sent the count back, while the destination counts again"
+          },
+          "receivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "receiveDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "cancelledAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferLine"
+            }
+          },
+          "sourceWarehouseName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "origin",
+          "status",
+          "requestId",
+          "sourceWarehouseId",
+          "destWarehouseId",
+          "note",
+          "requestedAt",
+          "shippedAt",
+          "shipDate",
+          "countedAt",
+          "countReturnReason",
+          "receivedAt",
+          "receiveDate",
+          "cancelledAt",
+          "cancelReason",
+          "createdAt",
+          "updatedAt",
+          "lines",
+          "sourceWarehouseName"
+        ]
+      },
+      "TransferRequestDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "destWarehouseId": {
+            "type": "number"
+          },
+          "destWarehouseName": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "REQUESTED",
+              "SHIPPED",
+              "COUNTED",
+              "RECEIVED",
+              "CANCELLED"
+            ],
+            "type": "string",
+            "description": "The lowest of the live groups"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "groups": {
+            "description": "One per source warehouse, cancelled ones left out",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferRequestGroup"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "destWarehouseId",
+          "destWarehouseName",
+          "status",
+          "note",
+          "requestedAt",
+          "createdAt",
+          "updatedAt",
+          "groups"
+        ]
+      },
+      "TransferRequestLineRequest": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "productUnitId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The unit asked for"
+          },
+          "qty": {
+            "type": "string",
+            "example": "5",
+            "description": "Positive, in that unit"
+          }
+        },
+        "required": [
+          "productId",
+          "productUnitId",
+          "qty"
+        ]
+      },
+      "TransferRequestCreateRequest": {
+        "type": "object",
+        "properties": {
+          "destWarehouseId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The store (a STORE warehouse in the caller’s scope)"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "lines": {
+            "minItems": 1,
+            "description": "One line per product",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferRequestLineRequest"
+            }
+          }
+        },
+        "required": [
+          "destWarehouseId",
+          "lines"
+        ]
+      },
+      "TransferRequestUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          }
+        }
+      },
+      "TransferRequestChange": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "productUnitId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The unit now (null with no quantity)"
+          },
+          "qty": {
+            "type": "string",
+            "nullable": true,
+            "description": "The quantity now; null or 0 removes"
+          },
+          "previousUnitId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The unit when the page opened"
+          },
+          "previousQty": {
+            "type": "string",
+            "nullable": true,
+            "description": "The quantity when the page opened"
+          }
+        },
+        "required": [
+          "productId",
+          "productUnitId",
+          "qty",
+          "previousUnitId",
+          "previousQty"
+        ]
+      },
+      "TransferRequestSaveLinesRequest": {
+        "type": "object",
+        "properties": {
+          "changes": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferRequestChange"
+            }
+          }
+        },
+        "required": [
+          "changes"
+        ]
+      },
+      "TransferRequestConflict": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "productUnitId": {
+            "type": "number",
+            "nullable": true
+          },
+          "qty": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "productId",
+          "productUnitId",
+          "qty"
+        ]
+      },
+      "TransferRequestRefusal": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "reason": {
+            "enum": [
+              "NO_HOME"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "productId",
+          "reason"
+        ]
+      },
+      "TransferRequestSaveResult": {
+        "type": "object",
+        "properties": {
+          "applied": {
+            "type": "number"
+          },
+          "conflicts": {
+            "description": "Changed by someone else: skipped",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferRequestConflict"
+            }
+          },
+          "refused": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferRequestRefusal"
+            }
+          }
+        },
+        "required": [
+          "applied",
+          "conflicts",
+          "refused"
+        ]
+      },
+      "TransferRequestCancelRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        }
+      },
+      "TransferSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "origin": {
+            "enum": [
+              "REQUEST",
+              "PUSH"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "REQUESTED",
+              "SHIPPED",
+              "COUNTED",
+              "RECEIVED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "requestId": {
+            "type": "number",
+            "nullable": true
+          },
+          "sourceWarehouseId": {
+            "type": "number"
+          },
+          "destWarehouseId": {
+            "type": "number"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "requestedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "shippedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "receivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "origin",
+          "status",
+          "requestId",
+          "sourceWarehouseId",
+          "destWarehouseId",
+          "lineCount",
+          "requestedAt",
+          "shippedAt",
+          "receivedAt",
+          "createdAt"
+        ]
+      },
+      "TransferPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "TransferDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true,
+            "example": "TR-2026-000001"
+          },
+          "origin": {
+            "enum": [
+              "REQUEST",
+              "PUSH"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "REQUESTED",
+              "SHIPPED",
+              "COUNTED",
+              "RECEIVED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "requestId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The request this group belongs to (every REQUEST has one; a PUSH none)"
+          },
+          "sourceWarehouseId": {
+            "type": "number"
+          },
+          "destWarehouseId": {
+            "type": "number"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "shippedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "shipDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "countedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "The destination finished its count (COUNTED)"
+          },
+          "countReturnReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Why the source sent the count back, while the destination counts again"
           },
           "receivedAt": {
             "type": "string",
@@ -36759,12 +38322,15 @@
           "number",
           "origin",
           "status",
+          "requestId",
           "sourceWarehouseId",
           "destWarehouseId",
           "note",
           "requestedAt",
           "shippedAt",
           "shipDate",
+          "countedAt",
+          "countReturnReason",
           "receivedAt",
           "receiveDate",
           "cancelledAt",
@@ -36879,6 +38445,87 @@
           }
         }
       },
+      "TransferCountEntry": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "productUnitId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "A current unit of the product; default the line’s unit"
+          },
+          "qty": {
+            "type": "string",
+            "example": "5",
+            "description": "In that unit; 0 = nothing arrived («ирээгүй»)"
+          },
+          "binId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The destination shelf the goods were put on, as scanned"
+          }
+        },
+        "required": [
+          "lineId",
+          "qty"
+        ]
+      },
+      "TransferSaveCountsRequest": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferCountEntry"
+            }
+          }
+        },
+        "required": [
+          "entries"
+        ]
+      },
+      "TransferUnrequestedLineRequest": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "productUnitId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The scanned unit"
+          },
+          "qty": {
+            "type": "string",
+            "example": "2",
+            "description": "What arrived, in that unit"
+          }
+        },
+        "required": [
+          "productId",
+          "productUnitId",
+          "qty"
+        ]
+      },
+      "TransferReturnCountRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "description": "Why the count goes back to the destination"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
       "TransferCancelRequest": {
         "type": "object",
         "properties": {
@@ -36932,6 +38579,10 @@
             "type": "number",
             "description": "Shipments on their way to the caller’s warehouses"
           },
+          "transfersToConfirm": {
+            "type": "number",
+            "description": "Request groups the caller’s warehouses sent, counted by the store, to confirm"
+          },
           "adjustmentsToApprove": {
             "type": "number",
             "description": "Adjustments waiting for approval (approvers)"
@@ -36956,6 +38607,7 @@
         "required": [
           "transfersToShip",
           "transfersToReceive",
+          "transfersToConfirm",
           "adjustmentsToApprove",
           "stocktakesToReview",
           "receiptsToCost",
@@ -56636,6 +58288,8 @@
           "PO_STATUS_INVALID",
           "SALE_PRICE_NO_TERMS",
           "TRANSFER_NOTHING_SHIPPED",
+          "TRANSFER_LINES_UNCOUNTED",
+          "TRANSFER_REQUEST_EMPTY",
           "STOCKTAKE_BINS_UNFINISHED",
           "IMPORT_FILE_INVALID",
           "IMPORT_STATE_INVALID",

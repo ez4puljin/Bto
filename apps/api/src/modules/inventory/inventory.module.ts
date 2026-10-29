@@ -16,6 +16,7 @@ import { ProductRegistrationsController } from './controllers/product-registrati
 import { ReceiptLinesController, ReceiptsController } from './controllers/receipts.controller';
 import { StockController } from './controllers/stock.controller';
 import { StocktakesController } from './controllers/stocktakes.controller';
+import { TransferRequestsController } from './controllers/transfer-requests.controller';
 import { TransferLinesController, TransfersController } from './controllers/transfers.controller';
 import { ReconcileJob } from './jobs/reconcile.job';
 import { SnapshotMonthlyJob } from './jobs/snapshot-monthly.job';
@@ -34,9 +35,11 @@ import { IssueExpenseTypesService } from './services/issue-expense-types.service
 import { StockQueryService } from './services/stock-query.service';
 import { StocktakesService } from './services/stocktakes.service';
 import { SystemBinsService } from './services/system-bins.service';
+import { TransferRequestsService } from './services/transfer-requests.service';
 import { TransfersService } from './services/transfers.service';
 
 const CORE_SERVICES = [
+  TransferRequestsService,
   AdjustmentsService,
   GoodsIssuesService,
   IssueExpenseTypesService,
@@ -103,6 +106,7 @@ export class InventoryBootstrap implements OnApplicationBootstrap {
     AdjustmentLinesController,
     StockController,
     StocktakesController,
+    TransferRequestsController,
     TransfersController,
     TransferLinesController,
     InventoryAttentionController,

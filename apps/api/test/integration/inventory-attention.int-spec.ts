@@ -123,6 +123,7 @@ describe('attention counts', () => {
     expect(await attention(admin)).toEqual({
       transfersToShip: 2,
       transfersToReceive: 1,
+      transfersToConfirm: 0,
       adjustmentsToApprove: 2,
       stocktakesToReview: 1,
       receiptsToCost: 1,
@@ -151,6 +152,7 @@ describe('attention counts', () => {
     expect(await attention(nobody)).toEqual({
       transfersToShip: 0,
       transfersToReceive: 0,
+      transfersToConfirm: 0,
       adjustmentsToApprove: 0,
       stocktakesToReview: 0,
       receiptsToCost: 0,
