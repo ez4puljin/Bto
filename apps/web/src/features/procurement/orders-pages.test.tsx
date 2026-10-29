@@ -569,6 +569,125 @@ describe('purchase orders', () => {
   });
 });
 
+const CANDIDATES: Schemas['PurchaseOrderSupplierCandidate'][] = [
+  { id: 31, code: 'S031', name: 'МСМ ХХК', phone: null, tin: null, mainProductCount: 12 },
+  { id: 32, code: 'S032', name: 'Сүү ХК', phone: null, tin: null, mainProductCount: 3 },
+  { id: 33, code: 'S033', name: 'Шинэ ХХК', phone: null, tin: null, mainProductCount: 0 },
+];
+
+describe('a new order with every supplier', () => {
+  it('ticks every supplier with main products, names the skipped ones and creates in one request', async () => {
+    const user = userEvent.setup();
+    const posted: { body: unknown; key: string | null }[] = [];
+    const fetchMock = signedIn(
+      ADMIN_ME,
+      base({
+        'GET /api/v1/purchase-orders': () => list([]),
+        'GET /api/v1/procurement/supplier-candidates': () => list(CANDIDATES),
+        'POST /api/v1/purchase-orders': async (request) => {
+          posted.push({
+            body: await request.json(),
+            key: request.headers.get('idempotency-key'),
+          });
+          return json(DETAIL, 201);
+        },
+      }),
+    );
+    renderApp('/procurement/orders?new=1', fetchMock);
+
+    const selectAll = await screen.findByRole('button', { name: mn.procurement.ticks.selectAll });
+    // The list shows each supplier's main-product count.
+    expect(await screen.findByText('12 бараа')).toBeInTheDocument();
+    expect(screen.getByText(mn.procurement.ticks.noMainProducts)).toBeInTheDocument();
+    await user.click(selectAll);
+    expect(screen.getByText('2 нийлүүлэгч сонгосон')).toBeInTheDocument();
+    expect(screen.getByText(/1 нийлүүлэгч үндсэн бараагүй тул орохгүй/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: mn.procurement.ticks.clearAll })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /Шинэ ХХК/ })).not.toBeChecked();
+
+    // A search narrows the list in the browser; the ticks stay.
+    await user.type(screen.getByRole('searchbox', { name: mn.procurement.ticks.search }), 'сүү');
+    await waitFor(() =>
+      expect(screen.queryByRole('checkbox', { name: /МСМ ХХК/ })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole('checkbox', { name: /Сүү ХК/ })).toBeChecked();
+
+    await user.click(screen.getByRole('button', { name: 'Захиалга үүсгэх (2)' }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]?.body).toMatchObject({ note: null, supplierIds: [31, 32] });
+    expect(posted[0]?.key).toMatch(/[0-9a-f-]{36}/);
+    expect(await screen.findByRole('status')).toHaveTextContent('PO-2026-000007 захиалга үүслээ');
+  }, 20_000);
+
+  it('keeps the groups of a large order closed until one is opened or filtered', async () => {
+    const user = userEvent.setup();
+    const many = Array.from({ length: 8 }, (_, index) => ({
+      ...MSM,
+      supplierId: 31 + index,
+      supplierCode: `S0${31 + index}`,
+      supplierName: index === 0 ? 'МСМ ХХК' : `Нийлүүлэгч ${31 + index}`,
+      lineCount: index === 1 ? 0 : 1,
+    }));
+    const requested: string[] = [];
+    const fetchMock = signedIn(
+      ADMIN_ME,
+      base({
+        'GET /api/v1/purchase-orders/7': () => json({ ...DETAIL, suppliers: many }),
+        ...Object.fromEntries(
+          many.map((supplier) => [
+            `GET /api/v1/purchase-orders/7/suppliers/${supplier.supplierId}/rows`,
+            () => {
+              requested.push(String(supplier.supplierId));
+              return gridPage([COLA]);
+            },
+          ]),
+        ),
+      }),
+    );
+    renderApp('/procurement/orders/7', fetchMock);
+
+    // Eight closed headers, their counts, and not one rows request.
+    expect(await screen.findByRole('button', { name: 'Дэлгэх: МСМ ХХК' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(screen.getAllByText('1 бараа захиалсан')).toHaveLength(7);
+    expect(screen.getByText(mn.procurement.detail.noLines)).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /Тоо:/ })).not.toBeInTheDocument();
+    expect(requested).toEqual([]);
+    expect(
+      screen.getByRole('button', { name: mn.procurement.detail.expandAll }),
+    ).toBeInTheDocument();
+
+    // Opening one loads its rows only.
+    await user.click(screen.getByRole('button', { name: 'Дэлгэх: МСМ ХХК' }));
+    expect(await screen.findByRole('textbox', { name: 'Тоо: 1001 Кока кола 0.5л' })).toHaveValue(
+      '2',
+    );
+    expect(requested).toEqual(['31']);
+    expect(screen.getByRole('button', { name: 'Хураах: МСМ ХХК' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+
+    // «Зөвхөн захиалсан» hides the supplier with nothing ordered.
+    await user.click(screen.getByRole('checkbox', { name: mn.procurement.detail.orderedOnly }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: 'Дэлгэх: Нийлүүлэгч 32' }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole('button', { name: 'Дэлгэх: Нийлүүлэгч 33' })).toBeInTheDocument();
+
+    // The supplier filter opens the chosen group.
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: mn.procurement.detail.supplierFilter }),
+      '33',
+    );
+    await waitFor(() => expect(requested).toContain('33'));
+  }, 20_000);
+});
+
 describe('purchase order history', () => {
   it('lists the changes with who, when and from → to, and filters by supplier', async () => {
     const rows: Schemas['PurchaseOrderHistoryRow'][] = [

@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { type components } from '@tugeel/api-client';
 import { Decimal } from '@tugeel/shared/money';
 import { poStatusRank, requiredGroupsFor } from '@tugeel/shared/procurement';
-import { ClipboardList, TriangleAlert, X } from 'lucide-react';
+import { ChevronsDownUp, ChevronsUpDown, ClipboardList, TriangleAlert, X } from 'lucide-react';
 import {
   type KeyboardEvent,
   useCallback,
@@ -93,6 +93,12 @@ const sameVersion = (a: PurchaseOrderVersion, b: PurchaseOrderVersion) =>
   a.updatedAt === b.updatedAt && a.receiptsUpdatedAt === b.receiptsUpdatedAt;
 
 /**
+ * Up to this many suppliers every group opens with the page (ADR-0118's one table); past it the
+ * groups start closed and load when opened, so an order of every supplier stays usable.
+ */
+const OPEN_ALL_UP_TO = 5;
+
+/**
  * One order as in Butenorgil (`/procurement/orders/:id`, ADR-0118): every supplier's products in one
  * table, grouped by supplier, with the columns of every stage side by side — stock and the sales
  * averages, the ordered quantity, the shipped one, the counted boxes × pieces with a note on a
@@ -152,11 +158,33 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
       ? filterParam
       : defaultFilter;
   const query: GridQuery = { q, filter, warehouseId };
-  const suppliers =
+  const chosen =
     supplierParam === undefined
-      ? detail.suppliers
-      : detail.suppliers.filter((supplier) => supplier.supplierId === supplierParam);
-  const chosen = supplierParam === undefined ? undefined : suppliers[0];
+      ? undefined
+      : detail.suppliers.find((supplier) => supplier.supplierId === supplierParam);
+  // «Зөвхөн захиалсан» also hides the suppliers with nothing ordered.
+  const suppliers = (chosen ? [chosen] : detail.suppliers).filter(
+    (supplier) => filter !== 'ORDERED' || supplier.lineCount > 0,
+  );
+
+  // Groups open or closed (ADR-0118 kept for small orders): a closed group loads no rows.
+  const collapsible = detail.suppliers.length > OPEN_ALL_UP_TO;
+  const [opened, setOpened] = useState<ReadonlySet<number>>(() => new Set());
+  const isOpen = (supplierId: number) =>
+    !collapsible || supplierParam === supplierId || opened.has(supplierId);
+  const toggleGroup = useCallback(
+    (supplierId: number) =>
+      setOpened((current) => {
+        const next = new Set(current);
+        if (next.has(supplierId)) next.delete(supplierId);
+        else next.add(supplierId);
+        return next;
+      }),
+    [],
+  );
+  const allOpen = suppliers.every((supplier) => isOpen(supplier.supplierId));
+  const toggleAllGroups = () =>
+    setOpened(allOpen ? new Set() : new Set(suppliers.map((supplier) => supplier.supplierId)));
 
   // Column groups hidden per user in this browser; the present stages' groups stay (ADR-0118 #5).
   const locked = requiredGroupsFor(detail.suppliers.map((supplier) => supplier.status));
@@ -446,14 +474,22 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
       />
       <FilterBar
         end={
-          <ColumnChooser
-            keys={GROUP_KEYS}
-            locked={locked}
-            label={(key) => t(`procurement.detail.groups.${key}`)}
-            hidden={columns.hidden}
-            toggle={columns.toggle}
-            showAll={columns.showAll}
-          />
+          <>
+            {collapsible ? (
+              <Button type="button" variant="outline" size="sm" onClick={toggleAllGroups}>
+                {allOpen ? <ChevronsDownUp /> : <ChevronsUpDown />}
+                {t(allOpen ? 'procurement.detail.collapseAll' : 'procurement.detail.expandAll')}
+              </Button>
+            ) : null}
+            <ColumnChooser
+              keys={GROUP_KEYS}
+              locked={locked}
+              label={(key) => t(`procurement.detail.groups.${key}`)}
+              hidden={columns.hidden}
+              toggle={columns.toggle}
+              showAll={columns.showAll}
+            />
+          </>
         }
       >
         <NativeSelect
@@ -544,7 +580,14 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
       <div ref={table}>
         <ListCard scroll>
           {suppliers.length === 0 ? (
-            <EmptyState icon={ClipboardList} title={t('procurement.order.noSuppliers')} />
+            <EmptyState
+              icon={ClipboardList}
+              title={t(
+                detail.suppliers.length === 0
+                  ? 'procurement.order.noSuppliers'
+                  : 'procurement.order.noOrdered',
+              )}
+            />
           ) : (
             <Table>
               <OrderTableHead view={view} />
@@ -562,6 +605,9 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
                   onAddExtra={(row, receiptId) => setExtraFor({ supplier: row, receiptId })}
                   movePending={mutations.move.isPending}
                   onEnter={onEnter}
+                  open={isOpen(supplier.supplierId)}
+                  collapsible={collapsible}
+                  onToggle={toggleGroup}
                 />
               ))}
             </Table>

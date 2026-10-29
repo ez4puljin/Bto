@@ -40,6 +40,7 @@ import {
   SaveArrivalsDto,
   SaveGridDto,
   SetOrdererDto,
+  SupplierCandidatePageDto,
   SupplierOrdererDto,
   UpdatePurchaseOrderDto,
 } from '../dto/purchase-orders.dto';
@@ -519,7 +520,18 @@ export class PurchaseOrdersController {
 @ApiTags('procurement')
 @Controller('procurement')
 export class SupplierOrderersController {
-  constructor(private readonly orderers: SupplierOrderersService) {}
+  constructor(
+    private readonly orderers: SupplierOrderersService,
+    private readonly orders: PurchaseOrdersService,
+  ) {}
+
+  /** Every active supplier with its main-product count: the new-order dialog's list (one page). */
+  @Get('supplier-candidates')
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: SupplierCandidatePageDto })
+  async supplierCandidates(): Promise<SupplierCandidatePageDto> {
+    return { data: await this.orders.supplierCandidates(), nextCursor: null };
+  }
 
   @Get('orderer-candidates')
   @RequirePermission(READ)

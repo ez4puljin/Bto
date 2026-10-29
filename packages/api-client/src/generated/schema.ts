@@ -6942,6 +6942,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/procurement/supplier-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every active supplier with its main-product count: the new-order dialog's list (one page). */
+        get: operations["SupplierOrderers_supplierCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/procurement/orderer-candidates": {
         parameters: {
             query?: never;
@@ -15673,6 +15690,20 @@ export interface components {
             orderDate: string;
             note: string | null;
             sheets: components["schemas"]["PurchaseOrderSheet"][];
+        };
+        PurchaseOrderSupplierCandidate: {
+            id: number;
+            code: string;
+            name: string;
+            phone: string | null;
+            tin: string | null;
+            /** @description Active products this supplier is the main supplier of */
+            mainProductCount: number;
+        };
+        PurchaseOrderSupplierCandidatePage: {
+            data: components["schemas"]["PurchaseOrderSupplierCandidate"][];
+            /** @description Always null: one list */
+            nextCursor: string | null;
         };
         OrdererCandidate: {
             id: number;
@@ -32344,6 +32375,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PurchaseOrderPrint"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SupplierOrderers_supplierCandidates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderSupplierCandidatePage"];
                 };
             };
             /** @description RFC 9457 problem details */

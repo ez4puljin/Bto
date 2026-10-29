@@ -16,7 +16,7 @@ import { escapeLike } from '../../../common/db/like';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
-import { CatalogService } from '../../catalog';
+import { CatalogService, ProductQueryService } from '../../catalog';
 import {
   type Actor,
   actorUserId,
@@ -31,7 +31,7 @@ import {
   type ReceiptDetail,
   ReceiptsService,
 } from '../../inventory';
-import { SuppliersService } from '../../partners';
+import { ProductSuppliersService, SuppliersService, type SupplierSummary } from '../../partners';
 import {
   purchaseOrderLines,
   purchaseOrders,
@@ -139,6 +139,20 @@ export interface PurchaseOrderQuery {
   limit?: number;
 }
 
+/** An active supplier the new-order dialog offers, with how many active products it is the main supplier of. */
+export interface SupplierCandidate {
+  id: number;
+  code: string;
+  name: string;
+  phone: string | null;
+  tin: string | null;
+  mainProductCount: number;
+}
+
+/** Most active products counted for the candidates' main-product counts, and most suppliers read. */
+const CANDIDATE_PRODUCT_CAP = 200_000;
+const CANDIDATE_SUPPLIER_CAP = 10_000;
+
 /** What the page polls to learn that someone else changed the order (ADR-0118 #3). */
 export interface PurchaseOrderVersion {
   updatedAt: Date;
@@ -166,9 +180,55 @@ export class PurchaseOrdersService {
     private readonly userNames: UserNamesService,
     private readonly suppliers: SuppliersService,
     private readonly catalog: CatalogService,
+    private readonly productQuery: ProductQueryService,
+    private readonly links: ProductSuppliersService,
     private readonly locations: ProductLocationsService,
     private readonly receipts: ReceiptsService,
   ) {}
+
+  /**
+   * Every active supplier by name with its number of active main products: the new-order dialog's
+   * «Бүгдийг сонгох» takes those with at least one and names how many it skipped. One list, no
+   * page: a few hundred rows.
+   */
+  async supplierCandidates(): Promise<SupplierCandidate[]> {
+    const all: SupplierSummary[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await this.suppliers.list({ status: 'ACTIVE', limit: 500, cursor });
+      all.push(...page.data);
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor !== undefined && all.length < CANDIDATE_SUPPLIER_CAP);
+    const { ids } = await this.productQuery.orderedIds({ status: 'ACTIVE' }, CANDIDATE_PRODUCT_CAP);
+    const counts = new Map(
+      (await this.links.mainSupplierCounts(ids)).map((row) => [row.supplierId, row.productCount]),
+    );
+    return all.map((supplier) => ({
+      id: supplier.id,
+      code: supplier.code,
+      name: supplier.name,
+      phone: supplier.phone,
+      tin: supplier.tin,
+      mainProductCount: counts.get(supplier.id) ?? 0,
+    }));
+  }
+
+  /** Every id must name an active supplier (SUPPLIER_INACTIVE / not found as before), read at once. */
+  private async assertAllActive(tx: Tx, supplierIds: readonly number[]): Promise<void> {
+    if (supplierIds.length === 0) return;
+    const found = new Map(
+      (await this.suppliers.getMany(supplierIds, tx)).map((supplier) => [supplier.id, supplier]),
+    );
+    for (const supplierId of supplierIds) {
+      const supplier = found.get(supplierId);
+      if (!supplier) throw notFound('supplier', supplierId);
+      if (supplier.status !== 'ACTIVE') {
+        throw new AppError('SUPPLIER_INACTIVE', `supplier ${supplierId} is inactive`, {
+          id: supplierId,
+        });
+      }
+    }
+  }
 
   create(ctx: AuthContext, input: PurchaseOrderInput): Promise<PurchaseOrderDetail> {
     assertManage(ctx);
@@ -176,8 +236,12 @@ export class PurchaseOrdersService {
     if (supplierIds.length === 0) {
       throw invalid('supplierIds', 'required', 'choose at least one supplier');
     }
+    if (supplierIds.length > MAX_PO_SUPPLIERS) {
+      throw invalid('supplierIds', 'max', `an order holds at most ${MAX_PO_SUPPLIERS} suppliers`);
+    }
+    // One transaction, one read of the suppliers, one insert of the rows: hundreds at once.
     return inTransaction(this.db, async (tx) => {
-      for (const supplierId of supplierIds) await this.suppliers.assertActive(tx, supplierId);
+      await this.assertAllActive(tx, supplierIds);
       const year = businessYear();
       const number = formatDocNumber('PO', year, await this.numbering.next(tx, 'PO', year));
       const [order] = await tx
@@ -252,7 +316,7 @@ export class PurchaseOrdersService {
       if (existing.size + fresh.length > MAX_PO_SUPPLIERS) {
         throw invalid('supplierIds', 'max', `an order holds at most ${MAX_PO_SUPPLIERS} suppliers`);
       }
-      for (const supplierId of fresh) await this.suppliers.assertActive(tx, supplierId);
+      await this.assertAllActive(tx, fresh);
       if (fresh.length > 0) {
         await tx.insert(purchaseOrderSuppliers).values(
           fresh.map((supplierId) => ({

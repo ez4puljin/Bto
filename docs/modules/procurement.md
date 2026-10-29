@@ -73,7 +73,7 @@ Services (not exported beyond the module):
 | Route | Right | What |
 |---|---|---|
 | `GET /purchase-orders?status&supplierId&mine&archived&q&cursor&limit` | `procurement.orders.read` | Orders, newest first; `mine` keeps those with a supplier the caller orders from; `archived=true` the archived ones (hidden otherwise) |
-| `POST /purchase-orders` (`Idempotency-Key`) | `procurement.orders.manage` | `{orderDate?, note?, supplierIds}` |
+| `POST /purchase-orders` (`Idempotency-Key`) | `procurement.orders.manage` | `{orderDate?, note?, supplierIds}`: up to `MAX_PO_SUPPLIERS` (1,000) suppliers, read and inserted at once in one transaction |
 | `GET /purchase-orders/:id` | read | Header (with `archivedAt`, `canArchive`) and suppliers with status, orderer, line count, Σ pieces and kg, Σ shipped, Σ arrived, unchecked lines, the estimated and the final amount and the price differences (price readers), the note's totals, the receipt, and what the caller may do (`canEdit`, `canShip`, `canCount`, `canPrice`, `canMoveNext`, `canMoveBack`) |
 | `GET /purchase-orders/:id/version` | read | `{updatedAt, receiptsUpdatedAt}`: the stamps the page polls every 30 s (ADR-0118 #2) |
 | `PATCH /purchase-orders/:id` | manage | The note |
@@ -87,6 +87,7 @@ Services (not exported beyond the module):
 | `GET /purchase-orders/:id/export.xlsx` | read | The order as one sheet (prices for price readers) |
 | `GET /purchase-orders/:id/print?supplierId` | read | The order sheets |
 | `GET /procurement/orderer-candidates`, `GET/PUT /procurement/supplier-orderers/:supplierId` | read / manage | The orderers |
+| `GET /procurement/supplier-candidates` | read | Every ACTIVE supplier by name with `mainProductCount` (active products it is the main supplier of), one list (`nextCursor` null): the supplier picker's «Бүгдийг сонгох» |
 
 ## 5. Rules worth knowing
 
@@ -124,6 +125,8 @@ Other cases:
 **Progress from the receipt.**
 - The keepers' last confirmation posts the receipt; procurement sets ARRIVED → ACCOUNTING.
 - The accountant's first price check (costing version 1) sets ACCOUNTING → RECEIVED.
+
+**Every supplier at once (owner 2026-10-30).** An order holds up to `MAX_PO_SUPPLIERS` = 1,000 suppliers (a few hundred are active); `create` and `addSuppliers` read the suppliers in one query (not found / `SUPPLIER_INACTIVE` fail the whole request), insert the supplier rows in one statement and load no grid rows; the limit is checked before the read. The rows stay bounded per supplier (the grid's cap of 5,000 products) and per save (`MAX_PO_CHANGES`). The picker skips suppliers whose `mainProductCount` is 0 on «Бүгдийг сонгох» (they may still be ticked by hand) and names how many it skipped.
 
 **Archiving (ADR-0118 #5).** A manager archives an order that is RECEIVED, or on which nothing is ordered; `PO_NOT_ARCHIVABLE` otherwise. Archived orders leave the list (`archived=true` shows them) and cannot move.
 
@@ -164,11 +167,11 @@ The **history** (`OrderHistoryService`, ADR-0118 #5) is a view over those rows a
 ## 8. Screens (`apps/web`)
 
 All in «Агуулах → Татан авалт»:
-- **«Худалдан авах захиалга»** (`/procurement/orders`): the list with «Архив», and a new order on `?new=1` (date, note, the ticked suppliers). A row opens the detail page.
+- **«Худалдан авах захиалга»** (`/procurement/orders`): the list with «Архив», and a new order on `?new=1` (date, note, the ticked suppliers: one list of every active supplier with its main-product count, searched in the browser by name, code, phone or TIN with `@tugeel/shared/text`, «Бүгдийг сонгох» / «Бүгдийг болих» over the listed rows with the skipped count, «Захиалга үүсгэх (N)»). A row opens the detail page.
 - **The order** (`/procurement/orders/:id`, full width, ADR-0118):
   - the header: number, status, date, author; the seven statuses as circles; «Хадгалах (n)», «Excel», «Түүх», «Хэвлэх», one step back for the filtered supplier, archive, the note and suppliers dialogs; the totals line; the yellow bar with «Дахин ачаалах»;
   - the filter row: supplier, warehouse, search, «Захиалах ёстой», «Зөвхөн захиалсан», «Баганууд» (column groups, ADR-0050's storage under `procurement.order`);
-  - one table: a header row per supplier (status, «→ дараагийн шат», «N захиалаагүй», pieces · kg, orderer, receipt, «Захиалгад байхгүй бараа нэмэх», the note's amount at «Нягтлан шалгаж»), its rows with the stage columns, its footer; conflicts shown per cell.
+  - one table: a header row per supplier (status, «→ дараагийн шат», «N захиалаагүй», pieces · kg, orderer, receipt, «Захиалгад байхгүй бараа нэмэх», the note's amount at «Нягтлан шалгаж»), its rows with the stage columns, its footer; conflicts shown per cell. Past five suppliers the groups start closed (a chevron per header with «N бараа захиалсан», «Бүгдийг дэлгэх / хураах» in the filter bar) and a group's rows are requested only when it is opened or the supplier filter picks it; «Зөвхөн захиалсан» also hides the suppliers with nothing ordered.
 - **The history** (`/procurement/orders/:id/history`, wide): user / supplier / product filters, «Excel».
 - **The order sheets** (`/procurement/orders/:id/print?supplierId=`, browser print, ADR-0058).
 - **«Захиалагч» card** on the supplier page.
@@ -185,10 +188,11 @@ The scanner screen and the receipt window are inventory's (`docs/modules/invento
   - each keeper confirming their warehouse, the pieces mismatch, the posting onto NOSHELF (sellable at once);
   - the price check from the page's data, the 1₮ amount check, RECEIVED, the bill, `finalAmount` and `priceDiffCount`;
   - the history's kinds and filters, both Excel files, archiving refused then allowed, the list's `archived` filter, unarchive;
-  - stepping back from «Ирсэн» cancelling an untouched draft, refused once posted.
+  - stepping back from «Ирсэн» cancelling an untouched draft, refused once posted;
+  - an order of 252 suppliers created in one request under 10 s, the candidates' main-product counts, 1,001 ids and adding past the limit refused (422), an unknown id failing the whole batch (404).
 - **Integrity:** `procurement-races.spec.ts`: two saves of one empty cell → one applied, one conflict; two keepers confirming at once → posted once; two counts of one line from two pages → one applied, one conflict.
 - **Shared (Vitest):** `procurement.test.ts` (seven statuses, the editable ones, boxes × pieces, the groups a stage requires, the 1₮ check).
-- **Web:** `features/procurement/orders-pages.test.tsx` (the list with «Архив», one table with two suppliers and one request per supplier and kind, conflicts kept, shipped cells and the locked column group, the price check through the receipt's costs, the yellow bar and reload, a keeper without prices, the history page).
+- **Web:** `features/procurement/orders-pages.test.tsx` (the list with «Архив», one table with two suppliers and one request per supplier and kind, conflicts kept, shipped cells and the locked column group, the price check through the receipt's costs, the yellow bar and reload, a keeper without prices, the history page; the new-order dialog's «Бүгдийг сонгох» with the skipped count, the browser search and the one create request with its key; an order of eight suppliers with closed groups, no rows request until one opens, «Зөвхөн захиалсан» and the supplier filter opening a group).
 
 ## 10. Open items
 

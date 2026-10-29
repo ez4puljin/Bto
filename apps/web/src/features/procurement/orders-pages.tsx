@@ -42,7 +42,7 @@ import {
 } from '@/components/ui/table';
 import { useCompanyName } from '@/features/company/api';
 import { BUSINESS_TZ } from '@/lib/dayjs';
-import { formatQty } from '@/lib/money';
+import { formatCount, formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
 import { toast } from '@/lib/toast';
@@ -267,7 +267,11 @@ function CreateOrderDialog({ onCancel }: { onCancel: () => void }) {
         <DialogFormFooter
           pending={mutations.create.isPending}
           disabled={suppliers.size === 0}
-          submitLabel={t('procurement.create.submit')}
+          submitLabel={
+            suppliers.size > 0
+              ? t('procurement.create.submitCount', { count: formatCount(suppliers.size) })
+              : t('procurement.create.submit')
+          }
           onCancel={onCancel}
         />
       </form>
