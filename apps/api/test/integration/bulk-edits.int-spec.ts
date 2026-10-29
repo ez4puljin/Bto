@@ -5,7 +5,12 @@ import request from 'supertest';
 import { connectAs, createHttpApp } from '../harness/apps';
 import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { bearer, login, seedUser } from '../harness/identity';
-import { expectReconciled, inventoryApi, type WarehouseJson } from '../harness/inventory';
+import {
+  expectReconciled,
+  inventoryApi,
+  postReceipt,
+  type WarehouseJson,
+} from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 import { pricingApi } from '../harness/pricing';
 
@@ -252,11 +257,7 @@ describe('bulk product edits', () => {
         lines: [{ productUnitId: unitOf(cola, 'PCS').id, enteredQty: '3' }],
       })
       .expect(201);
-    await http()
-      .post(`/api/v1/receipts/${(created.body as { id: number }).id}/post`)
-      .set(bearer(admin))
-      .set(idempotency())
-      .expect(200);
+    await postReceipt(app, admin, (created.body as { id: number }).id);
 
     const body = { productIds: [cola.id, still.id, rice.id], warehouseId: wh2.id };
     const dry = (await bulk('product-locations/bulk/home', { ...body, dryRun: true })).body;

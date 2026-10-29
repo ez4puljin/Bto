@@ -50,6 +50,7 @@ export {
   binStock,
   goodsIssueLines,
   goodsIssues,
+  goodsReceiptConfirmations,
   goodsReceiptDiscountLines,
   goodsReceiptDiscounts,
   goodsReceiptLines,
@@ -67,6 +68,12 @@ export {
   warehouseStock,
 } from '../modules/inventory/schema';
 export { importDocuments, importJobs, importRows } from '../modules/imports/schema';
+export {
+  purchaseOrderLines,
+  purchaseOrders,
+  purchaseOrderSuppliers,
+  supplierOrderers,
+} from '../modules/procurement/schema';
 export {
   discountPrograms,
   discountSteps,

@@ -6,7 +6,13 @@ import { createHttpApp } from '../harness/apps';
 import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { financeApi, setSetting } from '../harness/finance';
 import { bearer, login, seedUser } from '../harness/identity';
-import { expectReconciled, inventoryApi, type WarehouseJson } from '../harness/inventory';
+import {
+  costReceiptAsTyped,
+  expectReconciled,
+  inventoryApi,
+  postReceipt,
+  type WarehouseJson,
+} from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 
 interface ItemJson {
@@ -16,8 +22,8 @@ interface ItemJson {
 }
 
 /**
- * Races on a supplier's party (F3, ADR-0091): receipts of one supplier posted at once all book
- * their bills, two allocations of one payment never spend it twice, and a re-costing racing an
+ * Races on a supplier's party (F3, ADR-0091): receipts of one supplier priced at once all book
+ * their bills (the accountant's price check makes the bill, ADR-0115), two allocations of one payment never spend it twice, and a re-costing racing an
  * allocation of the same bill leaves the books whole. The party lock serialises them.
  */
 describe('payables races', () => {
@@ -43,8 +49,11 @@ describe('payables races', () => {
         })
         .expect(201)
     ).body as { id: number; lines: { id: number }[] };
-  const post = (id: number) =>
-    http().post(`/api/v1/receipts/${id}/post`).set(bearer(admin)).set(idempotency());
+  /** Posts a receipt and prices it as typed: the price check books the bill (ADR-0115). */
+  const billed = async (id: number) => {
+    await postReceipt(app, admin, id);
+    await costReceiptAsTyped(app, accountant, id);
+  };
   const owed = async (supplierId: number) =>
     (
       (
@@ -112,12 +121,17 @@ describe('payables races', () => {
     await app.close();
   });
 
-  it('books every bill of receipts of one supplier posted at once', async () => {
+  it('books every bill of receipts of one supplier priced at once', async () => {
     const supplier = (await partnersApi(app, admin).supplier({ name: 'Уралдаан УР 1' })).id;
     const drafts = await Promise.all(
       ['1000', '2000', '3000', '4000', '5000'].map((amount) => draft(supplier, amount)),
     );
-    const results = await Promise.all(drafts.map((receipt) => post(receipt.id)));
+    const posted = await Promise.all(drafts.map((receipt) => postReceipt(app, admin, receipt.id)));
+    expect(posted.map((res) => res.status)).toEqual([200, 200, 200, 200, 200]);
+    // The bills come with the price checks, all at once on the supplier's party.
+    const results = await Promise.all(
+      drafts.map((receipt) => costReceiptAsTyped(app, accountant, receipt.id)),
+    );
     expect(results.map((res) => res.status)).toEqual([200, 200, 200, 200, 200]);
     expect(await owed(supplier)).toBe('15000.00');
     expect(await reconciled()).toBe(true);
@@ -126,7 +140,7 @@ describe('payables races', () => {
   it('never spends one payment twice in two simultaneous allocations', async () => {
     const supplier = (await partnersApi(app, admin).supplier({ name: 'Уралдаан УР 2' })).id;
     const receipt = await draft(supplier, '5000');
-    await post(receipt.id).expect(200);
+    await billed(receipt.id);
     await pay(supplier, '3000');
     const open = await items(supplier);
     const bill = open.find((item) => item.side === 'CREDIT')?.id ?? 0;
@@ -148,7 +162,7 @@ describe('payables races', () => {
   it('keeps the books whole when a re-costing races an allocation of the same bill', async () => {
     const supplier = (await partnersApi(app, admin).supplier({ name: 'Уралдаан УР 3' })).id;
     const receipt = await draft(supplier, '5000');
-    await post(receipt.id).expect(200);
+    await billed(receipt.id);
     await pay(supplier, '5000');
     const open = await items(supplier);
     const bill = open.find((item) => item.side === 'CREDIT')?.id ?? 0;
@@ -159,7 +173,12 @@ describe('payables races', () => {
         .put(`/api/v1/receipts/${receipt.id}/costs`)
         .set(bearer(admin))
         .set(idempotency())
-        .send({ costingVersion: 1, lines: [{ lineId: receipt.lines[0]?.id, amount: '4000' }] }),
+        .send({
+          costingVersion: 1,
+          // The note's amount corrected with the price (ADR-0115).
+          noteTotalAmount: '4000',
+          lines: [{ lineId: receipt.lines[0]?.id, amount: '4000' }],
+        }),
     ]);
     expect(recosted.status).toBe(200);
     // Paired first, the credit stays open; costed first, the bill holds 4,000 and the pairing

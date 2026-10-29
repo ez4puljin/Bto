@@ -18,6 +18,7 @@ import {
   Calculator,
   ChartBar,
   ClipboardCheck,
+  ClipboardList,
   Factory,
   Gauge,
   FileChartColumn,
@@ -159,6 +160,18 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         label: 'nav.bins',
         icon: LayoutGrid,
         permission: 'inventory.setup.manage',
+      },
+    ],
+  },
+  {
+    // Ordering from suppliers (ADR-0115, slice 1): inside «Агуулах», where the goods arrive.
+    label: 'nav.groups.procurement',
+    items: [
+      {
+        to: '/procurement/orders',
+        label: 'nav.purchaseOrders',
+        icon: ClipboardList,
+        permission: 'procurement.orders.read',
       },
     ],
   },
@@ -457,7 +470,7 @@ export const NAV_MODULES: readonly NavModule[] = [
     key: 'inventory',
     label: 'nav.modules.inventory',
     icon: Warehouse,
-    groups: ['nav.groups.inventory'],
+    groups: ['nav.groups.inventory', 'nav.groups.procurement'],
   },
   {
     key: 'catalog',

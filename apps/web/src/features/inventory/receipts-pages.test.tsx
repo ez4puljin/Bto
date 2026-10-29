@@ -85,6 +85,8 @@ const RICE_LINE: Schemas['ReceiptLine'] = {
   lotId: null,
   weightKg: null,
   salePrice: null,
+  expectedQty: null,
+  checkedAt: STAMP,
 };
 
 const NO_TOTALS: Schemas['ReceiptTotals'] = {
@@ -279,6 +281,8 @@ const summary = (id: number, fields: Partial<Schemas['ReceiptSummary']> = {}) =>
     status: 'POSTED',
     costingStatus: 'PENDING',
     paymentMethod: 'CREDIT',
+    origin: 'MANUAL',
+    originRef: null,
     lineCount: 1,
     effectiveDate: '2026-10-11',
     createdAt: STAMP,
@@ -1358,7 +1362,7 @@ describe('costs of a posted receipt (ADR-0047 #1)', () => {
     await user.click(card.getByRole('button', { name: mn.common.save }));
     expect(await card.findByText('2,500₮')).toBeInTheDocument();
     expect(calls(fetchMock, 'PUT', '/api/v1/receipts/5/discounts')).toHaveLength(0);
-    await user.click(screen.getByRole('button', { name: form.saveCosts }));
+    await user.click(screen.getByRole('button', { name: mn.inventory.receipt.check.confirm }));
     await waitFor(() =>
       expect(calls(fetchMock, 'PUT', '/api/v1/receipts/5/costs')).toHaveLength(1),
     );
@@ -1387,13 +1391,99 @@ describe('costs of a posted receipt (ADR-0047 #1)', () => {
       screen.getByRole('switch', { name: `${mn.inventory.costing.freeGoods}: ${RICE_UNIT}` }),
     );
     // The discounts are not touched: they are not sent.
-    await user.click(screen.getByRole('button', { name: form.saveCosts }));
+    await user.click(screen.getByRole('button', { name: mn.inventory.receipt.check.confirm }));
     expect(await screen.findByText(mn.errors.CONFLICT)).toBeInTheDocument();
     expect(amount).toHaveValue('48000');
     expect(
       Object.keys((await bodyOf(calls(fetchMock, 'PUT', '/api/v1/receipts/5/costs')[0])) as object),
     ).toEqual(['costingVersion', 'lines']);
   });
+
+  it('checks each price against the previous receipt and sends a corrected note total (ADR-0115)', async () => {
+    const check = mn.inventory.receipt.check;
+    const fetchMock = signedIn(ACCOUNTANT_ME, {
+      'GET /api/v1/warehouses': () => list([WH1]),
+      'GET /api/v1/receipts/5': () =>
+        json({
+          ...COSTED_POSTED,
+          noteTotalAmount: '50000',
+          lines: [
+            {
+              ...BOX_LINE,
+              enteredQty: '2',
+              qtyBase: '48',
+              docUnitPrice: '26400',
+              docAmount: '52800',
+            },
+            // Ordered but did not arrive: no price is asked for it.
+            { ...RICE_LINE, enteredQty: '0', qtyBase: '0', expectedQty: '5' },
+          ],
+        }),
+      'GET /api/v1/receipts/5/costing': () =>
+        json({
+          receiptId: 5,
+          number: 'GR-2026-000005',
+          status: 'POSTED',
+          costingStatus: 'PENDING',
+          costingVersion: 0,
+          recostUntil: null,
+          costedAt: null,
+          vatRatePct: '0',
+          discounts: [],
+          total: null,
+          docTotal: null,
+          noteTotalQty: '48',
+          noteTotalAmount: '50000',
+          hasNotePhoto: false,
+          lines: [
+            {
+              lineId: BOX_LINE.id,
+              productId: BOX_LINE.productId,
+              productName: BOX_LINE.productName,
+              unitName: BOX_LINE.unitName,
+              enteredQty: '2',
+              qtyBase: '48',
+              provisionalUnitCost: '1000',
+              amount: null,
+              docAmount: '52800',
+              discountAmount: null,
+              unitCost: null,
+              freeGoods: false,
+              docUnitPrice: '26400',
+              previousUnitPrice: '24000.00',
+              previousBasePrice: '1000.00',
+              previousDate: '2026-10-01',
+              previousSupplierName: SUPPLIER.name,
+            },
+          ],
+        }),
+      'GET /api/v1/receipts': () => list([summary(5)]),
+      'PUT /api/v1/receipts/5/costs': () =>
+        json({ ...COSTED_POSTED, costingStatus: 'COSTED', costingVersion: 1 }),
+    });
+    renderApp('/inventory/receipts/5', fetchMock);
+    const user = userEvent.setup();
+    // 26,400 against 24,000 before: +10%, one line changed; the rice that did not arrive is left out.
+    expect(await screen.findByText('+10.0%')).toBeInTheDocument();
+    expect(screen.getByText(check.differing.replace('{{count}}', '1'))).toBeInTheDocument();
+    expect(screen.getByText(check.notArrived.replace('{{count}}', '1'))).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: `${form.unitPrice}: ${RICE_UNIT}` })).toBeNull();
+    // The note says 50,000; the payable is 52,800: the accountant corrects the note's total.
+    const note = screen.getByRole('textbox', { name: check.noteAmountFor });
+    expect(note).toHaveValue('50000');
+    await user.clear(note);
+    await user.type(note, '52800');
+    expect(await screen.findByText(check.amountMatch)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: check.confirm }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'PUT', '/api/v1/receipts/5/costs')).toHaveLength(1),
+    );
+    expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/receipts/5/costs')[0])).toEqual({
+      costingVersion: 0,
+      noteTotalAmount: '52800',
+      lines: [{ lineId: BOX_LINE.id, unitPrice: '26400' }],
+    });
+  }, 15_000);
 
   it('never shows costs to the warehouse', async () => {
     const fetchMock = signedIn(WAREHOUSE_ME, {
@@ -1404,6 +1494,7 @@ describe('costs of a posted receipt (ADR-0047 #1)', () => {
     expect(await screen.findByRole('heading', { name: POSTED.number ?? '' })).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: form.unitPrice })).toBeNull();
     expect(screen.queryByRole('button', { name: form.saveCosts })).toBeNull();
+    expect(screen.queryByRole('button', { name: mn.inventory.receipt.check.confirm })).toBeNull();
     expect(screen.queryByRole('region', { name: discountsText.title })).toBeNull();
     expect(calls(fetchMock, 'GET', '/api/v1/receipts/5/costing')).toHaveLength(0);
   });

@@ -13,6 +13,7 @@ import {
   type BinJson,
   expectReconciled,
   inventoryApi,
+  postReceipt,
   staffContext,
   type WarehouseJson,
 } from '../harness/inventory';
@@ -155,11 +156,7 @@ describe('stocktakes', () => {
       })
       .expect(201);
     const body = receipt.body as { id: number; lines: { id: number }[] };
-    await http()
-      .post(`/api/v1/receipts/${body.id}/post`)
-      .set(bearer(workerToken))
-      .set(idempotency())
-      .expect(200);
+    await postReceipt(app, workerToken, body.id, { amount: '53000' });
     await http()
       .put(`/api/v1/receipts/${body.id}/costs`)
       .set(bearer(adminToken))

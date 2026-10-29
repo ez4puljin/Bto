@@ -4,7 +4,12 @@ import request from 'supertest';
 import { connectAs, createHttpApp } from '../harness/apps';
 import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { bearer, login, seedUser } from '../harness/identity';
-import { expectReconciled, inventoryApi, type WarehouseJson } from '../harness/inventory';
+import {
+  expectReconciled,
+  inventoryApi,
+  postReceipt,
+  type WarehouseJson,
+} from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 
 interface AttentionJson {
@@ -107,11 +112,7 @@ describe('attention counts', () => {
         lines: [{ productUnitId: unitOf(rice, 'PCS').id, enteredQty: '5', warehouseId: wh1.id }],
       })
       .expect(201);
-    await http()
-      .post(`/api/v1/receipts/${(receipt.body as { id: number }).id}/post`)
-      .set(bearer(admin))
-      .set(idempotency())
-      .expect(200);
+    await postReceipt(app, admin, (receipt.body as { id: number }).id);
     // Rice at its minimum in WH1: one low-stock line there.
     await http()
       .put('/api/v1/product-locations')

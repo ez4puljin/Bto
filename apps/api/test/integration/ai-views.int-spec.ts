@@ -6,7 +6,12 @@ import { AI_DATASETS, type AiColumnType } from '../../src/modules/ai/semantic/da
 import { connectAs, createHttpApp, sqlStateOf } from '../harness/apps';
 import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { bearer, login, seedUser } from '../harness/identity';
-import { expectReconciled, inventoryApi, type WarehouseJson } from '../harness/inventory';
+import {
+  expectReconciled,
+  inventoryApi,
+  postReceipt,
+  type WarehouseJson,
+} from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 import { pricingApi } from '../harness/pricing';
 
@@ -135,11 +140,7 @@ describe('AI views (ADR-0045)', () => {
         throw new Error(`receipt ${created.status}: ${JSON.stringify(created.body)}`);
       }
       const body = created.body as { id: number; lines: { id: number }[] };
-      await http()
-        .post(`/api/v1/receipts/${body.id}/post`)
-        .set(bearer(worker))
-        .set(idempotency())
-        .expect(200);
+      await postReceipt(app, worker, body.id, { amount });
       await http()
         .put(`/api/v1/receipts/${body.id}/costs`)
         .set(bearer(accountant))

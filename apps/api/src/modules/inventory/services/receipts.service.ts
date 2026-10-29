@@ -5,8 +5,10 @@ import {
   canRecost,
   costingDeadline,
   lineAmountOf,
+  noteAmountMatches,
   ReceiptDiscountError,
   type ReceiptDiscountKind,
+  type ReceiptOrigin,
   type ReceiptPaymentMethod,
   receiptLineCost,
   receiptLineVat,
@@ -28,19 +30,25 @@ import {
   type AuthContext,
   AuditService,
   OrgService,
+  ScopeService,
+  StorageService,
+  UserNamesService,
 } from '../../identity';
 import { ProductSuppliersService, SuppliersService } from '../../partners';
 import {
   RECEIPT_MONEY_ACCOUNTS,
+  RECEIPT_PROGRESS,
   RECEIPT_SALE_PRICES,
   type ReceiptMoneyAccount,
   type ReceiptMoneyAccounts,
   type ReceiptBookFacts,
   type ReceiptBookTotals,
+  type ReceiptProgress,
   type ReceiptSalePrices,
 } from '../hooks';
 import {
   bins,
+  goodsReceiptConfirmations,
   goodsReceiptDiscountLines,
   goodsReceiptDiscounts,
   goodsReceiptLines,
@@ -66,7 +74,13 @@ const SHELF_TYPES = ['STORAGE', 'PICKING'];
 
 export interface ReceiptLineInput {
   productUnitId: number;
+  /** The counted quantity; ignored on a line the purchase order expects (it starts unchecked). */
   enteredQty: Decimal;
+  /**
+   * What a purchase order expects (ADR-0115): the line starts at zero, unchecked, and waits for
+   * the keeper's count. Absent on a line typed by hand, which is checked as it is entered.
+   */
+  expectedQty?: Decimal | null;
   /**
    * Only for a product without a home warehouse (ADR-0099 #1): the wholesale warehouse it is
    * received into, which becomes its home. A product with a home always goes there.
@@ -83,6 +97,7 @@ export interface ReceiptLineInput {
 }
 
 export interface ReceiptLinePatch {
+  /** The counted quantity; marks the line checked. Zero («ирээгүй») only on an expected line. */
   enteredQty?: Decimal;
   /** A price per entered unit; null clears the price. */
   docUnitPrice?: Decimal | null;
@@ -102,6 +117,12 @@ export interface ReceiptInput {
   paymentMethod?: ReceiptPaymentMethod;
   /** The cash box or bank account of a CASH / BANK receipt; required by the posting. */
   moneyAccountId?: number | null;
+  /** The delivery note's total pieces and amount (ADR-0115). */
+  noteTotalQty?: Decimal | null;
+  noteTotalAmount?: Decimal | null;
+  /** Set by the importer and procurement; the window makes MANUAL receipts. */
+  origin?: ReceiptOrigin;
+  originRef?: string | null;
   lines?: readonly ReceiptLineInput[];
 }
 
@@ -112,6 +133,10 @@ export interface ReceiptPatch {
   note?: string | null;
   paymentMethod?: ReceiptPaymentMethod;
   moneyAccountId?: number | null;
+  noteTotalQty?: Decimal | null;
+  noteTotalAmount?: Decimal | null;
+  /** An uploaded photo of the delivery note (kind `inventory.receipt_note`); null removes it. */
+  notePhotoFileId?: number | null;
 }
 
 /**
@@ -164,6 +189,17 @@ export interface ReceiptLine {
   vatAmount: Decimal | null;
   /** `netAmount` less its VAT: the line's cost. */
   costAmount: Decimal | null;
+  /** What the purchase order expected (ADR-0115); null on a line not on the order. */
+  expectedQty: Decimal | null;
+  /** When the keeper checked the count; null while the line waits for its check. */
+  checkedAt: Date | null;
+}
+
+/** A keeper's confirmation of a receipt's lines in one warehouse (ADR-0115). */
+export interface ReceiptConfirmation {
+  warehouseId: number;
+  confirmedBy: string | null;
+  confirmedAt: Date;
 }
 
 export interface ReceiptTotals {
@@ -181,6 +217,10 @@ export interface ReceiptTotals {
   pricedLines: number;
   /** Σ base quantity × weight of the lines whose product has a weight (kg). */
   weightKg: Decimal;
+  /** Σ base quantity of the lines: the pieces the delivery note's total is checked against. */
+  qtyBase: Decimal;
+  /** Lines that wait for the keeper's check. */
+  uncheckedLines: number;
   /** Lines whose product has no weight recorded. */
   weightMissing: number;
 }
@@ -209,6 +249,15 @@ export interface ReceiptDetail {
   vatRatePct: Decimal;
   /** Cost data, like the prices (ADR-0103). */
   discounts: ReceiptDiscountView[];
+  /** The delivery note's totals as typed (ADR-0115). */
+  noteTotalQty: Decimal | null;
+  noteTotalAmount: Decimal | null;
+  hasNotePhoto: boolean;
+  origin: ReceiptOrigin;
+  /** The purchase order's number of an ORDER receipt. */
+  originRef: string | null;
+  /** The warehouses whose keepers confirmed their lines (a draft's; the last one posts). */
+  confirmations: ReceiptConfirmation[];
   effectiveDate: string | null;
   postedAt: Date | null;
   createdAt: Date;
@@ -228,6 +277,8 @@ export interface ReceiptSummary {
   status: ReceiptStatus;
   costingStatus: 'PENDING' | 'COSTED' | null;
   paymentMethod: ReceiptPaymentMethod;
+  origin: ReceiptOrigin;
+  originRef: string | null;
   lineCount: number;
   /** The payable: the latest costing's, else the typed prices less the discount. Cost data. */
   netAmount: Decimal | null;
@@ -260,6 +311,11 @@ export interface CostLineInput {
   /** Or a price per entered unit (converted with round(price × entered qty, 2)). */
   unitPrice?: Decimal;
   freeGoods?: boolean;
+}
+
+/** The accountant may correct the delivery note's total amount with the price check (ADR-0115). */
+export interface CostNoteInput {
+  noteTotalAmount?: Decimal;
 }
 
 /** A product's latest delivery-note price (ADR-0099 #3), before the note's discount. */
@@ -297,6 +353,14 @@ export interface CostedReceiptLine {
   discountAmount: Decimal | null;
   unitCost: Decimal | null;
   freeGoods: boolean;
+  /** The draft's price per entered unit (typed, or the purchase order's last price). */
+  docUnitPrice: Decimal | null;
+  /** The product's price on the receipt posted before this one (ADR-0115), per entered unit. */
+  previousUnitPrice: Decimal | null;
+  /** The previous price per base unit, its receipt's date and supplier. */
+  previousBasePrice: Decimal | null;
+  previousDate: string | null;
+  previousSupplierName: string | null;
 }
 
 export interface ReceiptCosting {
@@ -312,24 +376,32 @@ export interface ReceiptCosting {
   discounts: ReceiptDiscountView[];
   total: Decimal | null;
   docTotal: Decimal | null;
+  /** The delivery note's totals (ADR-0115): the price check matches the payable within 1₮. */
+  noteTotalQty: Decimal | null;
+  noteTotalAmount: Decimal | null;
+  hasNotePhoto: boolean;
+  /** The arrived lines (a line that did not arrive takes no price). */
   lines: CostedReceiptLine[];
 }
 
 /**
- * Goods receipts (GR-, SPEC §5.4, ADR-0033, ADR-0078, ADR-0099): one window for the delivery note.
- * Each line goes to its product's home warehouse and fixed shelf (else that warehouse's receiving
- * area), so one note may fill several wholesale warehouses; anyone with the receipt right writes
- * them, whatever their warehouse scope. A cost holder may type the note's prices and its discount
- * on the draft (VAT included as printed), a price holder a new sale price per line. Posting brings
- * the stock in at once and puts the sale prices in force; a receipt priced in full is costed in the
- * same transaction, otherwise the accountant costs it later. Every action locks the receipt header
- * first and reads its lines after (ADR-0034). Draft edits are not audited; creation, posting,
- * cancelling and costing are.
+ * Goods receipts (GR-, SPEC §5.4, ADR-0033, ADR-0078, ADR-0099, ADR-0115): one window for the
+ * delivery note. Each line goes to its product's home warehouse, so one note may fill several
+ * wholesale warehouses; anyone with the receipt right edits a draft, whatever their warehouse scope.
+ * A cost holder may type the note's prices and its discount on the draft (VAT included as printed),
+ * a price holder a new sale price per line. A purchase order's arrival makes a draft whose lines
+ * wait for the keeper's count. Each warehouse's keeper confirms the lines there (their scope); the
+ * last confirmation checks the note's pieces and posts: the stock comes in on the fixed shelf, else
+ * the sellable «Тавиургүй» shelf, and the sale prices come into force. Only the accountant's price
+ * check then costs the receipt and makes the supplier's bill (ADR-0115 amends ADR-0078 #3). Every
+ * action locks the receipt header first and reads its lines after (ADR-0034). Draft edits are not
+ * audited; creation, confirmations, posting, cancelling and costing are.
  */
 @Injectable()
 export class ReceiptsService implements OnModuleInit {
   private moneyAccounts: ReceiptMoneyAccounts | null = null;
   private salePrices: ReceiptSalePrices | null = null;
+  private progress: ReceiptProgress | null = null;
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -343,10 +415,18 @@ export class ReceiptsService implements OnModuleInit {
     private readonly links: ProductSuppliersService,
     private readonly units: UnitConversionService,
     private readonly purchases: PurchaseBooksService,
+    private readonly scope: ScopeService,
+    private readonly storage: StorageService,
+    private readonly userNames: UserNamesService,
     private readonly moduleRef: ModuleRef,
   ) {}
 
   onModuleInit(): void {
+    try {
+      this.progress = this.moduleRef.get<ReceiptProgress>(RECEIPT_PROGRESS, { strict: false });
+    } catch {
+      this.progress = null;
+    }
     try {
       this.moneyAccounts = this.moduleRef.get<ReceiptMoneyAccounts>(RECEIPT_MONEY_ACCOUNTS, {
         strict: false,
@@ -392,6 +472,10 @@ export class ReceiptsService implements OnModuleInit {
         paymentMethod,
         moneyAccountId,
         vatRatePct: await this.vatRateOf(tx, input.supplierId, supplierDocDate),
+        noteTotalQty: noteQtyOf(input.noteTotalQty),
+        noteTotalAmount: noteAmountOf(input.noteTotalAmount),
+        origin: input.origin ?? 'MANUAL',
+        originRef: optionalText(input.originRef) ?? null,
         createdBy: actorUserId(actor),
       })
       .returning();
@@ -406,9 +490,30 @@ export class ReceiptsService implements OnModuleInit {
     return row.id;
   }
 
-  update(_ctx: AuthContext, id: number, patch: ReceiptPatch): Promise<ReceiptDetail> {
+  async update(_ctx: AuthContext, id: number, patch: ReceiptPatch): Promise<ReceiptDetail> {
+    // The photo must have arrived before the transaction (an HTTP HEAD with Spaces).
+    if (patch.notePhotoFileId) {
+      await this.storage.verifyUploaded(patch.notePhotoFileId, NOTE_PHOTO);
+    }
     return inTransaction(this.db, async (tx) => {
       const header = await this.lockDraft(tx, id);
+      if (patch.notePhotoFileId !== undefined && patch.notePhotoFileId !== header.notePhotoFileId) {
+        if (patch.notePhotoFileId !== null) {
+          await this.storage.confirm(tx, patch.notePhotoFileId, NOTE_PHOTO);
+        }
+        if (header.notePhotoFileId !== null) {
+          await this.storage.markDeleted(tx, header.notePhotoFileId);
+        }
+      }
+      if (
+        patch.supplierId !== undefined &&
+        patch.supplierId !== header.supplierId &&
+        header.origin === 'ORDER'
+      ) {
+        throw new AppError('RECEIPT_FROM_ORDER', `receipt ${id} belongs to a purchase order`, {
+          originRef: header.originRef,
+        });
+      }
       const supplierId = patch.supplierId ?? header.supplierId;
       if (supplierId !== header.supplierId) await this.suppliers.assertActive(tx, supplierId);
       const supplierDocDate =
@@ -435,11 +540,31 @@ export class ReceiptsService implements OnModuleInit {
           paymentMethod,
           moneyAccountId,
           vatRatePct: await this.vatRateOf(tx, supplierId, supplierDocDate),
+          ...(patch.noteTotalQty === undefined
+            ? {}
+            : { noteTotalQty: noteQtyOf(patch.noteTotalQty) }),
+          ...(patch.noteTotalAmount === undefined
+            ? {}
+            : { noteTotalAmount: noteAmountOf(patch.noteTotalAmount) }),
+          ...(patch.notePhotoFileId === undefined
+            ? {}
+            : { notePhotoFileId: patch.notePhotoFileId }),
           updatedAt: sql`now()`,
         })
         .where(eq(goodsReceipts.id, id));
       return this.get(id, tx);
     });
+  }
+
+  /** The delivery note's photo (receipt and cost holders; the route checks the right). */
+  async notePhoto(id: number): Promise<Awaited<ReturnType<StorageService['openPrivate']>>> {
+    const [header] = await this.db
+      .select({ fileId: goodsReceipts.notePhotoFileId })
+      .from(goodsReceipts)
+      .where(eq(goodsReceipts.id, id));
+    if (!header) throw notFound('goods receipt', id);
+    if (header.fileId === null) throw notFound('delivery note photo', id);
+    return this.storage.openPrivate(header.fileId, NOTE_PHOTO);
   }
 
   /**
@@ -466,7 +591,8 @@ export class ReceiptsService implements OnModuleInit {
     if (hasSalePrice(line)) assertPrices(ctx);
     return inTransaction(this.db, async (tx) => {
       const header = await this.lockDraft(tx, receiptId);
-      await this.insertLine(tx, ctx, header, line);
+      // A line added by hand is counted as it is entered; only the order expects quantities.
+      await this.insertLine(tx, ctx, header, { ...line, expectedQty: null });
       await this.touch(tx, receiptId);
       return this.get(receiptId, tx);
     });
@@ -483,8 +609,12 @@ export class ReceiptsService implements OnModuleInit {
     if (patch.salePrice !== undefined) assertPrices(ctx);
     return inTransaction(this.db, async (tx) => {
       const { header, line } = await this.lockLine(tx, lineId);
+      await this.assertNotConfirmed(tx, header.id, line.warehouseId);
       const enteredQty = patch.enteredQty ?? line.enteredQty;
-      const converted = await this.units.toBase(line.productUnitId, enteredQty, tx);
+      if (enteredQty.isZero() && line.expectedQty === null) {
+        throw invalid('enteredQty', 'positive', 'only a line on the order may arrive empty');
+      }
+      const converted = await this.convert(line.productUnitId, enteredQty, tx);
       const salePrice = patch.salePrice === undefined ? line.salePrice : patch.salePrice;
       if (salePrice !== null) assertSalePrice(salePrice);
       const priced =
@@ -508,6 +638,8 @@ export class ReceiptsService implements OnModuleInit {
           qtyBase: converted.qtyBase,
           ...priced,
           salePrice,
+          // A counted quantity is the keeper's check (ADR-0115).
+          ...(patch.enteredQty === undefined ? {} : { checkedAt: sql`now()` }),
           updatedAt: sql`now()`,
         })
         .where(eq(goodsReceiptLines.id, lineId));
@@ -518,7 +650,12 @@ export class ReceiptsService implements OnModuleInit {
 
   removeLine(ctx: AuthContext, lineId: number): Promise<ReceiptDetail> {
     return inTransaction(this.db, async (tx) => {
-      const { header } = await this.lockLine(tx, lineId);
+      const { header, line } = await this.lockLine(tx, lineId);
+      await this.assertNotConfirmed(tx, header.id, line.warehouseId);
+      if (line.expectedQty !== null) {
+        // The order's lines stay: «ирээгүй» sets their count to zero instead.
+        throw invalid('lineId', 'ordered', 'a line on the order is marked as not arrived');
+      }
       await tx.delete(goodsReceiptLines).where(eq(goodsReceiptLines.id, lineId));
       // A line discount whose last line went goes with it (ADR-0103).
       await tx.execute(sql`
@@ -531,121 +668,244 @@ export class ReceiptsService implements OnModuleInit {
   }
 
   /**
-   * DRAFT → POSTED: stock arrives in each line's bin, in its warehouse, at the provisional cost
-   * (ADR-0033); the lines' sale prices come into force from the posting's business date (ADR-0099
-   * #5); a receipt whose every line has its price or is free is costed at once from those prices,
-   * less its discounts (ADR-0078 #3, ADR-0103); each product not yet linked to the supplier is
-   * linked to it (ADR-0103).
+   * The keeper's confirmation (ADR-0115): confirms the lines in every warehouse of the receipt the
+   * caller may write for (their scope; everywhere without one), each line checked; the last
+   * warehouse's confirmation posts the receipt. A confirmed warehouse's lines are frozen until the
+   * confirmation is withdrawn.
    */
-  post(ctx: AuthContext, id: number): Promise<ReceiptDetail> {
+  confirm(ctx: AuthContext, id: number): Promise<ReceiptDetail> {
     return inTransaction(this.db, async (tx) => {
       const header = await this.lockHeader(tx, id);
       assertDraft(header);
       const lines = await this.linesOf(tx, id);
       if (lines.length === 0) throw invalid('lines', 'empty', 'a receipt needs at least one line');
-      await this.suppliers.assertActive(tx, header.supplierId);
-      if (header.paymentMethod !== 'CREDIT') {
-        if (header.moneyAccountId === null) {
-          throw invalid(
-            'moneyAccountId',
-            'required',
-            'a receipt paid in cash or by bank names its account',
-          );
-        }
-        await this.checkPayment(tx, header.paymentMethod, header.moneyAccountId);
-      }
-      for (const line of lines) {
-        // A unit superseded since the line was entered refuses the posting (UNIT_SUPERSEDED).
-        await this.units.toBase(line.productUnitId, line.enteredQty, tx);
-      }
-      // A home moved since the line was entered refuses the posting (PRODUCT_NOT_IN_WAREHOUSE).
-      for (const warehouseId of new Set(lines.map((line) => line.warehouseId))) {
-        await this.locations.assertMayReceive(
-          tx,
-          warehouseId,
-          lines.filter((line) => line.warehouseId === warehouseId).map((line) => line.productId),
-        );
-      }
-      const salePrices = salePricesOf(lines);
-      const priced = lines.every((line) => line.freeGoods || line.docAmount !== null);
-      const shares = priced
-        ? sharesOf(lineAmounts(lines), await this.discountsOf(tx, id)).shares
-        : null;
-      // The VAT rate is frozen with the posting, on the delivery note's date.
-      const vatRatePct = await this.vatRateOf(tx, header.supplierId, header.supplierDocDate);
-      await tx.update(goodsReceipts).set({ vatRatePct }).where(eq(goodsReceipts.id, id));
-      const result = await this.posting.post(tx, ctx, {
-        docs: [{ docType: 'GR', docId: id, expectedStatus: 'DRAFT', nextStatus: 'POSTED' }],
-        movements: lines.map((line) => ({
-          docType: 'GR' as const,
-          docId: id,
-          docLineId: line.id,
-          movementType: 'RECEIPT' as const,
-          leg: 1,
-          warehouseId: line.warehouseId,
-          binId: line.binId,
-          productId: line.productId,
-          lotId: line.lotId,
-          qtyBase: line.qtyBase,
-          enteredQty: line.enteredQty,
-          productUnitId: line.productUnitId,
-          factorSnapshot: line.factorSnapshot,
-        })),
-      });
-      if (salePrices.length > 0 && this.salePrices) {
-        await this.salePrices.applyInTx(tx, ctx, result.effectiveDate, salePrices);
-      }
-      await this.linkSupplierInTx(tx, ctx, header.supplierId, lines);
-      if (shares) {
-        const rates = await this.lineVatRates(tx, lines, vatRatePct);
-        await this.posting.revalue(tx, ctx, {
-          docId: id,
-          version: 1,
-          lines: lines.map((line) => {
-            const share = shares.get(line.id) ?? new Decimal(0);
-            return {
-              docLineId: line.id,
-              warehouseId: line.warehouseId,
-              productId: line.productId,
-              lotId: line.lotId,
-              qtyBase: line.qtyBase,
-              amount: line.freeGoods
-                ? new Decimal(0)
-                : receiptLineCost(
-                    (line.docAmount ?? new Decimal(0)).minus(share),
-                    rates.get(line.id) ?? 0,
-                  ),
-              docAmount: line.freeGoods ? new Decimal(0) : line.docAmount,
-              discountAmount: line.freeGoods ? null : share,
-              freeGoods: line.freeGoods,
-            };
-          }),
+      const warehouseIds = [...new Set(lines.map((line) => line.warehouseId))].sort(
+        (a, b) => a - b,
+      );
+      const mine = warehouseIds.filter((warehouseId) =>
+        this.scope.canWriteWarehouse(ctx, warehouseId),
+      );
+      if (mine.length === 0) {
+        throw new AppError('FORBIDDEN', `receipt ${id} has no lines in the caller's warehouses`, {
+          reason: 'WAREHOUSE_SCOPE',
         });
-        await tx
-          .update(goodsReceipts)
-          .set({
-            costingStatus: 'COSTED',
-            costingVersion: 1,
-            costedAt: sql`now()`,
-            costedBy: actorUserId(ctx),
-          })
-          .where(eq(goodsReceipts.id, id));
-        await this.purchases.receiptCostedInTx(tx, ctx, await this.bookFacts(id, tx, null));
       }
-      await this.audit.record(tx, ctx, {
-        action: 'POST',
-        entity: 'goods_receipts',
-        entityId: id,
-        before: header,
-        after: { number: result.numbers.get(id), vatRatePct, costed: priced, lines },
-      });
+      const confirmed = new Set((await this.confirmationsOf(tx, id)).map((row) => row.warehouseId));
+      const fresh = mine.filter((warehouseId) => !confirmed.has(warehouseId));
+      for (const warehouseId of fresh) {
+        const unchecked = lines.filter(
+          (line) => line.warehouseId === warehouseId && line.checkedAt === null,
+        ).length;
+        if (unchecked > 0) {
+          throw new AppError('RECEIPT_LINES_UNCHECKED', `receipt ${id} has unchecked lines`, {
+            warehouseId,
+            count: unchecked,
+          });
+        }
+      }
+      if (fresh.length > 0) {
+        await tx.insert(goodsReceiptConfirmations).values(
+          fresh.map((warehouseId) => ({
+            receiptId: id,
+            warehouseId,
+            confirmedBy: actorUserId(ctx),
+          })),
+        );
+        await this.audit.record(tx, ctx, {
+          action: 'CONFIRM',
+          entity: 'goods_receipts',
+          entityId: id,
+          after: { warehouseIds: fresh },
+        });
+      }
+      const complete = warehouseIds.every(
+        (warehouseId) => confirmed.has(warehouseId) || mine.includes(warehouseId),
+      );
+      if (complete) await this.postLocked(tx, ctx, header, lines);
+      else await this.touch(tx, id);
       return this.get(id, tx);
     });
+  }
+
+  /** Withdraws a warehouse's confirmation while the receipt is a draft (that warehouse's scope). */
+  withdraw(ctx: AuthContext, id: number, warehouseId: number): Promise<ReceiptDetail> {
+    return inTransaction(this.db, async (tx) => {
+      await this.lockDraft(tx, id);
+      this.scope.assertCanWriteWarehouse(ctx, warehouseId);
+      const removed = await tx
+        .delete(goodsReceiptConfirmations)
+        .where(
+          and(
+            eq(goodsReceiptConfirmations.receiptId, id),
+            eq(goodsReceiptConfirmations.warehouseId, warehouseId),
+          ),
+        )
+        .returning();
+      if (removed.length === 0) throw notFound('receipt confirmation', warehouseId);
+      await this.audit.record(tx, ctx, {
+        action: 'WITHDRAW',
+        entity: 'goods_receipts',
+        entityId: id,
+        before: { warehouseId },
+      });
+      await this.touch(tx, id);
+      return this.get(id, tx);
+    });
+  }
+
+  /**
+   * DRAFT → POSTED, once every warehouse is confirmed: the note's pieces must equal the lines'
+   * (ADR-0115); the arrived lines come in, each on its product's fixed shelf, else the warehouse's
+   * sellable «Тавиургүй» shelf (never the receiving area), at the provisional cost (ADR-0033); the
+   * sale prices come into force from the posting's business date (ADR-0099 #5); each product not
+   * yet linked to the supplier is linked (ADR-0103). The receipt stays PENDING for the
+   * accountant's price check, priced or not (ADR-0115 amends ADR-0078 #3).
+   */
+  private async postLocked(
+    tx: Tx,
+    ctx: AuthContext,
+    header: ReceiptRow,
+    allLines: readonly LineRow[],
+  ): Promise<void> {
+    const id = header.id;
+    await this.suppliers.assertActive(tx, header.supplierId);
+    if (header.paymentMethod !== 'CREDIT') {
+      if (header.moneyAccountId === null) {
+        throw invalid(
+          'moneyAccountId',
+          'required',
+          'a receipt paid in cash or by bank names its account',
+        );
+      }
+      await this.checkPayment(tx, header.paymentMethod, header.moneyAccountId);
+    }
+    if (header.noteTotalQty === null || header.noteTotalAmount === null) {
+      throw new AppError('RECEIPT_NOTE_MISSING', `receipt ${id} has no delivery-note totals`, {
+        field: header.noteTotalQty === null ? 'noteTotalQty' : 'noteTotalAmount',
+      });
+    }
+    const counted = allLines.reduce((sum, line) => sum.plus(line.qtyBase), new Decimal(0));
+    if (!header.noteTotalQty.equals(counted)) {
+      throw new AppError('RECEIPT_NOTE_QTY_MISMATCH', `receipt ${id} counts other pieces`, {
+        note: header.noteTotalQty.toString(),
+        counted: counted.toString(),
+      });
+    }
+    const lines = allLines.filter((line) => !line.qtyBase.isZero());
+    if (lines.length === 0) {
+      throw new AppError('RECEIPT_NOTHING_ARRIVED', `nothing of receipt ${id} arrived`);
+    }
+    for (const line of lines) {
+      // A unit superseded since the line was entered refuses the posting (UNIT_SUPERSEDED).
+      await this.units.toBase(line.productUnitId, line.enteredQty, tx);
+    }
+    // A home moved since the line was entered refuses the posting (PRODUCT_NOT_IN_WAREHOUSE).
+    for (const warehouseId of new Set(lines.map((line) => line.warehouseId))) {
+      await this.locations.assertMayReceive(
+        tx,
+        warehouseId,
+        lines.filter((line) => line.warehouseId === warehouseId).map((line) => line.productId),
+      );
+    }
+    const binIds = await this.shelvesOf(tx, ctx, lines);
+    for (const line of lines) {
+      const binId = binIds.get(line.id);
+      if (binId !== undefined && binId !== line.binId) {
+        await tx.update(goodsReceiptLines).set({ binId }).where(eq(goodsReceiptLines.id, line.id));
+      }
+    }
+    const salePrices = salePricesOf(lines);
+    // The VAT rate is frozen with the posting, on the delivery note's date.
+    const vatRatePct = await this.vatRateOf(tx, header.supplierId, header.supplierDocDate);
+    await tx.update(goodsReceipts).set({ vatRatePct }).where(eq(goodsReceipts.id, id));
+    const result = await this.posting.post(tx, ctx, {
+      docs: [{ docType: 'GR', docId: id, expectedStatus: 'DRAFT', nextStatus: 'POSTED' }],
+      movements: lines.map((line) => ({
+        docType: 'GR' as const,
+        docId: id,
+        docLineId: line.id,
+        movementType: 'RECEIPT' as const,
+        leg: 1,
+        warehouseId: line.warehouseId,
+        binId: binIds.get(line.id) ?? line.binId,
+        productId: line.productId,
+        lotId: line.lotId,
+        qtyBase: line.qtyBase,
+        enteredQty: line.enteredQty,
+        productUnitId: line.productUnitId,
+        factorSnapshot: line.factorSnapshot,
+      })),
+    });
+    if (salePrices.length > 0 && this.salePrices) {
+      await this.salePrices.applyInTx(tx, ctx, result.effectiveDate, salePrices);
+    }
+    await this.linkSupplierInTx(tx, ctx, header.supplierId, lines);
+    await this.audit.record(tx, ctx, {
+      action: 'POST',
+      entity: 'goods_receipts',
+      entityId: id,
+      before: header,
+      after: { number: result.numbers.get(id), vatRatePct, lines: allLines },
+    });
+    await this.progress?.receiptPostedInTx(tx, ctx, id);
+  }
+
+  /**
+   * Where each arrived line goes (ADR-0115): its product's fixed shelf in the line's warehouse while
+   * it can take goods (not archived, a shelf), else that warehouse's «Тавиургүй» shelf, which is
+   * sellable — shelves are not used today, so received goods must be on sale at once.
+   */
+  private async shelvesOf(
+    tx: Tx,
+    actor: Actor,
+    lines: readonly LineRow[],
+  ): Promise<Map<number, number>> {
+    const result = new Map<number, number>();
+    for (const warehouseId of new Set(lines.map((line) => line.warehouseId))) {
+      const own = lines.filter((line) => line.warehouseId === warehouseId);
+      const fixed = await this.locations.defaultBinOf(
+        warehouseId,
+        own.map((line) => line.productId),
+        tx,
+      );
+      let noShelf: number | null = null;
+      for (const line of own) {
+        const fixedId = fixed.get(line.productId);
+        const bin = fixedId === undefined ? undefined : await this.bins.get(fixedId, tx);
+        if (bin && !bin.archivedAt && SHELF_TYPES.includes(bin.type)) {
+          result.set(line.id, bin.id);
+          continue;
+        }
+        noShelf ??= (await this.bins.ensureNoShelfInTx(tx, actor, warehouseId)).id;
+        result.set(line.id, noShelf);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Cancels a purchase order's draft when the order steps back from «Ирсэн» (procurement, in its
+   * transaction): refused once a keeper confirmed a warehouse (RECEIPT_WAREHOUSE_CONFIRMED).
+   */
+  async cancelOrderDraftInTx(tx: Tx, actor: Actor, id: number): Promise<void> {
+    const header = await this.lockDraft(tx, id);
+    if ((await this.confirmationsOf(tx, id)).length > 0) {
+      throw new AppError('RECEIPT_WAREHOUSE_CONFIRMED', `receipt ${id} has confirmations`, {
+        receiptId: id,
+      });
+    }
+    await this.cancelLocked(tx, actor, header);
   }
 
   cancel(ctx: AuthContext, id: number): Promise<ReceiptDetail> {
     return inTransaction(this.db, async (tx) => {
       const header = await this.lockDraft(tx, id);
+      if (header.origin === 'ORDER') {
+        // The order steps back from «Ирсэн» instead, keeping the two in step.
+        throw new AppError('RECEIPT_FROM_ORDER', `receipt ${id} belongs to a purchase order`, {
+          originRef: header.originRef,
+        });
+      }
       await this.cancelLocked(tx, ctx, header);
       return this.get(id, tx);
     });
@@ -679,12 +939,15 @@ export class ReceiptsService implements OnModuleInit {
    * amount or price per entered unit (VAT included as printed), bonus lines at zero. Each line's cost
    * is its amount less the VAT at the receipt's frozen rate. `costingVersion` is the version the
    * form was opened at. The receipt's discounts (ADR-0103) lower the lines' cost; discounts given
-   * here replace the receipt's.
+   * here replace the receipt's. This is the accountant's price check (ADR-0115): only the arrived
+   * lines take a price, the payable must match the delivery note's total within 1₮ (the total may
+   * be corrected here), and only this makes the supplier's bill.
    */
   cost(
     ctx: AuthContext,
     id: number,
-    input: CostDiscountInput & { costingVersion: number; lines: readonly CostLineInput[] },
+    input: CostDiscountInput &
+      CostNoteInput & { costingVersion: number; lines: readonly CostLineInput[] },
   ): Promise<ReceiptCosting> {
     return inTransaction(this.db, async (tx) => {
       const header = await this.lockHeader(tx, id);
@@ -706,14 +969,24 @@ export class ReceiptsService implements OnModuleInit {
           });
         }
       }
-      const lines = await this.linesOf(tx, id);
+      // A line that did not arrive has no stock to cost.
+      const lines = (await this.linesOf(tx, id)).filter((line) => !line.qtyBase.isZero());
       const given = new Map(input.lines.map((line) => [line.lineId, line]));
       if (
         given.size !== input.lines.length ||
         lines.some((line) => !given.has(line.id)) ||
         given.size !== lines.length
       ) {
-        throw invalid('lines', 'complete', 'cost every line of the receipt once');
+        throw invalid('lines', 'complete', 'cost every arrived line of the receipt once');
+      }
+      const noteTotalAmount =
+        input.noteTotalAmount === undefined
+          ? header.noteTotalAmount
+          : noteAmountOf(input.noteTotalAmount);
+      if (noteTotalAmount === null) {
+        throw new AppError('RECEIPT_NOTE_MISSING', `receipt ${id} has no delivery-note total`, {
+          field: 'noteTotalAmount',
+        });
       }
       const rates = await this.lineVatRates(tx, lines, header.vatRatePct);
       const version = header.costingVersion + 1;
@@ -744,6 +1017,19 @@ export class ReceiptsService implements OnModuleInit {
         })),
         discounts,
       );
+      const payable = lines.reduce(
+        (sum, line) =>
+          free(line)
+            ? sum
+            : sum.plus((typed.get(line.id) ?? new Decimal(0)).minus(shares.get(line.id) ?? 0)),
+        new Decimal(0),
+      );
+      if (!noteAmountMatches(payable, noteTotalAmount)) {
+        throw new AppError('RECEIPT_NOTE_AMOUNT_MISMATCH', `receipt ${id} differs from its note`, {
+          note: noteTotalAmount.toFixed(2),
+          payable: payable.toFixed(2),
+        });
+      }
       await this.posting.revalue(tx, ctx, {
         docId: id,
         version,
@@ -770,6 +1056,7 @@ export class ReceiptsService implements OnModuleInit {
           costingVersion: version,
           costedAt: sql`now()`,
           costedBy: actorUserId(ctx),
+          noteTotalAmount,
           updatedAt: sql`now()`,
         })
         .where(eq(goodsReceipts.id, id));
@@ -780,11 +1067,13 @@ export class ReceiptsService implements OnModuleInit {
         after: {
           version,
           vatRatePct: header.vatRatePct,
+          noteTotalAmount,
           discounts,
           lines: lines.map((line) => ({ lineId: line.id, docAmount: typed.get(line.id) ?? null })),
         },
       });
       await this.purchases.receiptCostedInTx(tx, ctx, await this.bookFacts(id, tx, previous));
+      if (version === 1) await this.progress?.receiptCostedInTx(tx, ctx, id);
       return this.costing(id, tx);
     });
   }
@@ -792,11 +1081,25 @@ export class ReceiptsService implements OnModuleInit {
   async costing(id: number, executor: Db | Tx = this.db): Promise<ReceiptCosting> {
     const [header] = await executor.select().from(goodsReceipts).where(eq(goodsReceipts.id, id));
     if (!header) throw notFound('goods receipt', id);
-    const lines = await this.describeLines(executor, await this.linesOf(executor, id));
+    const lines = await this.describeLines(
+      executor,
+      (await this.linesOf(executor, id)).filter((line) => !line.qtyBase.isZero()),
+    );
     const provisional = await this.posting.receiptCosts(id, executor);
     const latest = await this.posting.costingOf(id, executor);
+    // The price check shows each product's price on the receipt posted before this one (ADR-0115).
+    const previous = new Map(
+      (
+        await this.lastPrices(
+          lines.map((line) => line.productId),
+          { exceptReceiptId: id, postedBefore: header.postedAt },
+          executor,
+        )
+      ).map((price) => [price.productId, price]),
+    );
     const costed = lines.map((line) => {
       const valuation = latest.get(line.id);
+      const before = previous.get(line.productId);
       return {
         lineId: line.id,
         productId: line.productId,
@@ -810,6 +1113,14 @@ export class ReceiptsService implements OnModuleInit {
         discountAmount: valuation?.discountAmount ?? null,
         unitCost: valuation ? unitCostOf(valuation.amount, line.qtyBase) : null,
         freeGoods: valuation?.freeGoods ?? line.freeGoods,
+        docUnitPrice: line.docUnitPrice,
+        // Per this line's unit: the base price times the line's factor.
+        previousUnitPrice: before
+          ? before.basePrice.times(line.factorSnapshot).toDecimalPlaces(2)
+          : null,
+        previousBasePrice: before?.basePrice ?? null,
+        previousDate: before?.date ?? null,
+        previousSupplierName: before?.supplierName ?? null,
       };
     });
     const sum = (pick: (line: (typeof costed)[number]) => Decimal | null) =>
@@ -832,6 +1143,9 @@ export class ReceiptsService implements OnModuleInit {
       ),
       total: header.costingVersion > 0 ? sum((line) => line.amount) : null,
       docTotal: header.costingVersion > 0 ? sum((line) => line.docAmount) : null,
+      noteTotalQty: header.noteTotalQty,
+      noteTotalAmount: header.noteTotalAmount,
+      hasNotePhoto: header.notePhotoFileId !== null,
       lines: costed,
     };
   }
@@ -916,6 +1230,12 @@ export class ReceiptsService implements OnModuleInit {
       supplierVatPayer: supplier?.vatPayer ?? false,
       vatRatePct: header.vatRatePct,
       discounts: views,
+      noteTotalQty: header.noteTotalQty,
+      noteTotalAmount: header.noteTotalAmount,
+      hasNotePhoto: header.notePhotoFileId !== null,
+      origin: header.origin,
+      originRef: header.originRef,
+      confirmations: await this.confirmationViews(executor, id),
       effectiveDate: header.effectiveDate,
       postedAt: header.postedAt,
       createdAt: header.createdAt,
@@ -931,6 +1251,8 @@ export class ReceiptsService implements OnModuleInit {
         pricedLines: priced.filter((line) => line.freeGoods || line.docAmount !== null).length,
         weightKg: sum((line) => (line.weightKg ? line.weightKg.times(line.qtyBase) : null)),
         weightMissing: priced.filter((line) => line.weightKg === null).length,
+        qtyBase: sum((line) => line.qtyBase),
+        uncheckedLines: priced.filter((line) => line.checkedAt === null).length,
       },
     };
   }
@@ -940,10 +1262,19 @@ export class ReceiptsService implements OnModuleInit {
    * that has a price, from any supplier — the latest costing's amount, else the typed one — per
    * entered unit and per base unit, before the note's discount, VAT included as printed. Cost data.
    */
-  async lastPrices(productIds: readonly number[]): Promise<LastReceiptPrice[]> {
+  async lastPrices(
+    productIds: readonly number[],
+    options: { exceptReceiptId?: number; postedBefore?: Date | null } = {},
+    executor: Db | Tx = this.db,
+  ): Promise<LastReceiptPrice[]> {
     const ids = [...new Set(productIds)];
     if (ids.length === 0) return [];
-    const rows = await this.db.execute<{
+    const except =
+      options.exceptReceiptId === undefined ? sql`` : sql` AND r.id <> ${options.exceptReceiptId}`;
+    const before = options.postedBefore
+      ? sql` AND r.posted_at < ${options.postedBefore.toISOString()}::timestamptz`
+      : sql``;
+    const rows = await executor.execute<{
       line_id: string;
       receipt_id: string;
       number: string;
@@ -966,7 +1297,7 @@ export class ReceiptsService implements OnModuleInit {
          ids.map((id) => sql`${id}`),
          sql`, `,
        )})
-         AND r.status = 'POSTED' AND NOT l.free_goods
+         AND r.status = 'POSTED' AND NOT l.free_goods AND l.qty_base > 0${except}${before}
          AND (l.doc_amount IS NOT NULL OR r.costing_status = 'COSTED')
        ORDER BY l.product_id, coalesce(r.supplier_doc_date, r.effective_date) DESC, r.id DESC,
                 l.id DESC`);
@@ -974,12 +1305,18 @@ export class ReceiptsService implements OnModuleInit {
     for (const receiptId of new Set(
       rows.rows.filter((row) => row.costing_version > 0).map((row) => int(row.receipt_id)),
     )) {
-      costings.set(receiptId, await this.posting.costingOf(receiptId));
+      costings.set(receiptId, await this.posting.costingOf(receiptId, executor));
     }
-    const units = await this.units.describe(rows.rows.map((row) => int(row.product_unit_id)));
+    const units = await this.units.describe(
+      rows.rows.map((row) => int(row.product_unit_id)),
+      executor,
+    );
     const suppliers = new Map(
       (
-        await this.suppliers.getMany([...new Set(rows.rows.map((row) => int(row.supplier_id)))])
+        await this.suppliers.getMany(
+          [...new Set(rows.rows.map((row) => int(row.supplier_id)))],
+          executor,
+        )
       ).map((supplier) => [supplier.id, supplier.name]),
     );
     return rows.rows.flatMap((row) => {
@@ -1054,6 +1391,8 @@ export class ReceiptsService implements OnModuleInit {
         costingStatus: goodsReceipts.costingStatus,
         costingVersion: goodsReceipts.costingVersion,
         paymentMethod: goodsReceipts.paymentMethod,
+        origin: goodsReceipts.origin,
+        originRef: goodsReceipts.originRef,
         effectiveDate: goodsReceipts.effectiveDate,
         createdAt: goodsReceipts.createdAt,
         // Spelled out: Drizzle leaves columns of a single-table select unqualified, and a bare "id"
@@ -1339,7 +1678,8 @@ export class ReceiptsService implements OnModuleInit {
   /**
    * A line goes to its product's home warehouse (ADR-0099 #1): a product without one takes the
    * warehouse the line names, which becomes its home (PRODUCT_NO_HOME when none is named); then
-   * the product's fixed shelf there, else that warehouse's receiving area.
+   * the product's fixed shelf there, else that warehouse's receiving area (the posting moves such
+   * a line to the sellable «Тавиургүй» shelf, ADR-0115).
    */
   private async insertLine(
     tx: Tx,
@@ -1347,7 +1687,11 @@ export class ReceiptsService implements OnModuleInit {
     header: ReceiptRow,
     line: ReceiptLineInput,
   ): Promise<void> {
-    const converted = await this.units.toBase(line.productUnitId, line.enteredQty, tx);
+    // A line the order expects starts empty and waits for the keeper's count (ADR-0115).
+    const expectedQty = line.expectedQty ?? null;
+    if (expectedQty !== null) await this.units.toBase(line.productUnitId, expectedQty, tx);
+    const enteredQty = expectedQty === null ? line.enteredQty : new Decimal(0);
+    const converted = await this.convert(line.productUnitId, enteredQty, tx);
     const productId = converted.productId;
     let warehouseId = (await this.locations.homeOf([productId], tx)).get(productId);
     if (warehouseId === undefined) {
@@ -1359,6 +1703,7 @@ export class ReceiptsService implements OnModuleInit {
       await this.locations.setHomeInTx(tx, actor, productId, line.warehouseId);
       warehouseId = line.warehouseId;
     }
+    await this.assertNotConfirmed(tx, header.id, warehouseId);
     // The fixed shelf while it can take goods (not archived, a shelf), else the receiving area.
     const fixedId = (await this.locations.defaultBinOf(warehouseId, [productId], tx)).get(
       productId,
@@ -1374,14 +1719,84 @@ export class ReceiptsService implements OnModuleInit {
       receiptId: header.id,
       productId,
       productUnitId: converted.unitId,
-      enteredQty: line.enteredQty,
+      enteredQty,
       factorSnapshot: converted.factorSnapshot,
       qtyBase: converted.qtyBase,
       warehouseId,
       binId,
-      ...priceOf(line, line.enteredQty),
+      ...priceOf(line, enteredQty),
       salePrice,
+      expectedQty,
+      checkedAt: expectedQty === null ? sql`now()` : null,
     });
+  }
+
+  /** An entered quantity in base units; a zero (an expected line not arrived) checks only the unit. */
+  private async convert(
+    unitId: number,
+    enteredQty: Decimal,
+    executor: Db | Tx,
+  ): Promise<{ productId: number; unitId: number; factorSnapshot: Decimal; qtyBase: Decimal }> {
+    if (!enteredQty.isZero()) return this.units.toBase(unitId, enteredQty, executor);
+    const unit = (await this.units.describe([unitId], executor)).get(unitId);
+    if (!unit) throw notFound('product unit', unitId);
+    if (!unit.current) {
+      throw new AppError('UNIT_SUPERSEDED', `unit ${unitId} is no longer current`, { id: unitId });
+    }
+    return {
+      productId: unit.productId,
+      unitId,
+      factorSnapshot: unit.factorToBase,
+      qtyBase: new Decimal(0),
+    };
+  }
+
+  private confirmationsOf(
+    executor: Db | Tx,
+    receiptId: number,
+  ): Promise<(typeof goodsReceiptConfirmations.$inferSelect)[]> {
+    return executor
+      .select()
+      .from(goodsReceiptConfirmations)
+      .where(eq(goodsReceiptConfirmations.receiptId, receiptId))
+      .orderBy(goodsReceiptConfirmations.warehouseId);
+  }
+
+  private async confirmationViews(
+    executor: Db | Tx,
+    receiptId: number,
+  ): Promise<ReceiptConfirmation[]> {
+    const rows = await this.confirmationsOf(executor, receiptId);
+    // Through the executor: inside a transaction a pooled read would need a second connection.
+    const names = await this.userNames.namesOf(
+      rows.flatMap((row) => (row.confirmedBy === null ? [] : [row.confirmedBy])),
+      executor,
+    );
+    return rows.map((row) => ({
+      warehouseId: row.warehouseId,
+      confirmedBy: row.confirmedBy === null ? null : (names.get(row.confirmedBy) ?? null),
+      confirmedAt: row.confirmedAt,
+    }));
+  }
+
+  /** A confirmed warehouse's lines are frozen (ADR-0115) until its keeper withdraws. */
+  private async assertNotConfirmed(tx: Tx, receiptId: number, warehouseId: number): Promise<void> {
+    const [row] = await tx
+      .select({ warehouseId: goodsReceiptConfirmations.warehouseId })
+      .from(goodsReceiptConfirmations)
+      .where(
+        and(
+          eq(goodsReceiptConfirmations.receiptId, receiptId),
+          eq(goodsReceiptConfirmations.warehouseId, warehouseId),
+        ),
+      );
+    if (row) {
+      throw new AppError(
+        'RECEIPT_WAREHOUSE_CONFIRMED',
+        `receipt ${receiptId} is confirmed in warehouse ${warehouseId}`,
+        { receiptId, warehouseId },
+      );
+    }
   }
 
   private async linesOf(executor: Db | Tx, receiptId: number): Promise<LineRow[]> {
@@ -1443,6 +1858,8 @@ export class ReceiptsService implements OnModuleInit {
       netAmount: null,
       vatAmount: null,
       costAmount: null,
+      expectedQty: line.expectedQty,
+      checkedAt: line.checkedAt,
     }));
   }
 
@@ -1489,6 +1906,25 @@ export class ReceiptsService implements OnModuleInit {
 
 /** A bigint column read as text by a raw query. */
 const int = (value: string) => Number.parseInt(value, 10);
+
+/** The file kind of a delivery note's photo (ADR-0115). */
+const NOTE_PHOTO = 'inventory.receipt_note';
+
+/** The delivery note's total pieces: null clears, else at least zero with three decimals. */
+function noteQtyOf(value: Decimal | null | undefined): Decimal | null {
+  if (value === undefined || value === null) return null;
+  if (value.isNegative() || value.decimalPlaces() > 3) {
+    throw invalid('noteTotalQty', 'qty', 'a quantity of at least zero');
+  }
+  return value;
+}
+
+/** The delivery note's total amount: null clears, else money of at least zero. */
+function noteAmountOf(value: Decimal | null | undefined): Decimal | null {
+  if (value === undefined || value === null) return null;
+  assertMoney('noteTotalAmount', value);
+  return value;
+}
 
 function assertDraft(header: ReceiptRow): void {
   if (header.status === 'POSTED') {

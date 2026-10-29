@@ -5,7 +5,12 @@ import request from 'supertest';
 import { connectAs, createHttpApp } from '../harness/apps';
 import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { bearer, login, seedUser } from '../harness/identity';
-import { expectReconciled, inventoryApi, type WarehouseJson } from '../harness/inventory';
+import {
+  expectReconciled,
+  inventoryApi,
+  postReceipt,
+  type WarehouseJson,
+} from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 
 interface MoveJson {
@@ -103,7 +108,6 @@ describe('bin moves and adjustments', () => {
     wh1 = await inventory.warehouse('WH1');
     wh2 = await inventory.warehouse('WH2');
     for (const code of ['A-01-01', 'A-01-02']) bins[code] = (await inventory.bin(wh1.id, code)).id;
-    bins.RECEIVING = (await inventory.systemBin(wh1.id, 'RECEIVING')).id;
     bins.WH2 = (await inventory.bin(wh2.id, 'B-01-01')).id;
     const catalog = catalogApi(app, admin);
     const category = await catalog.category('Ундаа');
@@ -124,7 +128,8 @@ describe('bin moves and adjustments', () => {
     });
     await inventory.setHome(cola.id, wh1.id);
 
-    // 2 boxes of cola into the receiving area (no fixed shelf yet), costed at 1 000 a piece.
+    // 2 boxes of cola onto WH1's «Тавиургүй» shelf (no fixed shelf yet; a receipt never fills the
+    // receiving area, ADR-0115), costed at 1 000 a piece.
     const supplierId = (await partnersApi(app, admin).supplier({ name: 'МСМ ХХК' })).id;
     const receipt = await http()
       .post('/api/v1/receipts')
@@ -136,11 +141,7 @@ describe('bin moves and adjustments', () => {
       })
       .expect(201);
     const receiptId = (receipt.body as { id: number }).id;
-    await http()
-      .post(`/api/v1/receipts/${receiptId}/post`)
-      .set(bearer(worker))
-      .set(idempotency())
-      .expect(200);
+    await postReceipt(app, worker, receiptId, { amount: '48000' });
     const lineId = (receipt.body as { lines: { id: number }[] }).lines[0]?.id;
     await http()
       .put(`/api/v1/receipts/${receiptId}/costs`)
@@ -148,6 +149,11 @@ describe('bin moves and adjustments', () => {
       .set(idempotency())
       .send({ costingVersion: 0, lines: [{ lineId, amount: '48000' }] })
       .expect(200);
+    const noShelf = await sql.query<{ id: string }>(
+      `SELECT id::text FROM bins WHERE warehouse_id = $1 AND code = 'NOSHELF'`,
+      [wh1.id],
+    );
+    bins.NOSHELF = Number.parseInt(noShelf.rows[0]?.id ?? '0', 10);
   });
   afterAll(async () => {
     await expectReconciled(app);
@@ -162,7 +168,7 @@ describe('bin moves and adjustments', () => {
         {
           productUnitId: unitOf(cola, 'BOX').id,
           enteredQty: '1',
-          fromBinId: bins.RECEIVING,
+          fromBinId: bins.NOSHELF,
           toBinId: bins['A-01-01'],
         },
       ],
@@ -170,11 +176,12 @@ describe('bin moves and adjustments', () => {
     const first = putaway.body as MoveJson;
     expect(first).toMatchObject({ status: 'POSTED', number: `BM-${year}-000001` });
     expect(first.lines).toEqual([
-      expect.objectContaining({ fromBinCode: 'RECEIVING', toBinCode: 'A-01-01', qtyBase: '24' }),
+      expect.objectContaining({ fromBinCode: 'NOSHELF', toBinCode: 'A-01-01', qtyBase: '24' }),
     ]);
+    // «Тавиургүй» is a shelf: putting its goods away is a shelf move (a put-away leaves RECEIVING).
     expect(await ledgerOf('BM', first.id)).toEqual([
-      { movement_type: 'PUTAWAY_OUT', leg: 1, qty_base: '-24.000', unit_cost: '1000.0000' },
-      { movement_type: 'PUTAWAY_IN', leg: 2, qty_base: '24.000', unit_cost: '1000.0000' },
+      { movement_type: 'BIN_MOVE_OUT', leg: 1, qty_base: '-24.000', unit_cost: '1000.0000' },
+      { movement_type: 'BIN_MOVE_IN', leg: 2, qty_base: '24.000', unit_cost: '1000.0000' },
     ]);
 
     const shelfMove = await move(worker, {
@@ -195,7 +202,7 @@ describe('bin moves and adjustments', () => {
       'BIN_MOVE_OUT',
       'BIN_MOVE_IN',
     ]);
-    expect(await binQty(binId('RECEIVING'), cola.id)).toBe('24.000');
+    expect(await binQty(binId('NOSHELF'), cola.id)).toBe('24.000');
     expect(await binQty(binId('A-01-01'), cola.id)).toBe('12.000');
     expect(await binQty(binId('A-01-02'), cola.id)).toBe('12.000');
     expect((await warehouseQty(wh1.id, cola.id))?.on_hand).toBe('48.000');

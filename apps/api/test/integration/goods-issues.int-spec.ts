@@ -6,7 +6,13 @@ import { connectAs, createHttpApp } from '../harness/apps';
 import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { bearer, login, seedUser } from '../harness/identity';
 import { importsApi } from '../harness/imports';
-import { expectReconciled, inventoryApi, type WarehouseJson } from '../harness/inventory';
+import {
+  costReceiptAsTyped,
+  expectReconciled,
+  inventoryApi,
+  postReceipt,
+  type WarehouseJson,
+} from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 
 interface IssueLineJson {
@@ -112,11 +118,9 @@ describe('goods issues', () => {
         lines: [{ productUnitId: unitOf(cola, 'PCS').id, enteredQty: '40', docAmount: '40000' }],
       })
       .expect(201);
-    await http()
-      .post(`/api/v1/receipts/${(receipt.body as { id: number }).id}/post`)
-      .set(bearer(admin))
-      .set(idempotency())
-      .expect(200);
+    await postReceipt(app, admin, (receipt.body as { id: number }).id);
+    // Priced on the draft, costed by the price check (ADR-0115: posting never costs).
+    await costReceiptAsTyped(app, admin, (receipt.body as { id: number }).id);
     await http()
       .post('/api/v1/bin-moves')
       .set(bearer(admin))

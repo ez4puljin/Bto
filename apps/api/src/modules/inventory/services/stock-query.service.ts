@@ -475,6 +475,18 @@ export class StockQueryService {
     };
   }
 
+  /**
+   * Each product's outflow per warehouse over business dates `from` … `to` (ADR-0115): wholesale
+   * sales less their returns, plus transfers to a supermarket, in base units.
+   */
+  outflowOf(
+    productIds: readonly number[],
+    from: string,
+    to: string,
+  ): Promise<Map<number, Map<number, Decimal>>> {
+    return this.posting.outflow(productIds, from, to);
+  }
+
   /** Warehouse balances per product (warehouses holding or reserving none left out). */
   balancesOf(productIds: readonly number[]): Promise<Map<number, WarehouseBalance[]>> {
     return this.balances(productIds);

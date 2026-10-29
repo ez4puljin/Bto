@@ -9,6 +9,7 @@ export const DISCOVER = {
   supplier: ['/api/v1/suppliers', (row) => row.id],
   stockProduct: ['/api/v1/stock', (row) => row.product?.id ?? row.productId],
   receipt: ['/api/v1/receipts', (row) => row.id],
+  purchaseOrder: ['/api/v1/purchase-orders', (row) => row.id],
   issue: ['/api/v1/issues', (row) => row.id],
   transfer: ['/api/v1/transfers', (row) => row.id],
   adjustment: ['/api/v1/adjustments', (row) => row.id],
@@ -73,6 +74,15 @@ export const ROUTES = [
   { area: 'inventory', name: 'movements', path: '/inventory/movements' },
   { area: 'inventory', name: 'bins', path: '/inventory/bins' },
   { area: 'inventory', name: 'bins-new', path: '/inventory/bins?new=1', dialog: true },
+
+  { area: 'procurement', name: 'purchase-orders', path: '/procurement/orders' },
+  {
+    area: 'procurement',
+    name: 'purchase-orders-new',
+    path: '/procurement/orders?new=1',
+    dialog: true,
+  },
+  { area: 'procurement', name: 'purchase-order', path: '/procurement/orders/{purchaseOrder}' },
 
   { area: 'catalog', name: 'products', path: '/catalog/products' },
   { area: 'catalog', name: 'product', path: '/catalog/products/{product}' },

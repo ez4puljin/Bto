@@ -18,7 +18,12 @@ import { StockPostingService } from '../../src/modules/inventory';
 import { connectAs, createHttpApp, createWorker, sqlStateOf, waitFor } from '../harness/apps';
 import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { bearer, login, seedUser } from '../harness/identity';
-import { expectReconciled, inventoryApi, type WarehouseJson } from '../harness/inventory';
+import {
+  expectReconciled,
+  inventoryApi,
+  postReceipt,
+  type WarehouseJson,
+} from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 
 const DENIED = '42501';
@@ -151,11 +156,7 @@ describe('nightly jobs', () => {
         lines: [{ productUnitId: unitOf(cola, 'BOX').id, enteredQty: '2' }],
       })
       .expect(201);
-    await http()
-      .post(`/api/v1/receipts/${(receipt.body as { id: number }).id}/post`)
-      .set(bearer(admin))
-      .set(idempotency())
-      .expect(200);
+    await postReceipt(app, admin, (receipt.body as { id: number }).id);
     const { rows } = await sql.query<{ now: Date }>('SELECT now() AS now');
     const now = rows[0]?.now ?? new Date();
     today = businessDate(now);

@@ -10,8 +10,12 @@ import {
   Post,
   Put,
   Query,
+  Res,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
+import { pipeline } from 'node:stream/promises';
+import type { Response } from 'express';
+import { AppError } from '../../../common/errors/app-error';
 import { Decimal } from '@tugeel/shared/money';
 import {
   type AuthContext,
@@ -55,6 +59,12 @@ const lineInput = (line: ReceiptLineRequestDto) => ({
   ...(line.salePrice === undefined ? {} : { salePrice: money(line.salePrice) }),
 });
 
+/** The delivery note's totals as decimals (ADR-0115); absent fields stay absent. */
+const noteTotals = (body: { noteTotalQty?: string | null; noteTotalAmount?: string | null }) => ({
+  ...(body.noteTotalQty === undefined ? {} : { noteTotalQty: money(body.noteTotalQty) }),
+  ...(body.noteTotalAmount === undefined ? {} : { noteTotalAmount: money(body.noteTotalAmount) }),
+});
+
 /** Discounts as typed, as decimals (ADR-0103). */
 const discountsInput = (discounts: readonly ReceiptDiscountRequestDto[]) =>
   discounts.map((discount) => ({
@@ -69,8 +79,8 @@ const detail = (ctx: AuthContext) => (receipt: Parameters<typeof toReceiptDetail
   toReceiptDetailDto(receipt, ctx.permissions.has(COSTS));
 
 /**
- * Goods receipts (ADR-0033, ADR-0099): holders of the receipt right count and post them, whatever
- * their warehouse scope; every user reads them without costs; the costs and the discount live
+ * Goods receipts (ADR-0033, ADR-0099, ADR-0115): holders of the receipt right count them whatever
+ * their warehouse scope and confirm the lines in their own warehouses; every user reads them without costs; the costs and the discount live
  * behind inventory.costs.manage, a line's new sale price behind pricing.prices.manage.
  */
 @ApiTags('inventory')
@@ -134,6 +144,7 @@ export class ReceiptsController {
     return detail(ctx)(
       await this.receipts.create(ctx, {
         supplierId: body.supplierId,
+        ...noteTotals(body),
         ...(body.supplierDocNo === undefined ? {} : { supplierDocNo: body.supplierDocNo }),
         ...(body.supplierDocDate === undefined ? {} : { supplierDocDate: body.supplierDocDate }),
         ...(body.note === undefined ? {} : { note: body.note }),
@@ -152,7 +163,36 @@ export class ReceiptsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateReceiptDto,
   ): Promise<ReceiptDetailDto> {
-    return detail(ctx)(await this.receipts.update(ctx, id, body));
+    const { noteTotalQty, noteTotalAmount, ...rest } = body;
+    return detail(ctx)(
+      await this.receipts.update(ctx, id, {
+        ...rest,
+        ...noteTotals({ noteTotalQty, noteTotalAmount }),
+      }),
+    );
+  }
+
+  /** The delivery note's photo (ADR-0115), streamed to receipt and cost holders. */
+  @Get(':id/note-photo')
+  @Authenticated()
+  @ApiProduces('image/jpeg', 'image/png', 'image/webp')
+  @ApiOkResponse({ description: 'The photo' })
+  async notePhoto(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Res() response: Response,
+  ): Promise<void> {
+    if (!ctx.permissions.has(MANAGE) && !ctx.permissions.has(COSTS)) {
+      throw new AppError('FORBIDDEN', 'the delivery note is for receipt and cost holders', {
+        permission: MANAGE,
+      });
+    }
+    const { file, body } = await this.receipts.notePhoto(id);
+    response.status(200);
+    response.setHeader('Content-Type', file.contentType);
+    response.setHeader('Content-Length', String(file.sizeBytes));
+    response.setHeader('Cache-Control', 'private, no-store');
+    await pipeline(body, response);
   }
 
   /** A draft's discounts, replaced as a whole (ADR-0103). */
@@ -178,7 +218,10 @@ export class ReceiptsController {
     return detail(ctx)(await this.receipts.addLine(ctx, id, lineInput(body)));
   }
 
-  /** DRAFT → POSTED; idempotent so a retried click never posts twice. */
+  /**
+   * The keeper's confirmation (ADR-0115): confirms the caller's warehouses of the receipt; the last
+   * one posts it (DRAFT → POSTED). Idempotent so a retried click never confirms twice.
+   */
   @Post(':id/post')
   @HttpCode(200)
   @RequirePermission(MANAGE)
@@ -188,7 +231,19 @@ export class ReceiptsController {
     @CurrentUser() ctx: AuthContext,
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ReceiptDetailDto> {
-    return detail(ctx)(await this.receipts.post(ctx, id));
+    return detail(ctx)(await this.receipts.confirm(ctx, id));
+  }
+
+  /** Withdraws a warehouse's confirmation while the receipt is a draft (that warehouse's scope). */
+  @Delete(':id/confirmations/:warehouseId')
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: ReceiptDetailDto })
+  async withdraw(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('warehouseId', ParseIntPipe) warehouseId: number,
+  ): Promise<ReceiptDetailDto> {
+    return detail(ctx)(await this.receipts.withdraw(ctx, id, warehouseId));
   }
 
   @Post(':id/cancel')
@@ -221,6 +276,9 @@ export class ReceiptsController {
     return toReceiptCostingDto(
       await this.receipts.cost(ctx, id, {
         costingVersion: body.costingVersion,
+        ...(body.noteTotalAmount === undefined
+          ? {}
+          : { noteTotalAmount: new Decimal(body.noteTotalAmount) }),
         ...(body.discounts === undefined ? {} : { discounts: discountsInput(body.discounts) }),
         lines: body.lines.map((line) => ({
           lineId: line.lineId,

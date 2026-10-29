@@ -293,6 +293,7 @@ export class ReceiptsImporter implements Importer<ReceiptRowPlan> {
         supplierDocDate: first.plan.date,
         paymentMethod: options.paymentMethod,
         moneyAccountId: options.moneyAccountId,
+        origin: 'IMPORT',
         lines: noteRows.flatMap((row) =>
           row.plan
             ? [

@@ -56,6 +56,12 @@ import {
   SuppliersPage,
 } from '@/features/partners/supplier-pages';
 import { HomePage } from '@/features/home/home-page';
+import {
+  PurchaseOrderPage,
+  PurchaseOrderPrintPage,
+  PurchaseOrdersPage,
+} from '@/features/procurement/orders-pages';
+import { ReceiptReceivePage } from '@/features/inventory/receipt-receive-page';
 import { ModulePage } from '@/features/home/module-page';
 import { AiPage } from '@/features/ai/ai-page';
 import { AccountLedgerPage, AccountsPage } from '@/features/finance/accounts-page';
@@ -160,6 +166,18 @@ export const routes: RouteObject[] = [
       <RequireAuth>
         <RequirePermission permission="pos.read">
           <PosVoucherPrintPage />
+        </RequirePermission>
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // A purchase order's sheets for the suppliers, one per supplier (ADR-0115).
+    path: '/procurement/orders/:id/print',
+    element: (
+      <RequireAuth>
+        <RequirePermission permission="procurement.orders.read">
+          <PurchaseOrderPrintPage />
         </RequirePermission>
       </RequireAuth>
     ),
@@ -358,6 +376,35 @@ export const routes: RouteObject[] = [
           // draft stays mounted when it takes the draft's address; `?new=1` on the list redirects
           // here. The old costing page is the receipt itself.
           { path: 'inventory/receipts/:id', handle: { width: 'wide' }, element: <ReceiptPage /> },
+          // The keeper's count against the expected quantities, by scanner (ADR-0115).
+          {
+            path: 'inventory/receipts/:id/receive',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="inventory.receipts.manage">
+                <ReceiptReceivePage />
+              </RequirePermission>
+            ),
+          },
+          // Purchase orders by supplier (ADR-0115): the list and one order with its grid.
+          {
+            path: 'procurement/orders',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="procurement.orders.read">
+                <PurchaseOrdersPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: 'procurement/orders/:id',
+            handle: { width: 'full' },
+            element: (
+              <RequirePermission permission="procurement.orders.read">
+                <PurchaseOrderPage />
+              </RequirePermission>
+            ),
+          },
           {
             path: 'inventory/receipts/:id/costing',
             handle: { width: 'wide' },

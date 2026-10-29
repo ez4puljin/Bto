@@ -7,7 +7,12 @@ import { connectAs, createHttpApp } from '../harness/apps';
 import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { financeApi, type InvoiceJson, moveInvoiceDue, salesFlow } from '../harness/finance';
 import { bearer, customRoleUser, login, seedUser } from '../harness/identity';
-import { expectReconciled, inventoryApi } from '../harness/inventory';
+import {
+  costReceiptAsTyped,
+  expectReconciled,
+  inventoryApi,
+  postReceipt,
+} from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 import { posStore, saleDoc, saleEvent } from '../harness/pos';
 
@@ -439,11 +444,9 @@ describe('management reports', () => {
         })
         .expect(201)
     ).body as { id: number };
-    await http()
-      .post(`/api/v1/receipts/${draft.id}/post`)
-      .set(bearer(admin))
-      .set(idempotency())
-      .expect(200);
+    await postReceipt(app, admin, draft.id);
+    // The price check makes the bill (ADR-0115: posting never bills).
+    await costReceiptAsTyped(app, admin, draft.id);
     const finance = financeApi(app, accountant);
     const payable = await finance.account('310101');
     const cash = await finance.account('100101');

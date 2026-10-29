@@ -4,7 +4,7 @@ import request from 'supertest';
 import { connectAs, createHttpApp } from '../harness/apps';
 import { catalogApi, idempotency, unitOf } from '../harness/catalog';
 import { bearer, login, seedUser } from '../harness/identity';
-import { expectReconciled, inventoryApi } from '../harness/inventory';
+import { expectReconciled, inventoryApi, postReceipt } from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 
 /**
@@ -50,11 +50,7 @@ describe('integrity: goods issue races', () => {
         .set(idempotency())
         .send({ supplierId, lines: [{ productUnitId: pieces, enteredQty: '1' }] })
         .expect(201);
-      await http()
-        .post(`/api/v1/receipts/${(receipt.body as { id: number }).id}/post`)
-        .set(bearer(admin))
-        .set(idempotency())
-        .expect(200);
+      await postReceipt(app, admin, (receipt.body as { id: number }).id);
       const drafts = await Promise.all(
         [0, 1].map(
           async () =>

@@ -3,7 +3,7 @@ import type { Permission } from '@tugeel/shared/auth';
 import { and, asc, eq, ilike, inArray, or } from 'drizzle-orm';
 import { escapeLike } from '../../../common/db/like';
 import { DB } from '../../../common/db/db.tokens';
-import type { Db } from '../../../common/db/db.types';
+import type { Db, Tx } from '../../../common/db/db.types';
 import { rolePermissions, userRoles, users } from '../schema';
 
 export interface UserSummary {
@@ -21,10 +21,14 @@ export interface UserSummary {
 export class UserNamesService {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  async namesOf(userIds: readonly number[]): Promise<Map<number, string>> {
+  /** In the caller's transaction when one is given, never a second pooled connection beside it. */
+  async namesOf(
+    userIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, string>> {
     const ids = [...new Set(userIds)];
     if (ids.length === 0) return new Map();
-    const rows = await this.db
+    const rows = await executor
       .select({ id: users.id, fullName: users.fullName })
       .from(users)
       .where(inArray(users.id, ids));
