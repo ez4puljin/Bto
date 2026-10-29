@@ -234,3 +234,26 @@ One question round before the build. Each item below was the proposal, and the o
 15. **Two stores.** The main supermarket's warehouse `S1` is renamed **«Заал»** and a second STORE warehouse **`S2` «Заалны архи»** is added (done on the development database 2026-10-29; its till, edge and e-Barimt come later, TODO-VERIFY in §2).
 
 Reserved for the build: ADR-0116 and migration `0053` (branch `claude/slice2-transfers`).
+
+## 6. Slice 3 scope: issues (owner, 2026-10-29)
+
+One question round before the build, run beside slice 2 as the owner asked for two sessions at once. Each item below was the proposal, and the owner accepted every one ("Бүх саналууд зөв").
+
+**Who does what**
+1. The accountant creates the issue on the web and **sends** it; the keeper of each warehouse **confirms** their own lines; the goods leave at the confirmation. A keeper who cannot confirm sends it back with a note.
+2. An issue with goods from several warehouses: each warehouse's part **posts on its own when its keeper confirms** (unlike slice 1's receipt, which waits for the last confirmation; issued goods leave separately).
+3. Scanning at the confirmation is optional: the keeper ticks each line from the list, and a scan jumps to the line.
+
+**Account and party**
+4. The account comes from the Finance Core's chart of accounts (each of today's issue types is bound to one account); the party (staff member, customer, supplier or other) is **mandatory**. The account report filters by account, and by account and party.
+5. **Damage charged to a person** is in this slice: an issue type «Хүнд тооцох» priced at the sale price, creating a receivable on the party (a staff member or a customer).
+6. Returns to a supplier (reducing the payable) follow the same flow.
+
+**Corrections**
+7. A posted issue is corrected by the accountant sending a **change** (new quantities); when the keeper confirms it, the reversal and the new document are booked in one step.
+
+**Scope**
+8. Kharkhorin is a customer (sales), never an issue (ADR-0084).
+9. Write-offs and damage (question 4 in §2) are not designed here; they are booked as ordinary issue types.
+
+Reserved for the build: ADR-0117 and migration `0054` (branch `claude/slice3-issues`). Slices 2 and 3 both touch `inventory`: whichever merges second merges main again and puts its journal entry last.
