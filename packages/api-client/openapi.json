@@ -6451,6 +6451,8 @@
               "type": "string",
               "enum": [
                 "DRAFT",
+                "SENT",
+                "RETURNED",
                 "POSTED",
                 "CANCELLED"
               ]
@@ -6473,6 +6475,15 @@
             "schema": {
               "maxLength": 100,
               "type": "string"
+            }
+          },
+          {
+            "name": "pending",
+            "required": false,
+            "in": "query",
+            "description": "Only sent issues with a line of the caller’s warehouses still to confirm",
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -6503,6 +6514,7 @@
             "bearer": []
           }
         ],
+        "summary": "`pending=1`: the sent issues with a line of the caller's warehouses still to confirm.",
         "tags": [
           "inventory"
         ]
@@ -6715,9 +6727,9 @@
         ]
       }
     },
-    "/api/v1/issues/{id}/post": {
+    "/api/v1/issues/{id}/send": {
       "post": {
-        "operationId": "Issues_post",
+        "operationId": "Issues_send",
         "parameters": [
           {
             "name": "id",
@@ -6764,7 +6776,173 @@
             "bearer": []
           }
         ],
-        "summary": "DRAFT → POSTED by the warehouse itself; idempotent so a retried click never posts twice.",
+        "summary": "DRAFT / RETURNED → SENT: the keepers may confirm (ADR-0117 #1).",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/issues/{id}/confirm": {
+      "post": {
+        "operationId": "Issues_confirm",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The keeper's confirmation of the warehouses in their scope: those parts leave at once\n(ADR-0117 #2); idempotent so a retried click never posts twice.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/issues/{id}/return": {
+      "post": {
+        "operationId": "Issues_return",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueReturnRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The keeper sends the issue back to the accountant with a note.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/issues/{id}/corrections": {
+      "post": {
+        "operationId": "Issues_createCorrection",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A correction of a posted issue: a child draft with the parent's lines (ADR-0117 #5).",
         "tags": [
           "inventory"
         ]
@@ -6865,6 +7043,7 @@
             "bearer": []
           }
         ],
+        "summary": "The accountant's edit: the quantity or the warehouse of an unconfirmed line.",
         "tags": [
           "inventory"
         ]
@@ -6908,6 +7087,118 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/issue-lines/{id}/check": {
+      "patch": {
+        "operationId": "IssueLines_check",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueLineCheckRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The keeper's tick on a line of their warehouse (ADR-0117 #1).",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/issue-lines/{id}/bin": {
+      "patch": {
+        "operationId": "IssueLines_setBin",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueLineBinRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The keeper names the shelf a line leaves from (a scanned label).",
         "tags": [
           "inventory"
         ]
@@ -17072,6 +17363,16 @@
               "example": "2026-10-31",
               "type": "string"
             }
+          },
+          {
+            "name": "partyId",
+            "required": false,
+            "in": "query",
+            "description": "The lines of one party only (ADR-0117 #2)",
+            "schema": {
+              "pattern": "^\\d{1,18}$",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -17101,6 +17402,66 @@
             "bearer": []
           }
         ],
+        "summary": "The account report: the account's lines, or one party's lines on it (ADR-0117 #2).",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/gl-accounts/{id}/parties": {
+      "get": {
+        "operationId": "GlAccounts_parties",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Part of the party’s name",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AccountParty"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The parties with lines on the account, for the ledger's party filter.",
         "tags": [
           "finance"
         ]
@@ -27020,6 +27381,7 @@
           "inventory.costs.manage",
           "inventory.transfers.manage",
           "inventory.issues.manage",
+          "inventory.issues.confirm",
           "procurement.orders.read",
           "procurement.orders.edit",
           "procurement.orders.manage",
@@ -31831,6 +32193,8 @@
           "status": {
             "enum": [
               "DRAFT",
+              "SENT",
+              "RETURNED",
               "POSTED",
               "CANCELLED"
             ],
@@ -31838,6 +32202,24 @@
           },
           "lineCount": {
             "type": "number"
+          },
+          "warehouseIds": {
+            "description": "The line warehouses",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "confirmedWarehouseIds": {
+            "description": "The warehouses whose part left",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "correctsIssueId": {
+            "type": "number",
+            "nullable": true
           },
           "effectiveDate": {
             "type": "string",
@@ -31860,6 +32242,9 @@
           "recipientName",
           "status",
           "lineCount",
+          "warehouseIds",
+          "confirmedWarehouseIds",
+          "correctsIssueId",
           "effectiveDate",
           "createdAt"
         ]
@@ -31914,11 +32299,36 @@
             "type": "string",
             "description": "Base units"
           },
-          "binId": {
+          "warehouseId": {
             "type": "number"
           },
-          "binCode": {
+          "warehouseName": {
             "type": "string"
+          },
+          "binId": {
+            "type": "number",
+            "nullable": true,
+            "description": "Null until the confirmation picks it"
+          },
+          "binCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "checkedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "The keeper’s tick"
+          },
+          "saleUnitPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "«Хүнд тооцох»: the sale price per base unit, whole MNT"
+          },
+          "saleAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "«Хүнд тооцох»: the line’s charge"
           },
           "unitCost": {
             "type": "string",
@@ -31941,8 +32351,71 @@
           "enteredQty",
           "factorSnapshot",
           "qtyBase",
+          "warehouseId",
+          "warehouseName",
           "binId",
-          "binCode"
+          "binCode",
+          "checkedAt",
+          "saleUnitPrice",
+          "saleAmount"
+        ]
+      },
+      "IssueWarehouse": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "checkedCount": {
+            "type": "number"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "description": "Its part left (or a correction left it unchanged)"
+          }
+        },
+        "required": [
+          "warehouseId",
+          "warehouseName",
+          "lineCount",
+          "checkedCount",
+          "confirmed"
+        ]
+      },
+      "IssueConfirmation": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "confirmedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "unchanged": {
+            "type": "boolean",
+            "description": "A correction’s warehouse whose lines equal the parent’s"
+          }
+        },
+        "required": [
+          "warehouseId",
+          "warehouseName",
+          "confirmedBy",
+          "confirmedAt",
+          "unchanged"
         ]
       },
       "IssueDetail": {
@@ -31972,6 +32445,10 @@
           "expenseTypeName": {
             "type": "string"
           },
+          "expenseTypeCode": {
+            "type": "string",
+            "nullable": true
+          },
           "recipientKind": {
             "enum": [
               "USER",
@@ -32000,12 +32477,51 @@
           "status": {
             "enum": [
               "DRAFT",
+              "SENT",
+              "RETURNED",
               "POSTED",
               "CANCELLED"
             ],
             "type": "string"
           },
           "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "sentAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "returnNote": {
+            "type": "string",
+            "nullable": true,
+            "description": "The keeper’s note when sent back"
+          },
+          "returnedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "returnedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "correctsIssueId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The posted issue this one corrects"
+          },
+          "correctsIssueNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "correctedByIssueId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The correction of this issue"
+          },
+          "correctedByIssueNumber": {
             "type": "string",
             "nullable": true
           },
@@ -32033,6 +32549,23 @@
               "$ref": "#/components/schemas/IssueLine"
             }
           },
+          "warehouses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueWarehouse"
+            }
+          },
+          "confirmations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueConfirmation"
+            }
+          },
+          "saleTotal": {
+            "type": "string",
+            "nullable": true,
+            "description": "«Хүнд тооцох»: Σ sale amounts"
+          },
           "total": {
             "type": "string",
             "nullable": true,
@@ -32047,6 +32580,7 @@
           "issuedOn",
           "expenseTypeId",
           "expenseTypeName",
+          "expenseTypeCode",
           "recipientKind",
           "recipientUserId",
           "recipientCustomerId",
@@ -32054,11 +32588,22 @@
           "recipientName",
           "status",
           "note",
+          "sentAt",
+          "returnNote",
+          "returnedAt",
+          "returnedBy",
+          "correctsIssueId",
+          "correctsIssueNumber",
+          "correctedByIssueId",
+          "correctedByIssueNumber",
           "effectiveDate",
           "postedAt",
           "createdAt",
           "updatedAt",
-          "lines"
+          "lines",
+          "warehouses",
+          "confirmations",
+          "saleTotal"
         ]
       },
       "IssueRecipientRequest": {
@@ -32110,11 +32655,17 @@
             "example": "2",
             "description": "In the product unit"
           },
+          "warehouseId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Omitted: the product’s home warehouse, else the issue’s default"
+          },
           "binId": {
             "type": "number",
             "nullable": true,
             "minimum": 1,
-            "description": "Omitted: the fixed shelf when it holds the product, else the fullest"
+            "description": "Omitted: picked at the confirmation (the fixed shelf, else the fullest)"
           }
         },
         "required": [
@@ -32127,7 +32678,8 @@
         "properties": {
           "warehouseId": {
             "type": "number",
-            "minimum": 1
+            "minimum": 1,
+            "description": "The default warehouse of lines whose product has no home"
           },
           "issuedOn": {
             "type": "string",
@@ -32170,6 +32722,11 @@
             "type": "number",
             "minimum": 1
           },
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The default warehouse"
+          },
           "recipient": {
             "$ref": "#/components/schemas/IssueRecipientRequest"
           },
@@ -32180,6 +32737,19 @@
           }
         }
       },
+      "IssueReturnRequest": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Why the issue is sent back"
+          }
+        },
+        "required": [
+          "note"
+        ]
+      },
       "IssueLineUpdateRequest": {
         "type": "object",
         "properties": {
@@ -32187,11 +32757,35 @@
             "type": "string",
             "example": "3"
           },
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Move the line to another warehouse"
+          }
+        }
+      },
+      "IssueLineCheckRequest": {
+        "type": "object",
+        "properties": {
+          "checked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "checked"
+        ]
+      },
+      "IssueLineBinRequest": {
+        "type": "object",
+        "properties": {
           "binId": {
             "type": "number",
             "minimum": 1
           }
-        }
+        },
+        "required": [
+          "binId"
+        ]
       },
       "ProductLocation": {
         "type": "object",
@@ -34433,6 +35027,7 @@
               "DELIVERY_ISSUE",
               "POS_SALE",
               "GOODS_ISSUE",
+              "GOODS_ISSUE_REVERSAL",
               "TRANSFER_OUT",
               "TRANSFER_IN",
               "RETURN_IN",
@@ -43157,6 +43752,15 @@
             "type": "string",
             "nullable": true
           },
+          "partyId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The core’s party of the line"
+          },
+          "partyName": {
+            "type": "string",
+            "nullable": true
+          },
           "description": {
             "type": "string",
             "nullable": true
@@ -43179,6 +43783,8 @@
           "credit",
           "customerId",
           "customerName",
+          "partyId",
+          "partyName",
           "description",
           "balanceAfter"
         ]
@@ -43206,6 +43812,30 @@
           "data",
           "nextCursor",
           "opening"
+        ]
+      },
+      "AccountParty": {
+        "type": "object",
+        "properties": {
+          "partyId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "COMPANY, INDIVIDUAL, EMPLOYEE, OTHER…"
+          },
+          "lineCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "partyId",
+          "name",
+          "kind",
+          "lineCount"
         ]
       },
       "IssueExpenseAccount": {
@@ -44143,7 +44773,8 @@
               "REFUND",
               "ADJUSTMENT",
               "OPENING",
-              "VOID"
+              "VOID",
+              "CHARGE"
             ],
             "type": "string"
           },
@@ -44354,7 +44985,8 @@
               "REFUND",
               "ADJUSTMENT",
               "OPENING",
-              "VOID"
+              "VOID",
+              "CHARGE"
             ],
             "type": "string"
           },
@@ -51939,7 +52571,8 @@
               "REFUND",
               "ADJUSTMENT",
               "OPENING",
-              "VOID"
+              "VOID",
+              "CHARGE"
             ],
             "type": "string"
           },
@@ -54934,6 +55567,12 @@
           "RECEIPT_NOTHING_ARRIVED",
           "RECEIPT_WAREHOUSE_CONFIRMED",
           "RECEIPT_NOTE_AMOUNT_MISMATCH",
+          "ISSUE_LINES_UNCHECKED",
+          "ISSUE_WAREHOUSE_CONFIRMED",
+          "ISSUE_PARTLY_POSTED",
+          "ISSUE_RECIPIENT_KIND",
+          "ISSUE_CORRECTION_OPEN",
+          "ISSUE_NOT_SENT",
           "PO_NOT_EDITABLE",
           "PO_SUPPLIER_EMPTY",
           "PO_STATUS_INVALID",

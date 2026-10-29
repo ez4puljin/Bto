@@ -119,6 +119,8 @@ export const AR_ENTRY_KINDS = [
   'ADJUSTMENT',
   'OPENING',
   'VOID',
+  /** Damage charged to the customer at the sale price (ADR-0117 #3). */
+  'CHARGE',
 ] as const;
 export type ArEntryKind = (typeof AR_ENTRY_KINDS)[number];
 

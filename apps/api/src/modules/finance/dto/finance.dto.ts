@@ -203,9 +203,36 @@ export class AccountLedgerLineDto {
   @ApiProperty({ example: '0.00' }) credit: string;
   @ApiProperty({ type: Number, nullable: true }) customerId: number | null;
   @ApiProperty({ type: String, nullable: true }) customerName: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'The core’s party of the line' })
+  partyId: string | null;
+  @ApiProperty({ type: String, nullable: true }) partyName: string | null;
   @ApiProperty({ type: String, nullable: true }) description: string | null;
   @ApiProperty({ example: '150000.00', description: 'debit − credit after this line' })
   balanceAfter: string;
+}
+
+export class AccountLedgerQueryDto extends DateRangeQueryDto {
+  @ApiPropertyOptional({ description: 'The lines of one party only (ADR-0117 #2)' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{1,18}$/)
+  partyId?: string;
+}
+
+@ApiSchema({ name: 'AccountParty' })
+export class AccountPartyDto {
+  @ApiProperty() partyId: string;
+  @ApiProperty() name: string;
+  @ApiProperty({ description: 'COMPANY, INDIVIDUAL, EMPLOYEE, OTHER…' }) kind: string;
+  @ApiProperty() lineCount: number;
+}
+
+export class AccountPartiesQueryDto {
+  @ApiPropertyOptional({ description: 'Part of the party’s name' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
 }
 
 @ApiSchema({ name: 'AccountLedgerPage' })

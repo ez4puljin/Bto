@@ -11,6 +11,7 @@ import {
   costReceiptAsTyped,
   expectReconciled,
   inventoryApi,
+  postIssue,
   postReceipt,
   type WarehouseJson,
 } from '../harness/inventory';
@@ -467,10 +468,11 @@ describe('finance payables', () => {
       .body as { id: number; code: string | null }[];
     const returned = types.find((type) => type.code === 'SUPPLIER_RETURN');
     const before = await balance(vatSupplier);
+    // The accountant sends, the keeper confirms (ADR-0117); the admin holds both rights here.
     const draft = (
       await http()
         .post('/api/v1/issues')
-        .set(bearer(worker))
+        .set(bearer(admin))
         .set(idempotency())
         .send({
           warehouseId: wh.id,
@@ -480,14 +482,9 @@ describe('finance payables', () => {
         })
         .expect(201)
     ).body as { id: number };
-    const posted = (
-      await http()
-        .post(`/api/v1/issues/${draft.id}/post`)
-        .set(bearer(worker))
-        .set(idempotency())
-        .expect(200)
-    ).body as { id: number; number: string };
-    const lines = await linesOf('SUPPLIER_RETURN', String(posted.id));
+    const posted = (await postIssue(app, admin, draft.id)).body as { id: number; number: string };
+    // One credit per confirmed warehouse, `<issue>:<warehouse>` (ADR-0117 #2).
+    const lines = await linesOf('SUPPLIER_RETURN', `${posted.id}:${wh.id}`);
     const stock = Number.parseFloat(lines['140101'] ?? '0');
     const vat = Number.parseFloat(lines['130301'] ?? '0');
     expect(stock).toBeLessThan(0);
@@ -502,7 +499,7 @@ describe('finance payables', () => {
       kind: 'RETURN',
       docType: 'ISSUE',
       docId: posted.id,
-      docNumber: posted.number,
+      docNumber: `${posted.number}/${wh.code}`,
     });
   });
 

@@ -155,6 +155,9 @@ const KIND_OF_TYPE: Readonly<Record<string, { kind: ArEntryKind; docType: Financ
   [FIN_DOC_TYPES.CUSTOMER_REFUND.code]: { kind: 'REFUND', docType: 'PAYMENT' },
   [FIN_DOC_TYPES.OTHER_RECEIPT.code]: { kind: 'PAYMENT', docType: 'PAYMENT' },
   [FIN_DOC_TYPES.OTHER_PAYMENT.code]: { kind: 'REFUND', docType: 'PAYMENT' },
+  // A «Хүнд тооцох» goods issue's part charged to the customer (ADR-0117 #3); it has no Bto
+  // finance record of its own, so it opens nothing (JOURNAL).
+  [FIN_DOC_TYPES.DAMAGE_CHARGE.code]: { kind: 'CHARGE', docType: 'JOURNAL' },
 };
 
 /**

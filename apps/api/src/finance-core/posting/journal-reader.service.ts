@@ -21,6 +21,7 @@ import {
   finJournalEntries,
   finJournalLines,
   finMoneyAccounts,
+  finParties,
   finSourceSystems,
 } from '../schema';
 
@@ -84,9 +85,19 @@ export interface FinLedgerRow {
   debit: Decimal;
   credit: Decimal;
   partyId: string | null;
+  /** The party's name in the core (a customer, a supplier, a staff member, a typed name). */
+  partyName: string | null;
   description: string | null;
   /** Debit − credit of the account after this line, oldest first. */
   balanceAfter: Decimal;
+}
+
+/** A party with lines on an account (the account report's party filter, ADR-0117 #2). */
+export interface FinAccountParty {
+  partyId: string;
+  name: string;
+  kind: string;
+  lineCount: number;
 }
 
 /**
@@ -294,13 +305,15 @@ export class FinJournalReader {
 
   /**
    * An account's lines newest first with the balance after each (`limit + 1` rows at most, after
-   * the keyset `after`), and the balance before `from` (0 without `from`).
+   * the keyset `after`), and the balance before `from` (0 without `from`). With `partyId`, the
+   * lines of that party only, and the running balance and the opening of that party (ADR-0117 #2).
    */
   async accountLedger(
     ctx: FinCallContext,
     query: {
       company: string;
       accountId: number;
+      partyId?: string;
       from?: string;
       to?: string;
       after?: { date: string; entryId: number; lineNo: number };
@@ -308,6 +321,11 @@ export class FinJournalReader {
     },
   ): Promise<{ rows: FinLedgerRow[]; opening: Decimal }> {
     const companyId = await this.companyId(this.db, ctx, query.company);
+    const partyId = query.partyId === undefined ? undefined : Number.parseInt(query.partyId, 10);
+    const partyFilter =
+      partyId === undefined || Number.isNaN(partyId)
+        ? sql`true`
+        : sql`${finJournalLines.partyId} = ${partyId}`;
     const running = this.db
       .select({
         id: finJournalLines.id,
@@ -322,6 +340,7 @@ export class FinJournalReader {
         debit: finJournalLines.debit,
         credit: finJournalLines.credit,
         partyId: finJournalLines.partyId,
+        partyName: sql<string | null>`${finParties.name}`.as('party_name'),
         description: sql<string | null>`${finJournalLines.description}`.as('line_description'),
         balanceAfter:
           sql<string>`sum(${finJournalLines.debit} - ${finJournalLines.credit}) OVER (ORDER BY ${finJournalEntries.entryDate}, ${finJournalEntries.id}, ${finJournalLines.lineNo})`.as(
@@ -337,10 +356,12 @@ export class FinJournalReader {
         ),
       )
       .innerJoin(finSourceSystems, eq(finSourceSystems.id, finJournalEntries.sourceSystemId))
+      .leftJoin(finParties, eq(finParties.id, finJournalLines.partyId))
       .where(
         and(
           eq(finJournalLines.companyId, companyId),
           eq(finJournalLines.accountId, query.accountId),
+          partyFilter,
         ),
       )
       .as('running');
@@ -376,6 +397,7 @@ export class FinJournalReader {
           and(
             eq(finJournalLines.companyId, companyId),
             eq(finJournalLines.accountId, query.accountId),
+            partyFilter,
             sql`${finJournalEntries.entryDate} < ${query.from}`,
           ),
         );
@@ -389,6 +411,50 @@ export class FinJournalReader {
       })),
       opening,
     };
+  }
+
+  /**
+   * The parties with lines on an account (ADR-0117 #2): the account report's party filter, by name
+   * (a `q` narrows by name, case-insensitively), `limit` at most.
+   */
+  async accountParties(
+    ctx: FinCallContext,
+    query: { company: string; accountId: number; q?: string; limit: number },
+  ): Promise<FinAccountParty[]> {
+    const companyId = await this.companyId(this.db, ctx, query.company);
+    const q = query.q?.trim();
+    const rows = await this.db
+      .select({
+        partyId: finJournalLines.partyId,
+        name: finParties.name,
+        kind: finParties.kind,
+        lineCount: sql<string>`count(*)`,
+      })
+      .from(finJournalLines)
+      .innerJoin(finParties, eq(finParties.id, finJournalLines.partyId))
+      .where(
+        and(
+          eq(finJournalLines.companyId, companyId),
+          eq(finJournalLines.accountId, query.accountId),
+          isNotNull(finJournalLines.partyId),
+          q ? sql`${finParties.name} ILIKE ${`%${q.replace(/[%_\\]/g, '\\$&')}%`}` : sql`true`,
+        ),
+      )
+      .groupBy(finJournalLines.partyId, finParties.name, finParties.kind)
+      .orderBy(asc(finParties.name), asc(finJournalLines.partyId))
+      .limit(query.limit);
+    return rows.flatMap((row) =>
+      row.partyId === null
+        ? []
+        : [
+            {
+              partyId: String(row.partyId),
+              name: row.name,
+              kind: row.kind,
+              lineCount: Number.parseInt(row.lineCount, 10),
+            },
+          ],
+    );
   }
 
   private scope(executor: FinExecutor, ctx: FinCallContext, company: string) {

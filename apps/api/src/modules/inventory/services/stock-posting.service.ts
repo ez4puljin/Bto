@@ -25,6 +25,7 @@ import {
   STOCK_BOOKS,
   type StockBookKind,
   type StockBookLine,
+  type StockBookParty,
   type StockBooks,
   type StockPostedFacts,
   type StockRevaluedFacts,
@@ -58,6 +59,12 @@ export interface PostingDoc {
    * without a new one (ADR-0035 #3, #7).
    */
   allocateNumber?: boolean;
+  /**
+   * A goods issue confirmed warehouse by warehouse (ADR-0117 #2): the posting writes this part's
+   * rows, numbers the document on the first part only and keeps its status (`expectedStatus` =
+   * `nextStatus`, SENT); the owner moves it to POSTED once every warehouse confirmed.
+   */
+  partial?: boolean;
 }
 
 /**
@@ -538,11 +545,15 @@ export class StockPostingService implements OnModuleInit {
       }
     }
 
-    // 9. Documents: status, dates and their number, allocated last (inventory's own only).
+    // 9. Documents: status, dates and their number, allocated last (inventory's own only). A
+    //    partial posting keeps the number its first part took (ADR-0117 #2).
     const numbers = new Map<number, string>();
     for (const doc of internal) {
       let number: string | null = null;
-      if (doc.allocateNumber !== false) {
+      const existing = doc.partial ? await this.existingNumber(tx, doc) : null;
+      if (existing !== null) {
+        numbers.set(doc.docId, existing);
+      } else if (doc.allocateNumber !== false) {
         const value = await this.numbering.next(tx, doc.docType, businessYear(postedAt));
         number = formatDocNumber(doc.docType, businessYear(postedAt), value);
         numbers.set(doc.docId, number);
@@ -575,30 +586,28 @@ export class StockPostingService implements OnModuleInit {
     written: readonly { row: typeof stockLedger.$inferInsert; id: number }[],
     numbers: ReadonlyMap<number, string>,
     effectiveDate: string,
-  ): Promise<
-    {
-      docType: string;
-      docId: number;
-      number: string | null;
-      date: string;
-      firstLedgerId: number;
-      lines: StockBookLine[];
-      warehouseIds: number[];
-    }[]
-  > {
+  ): Promise<StockPostedFacts[]> {
+    // A correction's reversal rows (ADR-0117 #5) are the corrected issue's type and party, booked
+    // as a document of their own beside the new content.
     const byDoc = new Map<string, { row: typeof stockLedger.$inferInsert; id: number }[]>();
     for (const entry of written) {
-      const key = `${entry.row.docType}:${entry.row.docId}`;
+      const reversal = entry.row.movementType === 'GOODS_ISSUE_REVERSAL' ? ':R' : '';
+      const key = `${entry.row.docType}:${entry.row.docId}${reversal}`;
       byDoc.set(key, [...(byDoc.get(key) ?? []), entry]);
     }
-    const facts = [];
+    const facts: StockPostedFacts[] = [];
     for (const entries of byDoc.values()) {
       const first = entries[0];
       if (!first) continue;
       const docType = first.row.docType;
       const docId = first.row.docId;
       let reason: string | null = null;
-      let issue: { code: string | null; typeId: number | null; supplier: boolean } | null = null;
+      let issue: {
+        code: string | null;
+        typeId: number | null;
+        supplier: boolean;
+        party: StockBookParty | undefined;
+      } | null = null;
       if (docType === 'ADJ') {
         const [row] = await tx
           .select({ reason: adjustments.reason })
@@ -607,20 +616,7 @@ export class StockPostingService implements OnModuleInit {
         reason = row?.reason ?? null;
       }
       if (docType === 'GI') {
-        const [row] = await tx
-          .select({
-            code: issueExpenseTypes.code,
-            typeId: goodsIssues.expenseTypeId,
-            recipient: goodsIssues.recipientKind,
-          })
-          .from(goodsIssues)
-          .innerJoin(issueExpenseTypes, eq(issueExpenseTypes.id, goodsIssues.expenseTypeId))
-          .where(eq(goodsIssues.id, docId));
-        issue = {
-          code: row?.code ?? null,
-          typeId: row?.typeId ?? null,
-          supplier: row?.recipient === 'SUPPLIER',
-        };
+        issue = await this.issueFacts(tx, docId, first.row.movementType === 'GOODS_ISSUE_REVERSAL');
         // The supplier's AP credit takes the stock out (F3, ADR-0091).
         if (issue.supplier) continue;
       }
@@ -660,9 +656,59 @@ export class StockPostingService implements OnModuleInit {
         firstLedgerId: Math.min(...entries.map((entry) => entry.id)),
         lines,
         warehouseIds: [...new Set(entries.map((entry) => entry.row.warehouseId))],
+        ...(issue?.party ? { party: issue.party } : {}),
       });
     }
     return facts;
+  }
+
+  /**
+   * A goods issue as the books see it: its expense type and its party (ADR-0117 #2). For a
+   * correction's reversal rows, the corrected issue's (`corrects_issue_id`).
+   */
+  private async issueFacts(
+    tx: Db | Tx,
+    issueId: number,
+    ofParent: boolean,
+  ): Promise<{
+    code: string | null;
+    typeId: number | null;
+    supplier: boolean;
+    party: StockBookParty | undefined;
+  }> {
+    const [own] = await tx
+      .select({ parentId: goodsIssues.correctsIssueId })
+      .from(goodsIssues)
+      .where(eq(goodsIssues.id, issueId));
+    const id = ofParent ? (own?.parentId ?? issueId) : issueId;
+    const [row] = await tx
+      .select({
+        code: issueExpenseTypes.code,
+        typeId: goodsIssues.expenseTypeId,
+        recipientKind: goodsIssues.recipientKind,
+        recipientUserId: goodsIssues.recipientUserId,
+        recipientCustomerId: goodsIssues.recipientCustomerId,
+        recipientSupplierId: goodsIssues.recipientSupplierId,
+        recipientName: goodsIssues.recipientName,
+      })
+      .from(goodsIssues)
+      .innerJoin(issueExpenseTypes, eq(issueExpenseTypes.id, goodsIssues.expenseTypeId))
+      .where(eq(goodsIssues.id, id));
+    if (!row) return { code: null, typeId: null, supplier: false, party: undefined };
+    const partyId =
+      row.recipientKind === 'USER'
+        ? row.recipientUserId
+        : row.recipientKind === 'CUSTOMER'
+          ? row.recipientCustomerId
+          : row.recipientKind === 'SUPPLIER'
+            ? row.recipientSupplierId
+            : null;
+    return {
+      code: row.code,
+      typeId: row.typeId,
+      supplier: row.recipientKind === 'SUPPLIER',
+      party: { kind: row.recipientKind, id: partyId, name: row.recipientName ?? '' },
+    };
   }
 
   /**
@@ -1363,7 +1409,7 @@ export class StockPostingService implements OnModuleInit {
     const status = await this.docStatus(tx, doc);
     if (status === undefined)
       throw new AppError('NOT_FOUND', `${doc.docType} ${doc.docId} not found`, { id: doc.docId });
-    if (status === doc.nextStatus) {
+    if (!doc.partial && status === doc.nextStatus) {
       throw new AppError('DOC_ALREADY_POSTED', `${doc.docType} ${doc.docId} is already ${status}`, {
         status,
       });
@@ -1428,9 +1474,34 @@ export class StockPostingService implements OnModuleInit {
     }
   }
 
+  /** The number a partially posted goods issue already carries (its first part's), if any. */
+  private async existingNumber(tx: Tx, doc: PostingDoc): Promise<string | null> {
+    if (doc.docType !== 'GI') {
+      throw new Error(`${doc.docType} ${doc.docId}: only a goods issue posts in parts`);
+    }
+    const [row] = await tx
+      .select({ number: goodsIssues.number })
+      .from(goodsIssues)
+      .where(eq(goodsIssues.id, doc.docId));
+    return row?.number ?? null;
+  }
+
   private async finishDoc(tx: Tx, doc: PostingDoc, values: DocStamp): Promise<void> {
     if (doc.docType === 'TR') {
       await this.finishTransfer(tx, doc, values);
+      return;
+    }
+    if (doc.partial && doc.docType === 'GI') {
+      // A part of a goods issue (ADR-0117 #2): the first part numbers and dates the document, the
+      // status is the owner's (POSTED once every warehouse confirmed).
+      await tx
+        .update(goodsIssues)
+        .set({
+          ...(values.number === null ? {} : { number: values.number }),
+          effectiveDate: sql`coalesce(${goodsIssues.effectiveDate}, ${values.effectiveDate}::date)`,
+          updatedAt: values.postedAt,
+        })
+        .where(eq(goodsIssues.id, doc.docId));
       return;
     }
     if (values.number === null) {

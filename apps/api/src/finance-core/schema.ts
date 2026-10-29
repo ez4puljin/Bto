@@ -784,6 +784,8 @@ export const finJournalLines = finSchema.table(
     }),
     index('fin_journal_lines_account_idx').on(t.companyId, t.accountId, t.id),
     index('fin_journal_lines_party_idx').on(t.companyId, t.partyId, t.id),
+    /** The account report by account and party (ADR-0117 #2). */
+    index('fin_journal_lines_account_party_idx').on(t.companyId, t.accountId, t.partyId),
     check(
       'fin_journal_lines_amounts',
       sql`${t.debit} >= 0 AND ${t.credit} >= 0 AND (${t.debit} = 0 OR ${t.credit} = 0) AND (${t.debit} <> 0 OR ${t.credit} <> 0)`,

@@ -172,6 +172,38 @@ export async function costReceiptAsTyped(
     .expect(options.status ?? 200);
 }
 
+/**
+ * Posts a goods issue the ADR-0117 way as one user who holds both rights (an admin, no scope): the
+ * accountant's send, then the keeper's confirmation of every warehouse. Asserts  (200) on
+ * the confirmation and returns its response.
+ */
+export async function postIssue(
+  app: NestExpressApplication,
+  token: string,
+  issueId: number,
+  options: { status?: number } = {},
+): Promise<request.Response> {
+  const http = () => request(app.getHttpServer());
+  const sent = await http()
+    .post(`/api/v1/issues/${issueId}/send`)
+    .set(bearer(token))
+    .set(idempotency())
+    .expect(200);
+  // The keeper ticks every line before confirming (ISSUE_LINES_UNCHECKED otherwise).
+  for (const line of (sent.body as { lines: { id: number }[] }).lines) {
+    await http()
+      .patch(`/api/v1/issue-lines/${line.id}/check`)
+      .set(bearer(token))
+      .send({ checked: true })
+      .expect(200);
+  }
+  return http()
+    .post(`/api/v1/issues/${issueId}/confirm`)
+    .set(bearer(token))
+    .set(idempotency())
+    .expect(options.status ?? 200);
+}
+
 /** Fails the test unless the ledger and both balance caches agree (run after every inventory file). */
 export async function expectReconciled(app: INestApplicationContext): Promise<void> {
   const run = await app.get(StockPostingService).reconcile('TEST');

@@ -174,6 +174,11 @@ export const MOVEMENT_TYPES = {
   POS_SALE: { sign: -1, legs: [1] },
   /** A goods issue (GI, ADR-0081): internal use, write-off, return to a supplier, at the average. */
   GOODS_ISSUE: { sign: -1, legs: [1] },
+  /**
+   * A correction of a posted goods issue (ADR-0117): the goods of the corrected part come back at
+   * the cost they left at, in the same posting as the new content.
+   */
+  GOODS_ISSUE_REVERSAL: { sign: 1, legs: [1] },
   TRANSFER_OUT: { sign: -1, legs: [1, 3, 5] },
   TRANSFER_IN: { sign: 1, legs: [2, 4, 6] },
   RETURN_IN: { sign: 1, legs: [1] },
@@ -607,4 +612,13 @@ export const DEFAULT_ISSUE_EXPENSE_TYPES = [
   'WRITE_OFF',
   'SUPPLIER_RETURN',
   'TRANSFER_OUT',
+  /** Damage charged to a person at the sale price (ADR-0117 #3): a receivable on the party. */
+  'DAMAGE_CHARGE',
 ] as const;
+
+/** The expense type whose lines are priced at the sale price and charged to the party. */
+export const DAMAGE_CHARGE_TYPE = 'DAMAGE_CHARGE';
+
+/** A goods issue's statuses (ADR-0117): the accountant sends, each keeper confirms their part. */
+export const ISSUE_STATUSES = ['DRAFT', 'SENT', 'RETURNED', 'POSTED', 'CANCELLED'] as const;
+export type IssueStatus = (typeof ISSUE_STATUSES)[number];
