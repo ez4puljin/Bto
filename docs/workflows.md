@@ -234,3 +234,10 @@ One question round before the build. Each item below was the proposal, and the o
 15. **Two stores.** The main supermarket's warehouse `S1` is renamed **«Заал»** and a second STORE warehouse **`S2` «Заалны архи»** is added (done on the development database 2026-10-29; its till, edge and e-Barimt come later, TODO-VERIFY in §2).
 
 Reserved for the build: ADR-0116 and migration `0053` (branch `claude/slice2-transfers`).
+
+**Built 2026-10-29** as ADR-0116 with migration `0053_transfer_requests` (`docs/modules/inventory.md` §5 «Transfer requests», `docs/modules/mobile.md` §1b): a request header with one transfer per home warehouse; the staff app's «Шилжүүлэг» for a store's seller (the request with the store's stock, the home stock and last month's sales beside each product; receiving by scan with «Ирээгүй» and products not asked for); the count saved on the server line by line; each keeper ships, then sees the count and confirms (or sends it back) on the web; the ledger moves at the confirmation. The owner walks it on the development environment:
+- a request from the app as a store user (S1 «Заал» in the write scope) with products from two home warehouses;
+- each keeper ships their group on the web, one of them short, and prints the sheet;
+- the receipt in the app by scan: one shortfall, one «Ирээгүй», one product not on the request;
+- each keeper's confirmation on the web;
+- the movement history and the shelf stock afterwards.
