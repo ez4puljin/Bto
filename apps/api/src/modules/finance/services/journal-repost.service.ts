@@ -148,15 +148,24 @@ export class JournalRepostService {
       });
       counts.supplierBills += 1;
     }
-    const issueIds = await this.issues.postedSupplierReturnIds();
-    const returned = await this.booked(FIN_DOC_TYPES.SUPPLIER_RETURN.docType, issueIds);
-    for (const id of issueIds) {
-      if (returned.has(String(id))) continue;
+    // Since ADR-0117 a return posts per confirmed warehouse (`<issue>:<warehouse>`); an issue
+    // posted in one step before keeps its plain id.
+    const parts = await this.issues.postedSupplierReturnParts();
+    const returned = await this.booked(
+      FIN_DOC_TYPES.SUPPLIER_RETURN.docType,
+      parts.map((part) =>
+        part.warehouseId === null ? String(part.issueId) : `${part.issueId}:${part.warehouseId}`,
+      ),
+    );
+    for (const part of parts) {
+      const key =
+        part.warehouseId === null ? String(part.issueId) : `${part.issueId}:${part.warehouseId}`;
+      if (returned.has(key)) continue;
       await inTransaction(this.db, async (tx) => {
         await this.bills.supplierReturnPostedInTx(
           tx,
           actor,
-          await this.issues.supplierReturnFacts(id, tx),
+          await this.issues.supplierReturnFacts(part.issueId, part.warehouseId, tx),
         );
       });
       counts.supplierReturns += 1;

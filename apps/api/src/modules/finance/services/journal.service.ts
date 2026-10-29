@@ -136,16 +136,29 @@ export interface AccountLedgerLine {
   credit: Decimal;
   customerId: number | null;
   customerName: string | null;
+  /** The core's party of the line, whatever its kind (a customer, a supplier, a staff member, a typed name). */
+  partyId: string | null;
+  partyName: string | null;
   description: string | null;
   /** Debit − credit of the account after this line, oldest first. */
   balanceAfter: Decimal;
 }
 
 export interface AccountLedgerQuery {
+  /** The account's lines of one party only (ADR-0117 #2). */
+  partyId?: string;
   from?: string;
   to?: string;
   cursor?: string;
   limit?: number;
+}
+
+/** A party with lines on an account: the account report's party filter (ADR-0117 #2). */
+export interface AccountParty {
+  partyId: string;
+  name: string;
+  kind: string;
+  lineCount: number;
 }
 
 export interface AccountLedgerPage {
@@ -486,6 +499,7 @@ export class JournalService {
     const { rows, opening } = await this.reader.accountLedger(this.books.source(), {
       company: await this.books.company(),
       accountId,
+      ...(query.partyId ? { partyId: query.partyId } : {}),
       ...(query.from ? { from: query.from } : {}),
       ...(query.to ? { to: query.to } : {}),
       ...(typeof after?.date === 'string' &&
@@ -519,6 +533,8 @@ export class JournalService {
           credit: row.credit,
           customerId,
           customerName: customerId === null ? null : (customerNames.get(customerId) ?? null),
+          partyId: row.partyId,
+          partyName: row.partyName,
           description: row.description,
           balanceAfter: row.balanceAfter,
         };
@@ -526,6 +542,17 @@ export class JournalService {
       nextCursor: page.nextCursor,
       opening,
     };
+  }
+
+  /** The parties with lines on an account, by name (≤ 200), for the ledger's party filter. */
+  async accountParties(accountId: number, q?: string): Promise<AccountParty[]> {
+    await this.accounts.get(accountId);
+    return this.reader.accountParties(this.books.source(), {
+      company: await this.books.company(),
+      accountId,
+      ...(q ? { q } : {}),
+      limit: 200,
+    });
   }
 
   /** Posts a manual entry or its reversal as the staff member, in today's words on a refusal. */

@@ -14,6 +14,8 @@ import type { ScanQty } from './scan-qty';
 
 type DocStatus =
   | 'DRAFT'
+  | 'SENT'
+  | 'RETURNED'
   | 'SUBMITTED'
   | 'REQUESTED'
   | 'SHIPPED'
@@ -65,16 +67,19 @@ export function DocStatusBadge({ status }: { status: DocStatus }) {
   const variant =
     status === 'POSTED' || status === 'RECEIVED' || status === 'APPROVED'
       ? 'success'
-      : status === 'SUBMITTED' ||
-          status === 'REQUESTED' ||
-          status === 'SHIPPED' ||
-          status === 'COUNTED' ||
-          status === 'COUNTING' ||
-          status === 'REVIEW'
-        ? 'default'
-        : status === 'DRAFT'
-          ? 'secondary'
-          : 'outline';
+      : status === 'RETURNED'
+        ? 'warning'
+        : status === 'SENT' ||
+            status === 'SUBMITTED' ||
+            status === 'REQUESTED' ||
+            status === 'SHIPPED' ||
+            status === 'COUNTED' ||
+            status === 'COUNTING' ||
+            status === 'REVIEW'
+          ? 'default'
+          : status === 'DRAFT'
+            ? 'secondary'
+            : 'outline';
   return <Badge variant={variant}>{t(`inventory.docStatus.${status}`)}</Badge>;
 }
 

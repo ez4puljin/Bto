@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CatalogModule, UNIT_SUPERSEDED_HOOK } from '../catalog';
 import { IdentityModule } from '../identity';
-import { RECEIPT_SALE_PRICES } from '../inventory';
+import { RECEIPT_SALE_PRICES, SALE_PRICE_READER } from '../inventory';
 import {
   DiscountProgramsController,
   PriceProfilesController,
@@ -14,6 +14,7 @@ import { PriceQuoteService } from './services/price-quote.service';
 import { PricingUnitsHook } from './services/pricing-units.hook';
 import { ProductDealsService } from './services/product-deals.service';
 import { ProductPricesService } from './services/product-prices.service';
+import { IssueSalePricesHook } from './services/issue-sale-prices.hook';
 import { ReceiptSalePricesHook } from './services/receipt-sale-prices.hook';
 import { SaleReadinessService } from './services/sale-readiness.service';
 
@@ -41,6 +42,9 @@ const CORE_SERVICES = [
     { provide: UNIT_SUPERSEDED_HOOK, useExisting: PricingUnitsHook },
     ReceiptSalePricesHook,
     { provide: RECEIPT_SALE_PRICES, useExisting: ReceiptSalePricesHook },
+    // A goods issue's «Хүнд тооцох» lines read the sale price in force at the send (ADR-0117 #3).
+    IssueSalePricesHook,
+    { provide: SALE_PRICE_READER, useExisting: IssueSalePricesHook },
   ],
   exports: CORE_SERVICES,
 })

@@ -24,6 +24,7 @@ import { AdjustmentPage, AdjustmentsPage } from '@/features/inventory/adjustment
 import { BinsPage } from '@/features/inventory/bins-page';
 import { LowStockPage } from '@/features/inventory/low-stock-page';
 import { BinMovesPage } from '@/features/inventory/moves-page';
+import { IssueConfirmPage } from '@/features/inventory/issue-confirm-page';
 import { IssuePage, IssuesPage } from '@/features/inventory/issues-pages';
 import { ReceiptPrintPage } from '@/features/inventory/receipt-print-page';
 import { ReceiptPage, ReceiptsPage } from '@/features/inventory/receipts-pages';
@@ -413,6 +414,16 @@ export const routes: RouteObject[] = [
           // Goods issues (ADR-0081): one page for a new issue (new) and an existing one, like receipts.
           { path: 'inventory/issues', handle: { width: 'wide' }, element: <IssuesPage /> },
           { path: 'inventory/issues/:id', handle: { width: 'wide' }, element: <IssuePage /> },
+          // The keeper's confirmation screen (ADR-0117): tick, scan, confirm or send back.
+          {
+            path: 'inventory/issues/:id/confirm',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="inventory.issues.confirm">
+                <IssueConfirmPage />
+              </RequirePermission>
+            ),
+          },
           { path: 'pricing/profiles', handle: { width: 'wide' }, element: <PriceProfilesPage /> },
           {
             path: 'pricing/profiles/:id',

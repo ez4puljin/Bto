@@ -1618,6 +1618,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** `pending=1`: the sent issues with a line of the caller's warehouses still to confirm. */
         get: operations["Issues_list"];
         put?: never;
         post: operations["Issues_create"];
@@ -1659,7 +1660,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/issues/{id}/post": {
+    "/api/v1/issues/{id}/send": {
         parameters: {
             query?: never;
             header?: never;
@@ -1668,8 +1669,62 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** DRAFT → POSTED by the warehouse itself; idempotent so a retried click never posts twice. */
-        post: operations["Issues_post"];
+        /** DRAFT / RETURNED → SENT: the keepers may confirm (ADR-0117 #1). */
+        post: operations["Issues_send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/issues/{id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The keeper's confirmation of the warehouses in their scope: those parts leave at once
+         *     (ADR-0117 #2); idempotent so a retried click never posts twice.
+         */
+        post: operations["Issues_confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/issues/{id}/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The keeper sends the issue back to the accountant with a note. */
+        post: operations["Issues_return"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/issues/{id}/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A correction of a posted issue: a child draft with the parent's lines (ADR-0117 #5). */
+        post: operations["Issues_createCorrection"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1705,7 +1760,42 @@ export interface paths {
         delete: operations["IssueLines_remove"];
         options?: never;
         head?: never;
+        /** The accountant's edit: the quantity or the warehouse of an unconfirmed line. */
         patch: operations["IssueLines_update"];
+        trace?: never;
+    };
+    "/api/v1/issue-lines/{id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** The keeper's tick on a line of their warehouse (ADR-0117 #1). */
+        patch: operations["IssueLines_check"];
+        trace?: never;
+    };
+    "/api/v1/issue-lines/{id}/bin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** The keeper names the shelf a line leaves from (a scanned label). */
+        patch: operations["IssueLines_setBin"];
         trace?: never;
     };
     "/api/v1/product-locations": {
@@ -4287,7 +4377,25 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** The account report: the account's lines, or one party's lines on it (ADR-0117 #2). */
         get: operations["GlAccounts_ledger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gl-accounts/{id}/parties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The parties with lines on the account, for the ledger's party filter. */
+        get: operations["GlAccounts_parties"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6819,7 +6927,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "procurement.orders.read" | "procurement.orders.edit" | "procurement.orders.manage" | "procurement.prices.read" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.rep" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "pos.loyalty.manage" | "notifications.send" | "customer.home.manage" | "reports.view" | "reports.margins.view";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "inventory.issues.confirm" | "procurement.orders.read" | "procurement.orders.edit" | "procurement.orders.manage" | "procurement.prices.read" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.rep" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "pos.loyalty.manage" | "notifications.send" | "customer.home.manage" | "reports.view" | "reports.margins.view";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -8208,8 +8316,13 @@ export interface components {
             recipientKind: "USER" | "CUSTOMER" | "SUPPLIER" | "OTHER";
             recipientName: string | null;
             /** @enum {string} */
-            status: "DRAFT" | "POSTED" | "CANCELLED";
+            status: "DRAFT" | "SENT" | "RETURNED" | "POSTED" | "CANCELLED";
             lineCount: number;
+            /** @description The line warehouses */
+            warehouseIds: number[];
+            /** @description The warehouses whose part left */
+            confirmedWarehouseIds: number[];
+            correctsIssueId: number | null;
             /** Format: date */
             effectiveDate: string | null;
             /** Format: date-time */
@@ -8230,12 +8343,41 @@ export interface components {
             factorSnapshot: string;
             /** @description Base units */
             qtyBase: string;
-            binId: number;
-            binCode: string;
+            warehouseId: number;
+            warehouseName: string;
+            /** @description Null until the confirmation picks it */
+            binId: number | null;
+            binCode: string | null;
+            /**
+             * Format: date-time
+             * @description The keeper’s tick
+             */
+            checkedAt: string | null;
+            /** @description «Хүнд тооцох»: the sale price per base unit, whole MNT */
+            saleUnitPrice: string | null;
+            /** @description «Хүнд тооцох»: the line’s charge */
+            saleAmount: string | null;
             /** @description Cost holders only */
             unitCost?: string | null;
             /** @description Cost holders only */
             amount?: string | null;
+        };
+        IssueWarehouse: {
+            warehouseId: number;
+            warehouseName: string;
+            lineCount: number;
+            checkedCount: number;
+            /** @description Its part left (or a correction left it unchanged) */
+            confirmed: boolean;
+        };
+        IssueConfirmation: {
+            warehouseId: number;
+            warehouseName: string;
+            confirmedBy: string | null;
+            /** Format: date-time */
+            confirmedAt: string;
+            /** @description A correction’s warehouse whose lines equal the parent’s */
+            unchanged: boolean;
         };
         IssueDetail: {
             id: number;
@@ -8247,6 +8389,7 @@ export interface components {
             issuedOn: string;
             expenseTypeId: number;
             expenseTypeName: string;
+            expenseTypeCode: string | null;
             /** @enum {string} */
             recipientKind: "USER" | "CUSTOMER" | "SUPPLIER" | "OTHER";
             recipientUserId: number | null;
@@ -8254,8 +8397,21 @@ export interface components {
             recipientSupplierId: number | null;
             recipientName: string | null;
             /** @enum {string} */
-            status: "DRAFT" | "POSTED" | "CANCELLED";
+            status: "DRAFT" | "SENT" | "RETURNED" | "POSTED" | "CANCELLED";
             note: string | null;
+            /** Format: date-time */
+            sentAt: string | null;
+            /** @description The keeper’s note when sent back */
+            returnNote: string | null;
+            /** Format: date-time */
+            returnedAt: string | null;
+            returnedBy: string | null;
+            /** @description The posted issue this one corrects */
+            correctsIssueId: number | null;
+            correctsIssueNumber: string | null;
+            /** @description The correction of this issue */
+            correctedByIssueId: number | null;
+            correctedByIssueNumber: string | null;
             /** Format: date */
             effectiveDate: string | null;
             /** Format: date-time */
@@ -8265,6 +8421,10 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             lines: components["schemas"]["IssueLine"][];
+            warehouses: components["schemas"]["IssueWarehouse"][];
+            confirmations: components["schemas"]["IssueConfirmation"][];
+            /** @description «Хүнд тооцох»: Σ sale amounts */
+            saleTotal: string | null;
             /** @description Cost holders only */
             total?: string | null;
         };
@@ -8283,10 +8443,13 @@ export interface components {
              * @example 2
              */
             enteredQty: string;
-            /** @description Omitted: the fixed shelf when it holds the product, else the fullest */
+            /** @description Omitted: the product’s home warehouse, else the issue’s default */
+            warehouseId?: number | null;
+            /** @description Omitted: picked at the confirmation (the fixed shelf, else the fullest) */
             binId?: number | null;
         };
         IssueCreateRequest: {
+            /** @description The default warehouse of lines whose product has no home */
             warehouseId: number;
             /**
              * Format: date
@@ -8302,13 +8465,26 @@ export interface components {
             /** Format: date */
             issuedOn?: string;
             expenseTypeId?: number;
+            /** @description The default warehouse */
+            warehouseId?: number;
             recipient?: components["schemas"]["IssueRecipientRequest"];
             note?: string | null;
+        };
+        IssueReturnRequest: {
+            /** @description Why the issue is sent back */
+            note: string;
         };
         IssueLineUpdateRequest: {
             /** @example 3 */
             enteredQty?: string;
-            binId?: number;
+            /** @description Move the line to another warehouse */
+            warehouseId?: number;
+        };
+        IssueLineCheckRequest: {
+            checked: boolean;
+        };
+        IssueLineBinRequest: {
+            binId: number;
         };
         ProductLocation: {
             id: number;
@@ -9000,7 +9176,7 @@ export interface components {
             product: components["schemas"]["StockProduct"];
             lotId: number | null;
             /** @enum {string} */
-            movementType: "RECEIPT" | "PUTAWAY_OUT" | "PUTAWAY_IN" | "BIN_MOVE_OUT" | "BIN_MOVE_IN" | "PICK_OUT" | "PICK_IN" | "DISPATCH_OUT" | "DISPATCH_IN" | "DELIVERY_ISSUE" | "POS_SALE" | "GOODS_ISSUE" | "TRANSFER_OUT" | "TRANSFER_IN" | "RETURN_IN" | "ADJUSTMENT" | "COUNT_CORRECTION";
+            movementType: "RECEIPT" | "PUTAWAY_OUT" | "PUTAWAY_IN" | "BIN_MOVE_OUT" | "BIN_MOVE_IN" | "PICK_OUT" | "PICK_IN" | "DISPATCH_OUT" | "DISPATCH_IN" | "DELIVERY_ISSUE" | "POS_SALE" | "GOODS_ISSUE" | "GOODS_ISSUE_REVERSAL" | "TRANSFER_OUT" | "TRANSFER_IN" | "RETURN_IN" | "ADJUSTMENT" | "COUNT_CORRECTION";
             /** @enum {string} */
             docType: "GR" | "BM" | "TR" | "ADJ" | "ST" | "PK" | "TRIP" | "SO" | "POS" | "CN" | "GI";
             docId: number;
@@ -11805,6 +11981,9 @@ export interface components {
             credit: string;
             customerId: number | null;
             customerName: string | null;
+            /** @description The core’s party of the line */
+            partyId: string | null;
+            partyName: string | null;
             description: string | null;
             /**
              * @description debit − credit after this line
@@ -11820,6 +11999,13 @@ export interface components {
              * @example 0.00
              */
             opening: string;
+        };
+        AccountParty: {
+            partyId: string;
+            name: string;
+            /** @description COMPANY, INDIVIDUAL, EMPLOYEE, OTHER… */
+            kind: string;
+            lineCount: number;
         };
         IssueExpenseAccount: {
             typeId: number;
@@ -12101,7 +12287,7 @@ export interface components {
             /** @example 2026-10-16 */
             entryDate: string;
             /** @enum {string} */
-            kind: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "REFUND" | "ADJUSTMENT" | "OPENING" | "VOID";
+            kind: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "REFUND" | "ADJUSTMENT" | "OPENING" | "VOID" | "CHARGE";
             /** @enum {string} */
             docType: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "JOURNAL";
             docId: number;
@@ -12167,7 +12353,7 @@ export interface components {
             /** @enum {string} */
             side: "DEBIT" | "CREDIT";
             /** @enum {string} */
-            kind: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "REFUND" | "ADJUSTMENT" | "OPENING" | "VOID";
+            kind: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "REFUND" | "ADJUSTMENT" | "OPENING" | "VOID" | "CHARGE";
             /**
              * @description Where the document opens
              * @enum {string}
@@ -14422,7 +14608,7 @@ export interface components {
             /** Format: date */
             date: string;
             /** @enum {string} */
-            kind: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "REFUND" | "ADJUSTMENT" | "OPENING" | "VOID";
+            kind: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "REFUND" | "ADJUSTMENT" | "OPENING" | "VOID" | "CHARGE";
             /** @example Н-20261019-0001 */
             number: string;
             /** @description The invoice it opens */
@@ -15213,7 +15399,7 @@ export interface components {
             userId: number | null;
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "PO_NOT_EDITABLE" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "TRANSFER_LINES_UNCOUNTED" | "TRANSFER_REQUEST_EMPTY" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "ISSUE_LINES_UNCHECKED" | "ISSUE_WAREHOUSE_CONFIRMED" | "ISSUE_PARTLY_POSTED" | "ISSUE_RECIPIENT_KIND" | "ISSUE_CORRECTION_OPEN" | "ISSUE_NOT_SENT" | "PO_NOT_EDITABLE" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "TRANSFER_LINES_UNCOUNTED" | "TRANSFER_REQUEST_EMPTY" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -19378,10 +19564,12 @@ export interface operations {
                 cursor?: string;
                 limit?: number;
                 warehouseId?: number;
-                status?: "DRAFT" | "POSTED" | "CANCELLED";
+                status?: "DRAFT" | "SENT" | "RETURNED" | "POSTED" | "CANCELLED";
                 expenseTypeId?: number;
                 /** @description Issue number or recipient */
                 q?: string;
+                /** @description Only sent issues with a line of the caller’s warehouses still to confirm */
+                pending?: boolean;
             };
             header?: never;
             path?: never;
@@ -19541,7 +19729,7 @@ export interface operations {
             };
         };
     };
-    Issues_post: {
+    Issues_send: {
         parameters: {
             query?: never;
             header: {
@@ -19556,6 +19744,106 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Issues_confirm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Issues_return: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueReturnRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Issues_createCorrection: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -19646,6 +19934,74 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["IssueLineUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    IssueLines_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueLineCheckRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    IssueLines_setBin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueLineBinRequest"];
             };
         };
         responses: {
@@ -25985,6 +26341,8 @@ export interface operations {
                 limit?: number;
                 from?: string;
                 to?: string;
+                /** @description The lines of one party only (ADR-0117 #2) */
+                partyId?: string;
             };
             header?: never;
             path: {
@@ -26000,6 +26358,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountLedgerPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GlAccounts_parties: {
+        parameters: {
+            query?: {
+                /** @description Part of the party’s name */
+                q?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountParty"][];
                 };
             };
             /** @description RFC 9457 problem details */

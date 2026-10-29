@@ -263,7 +263,7 @@ One question round before the build, run beside slice 2 as the owner asked for t
 8. Kharkhorin is a customer (sales), never an issue (ADR-0084).
 9. Write-offs and damage (question 4 in §2) are not designed here; they are booked as ordinary issue types.
 
-Reserved for the build: ADR-0117 and migration `0054` (branch `claude/slice3-issues`). Slices 2 and 3 both touch `inventory`: whichever merges second merges main again and puts its journal entry last.
+Built 2026-10-29 as ADR-0117 with migration `0054_issues_confirmed` (branch `claude/slice3-issues`). Slices 2 and 3 both touch `inventory`: whichever merges second merges main again and puts its journal entry last.
 
 ## 7. Slice 1b scope: the order's detail page as in Butenorgil (owner, 2026-10-29)
 

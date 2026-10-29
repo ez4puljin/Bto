@@ -1125,6 +1125,8 @@ export type IssueRecipient = Schemas['IssueRecipientRequest'];
 export type IssueRecipientKind = IssueDetail['recipientKind'];
 export type IssueStatus = IssueDetail['status'];
 export type IssueExpenseType = Schemas['IssueExpenseType'];
+export type IssueWarehouse = Schemas['IssueWarehouse'];
+export type IssueConfirmation = Schemas['IssueConfirmation'];
 export type UserLookup = Schemas['UserLookup'];
 export type CustomerLookup = Schemas['CustomerLookup'];
 
@@ -1133,6 +1135,8 @@ export interface IssueFilter {
   status?: IssueStatus;
   expenseTypeId?: number;
   q?: string;
+  /** The keeper's work: sent issues with a line of theirs still to confirm (ADR-0117). */
+  pending?: boolean;
 }
 
 export function useIssues(filter: IssueFilter) {
@@ -1149,6 +1153,7 @@ export function useIssues(filter: IssueFilter) {
               status: filter.status,
               expenseTypeId: filter.expenseTypeId,
               q: filter.q || undefined,
+              pending: filter.pending || undefined,
               cursor: pageParam,
               limit: 50,
             },
@@ -1267,10 +1272,21 @@ export function useIssueMutations() {
         unwrap(await api.DELETE('/api/v1/issue-lines/{id}', { params: { path: { id } } })),
       onSuccess: issueChanged,
     }),
-    post: useMutation({
+    /** The accountant's send (ADR-0117 #1): DRAFT / RETURNED → SENT. */
+    send: useMutation({
       mutationFn: async ({ id, key }: { id: number; key: string }) =>
         unwrap(
-          await api.POST('/api/v1/issues/{id}/post', {
+          await api.POST('/api/v1/issues/{id}/send', {
+            params: { path: { id }, header: idempotencyKey(key) },
+          }),
+        ),
+      onSuccess: issueChanged,
+    }),
+    /** The keeper's confirmation of their warehouses: those parts leave at once. */
+    confirm: useMutation({
+      mutationFn: async ({ id, key }: { id: number; key: string }) =>
+        unwrap(
+          await api.POST('/api/v1/issues/{id}/confirm', {
             params: { path: { id }, header: idempotencyKey(key) },
           }),
         ),
@@ -1278,6 +1294,52 @@ export function useIssueMutations() {
         queryClient.setQueryData([...KEYS.issues, issue.id], issue);
         await issuesChanged();
       },
+    }),
+    /** The keeper sends the issue back to the accountant with a note. */
+    returnIssue: useMutation({
+      mutationFn: async ({ id, note }: { id: number; note: string }) =>
+        unwrap(
+          await api.POST('/api/v1/issues/{id}/return', {
+            params: { path: { id } },
+            body: { note },
+          }),
+        ),
+      onSuccess: issueChanged,
+    }),
+    /** A correction of a posted issue: a child draft with the parent's lines (ADR-0117 #5). */
+    createCorrection: useMutation({
+      mutationFn: async ({ id, key }: { id: number; key: string }) =>
+        unwrap(
+          await api.POST('/api/v1/issues/{id}/corrections', {
+            params: { path: { id }, header: idempotencyKey(key) },
+          }),
+        ),
+      onSuccess: async (child) => {
+        await issueChanged(child);
+        await invalidate(KEYS.issues);
+      },
+    }),
+    /** The keeper's tick on a line of their warehouse. */
+    checkLine: useMutation({
+      mutationFn: async ({ id, checked }: { id: number; checked: boolean }) =>
+        unwrap(
+          await api.PATCH('/api/v1/issue-lines/{id}/check', {
+            params: { path: { id } },
+            body: { checked },
+          }),
+        ),
+      onSuccess: issueChanged,
+    }),
+    /** The keeper names the shelf a line leaves from (a scanned label). */
+    setLineBin: useMutation({
+      mutationFn: async ({ id, binId }: { id: number; binId: number }) =>
+        unwrap(
+          await api.PATCH('/api/v1/issue-lines/{id}/bin', {
+            params: { path: { id } },
+            body: { binId },
+          }),
+        ),
+      onSuccess: issueChanged,
     }),
     cancel: useMutation({
       mutationFn: async (id: number) =>

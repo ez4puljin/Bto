@@ -48,6 +48,7 @@ export {
   binMoves,
   bins,
   binStock,
+  goodsIssueConfirmations,
   goodsIssueLines,
   goodsIssues,
   goodsReceiptConfirmations,

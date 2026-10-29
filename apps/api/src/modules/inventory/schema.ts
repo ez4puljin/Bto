@@ -9,6 +9,7 @@ import {
   TRANSFER_STATUSES,
   USER_BIN_TYPES,
   ISSUE_RECIPIENT_KINDS,
+  ISSUE_STATUSES,
 } from '@tugeel/shared/inventory';
 import { sql } from 'drizzle-orm';
 import {
@@ -54,7 +55,7 @@ export const RECEIPT_STATUSES = ['DRAFT', 'POSTED', 'CANCELLED'] as const;
 export const COSTING_STATUSES = ['PENDING', 'COSTED'] as const;
 export const BIN_MOVE_STATUSES = ['DRAFT', 'POSTED'] as const;
 export const ADJUSTMENT_STATUSES = ['DRAFT', 'SUBMITTED', 'POSTED', 'CANCELLED'] as const;
-export const ISSUE_STATUSES = ['DRAFT', 'POSTED', 'CANCELLED'] as const;
+export { ISSUE_STATUSES };
 export const STOCKTAKE_STATUSES = ['DRAFT', 'COUNTING', 'REVIEW', 'APPROVED', 'CANCELLED'] as const;
 export const RESERVATION_STATUSES = ['ACTIVE', 'CONSUMED', 'RELEASED'] as const;
 export const RECONCILIATION_STATUSES = ['OK', 'DRIFT'] as const;
@@ -644,13 +645,17 @@ export const issueExpenseTypes = pgTable(
 );
 
 /**
- * Goods issues (GI-, ADR-0081): goods leave a warehouse at its average cost for an expense type and
- * a recipient (a user, a customer, a supplier or a typed name). Warehouse staff post them at once.
+ * Goods issues (GI-, ADR-0081, ADR-0117): goods leave a warehouse at its average cost for an expense
+ * type and a party (a user, a customer, a supplier or a typed name). The accountant sends the
+ * document (DRAFT → SENT); each warehouse's keeper confirms their own lines and that part leaves at
+ * once; a keeper may send it back (RETURNED) with a note; POSTED once every warehouse confirmed. A
+ * correction is a child document (`corrects_issue_id`) whose confirmation reverses the parent's part.
  */
 export const goodsIssues = pgTable(
   'goods_issues',
   {
     id: id(),
+    /** The default warehouse: a line whose product has no home leaves from here (ADR-0117 #1). */
     warehouseId: ref('warehouse_id')
       .notNull()
       .references(() => warehouses.id),
@@ -667,12 +672,22 @@ export const goodsIssues = pgTable(
     recipientName: text('recipient_name'),
     status: text('status', { enum: ISSUE_STATUSES }).notNull().default('DRAFT'),
     note: text('note'),
+    /** The accountant's send (ADR-0117 #1); set again on every re-send after a return. */
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    sentBy: userRef('sent_by'),
+    /** The keeper's note when the issue was sent back; cleared by the next send. */
+    returnNote: text('return_note'),
+    returnedAt: timestamp('returned_at', { withTimezone: true }),
+    returnedBy: userRef('returned_by'),
+    /** The posted issue this one corrects (ADR-0117 #5); null for an ordinary issue. */
+    correctsIssueId: ref('corrects_issue_id').references((): AnyPgColumn => goodsIssues.id),
     ...postingColumns(),
   },
   (t) => [
     unique('goods_issues_number_key').on(t.number),
     index('goods_issues_warehouse_idx').on(t.warehouseId, t.status, t.id),
     index('goods_issues_expense_type_idx').on(t.expenseTypeId, t.id),
+    index('goods_issues_corrects_idx').on(t.correctsIssueId),
     check('goods_issues_status', inList(t.status, ISSUE_STATUSES)),
     check('goods_issues_recipient_kind', inList(t.recipientKind, ISSUE_RECIPIENT_KINDS)),
     check(
@@ -690,7 +705,13 @@ export const goodsIssues = pgTable(
     check(
       'goods_issues_texts',
       sql`(${t.recipientName} IS NULL OR length(${t.recipientName}) BETWEEN 1 AND 200)
-        AND (${t.note} IS NULL OR length(${t.note}) BETWEEN 1 AND 500)`,
+        AND (${t.note} IS NULL OR length(${t.note}) BETWEEN 1 AND 500)
+        AND (${t.returnNote} IS NULL OR length(${t.returnNote}) BETWEEN 1 AND 500)`,
+    ),
+    check(
+      'goods_issues_returned',
+      sql`(${t.status} <> 'RETURNED' OR ${t.returnNote} IS NOT NULL)
+        AND (${t.returnNote} IS NULL) = (${t.returnedAt} IS NULL)`,
     ),
   ],
 );
@@ -702,21 +723,61 @@ export const goodsIssueLines = pgTable(
     issueId: ref('issue_id')
       .notNull()
       .references(() => goodsIssues.id),
-    ...lineQtyColumns(),
-    /** The shelf the goods leave from (the fixed shelf, the fullest, or a scanned label). */
-    binId: ref('bin_id')
+    /** The warehouse the line leaves: the product's home, else the issue's default (ADR-0117). */
+    warehouseId: ref('warehouse_id')
       .notNull()
-      .references(() => bins.id),
+      .references(() => warehouses.id),
+    ...lineQtyColumns(),
+    /**
+     * The shelf the goods leave from: null until the keeper's confirmation picks it (the fixed
+     * shelf while it holds the product, else the fullest, ADR-0081 #4), or a scanned label.
+     */
+    binId: ref('bin_id').references(() => bins.id),
+    /** The keeper's tick on the confirmation screen; cleared when the quantity changes. */
+    checkedAt: timestamp('checked_at', { withTimezone: true }),
     /** The average cost per base unit the line left at, written by the posting; cost data. */
     unitCost: cost('unit_cost'),
+    /** «Хүнд тооцох» (ADR-0117 #3): the sale price per base unit frozen at the send, whole MNT. */
+    saleUnitPrice: money('sale_unit_price'),
+    /** The line's charge: sale price × base quantity, whole MNT. */
+    saleAmount: money('sale_amount'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     index('goods_issue_lines_issue_idx').on(t.issueId, t.id),
+    index('goods_issue_lines_warehouse_idx').on(t.issueId, t.warehouseId),
     check('goods_issue_lines_qty', sql`${t.enteredQty} > 0 AND ${t.qtyBase} > 0`),
     check('goods_issue_lines_cost', sql`${t.unitCost} IS NULL OR ${t.unitCost} >= 0`),
+    check(
+      'goods_issue_lines_sale',
+      sql`(${t.saleUnitPrice} IS NULL) = (${t.saleAmount} IS NULL)
+        AND (${t.saleUnitPrice} IS NULL OR (${t.saleUnitPrice} >= 0 AND ${t.saleAmount} >= 0))`,
+    ),
+    /** A posted line (it has its cost) knows the shelf it left. */
+    check('goods_issue_lines_posted_bin', sql`${t.unitCost} IS NULL OR ${t.binId} IS NOT NULL`),
   ],
+);
+
+/**
+ * Each warehouse's confirmation of a goods issue (ADR-0117 #1–#2): the keeper confirmed the lines
+ * of this warehouse and they left at once. `unchanged` marks a correction's warehouse whose lines
+ * equal the parent's: nothing to confirm, nothing posted. Never withdrawn (the goods are gone).
+ */
+export const goodsIssueConfirmations = pgTable(
+  'goods_issue_confirmations',
+  {
+    issueId: ref('issue_id')
+      .notNull()
+      .references(() => goodsIssues.id),
+    warehouseId: ref('warehouse_id')
+      .notNull()
+      .references(() => warehouses.id),
+    confirmedBy: userRef('confirmed_by'),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }).notNull().defaultNow(),
+    unchanged: boolean('unchanged').notNull().default(false),
+  },
+  (t) => [primaryKey({ columns: [t.issueId, t.warehouseId] })],
 );
 
 /**

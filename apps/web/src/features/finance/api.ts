@@ -238,7 +238,10 @@ export function useGlAccounts() {
   });
 }
 
-export function useAccountLedger(accountId: number | null, range: { from?: string; to?: string }) {
+export function useAccountLedger(
+  accountId: number | null,
+  range: { from?: string; to?: string; partyId?: string },
+) {
   const api = useApiClient();
   return useInfiniteQuery({
     queryKey: [...KEYS.accountLedger, accountId, range],
@@ -249,13 +252,37 @@ export function useAccountLedger(accountId: number | null, range: { from?: strin
         await api.GET('/api/v1/gl-accounts/{id}/ledger', {
           params: {
             path: { id: accountId ?? 0 },
-            query: { from: range.from, to: range.to, cursor: pageParam, limit: 50 },
+            query: {
+              from: range.from,
+              to: range.to,
+              partyId: range.partyId,
+              cursor: pageParam,
+              limit: 50,
+            },
           },
           signal,
         }),
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
     placeholderData: keepPreviousData,
+  });
+}
+
+export type AccountParty = Schemas['AccountParty'];
+
+/** The parties with lines on an account: the account report's party filter (ADR-0117 #2). */
+export function useAccountParties(accountId: number | null) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.accountLedger, accountId, 'parties'],
+    enabled: accountId !== null,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/gl-accounts/{id}/parties', {
+          params: { path: { id: accountId ?? 0 } },
+          signal,
+        }),
+      ),
   });
 }
 

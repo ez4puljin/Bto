@@ -77,4 +77,13 @@ export class PurchaseBooksService implements OnModuleInit {
   async supplierReturnPostedInTx(tx: Tx, actor: Actor, facts: SupplierReturnFacts): Promise<void> {
     await this.books?.supplierReturnPostedInTx(tx, actor, facts);
   }
+
+  async supplierReturnReversedInTx(
+    tx: Tx,
+    actor: Actor,
+    docId: string,
+    reason: string,
+  ): Promise<void> {
+    await this.books?.supplierReturnReversedInTx(tx, actor, docId, reason);
+  }
 }

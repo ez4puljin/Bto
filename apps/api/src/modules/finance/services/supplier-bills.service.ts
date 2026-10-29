@@ -130,13 +130,14 @@ export class SupplierBillsService implements PurchaseBooks {
     });
   }
 
+  /** One confirmed part of a supplier return (ADR-0117 #2), `BTO/SUPPLIER_RETURN/<issue>:<warehouse>`. */
   async supplierReturnPostedInTx(tx: Tx, actor: Actor, facts: SupplierReturnFacts): Promise<void> {
     const payable = facts.cost.plus(facts.vat);
     if (!payable.gt(0)) return;
     await this.post(tx, actor, facts.supplierId, {
       docType: FIN_DOC_TYPES.SUPPLIER_RETURN.docType,
-      docId: String(facts.issueId),
-      docNo: facts.number,
+      docId: facts.docId,
+      docNo: facts.docNo,
       documentType: FIN_DOC_TYPES.SUPPLIER_RETURN.code,
       date: facts.date,
       warehouseIds: facts.warehouseIds,
@@ -145,6 +146,33 @@ export class SupplierBillsService implements PurchaseBooks {
         { role: 'INVENTORY', debit: ZERO, credit: facts.cost },
         { role: 'VAT_INPUT', debit: ZERO, credit: facts.vat, taxBase: facts.vatBase },
       ],
+    });
+  }
+
+  /**
+   * A correction of a posted supplier return (ADR-0117 #5): the corrected part's credit is
+   * reversed, dated today; nothing to reverse (a part that booked no payable) is not an error.
+   */
+  async supplierReturnReversedInTx(
+    tx: Tx,
+    actor: Actor,
+    docId: string,
+    reason: string,
+  ): Promise<void> {
+    const known = await this.reader.documentsOfSource(
+      this.books.source(actor),
+      {
+        company: await this.books.company(),
+        system: BTO_SOURCE,
+        docType: FIN_DOC_TYPES.SUPPLIER_RETURN.docType,
+        docIds: [docId],
+      },
+      this.books.executor(tx),
+    );
+    if (!known.has(docId)) return;
+    await this.intake.submitInTx(tx, this.books.source(actor), {
+      source: { system: BTO_SOURCE, docType: FIN_DOC_TYPES.SUPPLIER_RETURN.docType, docId },
+      body: { action: 'REVERSE', accountingDate: businessDate(), reason: reason.slice(0, 500) },
     });
   }
 

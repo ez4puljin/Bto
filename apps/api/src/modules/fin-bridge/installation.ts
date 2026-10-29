@@ -43,6 +43,9 @@ export const FIN_DOC_TYPES = {
   },
   RECEIPT_RECOST: { code: 'BTO.RECEIPT_RECOST', system: BTO_SOURCE, docType: 'RECEIPT_RECOST' },
   SUPPLIER_RETURN: { code: 'BTO.SUPPLIER_RETURN', system: BTO_SOURCE, docType: 'SUPPLIER_RETURN' },
+  // Damage charged to a person (ADR-0117 #3): one confirmed part of a «Хүнд тооцох» goods issue
+  // at the sale price, a receivable on the staff member or customer, numbered by Bto.
+  DAMAGE_CHARGE: { code: 'BTO.DAMAGE_CHARGE', system: BTO_SOURCE, docType: 'DAMAGE_CHARGE' },
   // F4 (ADR-0097): a stock posting's value and a receipt's revaluation, numbered by the core.
   STOCK_VALUE: { code: 'BTO.STOCK_VALUE', system: BTO_SOURCE, docType: 'STOCK' },
   STOCK_REVALUE: { code: 'BTO.STOCK_VALUE', system: BTO_SOURCE, docType: 'STOCK_REVALUE' },
@@ -276,6 +279,7 @@ export function btoInstallationSpec(input: {
           [FIN_DOC_TYPES.SUPPLIER_BILL_CREDIT.code, 'AP_CREDIT'],
           [FIN_DOC_TYPES.RECEIPT_RECOST.code, 'JOURNAL'],
           [FIN_DOC_TYPES.SUPPLIER_RETURN.code, 'AP_CREDIT'],
+          [FIN_DOC_TYPES.DAMAGE_CHARGE.code, 'AR_INVOICE'],
         ] as const
       ).map(([code, docClass]) => ({
         code,
