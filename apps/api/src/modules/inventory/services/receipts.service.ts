@@ -99,6 +99,14 @@ export interface ReceiptLineInput {
 export interface ReceiptLinePatch {
   /** The counted quantity; marks the line checked. Zero («ирээгүй») only on an expected line. */
   enteredQty?: Decimal;
+  /**
+   * The counted quantity in base units (boxes × loose pieces, ADR-0118 #5); marks the line checked.
+   * When it does not divide by the line's factor the line switches to the product's base unit, so
+   * `qty_base` stays exact.
+   */
+  arrivedQtyBase?: Decimal;
+  /** The keeper's note on a difference; null clears it. */
+  note?: string | null;
   /** A price per entered unit; null clears the price. */
   docUnitPrice?: Decimal | null;
   /** A line amount; null clears the price. */
@@ -193,6 +201,8 @@ export interface ReceiptLine {
   expectedQty: Decimal | null;
   /** When the keeper checked the count; null while the line waits for its check. */
   checkedAt: Date | null;
+  /** The keeper's note on a difference (ADR-0118). */
+  note: string | null;
 }
 
 /** A keeper's confirmation of a receipt's lines in one warehouse (ADR-0115). */
@@ -592,7 +602,20 @@ export class ReceiptsService implements OnModuleInit {
     return inTransaction(this.db, async (tx) => {
       const header = await this.lockDraft(tx, receiptId);
       // A line added by hand is counted as it is entered; only the order expects quantities.
-      await this.insertLine(tx, ctx, header, { ...line, expectedQty: null });
+      const lineId = await this.insertLine(tx, ctx, header, { ...line, expectedQty: null });
+      if (header.origin === 'ORDER') {
+        // The order's history shows goods the keeper added (ADR-0118 #6).
+        const [added] = await tx
+          .select()
+          .from(goodsReceiptLines)
+          .where(eq(goodsReceiptLines.id, lineId));
+        await this.audit.record(tx, ctx, {
+          action: 'LINE_ADD',
+          entity: 'goods_receipts',
+          entityId: receiptId,
+          after: added ? lineFacts(added) : { lineId },
+        });
+      }
       await this.touch(tx, receiptId);
       return this.get(receiptId, tx);
     });
@@ -608,44 +631,106 @@ export class ReceiptsService implements OnModuleInit {
     }
     if (patch.salePrice !== undefined) assertPrices(ctx);
     return inTransaction(this.db, async (tx) => {
-      const { header, line } = await this.lockLine(tx, lineId);
-      await this.assertNotConfirmed(tx, header.id, line.warehouseId);
-      const enteredQty = patch.enteredQty ?? line.enteredQty;
-      if (enteredQty.isZero() && line.expectedQty === null) {
-        throw invalid('enteredQty', 'positive', 'only a line on the order may arrive empty');
-      }
-      const converted = await this.convert(line.productUnitId, enteredQty, tx);
-      const salePrice = patch.salePrice === undefined ? line.salePrice : patch.salePrice;
-      if (salePrice !== null) assertSalePrice(salePrice);
-      const priced =
-        patch.docUnitPrice !== undefined ||
-        patch.docAmount !== undefined ||
-        patch.freeGoods !== undefined
-          ? priceOf(patch, enteredQty)
-          : // A price per unit follows a new quantity; a typed amount stays as typed.
-            line.docUnitPrice !== null
-            ? priceOf({ docUnitPrice: line.docUnitPrice }, enteredQty)
-            : {
-                docUnitPrice: null,
-                docAmount: line.docAmount,
-                freeGoods: line.freeGoods,
-              };
-      await tx
-        .update(goodsReceiptLines)
-        .set({
-          enteredQty,
-          factorSnapshot: converted.factorSnapshot,
-          qtyBase: converted.qtyBase,
-          ...priced,
-          salePrice,
-          // A counted quantity is the keeper's check (ADR-0115).
-          ...(patch.enteredQty === undefined ? {} : { checkedAt: sql`now()` }),
-          updatedAt: sql`now()`,
-        })
-        .where(eq(goodsReceiptLines.id, lineId));
-      await this.touch(tx, header.id);
-      return this.get(header.id, tx);
+      const { receiptId } = await this.countLineInTx(tx, ctx, lineId, patch);
+      return this.get(receiptId, tx);
     });
+  }
+
+  /**
+   * One line of a draft changed inside the caller's transaction (the receipt window, the scanner
+   * screen and the purchase order's page all write here, ADR-0118 #5). Locks the receipt, refuses a
+   * confirmed warehouse, converts the quantity, re-applies a price per unit, and marks a counted
+   * line checked. On a receipt made from an order the change is audited (`COUNT`) so the order's
+   * history is complete. Returns the receipt id and the line before and after.
+   */
+  async countLineInTx(
+    tx: Tx,
+    actor: Actor,
+    lineId: number,
+    patch: ReceiptLinePatch,
+  ): Promise<{ receiptId: number; before: LineRow; after: LineRow }> {
+    const { header, line } = await this.lockLine(tx, lineId);
+    await this.assertNotConfirmed(tx, header.id, line.warehouseId);
+    if (patch.enteredQty !== undefined && patch.arrivedQtyBase !== undefined) {
+      throw invalid('arrivedQtyBase', 'exclusive', 'send enteredQty or arrivedQtyBase, not both');
+    }
+    const counted = patch.enteredQty !== undefined || patch.arrivedQtyBase !== undefined;
+    // Boxes × pieces: an exact base quantity; the line keeps its unit when it divides, else it is
+    // counted in pieces (the product's base unit) so qty_base never rounds.
+    let unitId = line.productUnitId;
+    let expectedQty = line.expectedQty;
+    let docUnitPrice = line.docUnitPrice;
+    let enteredQty = patch.enteredQty ?? line.enteredQty;
+    if (patch.arrivedQtyBase !== undefined) {
+      const base = patch.arrivedQtyBase;
+      if (base.isNegative() || base.decimalPlaces() > 3) {
+        throw invalid('arrivedQtyBase', 'qty', 'a base quantity has at most 3 decimals');
+      }
+      const factor = line.factorSnapshot;
+      if (base.isZero() || base.mod(factor).isZero()) {
+        enteredQty = base.div(factor);
+      } else {
+        const baseUnit = (await this.units.baseUnits([line.productId], tx)).get(line.productId);
+        if (!baseUnit) throw notFound('product unit', line.productId);
+        unitId = baseUnit.unitId;
+        enteredQty = base;
+        expectedQty = expectedQty === null ? null : expectedQty.times(factor);
+        docUnitPrice = docUnitPrice === null ? null : docUnitPrice.div(factor).toDecimalPlaces(2);
+      }
+    }
+    if (enteredQty.isZero() && line.expectedQty === null) {
+      throw invalid('enteredQty', 'positive', 'only a line on the order may arrive empty');
+    }
+    const converted = await this.convert(unitId, enteredQty, tx);
+    const salePrice = patch.salePrice === undefined ? line.salePrice : patch.salePrice;
+    if (salePrice !== null) assertSalePrice(salePrice);
+    const priced =
+      patch.docUnitPrice !== undefined ||
+      patch.docAmount !== undefined ||
+      patch.freeGoods !== undefined
+        ? priceOf(patch, enteredQty)
+        : // A price per unit follows a new quantity; a typed amount stays as typed.
+          docUnitPrice !== null
+          ? priceOf({ docUnitPrice }, enteredQty)
+          : {
+              docUnitPrice: null,
+              docAmount: line.docAmount,
+              freeGoods: line.freeGoods,
+            };
+    const note =
+      patch.note === undefined ? line.note : (optionalText(patch.note ?? undefined) ?? null);
+    const [after] = await tx
+      .update(goodsReceiptLines)
+      .set({
+        productUnitId: converted.unitId,
+        enteredQty,
+        factorSnapshot: converted.factorSnapshot,
+        qtyBase: converted.qtyBase,
+        expectedQty,
+        ...priced,
+        salePrice,
+        note,
+        // A counted quantity is the keeper's check (ADR-0115).
+        ...(counted ? { checkedAt: sql`now()` } : {}),
+        updatedAt: sql`now()`,
+      })
+      .where(eq(goodsReceiptLines.id, lineId))
+      .returning();
+    if (!after) throw notFound('receipt line', lineId);
+    if (
+      header.origin === 'ORDER' &&
+      (counted || (patch.note !== undefined && note !== line.note))
+    ) {
+      await this.audit.record(tx, actor, {
+        action: 'COUNT',
+        entity: 'goods_receipts',
+        entityId: header.id,
+        before: lineFacts(line),
+        after: lineFacts(after),
+      });
+    }
+    await this.touch(tx, header.id);
+    return { receiptId: header.id, before: line, after };
   }
 
   removeLine(ctx: AuthContext, lineId: number): Promise<ReceiptDetail> {
@@ -657,6 +742,14 @@ export class ReceiptsService implements OnModuleInit {
         throw invalid('lineId', 'ordered', 'a line on the order is marked as not arrived');
       }
       await tx.delete(goodsReceiptLines).where(eq(goodsReceiptLines.id, lineId));
+      if (header.origin === 'ORDER') {
+        await this.audit.record(tx, ctx, {
+          action: 'LINE_REMOVE',
+          entity: 'goods_receipts',
+          entityId: header.id,
+          before: lineFacts(line),
+        });
+      }
       // A line discount whose last line went goes with it (ADR-0103).
       await tx.execute(sql`
         DELETE FROM goods_receipt_discounts d
@@ -887,6 +980,28 @@ export class ReceiptsService implements OnModuleInit {
    * Cancels a purchase order's draft when the order steps back from «Ирсэн» (procurement, in its
    * transaction): refused once a keeper confirmed a warehouse (RECEIPT_WAREHOUSE_CONFIRMED).
    */
+  /**
+   * Locks a draft receipt for the caller's transaction (ADR-0118: the purchase order's page locks
+   * the receipt before the order, the order the confirmation hook takes) and returns its id.
+   */
+  async lockDraftInTx(tx: Tx, id: number): Promise<{ id: number; origin: ReceiptOrigin }> {
+    const header = await this.lockDraft(tx, id);
+    return { id: header.id, origin: header.origin };
+  }
+
+  /** When each receipt last changed (ADR-0118: the order page's stale check). */
+  async updatedAtOf(
+    ids: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, Date>> {
+    if (ids.length === 0) return new Map();
+    const rows = await executor
+      .select({ id: goodsReceipts.id, updatedAt: goodsReceipts.updatedAt })
+      .from(goodsReceipts)
+      .where(inArray(goodsReceipts.id, [...ids]));
+    return new Map(rows.map((row) => [row.id, row.updatedAt]));
+  }
+
   async cancelOrderDraftInTx(tx: Tx, actor: Actor, id: number): Promise<void> {
     const header = await this.lockDraft(tx, id);
     if ((await this.confirmationsOf(tx, id)).length > 0) {
@@ -1069,7 +1184,11 @@ export class ReceiptsService implements OnModuleInit {
           vatRatePct: header.vatRatePct,
           noteTotalAmount,
           discounts,
-          lines: lines.map((line) => ({ lineId: line.id, docAmount: typed.get(line.id) ?? null })),
+          lines: lines.map((line) => ({
+            lineId: line.id,
+            productId: line.productId,
+            docAmount: typed.get(line.id) ?? null,
+          })),
         },
       });
       await this.purchases.receiptCostedInTx(tx, ctx, await this.bookFacts(id, tx, previous));
@@ -1686,7 +1805,7 @@ export class ReceiptsService implements OnModuleInit {
     actor: Actor,
     header: ReceiptRow,
     line: ReceiptLineInput,
-  ): Promise<void> {
+  ): Promise<number> {
     // A line the order expects starts empty and waits for the keeper's count (ADR-0115).
     const expectedQty = line.expectedQty ?? null;
     if (expectedQty !== null) await this.units.toBase(line.productUnitId, expectedQty, tx);
@@ -1715,20 +1834,25 @@ export class ReceiptsService implements OnModuleInit {
         : (await this.bins.systemBin(warehouseId, 'RECEIVING', tx)).id;
     const salePrice = line.salePrice ?? null;
     if (salePrice !== null) assertSalePrice(salePrice);
-    await tx.insert(goodsReceiptLines).values({
-      receiptId: header.id,
-      productId,
-      productUnitId: converted.unitId,
-      enteredQty,
-      factorSnapshot: converted.factorSnapshot,
-      qtyBase: converted.qtyBase,
-      warehouseId,
-      binId,
-      ...priceOf(line, enteredQty),
-      salePrice,
-      expectedQty,
-      checkedAt: expectedQty === null ? sql`now()` : null,
-    });
+    const [inserted] = await tx
+      .insert(goodsReceiptLines)
+      .values({
+        receiptId: header.id,
+        productId,
+        productUnitId: converted.unitId,
+        enteredQty,
+        factorSnapshot: converted.factorSnapshot,
+        qtyBase: converted.qtyBase,
+        warehouseId,
+        binId,
+        ...priceOf(line, enteredQty),
+        salePrice,
+        expectedQty,
+        checkedAt: expectedQty === null ? sql`now()` : null,
+      })
+      .returning({ id: goodsReceiptLines.id });
+    if (!inserted) throw new Error('receipt line not inserted');
+    return inserted.id;
   }
 
   /** An entered quantity in base units; a zero (an expected line not arrived) checks only the unit. */
@@ -1860,6 +1984,7 @@ export class ReceiptsService implements OnModuleInit {
       costAmount: null,
       expectedQty: line.expectedQty,
       checkedAt: line.checkedAt,
+      note: line.note,
     }));
   }
 
@@ -1906,6 +2031,20 @@ export class ReceiptsService implements OnModuleInit {
 
 /** A bigint column read as text by a raw query. */
 const int = (value: string) => Number.parseInt(value, 10);
+
+/** What the order's history needs of a receipt line (ADR-0118 #6). */
+function lineFacts(line: LineRow) {
+  return {
+    lineId: line.id,
+    productId: line.productId,
+    productUnitId: line.productUnitId,
+    enteredQty: line.enteredQty,
+    qtyBase: line.qtyBase,
+    expectedQty: line.expectedQty,
+    checkedAt: line.checkedAt,
+    note: line.note,
+  };
+}
 
 /** The file kind of a delivery note's photo (ADR-0115). */
 const NOTE_PHOTO = 'inventory.receipt_note';

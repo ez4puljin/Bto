@@ -87,6 +87,7 @@ const RICE_LINE: Schemas['ReceiptLine'] = {
   salePrice: null,
   expectedQty: null,
   checkedAt: STAMP,
+  note: null,
 };
 
 const NO_TOTALS: Schemas['ReceiptTotals'] = {

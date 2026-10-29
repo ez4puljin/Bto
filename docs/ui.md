@@ -163,6 +163,9 @@ Feature pieces other screens reuse (ADR-0044, ADR-0047):
 
 ## 5. Do and don't
 
+A page others edit at the same time polls a light version route and shows a yellow `Alert` («Өөр хэрэглэгч энэ захиалгыг шинэчиллээ» + «Дахин ачаалах») instead of refetching rows under a typing hand; a document's stages are numbered circles (`success` done, `primary` current, `fill` ahead) under the `PageHeader` (ADR-0118, `features/procurement/order-header.tsx`).
+
+
 | Do | Don't |
 |---|---|
 | One blue main button per view; secondary actions `outline`, `secondary` or `ghost` | «Буцах» buttons: the breadcrumb and the browser do that |

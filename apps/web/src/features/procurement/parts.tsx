@@ -12,6 +12,7 @@ import type { PoStatus } from './api';
 const STATUS_VARIANT = {
   PREPARING: 'secondary',
   SENT: 'default',
+  SHIPPING: 'default',
   IN_TRANSIT: 'default',
   ARRIVED: 'warning',
   ACCOUNTING: 'warning',

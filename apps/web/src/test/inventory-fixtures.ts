@@ -130,6 +130,7 @@ export const BOX_LINE: Schemas['ReceiptLine'] = {
   salePrice: null,
   expectedQty: null,
   checkedAt: STAMP,
+  note: null,
 };
 
 export const calls = (fetchMock: ReturnType<typeof signedIn>, method: string, path: string) =>

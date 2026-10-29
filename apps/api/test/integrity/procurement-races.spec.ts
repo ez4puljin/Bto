@@ -11,7 +11,8 @@ import { partnersApi } from '../harness/partners';
  * ADR-0115: a purchase order's save locks the order and its supplier rows, so two pages that opened
  * the same empty cell never both write it — one is applied, the other reported as a conflict; and
  * a receipt's confirmations lock its header, so two keepers confirming their warehouses at once
- * post it exactly once.
+ * post it exactly once. ADR-0118: the order page's arrivals lock the receipt, so two counts of one
+ * line typed from two pages at once apply once and report the other as a conflict.
  */
 describe('integrity: purchase order races', () => {
   let app: NestExpressApplication;
@@ -118,7 +119,7 @@ describe('integrity: purchase order races', () => {
     for (let round = 0; round < 4; round += 1) {
       const id = await newOrder();
       for (const product of products) await save(id, product, '3').expect(200);
-      for (const to of ['SENT', 'IN_TRANSIT', 'ARRIVED']) {
+      for (const to of ['SENT', 'SHIPPING', 'IN_TRANSIT', 'ARRIVED']) {
         await http()
           .post(`/api/v1/purchase-orders/${id}/suppliers/${supplierId}/status`)
           .set(bearer(manager))
@@ -160,6 +161,47 @@ describe('integrity: purchase order races', () => {
         [receiptId],
       );
       expect(state[0]).toEqual({ status: 'POSTED', ledger: '2', po: 'ACCOUNTING' });
+    }
+  });
+
+  it('applies one of two counts of the same receipt line typed on two order pages at once', async () => {
+    for (let round = 0; round < 4; round += 1) {
+      const id = await newOrder();
+      await save(id, products[0] as ProductJson, '5').expect(200);
+      for (const to of ['SENT', 'SHIPPING', 'IN_TRANSIT', 'ARRIVED']) {
+        await http()
+          .post(`/api/v1/purchase-orders/${id}/suppliers/${supplierId}/status`)
+          .set(bearer(manager))
+          .set(idempotency())
+          .send({ to })
+          .expect(200);
+      }
+      const { rows } = await sql.query<{ receipt_id: string }>(
+        `SELECT receipt_id::text FROM purchase_order_suppliers WHERE order_id = $1`,
+        [id],
+      );
+      const receiptId = Number.parseInt(rows[0]?.receipt_id ?? '0', 10);
+      const draft = (
+        await http().get(`/api/v1/receipts/${receiptId}`).set(bearer(manager)).expect(200)
+      ).body as { lines: { id: number }[] };
+      const lineId = draft.lines[0]?.id as number;
+      const typed = (qty: string) =>
+        http()
+          .put(`/api/v1/purchase-orders/${id}/suppliers/${supplierId}/arrivals`)
+          .set(bearer(manager))
+          .send({ changes: [{ lineId, arrivedQtyBase: qty, previousArrivedQtyBase: null }] });
+      const results = await Promise.all([typed('3'), typed('4')]);
+      expect(results.map((result) => result.status)).toEqual([200, 200]);
+      const bodies = results.map(
+        (result) => result.body as { applied: number; conflicts: unknown[] },
+      );
+      expect(bodies.map((body) => body.applied).sort()).toEqual([0, 1]);
+      expect(bodies.map((body) => body.conflicts.length).sort()).toEqual([0, 1]);
+      const { rows: counted } = await sql.query<{ qty_base: string }>(
+        `SELECT qty_base::text FROM goods_receipt_lines WHERE id = $1`,
+        [lineId],
+      );
+      expect(['3.000', '4.000']).toContain(counted[0]?.qty_base);
     }
   });
 });

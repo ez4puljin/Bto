@@ -11,7 +11,10 @@ import {
 } from '@/components/ui/dialog';
 import { formatUbDateTime } from '@/lib/dayjs';
 
-/** Shows a one-time password code once, so the admin can hand it to the user (ADR-0027 #9). */
+/**
+ * Shows a one-time password code once, so the admin can hand it to the staff member (ADR-0027 #9),
+ * with the words to hand over with it: the web's set-password page, then the app.
+ */
 export function CodeDialog(props: {
   code: { code: string; expiresAt: string } | null;
   name: string;
@@ -51,6 +54,8 @@ export function CodeDialog(props: {
         <p className="text-center font-mono text-3xl font-semibold tracking-widest select-all">
           {props.code?.code}
         </p>
+        {/* What the admin tells the staff member (owner 2026-10-29): the web page, then the app. */}
+        <p className="text-sm text-muted-foreground">{t('users.code.handOver')}</p>
         <DialogFooter closeLabel={t('common.close')}>
           {canCopy ? (
             <Button variant="secondary" onClick={() => void copy()}>

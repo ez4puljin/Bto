@@ -1,21 +1,11 @@
 import { Decimal } from '@tugeel/shared/money';
 import dayjs from 'dayjs';
-import {
-  ArrowLeft,
-  ArrowRight,
-  ClipboardList,
-  NotebookPen,
-  Plus,
-  Printer,
-  Trash2,
-} from 'lucide-react';
+import { ClipboardList, Plus } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
-import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DialogFormFooter, FormField } from '@/components/form';
-import { LeaveGuard } from '@/components/leave-guard';
 import {
   ChevronHead,
   EmptyState,
@@ -33,6 +23,7 @@ import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { PrintFrame } from '@/components/print-frame';
 import { ProblemAlert } from '@/components/problem-alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -43,11 +34,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
 import { useCompanyName } from '@/features/company/api';
-import type { ColumnSpec } from '@/lib/column-layout';
 import { BUSINESS_TZ } from '@/lib/dayjs';
-import { formatCount, formatQty, formatTugrik } from '@/lib/money';
+import type { ColumnSpec } from '@/lib/column-layout';
+import { formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
 import { toast } from '@/lib/toast';
@@ -58,20 +48,24 @@ import { randomUuid } from '@/lib/uuid';
 import {
   isPoStatus,
   PO_STATUSES,
-  type PoStatus,
-  type PurchaseOrderDetail,
   type PurchaseOrderPrint,
-  type PurchaseOrderSupplier,
-  usePurchaseOrder,
   usePurchaseOrderMutations,
   usePurchaseOrderPrint,
   usePurchaseOrders,
 } from './api';
-import { OrderGrid } from './order-grid';
 import { PoStatusBadge, SupplierTicks } from './parts';
 
-/** The purchase orders list's columns (ADR-0119). */
-const LIST_COLUMNS: readonly ColumnSpec[] = [
+const idOf = (value: string | null | undefined) => {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isNaN(parsed) ? undefined : parsed;
+};
+
+/**
+ * Purchase orders by supplier (ADR-0115): every order with its lowest status and its suppliers,
+ * filtered by number, status and «Миний нийлүүлэгч»; managers start a new one from a dialog.
+ */
+/** The columns of the order list (ADR-0119): number, date, suppliers, their count, note, status, chevron. */
+const ORDER_LIST_COLUMNS: readonly ColumnSpec[] = [
   { key: 'number', kind: 'number' },
   { key: 'date', kind: 'date' },
   { key: 'suppliers', kind: 'text', weight: 3, min: 12 },
@@ -81,18 +75,6 @@ const LIST_COLUMNS: readonly ColumnSpec[] = [
   { key: 'chevron', kind: 'chevron' },
 ];
 
-const idOf = (value: string | null | undefined) => {
-  const parsed = Number.parseInt(value ?? '', 10);
-  return Number.isNaN(parsed) ? undefined : parsed;
-};
-
-const stepFrom = (status: PoStatus, by: 1 | -1): PoStatus | undefined =>
-  PO_STATUSES[PO_STATUSES.indexOf(status) + by];
-
-/**
- * Purchase orders by supplier (ADR-0115): every order with its lowest status and its suppliers,
- * filtered by number, status and «Миний нийлүүлэгч»; managers start a new one from a dialog.
- */
 export function PurchaseOrdersPage() {
   const { t } = useTranslation();
   const canManage = useHasPermission('procurement.orders.manage');
@@ -103,10 +85,11 @@ export function PurchaseOrdersPage() {
   const statusParam = params.get('status');
   const status = isPoStatus(statusParam) ? statusParam : undefined;
   const mine = params.get('mine') === '1';
-  const orders = usePurchaseOrders({ q, status, mine });
+  const archived = params.get('archived') === '1';
+  const orders = usePurchaseOrders({ q, status, mine, archived });
   const rows = orders.data?.pages.flatMap((page) => page.data) ?? [];
   const [creating, setCreating] = useCreateParam();
-  const filtered = q !== '' || status !== undefined || mine;
+  const filtered = q !== '' || status !== undefined || mine || archived;
 
   return (
     <div>
@@ -154,10 +137,15 @@ export function PurchaseOrdersPage() {
           checked={mine}
           onCheckedChange={(checked) => setParam('mine', checked ? '1' : '')}
         />
+        <FilterToggle
+          label={t('procurement.orders.archived')}
+          checked={archived}
+          onCheckedChange={(checked) => setParam('archived', checked ? '1' : '')}
+        />
       </FilterBar>
       <ProblemAlert problem={problemFromError(orders.error)} onRetry={orders.refetch} />
       <ListCard scroll>
-        <ListTable columns={LIST_COLUMNS}>
+        <ListTable columns={ORDER_LIST_COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('procurement.orders.number')}</TableHead>
@@ -189,7 +177,12 @@ export function PurchaseOrdersPage() {
                   text={order.note ?? t('common.none')}
                 />
                 <TableCell>
-                  <PoStatusBadge status={order.status} />
+                  <span className="flex items-center gap-1.5">
+                    <PoStatusBadge status={order.status} />
+                    {order.archivedAt !== null ? (
+                      <Badge variant="outline">{t('procurement.detail.archived')}</Badge>
+                    ) : null}
+                  </span>
                 </TableCell>
               </LinkRow>
             ))}
@@ -206,6 +199,7 @@ export function PurchaseOrdersPage() {
                     setParam('q', '');
                     setParam('status', '');
                     setParam('mine', '');
+                    setParam('archived', '');
                   }
                 : undefined
             }
@@ -284,454 +278,6 @@ function CreateOrderDialog({ onCancel }: { onCancel: () => void }) {
         />
       </form>
     </DialogContent>
-  );
-}
-
-/**
- * One order (`/procurement/orders/:id`, ADR-0115): the suppliers as a strip of cards, each with its
- * status, orderer and steps, and the chosen one's grid (`?supplier=`) below.
- */
-export function PurchaseOrderPage() {
-  const { t } = useTranslation();
-  const id = idOf(useParams().id) ?? 0;
-  const order = usePurchaseOrder(id);
-  const [params] = useSearchParams();
-  const setParam = useSetParam();
-  const [dirty, setDirty] = useState(false);
-  const [switchTo, setSwitchTo] = useState<number | null>(null);
-  const loadProblem = problemFromError(order.error);
-
-  if (loadProblem || !order.data) {
-    return (
-      <div>
-        <PageHeader title={t('procurement.orders.title')} />
-        {loadProblem ? (
-          <ProblemAlert problem={loadProblem} onRetry={order.refetch} />
-        ) : (
-          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
-        )}
-      </div>
-    );
-  }
-  const detail = order.data;
-  const wanted = idOf(params.get('supplier'));
-  const selected =
-    detail.suppliers.find((supplier) => supplier.supplierId === wanted) ?? detail.suppliers[0];
-  const select = (supplierId: number) => {
-    if (supplierId === selected?.supplierId) return;
-    if (dirty) setSwitchTo(supplierId);
-    else setParam('supplier', String(supplierId));
-  };
-
-  return (
-    <div>
-      <OrderHeader detail={detail} />
-      <SupplierStrip
-        detail={detail}
-        selectedId={selected?.supplierId}
-        onSelect={select}
-        onRemoved={(supplierId) => {
-          if (supplierId === selected?.supplierId) setParam('supplier', '');
-        }}
-      />
-      {selected ? (
-        <OrderGrid
-          key={selected.supplierId}
-          orderId={detail.id}
-          supplier={selected}
-          onDirtyChange={setDirty}
-        />
-      ) : (
-        <ListCard>
-          <EmptyState icon={ClipboardList} title={t('procurement.order.noSuppliers')} />
-        </ListCard>
-      )}
-      <LeaveGuard
-        when={dirty}
-        title={t('procurement.grid.leaveTitle')}
-        description={t('procurement.grid.leaveDescription')}
-        leaveLabel={t('procurement.grid.leaveLabel')}
-      />
-      <ConfirmDialog
-        open={switchTo !== null}
-        title={t('procurement.grid.leaveTitle')}
-        description={t('procurement.grid.switchDescription')}
-        confirmLabel={t('procurement.grid.switchConfirm')}
-        onConfirm={() => {
-          if (switchTo !== null) setParam('supplier', String(switchTo));
-          setSwitchTo(null);
-        }}
-        onClose={() => setSwitchTo(null)}
-      />
-    </div>
-  );
-}
-
-/** The order's number, lowest status, date and author; print, the note and more suppliers. */
-function OrderHeader({ detail }: { detail: PurchaseOrderDetail }) {
-  const { t } = useTranslation();
-  const canManage = useHasPermission('procurement.orders.manage');
-  const [adding, setAdding] = useState(false);
-  const [editingNote, setEditingNote] = useState(false);
-  return (
-    <>
-      <PageHeader
-        title={detail.number}
-        description={detail.note ?? undefined}
-        meta={
-          <>
-            <PoStatusBadge status={detail.status} />
-            <span className="font-mono">{detail.orderDate}</span>
-            {detail.createdBy ? (
-              <span>{t('procurement.order.createdBy', { name: detail.createdBy })}</span>
-            ) : null}
-          </>
-        }
-        actions={
-          <>
-            {canManage ? (
-              <>
-                <Button variant="outline" onClick={() => setEditingNote(true)}>
-                  <NotebookPen />
-                  {t('procurement.order.editNote')}
-                </Button>
-                <Button variant="outline" onClick={() => setAdding(true)}>
-                  <Plus />
-                  {t('procurement.order.addSuppliers')}
-                </Button>
-              </>
-            ) : null}
-            <Button variant="outline" asChild>
-              <Link to={`/procurement/orders/${detail.id}/print`} target="_blank" rel="noreferrer">
-                <Printer />
-                {t('procurement.order.printAll')}
-              </Link>
-            </Button>
-          </>
-        }
-      />
-      {canManage ? (
-        <>
-          <Dialog open={adding} onOpenChange={setAdding}>
-            {adding ? (
-              <AddSuppliersDialog detail={detail} onClose={() => setAdding(false)} />
-            ) : null}
-          </Dialog>
-          <Dialog open={editingNote} onOpenChange={setEditingNote}>
-            {editingNote ? (
-              <NoteDialog detail={detail} onClose={() => setEditingNote(false)} />
-            ) : null}
-          </Dialog>
-        </>
-      ) : null}
-    </>
-  );
-}
-
-function AddSuppliersDialog(props: { detail: PurchaseOrderDetail; onClose: () => void }) {
-  const { t } = useTranslation();
-  const mutations = usePurchaseOrderMutations();
-  const action = useAction();
-  const [suppliers, setSuppliers] = useState<ReadonlyMap<number, string>>(new Map());
-  const inOrder = new Set(props.detail.suppliers.map((supplier) => supplier.supplierId));
-  const add = () =>
-    void action.run(async () => {
-      await mutations.addSuppliers.mutateAsync({
-        id: props.detail.id,
-        supplierIds: [...suppliers.keys()],
-      });
-      toast.success(t('procurement.order.added', { count: suppliers.size }));
-      props.onClose();
-    });
-  return (
-    <DialogContent size="lg" closeLabel={t('common.close')}>
-      <form
-        className="space-y-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (suppliers.size > 0 && !mutations.addSuppliers.isPending) add();
-        }}
-      >
-        <DialogHeader>
-          <DialogTitle>{t('procurement.order.addSuppliers')}</DialogTitle>
-          <DialogDescription>{t('procurement.order.addSuppliersHint')}</DialogDescription>
-        </DialogHeader>
-        <ProblemAlert problem={action.problem} />
-        <FormField label={t('procurement.create.suppliers')} htmlFor="po-add-suppliers">
-          <SupplierTicks
-            id="po-add-suppliers"
-            value={suppliers}
-            onChange={setSuppliers}
-            exclude={inOrder}
-          />
-        </FormField>
-        <DialogFormFooter
-          pending={mutations.addSuppliers.isPending}
-          disabled={suppliers.size === 0}
-          submitLabel={t('procurement.order.add')}
-          onCancel={props.onClose}
-        />
-      </form>
-    </DialogContent>
-  );
-}
-
-function NoteDialog(props: { detail: PurchaseOrderDetail; onClose: () => void }) {
-  const { t } = useTranslation();
-  const mutations = usePurchaseOrderMutations();
-  const action = useAction();
-  const [note, setNote] = useState(props.detail.note ?? '');
-  const save = () =>
-    void action.run(async () => {
-      await mutations.updateNote.mutateAsync({ id: props.detail.id, note: note.trim() || null });
-      toast.success(t('common.saved'));
-      props.onClose();
-    });
-  return (
-    <DialogContent size="md" closeLabel={t('common.close')}>
-      <form
-        className="space-y-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!mutations.updateNote.isPending) save();
-        }}
-      >
-        <DialogHeader>
-          <DialogTitle>{t('procurement.order.editNote')}</DialogTitle>
-        </DialogHeader>
-        <ProblemAlert problem={action.problem} />
-        <FormField label={t('procurement.orders.note')} htmlFor="po-note-edit">
-          <Textarea
-            id="po-note-edit"
-            maxLength={500}
-            rows={3}
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-          />
-        </FormField>
-        <DialogFormFooter pending={mutations.updateNote.isPending} onCancel={props.onClose} />
-      </form>
-    </DialogContent>
-  );
-}
-
-/**
- * The order's suppliers side by side: status, orderer, lines, the estimated cost (price readers),
- * the receipt once it arrived, and one step forward or back. ARRIVED asks first: it makes the
- * supplier's draft receipt; the last two statuses follow that receipt.
- */
-function SupplierStrip(props: {
-  detail: PurchaseOrderDetail;
-  selectedId: number | undefined;
-  onSelect: (supplierId: number) => void;
-  onRemoved: (supplierId: number) => void;
-}) {
-  const { t } = useTranslation();
-  const { detail } = props;
-  const canManage = useHasPermission('procurement.orders.manage');
-  const canPrices = useHasPermission('procurement.prices.read');
-  const mutations = usePurchaseOrderMutations();
-  const action = useAction();
-  const confirmAction = useAction();
-  const [arriving, setArriving] = useState<PurchaseOrderSupplier | null>(null);
-  const [removing, setRemoving] = useState<PurchaseOrderSupplier | null>(null);
-
-  const move = async (supplier: PurchaseOrderSupplier, to: PoStatus) => {
-    await mutations.move.mutateAsync({
-      key: randomUuid(),
-      id: detail.id,
-      supplierId: supplier.supplierId,
-      to,
-    });
-    toast.success(
-      t('procurement.supplier.moved', {
-        name: supplier.supplierName,
-        status: t(`procurement.status.${to}`),
-      }),
-    );
-  };
-  const step = (supplier: PurchaseOrderSupplier, by: 1 | -1) => {
-    const to = stepFrom(supplier.status, by);
-    if (!to) return;
-    if (to === 'ARRIVED' && by === 1) {
-      confirmAction.clear();
-      setArriving(supplier);
-      return;
-    }
-    void action.run(() => move(supplier, to));
-  };
-
-  return (
-    <section aria-label={t('procurement.order.suppliers')} className="mb-4">
-      <ProblemAlert problem={action.problem} />
-      <ul className="flex gap-3 overflow-x-auto pb-1">
-        {detail.suppliers.map((supplier) => {
-          const selected = supplier.supplierId === props.selectedId;
-          const next = stepFrom(supplier.status, 1);
-          const back = stepFrom(supplier.status, -1);
-          const name = supplier.supplierName;
-          return (
-            <li key={supplier.supplierId} className="shrink-0">
-              <article
-                aria-current={selected ? 'true' : undefined}
-                className={cn(
-                  'flex h-full w-72 flex-col gap-2 rounded-xl bg-card p-3 shadow-card ring-1 ring-border',
-                  selected && 'ring-2 ring-primary',
-                )}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <button
-                    type="button"
-                    aria-pressed={selected}
-                    title={name}
-                    className="min-w-0 truncate rounded text-left font-semibold underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                    onClick={() => props.onSelect(supplier.supplierId)}
-                  >
-                    {name}
-                  </button>
-                  <PoStatusBadge status={supplier.status} />
-                </div>
-                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[13px]">
-                  <dt className="text-muted-foreground">{t('procurement.supplier.orderer')}</dt>
-                  <dd className="truncate">
-                    {supplier.ordererName ?? t('procurement.supplier.noOrderer')}
-                  </dd>
-                  <dt className="text-muted-foreground">{t('procurement.supplier.lines')}</dt>
-                  <dd className="font-mono">
-                    {formatCount(supplier.lineCount)}
-                    {new Decimal(supplier.weightKg).gt(0)
-                      ? ` · ${t('procurement.supplier.kg', { kg: formatQty(new Decimal(supplier.weightKg).toDecimalPlaces(1).toString()) })}`
-                      : ''}
-                  </dd>
-                  {canPrices && supplier.estimatedCost !== null ? (
-                    <>
-                      <dt className="text-muted-foreground">
-                        {t('procurement.supplier.estimatedCost')}
-                      </dt>
-                      <dd className="font-mono">{formatTugrik(supplier.estimatedCost)}</dd>
-                    </>
-                  ) : null}
-                  {supplier.receiptId !== null ? (
-                    <>
-                      <dt className="text-muted-foreground">{t('procurement.supplier.receipt')}</dt>
-                      <dd>
-                        <Link
-                          to={`/inventory/receipts/${supplier.receiptId}`}
-                          className="font-mono text-link underline-offset-4 hover:underline"
-                        >
-                          {supplier.receiptNumber ??
-                            t('procurement.supplier.receiptDraft', { id: supplier.receiptId })}
-                        </Link>
-                      </dd>
-                    </>
-                  ) : null}
-                </dl>
-                <div className="mt-auto flex flex-wrap items-center gap-1.5">
-                  {supplier.canMoveBack && back ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      aria-label={t('procurement.supplier.backNamed', { name })}
-                      title={t('procurement.supplier.backTo', {
-                        status: t(`procurement.status.${back}`),
-                      })}
-                      disabled={mutations.move.isPending}
-                      onClick={() => step(supplier, -1)}
-                    >
-                      <ArrowLeft />
-                      {t('procurement.supplier.back')}
-                    </Button>
-                  ) : null}
-                  {supplier.canMoveNext && next ? (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      aria-label={t('procurement.supplier.nextNamed', { name })}
-                      title={t('procurement.supplier.nextTo', {
-                        status: t(`procurement.status.${next}`),
-                      })}
-                      disabled={mutations.move.isPending}
-                      onClick={() => step(supplier, 1)}
-                    >
-                      {t('procurement.supplier.next')}
-                      <ArrowRight />
-                    </Button>
-                  ) : null}
-                  <span className="ml-auto flex gap-0.5">
-                    <Button size="icon-sm" variant="ghost" className="size-7" asChild>
-                      <Link
-                        to={`/procurement/orders/${detail.id}/print?supplierId=${supplier.supplierId}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={t('procurement.supplier.print', { name })}
-                        title={t('procurement.supplier.print', { name })}
-                      >
-                        <Printer />
-                      </Link>
-                    </Button>
-                    {canManage && supplier.status === 'PREPARING' ? (
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        className="size-7 text-muted-foreground hover:text-destructive"
-                        aria-label={t('procurement.supplier.remove', { name })}
-                        title={t('procurement.supplier.remove', { name })}
-                        onClick={() => {
-                          confirmAction.clear();
-                          setRemoving(supplier);
-                        }}
-                      >
-                        <Trash2 />
-                      </Button>
-                    ) : null}
-                  </span>
-                </div>
-              </article>
-            </li>
-          );
-        })}
-      </ul>
-      <ConfirmDialog
-        open={arriving !== null}
-        variant="default"
-        title={t('procurement.supplier.arriveTitle', { name: arriving?.supplierName ?? '' })}
-        description={t('procurement.supplier.arriveDescription')}
-        confirmLabel={t('procurement.supplier.arriveConfirm')}
-        pending={mutations.move.isPending}
-        problem={confirmAction.problem}
-        onConfirm={() => {
-          const supplier = arriving;
-          if (!supplier) return;
-          void confirmAction
-            .run(() => move(supplier, 'ARRIVED'))
-            .then((done) => done && setArriving(null));
-        }}
-        onClose={() => setArriving(null)}
-      />
-      <ConfirmDialog
-        open={removing !== null}
-        title={t('procurement.supplier.removeTitle', { name: removing?.supplierName ?? '' })}
-        description={t('procurement.supplier.removeDescription')}
-        confirmLabel={t('procurement.supplier.removeConfirm')}
-        pending={mutations.removeSupplier.isPending}
-        problem={confirmAction.problem}
-        onConfirm={() => {
-          const supplier = removing;
-          if (!supplier) return;
-          void confirmAction
-            .run(async () => {
-              await mutations.removeSupplier.mutateAsync({
-                id: detail.id,
-                supplierId: supplier.supplierId,
-              });
-              toast.success(t('procurement.supplier.removed', { name: supplier.supplierName }));
-              props.onRemoved(supplier.supplierId);
-            })
-            .then((done) => done && setRemoving(null));
-        }}
-        onClose={() => setRemoving(null)}
-      />
-    </section>
   );
 }
 
