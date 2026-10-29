@@ -25,9 +25,7 @@ export async function writeJson(key: string, value: unknown): Promise<void> {
   }
 }
 
-/** Keys of one user on one server: two reps sharing a phone never see each other's cart. */
-export const userKey = (name: string, server: string, userId: number) =>
-  `bto.${name}.v1:${server}:${userId}`;
+export { userKey } from './keys';
 
 export const SERVER_KEY = 'bto.server.v1';
 

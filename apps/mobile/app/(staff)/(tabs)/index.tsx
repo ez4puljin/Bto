@@ -35,6 +35,7 @@ import { formatMillions, formatMnt, initialsOf } from '../../../src/format/forma
 import { allOrdered, countsOf } from '../../../src/map/stores';
 import { shortMoney } from '../../../src/orders/amounts';
 import { useAddOne } from '../../../src/shop/use-add';
+import { mayRequestTransfers } from '../../../src/state/phase';
 import { effectiveStage, placeOf } from '../../../src/state/placement';
 import { useSignedIn } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
@@ -123,6 +124,16 @@ export default function HomeScreen() {
     ),
     { key: 'map', label: t('mobile.map.title'), onPress: () => router.push('/map') },
     { key: 'orders', label: t('mobile.tabs.orders'), onPress: () => router.navigate('/orders') },
+    // A rep who also requests a store's transfers (ADR-0116 #1).
+    ...(mayRequestTransfers(me)
+      ? [
+          {
+            key: 'transfers',
+            label: t('mobile.transfers.title'),
+            onPress: () => router.push('/transfers'),
+          },
+        ]
+      : []),
   ];
 
   // Four tiles a row; the last row keeps its tiles at their place.
