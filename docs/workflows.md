@@ -203,3 +203,34 @@ Four short rounds before the build. Each choice below was the proposal, unless a
 - the payable.
 
 The trucks and the kg fill come in the next slice.
+
+## 5. Slice 2 scope: transfers (owner, 2026-10-29)
+
+One question round before the build. Each item below was the proposal, and the owner accepted every one ("Бүх саналууд зөв"); the two store names are the owner's.
+
+**Requests (the store's seller, in the staff app)**
+1. **Where.** A «Шилжүүлэг» section in the staff app («Bto Бараа дэлгэц»), shown only to users whose write scope is a STORE warehouse and who hold `inventory.transfers.manage`. The seller signs in with the same staff login.
+2. **Several source warehouses in one request.** One request lists products; the lines are grouped by the product's home warehouse, like a purchase order's suppliers, and each warehouse's keeper ships their own group. Today's one-source transfer document becomes one group of such a request.
+3. **Beside each line:** the store's stock, the home warehouse's stock, last month's sales at the store, and the unit (box or piece).
+4. The web's «Бага үлдэгдэл → Шилжүүлэг хүсэх» stays as it is.
+
+**Shipping (the warehouse keeper, on the web)**
+5. The keeper prepares the group on the web, as in slice 1 (a wedge scanner on the web screen); the app is the seller's.
+6. The shipped quantity may differ from the requested one (less when stock is short). The shipped quantity becomes the receiving screen's expected quantity.
+7. A printed sheet travels with the goods. Trucks and drivers are not in this slice.
+
+**Receiving (the store, in the app, by scan)**
+8. As in slice 1: a scan jumps to the line and shows the **shipped quantity**; the seller types the arrived quantity, or marks «ирээгүй». No blind count.
+9. "Goods with another barcode" covers both cases: a known product under another of its barcodes resolves to its line; a product that is not on the request is added as a new line (marked «Хүсэлтэд байхгүй») and is taken from the sender's stock as a surplus.
+10. **Differences keep ADR-0035's rule:** a shortfall goes back to the sending warehouse's stock, a surplus is taken from it. No receivable on a person.
+
+**Confirmation**
+11. The seller finishes the receipt in the app → each sending warehouse's keeper sees the differences of their group and confirms on the web → the stock moves (the ledger legs of ADR-0035). The keeper may send a group back to the seller instead of confirming.
+12. The keeper confirms on the web.
+
+**Scope**
+13. Transfers between the Mörön warehouses use the same documents on the web (a request by the receiving keeper, shipping and confirmation as above); they are not in the app in this slice.
+14. Returns from a store to a warehouse (PUSH) keep today's web flow; not in the app in this slice.
+15. **Two stores.** The main supermarket's warehouse `S1` is renamed **«Заал»** and a second STORE warehouse **`S2` «Заалны архи»** is added (done on the development database 2026-10-29; its till, edge and e-Barimt come later, TODO-VERIFY in §2).
+
+Reserved for the build: ADR-0116 and migration `0053` (branch `claude/slice2-transfers`).
