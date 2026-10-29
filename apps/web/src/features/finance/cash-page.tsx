@@ -5,6 +5,7 @@ import {
   EmptyState,
   FilterBar,
   ListCard,
+  ListTable,
   LoadMore,
   SkeletonRows,
   TruncateCell,
@@ -12,14 +13,8 @@ import {
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatMnt, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { hrefWithParam, useSetParam } from '@/lib/search-params';
@@ -27,6 +22,17 @@ import { cn } from '@/lib/utils';
 import { DateRangeFilter } from './date-range-filter';
 import { useCashBook, useMoneyAccounts } from './api';
 import { PaymentKindBadge } from './badges';
+
+/** The book's columns (ADR-0119): date, voucher number, kind, party, in, out, balance after. */
+const BOOK_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'date', kind: 'date' },
+  { key: 'number', kind: 'number' },
+  { key: 'kind', kind: 'status' },
+  { key: 'party', kind: 'text', weight: 3, min: 12 },
+  { key: 'in', kind: 'money' },
+  { key: 'out', kind: 'money' },
+  { key: 'balanceAfter', kind: 'money', width: 10 },
+];
 
 /**
  * The cash and bank books (ADR-0060 #5): every money account as a small card with its balance (as
@@ -105,7 +111,7 @@ export function CashPage() {
           </FilterBar>
           <ProblemAlert problem={problemFromError(book.error)} onRetry={book.refetch} />
           <ListCard scroll>
-            <Table>
+            <ListTable columns={BOOK_COLUMNS}>
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('finance.fields.date')}</TableHead>
@@ -148,7 +154,7 @@ export function CashPage() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </ListTable>
             {!book.isPending && rows.length === 0 ? (
               <EmptyState title={t('finance.cash.empty')} />
             ) : null}

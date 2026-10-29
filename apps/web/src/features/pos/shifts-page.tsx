@@ -10,6 +10,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SkeletonRows,
   SpacerCell,
@@ -19,14 +20,8 @@ import {
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
@@ -37,6 +32,19 @@ import { ShiftPanel } from './shift-panel';
 
 const isStatus = (value: string | null): value is ShiftStatus =>
   SHIFT_STATUSES.some((entry) => entry === value);
+
+/** The shifts list's columns (ADR-0119). */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'number', kind: 'number' },
+  { key: 'till', kind: 'text', weight: 2 },
+  { key: 'cashier', kind: 'text', weight: 2, min: 10 },
+  { key: 'openedAt', kind: 'datetime' },
+  { key: 'status', kind: 'status' },
+  { key: 'salesTotal', kind: 'money' },
+  { key: 'variance', kind: 'money' },
+  { key: 'spacer', kind: 'spacer' },
+  { key: 'chevron', kind: 'chevron' },
+];
 
 /**
  * «Ээлж» (ADR-0064): the tills' shifts as the edge replayed them; closed ones wait for the
@@ -102,7 +110,7 @@ export function PosShiftsPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(shifts.error)} onRetry={shifts.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('pos.fields.number')}</TableHead>
@@ -153,7 +161,7 @@ export function PosShiftsPage() {
               );
             })}
           </TableBody>
-        </Table>
+        </ListTable>
         {!shifts.isPending && rows.length === 0 ? (
           <EmptyState
             icon={Hourglass}

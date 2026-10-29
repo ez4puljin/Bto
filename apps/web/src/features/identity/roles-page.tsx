@@ -12,6 +12,7 @@ import { DialogFormFooter, FormField } from '@/components/form';
 import {
   EmptyState,
   ListCard,
+  ListTable,
   RowAction,
   RowActions,
   RowActionSpacer,
@@ -31,14 +32,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { problemFromError, settle } from '@/lib/problem';
 import { useCreateParam } from '@/lib/use-create-param';
 import { useDeleteConfirm } from '@/lib/use-delete-confirm';
@@ -49,6 +44,15 @@ const roleSchema = z.object({
   permissions: z.array(z.enum(PERMISSIONS)),
 });
 type RoleValues = z.infer<typeof roleSchema>;
+
+/** The roles list's columns (ADR-0119). */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
+  { key: 'kind', kind: 'status', width: 10 },
+  { key: 'permissions', kind: 'count' },
+  { key: 'users', kind: 'count' },
+  { key: 'actions', kind: 'actions', actions: 2 },
+];
 
 function PermissionLabel({ code }: { code: Permission }) {
   const { t } = useTranslation();
@@ -88,7 +92,7 @@ export function RolesPage() {
       />
       <ProblemAlert problem={problemFromError(roles.error)} onRetry={roles.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('roles.columns.name')}</TableHead>
@@ -145,7 +149,7 @@ export function RolesPage() {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!roles.isPending && rows.length === 0 ? (
           <EmptyState icon={ShieldCheck} title={t('roles.empty')} />
         ) : null}

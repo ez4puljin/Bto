@@ -11,6 +11,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SegmentedControl,
   SkeletonRows,
@@ -23,14 +24,8 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
@@ -54,6 +49,22 @@ export function ProgramStatusBadge({ status }: { status: ProgramStatus }) {
 }
 
 /** The status filter as a segmented control (ADR-0042); still tabs for keyboards and tests. */
+/**
+ * The list's columns (ADR-0119): the steps show the effect too (→ 1%, → 22,800₮, → −500₮), so
+ * the effect column is short; the period is two dates.
+ */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
+  { key: 'list', kind: 'text', weight: 1 },
+  { key: 'scope', kind: 'text', weight: 2 },
+  { key: 'effect', kind: 'text', weight: 1 },
+  { key: 'steps', kind: 'text', weight: 2, min: 10 },
+  { key: 'period', kind: 'date', width: 16 },
+  { key: 'status', kind: 'status' },
+  { key: 'spacer', kind: 'spacer' },
+  { key: 'chevron', kind: 'chevron' },
+];
+
 /** «Үнэ» → «Хямдрал»: programs in force by default, newest first (ADR-0041 #2). */
 export function DiscountProgramsPage() {
   const { t } = useTranslation();
@@ -93,17 +104,13 @@ export function DiscountProgramsPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(programs.error)} onRetry={programs.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('pricing.programs.columns.name')}</TableHead>
               <TableHead>{t('pricing.programs.columns.list')}</TableHead>
               <TableHead>{t('pricing.programs.columns.scope')}</TableHead>
-              {/* The steps show the effect too (→ 1%, → 22,800₮, → −500₮): below 1440px it gives
-                  way, so the list fits a laptop without scrolling sideways. */}
-              <TableHead className="hidden min-[1440px]:table-cell">
-                {t('pricing.programs.columns.effect')}
-              </TableHead>
+              <TableHead>{t('pricing.programs.columns.effect')}</TableHead>
               <TableHead>{t('pricing.programs.columns.steps')}</TableHead>
               <TableHead>{t('pricing.programs.columns.period')}</TableHead>
               <TableHead>{t('pricing.programs.columns.status')}</TableHead>
@@ -115,7 +122,7 @@ export function DiscountProgramsPage() {
             {programs.isPending ? <SkeletonRows columns={9} /> : null}
             {rows.map((program) => (
               <LinkRow key={program.id} to={`/pricing/discounts/${program.id}`}>
-                <TruncateCell text={program.name} className="max-w-48 min-[1440px]:max-w-56">
+                <TruncateCell text={program.name}>
                   <Link
                     to={`/pricing/discounts/${program.id}`}
                     className="font-medium underline-offset-4 hover:underline"
@@ -124,13 +131,8 @@ export function DiscountProgramsPage() {
                   </Link>
                 </TruncateCell>
                 <TableCell>{t(`pricing.lists.${program.list}`)}</TableCell>
-                <TruncateCell
-                  text={text.target(program)}
-                  className="max-w-48 min-[1440px]:max-w-56"
-                />
-                <TableCell className="hidden min-[1440px]:table-cell">
-                  {t(`pricing.programs.effects.${program.effect}`)}
-                </TableCell>
+                <TruncateCell text={text.target(program)} />
+                <TableCell>{t(`pricing.programs.effects.${program.effect}`)}</TableCell>
                 <TableCell>
                   {/* One step a line, each line whole. */}
                   <div className="flex flex-col whitespace-nowrap">
@@ -147,7 +149,7 @@ export function DiscountProgramsPage() {
               </LinkRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!programs.isPending && rows.length === 0 ? (
           <EmptyState icon={BadgePercent} title={t('pricing.programs.empty')} />
         ) : null}

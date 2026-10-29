@@ -5,21 +5,15 @@ import { useTranslation } from 'react-i18next';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FormField } from '@/components/form';
-import { EmptyState, ListCard, SkeletonRows } from '@/components/list';
+import { EmptyState, ListCard, ListTable, SkeletonRows } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
@@ -37,6 +31,24 @@ import { VoidDialog } from './void-dialog';
 
 /** The month before this one, `YYYY-MM`: the one usually closed next. */
 const previousMonth = (): string => addMonths(`${businessDate().slice(0, 7)}-01`, -1).slice(0, 7);
+
+/** The months' columns (ADR-0119): month, status, the last event, the «Дахин нээх» button. */
+const PERIOD_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'month', kind: 'code' },
+  { key: 'status', kind: 'status' },
+  { key: 'last', kind: 'text', weight: 1, min: 14 },
+  // A text button, not icons: wider than the default actions column.
+  { key: 'actions', kind: 'actions', width: 8 },
+];
+
+/** The history's columns: when, month, action, who, reason. */
+const EVENT_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'at', kind: 'datetime' },
+  { key: 'month', kind: 'code' },
+  { key: 'action', kind: 'text', weight: 1 },
+  { key: 'who', kind: 'text', weight: 2 },
+  { key: 'reason', kind: 'text', weight: 3 },
+];
 
 /**
  * «Сарын хаалт» (ADR-0102): the months of the books with their status, closing a month that has
@@ -117,13 +129,13 @@ export function PeriodsPage() {
       ) : null}
       <YearCloseCard />
       <ListCard>
-        <Table>
+        <ListTable columns={PERIOD_COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('finance.periods.columns.month')}</TableHead>
               <TableHead>{t('finance.periods.columns.status')}</TableHead>
               <TableHead>{t('finance.periods.columns.last')}</TableHead>
-              <TableHead className="w-10">
+              <TableHead>
                 <span className="sr-only">{t('common.actions')}</span>
               </TableHead>
             </TableRow>
@@ -158,7 +170,7 @@ export function PeriodsPage() {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!periods.isPending && rows.length === 0 ? (
           <EmptyState icon={CalendarCheck} title={t('finance.periods.empty')} />
         ) : null}
@@ -167,7 +179,7 @@ export function PeriodsPage() {
         {t('finance.periods.history')}
       </h2>
       <ListCard>
-        <Table>
+        <ListTable columns={EVENT_COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('finance.periods.columns.at')}</TableHead>
@@ -191,7 +203,7 @@ export function PeriodsPage() {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!events.isPending && (events.data ?? []).length === 0 ? (
           <EmptyState icon={History} title={t('finance.periods.historyEmpty')} />
         ) : null}

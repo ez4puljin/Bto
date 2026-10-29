@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { EmptyState, FilterToggle, ListCard } from '@/components/list';
+import { EmptyState, FilterToggle, ListCard, ListTable } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
@@ -16,14 +16,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
@@ -42,6 +36,15 @@ import { BoardDialog, ChannelsDialog, CopyDialog, NumberingDialog } from './sett
 
 type Confirming =
   { kind: 'pipeline'; pipeline: PipelineSummary } | { kind: 'board'; board: SalesBoard };
+
+/** The pipelines table's columns (ADR-0119); each row ends with its «⋯» menu. */
+const PIPELINE_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
+  { key: 'createdAt', kind: 'datetime' },
+  { key: 'createdBy', kind: 'text', weight: 1 },
+  { key: 'status', kind: 'status' },
+  { key: 'menu', kind: 'actions', actions: 1 },
+];
 
 /**
  * «Самбар ба дамжлага» (ADR-0057 #7, after erxes's boards and pipelines): the boards on the left,
@@ -224,7 +227,7 @@ export function SalesSettingsPage() {
             </p>
           ) : null}
           <ListCard scroll>
-            <Table>
+            <ListTable columns={PIPELINE_COLUMNS}>
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('sales.pipelines.columns.name')}</TableHead>
@@ -308,7 +311,7 @@ export function SalesSettingsPage() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </ListTable>
             {board && board.pipelines.length === 0 ? (
               <EmptyState title={t('sales.pipelines.empty')} />
             ) : null}

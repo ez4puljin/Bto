@@ -8,6 +8,7 @@ import {
   EmptyState,
   FilterBar,
   ListCard,
+  ListTable,
   LoadMore,
   SearchField,
   SegmentedControl,
@@ -19,15 +20,9 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { parseCount } from '@/features/inventory/helpers';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatCount, formatQty, formatTugrik, plainDecimal } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
@@ -45,6 +40,24 @@ import {
 } from './api';
 
 const FILTERS: readonly GridFilter[] = ['ALL', 'ORDERED', 'BELOW_MIN'];
+
+/** The grid's columns (ADR-0119); the prices only for those who see them. */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'sku', kind: 'code' },
+  { key: 'name', kind: 'text', weight: 3, min: 14 },
+  { key: 'warehouse', kind: 'text', weight: 1 },
+  { key: 'onHand', kind: 'qty' },
+  { key: 'minQty', kind: 'qty' },
+  { key: 'lastMonthOut', kind: 'qty' },
+  { key: 'lastPrice', kind: 'money' },
+  // A select of the product's units («хайрцаг ×24»).
+  { key: 'unit', kind: 'text', weight: 1, min: 8.5 },
+  // A box for the quantity typed.
+  { key: 'qty', kind: 'qty', width: 7.5 },
+  { key: 'estimatedCost', kind: 'money' },
+];
+const PRICE_COLUMNS = ['lastPrice', 'estimatedCost'];
+const COLUMNS_NO_PRICES = COLUMNS.filter((column) => !PRICE_COLUMNS.includes(column.key));
 
 /**
  * A typed cell kept over the server's rows until it is saved: the unit and the text typed, with the
@@ -332,7 +345,7 @@ export function OrderGrid(props: {
       ) : null}
       <div ref={table}>
         <ListCard scroll>
-          <Table>
+          <ListTable columns={canPrices ? COLUMNS : COLUMNS_NO_PRICES}>
             <TableHeader>
               <TableRow>
                 <TableHead>{t('procurement.grid.sku')}</TableHead>
@@ -455,7 +468,7 @@ export function OrderGrid(props: {
                 );
               })}
             </TableBody>
-          </Table>
+          </ListTable>
           {!rows.isPending && loaded.length === 0 ? (
             <EmptyState
               icon={PackageSearch}

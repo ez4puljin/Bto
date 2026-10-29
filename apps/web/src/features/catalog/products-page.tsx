@@ -39,6 +39,7 @@ import {
   DEFAULT_HIDDEN_PRODUCT_COLUMNS,
   LOCKED_PRODUCT_COLUMNS,
   PRODUCT_COLUMNS,
+  WIDE_DEFAULT_HIDDEN_PRODUCT_COLUMNS,
 } from './product-columns';
 import { ProductFilterMenu } from './product-filter-menu';
 import {
@@ -143,6 +144,7 @@ export function ProductsPage() {
     PRODUCT_LIST_COLUMNS,
     LOCKED_PRODUCT_COLUMNS,
     DEFAULT_HIDDEN_PRODUCT_COLUMNS,
+    WIDE_DEFAULT_HIDDEN_PRODUCT_COLUMNS,
   );
   const { hidden } = columnState;
   const columns = useMemo(

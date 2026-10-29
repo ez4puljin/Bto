@@ -20,6 +20,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SearchField,
   SkeletonRows,
@@ -51,6 +52,7 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { localPhone, phoneInput } from '@/features/partners/phone';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatMnt, formatTugrik, plainDecimal } from '@/lib/money';
 import { problemFromError, settle } from '@/lib/problem';
@@ -79,6 +81,18 @@ const pointsText = (value: string) => formatMnt(value);
 /** A history line's points with their sign («+400», «-1,200»). */
 const signedPoints = (value: string) =>
   new Decimal(value).gt(0) ? `+${formatMnt(value)}` : formatMnt(value);
+
+/** The members list's columns (ADR-0119). */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
+  { key: 'phone', kind: 'number' },
+  { key: 'tier', kind: 'text', weight: 2 },
+  { key: 'balance', kind: 'money' },
+  { key: 'lifetimeSpend', kind: 'money' },
+  { key: 'status', kind: 'status' },
+  { key: 'spacer', kind: 'spacer' },
+  { key: 'chevron', kind: 'chevron' },
+];
 
 function MemberStatusBadge({ status }: { status: LoyaltyMemberStatus }) {
   const { t } = useTranslation();
@@ -150,7 +164,7 @@ export function PosLoyaltyMembersPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(members.error)} onRetry={members.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('posLoyalty.fields.name')}</TableHead>
@@ -174,9 +188,7 @@ export function PosLoyaltyMembersPage() {
                       {row.name}
                     </Link>
                   </TruncateCell>
-                  <TableCell className="font-mono whitespace-nowrap">
-                    {localPhone(row.phone)}
-                  </TableCell>
+                  <TableCell className="font-mono">{localPhone(row.phone)}</TableCell>
                   <TableCell>
                     {row.tier ? (
                       t('posLoyalty.tierText', {
@@ -199,7 +211,7 @@ export function PosLoyaltyMembersPage() {
               );
             })}
           </TableBody>
-        </Table>
+        </ListTable>
         {!members.isPending && rows.length === 0 ? (
           <EmptyState
             icon={IdCard}

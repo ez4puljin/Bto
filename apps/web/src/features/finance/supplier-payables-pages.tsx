@@ -4,10 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import {
+  ChevronHead,
   EmptyState,
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SearchField,
   SkeletonRows,
@@ -17,14 +19,8 @@ import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatMnt, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
@@ -37,6 +33,24 @@ import {
   useSupplierLedger,
 } from './api';
 import { DateRangeFilter } from './date-range-filter';
+
+/** The balances' columns (ADR-0119): the supplier, what is owed, the oldest bill's date. */
+const BALANCE_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'supplier', kind: 'text', weight: 3, min: 14 },
+  { key: 'owed', kind: 'money', width: 10 },
+  { key: 'oldestBill', kind: 'date' },
+  { key: 'chevron', kind: 'chevron' },
+];
+
+/** The ledger's columns: date, kind, document number, two sides, owed after. */
+const LEDGER_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'date', kind: 'date' },
+  { key: 'kind', kind: 'text', weight: 1 },
+  { key: 'document', kind: 'number' },
+  { key: 'debit', kind: 'money' },
+  { key: 'credit', kind: 'money' },
+  { key: 'owedAfter', kind: 'money', width: 10 },
+];
 
 /**
  * «Нийлүүлэгчийн тооцоо» (F3, ADR-0091): every supplier with payables, largest owed first, with the
@@ -67,20 +81,20 @@ export function SupplierBalancesPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(balances.error)} onRetry={balances.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={BALANCE_COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('finance.fields.supplier')}</TableHead>
               <TableHead className="text-right">{t('finance.payables.owed')}</TableHead>
               <TableHead className="text-right">{t('finance.payables.oldestBill')}</TableHead>
-              <TableHead aria-hidden className="w-9 pl-0" />
+              <ChevronHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {balances.isPending ? <SkeletonRows columns={4} /> : null}
             {rows.map((row) => (
               <LinkRow key={row.supplierId} to={`/finance/suppliers/${row.supplierId}`}>
-                <TruncateCell text={`${row.name} · ${row.code}`} fill className="min-w-44">
+                <TruncateCell text={`${row.name} · ${row.code}`}>
                   <Link
                     to={`/finance/suppliers/${row.supplierId}`}
                     className="font-medium underline-offset-4 hover:underline"
@@ -96,7 +110,7 @@ export function SupplierBalancesPage() {
               </LinkRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!balances.isPending && rows.length === 0 ? (
           <EmptyState icon={Truck} title={t('finance.payables.empty')} />
         ) : null}
@@ -187,7 +201,7 @@ export function SupplierLedgerPage() {
         </FilterBar>
         <ProblemAlert problem={problemFromError(ledger.error)} onRetry={ledger.refetch} />
         <ListCard scroll>
-          <Table>
+          <ListTable columns={LEDGER_COLUMNS}>
             <TableHeader>
               <TableRow>
                 <TableHead>{t('finance.fields.date')}</TableHead>
@@ -219,7 +233,7 @@ export function SupplierLedgerPage() {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </ListTable>
           {!ledger.isPending && rows.length === 0 ? (
             <EmptyState title={t('finance.payables.ledgerEmpty')} />
           ) : null}

@@ -10,6 +10,7 @@ import { DialogFormFooter, FormField } from '@/components/form';
 import {
   EmptyState,
   ListCard,
+  ListTable,
   RowAction,
   RowActions,
   SkeletonRows,
@@ -28,20 +29,24 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
 import { randomUuid } from '@/lib/uuid';
 import { type CustomerCategory, useCustomerCategories, useCustomerCategoryMutations } from './api';
+
+/** The list's columns (ADR-0119); without the actions column for a reader. */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
+  { key: 'sortOrder', kind: 'count' },
+  { key: 'status', kind: 'status' },
+  { key: 'spacer', kind: 'spacer' },
+  { key: 'actions', kind: 'actions', actions: 2 },
+];
+const READER_COLUMNS = COLUMNS.slice(0, -1);
 
 /**
  * Customer categories (ADR-0107): the office's flat list, the Erkhet groups at the migration. A
@@ -88,7 +93,7 @@ export function CustomerCategoriesPage() {
       />
       <ProblemAlert problem={problemFromError(categories.error) ?? action.problem} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={canManage ? COLUMNS : READER_COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('partners.categories.name')}</TableHead>
@@ -149,7 +154,7 @@ export function CustomerCategoriesPage() {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!categories.isPending && rows.length === 0 ? (
           <EmptyState icon={Tags} title={t('partners.categories.empty')} />
         ) : null}

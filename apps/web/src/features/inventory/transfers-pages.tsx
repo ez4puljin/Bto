@@ -14,6 +14,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   RowAction,
   RowActions,
@@ -47,6 +48,7 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { type BarcodeResolution, useBarcodeLookup } from '@/features/catalog/api';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
@@ -108,6 +110,66 @@ const STATUSES: readonly TransferStatus[] = [
   'CANCELLED',
 ];
 const ORIGINS: readonly TransferOrigin[] = ['REQUEST', 'PUSH'];
+
+/** The transfers list's columns (ADR-0119). */
+const LIST_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'number', kind: 'number' },
+  { key: 'from', kind: 'text', weight: 1 },
+  { key: 'to', kind: 'text', weight: 1 },
+  { key: 'origin', kind: 'text', weight: 1 },
+  { key: 'lines', kind: 'count' },
+  // Two pills: the status and «Дахин нээсэн».
+  { key: 'status', kind: 'status', width: 12 },
+  { key: 'chevron', kind: 'chevron' },
+];
+
+/** The line tables' shared columns: the product wraps, a quantity typed in a box, a chosen unit. */
+const PRODUCT: ColumnSpec = { key: 'product', kind: 'text', weight: 3, min: 14 };
+const QTY_INPUT: ColumnSpec = { key: 'qty', kind: 'qty', width: 8 };
+/** «12 хайрцаг (288 ш)»: the shipped quantity in the line's unit and in base units. */
+const SHIPPED: ColumnSpec = { key: 'shipped', kind: 'qty', width: 11 };
+const UNIT_CHOICE: ColumnSpec = { key: 'unit', kind: 'text', weight: 1, min: 10 };
+
+const DRAFT_COLUMNS: readonly ColumnSpec[] = [
+  PRODUCT,
+  { key: 'unit', kind: 'text', weight: 1, min: 4 },
+  QTY_INPUT,
+  { key: 'actions', kind: 'actions', actions: 1 },
+];
+const SHIP_COLUMNS: readonly ColumnSpec[] = [
+  PRODUCT,
+  { key: 'requested', kind: 'qty', width: 8 },
+  { ...QTY_INPUT, key: 'toShip' },
+  UNIT_CHOICE,
+  // The shelf, or «Тавиур уншуулна уу» until one is scanned.
+  { key: 'fromBin', kind: 'code', width: 10.5 },
+];
+const RECEIVE_COLUMNS: readonly ColumnSpec[] = [
+  PRODUCT,
+  SHIPPED,
+  { ...QTY_INPUT, key: 'arrived' },
+  UNIT_CHOICE,
+  { key: 'difference', kind: 'qty', width: 8 },
+  { key: 'toBin', kind: 'code' },
+];
+const COUNT_COLUMNS: readonly ColumnSpec[] = [
+  PRODUCT,
+  SHIPPED,
+  // «Ирээгүй» and the count box side by side.
+  { key: 'arrived', kind: 'qty', width: 13 },
+  UNIT_CHOICE,
+  { key: 'difference', kind: 'qty', width: 8 },
+  { key: 'toBin', kind: 'code' },
+  { key: 'actions', kind: 'actions', actions: 1 },
+];
+const CONFIRM_COLUMNS: readonly ColumnSpec[] = [
+  PRODUCT,
+  SHIPPED,
+  { key: 'counted', kind: 'qty', width: 8 },
+  // The difference and, under it, where the goods go back to or come from.
+  { key: 'difference', kind: 'text', weight: 2, min: 12 },
+  { key: 'toBin', kind: 'code' },
+];
 
 const isStatus = (value: string | null): value is TransferStatus =>
   STATUSES.some((status) => status === value);
@@ -209,7 +271,7 @@ export function TransfersPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(transfers.error)} onRetry={transfers.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={LIST_COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('inventory.number')}</TableHead>
@@ -248,7 +310,7 @@ export function TransfersPage() {
               </LinkRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!transfers.isPending && rows.length === 0 ? (
           <EmptyState icon={ArrowLeftRight} title={t('inventory.transfers.empty')} />
         ) : null}
@@ -718,7 +780,7 @@ function TransferDraftEditor(props: {
           />
           <ProblemAlert problem={confirm ? null : action.problem} />
           {detail.lines.length > 0 ? (
-            <Table>
+            <ListTable columns={DRAFT_COLUMNS}>
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('inventory.product')}</TableHead>
@@ -763,7 +825,7 @@ function TransferDraftEditor(props: {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </ListTable>
           ) : null}
         </CardContent>
       </Card>
@@ -1110,7 +1172,7 @@ function TransferShipEditor({
             }
           />
           <ProblemAlert problem={confirm ? null : (action.problem ?? scanner.problem)} />
-          <Table>
+          <ListTable columns={SHIP_COLUMNS}>
             <TableHeader>
               <TableRow>
                 <TableHead>{t('inventory.product')}</TableHead>
@@ -1167,7 +1229,7 @@ function TransferShipEditor({
                 );
               })}
             </TableBody>
-          </Table>
+          </ListTable>
         </CardContent>
       </Card>
       <StickyActions
@@ -1350,7 +1412,7 @@ function TransferReceiveEditor({ detail }: { detail: TransferDetail }) {
             }
           />
           <ProblemAlert problem={confirm ? null : (action.problem ?? scanner.problem)} />
-          <Table>
+          <ListTable columns={RECEIVE_COLUMNS}>
             <TableHeader>
               <TableRow>
                 <TableHead>{t('inventory.product')}</TableHead>
@@ -1410,7 +1472,7 @@ function TransferReceiveEditor({ detail }: { detail: TransferDetail }) {
                 );
               })}
             </TableBody>
-          </Table>
+          </ListTable>
         </CardContent>
       </Card>
       <StickyActions
@@ -1671,7 +1733,7 @@ function TransferCountEditor({ detail }: { detail: TransferDetail }) {
             problem={confirm || extra ? null : (action.problem ?? scanner.problem)}
             onRetry={saveFailed ? () => void flush() : undefined}
           />
-          <Table>
+          <ListTable columns={COUNT_COLUMNS}>
             <TableHeader>
               <TableRow>
                 <TableHead>{t('inventory.product')}</TableHead>
@@ -1750,22 +1812,22 @@ function TransferCountEditor({ detail }: { detail: TransferDetail }) {
                     <TableCell className="font-mono">
                       {count?.binCode ?? t('common.none')}
                     </TableCell>
-                    <TableCell>
-                      {line.unrequested ? (
-                        <RowActions>
-                          <RowAction
-                            icon={Trash2}
-                            label={t('inventory.transfer.removeExtra')}
-                            onClick={() => removeExtra(line)}
-                          />
-                        </RowActions>
-                      ) : null}
-                    </TableCell>
+                    {line.unrequested ? (
+                      <RowActions>
+                        <RowAction
+                          icon={Trash2}
+                          label={t('inventory.transfer.removeExtra')}
+                          onClick={() => removeExtra(line)}
+                        />
+                      </RowActions>
+                    ) : (
+                      <TableCell />
+                    )}
                   </TableRow>
                 );
               })}
             </TableBody>
-          </Table>
+          </ListTable>
         </CardContent>
       </Card>
       <StickyActions summary={summary}>
@@ -1890,7 +1952,7 @@ function TransferConfirmView({ detail }: { detail: TransferDetail }) {
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <ProblemAlert problem={dialog ? null : action.problem} />
-          <Table>
+          <ListTable columns={CONFIRM_COLUMNS}>
             <TableHeader>
               <TableRow>
                 <TableHead>{t('inventory.product')}</TableHead>
@@ -1950,7 +2012,7 @@ function TransferConfirmView({ detail }: { detail: TransferDetail }) {
                 );
               })}
             </TableBody>
-          </Table>
+          </ListTable>
         </CardContent>
       </Card>
       <StickyActions

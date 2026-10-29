@@ -13,6 +13,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   RowAction,
   RowActions,
@@ -44,6 +45,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useBarcodeLookup } from '@/features/catalog/api';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
@@ -84,6 +86,17 @@ const SHELF_KINDS = ['WHOLESALE', 'STORE'] as const;
 const STATUSES: readonly AdjustmentStatus[] = ['DRAFT', 'SUBMITTED', 'POSTED', 'CANCELLED'];
 /** Cost per base unit, NUMERIC(14,4). */
 const UNIT_COST = /^\d{1,10}(\.\d{1,4})?$/;
+
+/** The adjustments list's columns (ADR-0119). */
+const LIST_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'number', kind: 'number' },
+  { key: 'date', kind: 'date' },
+  { key: 'warehouse', kind: 'text', weight: 1 },
+  { key: 'reason', kind: 'text', weight: 2 },
+  { key: 'lines', kind: 'count' },
+  { key: 'status', kind: 'status' },
+  { key: 'chevron', kind: 'chevron' },
+];
 
 const isStatus = (value: string | null): value is AdjustmentStatus =>
   STATUSES.some((status) => status === value);
@@ -146,7 +159,7 @@ export function AdjustmentsPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(adjustments.error)} onRetry={adjustments.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={LIST_COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('inventory.number')}</TableHead>
@@ -180,7 +193,7 @@ export function AdjustmentsPage() {
               </LinkRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!adjustments.isPending && rows.length === 0 ? (
           <EmptyState icon={SlidersHorizontal} title={t('inventory.adjustments.empty')} />
         ) : null}

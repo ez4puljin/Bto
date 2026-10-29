@@ -10,6 +10,7 @@ import {
   FilterBar,
   FilterChip,
   ListCard,
+  ListTable,
   LoadMore,
   SkeletonRows,
   TruncateCell,
@@ -18,14 +19,8 @@ import { DateRangeFilter } from '@/features/finance/date-range-filter';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { Input } from '@/components/ui/input';
 import { withScanChar } from '@/lib/barcode-keys';
@@ -82,18 +77,28 @@ const COLUMNS = [
 type Column = (typeof COLUMNS)[number];
 const LOCKED: readonly Column[] = ['postedAt', 'document', 'qty'];
 const RIGHT: readonly Column[] = ['qty', 'warehouseBalance', 'binBalance', 'unitCost', 'value'];
+/**
+ * The costs of a cost holder start hidden below a wide screen (ADR-0066, ADR-0119), so the history
+ * fits a laptop without a sideways scroll; from 1600px nothing is hidden. The column chooser
+ * brings them back.
+ */
 const COSTS: readonly Column[] = ['unitCost', 'value'];
 const NONE: readonly Column[] = [];
 
-/**
- * The costs of a cost holder start hidden below a wide screen (ADR-0066), so the history fits a
- * laptop without a sideways scroll; the column chooser brings them back.
- */
-function defaultHiddenColumns(): readonly Column[] {
-  const wide =
-    typeof window.matchMedia !== 'function' || window.matchMedia('(min-width: 1536px)').matches;
-  return wide ? NONE : COSTS;
-}
+/** How each column is sized (ADR-0119); the date and time, the document type and its number stack. */
+const COLUMN_SPECS: Record<Column, ColumnSpec> = {
+  postedAt: { key: 'postedAt', kind: 'date' },
+  document: { key: 'document', kind: 'text', weight: 1, min: 10 },
+  movement: { key: 'movement', kind: 'text', weight: 1, min: 9 },
+  warehouse: { key: 'warehouse', kind: 'text', weight: 1 },
+  bin: { key: 'bin', kind: 'code' },
+  product: { key: 'product', kind: 'text', weight: 3, min: 14 },
+  qty: { key: 'qty', kind: 'qty', width: 9 },
+  warehouseBalance: { key: 'warehouseBalance', kind: 'qty' },
+  binBalance: { key: 'binBalance', kind: 'qty' },
+  unitCost: { key: 'unitCost', kind: 'money' },
+  value: { key: 'value', kind: 'money' },
+};
 
 /**
  * Movement history (SPEC §8.2 #1): every ledger row newest first, by product, warehouse, shelf,
@@ -120,8 +125,7 @@ export function MovementsPage() {
   const [missingBin, setMissingBin] = useState<string | null>(null);
   const rows = movements.data?.pages.flatMap((page) => page.data) ?? [];
   const withBalances = productId !== undefined;
-  const [defaultHidden] = useState(defaultHiddenColumns);
-  const columnChoice = useHiddenColumns('stockMovements', COLUMNS, LOCKED, defaultHidden);
+  const columnChoice = useHiddenColumns('stockMovements', COLUMNS, LOCKED, COSTS, NONE);
   // The columns this page can show: balances with a product, costs for cost holders; one product's
   // history needs no product column.
   const available = COLUMNS.filter((column) => {
@@ -159,7 +163,9 @@ export function MovementsPage() {
     );
   };
 
-  const columns = available.filter(shown).length;
+  const visible = available.filter(shown);
+  const columnSpec = visible.map((column) => COLUMN_SPECS[column]);
+  const columns = visible.length;
 
   return (
     <div>
@@ -252,10 +258,10 @@ export function MovementsPage() {
       ) : null}
       <ProblemAlert problem={problemFromError(movements.error)} onRetry={movements.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={columnSpec}>
           <TableHeader>
             <TableRow>
-              {available.filter(shown).map((column) => (
+              {visible.map((column) => (
                 <TableHead
                   key={column}
                   className={RIGHT.includes(column) ? 'text-right' : undefined}
@@ -304,11 +310,7 @@ export function MovementsPage() {
                   ) : null}
                   {shown('bin') ? <TableCell className="font-mono">{row.binCode}</TableCell> : null}
                   {shown('product') ? (
-                    <TruncateCell
-                      text={`${row.product.sku} ${row.product.name}`}
-                      fill
-                      className="min-w-44"
-                    >
+                    <TruncateCell text={`${row.product.sku} ${row.product.name}`}>
                       <Link
                         to={`/inventory/stock/${row.product.id}`}
                         className="text-link underline-offset-4 hover:underline"
@@ -362,7 +364,7 @@ export function MovementsPage() {
               );
             })}
           </TableBody>
-        </Table>
+        </ListTable>
         {!movements.isPending && rows.length === 0 ? (
           <EmptyState icon={History} title={t('inventory.movements.empty')} />
         ) : null}

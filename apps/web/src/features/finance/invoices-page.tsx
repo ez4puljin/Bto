@@ -10,6 +10,7 @@ import {
   FilterToggle,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SearchField,
   SkeletonRows,
@@ -18,14 +19,8 @@ import {
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { hrefWithParam, useSetParam } from '@/lib/search-params';
@@ -36,6 +31,18 @@ import { InvoicePanel } from './invoice-panel';
 
 const isSettlement = (value: string | null): value is Settlement =>
   SETTLEMENTS.some((entry) => entry === value);
+
+/** The list's columns (ADR-0119): number, two dates, the customer, two amounts, the status. */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'number', kind: 'number' },
+  { key: 'date', kind: 'date' },
+  { key: 'dueDate', kind: 'date' },
+  { key: 'customer', kind: 'text', weight: 3, min: 14 },
+  { key: 'total', kind: 'money', width: 10 },
+  { key: 'open', kind: 'money', width: 10 },
+  { key: 'status', kind: 'status', width: 11 },
+  { key: 'chevron', kind: 'chevron' },
+];
 
 /**
  * Invoices (ADR-0060 #11): the sale issues them; the accountant searches by number, order or
@@ -105,7 +112,7 @@ export function InvoicesPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(invoices.error)} onRetry={invoices.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('finance.fields.number')}</TableHead>
@@ -152,7 +159,7 @@ export function InvoicesPage() {
               );
             })}
           </TableBody>
-        </Table>
+        </ListTable>
         {!invoices.isPending && rows.length === 0 ? (
           <EmptyState icon={FileText} title={t('finance.invoices.empty')} />
         ) : null}

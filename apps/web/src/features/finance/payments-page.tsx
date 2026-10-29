@@ -11,6 +11,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SearchField,
   SkeletonRows,
@@ -36,6 +37,7 @@ import {
 } from '@/components/ui/table';
 import { printFormatParam, usePrintFormat } from '@/lib/print-format';
 import { PrintFormatToggle } from '@/components/print-format-toggle';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatMnt, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
@@ -63,6 +65,18 @@ const isKind = (value: string | null): value is PaymentKind =>
   PAYMENT_KINDS.some((kind) => kind === value);
 const isStatus = (value: string | null): value is PaymentStatus =>
   PAYMENT_STATUSES.some((status) => status === value);
+
+/** The list's columns (ADR-0119): number, date, kind, counterparty, money account, amount, status. */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'number', kind: 'number' },
+  { key: 'date', kind: 'date' },
+  { key: 'kind', kind: 'status' },
+  { key: 'counterparty', kind: 'text', weight: 3, min: 14 },
+  { key: 'moneyAccount', kind: 'text', weight: 2 },
+  { key: 'amount', kind: 'money', width: 10 },
+  { key: 'status', kind: 'status' },
+  { key: 'chevron', kind: 'chevron' },
+];
 
 /**
  * The vouchers (ADR-0060 #11): search, filter by kind, status, money account and dates; «Төлбөр
@@ -171,7 +185,7 @@ export function PaymentsPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(payments.error)} onRetry={payments.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('finance.fields.number')}</TableHead>
@@ -208,7 +222,7 @@ export function PaymentsPage() {
                       ''
                     }
                   />
-                  <TableCell>{payment.moneyAccountName}</TableCell>
+                  <TruncateCell text={payment.moneyAccountName} />
                   <TableCell className="text-right font-mono">
                     {payment.direction === 'OUT' ? '−' : ''}
                     {formatTugrik(payment.amount)}
@@ -220,7 +234,7 @@ export function PaymentsPage() {
               );
             })}
           </TableBody>
-        </Table>
+        </ListTable>
         {!payments.isPending && rows.length === 0 ? (
           <EmptyState icon={Coins} title={t('finance.payments.empty')} />
         ) : null}

@@ -9,6 +9,7 @@ import { DialogFormFooter, FormField } from '@/components/form';
 import {
   EmptyState,
   ListCard,
+  ListTable,
   RowAction,
   RowActions,
   RowActionSpacer,
@@ -23,14 +24,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { problemFromError, settle } from '@/lib/problem';
 import { useCreateParam } from '@/lib/use-create-param';
 import {
@@ -82,6 +77,18 @@ function ActiveSwitch(props: {
   );
 }
 
+/** A manager's row ends with its edit action (ADR-0119). */
+const EDIT_ACTION: ColumnSpec = { key: 'actions', kind: 'actions', actions: 1 };
+
+const BRANCH_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'code', kind: 'code' },
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
+  { key: 'branchNo', kind: 'code' },
+  { key: 'districtCode', kind: 'code' },
+  { key: 'status', kind: 'status' },
+];
+const MANAGED_BRANCH_COLUMNS: readonly ColumnSpec[] = [...BRANCH_COLUMNS, EDIT_ACTION];
+
 /** Branches carry the e-Barimt branch number and district code (SPEC §5.1). */
 export function BranchesPage() {
   const { t } = useTranslation();
@@ -105,7 +112,7 @@ export function BranchesPage() {
       />
       <ProblemAlert problem={problemFromError(branches.error)} onRetry={branches.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={canManage ? MANAGED_BRANCH_COLUMNS : BRANCH_COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('org.branches.code')}</TableHead>
@@ -147,7 +154,7 @@ export function BranchesPage() {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {branches.data?.length === 0 ? (
           <EmptyState icon={Building2} title={t('org.branches.empty')} />
         ) : null}
@@ -278,6 +285,15 @@ const warehouseSchema = z.object({
 });
 type WarehouseValues = z.infer<typeof warehouseSchema>;
 
+const WAREHOUSE_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'code', kind: 'code' },
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
+  { key: 'kind', kind: 'text', weight: 1 },
+  { key: 'branch', kind: 'text', weight: 2 },
+  { key: 'status', kind: 'status' },
+];
+const MANAGED_WAREHOUSE_COLUMNS: readonly ColumnSpec[] = [...WAREHOUSE_COLUMNS, EDIT_ACTION];
+
 /** Wholesale and store warehouses; TRANSIT (system) and VEHICLE (delivery 5) are read-only here. */
 export function WarehousesPage() {
   const { t } = useTranslation();
@@ -304,7 +320,7 @@ export function WarehousesPage() {
       />
       <ProblemAlert problem={problemFromError(warehouses.error)} onRetry={warehouses.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={canManage ? MANAGED_WAREHOUSE_COLUMNS : WAREHOUSE_COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('org.warehouses.code')}</TableHead>
@@ -359,7 +375,7 @@ export function WarehousesPage() {
               );
             })}
           </TableBody>
-        </Table>
+        </ListTable>
         {warehouses.data?.length === 0 ? (
           <EmptyState icon={WarehouseIcon} title={t('org.warehouses.empty')} />
         ) : null}

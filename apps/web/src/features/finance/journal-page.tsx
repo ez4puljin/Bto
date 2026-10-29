@@ -10,6 +10,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SkeletonRows,
   TruncateCell,
@@ -32,6 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatMnt } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
@@ -56,6 +58,17 @@ import { VoidDialog } from './void-dialog';
 
 const isSource = (value: string | null): value is JournalSource =>
   JOURNAL_SOURCES.some((source) => source === value);
+
+/** The journal's columns (ADR-0119): number, date, description, source, amount, line count. */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'number', kind: 'number' },
+  { key: 'date', kind: 'date' },
+  { key: 'description', kind: 'text', weight: 3, min: 14 },
+  { key: 'source', kind: 'status' },
+  { key: 'amount', kind: 'money' },
+  { key: 'lines', kind: 'count' },
+  { key: 'chevron', kind: 'chevron' },
+];
 
 /**
  * The general journal (ADR-0060 #7): entries newest first, filtered by dates, source and account;
@@ -133,7 +146,7 @@ export function JournalPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(journal.error)} onRetry={journal.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('finance.fields.number')}</TableHead>
@@ -158,7 +171,7 @@ export function JournalPage() {
                     </Link>
                   </TableCell>
                   <TableCell className="font-mono">{entry.entryDate}</TableCell>
-                  <TruncateCell text={entry.description} fill />
+                  <TruncateCell text={entry.description} />
                   <TableCell>
                     <SourceBadge source={entry.source} />
                   </TableCell>
@@ -168,7 +181,7 @@ export function JournalPage() {
               );
             })}
           </TableBody>
-        </Table>
+        </ListTable>
         {!journal.isPending && rows.length === 0 ? (
           <EmptyState icon={BookOpenText} title={t('finance.journal.empty')} />
         ) : null}

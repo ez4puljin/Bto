@@ -12,6 +12,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SegmentedControl,
   SkeletonRows,
@@ -24,17 +25,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useHasPermission } from '@/app/auth-context';
 import { useWarehouses } from '@/features/identity/api';
 import { WarehouseSelect } from '@/features/inventory/shared';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { problemFromError, problemOf } from '@/lib/problem';
 import { useAction } from '@/lib/use-action';
@@ -57,6 +52,23 @@ import { columnName, fieldNames, issueText } from './helpers';
 const FILTERS: readonly RowFilter[] = ['ERRORS', 'WARNINGS', 'ALL'];
 /** Filled cells shown for each row before the ones with a problem. */
 const SHOWN_CELLS = 3;
+
+/** The history's columns (ADR-0119); a file name wraps. */
+const HISTORY_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'fileName', kind: 'text', weight: 3, min: 14 },
+  { key: 'kind', kind: 'text', weight: 2 },
+  { key: 'rows', kind: 'count' },
+  { key: 'createdAt', kind: 'datetime' },
+  { key: 'status', kind: 'status', width: 10 },
+  { key: 'chevron', kind: 'chevron' },
+];
+
+/** An import's rows: the row's cells and its result both wrap. */
+const ROW_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'rowNo', kind: 'count' },
+  { key: 'row', kind: 'text', weight: 3, min: 14 },
+  { key: 'result', kind: 'text', weight: 2, min: 12 },
+];
 
 /**
  * An import's state (docs/ui.md §1): green once in, blue while it runs or waits for «Системд
@@ -103,7 +115,7 @@ export function ImportsPage() {
       </h2>
       <ProblemAlert problem={problemFromError(imports.error)} onRetry={imports.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={HISTORY_COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('imports.fileName')}</TableHead>
@@ -137,7 +149,7 @@ export function ImportsPage() {
               </LinkRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!imports.isPending && rows.length === 0 ? (
           <EmptyState icon={FileSpreadsheet} title={t('imports.empty')} />
         ) : null}
@@ -575,7 +587,7 @@ function RowsTable({ job, filter }: { job: ImportJob; filter: RowFilter }) {
     <>
       <ProblemAlert problem={problemFromError(rows.error)} onRetry={rows.refetch} />
       <ListCard>
-        <Table>
+        <ListTable columns={ROW_COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead className="text-right">{t('imports.rowNo')}</TableHead>
@@ -598,7 +610,7 @@ function RowsTable({ job, filter }: { job: ImportJob; filter: RowFilter }) {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!rows.isPending && data.length === 0 ? (
           <EmptyState icon={ListChecks} title={t('imports.noRows')} />
         ) : null}

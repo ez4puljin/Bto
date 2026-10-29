@@ -9,6 +9,7 @@ import {
   FilterBar,
   FilterToggle,
   ListCard,
+  ListTable,
   LoadMore,
   RowAction,
   RowActions,
@@ -32,14 +33,8 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useSetParam } from '@/lib/search-params';
@@ -55,6 +50,15 @@ const SHELF_TYPES = ['STORAGE', 'PICKING'] as const;
 type ShelfType = (typeof SHELF_TYPES)[number];
 const MODES = ['one', 'range'] as const;
 type Mode = (typeof MODES)[number];
+
+/** The shelves list's columns (ADR-0119); the status holds up to three pills. */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'code', kind: 'code' },
+  { key: 'type', kind: 'text', weight: 1 },
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
+  { key: 'status', kind: 'status', width: 16 },
+  { key: 'actions', kind: 'actions', actions: 2 },
+];
 
 /**
  * Shelves of a warehouse (owner, 2026-10-11: numbered shelves with barcode labels "A-01-03", 300
@@ -135,7 +139,7 @@ export function BinsPage() {
         <>
           <ProblemAlert problem={action.problem ?? problemFromError(bins.error)} />
           <ListCard scroll>
-            <Table>
+            <ListTable columns={COLUMNS}>
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('inventory.bins.code')}</TableHead>
@@ -208,7 +212,7 @@ export function BinsPage() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </ListTable>
             {!bins.isPending && rows.length === 0 ? (
               <EmptyState icon={LayoutGrid} title={t('inventory.bins.empty')} />
             ) : null}

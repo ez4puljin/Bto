@@ -10,6 +10,7 @@ import {
   FilterToggle,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SearchField,
   SkeletonRows,
@@ -28,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatQty, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
@@ -37,6 +39,17 @@ import { useWarehouseName, useWarehouseOptions } from './helpers';
 import { WarehouseSelect } from './shared';
 
 const STOCK_KINDS = ['WHOLESALE', 'STORE', 'VEHICLE', 'TRANSIT'] as const;
+
+/** The stock list's columns (ADR-0119); the value only for cost holders. */
+const STOCK_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'sku', kind: 'code' },
+  { key: 'product', kind: 'text', weight: 3, min: 14 },
+  { key: 'onHand', kind: 'qty', width: 8.5 },
+  { key: 'available', kind: 'qty' },
+  { key: 'value', kind: 'money' },
+  { key: 'chevron', kind: 'chevron' },
+];
+const STOCK_COLUMNS_NO_COSTS = STOCK_COLUMNS.filter((column) => column.key !== 'value');
 
 /**
  * Stock by product (SPEC §5.4): search as in the catalog, or browse the products holding stock;
@@ -87,7 +100,7 @@ export function StockPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(stock.error)} onRetry={stock.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={canSeeCosts ? STOCK_COLUMNS : STOCK_COLUMNS_NO_COSTS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('inventory.sku')}</TableHead>
@@ -105,7 +118,7 @@ export function StockPage() {
             {rows.map((row) => (
               <LinkRow key={row.product.id} to={`/inventory/stock/${row.product.id}`}>
                 <TableCell className="font-mono">{row.product.sku}</TableCell>
-                <TruncateCell text={row.product.name} fill>
+                <TruncateCell text={row.product.name}>
                   <Link
                     to={`/inventory/stock/${row.product.id}`}
                     className="font-medium underline-offset-4 hover:underline"
@@ -128,7 +141,7 @@ export function StockPage() {
               </LinkRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!stock.isPending && rows.length === 0 ? (
           <EmptyState icon={Boxes} title={t('inventory.stock.empty')} />
         ) : null}

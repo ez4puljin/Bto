@@ -10,6 +10,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SegmentedControl,
   SkeletonRows,
@@ -29,6 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatCount, plainDecimal } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
@@ -46,6 +48,18 @@ import { profileValuesOf, useProfileSummaryParts } from './price-views';
 import { ProfileExample, ProfileValuesDialog, RenameProfileDialog } from './profile-form';
 
 const FILTERS = ['LIVE', 'ARCHIVED'] as const;
+
+/** The list's columns (ADR-0119): the markups are percentages, the bulk one with its quantity. */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'name', kind: 'text', weight: 3, min: 14 },
+  { key: 'loose', kind: 'percent', width: 7 },
+  { key: 'retail', kind: 'percent', width: 8.5 },
+  { key: 'retailBulk', kind: 'percent', width: 11 },
+  { key: 'rounding', kind: 'text', weight: 1 },
+  { key: 'products', kind: 'count' },
+  { key: 'spacer', kind: 'spacer' },
+  { key: 'chevron', kind: 'chevron' },
+];
 
 /**
  * «Үнэ» → «Үнийн тохиргоо» (ADR-0048 #3): the profiles products take their prices from, with the
@@ -87,7 +101,7 @@ export function PriceProfilesPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(profiles.error)} onRetry={profiles.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('pricing.profiles.columns.name')}</TableHead>
@@ -108,7 +122,7 @@ export function PriceProfilesPage() {
               <ProfileRow key={profile.id} profile={profile} />
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!profiles.isPending && rows.length === 0 ? (
           <EmptyState
             icon={Tags}

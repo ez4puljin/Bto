@@ -9,6 +9,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SkeletonRows,
   SpacerCell,
@@ -27,6 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatCount, formatQty, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
@@ -36,6 +38,19 @@ import { VoidReasonBadge } from './badges';
 
 const isReason = (value: string | null): value is VoidReason =>
   VOID_REASONS.some((entry) => entry === value);
+
+/** The voids list's columns (ADR-0119). */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'voidedAt', kind: 'datetime' },
+  { key: 'till', kind: 'code' },
+  { key: 'cashier', kind: 'text', weight: 2, min: 10 },
+  { key: 'reason', kind: 'status', width: 10 },
+  { key: 'approvedBy', kind: 'text', weight: 2, min: 10 },
+  { key: 'lineCount', kind: 'count' },
+  { key: 'total', kind: 'money' },
+  { key: 'spacer', kind: 'spacer' },
+  { key: 'chevron', kind: 'chevron' },
+];
 
 /**
  * «Хасалт» (ADR-0104): goods taken off a till's cart before payment, each approved by a
@@ -130,7 +145,7 @@ export function PosVoidsPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(voids.error)} onRetry={voids.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('pos.fields.voidedAt')}</TableHead>
@@ -178,7 +193,7 @@ export function PosVoidsPage() {
               );
             })}
           </TableBody>
-        </Table>
+        </ListTable>
         {!voids.isPending && rows.length === 0 ? (
           <EmptyState
             icon={Undo2}

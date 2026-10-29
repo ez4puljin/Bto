@@ -12,12 +12,13 @@ import { formatCount } from '@/lib/money';
 import { AttentionRows } from './attention-tiles';
 
 /**
- * «Нүүр» (ADR-0042, ADR-0114 after the owner's erxes example), a centred column: today's date, the
- * greeting and one line; for people who set up the boards, a warning while the customer app's
+ * «Нүүр» (ADR-0042, ADR-0114 after the owner's erxes example; the whole width since ADR-0119):
+ * today's date, the greeting and one line; for people who set up the boards, a warning while the customer app's
  * orders have no stage to land on (ADR-0079 #5); then two cards side by side — «Анхаарах», the
  * work waiting for this person (ADR-0047 #7), and «Мэдэгдэл», the newest lines of the bell — and
  * the permitted modules as tiles, each opening its own page, with the assistant and «Систем» under
- * «Хэрэгсэл». The shortcuts and the recent pages live in the Ctrl/⌘+K search.
+ * «Хэрэгсэл» — six tiles on one row at 1920px. The shortcuts and the recent pages live in the
+ * Ctrl/⌘+K search.
  */
 export function HomePage() {
   const { t } = useTranslation();
@@ -39,7 +40,7 @@ export function HomePage() {
   }, [t]);
 
   return (
-    <div className="mx-auto flex max-w-[61rem] flex-col gap-5 pt-4">
+    <div className="flex flex-col gap-5 pt-4">
       <div>
         <p className="text-[13px] text-muted-foreground">{formatUbToday()}</p>
         <h1 className="mt-0.5 text-[26px] leading-tight font-semibold tracking-tight">
@@ -88,7 +89,7 @@ function HomeCard({ id, title, children }: { id: string; title: string; children
 function ModuleGrid({ modules }: { modules: readonly VisibleModule[] }) {
   const { t } = useTranslation();
   return (
-    <ul className="grid grid-cols-2 gap-1 p-2 sm:grid-cols-3 lg:grid-cols-4">
+    <ul className="grid grid-cols-2 gap-1 p-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
       {modules.map((module) => (
         <li key={module.key}>
           <Link

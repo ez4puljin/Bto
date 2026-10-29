@@ -6,6 +6,7 @@ import {
   EmptyState,
   FilterBar,
   ListCard,
+  ListTable,
   LoadMore,
   RowAction,
   RowActions,
@@ -22,16 +23,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { type ProductSummary, useCategories, useProducts } from '@/features/catalog/api';
 import { categoryPaths, categoryTree } from '@/features/catalog/category-tree';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatMnt } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
@@ -45,6 +40,18 @@ const positiveId = (value: string | null) => {
   const id = Number.parseInt(value ?? '', 10);
   return Number.isSafeInteger(id) && id > 0 ? id : undefined;
 };
+
+/** The list's columns (ADR-0119): the tick, the product, its price and profile, one action. */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'check', kind: 'check' },
+  { key: 'sku', kind: 'code' },
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
+  { key: 'category', kind: 'text', weight: 2 },
+  { key: 'warehousePrice', kind: 'money' },
+  { key: 'priceProfile', kind: 'text', weight: 1 },
+  { key: 'spacer', kind: 'spacer' },
+  { key: 'actions', kind: 'actions', actions: 1 },
+];
 
 /**
  * Products waiting for their prices (ADR-0044 #3), the price clerk's list: each with its warehouse
@@ -181,10 +188,10 @@ export function PendingProductsPage() {
       )}
       <div ref={list}>
         <ListCard scroll>
-          <Table>
+          <ListTable columns={COLUMNS}>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10">
+                <TableHead>
                   <Checkbox
                     aria-label={t('pricing.pending.selectAll')}
                     checked={allChosen ? true : chosen.length > 0 ? 'indeterminate' : false}
@@ -196,15 +203,13 @@ export function PendingProductsPage() {
                 </TableHead>
                 <TableHead>{t('catalog.products.columns.sku')}</TableHead>
                 <TableHead>{t('catalog.products.columns.name')}</TableHead>
-                <TableHead className="hidden md:table-cell">
-                  {t('catalog.products.columns.category')}
-                </TableHead>
+                <TableHead>{t('catalog.products.columns.category')}</TableHead>
                 <TableHead className="text-right">
                   {t('catalog.products.columns.warehousePrice')}
                 </TableHead>
                 <TableHead>{t('catalog.products.columns.priceProfile')}</TableHead>
                 <SpacerHead />
-                <TableHead className="w-px" />
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -213,7 +218,7 @@ export function PendingProductsPage() {
                 const terms = termsOf(row.id);
                 return (
                   <TableRow key={row.id} data-state={selected.has(row.id) ? 'selected' : undefined}>
-                    <TableCell className="w-10 p-0 first:pl-0">
+                    <TableCell className="p-0 first:pl-0">
                       {/* The whole cell ticks the row (docs/ui.md), in line with the header box. */}
                       <label className="flex cursor-pointer items-center py-2.5 pr-3 pl-4">
                         <Checkbox
@@ -224,7 +229,7 @@ export function PendingProductsPage() {
                       </label>
                     </TableCell>
                     <TableCell className="font-mono">{row.sku}</TableCell>
-                    <TruncateCell text={row.name} className="max-w-80">
+                    <TruncateCell text={row.name}>
                       <Link
                         to={`/catalog/products/${row.id}`}
                         className="font-medium underline-offset-4 hover:underline"
@@ -234,7 +239,7 @@ export function PendingProductsPage() {
                     </TruncateCell>
                     <TruncateCell
                       text={paths.get(row.categoryId) ?? ''}
-                      className="hidden max-w-56 text-muted-foreground md:table-cell min-[1440px]:max-w-80"
+                      className="text-muted-foreground"
                     />
                     <TableCell className="text-right font-mono">
                       {terms ? (
@@ -261,7 +266,7 @@ export function PendingProductsPage() {
                 );
               })}
             </TableBody>
-          </Table>
+          </ListTable>
           {!products.isPending && rows.length === 0 ? (
             <EmptyState
               icon={CircleCheck}

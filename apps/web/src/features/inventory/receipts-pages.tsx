@@ -12,6 +12,7 @@ import {
   FilterToggle,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SearchField,
   SkeletonRows,
@@ -22,17 +23,11 @@ import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DateRangeFilter } from '@/features/finance/date-range-filter';
 import { useSupplier } from '@/features/partners/api';
 import { SupplierPicker } from '@/features/partners/supplier-picker';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
@@ -52,6 +47,21 @@ const WHOLESALE = ['WHOLESALE'] as const;
 
 const isStatus = (value: string | null): value is ReceiptStatus =>
   RECEIPT_STATUSES.some((status) => status === value);
+
+/** The receipts list's columns (ADR-0119); the amount only for cost holders. */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'number', kind: 'number' },
+  { key: 'date', kind: 'date' },
+  { key: 'supplier', kind: 'text', weight: 3, min: 12 },
+  { key: 'supplierDoc', kind: 'number' },
+  { key: 'payment', kind: 'text', weight: 1 },
+  { key: 'amount', kind: 'money' },
+  { key: 'lines', kind: 'count' },
+  // Two pills: the document's status and, for a cost holder, the costing's.
+  { key: 'status', kind: 'status', width: 13 },
+  { key: 'chevron', kind: 'chevron' },
+];
+const COLUMNS_NO_COSTS = COLUMNS.filter((column) => column.key !== 'amount');
 
 /**
  * Goods receipts (ADR-0033, ADR-0099): every user reads them, filtered by the delivery note's dates,
@@ -203,7 +213,7 @@ export function ReceiptsPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(receipts.error)} onRetry={receipts.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={canCost ? COLUMNS : COLUMNS_NO_COSTS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('inventory.number')}</TableHead>
@@ -260,7 +270,7 @@ export function ReceiptsPage() {
               </LinkRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!receipts.isPending && rows.length === 0 ? (
           <EmptyState icon={PackagePlus} title={t('inventory.receipts.empty')} />
         ) : null}

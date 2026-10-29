@@ -7,6 +7,7 @@ import { DialogFormFooter, FormField } from '@/components/form';
 import {
   EmptyState,
   ListCard,
+  ListTable,
   RowAction,
   RowActions,
   SkeletonRows,
@@ -28,15 +29,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useWarehouses } from '@/features/identity/api';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatCount } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
@@ -46,6 +41,32 @@ import { useCreateParam } from '@/lib/use-create-param';
 import { type EdgeNode, type Till, useEdgeNodes, usePosMutations, useTills } from './api';
 import { ActiveBadge } from './badges';
 import { OneTimeCodeDialog } from './one-time-code-dialog';
+
+/** The tills' columns (ADR-0119); the printer is `host:port`. */
+const TILL_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'code', kind: 'code' },
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
+  { key: 'node', kind: 'code' },
+  { key: 'printer', kind: 'number', width: 12 },
+  { key: 'lastSale', kind: 'datetime' },
+  { key: 'status', kind: 'status' },
+  { key: 'spacer', kind: 'spacer' },
+  { key: 'actions', kind: 'actions', actions: 2 },
+];
+
+/** The edge servers' columns; the PosAPI facts are two or three short lines. */
+const NODE_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'code', kind: 'code' },
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
+  { key: 'warehouse', kind: 'text', weight: 2 },
+  { key: 'tokenPrefix', kind: 'code' },
+  { key: 'lastSeen', kind: 'datetime' },
+  { key: 'backlog', kind: 'count' },
+  { key: 'posapi', kind: 'text', weight: 2, min: 12 },
+  { key: 'status', kind: 'status' },
+  { key: 'spacer', kind: 'spacer' },
+  { key: 'actions', kind: 'actions', actions: 2 },
+];
 
 /**
  * «Касс» (ADR-0063 #8): the tills with their printers first (the page's main object), then the
@@ -119,7 +140,7 @@ export function PosTillsPage() {
           description={t('pos.tills.description')}
         />
         <ListCard scroll>
-          <Table>
+          <ListTable columns={TILL_COLUMNS}>
             <TableHeader>
               <TableRow>
                 <TableHead>{t('pos.fields.code')}</TableHead>
@@ -129,7 +150,7 @@ export function PosTillsPage() {
                 <TableHead>{t('pos.tills.lastSale')}</TableHead>
                 <TableHead>{t('pos.fields.status')}</TableHead>
                 <SpacerHead />
-                <TableHead className="w-px" />
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -174,7 +195,7 @@ export function PosTillsPage() {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </ListTable>
           {!tills.isPending && (tills.data ?? []).length === 0 ? (
             <EmptyState icon={Monitor} title={t('pos.tills.empty')} />
           ) : null}
@@ -195,7 +216,7 @@ export function PosTillsPage() {
           }
         />
         <ListCard>
-          <Table>
+          <ListTable columns={NODE_COLUMNS}>
             <TableHeader>
               <TableRow>
                 <TableHead>{t('pos.fields.code')}</TableHead>
@@ -207,7 +228,7 @@ export function PosTillsPage() {
                 <TableHead>{t('pos.fields.posapi')}</TableHead>
                 <TableHead>{t('pos.fields.status')}</TableHead>
                 <SpacerHead />
-                <TableHead className="w-px" />
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -259,7 +280,7 @@ export function PosTillsPage() {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </ListTable>
           {!nodes.isPending && (nodes.data ?? []).length === 0 ? (
             <EmptyState icon={Monitor} title={t('pos.nodes.empty')} />
           ) : null}

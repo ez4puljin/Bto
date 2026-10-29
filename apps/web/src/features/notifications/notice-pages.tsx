@@ -5,6 +5,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
   EmptyState,
   ListCard,
+  ListTable,
   LoadMore,
   RowAction,
   RowActions,
@@ -14,14 +15,8 @@ import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
@@ -37,6 +32,19 @@ const STATE_BADGES: Record<NoticeState, 'success' | 'default' | 'secondary' | 'o
   ENDED: 'secondary',
   WITHDRAWN: 'outline',
 };
+
+/**
+ * The list's columns (ADR-0119): the notice wraps over a few lines, the period is two dates, the
+ * reads a «12 / 340», the sender a name over a time.
+ */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'notice', kind: 'text', weight: 3, min: 16 },
+  { key: 'period', kind: 'date', width: 14 },
+  { key: 'state', kind: 'status' },
+  { key: 'reads', kind: 'count', width: 6 },
+  { key: 'sent', kind: 'text', weight: 1, min: 11 },
+  { key: 'actions', kind: 'actions', actions: 1 },
+];
 
 /**
  * «Систем» → «Апп мэдэгдэл» (ADR-0062, notifications.send): every notice sent to the rep app or to
@@ -75,7 +83,7 @@ export function AppNoticesPage() {
       />
       <ProblemAlert problem={problemFromError(notices.error)} onRetry={notices.refetch} />
       <ListCard>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('notifications.columns.notice')}</TableHead>
@@ -100,7 +108,7 @@ export function AppNoticesPage() {
               />
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!notices.isPending && rows.length === 0 ? (
           <EmptyState
             icon={Megaphone}
@@ -140,7 +148,7 @@ function NoticeRow(props: { notice: AppNotice; onWithdraw: () => void }) {
   const live = notice.state === 'RUNNING' || notice.state === 'SCHEDULED';
   return (
     <TableRow>
-      <TableCell className="max-w-md whitespace-normal">
+      <TableCell className="whitespace-normal">
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant="secondary">{t(`notifications.kinds.${notice.kind}`)}</Badge>
           <Badge variant="outline">{t(`notifications.audiences.${notice.audience}`)}</Badge>
@@ -165,7 +173,7 @@ function NoticeRow(props: { notice: AppNotice; onWithdraw: () => void }) {
           ) : null}
         </div>
       </TableCell>
-      <TableCell className="font-mono whitespace-nowrap">
+      <TableCell className="font-mono">
         {notice.validTo
           ? t('notifications.period', { from: notice.validFrom, to: lastDayOf(notice.validTo) })
           : t('notifications.periodOpen', { from: notice.validFrom })}
@@ -178,8 +186,8 @@ function NoticeRow(props: { notice: AppNotice; onWithdraw: () => void }) {
       <TableCell className="text-right font-mono" title={t('notifications.readsHint')}>
         {t('notifications.readsCell', { reads: notice.reads, recipients: notice.recipients })}
       </TableCell>
-      <TableCell className="whitespace-nowrap">
-        <div className="text-sm">{notice.createdByName}</div>
+      <TableCell>
+        <div className="truncate text-sm">{notice.createdByName}</div>
         <div className="text-xs text-muted-foreground">
           {formatUbDateTime(Date.parse(notice.createdAt))}
         </div>

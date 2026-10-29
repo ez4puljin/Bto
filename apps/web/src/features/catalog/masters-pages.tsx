@@ -25,6 +25,7 @@ import { DialogFormFooter, FormField } from '@/components/form';
 import {
   EmptyState,
   ListCard,
+  ListTable,
   RowAction,
   RowActionSpacer,
   RowActions,
@@ -48,14 +49,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { CATEGORY_PICTURE_SIZE, cropToJpeg } from '@/lib/image-resize';
 import { formatCount } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
@@ -75,6 +70,27 @@ const optionalCode = z
     (value) => value === '' || CLASSIFICATION_CODE.test(value),
     'validation.classificationCode',
   );
+
+/** The category list's columns (ADR-0119), the actions column added per the user's rights. */
+const CATEGORY_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'name', kind: 'text', weight: 3, min: 14 },
+  { key: 'defaultCode', kind: 'code', width: 9 },
+  { key: 'skuRange', kind: 'text', weight: 2, min: 10 },
+  { key: 'products', kind: 'count', width: 7 },
+  { key: 'appPicture', kind: 'image', width: 6 },
+  { key: 'spacer', kind: 'spacer' },
+];
+
+/** The units' columns (ADR-0119); the actions column only for a manager. */
+const UOM_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
+  { key: 'kind', kind: 'status' },
+  { key: 'fractional', kind: 'icon', width: 7 },
+  { key: 'measureUnit', kind: 'text', weight: 2, min: 10 },
+  { key: 'spacer', kind: 'spacer' },
+  { key: 'actions', kind: 'actions', actions: 2 },
+];
+const UOM_READER_COLUMNS = UOM_COLUMNS.slice(0, -1);
 
 /** A muted «—» for an empty cell. */
 function None() {
@@ -103,6 +119,20 @@ export function CategoriesPage() {
   );
   const deletion = useDeleteConfirm<Category>((id) => mutations.deleteCategory.mutateAsync(id));
   const dialog = editing ?? (creating && canManage ? { parentId: null } : null);
+  const columns = useMemo<readonly ColumnSpec[]>(
+    () =>
+      withActions
+        ? [
+            ...CATEGORY_COLUMNS,
+            {
+              key: 'actions',
+              kind: 'actions',
+              actions: (canPicture ? 1 : 0) + (canManage ? 3 : 0),
+            },
+          ]
+        : CATEGORY_COLUMNS,
+    [withActions, canPicture, canManage],
+  );
 
   return (
     <div>
@@ -119,7 +149,7 @@ export function CategoriesPage() {
       />
       <ProblemAlert problem={problemFromError(categories.error)} onRetry={categories.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={columns}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('catalog.categories.name')}</TableHead>
@@ -234,7 +264,7 @@ export function CategoriesPage() {
               );
             })}
           </TableBody>
-        </Table>
+        </ListTable>
         {categories.data?.length === 0 ? (
           <EmptyState icon={FolderTree} title={t('catalog.categories.empty')} />
         ) : null}
@@ -576,7 +606,7 @@ export function UomsPage() {
       />
       <ProblemAlert problem={problemFromError(uoms.error)} onRetry={uoms.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={canManage ? UOM_COLUMNS : UOM_READER_COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('catalog.uoms.name')}</TableHead>
@@ -636,7 +666,7 @@ export function UomsPage() {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
       </ListCard>
       {dialog ? (
         <UomDialog uom={dialog} onClose={() => (editing ? setEditing(null) : setCreating(false))} />

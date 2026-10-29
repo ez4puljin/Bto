@@ -14,6 +14,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SegmentedControl,
   SkeletonRows,
@@ -43,6 +44,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatMnt, formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
@@ -85,6 +87,16 @@ const UNIT_COST = /^\d{1,10}(\.\d{1,4})?$/;
 /** Shelf codes listed on a page before «+N». */
 const CODES_SHOWN = 60;
 const REVIEW_VIEWS = ['differences', 'all'] as const;
+
+/** The stocktakes list's columns (ADR-0119); the date cell may hold a date and time. */
+const LIST_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'number', kind: 'number' },
+  { key: 'warehouse', kind: 'text', weight: 1 },
+  { key: 'shelves', kind: 'count', width: 6 },
+  { key: 'status', kind: 'status' },
+  { key: 'date', kind: 'datetime' },
+  { key: 'chevron', kind: 'chevron' },
+];
 
 const isStatus = (value: string | null): value is StocktakeStatus =>
   STATUSES.some((status) => status === value);
@@ -152,7 +164,7 @@ export function StocktakesPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(stocktakes.error)} onRetry={stocktakes.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={LIST_COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('inventory.number')}</TableHead>
@@ -192,7 +204,7 @@ export function StocktakesPage() {
               </LinkRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!stocktakes.isPending && rows.length === 0 ? (
           <EmptyState icon={ClipboardCheck} title={t('inventory.stocktakes.empty')} />
         ) : null}

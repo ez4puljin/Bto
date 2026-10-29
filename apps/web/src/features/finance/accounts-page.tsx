@@ -11,6 +11,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SkeletonRows,
   TruncateCell,
@@ -36,14 +37,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatMnt } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
@@ -66,6 +61,30 @@ const CODE = /^[0-9A-Za-z][0-9A-Za-z._-]{0,15}$/;
 const isKind = (value: string): value is GlAccountKind =>
   GL_ACCOUNT_KINDS.some((kind) => kind === value);
 const isRole = (value: string): value is GlRole => GL_ROLES.some((role) => role === value);
+
+/** The chart's columns (ADR-0119): the code, the name, the kind and role, three amounts, the menu. */
+const ACCOUNT_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'code', kind: 'code' },
+  { key: 'name', kind: 'text', weight: 3, min: 14 },
+  { key: 'kind', kind: 'text', weight: 1 },
+  { key: 'role', kind: 'text', weight: 2 },
+  { key: 'debit', kind: 'money' },
+  { key: 'credit', kind: 'money' },
+  { key: 'balance', kind: 'money', width: 10 },
+  { key: 'actions', kind: 'actions', actions: 1 },
+  { key: 'chevron', kind: 'chevron' },
+];
+
+/** The account ledger's columns: date, entry number, description, source, two sides, balance. */
+const LEDGER_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'date', kind: 'date' },
+  { key: 'number', kind: 'number' },
+  { key: 'description', kind: 'text', weight: 3, min: 14 },
+  { key: 'source', kind: 'status' },
+  { key: 'debit', kind: 'money' },
+  { key: 'credit', kind: 'money' },
+  { key: 'balanceAfter', kind: 'money', width: 10 },
+];
 
 /**
  * The chart of accounts (ADR-0060 #7) with each account's turnover and balance; the accountant
@@ -107,7 +126,7 @@ export function AccountsPage() {
       />
       <ProblemAlert problem={problemFromError(accounts.error)} onRetry={accounts.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={ACCOUNT_COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('finance.fields.code')}</TableHead>
@@ -117,7 +136,7 @@ export function AccountsPage() {
               <TableHead className="text-right">{t('finance.fields.debit')}</TableHead>
               <TableHead className="text-right">{t('finance.fields.credit')}</TableHead>
               <TableHead className="text-right">{t('finance.fields.balance')}</TableHead>
-              <TableHead className="w-10">
+              <TableHead>
                 <span className="sr-only">{t('common.actions')}</span>
               </TableHead>
               <ChevronHead />
@@ -188,7 +207,7 @@ export function AccountsPage() {
               </LinkRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!accounts.isPending && rows.length === 0 ? (
           <EmptyState icon={ListTree} title={t('finance.accounts.empty')} />
         ) : null}
@@ -431,7 +450,7 @@ export function AccountLedgerPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(ledger.error ?? accounts.error)} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={LEDGER_COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('finance.fields.date')}</TableHead>
@@ -464,7 +483,6 @@ export function AccountLedgerPage() {
                   ]
                     .filter(Boolean)
                     .join(' · ')}
-                  fill
                 />
                 <TableCell>
                   <SourceBadge source={line.source} />
@@ -481,7 +499,7 @@ export function AccountLedgerPage() {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!ledger.isPending && rows.length === 0 ? (
           <EmptyState title={t('finance.accounts.ledgerEmpty')} />
         ) : null}

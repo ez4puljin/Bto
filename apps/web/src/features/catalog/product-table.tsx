@@ -1,19 +1,13 @@
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronHead, LinkRow, TruncateCell } from '@/components/list';
+import { ChevronHead, LinkRow, ListTable, TruncateCell } from '@/components/list';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useProductLocationsOf } from '@/features/inventory/api';
 import { useProductSuppliersOf } from '@/features/partners/api';
 import { useCurrentPricesOf } from '@/features/pricing/api';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { problemFromError } from '@/lib/problem';
 import { cn } from '@/lib/utils';
 import type { ProductListItem } from './api';
@@ -30,11 +24,27 @@ export interface ProductSelection {
   setAll: (ids: readonly number[], on: boolean) => void;
 }
 
+const CHECK_COLUMN: ColumnSpec = { key: 'check', kind: 'check' };
+const CHEVRON_COLUMN: ColumnSpec = { key: 'chevron', kind: 'chevron' };
+
+/** The layout of the shown columns (ADR-0119): the checkbox first, the chevron last. */
+function columnSpecs(columns: readonly ProductColumn[], selectable: boolean): ColumnSpec[] {
+  const specs = columns.map<ColumnSpec>((column) => ({
+    key: column.key,
+    kind: column.kind,
+    ...(column.weight === undefined ? {} : { weight: column.weight }),
+    ...(column.min === undefined ? {} : { min: column.min }),
+    ...(column.width === undefined ? {} : { width: column.width }),
+  }));
+  return [...(selectable ? [CHECK_COLUMN] : []), ...specs, CHEVRON_COLUMN];
+}
+
 /**
  * The product list (ADR-0037): one body for every loaded page; each page reads the supplier links
  * and locations of its own products, only while a column shows them. Rows open the product
  * (`LinkRow`, ADR-0042). With a selection, a first column of checkboxes (ADR-0049): each in a label
- * filling its cell, so a click beside the box ticks it rather than opening the product.
+ * filling its cell, so a click beside the box ticks it rather than opening the product. The
+ * columns are sized by the layout (`ListTable`, ADR-0119).
  */
 export const ProductTable = memo(function ProductTable(props: {
   pages: readonly { data: ProductListItem[] }[];
@@ -49,12 +59,16 @@ export const ProductTable = memo(function ProductTable(props: {
     [props.pages],
   );
   const ticked = selection ? loaded.filter((id) => selection.selected.has(id)).length : 0;
+  const specs = useMemo(
+    () => columnSpecs(props.columns, selection !== undefined),
+    [props.columns, selection],
+  );
   return (
-    <Table>
+    <ListTable columns={specs}>
       <TableHeader>
         <TableRow>
           {selection ? (
-            <TableHead className="w-10">
+            <TableHead>
               <Checkbox
                 aria-label={t('common.selectAll')}
                 checked={
@@ -89,7 +103,7 @@ export const ProductTable = memo(function ProductTable(props: {
           />
         ))}
       </TableBody>
-    </Table>
+    </ListTable>
   );
 });
 
@@ -144,7 +158,7 @@ const ProductPageRows = memo(function ProductPageRows(props: {
           selected={selection?.selected.has(row.id) ?? false}
         >
           {selection ? (
-            <TableCell className="w-10 p-0 first:pl-0">
+            <TableCell className="p-0 first:pl-0">
               {/* The whole cell ticks the row, its box in line with the header's. */}
               <label className="flex cursor-pointer items-center py-2.5 pr-3 pl-4">
                 <Checkbox

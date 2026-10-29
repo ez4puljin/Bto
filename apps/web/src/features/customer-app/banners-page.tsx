@@ -27,6 +27,7 @@ import {
   EmptyState,
   FilterBar,
   ListCard,
+  ListTable,
   RowAction,
   RowActions,
   RowActionSpacer,
@@ -46,14 +47,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { BANNER_SIZE, cropToJpeg } from '@/lib/image-resize';
 import { problemFromError, settle } from '@/lib/problem';
 import { toast } from '@/lib/toast';
@@ -77,6 +72,19 @@ const STATE_BADGES: Record<BannerState, 'success' | 'default' | 'secondary' | 'o
 
 const VIEWS = ['LIVE', 'ARCHIVED'] as const;
 type View = (typeof VIEWS)[number];
+
+/** The list's columns (ADR-0119): a 2:1 thumbnail, then the live rows' move and archive actions. */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'picture', kind: 'image', width: 8 },
+  { key: 'title', kind: 'text', weight: 3, min: 12 },
+  { key: 'link', kind: 'text', weight: 2 },
+  { key: 'period', kind: 'date', width: 14 },
+  { key: 'state', kind: 'status' },
+];
+const LIVE_COLUMNS: readonly ColumnSpec[] = [
+  ...COLUMNS,
+  { key: 'actions', kind: 'actions', actions: 3 },
+];
 
 /**
  * «Систем» → «Харилцагчийн апп» → «Баннер» (ADR-0092 #5, customer.home.manage): the banners
@@ -127,10 +135,10 @@ export function BannersPage() {
       <ProblemAlert problem={problemFromError(banners.error)} onRetry={banners.refetch} />
       {archiving ? null : <ProblemAlert problem={action.problem} />}
       <ListCard scroll>
-        <Table>
+        <ListTable columns={view === 'LIVE' ? LIVE_COLUMNS : COLUMNS}>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-32">{t('customerApp.banners.columns.picture')}</TableHead>
+              <TableHead>{t('customerApp.banners.columns.picture')}</TableHead>
               <TableHead>{t('customerApp.banners.columns.title')}</TableHead>
               <TableHead>{t('customerApp.banners.columns.link')}</TableHead>
               <TableHead>{t('customerApp.banners.columns.period')}</TableHead>
@@ -163,7 +171,7 @@ export function BannersPage() {
                 <TableCell>
                   <BannerLink banner={banner} />
                 </TableCell>
-                <TableCell className="font-mono whitespace-nowrap">
+                <TableCell className="font-mono">
                   {banner.validTo
                     ? t('customerApp.banners.period', {
                         from: banner.validFrom,
@@ -209,7 +217,7 @@ export function BannersPage() {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {banners.isSuccess && rows.length === 0 ? (
           <EmptyState
             icon={ImageIcon}

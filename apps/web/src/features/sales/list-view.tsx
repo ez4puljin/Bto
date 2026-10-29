@@ -1,6 +1,6 @@
 import { ORDER_STATUSES } from '@tugeel/shared/sales';
 import { ShoppingCart } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ColumnChooser } from '@/components/column-chooser';
 import {
@@ -8,6 +8,7 @@ import {
   ChevronHead,
   EmptyState,
   ListCard,
+  ListTable,
   LoadMore,
   SkeletonRows,
   TruncateCell,
@@ -15,14 +16,8 @@ import {
 import { NativeSelect } from '@/components/native-select';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
@@ -42,6 +37,21 @@ import {
   type SalesPipeline,
   useOrderList,
 } from './pipelines-api';
+
+/** How each column shares the list's width (ADR-0119); the chevron column ends every row. */
+const COLUMN_SPECS: Record<ListColumn, ColumnSpec> = {
+  number: { key: 'number', kind: 'number' },
+  customer: { key: 'customer', kind: 'text', weight: 3, min: 12 },
+  stage: { key: 'stage', kind: 'text', weight: 1 },
+  status: { key: 'status', kind: 'status' },
+  deliveryDate: { key: 'deliveryDate', kind: 'date' },
+  total: { key: 'total', kind: 'money' },
+  payment: { key: 'payment', kind: 'status' },
+  createdBy: { key: 'createdBy', kind: 'text', weight: 1 },
+  channel: { key: 'channel', kind: 'text', weight: 1 },
+  createdAt: { key: 'createdAt', kind: 'datetime' },
+};
+const CHEVRON_COLUMN: ColumnSpec = { key: 'chevron', kind: 'chevron' };
 
 /** «Баганууд» of the list view, at the end of the work page's bar. */
 export function ListColumnChooser({ columns }: { columns: ListColumns }) {
@@ -186,6 +196,15 @@ export function ListView({
   }, [total, onCount]);
   const shown = (column: ListColumn) => !columns.hidden.has(column);
   const visible = LIST_COLUMNS.filter(shown);
+  // The spec follows the shown columns, so the colgroup always matches the cells of a row.
+  const hidden = columns.hidden;
+  const specs = useMemo(
+    () => [
+      ...LIST_COLUMNS.filter((column) => !hidden.has(column)).map((column) => COLUMN_SPECS[column]),
+      CHEVRON_COLUMN,
+    ],
+    [hidden],
+  );
   const problem = problemFromError(orders.error);
   return (
     <>
@@ -195,7 +214,7 @@ export function ListView({
         </div>
       ) : null}
       <ListCard scroll>
-        <Table>
+        <ListTable columns={specs}>
           <TableHeader>
             <TableRow>
               {visible.map((column) => (
@@ -232,11 +251,7 @@ export function ListView({
                     </TableCell>
                   ) : null}
                   {shown('customer') ? (
-                    <TruncateCell
-                      text={`${row.customerName} · ${row.customerCode}`}
-                      fill
-                      className="min-w-40"
-                    >
+                    <TruncateCell text={`${row.customerName} · ${row.customerCode}`}>
                       {row.customerName}
                       <span className="ml-2 font-mono text-xs text-muted-foreground">
                         {row.customerCode}
@@ -275,7 +290,7 @@ export function ListView({
               );
             })}
           </TableBody>
-        </Table>
+        </ListTable>
         {!orders.isPending && rows.length === 0 ? (
           <EmptyState
             icon={ShoppingCart}

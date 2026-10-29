@@ -1,4 +1,5 @@
 import { TrendingUp } from 'lucide-react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import {
@@ -8,6 +9,7 @@ import {
   FilterBar,
   FilterChip,
   ListCard,
+  ListTable,
   SegmentedControl,
   SkeletonRows,
   TruncateCell,
@@ -28,6 +30,7 @@ import {
 } from '@/components/ui/table';
 import { useCompanyName } from '@/features/company/api';
 import { DateRangeFilter } from '@/features/finance/date-range-filter';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { saveBlob } from '@/lib/download';
 import { formatQty, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
@@ -134,6 +137,22 @@ function useRowName() {
   };
 }
 
+/** The report's columns on screen (ADR-0119): the code and quantity only when the grouping shows them. */
+function profitColumns(coded: boolean, product: boolean): readonly ColumnSpec[] {
+  return [
+    ...(coded ? [{ key: 'code', kind: 'code' } as const] : []),
+    { key: 'name', kind: 'text', weight: 3, min: 14 },
+    ...(product ? [{ key: 'qty', kind: 'qty' } as const] : []),
+    { key: 'sales', kind: 'money', width: 10 },
+    { key: 'returns', kind: 'money' },
+    { key: 'cost', kind: 'money', width: 10 },
+    { key: 'profit', kind: 'money', width: 10 },
+    { key: 'margin', kind: 'percent' },
+    { key: 'chevron', kind: 'chevron' },
+  ];
+}
+
+/** With `onOpen` (the screen) the columns are sized by the layout; on paper the table lays itself out. */
 function ProfitTable(props: { report: ProfitReport; onOpen?: (row: ProfitRow) => void }) {
   const { t } = useTranslation();
   const nameOf = useRowName();
@@ -141,6 +160,7 @@ function ProfitTable(props: { report: ProfitReport; onOpen?: (row: ProfitRow) =>
   const columns = 'reports.profit.columns';
   const product = report.by === 'product';
   const coded = report.by !== 'rep';
+  const spec = useMemo(() => profitColumns(coded, product), [coded, product]);
   // The cells before the amounts: the name, the code and the quantity when shown.
   const span = 1 + (coded ? 1 : 0) + (product ? 1 : 0);
   const amounts = (row: {
@@ -166,8 +186,8 @@ function ProfitTable(props: { report: ProfitReport; onOpen?: (row: ProfitRow) =>
       </TableCell>
     </>
   );
-  return (
-    <Table>
+  const body = (
+    <>
       <TableHeader>
         <TableRow>
           {coded ? <TableHead>{t(`${columns}.code`)}</TableHead> : null}
@@ -233,8 +253,9 @@ function ProfitTable(props: { report: ProfitReport; onOpen?: (row: ProfitRow) =>
           {props.onOpen ? <TableCell /> : null}
         </TableRow>
       </TableBody>
-    </Table>
+    </>
   );
+  return props.onOpen ? <ListTable columns={spec}>{body}</ListTable> : <Table>{body}</Table>;
 }
 
 /** Where a sales document opens in the app, or null (a credit note opens with its invoice's order). */

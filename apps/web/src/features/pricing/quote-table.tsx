@@ -1,10 +1,9 @@
 import { DISCOUNT_EFFECTS, type DiscountEffect } from '@tugeel/shared/pricing';
 import { useTranslation } from 'react-i18next';
-import { ListCard } from '@/components/list';
+import { ListCard, ListTable } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { Badge } from '@/components/ui/badge';
 import {
-  Table,
   TableBody,
   TableCell,
   TableFooter,
@@ -13,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useProduct } from '@/features/catalog/api';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatMnt, plainDecimal } from '@/lib/money';
 import type { QuotePart } from './api';
 import { useProgramText } from './program-text';
@@ -51,6 +51,18 @@ export function UnitSelect(props: {
     </NativeSelect>
   );
 }
+
+/** The quote's columns (ADR-0119): the product wraps, the quantity carries its unit. */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'product', kind: 'text', weight: 3, min: 14 },
+  { key: 'qty', kind: 'qty', width: 8 },
+  { key: 'basis', kind: 'status' },
+  { key: 'listPrice', kind: 'money' },
+  { key: 'unitPrice', kind: 'money' },
+  { key: 'subtotal', kind: 'money' },
+  { key: 'discount', kind: 'money' },
+  { key: 'total', kind: 'money' },
+];
 
 const effectOf = (effect: string): DiscountEffect =>
   DISCOUNT_EFFECTS.find((entry) => entry === effect) ?? 'AMOUNT';
@@ -97,7 +109,7 @@ export function QuoteResult({
 
   return (
     <ListCard>
-      <Table>
+      <ListTable columns={COLUMNS}>
         <TableHeader>
           <TableRow>
             <TableHead>{t('pricing.quote.columns.product')}</TableHead>
@@ -173,7 +185,7 @@ export function QuoteResult({
             </TableCell>
           </TableRow>
         </TableFooter>
-      </Table>
+      </ListTable>
     </ListCard>
   );
 }

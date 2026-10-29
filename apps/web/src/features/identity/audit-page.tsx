@@ -7,6 +7,7 @@ import {
   EmptyState,
   FilterBar,
   ListCard,
+  ListTable,
   LoadMore,
   SkeletonRows,
 } from '@/components/list';
@@ -14,20 +15,24 @@ import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
 import { cn } from '@/lib/utils';
 import { type AuditEntry, type AuditFilter, useAudit } from './api';
 import { AUDIT_ENTITIES, isAuditAction, isAuditEntity } from './labels';
+
+/** The log's columns (ADR-0119); the entity wraps (session ids are long), the details fold out. */
+const COLUMNS: readonly ColumnSpec[] = [
+  // The time keeps its seconds («2026-10-29 19:52:11»).
+  { key: 'time', kind: 'datetime', width: 12.5 },
+  { key: 'actor', kind: 'text', weight: 1 },
+  { key: 'action', kind: 'code', width: 12 },
+  { key: 'entity', kind: 'text', weight: 2 },
+  { key: 'details', kind: 'actions', actions: 1 },
+];
 
 function ActionLabel({ action }: { action: string }) {
   const { t } = useTranslation();
@@ -102,14 +107,14 @@ export function AuditPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(audit.error)} onRetry={audit.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('audit.time')}</TableHead>
               <TableHead>{t('audit.actor')}</TableHead>
               <TableHead>{t('audit.action')}</TableHead>
               <TableHead>{t('audit.entity')}</TableHead>
-              <TableHead className="w-px">
+              <TableHead>
                 <span className="sr-only">{t('audit.details')}</span>
               </TableHead>
             </TableRow>
@@ -130,13 +135,13 @@ export function AuditPage() {
                     <TableCell>
                       <ActionLabel action={entry.action} />
                     </TableCell>
-                    <TableCell className="min-w-64 whitespace-normal">
+                    <TableCell className="whitespace-normal">
                       <EntityLabel entity={entry.entity} />
                       {/* Session ids are long UUIDs: they wrap (in two lines at most) instead of
                           pushing the details off the card. */}
                       <span className="font-mono break-all text-muted-foreground">{` #${entry.entityId}`}</span>
                     </TableCell>
-                    <TableCell className="w-px py-0.5 text-right">
+                    <TableCell className="py-0.5 text-right">
                       {entry.before !== null || entry.after !== null ? (
                         <Button
                           size="icon-sm"
@@ -182,7 +187,7 @@ export function AuditPage() {
               );
             })}
           </TableBody>
-        </Table>
+        </ListTable>
         {!audit.isPending && rows.length === 0 ? (
           <EmptyState
             icon={ScrollText}

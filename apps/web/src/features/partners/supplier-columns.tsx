@@ -1,10 +1,9 @@
-import type { TFunction } from 'i18next';
-import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Badge } from '@/components/ui/badge';
 import { formatCount } from '@/lib/money';
 import type { SupplierListItem } from './api';
 import { contactCell, none, text } from './list-cells';
+import type { ListColumn } from './list-column-cell';
 import { localPhone } from './phone';
 
 /** Every column of the supplier list (ADR-0037). */
@@ -43,23 +42,31 @@ export const DEFAULT_HIDDEN_SUPPLIER_COLUMNS: readonly SupplierColumnKey[] = [
   'note',
 ];
 
-export interface SupplierColumn {
+/**
+ * What that user sees hidden on a screen of 1600px or more (ADR-0119): the email, the address,
+ * the bank and the payment term fit there too.
+ */
+export const WIDE_DEFAULT_HIDDEN_SUPPLIER_COLUMNS: readonly SupplierColumnKey[] = [
+  'regNo',
+  'bankAccount',
+  'note',
+];
+
+/** A column of the supplier list, sized by the layout (ADR-0119). */
+export interface SupplierColumn extends ListColumn<SupplierListItem> {
   key: SupplierColumnKey;
-  /** Counts: right-aligned in the head and the cells. */
-  numeric?: boolean;
-  /** Long text on one line with «…» and the whole text on hover; `fill` takes the spare width. */
-  truncate?: { text: (row: SupplierListItem, t: TFunction) => string; fill?: boolean };
-  className?: string;
-  cell: (row: SupplierListItem, t: TFunction) => ReactNode;
 }
 
 export const SUPPLIER_COLUMNS: readonly SupplierColumn[] = [
-  { key: 'code', className: 'font-mono', cell: (row) => row.code },
+  { key: 'code', kind: 'code', className: 'font-mono', cell: (row) => row.code },
   {
     key: 'name',
-    // The name takes the spare width, never less than 14rem: with many columns the list scrolls.
-    truncate: { text: (row) => row.name, fill: true },
-    className: 'min-w-56',
+    // The name takes the largest share of the spare width, never less than 12rem: with many
+    // columns the list scrolls.
+    kind: 'text',
+    weight: 3,
+    min: 12,
+    truncate: { text: (row) => row.name },
     cell: (row) => (
       <Link
         to={`/partners/suppliers/${row.id}`}
@@ -69,37 +76,61 @@ export const SUPPLIER_COLUMNS: readonly SupplierColumn[] = [
       </Link>
     ),
   },
-  { key: 'regNo', className: 'font-mono', cell: (row, t) => text(row.regNo, t) },
-  { key: 'tin', className: 'font-mono', cell: (row, t) => text(row.tin, t) },
+  { key: 'regNo', kind: 'number', className: 'font-mono', cell: (row, t) => text(row.regNo, t) },
+  {
+    key: 'tin',
+    kind: 'number',
+    width: 8,
+    className: 'font-mono',
+    cell: (row, t) => text(row.tin, t),
+  },
   {
     key: 'phone',
+    kind: 'number',
+    width: 8,
     className: 'font-mono',
     cell: (row, t) => (row.phone ? localPhone(row.phone) : none(t)),
   },
-  { key: 'email', cell: (row, t) => text(row.email, t) },
+  { key: 'email', kind: 'text', weight: 2, cell: (row, t) => text(row.email, t) },
   {
     key: 'address',
+    kind: 'text',
+    weight: 2,
     truncate: { text: (row, t) => row.address ?? t('common.none') },
     cell: (row, t) => text(row.address, t),
   },
-  { key: 'bankName', cell: (row, t) => text(row.bankName, t) },
-  { key: 'bankAccount', className: 'font-mono', cell: (row, t) => text(row.bankAccount, t) },
+  { key: 'bankName', kind: 'text', cell: (row, t) => text(row.bankName, t) },
+  {
+    key: 'bankAccount',
+    kind: 'number',
+    className: 'font-mono',
+    cell: (row, t) => text(row.bankAccount, t),
+  },
   {
     key: 'paymentTerm',
+    kind: 'text',
     cell: (row, t) =>
       row.paymentTermDays === null
         ? none(t)
         : t('partners.credit.termCustomer', { days: row.paymentTermDays }),
   },
-  { key: 'contact', cell: (row, t) => contactCell(row.contact, t) },
-  { key: 'productCount', numeric: true, cell: (row) => formatCount(row.productCount) },
+  { key: 'contact', kind: 'text', weight: 2, cell: (row, t) => contactCell(row.contact, t) },
+  {
+    key: 'productCount',
+    kind: 'count',
+    numeric: true,
+    cell: (row) => formatCount(row.productCount),
+  },
   {
     key: 'note',
+    kind: 'text',
+    weight: 2,
     truncate: { text: (row, t) => row.note ?? t('common.none') },
     cell: (row, t) => text(row.note, t),
   },
   {
     key: 'status',
+    kind: 'status',
     cell: (row, t) => (
       <Badge variant={row.status === 'ACTIVE' ? 'success' : 'secondary'}>
         {t(`partners.status.${row.status}`)}
