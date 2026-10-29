@@ -136,16 +136,13 @@ When an answer arrives: write the date and the answer in this table, update SPEC
 
 ## Next session
 
-**Slice 1, purchase orders → receipts, is built (2026-10-29, ADR-0115, migration `0052_procurement`, branch `claude/slice1-po-receipts`, a pull request for «Bto удирдлага»).**
+**Slice 1, purchase orders → receipts, is built (2026-10-29, ADR-0115, migration `0052_procurement`, merged as PR #35 `dc8d56f`).**
 
-After the merge:
-1. **Migrate.** Stop dev and run `pnpm db:migrate` on `bto_main`: it adds the four procurement tables, the receipts' note totals, origin and confirmations, and marks every existing receipt line checked. Restart dev; the boot syncs the new permissions and gives them to the PROCUREMENT, WAREHOUSE, ACCOUNTANT and OFFICE roles.
-2. **Test data.** With the owner's yes, prepare test data only (the trial is development-only):
-   - a PROCUREMENT user as manager;
-   - two WAREHOUSE users, each scoped to one warehouse;
-   - an ACCOUNTANT;
-   - two test suppliers with a few main products whose homes lie in two warehouses, and one supplier's orderer («Нийлүүлэгч» page → «Захиалагч»).
-3. **The owner's walk:**
+Done by «Bto удирдлага» on 2026-10-29, after the merge:
+1. **Migrated.** `0052_procurement` is applied to `bto_main`; dev restarted and the boot gave the new permissions to the PROCUREMENT, WAREHOUSE, ACCOUNTANT and OFFICE roles.
+2. **Test data** on `bto_main` (development only): the users `menejer` (PROCUREMENT), `nyarav1` (WAREHOUSE, WH1 «Жижиглэн агуулах»), `nyarav2` (WAREHOUSE, WH2 «Зааланд ирдэг») and `nyagtlan` (ACCOUNTANT), passwords in `tmp/dev-logins.txt`; two imported suppliers (ids 293 and 294, each with three main products homed in WH1 and WH2 and real barcodes for the scanner); `nyarav2` is the orderer of supplier 293.
+3. **Smoke run through the api** (scratchpad `slice1-smoke.cjs`, `slice1-smoke-b.cjs`): `PO-2026-000001` with both suppliers; the keeper's SCOPE refusal, the orderer's rows, a stale cell returned in `conflicts`, `PO_NOT_EDITABLE` after «Ирсэн», the keeper's 403 on a move; supplier 293 walked to the end: WH1 confirmed first, WH2 counted one line short, one «ирээгүй» and one product not on the order, `RECEIPT_NOTE_MISSING` and `RECEIPT_NOTE_QTY_MISMATCH`, the last confirmation posted `GR-2026-000001` onto NOSHELF (sellable), `RECEIPT_NOTE_AMOUNT_MISMATCH` at 5₮ off, the accountant's prices made the 42,000₮ payable and set «Орлого авсан»; `pnpm finance:reconcile` and `pnpm inventory:reconcile` clean. Supplier 294's draft receipt №4 is left at «Ирсэн» for the owner's scanner walk (one line already checked through the browser). Noted, by design (ADR-0115): any receipt holder may type another warehouse's count on a draft; only the confirmation takes the scope.
+4. **The owner's walk** (still to do):
    - «Агуулах → Худалдан авах захиалга»: a new order with both suppliers; the orderer's and a keeper's quantities (the keeper only their warehouse, only in «Бэлдэж»); two browser tabs typing the same cell (the second is told); the printed sheet.
    - «Илгээсэн» → «Замд» → «Ирсэн».
    - The draft receipt → «Хүлээн авах» on a 1366 laptop with the handheld scanner: scan, type, «Ирээгүй», a product not on the order, the note's pieces and amount and a photo.
