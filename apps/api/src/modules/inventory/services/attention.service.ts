@@ -14,8 +14,10 @@ const SHELF_KINDS = new Set(['WHOLESALE', 'STORE']);
 export interface InventoryAttention {
   /** Requests waiting for the caller's warehouses to ship them. */
   transfersToShip: number;
-  /** Shipments on their way to the caller's warehouses. */
+  /** Shipments on their way to the caller's warehouses (a request's group is counted there). */
   transfersToReceive: number;
+  /** Request groups the caller's warehouses sent, counted by the destination, to confirm (ADR-0116). */
+  transfersToConfirm: number;
   adjustmentsToApprove: number;
   stocktakesToReview: number;
   /** Posted receipts waiting for their costs. */
@@ -57,36 +59,48 @@ export class InventoryAttentionService {
     const none = Promise.resolve(0);
     const transferring = may('inventory.transfers.manage');
 
-    const [toShip, toReceive, toApprove, toReview, toCost, lowStock] = await Promise.all([
-      transferring
-        ? count(
-            transfers,
-            and(eq(transfers.status, 'REQUESTED'), within(transfers.sourceWarehouseId)),
-          )
-        : none,
-      transferring
-        ? count(transfers, and(eq(transfers.status, 'SHIPPED'), within(transfers.destWarehouseId)))
-        : none,
-      may('inventory.adjustments.approve')
-        ? count(
-            adjustments,
-            and(eq(adjustments.status, 'SUBMITTED'), within(adjustments.warehouseId)),
-          )
-        : none,
-      may('inventory.stocktakes.approve')
-        ? count(stocktakes, and(eq(stocktakes.status, 'REVIEW'), within(stocktakes.warehouseId)))
-        : none,
-      may('inventory.costs.manage')
-        ? count(
-            goodsReceipts,
-            and(eq(goodsReceipts.status, 'POSTED'), eq(goodsReceipts.costingStatus, 'PENDING')),
-          )
-        : none,
-      transferring ? this.lowStock(scope) : Promise.resolve({ count: 0, warehouseId: null }),
-    ]);
+    const [toShip, toReceive, toConfirm, toApprove, toReview, toCost, lowStock] = await Promise.all(
+      [
+        transferring
+          ? count(
+              transfers,
+              and(eq(transfers.status, 'REQUESTED'), within(transfers.sourceWarehouseId)),
+            )
+          : none,
+        transferring
+          ? count(
+              transfers,
+              and(eq(transfers.status, 'SHIPPED'), within(transfers.destWarehouseId)),
+            )
+          : none,
+        transferring
+          ? count(
+              transfers,
+              and(eq(transfers.status, 'COUNTED'), within(transfers.sourceWarehouseId)),
+            )
+          : none,
+        may('inventory.adjustments.approve')
+          ? count(
+              adjustments,
+              and(eq(adjustments.status, 'SUBMITTED'), within(adjustments.warehouseId)),
+            )
+          : none,
+        may('inventory.stocktakes.approve')
+          ? count(stocktakes, and(eq(stocktakes.status, 'REVIEW'), within(stocktakes.warehouseId)))
+          : none,
+        may('inventory.costs.manage')
+          ? count(
+              goodsReceipts,
+              and(eq(goodsReceipts.status, 'POSTED'), eq(goodsReceipts.costingStatus, 'PENDING')),
+            )
+          : none,
+        transferring ? this.lowStock(scope) : Promise.resolve({ count: 0, warehouseId: null }),
+      ],
+    );
     return {
       transfersToShip: toShip,
       transfersToReceive: toReceive,
+      transfersToConfirm: toConfirm,
       adjustmentsToApprove: toApprove,
       stocktakesToReview: toReview,
       receiptsToCost: toCost,

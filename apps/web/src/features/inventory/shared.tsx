@@ -17,6 +17,7 @@ type DocStatus =
   | 'SUBMITTED'
   | 'REQUESTED'
   | 'SHIPPED'
+  | 'COUNTED'
   | 'POSTED'
   | 'RECEIVED'
   | 'COUNTING'
@@ -67,6 +68,7 @@ export function DocStatusBadge({ status }: { status: DocStatus }) {
       : status === 'SUBMITTED' ||
           status === 'REQUESTED' ||
           status === 'SHIPPED' ||
+          status === 'COUNTED' ||
           status === 'COUNTING' ||
           status === 'REVIEW'
         ? 'default'

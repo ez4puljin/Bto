@@ -102,6 +102,7 @@ const STATUSES: readonly TransferStatus[] = [
   'DRAFT',
   'REQUESTED',
   'SHIPPED',
+  'COUNTED',
   'RECEIVED',
   'CANCELLED',
 ];

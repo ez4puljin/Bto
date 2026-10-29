@@ -235,10 +235,28 @@ export const TRANSFER_STATUSES = [
   'DRAFT',
   'REQUESTED',
   'SHIPPED',
+  'COUNTED',
   'RECEIVED',
   'CANCELLED',
 ] as const;
 export type TransferStatus = (typeof TRANSFER_STATUSES)[number];
+
+/** How far a transfer has come: the index in `TRANSFER_STATUSES` (ADR-0116). */
+export function transferStatusRank(status: TransferStatus): number {
+  return TRANSFER_STATUSES.indexOf(status);
+}
+
+/**
+ * A request's status is the lowest of its groups (ADR-0116 #3): a cancelled group is ignored unless
+ * every group is cancelled; with no group at all the request counts as cancelled.
+ */
+export function lowestTransferStatus(statuses: readonly TransferStatus[]): TransferStatus {
+  const live = statuses.filter((status) => status !== 'CANCELLED');
+  if (live.length === 0) return 'CANCELLED';
+  return live.reduce((lowest, status) =>
+    transferStatusRank(status) < transferStatusRank(lowest) ? status : lowest,
+  );
+}
 /** REQUEST: the receiver asked for the goods; PUSH: the sender sends on its own (returns). */
 export const TRANSFER_ORIGINS = ['REQUEST', 'PUSH'] as const;
 export type TransferOrigin = (typeof TRANSFER_ORIGINS)[number];

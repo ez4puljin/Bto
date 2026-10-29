@@ -64,6 +64,7 @@ export {
   stocktakeLines,
   stocktakes,
   transferLines,
+  transferRequests,
   transfers,
   warehouseStock,
 } from '../modules/inventory/schema';
