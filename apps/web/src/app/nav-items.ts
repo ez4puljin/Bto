@@ -19,6 +19,7 @@ import {
   ChartBar,
   ClipboardCheck,
   ClipboardList,
+  Contact,
   Factory,
   Gauge,
   FileChartColumn,
@@ -96,7 +97,9 @@ export interface NavGroup {
  * the supermarket, the assistant, the system. An entry with a permission
  * is shown only to users who hold it (ADR-0027); a group without visible entries is hidden. Catalog
  * pages and suppliers are readable by every user; customers only by the office, accountants and
- * admins. Branches and warehouses are readable by every user too (other pages list them), but only
+ * admins. The staff registry («Ажилтан», the users) sits among the partners (owner 2026-10-29): a
+ * new rep, store seller or keeper is registered from «Харилцагч», and the roles stay under «Систем».
+ * Branches and warehouses are readable by every user too (other pages list them), but only
  * people who manage them need the menu entry. Stock, its history, the low-stock list and receipts
  * are read by every user (without costs); transfers, goods issues, moves, adjustments, stocktakes
  * and shelves only by the people who make them (every user may still open a transfer or a stocktake by its link).
@@ -225,6 +228,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'partners.customers.read',
       },
       { to: '/partners/suppliers', label: 'nav.suppliers', icon: Factory },
+      { to: '/users', label: 'nav.staff', icon: Contact, permission: 'identity.users.read' },
     ],
   },
   {
@@ -386,7 +390,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: 'nav.groups.system',
     items: [
-      { to: '/users', label: 'nav.users', icon: Users, permission: 'identity.users.read' },
       { to: '/roles', label: 'nav.roles', icon: ShieldCheck, permission: 'identity.users.read' },
       // ADR-0084: the Finance Core company; everyone reads it, finance.settings.manage edits it.
       { to: '/company', label: 'nav.company', icon: Briefcase, permission: 'finance.read' },

@@ -92,7 +92,7 @@ const ORG_ROUTES = {
   'GET /api/v1/warehouses': () => list(WAREHOUSES),
 };
 const ADMIN_MENU = [
-  mn.nav.users,
+  mn.nav.staff,
   mn.nav.roles,
   mn.nav.branches,
   mn.nav.warehouses,
@@ -137,8 +137,14 @@ describe('menu and page access', () => {
 describe('users', () => {
   it('creates a user, shows the one-time code once, then opens the user', async () => {
     let created: unknown;
+    const seeded: Schemas['Role'][] = [
+      ...ROLES,
+      { id: 7, code: 'POS_CASHIER', name: null, isSystem: true, permissions: [], userCount: 0 },
+      { id: 9, code: 'SALES_REP', name: null, isSystem: true, permissions: [], userCount: 0 },
+    ];
     const fetchMock = signedIn(ADMIN_ME, {
       ...ORG_ROUTES,
+      'GET /api/v1/roles': () => list(seeded),
       'GET /api/v1/users': () => list([]),
       'POST /api/v1/users': async (request) => {
         created = await request.json();
@@ -153,15 +159,38 @@ describe('users', () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: mn.users.create }));
     const dialog = within(await screen.findByRole('dialog'));
-    await user.type(dialog.getByLabelText(mn.users.form.username), 'Dorj.N');
-    await user.type(dialog.getByLabelText(mn.users.form.fullName), 'Дорж Нямаа');
+    const fullName = dialog.getByLabelText(mn.users.form.fullName);
+    const username = dialog.getByLabelText(mn.users.form.username);
+    const keeperRole = await dialog.findByRole('checkbox', { name: mn.roles.system.WAREHOUSE });
+    const warehouse = dialog.getByRole('checkbox', { name: 'WH1 · Бөөний агуулах' });
+    const branch = dialog.getByRole('checkbox', { name: 'MAIN · Төв салбар' });
+    // A staff registration reads top-down: the name, the username, the role, then the warehouse.
+    const follows = (first: HTMLElement, second: HTMLElement) =>
+      Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(follows(fullName, username)).toBe(true);
+    expect(follows(username, keeperRole)).toBe(true);
+    expect(follows(keeperRole, warehouse)).toBe(true);
+    expect(follows(warehouse, branch)).toBe(true);
+    // The hint names the seeded roles of a rep, a store seller and a keeper.
+    expect(
+      dialog.getByText(
+        mn.users.form.roleHint
+          .replace('{{rep}}', mn.roles.system.SALES_REP)
+          .replace('{{seller}}', mn.roles.system.POS_CASHIER)
+          .replace('{{keeper}}', mn.roles.system.WAREHOUSE),
+      ),
+    ).toBeInTheDocument();
+    await user.type(fullName, 'Дорж Нямаа');
+    await user.type(username, 'Dorj.N');
     await user.type(dialog.getByLabelText(mn.users.form.phone), '9911 2233');
-    await user.click(await dialog.findByRole('checkbox', { name: mn.roles.system.WAREHOUSE }));
-    await user.click(dialog.getByRole('checkbox', { name: 'WH1 · Бөөний агуулах' }));
+    await user.click(keeperRole);
+    await user.click(warehouse);
     expect(dialog.queryByRole('checkbox', { name: /TRANSIT/ })).toBeNull();
     await user.click(dialog.getByRole('button', { name: mn.common.save }));
 
     expect(await screen.findByText('ABCDE-FGHJK')).toBeInTheDocument();
+    // With the code, the words to hand over: the web's set-password page, then the app.
+    expect(screen.getByText(mn.users.code.handOver)).toBeInTheDocument();
     expect(created).toEqual({
       username: 'dorj.n',
       fullName: 'Дорж Нямаа',

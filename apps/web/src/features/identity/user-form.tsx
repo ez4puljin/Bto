@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { USERNAME_PATTERN } from '@tugeel/shared/auth';
+import { isSystemRole, USERNAME_PATTERN } from '@tugeel/shared/auth';
 import { normalizeMnPhone } from '@tugeel/shared/phone';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -33,11 +33,17 @@ const ROLE_COLUMNS = '@container @xl:[&>div]:grid-cols-3 @3xl:[&>div]:grid-cols-
 /** Beside its label (FormRow's container from @md), a checkbox list starts on the label's line. */
 const SCOPE_OFFSET = '@md:pt-2.5';
 
+/** The roles the hint under «Дүр» names, by the job a non-technical admin registers (owner 2026-10-29). */
+const HINTED_ROLES = { rep: 'SALES_REP', seller: 'POS_CASHIER', keeper: 'WAREHOUSE' } as const;
+
 /**
- * Username, name, phone, roles and write scopes, settings-style (ADR-0043). `lockUsername` for
- * existing users, `lockAccess` when an admin edits themselves (the API refuses own role and scope
- * changes). `inDialog` ends the form with the dialog's footer, which stays in view while the
- * sections scroll (ADR-0066); on a page it ends with the page form's footer.
+ * Name, username, phone, roles and write scopes, settings-style (ADR-0043), in the order a staff
+ * registration is filled: who, how they sign in, what they do, where they write (the warehouses
+ * first). Under the roles a hint names the seeded role of a rep, a store seller and a keeper —
+ * only the roles this installation holds. `lockUsername` for existing users, `lockAccess` when an
+ * admin edits themselves (the API refuses own role and scope changes). `inDialog` ends the form with
+ * the dialog's footer, which stays in view while the sections scroll (ADR-0066); on a page it ends
+ * with the page form's footer.
  */
 export function UserForm(props: {
   defaultValues: UserFormValues;
@@ -58,10 +64,28 @@ export function UserForm(props: {
   });
   const { errors, isSubmitting } = form.formState;
   const submit = form.handleSubmit(props.onSubmit);
+  // The hint names the seeded roles as the list shows them; a job whose role is missing is left out.
+  const seeded = new Set(
+    (roles.data ?? []).flatMap((role) => (role.code && isSystemRole(role.code) ? [role.code] : [])),
+  );
+  const roleHint = Object.values(HINTED_ROLES).every((code) => seeded.has(code))
+    ? t('users.form.roleHint', {
+        rep: t(`roles.system.${HINTED_ROLES.rep}`),
+        seller: t(`roles.system.${HINTED_ROLES.seller}`),
+        keeper: t(`roles.system.${HINTED_ROLES.keeper}`),
+      })
+    : undefined;
 
   return (
     <form className="flex flex-col gap-5" noValidate onSubmit={(event) => void submit(event)}>
       <FormSection title={t('users.form.sectionAccount')}>
+        <FormRow
+          label={t('users.form.fullName')}
+          htmlFor="user-fullName"
+          error={errors.fullName?.message}
+        >
+          <Input id="user-fullName" {...form.register('fullName')} />
+        </FormRow>
         <FormRow
           label={t('users.form.username')}
           htmlFor="user-username"
@@ -75,19 +99,12 @@ export function UserForm(props: {
             {...form.register('username')}
           />
         </FormRow>
-        <FormRow
-          label={t('users.form.fullName')}
-          htmlFor="user-fullName"
-          error={errors.fullName?.message}
-        >
-          <Input id="user-fullName" {...form.register('fullName')} />
-        </FormRow>
         <FormRow label={t('users.form.phone')} htmlFor="user-phone" error={errors.phone?.message}>
           <Input id="user-phone" inputMode="tel" className="sm:w-56" {...form.register('phone')} />
         </FormRow>
       </FormSection>
       <fieldset disabled={props.lockAccess} className="flex min-w-0 flex-col gap-5">
-        <FormSection title={t('users.form.roles')}>
+        <FormSection title={t('users.form.roles')} description={roleHint}>
           <div className="px-3.5 py-3">
             <div className={ROLE_COLUMNS}>
               <Controller
@@ -110,26 +127,6 @@ export function UserForm(props: {
           </div>
         </FormSection>
         <FormSection title={t('users.form.scopes')} description={t('users.form.scopesHint')}>
-          <FormRow label={t('users.form.scopeBranches')}>
-            <div className={SCOPE_OFFSET}>
-              <Controller
-                control={form.control}
-                name="branchIds"
-                render={({ field }) => (
-                  <CheckboxGroup
-                    name="scope-branch"
-                    value={field.value}
-                    onChange={field.onChange}
-                    disabled={props.lockAccess}
-                    options={(branches.data ?? []).map((branch) => ({
-                      value: branch.id,
-                      label: `${branch.code} · ${branch.name}`,
-                    }))}
-                  />
-                )}
-              />
-            </div>
-          </FormRow>
           <FormRow label={t('users.form.scopeWarehouses')}>
             <div className={SCOPE_OFFSET}>
               <Controller
@@ -147,6 +144,26 @@ export function UserForm(props: {
                         value: warehouse.id,
                         label: `${warehouse.code} · ${warehouse.name}`,
                       }))}
+                  />
+                )}
+              />
+            </div>
+          </FormRow>
+          <FormRow label={t('users.form.scopeBranches')}>
+            <div className={SCOPE_OFFSET}>
+              <Controller
+                control={form.control}
+                name="branchIds"
+                render={({ field }) => (
+                  <CheckboxGroup
+                    name="scope-branch"
+                    value={field.value}
+                    onChange={field.onChange}
+                    disabled={props.lockAccess}
+                    options={(branches.data ?? []).map((branch) => ({
+                      value: branch.id,
+                      label: `${branch.code} · ${branch.name}`,
+                    }))}
                   />
                 )}
               />
