@@ -14,6 +14,7 @@ import {
   StockPostingService,
   StocktakesService,
   type TransferDetail,
+  TransferRequestsService,
   TransfersService,
 } from '../../src/modules/inventory';
 import { connectAs, createHttpApp } from '../harness/apps';
@@ -51,6 +52,7 @@ describe('integrity: transfers', () => {
   let categoryId: number;
   let flour: ProductJson;
   let sugar: ProductJson;
+  let rice: ProductJson;
 
   const pcs = (product: ProductJson) => unitOf(product, 'PCS').id;
   const lineOf = (transfer: TransferDetail, productId: number) => {
@@ -111,6 +113,40 @@ describe('integrity: transfers', () => {
     });
     return transfers.request(ctx, draft.id);
   };
+  /**
+   * A request's receipt since ADR-0116: the destination counts (what was shipped unless said
+   * otherwise) and finishes, the source confirms. `count` alone leaves the group COUNTED.
+   */
+  const count = async (
+    ctx: AuthContext,
+    id: number,
+    counts: { lineId: number; qty: Decimal }[] = [],
+  ) => {
+    const transfer = await transfers.get(id);
+    const byLine = new Map(counts.map((entry) => [entry.lineId, entry]));
+    await transfers.saveCounts(
+      ctx,
+      id,
+      transfer.lines.map(
+        (line) =>
+          byLine.get(line.id) ?? {
+            lineId: line.id,
+            productUnitId: line.baseUnitId,
+            qty: line.shippedQtyBase ?? new Decimal(0),
+          },
+      ),
+    );
+    return transfers.finishCount(ctx, id);
+  };
+  const receive = async (
+    destCtx: AuthContext,
+    sourceCtx: AuthContext,
+    id: number,
+    counts: { lineId: number; qty: Decimal }[] = [],
+  ) => {
+    await count(destCtx, id, counts);
+    return transfers.confirm(sourceCtx, id);
+  };
 
   beforeAll(async () => {
     app = await createHttpApp();
@@ -140,9 +176,11 @@ describe('integrity: transfers', () => {
       catalog.product({ sku, name, categoryId, baseUomId: pcsUom });
     flour = await product('1', 'Гурил');
     sugar = await product('2', 'Элсэн чихэр');
+    rice = await product('3', 'Будаа');
     await stock(wh1, shelf, flour, '1000', '1000');
     await stock(wh1, shelf, sugar, '1000', '2000');
     await stock(wh2, wh2Shelf, flour, '100', '1500');
+    await stock(wh2, wh2Shelf, rice, '100', '1500');
     await stock(store, floor, flour, '500', '1000');
     await stock(store, floor, sugar, '500', '2000');
     // Fixed shelves: shipments leave them unless another shelf is scanned.
@@ -151,6 +189,9 @@ describe('integrity: transfers', () => {
        VALUES ($1, $2, $3), ($1, $4, $3), ($5, $2, $6)`,
       [wh1, flour.id, shelf, sugar.id, wh2, wh2Shelf],
     );
+    // Homes for the request from the app (ADR-0116): flour in WH1, rice in WH2.
+    await inventory.homeShelf(flour.id, wh1, shelf);
+    await inventory.homeShelf(rice.id, wh2, wh2Shelf);
   });
   afterAll(async () => {
     await expectReconciled(app);
@@ -170,12 +211,14 @@ describe('integrity: transfers', () => {
           { lineId: lineOf(fromWh2, flour.id).id, binId: wh2Shelf },
         ]),
       ]);
-      // Received in the opposite order, one of them short.
+      // Counted, then confirmed in the opposite order, one of them short.
+      await count(clerk, fromWh2.id);
+      await count(clerk, fromWh1.id, [
+        { lineId: lineOf(fromWh1, flour.id).id, qty: new Decimal(7) },
+      ]);
       await Promise.all([
-        transfers.receive(clerk, fromWh2.id),
-        transfers.receive(clerk, fromWh1.id, [
-          { lineId: lineOf(fromWh1, flour.id).id, qty: new Decimal(7) },
-        ]),
+        transfers.confirm(worker, fromWh2.id),
+        transfers.confirm(worker, fromWh1.id),
       ]);
       const { rows } = await sql.query<{ leg: number; unit_cost: string }>(
         `SELECT leg, unit_cost::text FROM stock_ledger
@@ -216,7 +259,7 @@ describe('integrity: transfers', () => {
         expect(reasonCode((cancelled as PromiseRejectedResult).reason)).toBe('DOC_STATE_INVALID');
         expect(final.status).toBe('SHIPPED');
         expect(rows).toHaveLength(2);
-        await transfers.receive(clerk, sent.id);
+        await receive(clerk, worker, sent.id);
       } else {
         expect(cancelled.status).toBe('fulfilled');
         expect(reasonCode(shipped.reason)).toBe('DOC_STATE_INVALID');
@@ -245,7 +288,7 @@ describe('integrity: transfers', () => {
         expect(reasonCode((reopened as PromiseRejectedResult).reason)).toBe('DOC_STATE_INVALID');
         expect(final.status).toBe('SHIPPED');
         expect(rows).toHaveLength(2);
-        await transfers.receive(clerk, sent.id);
+        await receive(clerk, worker, sent.id);
       } else {
         expect(reopened.status).toBe('fulfilled');
         expect(reasonCode(shipped.reason)).toBe('DOC_STATE_INVALID');
@@ -256,13 +299,14 @@ describe('integrity: transfers', () => {
     }
   });
 
-  it('receives a transfer once when two receivers confirm together', async () => {
+  it('receives a transfer once when two keepers confirm together', async () => {
     for (let round = 0; round < 4; round += 1) {
       const sent = await request(clerk, wh1, store, [{ product: sugar, qty: '2' }]);
       await transfers.ship(worker, sent.id);
+      await count(clerk, sent.id);
       const results = await Promise.allSettled([
-        transfers.receive(clerk, sent.id),
-        transfers.receive(clerk, sent.id),
+        transfers.confirm(worker, sent.id),
+        transfers.confirm(worker, sent.id),
       ]);
       const failed = results.filter((result) => result.status === 'rejected');
       expect(failed).toHaveLength(1);
@@ -273,6 +317,76 @@ describe('integrity: transfers', () => {
       );
       expect(rows.map((row) => row.leg)).toEqual([1, 2, 3, 4]);
     }
+  });
+
+  it('lets exactly one of finishing a count and sending it back win (ADR-0116)', async () => {
+    const ends: string[] = [];
+    for (let round = 0; round < 6; round += 1) {
+      const sent = await request(clerk, wh1, store, [{ product: sugar, qty: '1' }]);
+      await transfers.ship(worker, sent.id);
+      await transfers.saveCounts(clerk, sent.id, [
+        { lineId: lineOf(sent, sugar.id).id, qty: new Decimal(1) },
+      ]);
+      const [finished, returned] = await Promise.allSettled([
+        transfers.finishCount(clerk, sent.id),
+        transfers.returnCount(worker, sent.id, 'Дахин тоолно уу'),
+      ]);
+      expect(finished.status).toBe('fulfilled');
+      const final = await transfers.get(sent.id);
+      if (returned.status === 'fulfilled') {
+        // The finish came first and the keeper sent it straight back.
+        expect(final).toMatchObject({ status: 'SHIPPED', countReturnReason: 'Дахин тоолно уу' });
+        await transfers.finishCount(clerk, sent.id);
+      } else {
+        expect(reasonCode(returned.reason)).toBe('DOC_STATE_INVALID');
+        expect(final.status).toBe('COUNTED');
+      }
+      ends.push(final.status);
+      await transfers.confirm(worker, sent.id);
+    }
+    expect(ends).toHaveLength(6);
+  });
+
+  it('lets a shipment and a take-back of the whole request run without a deadlock (ADR-0116 #7)', async () => {
+    const requests = app.get(TransferRequestsService);
+    const outcomes: string[] = [];
+    for (let round = 0; round < 6; round += 1) {
+      const made = await requests.create(clerk, {
+        destWarehouseId: store,
+        lines: [
+          { productId: flour.id, productUnitId: pcs(flour), qty: new Decimal(1) },
+          { productId: rice.id, productUnitId: pcs(rice), qty: new Decimal(1) },
+        ],
+      });
+      const sent = await requests.request(clerk, made.id);
+      const fromWh1 = sent.groups.find((group) => group.sourceWarehouseId === wh1);
+      if (!fromWh1) throw new Error('no group from WH1');
+      const [shipped, reopened] = await Promise.allSettled([
+        transfers.ship(worker, fromWh1.id),
+        requests.reopen(clerk, made.id),
+      ]);
+      const final = await requests.get(made.id);
+      if (shipped.status === 'fulfilled') {
+        // Shipped first: the take-back reaches only the other group, or nothing at all.
+        expect(final.groups.map((group) => group.status).sort()).toEqual(
+          reopened.status === 'fulfilled' ? ['DRAFT', 'SHIPPED'] : ['REQUESTED', 'SHIPPED'],
+        );
+        outcomes.push('shipped');
+        await receive(clerk, worker, fromWh1.id);
+        if (reopened.status === 'fulfilled') await requests.request(clerk, made.id);
+        for (const group of (await requests.get(made.id)).groups) {
+          if (group.status === 'REQUESTED') await transfers.cancel(clerk, group.id);
+        }
+      } else {
+        expect(reasonCode(shipped.reason)).toBe('DOC_STATE_INVALID');
+        expect(reopened.status).toBe('fulfilled');
+        expect(final.groups.map((group) => group.status)).toEqual(['DRAFT', 'DRAFT']);
+        outcomes.push('reopened');
+        await requests.cancel(clerk, made.id);
+      }
+    }
+    expect(outcomes).toHaveLength(6);
+    expect(await unbalancedTransit()).toEqual([]);
   });
 
   it('receives opposite transfers of the same products at once without deadlock', async () => {
@@ -292,8 +406,9 @@ describe('integrity: transfers', () => {
       });
       await transfers.ship(worker, toStore.id);
       await transfers.ship(clerk, back.id);
+      await count(clerk, toStore.id);
       const [one, two] = await Promise.all([
-        transfers.receive(clerk, toStore.id),
+        transfers.confirm(worker, toStore.id),
         transfers.receive(worker, back.id, [
           { lineId: lineOf(back, flour.id).id, binId: shelf },
           { lineId: lineOf(back, sugar.id).id, binId: shelf, qty: new Decimal(3) },
@@ -309,11 +424,10 @@ describe('integrity: transfers', () => {
     for (let round = 0; round < 6; round += 1) {
       const sent = await request(clerk, wh1, store, [{ product: flour, qty: '4' }]);
       await transfers.ship(worker, sent.id, [{ lineId: lineOf(sent, flour.id).id, binId: shelf }]);
+      await count(clerk, sent.id, [{ lineId: lineOf(sent, flour.id).id, qty: new Decimal(1) }]);
       const draft = await stocktakes.create(worker, { warehouseId: wh1, binIds: [shelf] });
       const [received, started] = await Promise.allSettled([
-        transfers.receive(clerk, sent.id, [
-          { lineId: lineOf(sent, flour.id).id, qty: new Decimal(1) },
-        ]),
+        transfers.confirm(worker, sent.id),
         stocktakes.start(worker, draft.id),
       ]);
       if (started.status !== 'fulfilled') throw started.reason;
@@ -329,9 +443,7 @@ describe('integrity: transfers', () => {
         expect(frozen?.toFixed(3)).toBe(await onHand(shelf, flour.id));
         outcomes.push('refused');
         await stocktakes.cancel(worker, draft.id);
-        await transfers.receive(clerk, sent.id, [
-          { lineId: lineOf(sent, flour.id).id, qty: new Decimal(1) },
-        ]);
+        await transfers.confirm(worker, sent.id);
       }
     }
     expect(outcomes).toHaveLength(6);
@@ -416,8 +528,9 @@ describe('integrity: transfers', () => {
     const shipped = await transfers.ship(worker, draft.id);
     expect(shipped.lines).toHaveLength(count);
     // A third arrives short by one, a third with one extra, the rest exactly.
-    const received = await transfers.receive(
+    const received = await receive(
       clerk,
+      worker,
       draft.id,
       shipped.lines.flatMap((line, index) =>
         index % 3 === 2 ? [] : [{ lineId: line.id, qty: new Decimal(index % 3 === 0 ? 1 : 3) }],

@@ -10,6 +10,7 @@ type Schemas = components['schemas'];
 const NOTHING: Schemas['InventoryAttention'] = {
   transfersToShip: 0,
   transfersToReceive: 0,
+  transfersToConfirm: 0,
   adjustmentsToApprove: 0,
   stocktakesToReview: 0,
   receiptsToCost: 0,

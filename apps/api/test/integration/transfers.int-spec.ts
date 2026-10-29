@@ -17,6 +17,9 @@ interface TransferLineJson {
   baseUnitId: number;
   baseUnitName: string;
   shippedQtyBase: string | null;
+  countedQtyBase: string | null;
+  countedAt: string | null;
+  unrequested: boolean;
   receivedQtyBase: string | null;
   fromBinId: number | null;
   fromBinCode: string | null;
@@ -28,9 +31,12 @@ interface TransferJson {
   number: string | null;
   origin: string;
   status: string;
+  requestId: number | null;
   sourceWarehouseId: number;
   destWarehouseId: number;
   shipDate: string | null;
+  countedAt: string | null;
+  countReturnReason: string | null;
   receiveDate: string | null;
   cancelReason: string | null;
   lines: TransferLineJson[];
@@ -83,14 +89,53 @@ describe('transfers', () => {
 
   const create = (token: string, body: Record<string, unknown>) =>
     http().post('/api/v1/transfers').set(bearer(token)).set(idempotency()).send(body);
+  const IDEMPOTENT = new Set(['ship', 'receive', 'confirm', 'count-lines']);
   const step = (token: string, id: number, name: string, body: Record<string, unknown> = {}) => {
     const call = http().post(`/api/v1/transfers/${id}/${name}`).set(bearer(token));
-    return (name === 'ship' || name === 'receive' ? call.set(idempotency()) : call).send(body);
+    return (IDEMPOTENT.has(name) ? call.set(idempotency()) : call).send(body);
   };
   const requested = async (token: string, body: Record<string, unknown>) => {
     const draft = (await create(token, { origin: 'REQUEST', ...body }).expect(201))
       .body as TransferJson;
     return (await step(token, draft.id, 'request').expect(200)).body as TransferJson;
+  };
+  const detailOf = async (id: number) =>
+    (await http().get(`/api/v1/transfers/${id}`).set(bearer(admin)).expect(200))
+      .body as TransferJson;
+  /**
+   * A request's receipt since ADR-0116: the destination counts every line (what was shipped unless
+   * said otherwise) and finishes; the source confirms, which posts the receive legs.
+   */
+  const countAll = async (
+    token: string,
+    id: number,
+    counts: { lineId: number; productUnitId?: number; qty: string }[] = [],
+  ) => {
+    const transfer = await detailOf(id);
+    const byLine = new Map(counts.map((count) => [count.lineId, count]));
+    // Lines not named count as shipped; a line the store added keeps its own count.
+    const entries = transfer.lines.flatMap((line) => {
+      const given = byLine.get(line.id);
+      if (given) return [given];
+      if (line.unrequested) return [];
+      return [{ lineId: line.id, productUnitId: line.baseUnitId, qty: line.shippedQtyBase ?? '0' }];
+    });
+    await http()
+      .put(`/api/v1/transfers/${id}/counts`)
+      .set(bearer(token))
+      .send({ entries })
+      .expect(200);
+    return (await step(token, id, 'finish-count').expect(200)).body as TransferJson;
+  };
+  const receive = async (
+    destToken: string,
+    sourceToken: string,
+    id: number,
+    counts: { lineId: number; productUnitId?: number; qty: string }[] = [],
+  ) => {
+    const counted = await countAll(destToken, id, counts);
+    expect(counted.status).toBe('COUNTED');
+    return (await step(sourceToken, id, 'confirm').expect(200)).body as TransferJson;
   };
 
   const binQty = async (bin: number, productId: number) => {
@@ -269,7 +314,18 @@ describe('transfers', () => {
     ]);
     expect(await stockOf(store.id, cola.id)).toMatchObject({ on_hand: '0' });
 
-    const received = (await step(clerk, draft.id, 'receive').expect(200)).body as TransferJson;
+    // A request is counted by the store and confirmed by the sender (ADR-0116); the store's clerk
+    // cannot confirm, and the old one-step receipt is refused on a request.
+    expect((await step(clerk, draft.id, 'receive').expect(409)).body).toMatchObject({
+      code: 'DOC_STATE_INVALID',
+    });
+    const counted = await countAll(clerk, draft.id);
+    expect(counted).toMatchObject({ status: 'COUNTED', countReturnReason: null });
+    expect(counted.countedAt).toEqual(expect.any(String));
+    expect(lineOf(counted, cola)).toMatchObject({ countedQtyBase: '48', unrequested: false });
+    expect(await stockOf(store.id, cola.id)).toMatchObject({ on_hand: '0' });
+    await step(clerk, draft.id, 'confirm').expect(403);
+    const received = (await step(worker, draft.id, 'confirm').expect(200)).body as TransferJson;
     expect(received).toMatchObject({ status: 'RECEIVED' });
     expect(lineOf(received, cola)).toMatchObject({
       receivedQtyBase: '48',
@@ -305,7 +361,20 @@ describe('transfers', () => {
       `SELECT action FROM audit_log WHERE entity = 'transfers' AND entity_id = $1 ORDER BY id`,
       [String(draft.id)],
     );
-    expect(audit.map((row) => row.action)).toEqual(['CREATE', 'REQUEST', 'SHIP', 'RECEIVE']);
+    expect(audit.map((row) => row.action)).toEqual([
+      'CREATE',
+      'REQUEST',
+      'SHIP',
+      'SUBMIT',
+      'RECEIVE',
+    ]);
+    // Every request has a header since ADR-0116, one group here, at the group's status.
+    const { rows: headers } = await sql.query<{ status: string; count: string }>(
+      `SELECT r.status, (SELECT count(*) FROM transfers t WHERE t.request_id = r.id)::text AS count
+         FROM transfer_requests r WHERE r.id = $1`,
+      [received.requestId],
+    );
+    expect(headers).toEqual([{ status: 'RECEIVED', count: '1' }]);
   });
 
   it('returns a shortfall to the sender’s shelf and takes a surplus out of the sender’s stock', async () => {
@@ -321,14 +390,10 @@ describe('transfers', () => {
     expect(lineOf(shipped, water)).toMatchObject({ shippedQtyBase: '10', fromBinCode: 'A-01-02' });
 
     // One box and 20 pieces of cola arrived (4 short); 12 bottles of water (2 extra).
-    const received = (
-      await step(clerk, sent.id, 'receive', {
-        lines: [
-          { lineId: lineOf(shipped, cola).id, productUnitId: pcs(cola), qty: '44' },
-          { lineId: lineOf(shipped, water).id, qty: '12' },
-        ],
-      }).expect(200)
-    ).body as TransferJson;
+    const received = await receive(clerk, worker, sent.id, [
+      { lineId: lineOf(shipped, cola).id, productUnitId: pcs(cola), qty: '44' },
+      { lineId: lineOf(shipped, water).id, qty: '12' },
+    ]);
     expect(lineOf(received, cola).receivedQtyBase).toBe('44');
     expect(lineOf(received, water).receivedQtyBase).toBe('12');
     expect((await legsOf(sent.id, cola.id)).slice(2)).toEqual([
@@ -417,12 +482,10 @@ describe('transfers', () => {
     expect(lineOf(shipped, soap)).toMatchObject({ shippedQtyBase: '1', fromBinCode: 'A-02-01' });
 
     // No cola arrived; 29 bottles of water too many: more than its shelf A-02-01 still holds (23).
-    await step(clerk, sent.id, 'receive', {
-      lines: [
-        { lineId: lineOf(shipped, cola).id, qty: '0' },
-        { lineId: lineOf(shipped, water).id, qty: '30' },
-      ],
-    }).expect(200);
+    await receive(clerk, worker, sent.id, [
+      { lineId: lineOf(shipped, cola).id, qty: '0' },
+      { lineId: lineOf(shipped, water).id, qty: '30' },
+    ]);
     expect((await legsOf(sent.id, cola.id)).slice(2)).toEqual([
       {
         movement_type: 'TRANSFER_OUT',
@@ -604,11 +667,31 @@ describe('transfers', () => {
       code: 'DOC_STATE_INVALID',
     });
     // A count must be exact in base units.
-    const inexact = await step(clerk, sent.id, 'receive', {
-      lines: [{ lineId: lineOf(sent, water).id, productUnitId: box(water), qty: '0.3' }],
-    }).expect(422);
+    const inexact = await http()
+      .put(`/api/v1/transfers/${sent.id}/counts`)
+      .set(bearer(clerk))
+      .send({
+        entries: [{ lineId: lineOf(sent, water).id, productUnitId: box(water), qty: '0.3' }],
+      })
+      .expect(422);
     expect((inexact.body as ProblemJson).code).toBe('UNIT_FACTOR_INEXACT');
-    await step(clerk, sent.id, 'receive').expect(200);
+    // Nothing is confirmed before every line is counted; the sender's right stops at its side.
+    expect((await step(clerk, sent.id, 'finish-count').expect(409)).body).toMatchObject({
+      code: 'TRANSFER_LINES_UNCOUNTED',
+      params: { count: 1 },
+    });
+    await http()
+      .put(`/api/v1/transfers/${sent.id}/counts`)
+      .set(bearer(wh1Worker))
+      .send({ entries: [{ lineId: lineOf(sent, water).id, qty: '3' }] })
+      .expect(403);
+    expect((await step(worker, sent.id, 'confirm').expect(409)).body).toMatchObject({
+      code: 'DOC_STATE_INVALID',
+    });
+    await receive(clerk, worker, sent.id);
+    expect((await step(worker, sent.id, 'confirm').expect(409)).body).toMatchObject({
+      code: 'DOC_ALREADY_POSTED',
+    });
     expect((await step(clerk, sent.id, 'receive').expect(409)).body).toMatchObject({
       code: 'DOC_ALREADY_POSTED',
     });
@@ -699,7 +782,7 @@ describe('transfers', () => {
     expect((await step(clerk, sent.id, 'reopen').expect(409)).body).toMatchObject({
       code: 'DOC_STATE_INVALID',
     });
-    await step(clerk, sent.id, 'receive').expect(200);
+    await receive(clerk, wh1Worker, sent.id);
     const unsent = (
       await create(clerk, {
         origin: 'REQUEST',
@@ -735,7 +818,96 @@ describe('transfers', () => {
       'RETURN',
       'REQUEST',
       'SHIP',
+      'SUBMIT',
       'RECEIVE',
     ]);
+  });
+
+  it('lets the sender send a count back, and takes an unrequested product as a surplus (ADR-0116)', async () => {
+    const sent = await requested(clerk, {
+      sourceWarehouseId: wh1.id,
+      destWarehouseId: store.id,
+      lines: [{ productUnitId: pcs(water), qty: '5' }],
+    });
+    const shipped = (await step(worker, sent.id, 'ship').expect(200)).body as TransferJson;
+    // The store finds 2 pieces of cola that were not asked for: a line of its own, counted at once.
+    const extra = (
+      await step(clerk, sent.id, 'count-lines', {
+        productId: cola.id,
+        productUnitId: pcs(cola),
+        qty: '2',
+      }).expect(200)
+    ).body as TransferJson;
+    expect(lineOf(extra, cola)).toMatchObject({
+      unrequested: true,
+      requestedQty: '0',
+      shippedQtyBase: '0',
+      countedQtyBase: '2',
+    });
+    expect(
+      (
+        await step(clerk, sent.id, 'count-lines', {
+          productId: cola.id,
+          productUnitId: pcs(cola),
+          qty: '1',
+        }).expect(409)
+      ).body,
+    ).toMatchObject({ code: 'DUPLICATE_VALUE' });
+    // The sender cannot send back what is still being counted.
+    expect(
+      (await step(worker, sent.id, 'return-count', { reason: 'Дахин тоолно уу' }).expect(409)).body,
+    ).toMatchObject({ code: 'DOC_STATE_INVALID' });
+    const counted = await countAll(clerk, sent.id, [
+      { lineId: lineOf(shipped, water).id, qty: '4' },
+    ]);
+    expect(counted.status).toBe('COUNTED');
+    // The sender sends it back with a reason: the counts stay, the store counts again.
+    await step(worker, sent.id, 'return-count', {}).expect(422);
+    const returned = (
+      await step(worker, sent.id, 'return-count', { reason: 'Усыг дахин тоолно уу' }).expect(200)
+    ).body as TransferJson;
+    expect(returned).toMatchObject({
+      status: 'SHIPPED',
+      countedAt: null,
+      countReturnReason: 'Усыг дахин тоолно уу',
+    });
+    expect(lineOf(returned, water).countedQtyBase).toBe('4');
+    // Pressed again, nothing changes; the store finishes again over its counts.
+    expect(
+      (await step(worker, sent.id, 'return-count', { reason: 'x' }).expect(200)).body,
+    ).toMatchObject({ status: 'SHIPPED' });
+    await http()
+      .put(`/api/v1/transfers/${sent.id}/counts`)
+      .set(bearer(clerk))
+      .send({ entries: [{ lineId: lineOf(shipped, water).id, qty: '5' }] })
+      .expect(200);
+    const again = (await step(clerk, sent.id, 'finish-count').expect(200)).body as TransferJson;
+    expect(again).toMatchObject({ status: 'COUNTED', countReturnReason: null });
+    expect((await step(clerk, sent.id, 'finish-count').expect(200)).body).toMatchObject({
+      status: 'COUNTED',
+    });
+    // Confirmed: the water arrives whole, the cola leaves the sender's shelf for the store.
+    const received = (await step(worker, sent.id, 'confirm').expect(200)).body as TransferJson;
+    expect(received.status).toBe('RECEIVED');
+    expect((await legsOf(sent.id, cola.id)).map((row) => [row.leg, row.bin, row.qty_base])).toEqual(
+      [
+        [5, 'A-01-01', '-2.000'],
+        [6, 'SALESFLOOR', '2.000'],
+      ],
+    );
+    expect(
+      (await legsOf(sent.id, water.id)).map((row) => [row.leg, row.bin, row.qty_base]),
+    ).toEqual([
+      [1, 'A-01-02', '-5.000'],
+      [2, 'TRANSIT', '5.000'],
+      [3, 'TRANSIT', '-5.000'],
+      [4, 'SALESFLOOR', '5.000'],
+    ]);
+    expect(await transitLeft(sent.id)).toEqual({ qty: '0.000', value: '0.0000000' });
+    const attention = await http()
+      .get('/api/v1/inventory/attention')
+      .set(bearer(wh1Worker))
+      .expect(200);
+    expect((attention.body as { transfersToConfirm: number }).transfersToConfirm).toBe(0);
   });
 });

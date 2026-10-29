@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   formatDocNumber,
+  lowestTransferStatus,
   SELLABLE_BIN_TYPES,
   type TransferOrigin,
   transferReceiveLegs,
@@ -24,7 +25,7 @@ import {
   ScopeService,
   type Warehouse,
 } from '../../identity';
-import { binStock, bins, transferLines, transfers } from '../schema';
+import { binStock, bins, transferLines, transferRequests, transfers } from '../schema';
 import { BinsService } from './bins.service';
 import { ProductLocationsService } from './product-locations.service';
 import { type Movement, StockPostingService } from './stock-posting.service';
@@ -52,6 +53,19 @@ export interface TransferInput {
   destWarehouseId: number;
   note?: string | null;
   lines?: readonly TransferLineInput[];
+  /**
+   * The request this REQUEST group joins (ADR-0116); without it a REQUEST gets a header of its own.
+   * Only `TransferRequestsService` passes one.
+   */
+  requestId?: number;
+}
+
+/** A product the destination found that was not asked for (ADR-0116 #5). */
+export interface UnrequestedLineInput {
+  productId: number;
+  /** The scanned unit; the quantity is in it. */
+  productUnitId: number;
+  qty: Decimal;
 }
 
 /**
@@ -81,6 +95,11 @@ export interface TransferLine {
   baseUnitId: number;
   baseUnitName: string;
   shippedQtyBase: Decimal | null;
+  /** What the destination counted on a shipped request (ADR-0116); null until counted, 0 = none. */
+  countedQtyBase: Decimal | null;
+  countedAt: Date | null;
+  /** Found at the destination without being asked for: requested 0, shipped 0. */
+  unrequested: boolean;
   receivedQtyBase: Decimal | null;
   /** The source bin: chosen when shipped; until then the suggested one (null: to be scanned). */
   fromBinId: number | null;
@@ -95,12 +114,18 @@ export interface TransferDetail {
   number: string | null;
   origin: TransferOrigin;
   status: TransferStatus;
+  /** The request this group belongs to (every REQUEST has one since ADR-0116; a PUSH none). */
+  requestId: number | null;
   sourceWarehouseId: number;
   destWarehouseId: number;
   note: string | null;
   requestedAt: Date | null;
   shippedAt: Date | null;
   shipDate: string | null;
+  /** The destination finished its count (COUNTED); cleared when the source sends it back. */
+  countedAt: Date | null;
+  /** Why the source sent the count back, while the destination counts again. */
+  countReturnReason: string | null;
   receivedAt: Date | null;
   receiveDate: string | null;
   cancelledAt: Date | null;
@@ -115,6 +140,7 @@ export interface TransferSummary {
   number: string | null;
   origin: TransferOrigin;
   status: TransferStatus;
+  requestId: number | null;
   sourceWarehouseId: number;
   destWarehouseId: number;
   lineCount: number;
@@ -132,6 +158,8 @@ export interface TransferQuery {
   direction?: 'INCOMING' | 'OUTGOING';
   warehouseId?: number;
   status?: TransferStatus;
+  /** The groups of one request (ADR-0116). */
+  requestId?: number;
   cursor?: string;
   limit?: number;
 }
@@ -140,6 +168,11 @@ interface LineUpdate {
   id: number;
   qtyBase: Decimal;
   binId: number | null;
+}
+
+/** A counted line (ADR-0116 #4): the quantity is required, 0 = «ирээгүй». */
+export interface TransferCountEntry extends TransferCount {
+  qty: Decimal;
 }
 
 /**
@@ -163,7 +196,16 @@ export class TransfersService {
     private readonly units: UnitConversionService,
   ) {}
 
-  async create(ctx: AuthContext, input: TransferInput): Promise<TransferDetail> {
+  create(ctx: AuthContext, input: TransferInput): Promise<TransferDetail> {
+    return inTransaction(this.db, (tx) => this.createInTx(tx, ctx, input));
+  }
+
+  /**
+   * A draft by the side that owns it. A REQUEST without `requestId` gets a request header of its
+   * own (ADR-0116 #1: every request has one, a one-source web request included); with one, the
+   * group joins that draft request, whose row the caller has locked.
+   */
+  async createInTx(tx: Tx, ctx: AuthContext, input: TransferInput): Promise<TransferDetail> {
     this.scope.assertCanWriteWarehouse(ctx, ownerSide(input));
     if (input.sourceWarehouseId === input.destWarehouseId) {
       throw invalid('destWarehouseId', 'different', 'the destination differs from the source');
@@ -171,37 +213,73 @@ export class TransfersService {
     if ((input.lines?.length ?? 0) > MAX_TRANSFER_LINES) {
       throw invalid('lines', 'max', `at most ${MAX_TRANSFER_LINES} lines`);
     }
-    return inTransaction(this.db, async (tx) => {
-      for (const warehouseId of [input.sourceWarehouseId, input.destWarehouseId]) {
-        const warehouse = await this.org.getWarehouse(warehouseId, tx);
-        if (!TRANSFER_KINDS.includes(warehouse.kind)) {
-          throw new AppError(
-            'WAREHOUSE_KIND_NOT_ALLOWED',
-            `no transfers with a ${warehouse.kind} warehouse`,
-            { kind: warehouse.kind },
-          );
-        }
+    if (input.requestId !== undefined && input.origin !== 'REQUEST') {
+      throw invalid('requestId', 'origin', 'only a request has groups');
+    }
+    for (const warehouseId of [input.sourceWarehouseId, input.destWarehouseId]) {
+      const warehouse = await this.org.getWarehouse(warehouseId, tx);
+      if (!TRANSFER_KINDS.includes(warehouse.kind)) {
+        throw new AppError(
+          'WAREHOUSE_KIND_NOT_ALLOWED',
+          `no transfers with a ${warehouse.kind} warehouse`,
+          { kind: warehouse.kind },
+        );
       }
-      const [header] = await tx
-        .insert(transfers)
+    }
+    let requestId: number | null = null;
+    if (input.requestId !== undefined) {
+      const [request] = await tx
+        .select()
+        .from(transferRequests)
+        .where(eq(transferRequests.id, input.requestId));
+      if (!request) throw notFound('transfer request', input.requestId);
+      if (request.destWarehouseId !== input.destWarehouseId) {
+        throw invalid('destWarehouseId', 'request', 'the destination of the request');
+      }
+      if (request.status !== 'DRAFT') {
+        throw new AppError('DOC_STATE_INVALID', `request ${request.id} is ${request.status}`, {
+          status: request.status,
+        });
+      }
+      requestId = request.id;
+    } else if (input.origin === 'REQUEST') {
+      const [request] = await tx
+        .insert(transferRequests)
         .values({
-          origin: input.origin,
-          sourceWarehouseId: input.sourceWarehouseId,
           destWarehouseId: input.destWarehouseId,
           note: optionalText(input.note) ?? null,
           createdBy: actorUserId(ctx),
         })
         .returning();
-      if (!header) throw new Error('transfer insert returned no row');
-      for (const line of input.lines ?? []) await this.insertLine(tx, header, line);
+      if (!request) throw new Error('transfer request insert returned no row');
+      requestId = request.id;
       await this.audit.record(tx, ctx, {
         action: 'CREATE',
-        entity: 'transfers',
-        entityId: header.id,
-        after: header,
+        entity: 'transfer_requests',
+        entityId: request.id,
+        after: request,
       });
-      return this.get(header.id, tx);
+    }
+    const [header] = await tx
+      .insert(transfers)
+      .values({
+        origin: input.origin,
+        requestId,
+        sourceWarehouseId: input.sourceWarehouseId,
+        destWarehouseId: input.destWarehouseId,
+        note: optionalText(input.note) ?? null,
+        createdBy: actorUserId(ctx),
+      })
+      .returning();
+    if (!header) throw new Error('transfer insert returned no row');
+    for (const line of input.lines ?? []) await this.insertLine(tx, header, line);
+    await this.audit.record(tx, ctx, {
+      action: 'CREATE',
+      entity: 'transfers',
+      entityId: header.id,
+      after: header,
     });
+    return this.get(header.id, tx);
   }
 
   update(ctx: AuthContext, id: number, patch: { note?: string | null }): Promise<TransferDetail> {
@@ -269,9 +347,19 @@ export class TransfersService {
     });
   }
 
+  /**
+   * A draft's line goes by its owner side; an unrequested line found while counting goes by the
+   * destination while the group is still SHIPPED (ADR-0116 #5).
+   */
   removeLine(ctx: AuthContext, lineId: number): Promise<TransferDetail> {
     return inTransaction(this.db, async (tx) => {
-      const { header } = await this.lockLine(tx, ctx, lineId);
+      const { header, line } = await this.lockLine(tx, ctx, lineId, 'any');
+      if (line.unrequested && header.status === 'SHIPPED') {
+        this.scope.assertCanWriteWarehouse(ctx, header.destWarehouseId);
+      } else {
+        this.scope.assertCanWriteWarehouse(ctx, ownerSide(header));
+        assertStatus(header, 'DRAFT', []);
+      }
       await tx.delete(transferLines).where(eq(transferLines.id, lineId));
       await this.touch(tx, header.id);
       return this.get(header.id, tx);
@@ -280,7 +368,11 @@ export class TransfersService {
 
   /** DRAFT → REQUESTED by the destination: the request gets its number (ADR-0035 #3). */
   request(ctx: AuthContext, id: number): Promise<TransferDetail> {
-    return inTransaction(this.db, async (tx) => {
+    return inTransaction(this.db, (tx) => this.requestInTx(tx, ctx, id));
+  }
+
+  async requestInTx(tx: Tx, ctx: AuthContext, id: number): Promise<TransferDetail> {
+    {
       const header = await this.lockDraft(tx, ctx, id);
       if (header.origin !== 'REQUEST') {
         throw invalid('origin', 'request', 'a push is shipped by its sender, not requested');
@@ -311,8 +403,9 @@ export class TransfersService {
         before: header,
         after: { number },
       });
+      await this.refreshRequestStatus(tx, header.requestId);
       return this.get(id, tx);
-    });
+    }
   }
 
   /**
@@ -321,7 +414,11 @@ export class TransfersService {
    * take-back exactly one wins; pressed twice, the draft is answered as it is.
    */
   reopen(ctx: AuthContext, id: number): Promise<TransferDetail> {
-    return inTransaction(this.db, async (tx) => {
+    return inTransaction(this.db, (tx) => this.reopenInTx(tx, ctx, id));
+  }
+
+  async reopenInTx(tx: Tx, ctx: AuthContext, id: number): Promise<TransferDetail> {
+    {
       const header = await this.lockHeader(tx, id);
       this.scope.assertCanWriteWarehouse(ctx, ownerSide(header));
       if (header.status === 'DRAFT' && header.number !== null) return this.get(id, tx);
@@ -341,8 +438,9 @@ export class TransfersService {
         before: header,
         after: { status: 'DRAFT', number: header.number },
       });
+      await this.refreshRequestStatus(tx, header.requestId);
       return this.get(id, tx);
-    });
+    }
   }
 
   /**
@@ -438,14 +536,16 @@ export class TransfersService {
           })),
         },
       });
+      await this.refreshRequestStatus(tx, header.requestId);
       return this.get(id, tx);
     });
   }
 
   /**
-   * The destination receives a shipped transfer: TRANSIT empties (leg 3), the goods arrive
+   * The destination receives a shipped PUSH in one step: TRANSIT empties (leg 3), the goods arrive
    * (leg 4), a shortfall returns to the sender's shelf (leg 6) and a surplus leaves the sender's
    * stock for the destination (legs 5 and 6). The home rule is never checked here (ADR-0035 #6).
+   * A request is counted by the destination and confirmed by the source instead (ADR-0116 #6).
    */
   receive(
     ctx: AuthContext,
@@ -455,6 +555,15 @@ export class TransfersService {
     return inTransaction(this.db, async (tx) => {
       const header = await this.lockHeader(tx, id);
       this.scope.assertCanWriteWarehouse(ctx, header.destWarehouseId);
+      if (header.origin === 'REQUEST' && header.status !== 'RECEIVED') {
+        throw new AppError(
+          'DOC_STATE_INVALID',
+          `transfer ${id} is a request: it is counted, then confirmed`,
+          {
+            status: header.status,
+          },
+        );
+      }
       assertStatus(header, 'SHIPPED', ['RECEIVED']);
       const lines = await this.linesOf(tx, id);
       const byLine = countsByLine(lines, counts);
@@ -470,85 +579,285 @@ export class TransfersService {
         const binId = count?.binId ?? suggested.get(line.productId) ?? null;
         plan.push({ id: line.id, qtyBase, binId: qtyBase.gt(0) ? binId : null });
       }
+      await this.postReceiveInTx(tx, ctx, header, lines, plan, dest);
+      return this.get(id, tx);
+    });
+  }
+
+  /**
+   * The destination's counts on a shipped request (ADR-0116 #4), saved line by line as they are
+   * typed or scanned: the quantity in any current unit (0 = «ирээгүй»), and the shelf the goods
+   * were put on when one was scanned. Saved until the count is finished; a group sent back by the
+   * source is counted again over the saved counts.
+   */
+  saveCounts(
+    ctx: AuthContext,
+    id: number,
+    entries: readonly TransferCountEntry[],
+  ): Promise<TransferDetail> {
+    return inTransaction(this.db, async (tx) => {
+      const header = await this.lockHeader(tx, id);
+      this.scope.assertCanWriteWarehouse(ctx, header.destWarehouseId);
+      this.assertCounting(header);
+      const lines = await this.linesOf(tx, id);
+      const byLine = countsByLine(lines, entries);
+      const lineById = new Map(lines.map((line) => [line.id, line]));
+      const plan: LineUpdate[] = [];
+      for (const [lineId, entry] of byLine) {
+        const line = lineOf(lineById, lineId);
+        const qtyBase = await this.countToBase(tx, line, entry);
+        plan.push({ id: lineId, qtyBase, binId: entry.binId ?? line.toBinId });
+      }
       await this.assertBinsIn(
         tx,
-        dest.id,
-        plan.flatMap((entry) => (entry.qtyBase.gt(0) ? [entry.binId] : [])),
+        header.destWarehouseId,
+        plan.map((entry) => entry.binId),
       );
+      await this.updateLines(tx, plan, 'count');
+      await this.touch(tx, id);
+      return this.get(id, tx);
+    });
+  }
 
-      const lineById = new Map(lines.map((line) => [line.id, line]));
-      const transit = await this.org.getTransitWarehouse(tx);
-      const transitBin = await this.bins.systemBin(transit.id, 'TRANSIT', tx);
-      const returnBins = await this.returnBins(tx, header.sourceWarehouseId, lines);
-      const surplus = plan.flatMap((entry) => {
-        const line = lineOf(lineById, entry.id);
-        const extra = entry.qtyBase.minus(line.shippedQtyBase ?? ZERO);
-        return extra.gt(0) ? [{ line, extra }] : [];
-      });
-      const surplusBins = await this.surplusBins(tx, header.sourceWarehouseId, surplus);
-      const baseUnits = await this.baseUnitsOf(
-        tx,
-        lines.map((line) => line.productId),
-      );
-
-      const movements: Movement[] = [];
-      for (const entry of plan) {
-        const line = lineOf(lineById, entry.id);
-        const unit = baseUnitOf(baseUnits, line.productId);
-        for (const leg of transferReceiveLegs(line.shippedQtyBase ?? ZERO, entry.qtyBase)) {
-          const [warehouseId, binId] =
-            leg.place === 'TRANSIT'
-              ? [transit.id, transitBin.id]
-              : leg.place === 'DESTINATION'
-                ? [dest.id, entry.binId]
-                : [
-                    header.sourceWarehouseId,
-                    leg.movementType === 'TRANSFER_IN'
-                      ? returnBins.get(line.id)
-                      : surplusBins.get(line.id),
-                  ];
-          movements.push(
-            legOf(
-              header,
-              line,
-              unit,
-              leg.movementType,
-              leg.leg,
-              warehouseId,
-              binId ?? null,
-              leg.qty,
-            ),
-          );
-        }
+  /**
+   * A product found at the destination that was not asked for (ADR-0116 #5): a line with nothing
+   * requested or shipped, counted at once; the confirmation takes it from the sender's stock as a
+   * surplus (legs 5 and 6).
+   */
+  addCountLine(ctx: AuthContext, id: number, input: UnrequestedLineInput): Promise<TransferDetail> {
+    return inTransaction(this.db, async (tx) => {
+      const header = await this.lockHeader(tx, id);
+      this.scope.assertCanWriteWarehouse(ctx, header.destWarehouseId);
+      this.assertCounting(header);
+      if (input.qty.isNegative()) throw invalid('qty', 'min', 'never negative');
+      const converted = await this.units.toBase(input.productUnitId, input.qty, tx);
+      if (converted.productId !== input.productId) {
+        throw invalid('productUnitId', 'product', 'a unit of the product');
       }
-      await this.updateLines(tx, plan, 'receive');
-      await this.posting.post(tx, ctx, {
-        docs: [
-          {
-            docType: 'TR',
-            docId: id,
-            expectedStatus: 'SHIPPED',
-            nextStatus: 'RECEIVED',
-            allocateNumber: false,
-          },
-        ],
-        movements,
+      const lines = await this.linesOf(tx, id);
+      if (lines.length >= MAX_TRANSFER_LINES) {
+        throw invalid('lines', 'max', `at most ${MAX_TRANSFER_LINES} lines`);
+      }
+      if (lines.some((line) => line.productId === input.productId && line.lotId === null)) {
+        throw new AppError('DUPLICATE_VALUE', 'the product is already on the transfer', {
+          field: 'productId',
+        });
+      }
+      await tx.insert(transferLines).values({
+        transferId: id,
+        productId: converted.productId,
+        requestUnitId: converted.unitId,
+        requestFactor: converted.factorSnapshot,
+        requestedQty: ZERO,
+        shippedQtyBase: ZERO,
+        countedQtyBase: converted.qtyBase,
+        countedAt: sql`now()`,
+        unrequested: true,
       });
+      await this.touch(tx, id);
+      return this.get(id, tx);
+    });
+  }
+
+  /**
+   * SHIPPED → COUNTED by the destination (ADR-0116 #4): every line counted or marked «ирээгүй»;
+   * the source then sees the differences and confirms. Pressed again on a counted group, it
+   * answers the group as it is.
+   */
+  finishCount(ctx: AuthContext, id: number): Promise<TransferDetail> {
+    return inTransaction(this.db, async (tx) => {
+      const header = await this.lockHeader(tx, id);
+      this.scope.assertCanWriteWarehouse(ctx, header.destWarehouseId);
+      if (header.status === 'COUNTED') return this.get(id, tx);
+      this.assertCounting(header);
+      const lines = await this.linesOf(tx, id);
+      const uncounted = lines.filter((line) => line.countedQtyBase === null).length;
+      if (uncounted > 0) {
+        throw new AppError('TRANSFER_LINES_UNCOUNTED', `transfer ${id} has uncounted lines`, {
+          count: uncounted,
+        });
+      }
+      await tx
+        .update(transfers)
+        .set({
+          status: 'COUNTED',
+          countedAt: sql`now()`,
+          countedBy: actorUserId(ctx),
+          countReturnReason: null,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(transfers.id, id));
       await this.audit.record(tx, ctx, {
-        action: 'RECEIVE',
+        action: 'SUBMIT',
         entity: 'transfers',
         entityId: id,
         before: { status: header.status },
         after: {
-          lines: plan.map((entry) => ({
-            id: entry.id,
-            receivedQtyBase: entry.qtyBase.toFixed(),
-            toBinId: entry.binId,
+          status: 'COUNTED',
+          lines: lines.map((line) => ({
+            id: line.id,
+            countedQtyBase: line.countedQtyBase?.toFixed() ?? null,
+            unrequested: line.unrequested,
           })),
         },
       });
+      await this.refreshRequestStatus(tx, header.requestId);
       return this.get(id, tx);
     });
+  }
+
+  /**
+   * COUNTED → SHIPPED by the source, with a reason (ADR-0116 #6): the destination counts again
+   * over its saved counts. Pressed again on the returned group, it answers the group as it is.
+   */
+  returnCount(ctx: AuthContext, id: number, reason: string): Promise<TransferDetail> {
+    return inTransaction(this.db, async (tx) => {
+      const header = await this.lockHeader(tx, id);
+      this.scope.assertCanWriteWarehouse(ctx, header.sourceWarehouseId);
+      if (header.status === 'SHIPPED' && header.countReturnReason !== null) {
+        return this.get(id, tx);
+      }
+      assertStatus(header, 'COUNTED', ['RECEIVED']);
+      const text = optionalText(reason);
+      if (!text) throw invalid('reason', 'required', 'why the count goes back');
+      await tx
+        .update(transfers)
+        .set({
+          status: 'SHIPPED',
+          countedAt: null,
+          countedBy: null,
+          countReturnReason: text,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(transfers.id, id));
+      await this.audit.record(tx, ctx, {
+        action: 'RETURN',
+        entity: 'transfers',
+        entityId: id,
+        before: { status: header.status, countedAt: header.countedAt },
+        after: { status: 'SHIPPED', reason: text },
+      });
+      await this.refreshRequestStatus(tx, header.requestId);
+      return this.get(id, tx);
+    });
+  }
+
+  /**
+   * COUNTED → RECEIVED by the source (ADR-0116 #6): the receipt is posted with what the
+   * destination counted — the legs of ADR-0035 #4, a shortfall back onto the sender's shelf, a
+   * surplus and every unrequested line out of the sender's stock.
+   */
+  confirm(ctx: AuthContext, id: number): Promise<TransferDetail> {
+    return inTransaction(this.db, async (tx) => {
+      const header = await this.lockHeader(tx, id);
+      this.scope.assertCanWriteWarehouse(ctx, header.sourceWarehouseId);
+      assertStatus(header, 'COUNTED', ['RECEIVED']);
+      const lines = await this.linesOf(tx, id);
+      const dest = await this.org.getWarehouse(header.destWarehouseId, tx);
+      const suggested = await this.destinationBins(tx, dest, lines);
+      const plan: LineUpdate[] = lines.map((line) => {
+        if (line.countedQtyBase === null) {
+          throw new Error(`transfer line ${line.id} is not counted`);
+        }
+        const binId = line.toBinId ?? suggested.get(line.productId) ?? null;
+        return {
+          id: line.id,
+          qtyBase: line.countedQtyBase,
+          binId: line.countedQtyBase.gt(0) ? binId : null,
+        };
+      });
+      await this.postReceiveInTx(tx, ctx, header, lines, plan, dest);
+      await this.refreshRequestStatus(tx, header.requestId);
+      return this.get(id, tx);
+    });
+  }
+
+  /** The receive legs and the posting shared by a push's receipt and a request's confirmation. */
+  private async postReceiveInTx(
+    tx: Tx,
+    ctx: AuthContext,
+    header: TransferRow,
+    lines: readonly TransferLineRow[],
+    plan: readonly LineUpdate[],
+    dest: Warehouse,
+  ): Promise<void> {
+    await this.assertBinsIn(
+      tx,
+      dest.id,
+      plan.flatMap((entry) => (entry.qtyBase.gt(0) ? [entry.binId] : [])),
+    );
+    const lineById = new Map(lines.map((line) => [line.id, line]));
+    const transit = await this.org.getTransitWarehouse(tx);
+    const transitBin = await this.bins.systemBin(transit.id, 'TRANSIT', tx);
+    const returnBins = await this.returnBins(tx, header.sourceWarehouseId, lines);
+    const surplus = plan.flatMap((entry) => {
+      const line = lineOf(lineById, entry.id);
+      const extra = entry.qtyBase.minus(line.shippedQtyBase ?? ZERO);
+      return extra.gt(0) ? [{ line, extra }] : [];
+    });
+    const surplusBins = await this.surplusBins(tx, header.sourceWarehouseId, surplus);
+    const baseUnits = await this.baseUnitsOf(
+      tx,
+      lines.map((line) => line.productId),
+    );
+
+    const movements: Movement[] = [];
+    for (const entry of plan) {
+      const line = lineOf(lineById, entry.id);
+      const unit = baseUnitOf(baseUnits, line.productId);
+      for (const leg of transferReceiveLegs(line.shippedQtyBase ?? ZERO, entry.qtyBase)) {
+        const [warehouseId, binId] =
+          leg.place === 'TRANSIT'
+            ? [transit.id, transitBin.id]
+            : leg.place === 'DESTINATION'
+              ? [dest.id, entry.binId]
+              : [
+                  header.sourceWarehouseId,
+                  leg.movementType === 'TRANSFER_IN'
+                    ? returnBins.get(line.id)
+                    : surplusBins.get(line.id),
+                ];
+        movements.push(
+          legOf(header, line, unit, leg.movementType, leg.leg, warehouseId, binId ?? null, leg.qty),
+        );
+      }
+    }
+    await this.updateLines(tx, plan, 'receive');
+    await this.posting.post(tx, ctx, {
+      docs: [
+        {
+          docType: 'TR',
+          docId: header.id,
+          expectedStatus: header.status,
+          nextStatus: 'RECEIVED',
+          allocateNumber: false,
+        },
+      ],
+      movements,
+    });
+    await this.audit.record(tx, ctx, {
+      action: 'RECEIVE',
+      entity: 'transfers',
+      entityId: header.id,
+      before: { status: header.status },
+      after: {
+        lines: plan.map((entry) => ({
+          id: entry.id,
+          receivedQtyBase: entry.qtyBase.toFixed(),
+          toBinId: entry.binId,
+        })),
+      },
+    });
+  }
+
+  /** A request group being counted by the destination: SHIPPED, of origin REQUEST. */
+  private assertCounting(header: TransferRow): void {
+    if (header.origin !== 'REQUEST') {
+      throw new AppError('DOC_STATE_INVALID', `transfer ${header.id} is a push: it is received`, {
+        status: header.status,
+      });
+    }
+    assertStatus(header, 'SHIPPED', ['COUNTED', 'RECEIVED']);
   }
 
   /**
@@ -556,7 +865,16 @@ export class TransfersService {
    * declined by the source, with a reason. A shipped transfer is never cancelled.
    */
   cancel(ctx: AuthContext, id: number, reason?: string | null): Promise<TransferDetail> {
-    return inTransaction(this.db, async (tx) => {
+    return inTransaction(this.db, (tx) => this.cancelInTx(tx, ctx, id, reason));
+  }
+
+  async cancelInTx(
+    tx: Tx,
+    ctx: AuthContext,
+    id: number,
+    reason?: string | null,
+  ): Promise<TransferDetail> {
+    {
       const header = await this.lockHeader(tx, id);
       if (header.status === 'CANCELLED') return this.get(id, tx);
       if (header.status === 'DRAFT') {
@@ -591,8 +909,9 @@ export class TransfersService {
         before: header,
         after: { reason: optionalText(reason) ?? null },
       });
+      await this.refreshRequestStatus(tx, header.requestId);
       return this.get(id, tx);
-    });
+    }
   }
 
   async get(id: number, executor: Db | Tx = this.db): Promise<TransferDetail> {
@@ -628,6 +947,7 @@ export class TransfersService {
       if (side) filters.push(side);
     }
     if (query.status) filters.push(eq(transfers.status, query.status));
+    if (query.requestId !== undefined) filters.push(eq(transfers.requestId, query.requestId));
     const after = decodeCursor(query.cursor);
     if (typeof after?.id === 'number') filters.push(lt(transfers.id, after.id));
     const rows = await this.db
@@ -636,6 +956,7 @@ export class TransfersService {
         number: transfers.number,
         origin: transfers.origin,
         status: transfers.status,
+        requestId: transfers.requestId,
         sourceWarehouseId: transfers.sourceWarehouseId,
         destWarehouseId: transfers.destWarehouseId,
         requestedAt: transfers.requestedAt,
@@ -658,7 +979,20 @@ export class TransfersService {
 
   // -------------------------------------------------------------------------------------------
 
-  private async insertLine(tx: Tx, header: TransferRow, input: TransferLineInput): Promise<void> {
+  /** A line of a draft the caller has locked: a positive quantity, the home rule, one per product. */
+  async addLineInTx(
+    tx: Tx,
+    header: { id: number; destWarehouseId: number },
+    input: TransferLineInput,
+  ): Promise<void> {
+    return this.insertLine(tx, header, input);
+  }
+
+  private async insertLine(
+    tx: Tx,
+    header: { id: number; destWarehouseId: number },
+    input: TransferLineInput,
+  ): Promise<void> {
     if (!input.qty.gt(0)) throw invalid('qty', 'min', 'a positive quantity');
     const converted = await this.units.toBase(input.productUnitId, input.qty, tx);
     await this.locations.assertMayReceive(tx, header.destWarehouseId, [converted.productId]);
@@ -813,11 +1147,11 @@ export class TransfersService {
     return this.units.baseUnits([...new Set(productIds)], tx);
   }
 
-  /** Writes shipped or received quantities and bins, a chunk of lines per statement. */
+  /** Writes shipped, counted or received quantities and bins, a chunk of lines per statement. */
   private async updateLines(
     tx: Tx,
     plan: readonly LineUpdate[],
-    step: 'ship' | 'receive',
+    step: 'ship' | 'count' | 'receive',
   ): Promise<void> {
     for (let start = 0; start < plan.length; start += CHUNK) {
       const rows = sql.join(
@@ -833,7 +1167,10 @@ export class TransfersService {
         step === 'ship'
           ? sql`UPDATE transfer_lines l SET shipped_qty_base = v.qty, from_bin_id = v.bin_id, updated_at = now()
                   FROM (VALUES ${rows}) AS v (id, qty, bin_id) WHERE l.id = v.id`
-          : sql`UPDATE transfer_lines l SET received_qty_base = v.qty, to_bin_id = v.bin_id, updated_at = now()
+          : step === 'count'
+            ? sql`UPDATE transfer_lines l SET counted_qty_base = v.qty, counted_at = now(), to_bin_id = v.bin_id, updated_at = now()
+                  FROM (VALUES ${rows}) AS v (id, qty, bin_id) WHERE l.id = v.id`
+            : sql`UPDATE transfer_lines l SET received_qty_base = v.qty, to_bin_id = v.bin_id, updated_at = now()
                   FROM (VALUES ${rows}) AS v (id, qty, bin_id) WHERE l.id = v.id`,
       );
     }
@@ -870,7 +1207,7 @@ export class TransfersService {
           )
         : new Map<number, number>();
     const suggestedTo =
-      header.status === 'SHIPPED'
+      header.status === 'SHIPPED' || header.status === 'COUNTED'
         ? await this.destinationBins(
             executor,
             await this.org.getWarehouse(header.destWarehouseId, executor),
@@ -879,8 +1216,8 @@ export class TransfersService {
         : new Map<number, number>();
     const fromOf = (line: TransferLineRow) =>
       line.shippedQtyBase === null ? (suggestedFrom.get(line.productId) ?? null) : line.fromBinId;
-    const toOf = (line: TransferLineRow) =>
-      line.receivedQtyBase === null ? (suggestedTo.get(line.productId) ?? null) : line.toBinId;
+    // The counted or received bin once set; while in transit the suggested one (ADR-0116 #4).
+    const toOf = (line: TransferLineRow) => line.toBinId ?? suggestedTo.get(line.productId) ?? null;
     const binIds = [
       ...new Set(lines.flatMap((line) => [fromOf(line), toOf(line)]).filter((id) => id !== null)),
     ];
@@ -903,6 +1240,9 @@ export class TransfersService {
         baseUnitId: base?.unitId ?? line.requestUnitId,
         baseUnitName: base?.uomName ?? '',
         shippedQtyBase: line.shippedQtyBase,
+        countedQtyBase: line.countedQtyBase,
+        countedAt: line.countedAt,
+        unrequested: line.unrequested,
         receivedQtyBase: line.receivedQtyBase,
         fromBinId,
         fromBinCode: fromBinId === null ? null : (codes.get(fromBinId) ?? null),
@@ -920,10 +1260,50 @@ export class TransfersService {
       .orderBy(transferLines.id);
   }
 
+  /**
+   * Locks a transfer for a change: the request header first (read without a lock — `request_id`
+   * never changes), then the group (ADR-0116 #7). Request-level operations lock the header, then
+   * each group in id order, so a shipment and a take-back of the whole request never wait on each
+   * other both ways. The posting's own lock on the same row follows in the same transaction.
+   */
   private async lockHeader(tx: Tx, id: number): Promise<TransferRow> {
+    const [peek] = await tx
+      .select({ requestId: transfers.requestId })
+      .from(transfers)
+      .where(eq(transfers.id, id));
+    if (!peek) throw notFound('transfer', id);
+    if (peek.requestId !== null) await this.lockRequest(tx, peek.requestId);
     const [row] = await tx.select().from(transfers).where(eq(transfers.id, id)).for('update');
     if (!row) throw notFound('transfer', id);
     return row;
+  }
+
+  /** The request header, locked FOR UPDATE (the first lock of every request-level change). */
+  async lockRequest(tx: Tx, requestId: number): Promise<typeof transferRequests.$inferSelect> {
+    const [row] = await tx
+      .select()
+      .from(transferRequests)
+      .where(eq(transferRequests.id, requestId))
+      .for('update');
+    if (!row) throw notFound('transfer request', requestId);
+    return row;
+  }
+
+  /**
+   * The request's status is the lowest of its live groups (ADR-0116 #3), recomputed in the
+   * transaction of every step that moves a group. The caller holds the header lock.
+   */
+  async refreshRequestStatus(tx: Tx, requestId: number | null): Promise<void> {
+    if (requestId === null) return;
+    const groups = await tx
+      .select({ status: transfers.status })
+      .from(transfers)
+      .where(eq(transfers.requestId, requestId));
+    const status = lowestTransferStatus(groups.map((group) => group.status));
+    await tx
+      .update(transferRequests)
+      .set({ status, updatedAt: sql`now()` })
+      .where(and(eq(transferRequests.id, requestId), sql`${transferRequests.status} <> ${status}`));
   }
 
   /** A draft, locked, for the side that created it. */
@@ -938,13 +1318,17 @@ export class TransfersService {
     tx: Tx,
     ctx: AuthContext,
     lineId: number,
+    state: 'draft' | 'any' = 'draft',
   ): Promise<{ header: TransferRow; line: TransferLineRow }> {
     const [peek] = await tx
       .select({ transferId: transferLines.transferId })
       .from(transferLines)
       .where(eq(transferLines.id, lineId));
     if (!peek) throw notFound('transfer line', lineId);
-    const header = await this.lockDraft(tx, ctx, peek.transferId);
+    const header =
+      state === 'draft'
+        ? await this.lockDraft(tx, ctx, peek.transferId)
+        : await this.lockHeader(tx, peek.transferId);
     const [line] = await tx.select().from(transferLines).where(eq(transferLines.id, lineId));
     if (!line) throw notFound('transfer line', lineId);
     return { header, line };
@@ -1048,12 +1432,15 @@ function headerView(row: TransferRow): Omit<TransferDetail, 'lines'> {
     number: row.number,
     origin: row.origin,
     status: row.status,
+    requestId: row.requestId,
     sourceWarehouseId: row.sourceWarehouseId,
     destWarehouseId: row.destWarehouseId,
     note: row.note,
     requestedAt: row.requestedAt,
     shippedAt: row.shippedAt,
     shipDate: row.shipDate,
+    countedAt: row.countedAt,
+    countReturnReason: row.countReturnReason,
     receivedAt: row.receivedAt,
     receiveDate: row.receiveDate,
     cancelledAt: row.cancelledAt,

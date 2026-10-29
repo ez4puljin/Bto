@@ -781,9 +781,38 @@ export const goodsIssueConfirmations = pgTable(
 );
 
 /**
+ * A transfer request (ADR-0116): what one destination asked for at once, in groups — one `transfers`
+ * row per source warehouse, each shipped, counted and confirmed on its own. The header carries no
+ * number (the groups do) and its status is the lowest of its live groups.
+ */
+export const transferRequests = pgTable(
+  'transfer_requests',
+  {
+    id: id(),
+    destWarehouseId: ref('dest_warehouse_id')
+      .notNull()
+      .references(() => warehouses.id),
+    status: text('status', { enum: TRANSFER_STATUSES }).notNull().default('DRAFT'),
+    note: text('note'),
+    requestedAt: timestamp('requested_at', { withTimezone: true }),
+    requestedBy: userRef('requested_by'),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index('transfer_requests_dest_idx').on(t.destWarehouseId, t.status, t.id),
+    check('transfer_requests_status', inList(t.status, TRANSFER_STATUSES)),
+    check('transfer_requests_note', sql`${t.note} IS NULL OR length(${t.note}) BETWEEN 1 AND 500`),
+  ],
+);
+
+/**
  * Transfers (TR-, ADR-0035): requested by the receiver (REQUEST) or sent on the sender's own
  * initiative (PUSH, e.g. supermarket returns); shipped into TRANSIT and received at the destination,
- * where a shortfall goes back to the sender and a surplus comes out of the sender's stock.
+ * where a shortfall goes back to the sender and a surplus comes out of the sender's stock. A request
+ * is counted by the destination (COUNTED) and confirmed by the source, which posts the receipt
+ * (ADR-0116); a push is received by the destination in one step.
  */
 export const transfers = pgTable(
   'transfers',
@@ -791,6 +820,8 @@ export const transfers = pgTable(
     id: id(),
     number: text('number'),
     origin: text('origin', { enum: TRANSFER_ORIGINS }).notNull(),
+    /** The request this group belongs to (ADR-0116); never changed once set. */
+    requestId: ref('request_id').references(() => transferRequests.id),
     sourceWarehouseId: ref('source_warehouse_id')
       .notNull()
       .references(() => warehouses.id),
@@ -804,6 +835,11 @@ export const transfers = pgTable(
     shippedAt: timestamp('shipped_at', { withTimezone: true }),
     shippedBy: userRef('shipped_by'),
     shipDate: date('ship_date', { mode: 'string' }),
+    /** The destination finished counting (ADR-0116); cleared when the source sends it back. */
+    countedAt: timestamp('counted_at', { withTimezone: true }),
+    countedBy: userRef('counted_by'),
+    /** Why the source sent the count back to the destination; cleared by the next finish. */
+    countReturnReason: text('count_return_reason'),
     receivedAt: timestamp('received_at', { withTimezone: true }),
     receivedBy: userRef('received_by'),
     receiveDate: date('receive_date', { mode: 'string' }),
@@ -818,6 +854,7 @@ export const transfers = pgTable(
     unique('transfers_number_key').on(t.number),
     index('transfers_source_idx').on(t.sourceWarehouseId, t.status, t.id),
     index('transfers_dest_idx').on(t.destWarehouseId, t.status, t.id),
+    index('transfers_request_idx').on(t.requestId),
     check('transfers_origin', inList(t.origin, TRANSFER_ORIGINS)),
     check('transfers_status', inList(t.status, TRANSFER_STATUSES)),
     check('transfers_warehouses', sql`${t.sourceWarehouseId} <> ${t.destWarehouseId}`),
@@ -826,7 +863,7 @@ export const transfers = pgTable(
     check(
       'transfers_number',
       sql`(${t.status} <> 'DRAFT' OR ${t.number} IS NULL OR ${t.origin} = 'REQUEST')
-        AND (${t.status} NOT IN ('REQUESTED', 'SHIPPED', 'RECEIVED') OR ${t.number} IS NOT NULL)`,
+        AND (${t.status} NOT IN ('REQUESTED', 'SHIPPED', 'COUNTED', 'RECEIVED') OR ${t.number} IS NOT NULL)`,
     ),
     check(
       'transfers_requested',
@@ -835,9 +872,19 @@ export const transfers = pgTable(
     ),
     check(
       'transfers_shipped',
-      sql`(${t.status} IN ('SHIPPED', 'RECEIVED'))
+      sql`(${t.status} IN ('SHIPPED', 'COUNTED', 'RECEIVED'))
         = (${t.shippedAt} IS NOT NULL AND ${t.shipDate} IS NOT NULL)`,
     ),
+    // A count is finished exactly while COUNTED (and may stay stamped on a RECEIVED request); a
+    // push is never counted, only received (ADR-0116).
+    check(
+      'transfers_counted',
+      sql`(${t.status} <> 'COUNTED' OR ${t.countedAt} IS NOT NULL)
+        AND (${t.status} NOT IN ('DRAFT', 'REQUESTED', 'SHIPPED') OR ${t.countedAt} IS NULL)
+        AND (${t.origin} = 'REQUEST' OR (${t.countedAt} IS NULL AND ${t.countReturnReason} IS NULL))
+        AND (${t.countReturnReason} IS NULL OR length(${t.countReturnReason}) BETWEEN 1 AND 300)`,
+    ),
+    check('transfers_request', sql`${t.requestId} IS NULL OR ${t.origin} = 'REQUEST'`),
     check(
       'transfers_received',
       sql`(${t.status} = 'RECEIVED') = (${t.receivedAt} IS NOT NULL AND ${t.receiveDate} IS NOT NULL)`,
@@ -874,10 +921,15 @@ export const transferLines = pgTable(
     /** Set when shipped; 0 for a line the sender did not ship. */
     shippedQtyBase: qty('shipped_qty_base'),
     fromBinId: ref('from_bin_id').references(() => bins.id),
+    /** What the destination counted on a shipped request (ADR-0116); 0 = «ирээгүй». */
+    countedQtyBase: qty('counted_qty_base'),
+    countedAt: timestamp('counted_at', { withTimezone: true }),
     /** Set when received. */
     receivedQtyBase: qty('received_qty_base'),
     toBinId: ref('to_bin_id').references(() => bins.id),
     lotId: ref('lot_id').references(() => lots.id),
+    /** A product the destination found that was not asked for: requested 0, shipped 0 (ADR-0116). */
+    unrequested: boolean('unrequested').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -886,9 +938,13 @@ export const transferLines = pgTable(
     index('transfer_lines_transfer_idx').on(t.transferId, t.id),
     check(
       'transfer_lines_qty',
-      sql`${t.requestFactor} > 0 AND ${t.requestedQty} > 0
+      sql`${t.requestFactor} > 0
+        AND (${t.requestedQty} > 0 OR ${t.unrequested})
+        AND (NOT ${t.unrequested} OR (${t.requestedQty} = 0 AND ${t.shippedQtyBase} = 0))
         AND (${t.shippedQtyBase} IS NULL OR ${t.shippedQtyBase} >= 0)
-        AND (${t.receivedQtyBase} IS NULL OR (${t.shippedQtyBase} IS NOT NULL AND ${t.receivedQtyBase} >= 0))`,
+        AND (${t.receivedQtyBase} IS NULL OR (${t.shippedQtyBase} IS NOT NULL AND ${t.receivedQtyBase} >= 0))
+        AND (${t.countedQtyBase} IS NULL OR (${t.shippedQtyBase} IS NOT NULL AND ${t.countedQtyBase} >= 0))
+        AND ((${t.countedQtyBase} IS NULL) = (${t.countedAt} IS NULL))`,
     ),
   ],
 );

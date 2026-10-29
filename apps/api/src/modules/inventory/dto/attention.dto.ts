@@ -19,6 +19,10 @@ export class InventoryAttentionDto {
   transfersToShip: number;
   @ApiProperty({ description: 'Shipments on their way to the caller’s warehouses' })
   transfersToReceive: number;
+  @ApiProperty({
+    description: 'Request groups the caller’s warehouses sent, counted by the store, to confirm',
+  })
+  transfersToConfirm: number;
   @ApiProperty({ description: 'Adjustments waiting for approval (approvers)' })
   adjustmentsToApprove: number;
   @ApiProperty({ description: 'Stocktakes waiting for review (approvers)' })

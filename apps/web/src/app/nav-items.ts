@@ -616,6 +616,7 @@ export function visibleQuickActions(permissions: readonly Permission[]): QuickAc
 export type AttentionCount =
   | 'transfersToShip'
   | 'transfersToReceive'
+  | 'transfersToConfirm'
   | 'adjustmentsToApprove'
   | 'stocktakesToReview'
   | 'receiptsToCost'
@@ -649,6 +650,13 @@ export const ATTENTION_TILES: readonly AttentionTile[] = [
     icon: Truck,
     permission: 'inventory.transfers.manage',
     to: '/inventory/transfers?direction=OUTGOING&status=REQUESTED',
+  },
+  {
+    count: 'transfersToConfirm',
+    label: 'home.attention.transfersToConfirm',
+    icon: PackageCheck,
+    permission: 'inventory.transfers.manage',
+    to: '/inventory/transfers?direction=OUTGOING&status=COUNTED',
   },
   {
     count: 'adjustmentsToApprove',

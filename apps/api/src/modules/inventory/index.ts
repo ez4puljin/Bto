@@ -142,10 +142,20 @@ export { SystemBinsService } from './services/system-bins.service';
 export {
   MAX_TRANSFER_LINES,
   type TransferCount,
+  type TransferCountEntry,
   type TransferDetail,
   type TransferInput,
   type TransferLineInput,
   type TransferQuery,
   TransfersService,
   type TransferSummary,
+  type UnrequestedLineInput,
 } from './services/transfers.service';
+export {
+  type TransferRequestContext,
+  type TransferRequestDetail,
+  type TransferRequestInput,
+  type TransferRequestQuery,
+  TransferRequestsService,
+  type TransferRequestSummary,
+} from './services/transfer-requests.service';

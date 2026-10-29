@@ -23,6 +23,8 @@ import {
   reaverage,
   revalue,
   systemBinTypes,
+  lowestTransferStatus,
+  TRANSFER_STATUSES,
   transferReceiveLegs,
   USER_ADJUSTMENT_REASONS,
   unitCostOf,
@@ -144,6 +146,17 @@ describe('movements and documents', () => {
         expect(leg.qty.isNegative()).toBe(leg.movementType === 'TRANSFER_OUT');
       }
     }
+  });
+
+  it('shows a request at the lowest of its groups (ADR-0116)', () => {
+    expect(lowestTransferStatus(['RECEIVED', 'SHIPPED'])).toBe('SHIPPED');
+    expect(lowestTransferStatus(['COUNTED', 'RECEIVED'])).toBe('COUNTED');
+    expect(lowestTransferStatus(['REQUESTED', 'DRAFT'])).toBe('DRAFT');
+    // A cancelled group does not hold the request back, unless every group is cancelled.
+    expect(lowestTransferStatus(['CANCELLED', 'RECEIVED'])).toBe('RECEIVED');
+    expect(lowestTransferStatus(['CANCELLED', 'CANCELLED'])).toBe('CANCELLED');
+    expect(lowestTransferStatus([])).toBe('CANCELLED');
+    expect(TRANSFER_STATUSES.indexOf('COUNTED')).toBe(TRANSFER_STATUSES.indexOf('SHIPPED') + 1);
   });
 
   it('keeps the system adjustment reasons out of the people’s list', () => {

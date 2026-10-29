@@ -654,6 +654,8 @@ export type TransferDetail = Schemas['TransferDetail'];
 export type TransferLine = Schemas['TransferLine'];
 export type TransferCreate = Schemas['TransferCreateRequest'];
 export type TransferCount = Schemas['TransferCount'];
+export type TransferCountEntry = Schemas['TransferCountEntry'];
+export type TransferRequestDetail = Schemas['TransferRequestDetail'];
 export type TransferStatus = TransferDetail['status'];
 export type TransferOrigin = TransferDetail['origin'];
 
@@ -696,6 +698,22 @@ export function useTransfer(id: number) {
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/v1/transfers/{id}', { params: { path: { id } }, signal })),
     refetchOnWindowFocus: true,
+  });
+}
+
+/** The request a group belongs to (ADR-0116): its other groups, for the links between them. */
+export function useTransferRequest(id: number | null) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.transfers, 'request', id],
+    enabled: id !== null,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/transfer-requests/{id}', {
+          params: { path: { id: id ?? 0 } },
+          signal,
+        }),
+      ),
   });
 }
 
@@ -769,6 +787,61 @@ export function useTransferMutations() {
           await api.POST('/api/v1/transfers/{id}/receive', {
             params: { path: { id }, header: idempotencyKey(key) },
             body: { lines },
+          }),
+        ),
+      onSettled: () => changed(true),
+    }),
+    /** ADR-0116 #4: the destination's counts on a shipped request, saved as they are typed. */
+    saveCounts: useMutation({
+      mutationFn: async ({ id, entries }: { id: number; entries: TransferCountEntry[] }) =>
+        unwrap(
+          await api.PUT('/api/v1/transfers/{id}/counts', {
+            params: { path: { id } },
+            body: { entries },
+          }),
+        ),
+      onSettled: () => changed(),
+    }),
+    /** ADR-0116 #5: a product found at the destination that was not asked for. */
+    addCountLine: useMutation({
+      mutationFn: async ({
+        id,
+        key,
+        body,
+      }: {
+        id: number;
+        key: string;
+        body: { productId: number; productUnitId: number; qty: string };
+      }) =>
+        unwrap(
+          await api.POST('/api/v1/transfers/{id}/count-lines', {
+            params: { path: { id }, header: idempotencyKey(key) },
+            body,
+          }),
+        ),
+      onSettled: () => changed(),
+    }),
+    finishCount: useMutation({
+      mutationFn: async (id: number) =>
+        unwrap(await api.POST('/api/v1/transfers/{id}/finish-count', { params: { path: { id } } })),
+      onSettled: () => changed(),
+    }),
+    returnCount: useMutation({
+      mutationFn: async ({ id, reason }: { id: number; reason: string }) =>
+        unwrap(
+          await api.POST('/api/v1/transfers/{id}/return-count', {
+            params: { path: { id } },
+            body: { reason },
+          }),
+        ),
+      onSettled: () => changed(),
+    }),
+    /** ADR-0116 #6: the source confirms the destination's count; the ledger moves here. */
+    confirm: useMutation({
+      mutationFn: async ({ id, key }: { id: number; key: string }) =>
+        unwrap(
+          await api.POST('/api/v1/transfers/{id}/confirm', {
+            params: { path: { id }, header: idempotencyKey(key) },
           }),
         ),
       onSettled: () => changed(true),

@@ -46,7 +46,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { useBarcodeLookup } from '@/features/catalog/api';
+import { type BarcodeResolution, useBarcodeLookup } from '@/features/catalog/api';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
@@ -67,6 +67,7 @@ import {
   useBinLookup,
   useTransfer,
   useTransferMutations,
+  useTransferRequest,
   useTransfers,
 } from './api';
 import {
@@ -102,6 +103,7 @@ const STATUSES: readonly TransferStatus[] = [
   'DRAFT',
   'REQUESTED',
   'SHIPPED',
+  'COUNTED',
   'RECEIVED',
   'CANCELLED',
 ];
@@ -409,7 +411,13 @@ export function TransferPage() {
         canDecline={detail.status === 'REQUESTED' && !atDest}
       />
     ) : detail.status === 'SHIPPED' && atDest ? (
-      <TransferReceiveEditor key={`receive-${detail.id}`} detail={detail} />
+      detail.origin === 'PUSH' ? (
+        <TransferReceiveEditor key={`receive-${detail.id}`} detail={detail} />
+      ) : (
+        <TransferCountEditor key={`count-${detail.id}`} detail={detail} />
+      )
+    ) : detail.status === 'COUNTED' && atSource ? (
+      <TransferConfirmView key={`confirm-${detail.id}`} detail={detail} />
     ) : null;
 
   return (
@@ -441,6 +449,13 @@ export function TransferPage() {
                 {t('inventory.transfer.shippedOn', { date: detail.shipDate })}
               </span>
             ) : null}
+            {detail.countedAt ? (
+              <span className="font-mono">
+                {t('inventory.transfer.countedOn', {
+                  time: formatUbDateTime(Date.parse(detail.countedAt)),
+                })}
+              </span>
+            ) : null}
             {detail.receiveDate ? (
               <span className="font-mono">
                 {t('inventory.transfer.receivedOn', { date: detail.receiveDate })}
@@ -464,12 +479,58 @@ export function TransferPage() {
           </AlertDescription>
         </Alert>
       ) : null}
+      {detail.requestId !== null ? <RequestGroups detail={detail} /> : null}
+      {detail.status === 'SHIPPED' && detail.countReturnReason && atDest ? (
+        <Alert className="print:hidden">
+          <AlertDescription>
+            {t('inventory.transfer.countReturned', { reason: detail.countReturnReason })}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {detail.status === 'COUNTED' && atDest && !atSource ? (
+        <Alert className="print:hidden">
+          <AlertDescription>{t('inventory.transfer.waitingConfirm')}</AlertDescription>
+        </Alert>
+      ) : null}
       {detail.status === 'REQUESTED' && atDest ? <RequestOwnerActions detail={detail} /> : null}
       {editor ? <div className="space-y-4 print:hidden">{editor}</div> : null}
       <div className={editor ? 'hidden print:block' : undefined}>
         <TransferLinesView detail={detail} />
       </div>
     </div>
+  );
+}
+
+/**
+ * The other groups of the same request (ADR-0116 #1): a store's request from several home
+ * warehouses is one transfer per sender; each links to the others.
+ */
+function RequestGroups({ detail }: { detail: TransferDetail }) {
+  const { t } = useTranslation();
+  const warehouseName = useWarehouseName();
+  const request = useTransferRequest(detail.requestId);
+  const others = (request.data?.groups ?? []).filter((group) => group.id !== detail.id);
+  if (!request.data || (others.length === 0 && !request.data.note)) return null;
+  return (
+    <Alert className="print:hidden">
+      <AlertDescription className="flex flex-col gap-1">
+        {request.data.note ? (
+          <span>{t('inventory.transfer.requestNote', { note: request.data.note })}</span>
+        ) : null}
+        {others.length > 0 ? (
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>{t('inventory.transfer.requestGroups')}:</span>
+            {others.map((group) => (
+              <Link key={group.id} className="text-link" to={`/inventory/transfers/${group.id}`}>
+                {group.number ?? t('inventory.draftNo', { id: group.id })} ·{' '}
+                {warehouseName(group.sourceWarehouseId)} ·{' '}
+                {t(`inventory.docStatus.${group.status}`)}
+              </Link>
+            ))}
+          </span>
+        ) : null}
+      </AlertDescription>
+    </Alert>
   );
 }
 
@@ -752,6 +813,12 @@ function useLineScanner(
   detail: TransferDetail,
   warehouseId: number,
   assign: (line: TransferLine, bin: Bin) => void,
+  options: {
+    /** A product scan lands on its line (ADR-0116): the message to show, or nothing more. */
+    onProduct?: (line: TransferLine, resolved: BarcodeResolution) => string | null;
+    /** A product that is not on the transfer, when the step may add it. */
+    onUnknown?: (resolved: BarcodeResolution) => void;
+  } = {},
 ) {
   const { t } = useTranslation();
   const lookupBin = useBinLookup();
@@ -778,14 +845,17 @@ function useLineScanner(
       }
       const line = detail.lines.find((row) => row.productId === resolved.product.id);
       if (!line) {
-        setMessage(t('inventory.transfer.notOnTransfer', { name: resolved.product.name }));
-      } else if (activeBin === null) {
-        setMessage(t('inventory.needBin'));
-      } else {
+        if (options.onUnknown) options.onUnknown(resolved);
+        else setMessage(t('inventory.transfer.notOnTransfer', { name: resolved.product.name }));
+      } else if (activeBin !== null) {
         assign(line, activeBin);
         setMessage(
           t('inventory.transfer.binSet', { name: line.productName, code: activeBin.code }),
         );
+      } else if (options.onProduct) {
+        setMessage(options.onProduct(line, resolved));
+      } else {
+        setMessage(t('inventory.needBin'));
       }
     });
 
@@ -799,10 +869,20 @@ function CountInput(props: {
   invalid: boolean;
   onChange: (value: string) => void;
   onScan: (code: string) => void;
+  /** Changes when a scan lands on this line: the field takes the focus and selects its text. */
+  focusAt?: number;
 }) {
   const guard = useScanGuard(props.onScan, { letters: true });
+  const ref = useRef<HTMLInputElement>(null);
+  const focusAt = props.focusAt;
+  useEffect(() => {
+    if (focusAt === undefined) return;
+    ref.current?.focus();
+    ref.current?.select();
+  }, [focusAt]);
   return (
     <Input
+      ref={ref}
       aria-label={props.label}
       aria-invalid={props.invalid}
       inputMode="decimal"
@@ -813,6 +893,12 @@ function CountInput(props: {
       onKeyDown={(event) => guard(event, props.value, props.onChange)}
     />
   );
+}
+
+/** Which line a scan landed on, and when (a second scan of the same line focuses it again). */
+interface LineFocus {
+  lineId: number;
+  at: number;
 }
 
 /** The line's unit or its base unit, when they differ. */
@@ -926,8 +1012,25 @@ function TransferShipEditor({
       const current = previous[lineId];
       return current ? { ...previous, [lineId]: { ...current, ...patch } } : previous;
     });
-  const scanner = useLineScanner(detail, detail.sourceWarehouseId, (line, bin) =>
-    update(line.id, { binId: bin.id, binCode: bin.code }),
+  const [focus, setFocus] = useState<LineFocus | null>(null);
+  // A product scan without a shelf lands on its line and shows what was asked (ADR-0116, slice 1's
+  // receiving); with a shelf scanned first it sets the shelf, as before.
+  const scanner = useLineScanner(
+    detail,
+    detail.sourceWarehouseId,
+    (line, bin) => update(line.id, { binId: bin.id, binCode: bin.code }),
+    {
+      onProduct: (line) => {
+        setFocus({ lineId: line.id, at: Date.now() });
+        return t('inventory.transfer.scannedRequested', {
+          name: line.productName,
+          qty: t('inventory.qtyWithUnit', {
+            qty: formatQty(line.requestedQty),
+            unit: line.unitName,
+          }),
+        });
+      },
+    },
   );
   const base = (line: TransferLine) => {
     const count = counts[line.id];
@@ -1040,6 +1143,7 @@ function TransferShipEditor({
                         invalid={qtyBase === null}
                         onChange={(qty) => update(line.id, { qty })}
                         onScan={scanner.onScan}
+                        focusAt={focus?.lineId === line.id ? focus.at : undefined}
                       />
                     </TableCell>
                     <TableCell>
@@ -1364,6 +1468,567 @@ function TransferReceiveEditor({ detail }: { detail: TransferDetail }) {
   );
 }
 
+/** A line's count as the count editor keeps it: what the server holds, in the line's unit. */
+function countedEntry(line: TransferLine): LineCount {
+  return {
+    ...(line.countedQtyBase === null
+      ? { qty: '', base: false }
+      : countEntry(line.countedQtyBase, line)),
+    binId: line.toBinId,
+    binCode: line.toBinCode,
+  };
+}
+
+/**
+ * The store counts a shipped request (ADR-0116 #4): a product scan lands on its line and shows what
+ * was shipped, the arrived quantity is typed or «Ирээгүй» pressed, and every count is saved on the
+ * server as it is typed (the keeper sees it on confirmation). A product that was not asked for is
+ * added after a question (#5). «Тоолж дуусгах» hands the group to the sender's keeper.
+ */
+function TransferCountEditor({ detail }: { detail: TransferDetail }) {
+  const { t } = useTranslation();
+  const mutations = useTransferMutations();
+  const action = useAction();
+  const [confirm, setConfirm] = useState(false);
+  const [extra, setExtra] = useState<{ resolved: BarcodeResolution; qty: string } | null>(null);
+  const [counts, setCounts] = useState<Record<number, LineCount>>(() =>
+    Object.fromEntries(detail.lines.map((line) => [line.id, countedEntry(line)])),
+  );
+  const [focus, setFocus] = useState<LineFocus | null>(null);
+  const [unsaved, setUnsaved] = useState(0);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const pending = useRef(new Map<number, LineCount>());
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saving = useRef<Promise<void> | null>(null);
+
+  // A line added meanwhile (the scan's extra product) gets its entry; typed counts are kept.
+  useEffect(() => {
+    setCounts((previous) => {
+      const next = { ...previous };
+      for (const line of detail.lines) if (!(line.id in next)) next[line.id] = countedEntry(line);
+      return next;
+    });
+  }, [detail.lines]);
+
+  const flush = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    if (saving.current) return saving.current;
+    const entries = [...pending.current.entries()].flatMap(([lineId, count]) => {
+      const line = detail.lines.find((row) => row.id === lineId);
+      if (!line || countBase(count, line) === null) return [];
+      return [
+        {
+          lineId,
+          productUnitId: count.base ? line.baseUnitId : line.requestUnitId,
+          qty: count.qty.trim(),
+          ...(count.binId ? { binId: count.binId } : {}),
+        },
+      ];
+    });
+    pending.current.clear();
+    setUnsaved(0);
+    if (entries.length === 0) return Promise.resolve();
+    saving.current = mutations.saveCounts
+      .mutateAsync({ id: detail.id, entries })
+      .then(() => setSaveFailed(false))
+      .catch(() => {
+        // Kept for «Дахин оролдох»: the entries go back into the queue.
+        for (const entry of entries) {
+          const count = counts[entry.lineId];
+          if (count && !pending.current.has(entry.lineId)) pending.current.set(entry.lineId, count);
+        }
+        setUnsaved(pending.current.size);
+        setSaveFailed(true);
+      })
+      .finally(() => {
+        saving.current = null;
+      });
+    return saving.current;
+  };
+  const update = (lineId: number, patch: Partial<LineCount>) => {
+    const current = counts[lineId];
+    if (!current) return;
+    const next = { ...current, ...patch };
+    setCounts((previous) => ({ ...previous, [lineId]: next }));
+    const line = detail.lines.find((row) => row.id === lineId);
+    if (line && countBase(next, line) !== null) {
+      pending.current.set(lineId, next);
+      setUnsaved(pending.current.size);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => void flush(), 600);
+    }
+  };
+  const scanner = useLineScanner(
+    detail,
+    detail.destWarehouseId,
+    (line, bin) => update(line.id, { binId: bin.id, binCode: bin.code }),
+    {
+      onProduct: (line) => {
+        setFocus({ lineId: line.id, at: Date.now() });
+        return t('inventory.transfer.scannedShipped', {
+          name: line.productName,
+          qty: t('inventory.qtyWithUnit', {
+            qty: formatQty(inUnit(line.shippedQtyBase ?? '0', line.requestFactor)),
+            unit: line.unitName,
+          }),
+        });
+      },
+      onUnknown: (resolved) => setExtra({ resolved, qty: '' }),
+    },
+  );
+  const base = (line: TransferLine) => {
+    const count = counts[line.id];
+    return count ? countBase(count, line) : null;
+  };
+  const differenceOf = (line: TransferLine) =>
+    base(line)?.minus(line.shippedQtyBase ?? '0') ?? null;
+  const uncounted = detail.lines.filter((line) => base(line) === null);
+  const differences = detail.lines.flatMap((line) => {
+    const difference = differenceOf(line);
+    return difference && !difference.isZero() ? [{ line, difference }] : [];
+  });
+  const finish = () =>
+    void action.run(async () => {
+      await flush();
+      if (pending.current.size > 0) return;
+      const counted = await mutations.finishCount.mutateAsync(detail.id);
+      setConfirm(false);
+      toast.success(t('inventory.transfer.countedToast', { number: counted.number ?? '' }));
+    });
+  const addExtra = () =>
+    void action.run(async () => {
+      if (!extra) return;
+      const added = await mutations.addCountLine.mutateAsync({
+        id: detail.id,
+        key: randomUuid(),
+        body: {
+          productId: extra.resolved.product.id,
+          productUnitId: extra.resolved.unit.id,
+          qty: extra.qty.trim(),
+        },
+      });
+      const line = added.lines.find((row) => row.productId === extra.resolved.product.id);
+      if (line) setCounts((previous) => ({ ...previous, [line.id]: countedEntry(line) }));
+      setExtra(null);
+      toast.success(t('inventory.transfer.extraAdded', { name: extra.resolved.product.name }));
+    });
+  const removeExtra = (line: TransferLine) =>
+    void action.run(async () => {
+      pending.current.delete(line.id);
+      setUnsaved(pending.current.size);
+      await mutations.removeLine.mutateAsync(line.id);
+    });
+  const summary =
+    unsaved > 0 ? (
+      <span className="text-warning">
+        {saveFailed
+          ? t('inventory.transfer.saveFailed')
+          : t('inventory.transfer.unsaved', { count: unsaved })}
+      </span>
+    ) : uncounted.length > 0 ? (
+      <span className="text-warning">
+        {t('inventory.transfer.blockedUncounted', { count: uncounted.length })}
+      </span>
+    ) : differences.length > 0 ? (
+      t('inventory.transfer.differencesCount', { count: differences.length })
+    ) : (
+      t('inventory.linesCount', { count: detail.lines.length })
+    );
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('inventory.transfer.countTitle')}</CardTitle>
+          <CardDescription>{t('inventory.transfer.countHint')}</CardDescription>
+          <TransferNotes detail={detail} />
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <ScanToolbar
+            scanBox={
+              <ScanBox
+                letters
+                label={t('inventory.scanLabel')}
+                placeholder={t('inventory.scanPlaceholder')}
+                onScan={scanner.onScan}
+              />
+            }
+            status={
+              <>
+                <span className="font-medium">
+                  {scanner.activeBin
+                    ? t('inventory.activeBin', { code: scanner.activeBin.code })
+                    : t('inventory.transfer.destinationHint')}
+                </span>
+                {scanner.message ? (
+                  <span className="text-muted-foreground">{scanner.message}</span>
+                ) : null}
+              </>
+            }
+          />
+          <ProblemAlert
+            problem={confirm || extra ? null : (action.problem ?? scanner.problem)}
+            onRetry={saveFailed ? () => void flush() : undefined}
+          />
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('inventory.product')}</TableHead>
+                <TableHead className="text-right">{t('inventory.transfer.shipped')}</TableHead>
+                <TableHead className="text-right">{t('inventory.transfer.arrived')}</TableHead>
+                <TableHead>{t('inventory.unit')}</TableHead>
+                <TableHead className="text-right">{t('inventory.transfer.difference')}</TableHead>
+                <TableHead>{t('inventory.transfer.toBin')}</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {detail.lines.map((line) => {
+                const count = counts[line.id];
+                const difference = differenceOf(line);
+                const none = difference !== null && base(line)?.isZero();
+                return (
+                  <TableRow
+                    key={line.id}
+                    data-state={focus?.lineId === line.id ? 'selected' : undefined}
+                  >
+                    <TableCell className="whitespace-normal">
+                      <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
+                      {line.productName}
+                      {line.unrequested ? (
+                        <>
+                          {' '}
+                          <Badge variant="outline">{t('inventory.transfer.unrequested')}</Badge>
+                        </>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {line.unrequested ? t('common.none') : <ShippedQty line={line} />}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <span className="inline-flex items-center gap-2">
+                        <Button
+                          size="xs"
+                          variant={none ? 'secondary' : 'ghost'}
+                          onClick={() => update(line.id, { qty: '0', base: false })}
+                        >
+                          {t('inventory.transfer.notArrived')}
+                        </Button>
+                        <CountInput
+                          label={`${t('inventory.transfer.arrived')}: ${line.productName}`}
+                          value={count?.qty ?? ''}
+                          invalid={difference === null}
+                          onChange={(qty) => update(line.id, { qty })}
+                          onScan={scanner.onScan}
+                          focusAt={focus?.lineId === line.id ? focus.at : undefined}
+                        />
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <UnitChoice
+                        line={line}
+                        base={count?.base ?? false}
+                        onChange={(value) => update(line.id, { base: value })}
+                      />
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        'text-right font-mono',
+                        difference && !difference.isZero() && 'text-destructive',
+                      )}
+                    >
+                      {difference === null
+                        ? t('inventory.transfer.notCounted')
+                        : difference.isZero()
+                          ? t('common.none')
+                          : t('inventory.qtyWithUnit', {
+                              qty: signed(difference),
+                              unit: line.baseUnitName,
+                            })}
+                    </TableCell>
+                    <TableCell className="font-mono">
+                      {count?.binCode ?? t('common.none')}
+                    </TableCell>
+                    <TableCell>
+                      {line.unrequested ? (
+                        <RowActions>
+                          <RowAction
+                            icon={Trash2}
+                            label={t('inventory.transfer.removeExtra')}
+                            onClick={() => removeExtra(line)}
+                          />
+                        </RowActions>
+                      ) : null}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+      <StickyActions summary={summary}>
+        <Button
+          disabled={
+            unsaved > 0 ||
+            uncounted.length > 0 ||
+            mutations.finishCount.isPending ||
+            mutations.saveCounts.isPending
+          }
+          onClick={() => {
+            action.clear();
+            if (differences.length > 0) setConfirm(true);
+            else finish();
+          }}
+        >
+          {t('inventory.transfer.finishCount')}
+        </Button>
+      </StickyActions>
+      <ConfirmDialog
+        open={confirm}
+        variant="default"
+        title={t('inventory.transfer.finishConfirm')}
+        description={t('inventory.transfer.finishDescription')}
+        confirmLabel={t('inventory.transfer.finishCount')}
+        pending={mutations.finishCount.isPending}
+        problem={action.problem}
+        onConfirm={finish}
+        onClose={() => setConfirm(false)}
+      >
+        <ul className="flex list-disc flex-col gap-1 pl-5 text-sm">
+          {differences.map(({ line, difference }) => (
+            <li key={line.id}>
+              {t(
+                difference.isNegative() ? 'inventory.transfer.short' : 'inventory.transfer.extra',
+                { name: line.productName, qty: differenceText(t, line, difference) },
+              )}
+            </li>
+          ))}
+        </ul>
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={extra !== null}
+        variant="default"
+        title={t('inventory.transfer.addExtraTitle', { name: extra?.resolved.product.name ?? '' })}
+        description={t('inventory.transfer.addExtraDescription')}
+        confirmLabel={t('inventory.transfer.addExtra')}
+        disabled={!extra || !parseScanQty(extra.qty)}
+        pending={mutations.addCountLine.isPending}
+        problem={action.problem}
+        onConfirm={addExtra}
+        onClose={() => setExtra(null)}
+      >
+        <FormField
+          label={t('inventory.transfer.addExtraQty', { unit: extra?.resolved.unit.uomName ?? '' })}
+          htmlFor="transfer-extra-qty"
+        >
+          <Input
+            id="transfer-extra-qty"
+            inputMode="decimal"
+            autoComplete="off"
+            className="w-32 text-right font-mono"
+            value={extra?.qty ?? ''}
+            onChange={(event) =>
+              setExtra((previous) =>
+                previous ? { ...previous, qty: event.target.value } : previous,
+              )
+            }
+          />
+        </FormField>
+      </ConfirmDialog>
+    </>
+  );
+}
+
+/**
+ * The sender's keeper confirms the store's count (ADR-0116 #6): the differences line by line, where
+ * a shortfall returns and what a surplus takes; the ledger moves on «Батлах». «Буцаах» sends the
+ * count back to the store with a reason.
+ */
+function TransferConfirmView({ detail }: { detail: TransferDetail }) {
+  const { t } = useTranslation();
+  const mutations = useTransferMutations();
+  const action = useAction();
+  const [dialog, setDialog] = useState<'confirm' | 'return' | null>(null);
+  const [reason, setReason] = useState('');
+  const key = useRef(randomUuid());
+  const differences = detail.lines.flatMap((line) => {
+    if (line.countedQtyBase === null) return [];
+    const difference = new Decimal(line.countedQtyBase).minus(line.shippedQtyBase ?? '0');
+    return difference.isZero() ? [] : [{ line, difference }];
+  });
+  const confirm = () =>
+    void action.run(async () => {
+      const received = await mutations.confirm.mutateAsync({ id: detail.id, key: key.current });
+      setDialog(null);
+      toast.success(t('inventory.transfer.confirmedToast', { number: received.number ?? '' }));
+    });
+  const sendBack = () =>
+    void action.run(async () => {
+      await mutations.returnCount.mutateAsync({ id: detail.id, reason: reason.trim() });
+      setDialog(null);
+      toast.success(t('inventory.transfer.returnedToast'));
+    });
+  const countedText = (line: TransferLine) =>
+    line.countedQtyBase === null
+      ? t('inventory.transfer.notCounted')
+      : new Decimal(line.countedQtyBase).isZero()
+        ? t('inventory.transfer.notArrived')
+        : t('inventory.qtyWithUnit', {
+            qty: formatQty(line.countedQtyBase),
+            unit: line.baseUnitName,
+          });
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('inventory.transfer.confirmTitle')}</CardTitle>
+          <CardDescription>{t('inventory.transfer.confirmHint')}</CardDescription>
+          <TransferNotes detail={detail} />
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <ProblemAlert problem={dialog ? null : action.problem} />
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('inventory.product')}</TableHead>
+                <TableHead className="text-right">{t('inventory.transfer.shipped')}</TableHead>
+                <TableHead className="text-right">{t('inventory.transfer.counted')}</TableHead>
+                <TableHead className="text-right">{t('inventory.transfer.difference')}</TableHead>
+                <TableHead>{t('inventory.transfer.toBin')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {detail.lines.map((line) => {
+                const difference = differences.find((row) => row.line.id === line.id)?.difference;
+                return (
+                  <TableRow key={line.id}>
+                    <TableCell className="whitespace-normal">
+                      <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
+                      {line.productName}
+                      {line.unrequested ? (
+                        <>
+                          {' '}
+                          <Badge variant="outline">{t('inventory.transfer.unrequested')}</Badge>
+                        </>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {line.unrequested ? t('common.none') : <ShippedQty line={line} />}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">{countedText(line)}</TableCell>
+                    <TableCell className="whitespace-normal text-right">
+                      {difference ? (
+                        <span className="flex flex-col items-end">
+                          <span className="font-mono text-destructive">
+                            {t('inventory.qtyWithUnit', {
+                              qty: signed(difference),
+                              unit: line.baseUnitName,
+                            })}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {difference.isNegative()
+                              ? t('inventory.transfer.goesBack', {
+                                  qty: differenceText(t, line, difference),
+                                  bin: line.fromBinCode ?? t('common.none'),
+                                })
+                              : t('inventory.transfer.comesFrom', {
+                                  qty: differenceText(t, line, difference),
+                                })}
+                          </span>
+                        </span>
+                      ) : (
+                        t('common.none')
+                      )}
+                    </TableCell>
+                    <TableCell className="font-mono">
+                      {line.toBinCode ?? t('common.none')}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+      <StickyActions
+        summary={
+          differences.length > 0
+            ? t('inventory.transfer.differencesCount', { count: differences.length })
+            : t('inventory.linesCount', { count: detail.lines.length })
+        }
+      >
+        <Button
+          variant="ghost"
+          onClick={() => {
+            action.clear();
+            setReason('');
+            setDialog('return');
+          }}
+        >
+          {t('inventory.transfer.returnCount')}
+        </Button>
+        <Button
+          disabled={mutations.confirm.isPending}
+          onClick={() => {
+            action.clear();
+            setDialog('confirm');
+          }}
+        >
+          {t('inventory.transfer.confirm')}
+        </Button>
+      </StickyActions>
+      <ConfirmDialog
+        open={dialog === 'confirm'}
+        variant="default"
+        title={t('inventory.transfer.confirmQuestion')}
+        description={t('inventory.transfer.confirmDescription')}
+        confirmLabel={t('inventory.transfer.confirm')}
+        pending={mutations.confirm.isPending}
+        problem={action.problem}
+        onConfirm={confirm}
+        onClose={() => setDialog(null)}
+      >
+        {differences.length > 0 ? (
+          <ul className="flex list-disc flex-col gap-1 pl-5 text-sm">
+            {differences.map(({ line, difference }) => (
+              <li key={line.id}>
+                {t(
+                  difference.isNegative() ? 'inventory.transfer.short' : 'inventory.transfer.extra',
+                  { name: line.productName, qty: differenceText(t, line, difference) },
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={dialog === 'return'}
+        title={t('inventory.transfer.returnTitle')}
+        description={t('inventory.transfer.returnDescription')}
+        confirmLabel={t('inventory.transfer.returnCount')}
+        disabled={!reason.trim()}
+        pending={mutations.returnCount.isPending}
+        problem={action.problem}
+        onConfirm={sendBack}
+        onClose={() => setDialog(null)}
+      >
+        <FormField label={t('inventory.transfer.returnReason')} htmlFor="transfer-return-reason">
+          <Textarea
+            id="transfer-return-reason"
+            rows={2}
+            maxLength={300}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </FormField>
+      </ConfirmDialog>
+    </>
+  );
+}
+
 function signed(value: Decimal): string {
   return value.isNegative() ? formatQty(value.toFixed()) : `+${formatQty(value.toFixed())}`;
 }
@@ -1415,7 +2080,7 @@ function ShippedQty({ line }: { line: TransferLine }) {
   );
 }
 
-/** The printable list: asked, shipped and received quantities with their shelves. */
+/** The printable list: asked, shipped, counted and received quantities with their shelves. */
 function TransferLinesView({ detail }: { detail: TransferDetail }) {
   const { t } = useTranslation();
   const received = (line: TransferLine) =>
@@ -1425,6 +2090,16 @@ function TransferLinesView({ detail }: { detail: TransferDetail }) {
           qty: formatQty(line.receivedQtyBase),
           unit: line.baseUnitName,
         });
+  const counted = (line: TransferLine) =>
+    line.countedQtyBase === null
+      ? t('common.none')
+      : new Decimal(line.countedQtyBase).isZero()
+        ? t('inventory.transfer.notArrived')
+        : t('inventory.qtyWithUnit', {
+            qty: formatQty(line.countedQtyBase),
+            unit: line.baseUnitName,
+          });
+  const withCounts = detail.lines.some((line) => line.countedQtyBase !== null);
   return (
     <Card>
       {detail.note || detail.cancelReason ? (
@@ -1440,6 +2115,9 @@ function TransferLinesView({ detail }: { detail: TransferDetail }) {
               <TableHead className="text-right">{t(requestedLabel(detail.origin))}</TableHead>
               <TableHead>{t('inventory.transfer.fromBin')}</TableHead>
               <TableHead className="text-right">{t('inventory.transfer.shipped')}</TableHead>
+              {withCounts ? (
+                <TableHead className="text-right">{t('inventory.transfer.counted')}</TableHead>
+              ) : null}
               <TableHead className="text-right">{t('inventory.transfer.received')}</TableHead>
               <TableHead>{t('inventory.transfer.toBin')}</TableHead>
             </TableRow>
@@ -1450,17 +2128,28 @@ function TransferLinesView({ detail }: { detail: TransferDetail }) {
                 <TableCell className="whitespace-normal">
                   <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
                   {line.productName}
+                  {line.unrequested ? (
+                    <>
+                      {' '}
+                      <Badge variant="outline">{t('inventory.transfer.unrequested')}</Badge>
+                    </>
+                  ) : null}
                 </TableCell>
                 <TableCell className="text-right font-mono">
-                  {t('inventory.qtyWithUnit', {
-                    qty: formatQty(line.requestedQty),
-                    unit: line.unitName,
-                  })}
+                  {line.unrequested
+                    ? t('common.none')
+                    : t('inventory.qtyWithUnit', {
+                        qty: formatQty(line.requestedQty),
+                        unit: line.unitName,
+                      })}
                 </TableCell>
                 <TableCell className="font-mono">{line.fromBinCode ?? t('common.none')}</TableCell>
                 <TableCell className="text-right font-mono">
-                  <ShippedQty line={line} />
+                  {line.unrequested ? t('common.none') : <ShippedQty line={line} />}
                 </TableCell>
+                {withCounts ? (
+                  <TableCell className="text-right font-mono">{counted(line)}</TableCell>
+                ) : null}
                 <TableCell className="text-right font-mono">{received(line)}</TableCell>
                 <TableCell className="font-mono">{line.toBinCode ?? t('common.none')}</TableCell>
               </TableRow>

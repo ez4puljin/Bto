@@ -2561,6 +2561,138 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/transfer-requests/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferRequests_context"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transfer-requests/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferRequests_rows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transfer-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferRequests_list"];
+        put?: never;
+        post: operations["TransferRequests_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transfer-requests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferRequests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["TransferRequests_update"];
+        trace?: never;
+    };
+    "/api/v1/transfer-requests/{id}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Writes only the changed cells, each against the value the page opened with. */
+        put: operations["TransferRequests_saveLines"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transfer-requests/{id}/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** DRAFT → REQUESTED: every group is sent and numbered. */
+        post: operations["TransferRequests_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transfer-requests/{id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Every REQUESTED group back to DRAFT for editing (ADR-0046). */
+        post: operations["TransferRequests_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transfer-requests/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The store withdraws the whole request while nothing is shipped. */
+        post: operations["TransferRequests_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/transfers": {
         parameters: {
             query?: never;
@@ -2669,8 +2801,96 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** The destination counts what arrived; differences go back to the sender (ADR-0035). */
+        /**
+         * The destination receives a push in one step; differences go back to the sender (ADR-0035). A
+         *     request is counted, then confirmed by the source (ADR-0116): `DOC_STATE_INVALID` here.
+         */
         post: operations["Transfers_receive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transfers/{id}/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** The destination's counts on a shipped request, saved line by line (ADR-0116 #4). */
+        put: operations["Transfers_saveCounts"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transfers/{id}/count-lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A product found at the destination that was not asked for (ADR-0116 #5). */
+        post: operations["Transfers_addCountLine"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transfers/{id}/finish-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** SHIPPED → COUNTED by the destination: every line counted or «ирээгүй» (ADR-0116 #4). */
+        post: operations["Transfers_finishCount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transfers/{id}/return-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** COUNTED → SHIPPED by the source, with a reason: the destination counts again (ADR-0116 #6). */
+        post: operations["Transfers_returnCount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transfers/{id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** COUNTED → RECEIVED by the source: the receipt is posted with what was counted (ADR-0116 #6). */
+        post: operations["Transfers_confirm"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9275,27 +9495,96 @@ export interface components {
             /** @description Surplus lines, cost holders only; lines without a cost take the average */
             costs?: components["schemas"]["StocktakeCostRequest"][];
         };
-        TransferSummary: {
+        TransferRequestContext: {
+            /** @description The STORE warehouses the caller may request for */
+            storeWarehouses: {
+                id: number;
+                name: string;
+            }[];
+            /**
+             * Format: date
+             * @description The server’s business date
+             */
+            today: string;
+        };
+        TransferRequestRowUnit: {
+            /** @description The product unit id */
             id: number;
-            number: string | null;
-            /** @enum {string} */
-            origin: "REQUEST" | "PUSH";
-            /** @enum {string} */
-            status: "DRAFT" | "REQUESTED" | "SHIPPED" | "RECEIVED" | "CANCELLED";
-            sourceWarehouseId: number;
+            /** @example хайрцаг */
+            name: string;
+            /** @example BOX */
+            uomCode: string | null;
+            /**
+             * @description Base units per unit
+             * @example 24
+             */
+            factor: string;
+            isBase: boolean;
+        };
+        TransferRequestRowLine: {
+            transferId: number;
+            lineId: number;
+            productUnitId: number;
+            /**
+             * @description In that unit
+             * @example 3
+             */
+            qty: string;
+        };
+        TransferRequestRow: {
+            productId: number;
+            sku: string;
+            name: string;
+            thumbUrl: string | null;
+            /** @description Current units, base first */
+            units: components["schemas"]["TransferRequestRowUnit"][];
+            homeWarehouseId: number | null;
+            homeWarehouseName: string | null;
+            /**
+             * @description On hand in the home warehouse, base units
+             * @example 240
+             */
+            homeOnHand: string;
+            /**
+             * @description On hand at the store, base units
+             * @example 12
+             */
+            storeOnHand: string;
+            /**
+             * @description Last calendar month’s till sales at the store, base units
+             * @example 96
+             */
+            lastMonthOut: string;
+            line: components["schemas"]["TransferRequestRowLine"] | null;
+        };
+        TransferRequestRowsPage: {
+            data: components["schemas"]["TransferRequestRow"][];
+            nextCursor: string | null;
+            total: number;
+            /** Format: date */
+            outflowFrom: string;
+            /** Format: date */
+            outflowTo: string;
+        };
+        TransferRequestSummary: {
+            id: number;
             destWarehouseId: number;
-            lineCount: number;
+            /** @enum {string} */
+            status: "DRAFT" | "REQUESTED" | "SHIPPED" | "COUNTED" | "RECEIVED" | "CANCELLED";
+            note: string | null;
             /** Format: date-time */
             requestedAt: string | null;
             /** Format: date-time */
-            shippedAt: string | null;
-            /** Format: date-time */
-            receivedAt: string | null;
-            /** Format: date-time */
             createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            groupCount: number;
+            lineCount: number;
+            /** @description The groups’ TR- numbers, by group */
+            numbers: string[];
         };
-        TransferPage: {
-            data: components["schemas"]["TransferSummary"][];
+        TransferRequestPage: {
+            data: components["schemas"]["TransferRequestSummary"][];
             nextCursor: string | null;
         };
         TransferLine: {
@@ -9326,6 +9615,15 @@ export interface components {
              */
             shippedQtyBase: string | null;
             /**
+             * @description What the destination counted, base units (null until counted; 0 = none arrived)
+             * @example 118
+             */
+            countedQtyBase: string | null;
+            /** Format: date-time */
+            countedAt: string | null;
+            /** @description Found at the destination without being asked for (requested 0) */
+            unrequested: boolean;
+            /**
              * @description Base units
              * @example 118
              */
@@ -9339,14 +9637,16 @@ export interface components {
             /** @example SALESFLOOR */
             toBinCode: string | null;
         };
-        TransferDetail: {
+        TransferRequestGroup: {
             id: number;
             /** @example TR-2026-000001 */
             number: string | null;
             /** @enum {string} */
             origin: "REQUEST" | "PUSH";
             /** @enum {string} */
-            status: "DRAFT" | "REQUESTED" | "SHIPPED" | "RECEIVED" | "CANCELLED";
+            status: "DRAFT" | "REQUESTED" | "SHIPPED" | "COUNTED" | "RECEIVED" | "CANCELLED";
+            /** @description The request this group belongs to (every REQUEST has one; a PUSH none) */
+            requestId: number | null;
             sourceWarehouseId: number;
             destWarehouseId: number;
             note: string | null;
@@ -9356,6 +9656,149 @@ export interface components {
             shippedAt: string | null;
             /** Format: date */
             shipDate: string | null;
+            /**
+             * Format: date-time
+             * @description The destination finished its count (COUNTED)
+             */
+            countedAt: string | null;
+            /** @description Why the source sent the count back, while the destination counts again */
+            countReturnReason: string | null;
+            /** Format: date-time */
+            receivedAt: string | null;
+            /** Format: date */
+            receiveDate: string | null;
+            /** Format: date-time */
+            cancelledAt: string | null;
+            cancelReason: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            lines: components["schemas"]["TransferLine"][];
+            sourceWarehouseName: string;
+        };
+        TransferRequestDetail: {
+            id: number;
+            destWarehouseId: number;
+            destWarehouseName: string;
+            /**
+             * @description The lowest of the live groups
+             * @enum {string}
+             */
+            status: "DRAFT" | "REQUESTED" | "SHIPPED" | "COUNTED" | "RECEIVED" | "CANCELLED";
+            note: string | null;
+            /** Format: date-time */
+            requestedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description One per source warehouse, cancelled ones left out */
+            groups: components["schemas"]["TransferRequestGroup"][];
+        };
+        TransferRequestLineRequest: {
+            productId: number;
+            /** @description The unit asked for */
+            productUnitId: number;
+            /**
+             * @description Positive, in that unit
+             * @example 5
+             */
+            qty: string;
+        };
+        TransferRequestCreateRequest: {
+            /** @description The store (a STORE warehouse in the caller’s scope) */
+            destWarehouseId: number;
+            note?: string | null;
+            /** @description One line per product */
+            lines: components["schemas"]["TransferRequestLineRequest"][];
+        };
+        TransferRequestUpdateRequest: {
+            note?: string | null;
+        };
+        TransferRequestChange: {
+            productId: number;
+            /** @description The unit now (null with no quantity) */
+            productUnitId: number | null;
+            /** @description The quantity now; null or 0 removes */
+            qty: string | null;
+            /** @description The unit when the page opened */
+            previousUnitId: number | null;
+            /** @description The quantity when the page opened */
+            previousQty: string | null;
+        };
+        TransferRequestSaveLinesRequest: {
+            changes: components["schemas"]["TransferRequestChange"][];
+        };
+        TransferRequestConflict: {
+            productId: number;
+            productUnitId: number | null;
+            qty: string | null;
+        };
+        TransferRequestRefusal: {
+            productId: number;
+            /** @enum {string} */
+            reason: "NO_HOME";
+        };
+        TransferRequestSaveResult: {
+            applied: number;
+            /** @description Changed by someone else: skipped */
+            conflicts: components["schemas"]["TransferRequestConflict"][];
+            refused: components["schemas"]["TransferRequestRefusal"][];
+        };
+        TransferRequestCancelRequest: {
+            reason?: string | null;
+        };
+        TransferSummary: {
+            id: number;
+            number: string | null;
+            /** @enum {string} */
+            origin: "REQUEST" | "PUSH";
+            /** @enum {string} */
+            status: "DRAFT" | "REQUESTED" | "SHIPPED" | "COUNTED" | "RECEIVED" | "CANCELLED";
+            requestId: number | null;
+            sourceWarehouseId: number;
+            destWarehouseId: number;
+            lineCount: number;
+            /** Format: date-time */
+            requestedAt: string | null;
+            /** Format: date-time */
+            shippedAt: string | null;
+            /** Format: date-time */
+            receivedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        TransferPage: {
+            data: components["schemas"]["TransferSummary"][];
+            nextCursor: string | null;
+        };
+        TransferDetail: {
+            id: number;
+            /** @example TR-2026-000001 */
+            number: string | null;
+            /** @enum {string} */
+            origin: "REQUEST" | "PUSH";
+            /** @enum {string} */
+            status: "DRAFT" | "REQUESTED" | "SHIPPED" | "COUNTED" | "RECEIVED" | "CANCELLED";
+            /** @description The request this group belongs to (every REQUEST has one; a PUSH none) */
+            requestId: number | null;
+            sourceWarehouseId: number;
+            destWarehouseId: number;
+            note: string | null;
+            /** Format: date-time */
+            requestedAt: string | null;
+            /** Format: date-time */
+            shippedAt: string | null;
+            /** Format: date */
+            shipDate: string | null;
+            /**
+             * Format: date-time
+             * @description The destination finished its count (COUNTED)
+             */
+            countedAt: string | null;
+            /** @description Why the source sent the count back, while the destination counts again */
+            countReturnReason: string | null;
             /** Format: date-time */
             receivedAt: string | null;
             /** Format: date */
@@ -9408,6 +9851,35 @@ export interface components {
             /** @description Lines left out take the default quantity and bin */
             lines?: components["schemas"]["TransferCount"][];
         };
+        TransferCountEntry: {
+            lineId: number;
+            /** @description A current unit of the product; default the line’s unit */
+            productUnitId?: number;
+            /**
+             * @description In that unit; 0 = nothing arrived («ирээгүй»)
+             * @example 5
+             */
+            qty: string;
+            /** @description The destination shelf the goods were put on, as scanned */
+            binId?: number;
+        };
+        TransferSaveCountsRequest: {
+            entries: components["schemas"]["TransferCountEntry"][];
+        };
+        TransferUnrequestedLineRequest: {
+            productId: number;
+            /** @description The scanned unit */
+            productUnitId: number;
+            /**
+             * @description What arrived, in that unit
+             * @example 2
+             */
+            qty: string;
+        };
+        TransferReturnCountRequest: {
+            /** @description Why the count goes back to the destination */
+            reason: string;
+        };
         TransferCancelRequest: {
             /** @description Required when the source declines a request */
             reason?: string | null;
@@ -9428,6 +9900,8 @@ export interface components {
             transfersToShip: number;
             /** @description Shipments on their way to the caller’s warehouses */
             transfersToReceive: number;
+            /** @description Request groups the caller’s warehouses sent, counted by the store, to confirm */
+            transfersToConfirm: number;
             /** @description Adjustments waiting for approval (approvers) */
             adjustmentsToApprove: number;
             /** @description Stocktakes waiting for review (approvers) */
@@ -14925,7 +15399,7 @@ export interface components {
             userId: number | null;
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "ISSUE_LINES_UNCHECKED" | "ISSUE_WAREHOUSE_CONFIRMED" | "ISSUE_PARTLY_POSTED" | "ISSUE_RECIPIENT_KIND" | "ISSUE_CORRECTION_OPEN" | "ISSUE_NOT_SENT" | "PO_NOT_EDITABLE" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "ISSUE_LINES_UNCHECKED" | "ISSUE_WAREHOUSE_CONFIRMED" | "ISSUE_PARTLY_POSTED" | "ISSUE_RECIPIENT_KIND" | "ISSUE_CORRECTION_OPEN" | "ISSUE_NOT_SENT" | "PO_NOT_EDITABLE" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "TRANSFER_LINES_UNCOUNTED" | "TRANSFER_REQUEST_EMPTY" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -21361,6 +21835,335 @@ export interface operations {
             };
         };
     };
+    TransferRequests_context: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestContext"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    TransferRequests_rows: {
+        parameters: {
+            query: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description The store the request is for */
+                warehouseId: number;
+                q?: string;
+                /** @description Show this request’s lines beside the products */
+                requestId?: number;
+                /** @description REQUESTED: only the request’s products */
+                filter?: "ALL" | "REQUESTED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestRowsPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    TransferRequests_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description The store; without it, the caller’s own warehouses */
+                warehouseId?: number;
+                status?: "DRAFT" | "REQUESTED" | "SHIPPED" | "COUNTED" | "RECEIVED" | "CANCELLED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    TransferRequests_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferRequestCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    TransferRequests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    TransferRequests_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferRequestUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    TransferRequests_saveLines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferRequestSaveLinesRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestSaveResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    TransferRequests_request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    TransferRequests_reopen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    TransferRequests_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferRequestCancelRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Transfers_list: {
         parameters: {
             query?: {
@@ -21370,7 +22173,9 @@ export interface operations {
                 /** @description INCOMING = received by, OUTGOING = sent by warehouseId; without it, by the warehouses the caller writes for */
                 direction?: "INCOMING" | "OUTGOING";
                 warehouseId?: number;
-                status?: "DRAFT" | "REQUESTED" | "SHIPPED" | "RECEIVED" | "CANCELLED";
+                status?: "DRAFT" | "REQUESTED" | "SHIPPED" | "COUNTED" | "RECEIVED" | "CANCELLED";
+                /** @description The groups of one request */
+                requestId?: number;
             };
             header?: never;
             path?: never;
@@ -21644,6 +22449,174 @@ export interface operations {
                 "application/json": components["schemas"]["TransferCountRequest"];
             };
         };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Transfers_saveCounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferSaveCountsRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Transfers_addCountLine: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferUnrequestedLineRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Transfers_finishCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Transfers_returnCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferReturnCountRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Transfers_confirm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             200: {
                 headers: {
