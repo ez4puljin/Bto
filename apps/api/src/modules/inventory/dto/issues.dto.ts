@@ -1,7 +1,9 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
 import {
   ISSUE_RECIPIENT_KINDS,
+  ISSUE_STATUSES,
   type IssueRecipientKind,
+  type IssueStatus,
   MAX_ISSUE_LINES,
 } from '@tugeel/shared/inventory';
 import { Transform, Type } from 'class-transformer';
@@ -19,11 +21,8 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { PageQueryDto } from '../../../common/pagination/page';
-import { ISSUE_STATUSES } from '../schema';
 import { QTY, trimmed } from './bins.dto';
 import { ISO_DATE } from './receipts.dto';
-
-type IssueStatus = (typeof ISSUE_STATUSES)[number];
 
 @ApiSchema({ name: 'IssueExpenseType' })
 export class IssueExpenseTypeDto {
@@ -64,12 +63,54 @@ export class IssueLineDto {
   @ApiProperty() enteredQty: string;
   @ApiProperty() factorSnapshot: string;
   @ApiProperty({ description: 'Base units' }) qtyBase: string;
-  @ApiProperty() binId: number;
-  @ApiProperty() binCode: string;
+  @ApiProperty() warehouseId: number;
+  @ApiProperty() warehouseName: string;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'Null until the confirmation picks it',
+  })
+  binId: number | null;
+  @ApiProperty({ type: String, nullable: true }) binCode: string | null;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'The keeper’s tick',
+  })
+  checkedAt: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: '«Хүнд тооцох»: the sale price per base unit, whole MNT',
+  })
+  saleUnitPrice: string | null;
+  @ApiProperty({ type: String, nullable: true, description: '«Хүнд тооцох»: the line’s charge' })
+  saleAmount: string | null;
   @ApiPropertyOptional({ type: String, nullable: true, description: 'Cost holders only' })
   unitCost?: string | null;
   @ApiPropertyOptional({ type: String, nullable: true, description: 'Cost holders only' })
   amount?: string | null;
+}
+
+@ApiSchema({ name: 'IssueWarehouse' })
+export class IssueWarehouseDto {
+  @ApiProperty() warehouseId: number;
+  @ApiProperty() warehouseName: string;
+  @ApiProperty() lineCount: number;
+  @ApiProperty() checkedCount: number;
+  @ApiProperty({ description: 'Its part left (or a correction left it unchanged)' })
+  confirmed: boolean;
+}
+
+@ApiSchema({ name: 'IssueConfirmation' })
+export class IssueConfirmationDto {
+  @ApiProperty() warehouseId: number;
+  @ApiProperty() warehouseName: string;
+  @ApiProperty({ type: String, nullable: true }) confirmedBy: string | null;
+  @ApiProperty({ type: String, format: 'date-time' }) confirmedAt: string;
+  @ApiProperty({ description: 'A correction’s warehouse whose lines equal the parent’s' })
+  unchanged: boolean;
 }
 
 @ApiSchema({ name: 'IssueDetail' })
@@ -81,6 +122,7 @@ export class IssueDetailDto {
   @ApiProperty({ type: String, format: 'date' }) issuedOn: string;
   @ApiProperty() expenseTypeId: number;
   @ApiProperty() expenseTypeName: string;
+  @ApiProperty({ type: String, nullable: true }) expenseTypeCode: string | null;
   @ApiProperty({ enum: ISSUE_RECIPIENT_KINDS }) recipientKind: IssueRecipientKind;
   @ApiProperty({ type: Number, nullable: true }) recipientUserId: number | null;
   @ApiProperty({ type: Number, nullable: true }) recipientCustomerId: number | null;
@@ -88,11 +130,26 @@ export class IssueDetailDto {
   @ApiProperty({ type: String, nullable: true }) recipientName: string | null;
   @ApiProperty({ enum: ISSUE_STATUSES }) status: IssueStatus;
   @ApiProperty({ type: String, nullable: true }) note: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) sentAt: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'The keeper’s note when sent back' })
+  returnNote: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) returnedAt: string | null;
+  @ApiProperty({ type: String, nullable: true }) returnedBy: string | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'The posted issue this one corrects' })
+  correctsIssueId: number | null;
+  @ApiProperty({ type: String, nullable: true }) correctsIssueNumber: string | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'The correction of this issue' })
+  correctedByIssueId: number | null;
+  @ApiProperty({ type: String, nullable: true }) correctedByIssueNumber: string | null;
   @ApiProperty({ type: String, format: 'date', nullable: true }) effectiveDate: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) postedAt: string | null;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt: string;
   @ApiProperty({ type: [IssueLineDto] }) lines: IssueLineDto[];
+  @ApiProperty({ type: [IssueWarehouseDto] }) warehouses: IssueWarehouseDto[];
+  @ApiProperty({ type: [IssueConfirmationDto] }) confirmations: IssueConfirmationDto[];
+  @ApiProperty({ type: String, nullable: true, description: '«Хүнд тооцох»: Σ sale amounts' })
+  saleTotal: string | null;
   @ApiPropertyOptional({ type: String, nullable: true, description: 'Cost holders only' })
   total?: string | null;
 }
@@ -109,6 +166,10 @@ export class IssueSummaryDto {
   @ApiProperty({ type: String, nullable: true }) recipientName: string | null;
   @ApiProperty({ enum: ISSUE_STATUSES }) status: IssueStatus;
   @ApiProperty() lineCount: number;
+  @ApiProperty({ type: [Number], description: 'The line warehouses' }) warehouseIds: number[];
+  @ApiProperty({ type: [Number], description: 'The warehouses whose part left' })
+  confirmedWarehouseIds: number[];
+  @ApiProperty({ type: Number, nullable: true }) correctsIssueId: number | null;
   @ApiProperty({ type: String, format: 'date', nullable: true }) effectiveDate: string | null;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
 }
@@ -131,6 +192,13 @@ export class IssueListQueryDto extends PageQueryDto {
   @IsString()
   @MaxLength(100)
   q?: string;
+  @ApiPropertyOptional({
+    description: 'Only sent issues with a line of the caller’s warehouses still to confirm',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  pending?: boolean;
 }
 
 @ApiSchema({ name: 'IssueRecipientRequest' })
@@ -170,7 +238,16 @@ export class IssueLineRequestDto {
   @ApiPropertyOptional({
     type: Number,
     nullable: true,
-    description: 'Omitted: the fixed shelf when it holds the product, else the fullest',
+    description: 'Omitted: the product’s home warehouse, else the issue’s default',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  warehouseId?: number | null;
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'Omitted: picked at the confirmation (the fixed shelf, else the fullest)',
   })
   @IsOptional()
   @IsInt()
@@ -180,7 +257,10 @@ export class IssueLineRequestDto {
 
 @ApiSchema({ name: 'IssueCreateRequest' })
 export class CreateIssueDto {
-  @ApiProperty() @IsInt() @Min(1) warehouseId: number;
+  @ApiProperty({ description: 'The default warehouse of lines whose product has no home' })
+  @IsInt()
+  @Min(1)
+  warehouseId: number;
   @ApiPropertyOptional({ type: String, format: 'date', description: 'Default today' })
   @IsOptional()
   @Matches(ISO_DATE)
@@ -212,6 +292,11 @@ export class UpdateIssueDto {
   @Matches(ISO_DATE)
   issuedOn?: string;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) expenseTypeId?: number;
+  @ApiPropertyOptional({ description: 'The default warehouse' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  warehouseId?: number;
   @ApiPropertyOptional({ type: IssueRecipientDto })
   @IsOptional()
   @ValidateNested()
@@ -228,5 +313,28 @@ export class UpdateIssueDto {
 @ApiSchema({ name: 'IssueLineUpdateRequest' })
 export class UpdateIssueLineDto {
   @ApiPropertyOptional({ example: '3' }) @IsOptional() @Matches(QTY) enteredQty?: string;
-  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) binId?: number;
+  @ApiPropertyOptional({ description: 'Move the line to another warehouse' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  warehouseId?: number;
+}
+
+@ApiSchema({ name: 'IssueLineCheckRequest' })
+export class CheckIssueLineDto {
+  @ApiProperty() @IsBoolean() checked: boolean;
+}
+
+@ApiSchema({ name: 'IssueLineBinRequest' })
+export class SetIssueLineBinDto {
+  @ApiProperty() @IsInt() @Min(1) binId: number;
+}
+
+@ApiSchema({ name: 'IssueReturnRequest' })
+export class ReturnIssueDto {
+  @ApiProperty({ maxLength: 500, description: 'Why the issue is sent back' })
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(500)
+  note: string;
 }

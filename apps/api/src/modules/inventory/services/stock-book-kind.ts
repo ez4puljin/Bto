@@ -18,7 +18,9 @@ export function bookKindOf(
       return 'SALE';
     case 'RETURN_IN':
       return 'SALE_RETURN';
+    // A correction brings the corrected part back (ADR-0117 #5): the same kind, the value negative.
     case 'GOODS_ISSUE':
+    case 'GOODS_ISSUE_REVERSAL':
       return 'ISSUE';
     case 'ADJUSTMENT':
       if (reason === 'OPENING' || reason === 'OPENING_REVERSAL') return 'OPENING';

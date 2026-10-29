@@ -21,6 +21,7 @@ import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -55,7 +56,7 @@ import { useWarehouseName, useWarehouseOptions, wantsScanFocus } from './helpers
 import { IssueForm } from './issue-form';
 import { DocStatusBadge, WarehouseSelect } from './shared';
 
-const ISSUE_STATUSES: readonly IssueStatus[] = ['DRAFT', 'POSTED', 'CANCELLED'];
+const ISSUE_STATUSES: readonly IssueStatus[] = ['DRAFT', 'SENT', 'RETURNED', 'POSTED', 'CANCELLED'];
 const ISSUE_WAREHOUSES = ['WHOLESALE', 'STORE'] as const;
 
 const isStatus = (value: string | null): value is IssueStatus =>
@@ -65,13 +66,20 @@ const positiveId = (value: string | null) => {
   return Number.isSafeInteger(id) && id > 0 ? id : undefined;
 };
 
-/** Goods issues (ADR-0081): goods leaving a warehouse for an expense type and a recipient. */
+/**
+ * Goods issues (ADR-0081, ADR-0117): goods leaving the warehouses for an expense type and a party;
+ * the accountant's list, and the keepers' work («Батлах хүлээж буй»: the sent issues with a line
+ * of theirs still to confirm, preselected for a keeper who does not send issues).
+ */
 export function IssuesPage() {
   const { t } = useTranslation();
   const canManage = useHasPermission('inventory.issues.manage');
+  const canConfirm = useHasPermission('inventory.issues.confirm');
   const canSetup = useHasPermission('inventory.setup.manage');
   const [params] = useSearchParams();
   const setParam = useSetParam();
+  const pendingParam = params.get('pending');
+  const pending = pendingParam === null ? canConfirm && !canManage : pendingParam === '1';
   const [search, setSearch] = useState(params.get('q') ?? '');
   const [typesOpen, setTypesOpen] = useState(false);
   const q = useDeferredValue(search.trim());
@@ -82,7 +90,7 @@ export function IssuesPage() {
   const warehouses = useWarehouseOptions(ISSUE_WAREHOUSES);
   const warehouseName = useWarehouseName();
   const types = useIssueExpenseTypes();
-  const issues = useIssues({ q, status, warehouseId, expenseTypeId });
+  const issues = useIssues({ q, status, warehouseId, expenseTypeId, pending });
   const rows = issues.data?.pages.flatMap((page) => page.data) ?? [];
 
   if (params.get('new') === '1') return <Navigate to="/inventory/issues/new" replace />;
@@ -153,6 +161,15 @@ export function IssuesPage() {
             </option>
           ))}
         </NativeSelect>
+        {canConfirm ? (
+          <Label className="flex items-center gap-2 text-sm font-normal">
+            <Checkbox
+              checked={pending}
+              onCheckedChange={(checked) => setParam('pending', checked === true ? '1' : '0')}
+            />
+            {t('inventory.issues.pendingOnly')}
+          </Label>
+        ) : null}
       </FilterBar>
       <ProblemAlert problem={problemFromError(issues.error)} onRetry={issues.refetch} />
       <ListCard scroll>
@@ -161,7 +178,7 @@ export function IssuesPage() {
             <TableRow>
               <TableHead>{t('inventory.number')}</TableHead>
               <TableHead>{t('inventory.date')}</TableHead>
-              <TableHead>{t('inventory.warehouse')}</TableHead>
+              <TableHead>{t('inventory.issues.parts')}</TableHead>
               <TableHead>{t('inventory.issues.expenseType')}</TableHead>
               <TableHead>{t('inventory.issues.recipient')}</TableHead>
               <TableHead className="text-right">{t('inventory.lines')}</TableHead>
@@ -182,7 +199,23 @@ export function IssuesPage() {
                   </Link>
                 </TableCell>
                 <TableCell className="font-mono">{issue.issuedOn}</TableCell>
-                <TableCell>{warehouseName(issue.warehouseId)}</TableCell>
+                <TableCell>
+                  <span className="flex items-center gap-1.5">
+                    <span className="block max-w-[16rem] truncate">
+                      {(issue.warehouseIds.length > 0 ? issue.warehouseIds : [issue.warehouseId])
+                        .map(warehouseName)
+                        .join(', ')}
+                    </span>
+                    {issue.warehouseIds.length > 0 && issue.status !== 'DRAFT' ? (
+                      <Badge variant={issue.status === 'POSTED' ? 'success' : 'secondary'}>
+                        {t('inventory.issues.partsProgress', {
+                          done: issue.confirmedWarehouseIds.length,
+                          total: issue.warehouseIds.length,
+                        })}
+                      </Badge>
+                    ) : null}
+                  </span>
+                </TableCell>
                 <TruncateCell text={issue.expenseTypeName} />
                 <TruncateCell
                   text={

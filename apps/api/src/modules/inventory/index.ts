@@ -1,10 +1,14 @@
 // Public API of the inventory module (docs/modules/inventory.md). Other modules import only this
 // file; named exports only (ESLint G2 rejects `export *`).
 export {
+  type DamageChargeFacts,
   PURCHASE_BOOKS,
   type PurchaseBooks,
   type ReceiptBookFacts,
   type ReceiptBookTotals,
+  SALE_PRICE_READER,
+  type SalePriceReader,
+  type StockBookParty,
   RECEIPT_MONEY_ACCOUNTS,
   RECEIPT_PROGRESS,
   type ReceiptMoneyAccount,

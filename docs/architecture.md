@@ -371,6 +371,7 @@ The drawing above is the graph as `MODULE_DEPS` holds it today. The Finance Core
 | DELIVERY_ISSUE | TRIP- (stop) or SO- (pickup) | 1 | − | CARGO or STAGING |
 | POS_SALE | the till’s number (`К3-261016-0045`, ADR-0063 #3; external document `POS` posted by the pos module) | 1 | − | SALESFLOOR, after an automatic `POS_SHORTFALL` adjustment filled what the shelf lacked (ADR-0063 #5); a return is `RETURN_IN` onto SALESFLOOR or DAMAGED |
 | TRANSFER_OUT / TRANSFER_IN | TR- | ship 1 / 2, receive 3 / 4, corrections 5 / 6 | − / + | source → TRANSIT; TRANSIT → destination (SALESFLOOR at the store, else the fixed shelf or RECEIVING); a shortfall back into the source bin, a surplus out of it (ADR-0035) |
+| GOODS_ISSUE_REVERSAL | GI- (a correction, ADR-0117) | 1 | + | the shelf the corrected part left, at the cost it left at; in the same posting as the correction's new GOODS_ISSUE rows |
 | RETURN_IN | TRIP- (return) or CN- | 1 | + | CARGO or RETURNS |
 | ADJUSTMENT | ADJ- | 1 | ± | any (reason code required; opening stock) |
 | COUNT_CORRECTION | ST- | 1 | ± | counted bins |
@@ -424,7 +425,7 @@ CREATE TABLE stock_snapshot_daily (
 | Document | States | Notes |
 |---|---|---|
 | goods_receipts (GR-) | DRAFT → POSTED; DRAFT → CANCELLED | number allocated at POST; then `costing_status` PENDING → COSTED by the accountant, re-costed with a new `costing_version` (ADR-0033) |
-| goods_issues (GI-) | DRAFT → POSTED; DRAFT → CANCELLED | ADR-0081: number allocated at POST; posted directly by `inventory.issues.manage` (no approval); one `GOODS_ISSUE` leg per line at the average cost, the posted `unit_cost` kept on the line; an active expense type checked again at posting |
+| goods_issues (GI-) | DRAFT → SENT → (RETURNED → SENT)* → POSTED; DRAFT/SENT/RETURNED → CANCELLED while no part left | ADR-0081, ADR-0117: the accountant sends (`inventory.issues.manage`), each warehouse's keeper confirms their own lines (`inventory.issues.confirm`, the write scope) and that part posts at once (`post` with `partial: true`: the number and the effective date at the first part, the status kept); POSTED once every warehouse has its confirmation; one `GOODS_ISSUE` leg per line at the average cost, the posted `unit_cost` kept on the line; a correction (`corrects_issue_id`) posts `GOODS_ISSUE_REVERSAL` for the parent's part and its own `GOODS_ISSUE` rows in one posting |
 | bin_moves (BM-) | DRAFT → POSTED | created and posted in one request from the scanner flow |
 | transfers (TR-) | REQUEST: DRAFT → REQUESTED → SHIPPED → RECEIVED; PUSH: DRAFT → SHIPPED → RECEIVED; DRAFT/REQUESTED → CANCELLED; REQUESTED → DRAFT when the destination takes the request back (ADR-0046) | numbered at REQUESTED (PUSH: at SHIPPED); a request taken back keeps its number and is sent again under it; SHIPPED posts legs 1/2; RECEIVED posts legs 3/4 and the corrections 5/6, all in base units (ADR-0035) |
 | adjustments (ADJ-) | DRAFT → SUBMITTED → POSTED; SUBMITTED → DRAFT (returned); DRAFT/SUBMITTED → CANCELLED | warehouse staff submit, an approver posts (owner, 2026-10-11); the reason fixes the sign; unit_cost on inbound lines; the system reasons OPENING and OPENING_REVERSAL post DRAFT → POSTED inside an import (ADR-0036) |

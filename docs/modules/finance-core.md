@@ -410,6 +410,14 @@ The owner's answers (2026-10-23):
 - income tax (manual);
 - a base on the POS shift's VAT line.
 
+### 3.14 What slice 3 added (2026-10-29, ADR-0117) — the party on stock journals, the damage charge, the account report by party
+
+**The core.** `FinJournalReader.accountLedger` takes `partyId` (the lines, the running balance and the opening of one party on the account) and every row carries `partyName`; `accountParties` lists the parties with lines on an account (by name, `q`); the index `fin_journal_lines_account_party_idx` (migration `0054_issues_confirmed`). No engine change: a JOURNAL document already stores a non-control line's party, and an AR_INVOICE opens the receivable.
+
+**Bto's side.** The stock journal of a goods issue names the issue's party on the document and on the expense line (a customer's or a supplier's party, a staff member as `user:<id>` EMPLOYEE, a typed name as `other:<search key>` OTHER). A new document type `BTO.DAMAGE_CHARGE` (AR_INVOICE, numbered by Bto, data section of `0054`): each confirmed part of a «Хүнд тооцох» issue is Dr AR / Cr OTHER_INCOME at the sale price on the party, due on the posting day, no VAT (TODO-VERIFY); the goods left at cost on COGS. Supplier returns credit per confirmed part (`BTO/SUPPLIER_RETURN/<issue>:<warehouse>`). A correction reverses the parent part's charge or credit (intake REVERSE, dated today) and books the child's. `GET /gl-accounts/:id/ledger?partyId=` and `GET /gl-accounts/:id/parties`.
+
+**Tests.** `goods-issues.int-spec.ts` (the party on the stock journal, the charge's lines and open item, the ledger by account and party, the customer's balance, two supplier credits, the correction's reversal), `fin-bridge.int-spec.ts` replays `0054`'s document type.
+
 ### 3.13 What ADR-0106 changed (2026-10-24) — the questionnaire's suggestions adopted
 
 The owner adopted every suggestion of the accountant questionnaire as a decision (§18's Status column). Where a suggestion differs from F3/F4 (1.1 a daily COGS batch, 1.3 cash receipts crediting cash, 1.5 supplier returns at the document's amount), the owner's later F3/F4 decisions are kept. No migration.

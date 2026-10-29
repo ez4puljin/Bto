@@ -55,6 +55,7 @@ import {
   type GlAccount,
   type GlRole,
   useAccountLedger,
+  useAccountParties,
   useFinanceMutations,
   useGlAccounts,
 } from './api';
@@ -374,9 +375,12 @@ export function AccountLedgerPage() {
   const setParam = useSetParam();
   const from = params.get('from') ?? undefined;
   const to = params.get('to') ?? undefined;
+  const partyId = params.get('partyId') ?? undefined;
   const accounts = useGlAccounts();
   const account = accounts.data?.find((entry) => entry.id === accountId);
-  const ledger = useAccountLedger(accountId > 0 ? accountId : null, { from, to });
+  // The account report by account and party (ADR-0117 #2).
+  const parties = useAccountParties(accountId > 0 ? accountId : null);
+  const ledger = useAccountLedger(accountId > 0 ? accountId : null, { from, to, partyId });
   const rows = ledger.data?.pages.flatMap((page) => page.data) ?? [];
 
   return (
@@ -405,6 +409,19 @@ export function AccountLedgerPage() {
           onFrom={(value) => setParam('from', value)}
           onTo={(value) => setParam('to', value)}
         />
+        <NativeSelect
+          variant="filter"
+          aria-label={t('finance.accounts.partyFilter')}
+          value={partyId ?? ''}
+          onChange={(event) => setParam('partyId', event.target.value)}
+        >
+          <option value="">{t('finance.accounts.allParties')}</option>
+          {(parties.data ?? []).map((party) => (
+            <option key={party.partyId} value={party.partyId}>
+              {party.name}
+            </option>
+          ))}
+        </NativeSelect>
         {ledger.data?.pages[0] && from ? (
           <span className="text-sm text-muted-foreground">
             {t('finance.fields.opening')}:{' '}
@@ -440,7 +457,11 @@ export function AccountLedgerPage() {
                   </Link>
                 </TableCell>
                 <TruncateCell
-                  text={[line.entryDescription, line.customerName, line.description]
+                  text={[
+                    line.entryDescription,
+                    line.partyName ?? line.customerName,
+                    line.description,
+                  ]
                     .filter(Boolean)
                     .join(' · ')}
                   fill

@@ -7,7 +7,7 @@ import { connectAs, createHttpApp } from '../harness/apps';
 import { idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { financeApi, type InvoiceJson, salesFlow } from '../harness/finance';
 import { bearer, login, seedUser } from '../harness/identity';
-import { expectReconciled, inventoryApi, postReceipt } from '../harness/inventory';
+import { expectReconciled, inventoryApi, postIssue, postReceipt } from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 
 /**
@@ -95,11 +95,7 @@ describe('finance stock and cost', () => {
         })
         .expect(201)
     ).body as { id: number };
-    await http()
-      .post(`/api/v1/issues/${draft.id}/post`)
-      .set(bearer(admin))
-      .set(idempotency())
-      .expect(200);
+    await postIssue(app, admin, draft.id);
     return draft.id;
   };
 
@@ -174,8 +170,8 @@ describe('finance stock and cost', () => {
          JOIN fin.journal_entries e ON e.company_id = d.company_id AND e.document_id = d.id
          JOIN fin.journal_lines l ON l.company_id = e.company_id AND l.entry_id = e.id
          JOIN fin.accounts a ON a.company_id = l.company_id AND a.id = l.account_id
-        WHERE d.source_doc_type = 'SUPPLIER_RETURN' AND d.source_doc_id = $1 AND a.code = '140101'`,
-      [String(returned)],
+        WHERE d.source_doc_type = 'SUPPLIER_RETURN' AND d.source_doc_id LIKE $1 AND a.code = '140101'`,
+      [`${returned}:%`],
     );
     expect(credit.rows[0]?.amount).toBe('-700.00');
   });
@@ -249,7 +245,7 @@ describe('finance stock and cost', () => {
       { kind: 'SUPPLIER', supplierId: supplier },
       '1',
     );
-    expect(await branchesOf('SUPPLIER_RETURN', String(returned))).toEqual([branch]);
+    expect(await branchesOf('SUPPLIER_RETURN', `${returned}:%`)).toEqual([branch]);
     // A voucher of the core's screens (source FIN) carries its cash box's branch.
     const finance = financeApi(app, admin);
     const box = (
@@ -306,11 +302,7 @@ describe('finance stock and cost', () => {
           })
           .expect(201)
       ).body as { id: number };
-      await http()
-        .post(`/api/v1/issues/${draft.id}/post`)
-        .set(bearer(admin))
-        .set(idempotency())
-        .expect(200);
+      await postIssue(app, admin, draft.id);
       return draft.id;
     };
     const first = await issueOf();

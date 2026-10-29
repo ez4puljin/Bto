@@ -104,5 +104,6 @@ export {
   type FinEntryOrigin,
   type FinEntrySummary,
   FinJournalReader,
+  type FinAccountParty,
   type FinLedgerRow,
 } from './posting/journal-reader.service';

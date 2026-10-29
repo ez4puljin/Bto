@@ -20,6 +20,9 @@ import {
 } from '../../identity';
 import {
   AccountLedgerPageDto,
+  AccountLedgerQueryDto,
+  AccountPartiesQueryDto,
+  AccountPartyDto,
   CashBookPageDto,
   DateRangeQueryDto,
   GlAccountDto,
@@ -110,12 +113,13 @@ export class GlAccountsController {
     return glAccountDto(withoutBalances(await this.accounts.setRole(ctx, id, body.role ?? null)));
   }
 
+  /** The account report: the account's lines, or one party's lines on it (ADR-0117 #2). */
   @Get(':id/ledger')
   @RequirePermission(READ)
   @ApiOkResponse({ type: AccountLedgerPageDto })
   async ledger(
     @Param('id', ParseIntPipe) id: number,
-    @Query() query: DateRangeQueryDto,
+    @Query() query: AccountLedgerQueryDto,
   ): Promise<AccountLedgerPageDto> {
     const page = await this.journal.accountLedger(id, query);
     return {
@@ -123,6 +127,17 @@ export class GlAccountsController {
       nextCursor: page.nextCursor,
       opening: money(page.opening),
     };
+  }
+
+  /** The parties with lines on the account, for the ledger's party filter. */
+  @Get(':id/parties')
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: [AccountPartyDto] })
+  parties(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: AccountPartiesQueryDto,
+  ): Promise<AccountPartyDto[]> {
+    return this.journal.accountParties(id, query.q);
   }
 }
 

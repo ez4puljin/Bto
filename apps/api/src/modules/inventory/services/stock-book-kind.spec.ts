@@ -12,6 +12,8 @@ describe('bookKindOf', () => {
     expect(bookKindOf('POS_SALE', null, out)).toBe('SALE');
     expect(bookKindOf('RETURN_IN', null, into)).toBe('SALE_RETURN');
     expect(bookKindOf('GOODS_ISSUE', null, out)).toBe('ISSUE');
+    // A correction brings the corrected part back as the same kind (ADR-0117 #5).
+    expect(bookKindOf('GOODS_ISSUE_REVERSAL', null, out.negated())).toBe('ISSUE');
   });
 
   it('books an adjustment by its reason and a count correction by its sign', () => {

@@ -126,8 +126,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       {
         to: '/inventory/issues',
         label: 'nav.issues',
+        // The accountant sends, the keeper confirms (ADR-0117): both see the list.
         icon: PackageOpen,
-        permission: 'inventory.issues.manage',
+        permission: ['inventory.issues.manage', 'inventory.issues.confirm'],
       },
       {
         to: '/inventory/transfers',

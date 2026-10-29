@@ -35,6 +35,9 @@ export const PERMISSIONS = [
   'inventory.costs.manage',
   'inventory.transfers.manage',
   'inventory.issues.manage',
+  // The keeper's side of a goods issue (ADR-0117): ticking, confirming and returning the lines of
+  // the warehouses in the write scope.
+  'inventory.issues.confirm',
   // Purchase orders (ADR-0115): read; type quantities (the supplier's orderer, or a keeper for the
   // own warehouse's products while «Бэлдэж»); every supplier, statuses and orderers; the last
   // receipt price and the estimated cost beside each line.
@@ -155,7 +158,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'inventory.adjustments.manage',
     'inventory.stocktakes.manage',
     'inventory.transfers.manage',
-    'inventory.issues.manage',
+    // The accountant sends a goods issue, the keeper confirms their warehouse's part (ADR-0117).
+    'inventory.issues.confirm',
     'sales.orders.read',
     'sales.orders.pick',
     // Keepers type their own warehouse's quantities into an order while «Бэлдэж» (ADR-0115).
@@ -172,6 +176,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'partners.customers.manage',
     'partners.credit.manage',
     'inventory.costs.manage',
+    // The accountant creates and sends goods issues; the keepers confirm them (ADR-0117).
+    'inventory.issues.manage',
     // The price check compares a receipt with its order's last prices (ADR-0115).
     'procurement.orders.read',
     'procurement.prices.read',

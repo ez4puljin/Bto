@@ -5,6 +5,7 @@ import mn from '@tugeel/shared/i18n/mn.json';
 import { businessDate } from '@tugeel/shared/time';
 import { describe, expect, it } from 'vitest';
 import {
+  ACCOUNTANT_ME,
   bodyOf,
   calls,
   COLA,
@@ -17,6 +18,7 @@ import {
   WH1,
   warehouses,
 } from '@/test/inventory-fixtures';
+import { DRAFT, LINE, POSTED, SENT, summary, TYPES } from '@/test/issue-fixtures';
 import { ADMIN_ME, findSidebar, json, problem, renderApp, signedIn } from '@/test/render-app';
 
 type Schemas = components['schemas'];
@@ -24,71 +26,6 @@ type Detail = Schemas['IssueDetail'];
 
 const issues = mn.inventory.issues;
 const COLA_UNIT = `${COLA.name} (хайрцаг)`;
-
-const TYPES: Schemas['IssueExpenseType'][] = [
-  { id: 1, name: 'Дотоод хэрэглээ', code: 'INTERNAL_USE', active: true, sortOrder: 10 },
-  { id: 2, name: 'Урамшуулал', code: 'BONUS', active: true, sortOrder: 20 },
-  { id: 3, name: 'Хуучин төрөл', code: null, active: false, sortOrder: 30 },
-];
-
-const LINE: Schemas['IssueLine'] = {
-  id: 1,
-  productId: COLA.id,
-  productSku: COLA.sku,
-  productName: COLA.name,
-  productUnitId: 77,
-  unitName: 'хайрцаг',
-  enteredQty: '1',
-  factorSnapshot: '24',
-  qtyBase: '24',
-  binId: SHELF.id,
-  binCode: SHELF.code,
-};
-
-const DRAFT: Detail = {
-  id: 7,
-  number: null,
-  warehouseId: 1,
-  warehouseName: WH1.name,
-  issuedOn: '2026-10-18',
-  expenseTypeId: 1,
-  expenseTypeName: 'Дотоод хэрэглээ',
-  recipientKind: 'OTHER',
-  recipientUserId: null,
-  recipientCustomerId: null,
-  recipientSupplierId: null,
-  recipientName: 'Бат',
-  status: 'DRAFT',
-  note: null,
-  effectiveDate: null,
-  postedAt: null,
-  createdAt: STAMP,
-  updatedAt: STAMP,
-  lines: [LINE],
-};
-
-const POSTED: Detail = {
-  ...DRAFT,
-  status: 'POSTED',
-  number: 'GI-2026-000001',
-  effectiveDate: '2026-10-18',
-  postedAt: STAMP,
-};
-
-const summary = (id: number): Schemas['IssueSummary'] => ({
-  id,
-  number: `GI-2026-00000${id}`,
-  warehouseId: 1,
-  issuedOn: '2026-10-18',
-  expenseTypeId: 2,
-  expenseTypeName: 'Урамшуулал',
-  recipientKind: 'CUSTOMER',
-  recipientName: 'Номин дэлгүүр',
-  status: 'POSTED',
-  lineCount: 3,
-  effectiveDate: '2026-10-18',
-  createdAt: STAMP,
-});
 
 const editorRoutes = {
   'GET /api/v1/warehouses': warehouses,
@@ -98,11 +35,11 @@ const editorRoutes = {
 const scanBox = () => screen.getByRole('textbox', { name: mn.inventory.scanLabel });
 const header = async () => within(await screen.findByRole('region', { name: issues.header }));
 
-describe('goods issues list (ADR-0081)', () => {
-  it('lists issues with their type and recipient and opens one', async () => {
+describe('goods issues list (ADR-0081, ADR-0117)', () => {
+  it('lists issues with their type, recipient and parts, and lets the accountant create one', async () => {
     renderApp(
       '/inventory/issues',
-      signedIn(WAREHOUSE_ME, {
+      signedIn(ACCOUNTANT_ME, {
         ...editorRoutes,
         'GET /api/v1/issues': () => list([summary(1), summary(2)], 'next'),
       }),
@@ -116,6 +53,7 @@ describe('goods issues list (ADR-0081)', () => {
     expect(link).toHaveAttribute('href', '/inventory/issues/1');
     expect(screen.getAllByText('Урамшуулал').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Харилцагч · Номин дэлгүүр')).toHaveLength(2);
+    expect(screen.getAllByText('1/1')).toHaveLength(2);
     expect(screen.getByRole('button', { name: mn.common.loadMore })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: issues.create })).toHaveAttribute(
       'href',
@@ -123,21 +61,39 @@ describe('goods issues list (ADR-0081)', () => {
     );
     // Only those who set up the warehouse manage the expense types.
     expect(screen.queryByRole('button', { name: issues.types.open })).toBeNull();
+    // The accountant sends issues; the pending filter is the keeper's.
+    expect(screen.queryByRole('checkbox', { name: issues.pendingOnly })).toBeNull();
+  });
+
+  it('shows the keeper the issues waiting for their confirmation', async () => {
+    const fetchMock = signedIn(WAREHOUSE_ME, {
+      ...editorRoutes,
+      'GET /api/v1/issues': () =>
+        list([{ ...summary(3), status: 'SENT', confirmedWarehouseIds: [] }]),
+    });
+    renderApp('/inventory/issues', fetchMock);
+    expect(await screen.findByRole('link', { name: 'GI-2026-000003' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: issues.pendingOnly })).toBeChecked();
+    const query = new URL(calls(fetchMock, 'GET', '/api/v1/issues')[0]!.url).searchParams;
+    expect(query.get('pending')).toBe('true');
+    expect(screen.getByText('0/1')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: issues.create })).toBeNull();
   });
 
   it('sends the filters to the list', async () => {
-    const fetchMock = signedIn(WAREHOUSE_ME, {
+    const fetchMock = signedIn(ACCOUNTANT_ME, {
       ...editorRoutes,
       'GET /api/v1/issues': () => list([]),
     });
-    renderApp('/inventory/issues?status=DRAFT&type=2', fetchMock);
+    renderApp('/inventory/issues?status=SENT&type=2', fetchMock);
     expect(await screen.findByText(issues.empty)).toBeInTheDocument();
     const query = new URL(calls(fetchMock, 'GET', '/api/v1/issues')[0]!.url).searchParams;
-    expect(query.get('status')).toBe('DRAFT');
+    expect(query.get('status')).toBe('SENT');
     expect(query.get('expenseTypeId')).toBe('2');
+    expect(query.get('pending')).toBeNull();
   });
 
-  it('keeps the menu entry from people who do not issue goods', async () => {
+  it('keeps the menu entry from people who neither send nor confirm issues', async () => {
     renderApp('/inventory/stock', signedIn({ ...WAREHOUSE_ME, permissions: [] }));
     const nav = await findSidebar();
     expect(within(nav).queryByRole('link', { name: mn.nav.issues })).toBeNull();
@@ -203,17 +159,16 @@ describe('expense types', () => {
 describe('a new issue (one window like the receipt)', () => {
   it('creates the draft with its header on the first scan', async () => {
     const issue: Detail = { ...DRAFT, issuedOn: businessDate() };
-    const fetchMock = signedIn(WAREHOUSE_ME, {
+    const fetchMock = signedIn(ACCOUNTANT_ME, {
       ...editorRoutes,
       'GET /api/v1/barcodes/4006381333931': () => json(COLA_BOX),
-      'GET /api/v1/bins/lookup': () => problem('NOT_FOUND', 404),
       'POST /api/v1/issues': () => json(issue, 201),
       'GET /api/v1/issues/7': () => json(issue),
     });
     const { router } = renderApp('/inventory/issues/new', fetchMock);
     const user = userEvent.setup();
     const card = await header();
-    await waitFor(() => expect(card.getByLabelText(mn.inventory.warehouse)).toHaveValue('1'));
+    await waitFor(() => expect(card.getByLabelText(issues.defaultWarehouse)).toHaveValue('1'));
     expect(card.getByLabelText(mn.inventory.date)).toHaveValue(businessDate());
     expect(card.getByLabelText(mn.inventory.date)).toHaveAttribute('max', businessDate());
     // A retired type is not offered to a new issue.
@@ -249,12 +204,12 @@ describe('a new issue (one window like the receipt)', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('+1 хайрцаг (24 ш) · Кока кола')).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem('tugeel.inventory.lastWarehouse.v1') ?? '{}')).toEqual({
-      '2': { issue: 1 },
+      '3': { issue: 1 },
     });
   }, 20_000);
 
   it('refuses a date in the future', async () => {
-    renderApp('/inventory/issues/new', signedIn(WAREHOUSE_ME, editorRoutes));
+    renderApp('/inventory/issues/new', signedIn(ACCOUNTANT_ME, editorRoutes));
     const user = userEvent.setup();
     const card = await header();
     const date = card.getByLabelText(mn.inventory.date);
@@ -265,7 +220,7 @@ describe('a new issue (one window like the receipt)', () => {
 
   it('finds a staff member as the recipient and saves the choice on the draft', async () => {
     let issue = DRAFT;
-    const fetchMock = signedIn(WAREHOUSE_ME, {
+    const fetchMock = signedIn(ACCOUNTANT_ME, {
       ...editorRoutes,
       'GET /api/v1/issues/7': () => json(issue),
       'GET /api/v1/users/lookup': () => json([{ id: 9, fullName: 'Бат-Эрдэнэ Дорж' }]),
@@ -301,62 +256,94 @@ describe('a new issue (one window like the receipt)', () => {
     expect(card.getByLabelText(issues.recipient)).toHaveValue('Бат-Эрдэнэ Дорж');
     expect(card.getByRole('button', { name: issues.picker.change })).toBeInTheDocument();
   }, 15_000);
+
+  it('shows the type’s account to a reader of the books', async () => {
+    renderApp(
+      '/inventory/issues/7',
+      signedIn(ACCOUNTANT_ME, {
+        ...editorRoutes,
+        'GET /api/v1/issues/7': () => json(DRAFT),
+        'GET /api/v1/finance/issue-expense-accounts': () =>
+          json([
+            {
+              typeId: 1,
+              name: 'Дотоод хэрэглээ',
+              active: true,
+              seeded: true,
+              own: true,
+              accountId: 21,
+              accountCode: '730201',
+              accountName: 'Дотоод хэрэгцээний бараа',
+            },
+          ]),
+      }),
+    );
+    const card = await header();
+    expect(await card.findByText('730201 · Дотоод хэрэгцээний бараа')).toBeInTheDocument();
+  });
 });
 
-describe('posting an issue', () => {
-  it('posts with Enter and an Idempotency-Key, then reads only', async () => {
+describe('sending an issue (ADR-0117 #1)', () => {
+  it('sends with Enter and an Idempotency-Key; the keepers take it from there', async () => {
     let issue = DRAFT;
-    const fetchMock = signedIn(WAREHOUSE_ME, {
+    const fetchMock = signedIn(ACCOUNTANT_ME, {
       ...editorRoutes,
       'GET /api/v1/issues/7': () => json(issue),
-      'POST /api/v1/issues/7/post': () => {
-        issue = POSTED;
+      'POST /api/v1/issues/7/send': () => {
+        issue = SENT;
         return json(issue);
       },
     });
     renderApp('/inventory/issues/7', fetchMock);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: issues.post }));
+    await user.click(await screen.findByRole('button', { name: issues.send }));
     const dialog = within(await screen.findByRole('dialog'));
-    await waitFor(() => expect(dialog.getByRole('button', { name: issues.post })).toHaveFocus());
+    await waitFor(() => expect(dialog.getByRole('button', { name: issues.send })).toHaveFocus());
     await user.keyboard('{Enter}');
-    expect(await screen.findByRole('heading', { name: 'GI-2026-000001' })).toBeInTheDocument();
-    const posts = calls(fetchMock, 'POST', '/api/v1/issues/7/post');
+    expect(await screen.findByRole('status')).toHaveTextContent(issues.sent);
+    const posts = calls(fetchMock, 'POST', '/api/v1/issues/7/send');
     expect(posts).toHaveLength(1);
     expect(posts[0]!.headers.get('Idempotency-Key')).toMatch(UUID);
-    expect(await screen.findByRole('status')).toHaveTextContent('GI-2026-000001');
-    expect(screen.queryByRole('textbox', { name: mn.inventory.scanLabel })).toBeNull();
-    expect(screen.queryByRole('button', { name: issues.post })).toBeNull();
+    expect(await screen.findByText(mn.inventory.docStatus.SENT)).toBeInTheDocument();
+    // A sent issue is still the accountant's to edit until a keeper confirms a part.
+    expect(screen.getByRole('textbox', { name: mn.inventory.scanLabel })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: issues.send })).toBeNull();
+    expect(
+      screen.getByText(
+        issues.confirmations.checked
+          .replace('{{warehouse}}', WH1.name)
+          .replace('{{checked}}', '0')
+          .replace('{{total}}', '1'),
+      ),
+    ).toBeInTheDocument();
   });
 
-  it('shows the shelf that is short in the posting dialog', async () => {
-    const fetchMock = signedIn(WAREHOUSE_ME, {
+  it('names the product without a sale price in the sending dialog', async () => {
+    const fetchMock = signedIn(ACCOUNTANT_ME, {
       ...editorRoutes,
-      'GET /api/v1/issues/7': () => json(DRAFT),
-      'POST /api/v1/issues/7/post': () =>
-        problem('STOCK_INSUFFICIENT', 409, {
-          binCode: 'A-01-03',
-          available: '3',
-          requested: '24',
+      'GET /api/v1/issues/7': () =>
+        json({
+          ...DRAFT,
+          expenseTypeId: 7,
+          expenseTypeName: 'Хүнд тооцох',
+          expenseTypeCode: 'DAMAGE_CHARGE',
         }),
+      'POST /api/v1/issues/7/send': () =>
+        problem('PRICE_MISSING', 422, { productId: 10, product: COLA.name, sku: COLA.sku }),
     });
     renderApp('/inventory/issues/7', fetchMock);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: issues.post }));
+    expect(await screen.findByRole('columnheader', { name: issues.salePrice })).toBeInTheDocument();
+    expect(screen.getByText(issues.salePending)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: issues.send }));
     const dialog = within(await screen.findByRole('dialog'));
-    await user.click(dialog.getByRole('button', { name: issues.post }));
-    expect(
-      await dialog.findByText(
-        mn.errors.STOCK_INSUFFICIENT.replace('{{binCode}}', 'A-01-03')
-          .replace('{{available}}', '3')
-          .replace('{{requested}}', '24'),
-      ),
-    ).toBeInTheDocument();
+    await user.click(dialog.getByRole('button', { name: issues.send }));
+    expect(await dialog.findByText(mn.errors.PRICE_MISSING)).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
   it('cancels a draft and goes back to the list', async () => {
-    const fetchMock = signedIn(WAREHOUSE_ME, {
+    const fetchMock = signedIn(ACCOUNTANT_ME, {
       ...editorRoutes,
       'GET /api/v1/issues/7': () => json(DRAFT),
       'GET /api/v1/issues': () => list([]),
@@ -370,16 +357,79 @@ describe('posting an issue', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/inventory/issues'));
     expect(calls(fetchMock, 'POST', '/api/v1/issues/7/cancel')).toHaveLength(1);
   });
+
+  it('shows the keeper’s note on an issue sent back and freezes a confirmed warehouse', async () => {
+    const returned: Detail = {
+      ...SENT,
+      status: 'RETURNED',
+      returnNote: 'Ус дутуу байна',
+      returnedBy: 'Нярав Дорж',
+      returnedAt: STAMP,
+      lines: [
+        { ...LINE, binId: SHELF.id, binCode: SHELF.code, checkedAt: STAMP },
+        { ...LINE, id: 2, productUnitId: 78, warehouseId: 2, warehouseName: 'Хоёр дахь агуулах' },
+      ],
+      warehouses: [
+        { warehouseId: 1, warehouseName: WH1.name, lineCount: 1, checkedCount: 1, confirmed: true },
+        {
+          warehouseId: 2,
+          warehouseName: 'Хоёр дахь агуулах',
+          lineCount: 1,
+          checkedCount: 0,
+          confirmed: false,
+        },
+      ],
+      confirmations: [POSTED.confirmations[0]!],
+    };
+    renderApp(
+      '/inventory/issues/7',
+      signedIn(ACCOUNTANT_ME, { ...editorRoutes, 'GET /api/v1/issues/7': () => json(returned) }),
+    );
+    expect(
+      await screen.findByText(
+        issues.returnedBanner.replace('{{by}}', 'Нярав Дорж').replace('{{note}}', 'Ус дутуу байна'),
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        issues.confirmations.done
+          .replace('{{warehouse}}', WH1.name)
+          .replace('{{by}}', 'Нярав Дорж'),
+      ),
+    ).toBeInTheDocument();
+    // The confirmed warehouse's line reads only; the other one still takes a quantity.
+    expect(
+      screen.getAllByRole('textbox', { name: `${mn.inventory.qty}: ${COLA_UNIT}` }),
+    ).toHaveLength(1);
+    expect(screen.getByLabelText(issues.lockedLine)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: issues.send })).toBeEnabled();
+    expect(screen.getByRole('button', { name: issues.cancel })).toBeDisabled();
+  });
 });
 
 describe('issue lines and costs', () => {
-  it('saves a changed quantity and removes a line', async () => {
+  it('saves a changed quantity, moves a line to another warehouse and removes a line', async () => {
     let issue = DRAFT;
-    const fetchMock = signedIn(WAREHOUSE_ME, {
+    const fetchMock = signedIn(ACCOUNTANT_ME, {
       ...editorRoutes,
+      'GET /api/v1/warehouses': () =>
+        list([WH1, { ...WH1, id: 2, code: 'WH2', name: 'Хоёр дахь агуулах' }]),
       'GET /api/v1/issues/7': () => json(issue),
-      'PATCH /api/v1/issue-lines/1': () => {
-        issue = { ...issue, lines: [{ ...LINE, enteredQty: '3', qtyBase: '72' }] };
+      'PATCH /api/v1/issue-lines/1': async (request) => {
+        const body = (await request.clone().json()) as {
+          enteredQty?: string;
+          warehouseId?: number;
+        };
+        issue = {
+          ...issue,
+          lines: [
+            {
+              ...LINE,
+              ...(body.enteredQty ? { enteredQty: '3', qtyBase: '72' } : {}),
+              ...(body.warehouseId ? { warehouseId: 2, warehouseName: 'Хоёр дахь агуулах' } : {}),
+            },
+          ],
+        };
         return json(issue);
       },
       'DELETE /api/v1/issue-lines/1': () => {
@@ -396,9 +446,17 @@ describe('issue lines and costs', () => {
     expect(await bodyOf(calls(fetchMock, 'PATCH', '/api/v1/issue-lines/1')[0])).toEqual({
       enteredQty: '3',
     });
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: issues.moveLineTo.replace('{{product}}', COLA_UNIT) }),
+      '2',
+    );
+    await waitFor(() => expect(calls(fetchMock, 'PATCH', '/api/v1/issue-lines/1')).toHaveLength(2));
+    expect(await bodyOf(calls(fetchMock, 'PATCH', '/api/v1/issue-lines/1')[1])).toEqual({
+      warehouseId: 2,
+    });
     await user.click(screen.getByRole('button', { name: `${mn.inventory.remove}: ${COLA_UNIT}` }));
     expect(await screen.findByText(issues.linesEmpty)).toBeInTheDocument();
-  });
+  }, 15_000);
 
   it('hides the cost columns from people without the costs right', async () => {
     renderApp(
@@ -419,7 +477,7 @@ describe('issue lines and costs', () => {
         'GET /api/v1/issues/7': () =>
           json({
             ...POSTED,
-            lines: [{ ...LINE, unitCost: '1000', amount: '24000.00' }],
+            lines: [{ ...POSTED.lines[0], unitCost: '1000', amount: '24000.00' }],
             total: '24000.00',
           }),
       }),
@@ -429,7 +487,7 @@ describe('issue lines and costs', () => {
     expect(screen.getAllByText('24,000₮')).toHaveLength(2);
   });
 
-  it('reads a posted issue with its number, status and recipient', async () => {
+  it('reads a posted issue with its number, status, recipient and confirmation', async () => {
     renderApp(
       '/inventory/issues/7',
       signedIn(WAREHOUSE_ME, { ...editorRoutes, 'GET /api/v1/issues/7': () => json(POSTED) }),
@@ -442,6 +500,54 @@ describe('issue lines and costs', () => {
     expect(card.queryByRole('textbox')).toBeNull();
     expect(screen.queryByRole('textbox', { name: `${mn.inventory.qty}: ${COLA_UNIT}` })).toBeNull();
     expect(screen.queryByRole('button', { name: issues.cancel })).toBeNull();
+    expect(screen.queryByRole('button', { name: issues.createCorrection })).toBeNull();
+    expect(
+      screen.getByText(
+        issues.confirmations.done
+          .replace('{{warehouse}}', WH1.name)
+          .replace('{{by}}', 'Нярав Дорж'),
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('lets the accountant start a correction of a posted issue (ADR-0117 #5)', async () => {
+    const child: Detail = {
+      ...DRAFT,
+      id: 8,
+      correctsIssueId: 7,
+      correctsIssueNumber: 'GI-2026-000001',
+    };
+    const fetchMock = signedIn(ACCOUNTANT_ME, {
+      ...editorRoutes,
+      'GET /api/v1/issues/7': () => json(POSTED),
+      'GET /api/v1/issues/8': () => json(child),
+      'POST /api/v1/issues/7/corrections': () => json(child, 201),
+    });
+    const { router } = renderApp('/inventory/issues/7', fetchMock);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: issues.createCorrection }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/inventory/issues/8'));
+    const posts = calls(fetchMock, 'POST', '/api/v1/issues/7/corrections');
+    expect(posts).toHaveLength(1);
+    expect(posts[0]!.headers.get('Idempotency-Key')).toMatch(UUID);
+    expect(
+      await screen.findByRole('link', {
+        name: issues.correctsOf.replace('{{number}}', 'GI-2026-000001'),
+      }),
+    ).toHaveAttribute('href', '/inventory/issues/7');
+    expect(screen.getByText(issues.correctionHint)).toBeInTheDocument();
+  });
+
+  it('points the keeper to the confirmation screen of a sent issue', async () => {
+    renderApp(
+      '/inventory/issues/7',
+      signedIn(WAREHOUSE_ME, { ...editorRoutes, 'GET /api/v1/issues/7': () => json(SENT) }),
+    );
+    expect(await screen.findByRole('link', { name: issues.openConfirm })).toHaveAttribute(
+      'href',
+      '/inventory/issues/7/confirm',
+    );
+    expect(screen.queryByRole('textbox', { name: mn.inventory.scanLabel })).toBeNull();
   });
 });
 
