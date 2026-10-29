@@ -1,10 +1,10 @@
 import type { ProblemDetails } from '@tugeel/api-client';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
-import { Trash2 } from 'lucide-react';
+import { ClipboardCheck, FilePlus2, Trash2 } from 'lucide-react';
 import { type ReactNode, useDeferredValue, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FormField } from '@/components/form';
@@ -16,40 +16,38 @@ import { StickyActions } from '@/components/sticky-actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useBarcodeLookup } from '@/features/catalog/api';
+import { useIssueExpenseAccounts } from '@/features/finance/api';
 import { SupplierPicker } from '@/features/partners/supplier-picker';
 import type { ValidationMessage } from '@/lib/forms';
-import { formatQty, formatTugrik } from '@/lib/money';
+import { formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
 import {
-  type Bin,
   type IssueDetail,
   type IssueExpenseType,
-  type IssueLine,
   type IssueLineRequest,
   type IssueLineUpdate,
   type IssueRecipient,
   type IssueRecipientKind,
   type IssueUpdate,
-  useBinLookup,
   useCustomerLookup,
   useIssueExpenseTypes,
   useIssueMutations,
   useIssueSnapshot,
   useUserLookup,
 } from './api';
-import { looksLikeLabel, parseScanQty, useCanWrite, useWarehouseOptions } from './helpers';
+import { parseScanQty, useWarehouseOptions } from './helpers';
+import { postedWarehouses } from './issue-helpers';
+import {
+  CorrectionLinks,
+  IssueConfirmations,
+  IssueTotals,
+  LinesTable,
+  ReturnedBanner,
+} from './issue-parts';
 import { useDefaultWarehouse } from './last-warehouse';
 import { useScanQty } from './scan-qty';
 import { ProductSearch, QtyInput, ScanQtyControl, ScanToolbar, WarehouseSelect } from './shared';
@@ -57,12 +55,15 @@ import { ProductSearch, QtyInput, ScanQtyControl, ScanToolbar, WarehouseSelect }
 /** Goods leave a wholesale warehouse or a store (ADR-0081). */
 const ISSUE_WAREHOUSES = ['WHOLESALE', 'STORE'] as const;
 const RECIPIENT_KINDS: readonly IssueRecipientKind[] = ['USER', 'CUSTOMER', 'SUPPLIER', 'OTHER'];
+/** The statuses the accountant still edits (ADR-0117 #1): posted parts are frozen line by line. */
+const EDITABLE = new Set<IssueDetail['status']>(['DRAFT', 'SENT', 'RETURNED']);
 /** Refusals about the header that name no field: they show in the header card. */
 const HEADER_CODES = new Set([
   'EXPENSE_TYPE_INACTIVE',
   'CUSTOMER_INACTIVE',
   'SUPPLIER_INACTIVE',
   'WAREHOUSE_KIND_NOT_ALLOWED',
+  'ISSUE_WAREHOUSE_CONFIRMED',
 ]);
 const HEADER_GRID = 'grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3';
 /** The draft's fields in one row from `xl`, so a 1366 laptop shows the first lines (ADR-0113). */
@@ -90,7 +91,7 @@ function fieldError(problem: ProblemDetails | null, path: string): ValidationMes
   return 'validation.required';
 }
 
-const HEADER_FIELDS = ['issuedOn', 'expenseTypeId', 'recipient', 'note'];
+const HEADER_FIELDS = ['issuedOn', 'expenseTypeId', 'recipient', 'note', 'warehouseId'];
 const namesField = (problem: ProblemDetails | null) =>
   HEADER_FIELDS.some((path) => errorsAt(problem, path).length > 0);
 /** Whether a refusal belongs to the header card (a field or a header code). */
@@ -113,9 +114,11 @@ function typeChoices(types: readonly IssueExpenseType[], currentId: number | und
 }
 
 /**
- * One goods issue in one window, like the receipt (ADR-0078, ADR-0081): the header — date,
- * warehouse, expense type, recipient, note — on top, its lines below. A new issue and a draft are
- * edited here; a posted or cancelled one, or one the user may not change, reads the same way.
+ * One goods issue in one window, like the receipt (ADR-0078, ADR-0081, ADR-0117): the header —
+ * date, default warehouse, expense type with its account, the party, note — on top, its lines
+ * below. The accountant edits a new issue and one that is DRAFT, SENT or RETURNED (the lines of a
+ * confirmed warehouse are frozen); a posted or cancelled one, or one the user may not change, reads
+ * the same way, with the keeper's way to the confirmation screen while it is sent.
  */
 export function IssueForm(props: {
   detail: IssueDetail | null;
@@ -124,10 +127,8 @@ export function IssueForm(props: {
 }) {
   const { detail } = props;
   const canManage = useHasPermission('inventory.issues.manage');
-  const canWrite = useCanWrite();
-  const editsDraft =
-    canManage && (detail === null || (detail.status === 'DRAFT' && canWrite(detail.warehouseId)));
-  return editsDraft ? (
+  const edits = canManage && (detail === null || EDITABLE.has(detail.status));
+  return edits ? (
     <DraftEditor detail={detail} focusScan={props.focusScan} onCreated={props.onCreated} />
   ) : detail ? (
     <IssueView detail={detail} />
@@ -146,14 +147,38 @@ function HeaderCard(props: { children: ReactNode }) {
   );
 }
 
+/** «код · нэр» of the account an expense type books to, when the user may read finance. */
+function useAccountLabel(): (typeId: number | undefined) => string | null {
+  const canRead = useHasPermission('finance.read');
+  const accounts = useIssueExpenseAccounts(canRead);
+  return (typeId) => {
+    if (typeId === undefined) return null;
+    const row = accounts.data?.find((entry) => entry.typeId === typeId);
+    if (!row?.accountCode) return null;
+    return `${row.accountCode} · ${row.accountName ?? ''}`.trim();
+  };
+}
+
 function ReadOnlyHeader({ detail }: { detail: IssueDetail }) {
   const { t } = useTranslation();
+  const accountOf = useAccountLabel();
   const none = t('common.none');
   const kind = t(`inventory.issues.recipientKinds.${detail.recipientKind}`);
+  const account = accountOf(detail.expenseTypeId);
   const items: [string, ReactNode][] = [
     [t('inventory.date'), detail.issuedOn],
-    [t('inventory.warehouse'), detail.warehouseName],
-    [t('inventory.issues.expenseType'), detail.expenseTypeName],
+    [t('inventory.issues.defaultWarehouse'), detail.warehouseName],
+    [
+      t('inventory.issues.expenseType'),
+      account ? (
+        <>
+          {detail.expenseTypeName}{' '}
+          <span className="font-mono text-[13px] text-muted-foreground">{account}</span>
+        </>
+      ) : (
+        detail.expenseTypeName
+      ),
+    ],
     [
       t('inventory.issues.recipient'),
       detail.recipientName ? `${kind} · ${detail.recipientName}` : kind,
@@ -174,118 +199,77 @@ function ReadOnlyHeader({ detail }: { detail: IssueDetail }) {
   );
 }
 
-/** Whether the API sent the costs (only to holders of inventory.costs.manage). */
-const hasCosts = (detail: IssueDetail | null) =>
-  detail !== null &&
-  (detail.total !== undefined || detail.lines.some((line) => line.unitCost !== undefined));
-
-/** The lines table: №, product, unit, shelf, quantity, then the costs when the API sent them. */
-function LinesTable(props: {
-  lines: readonly IssueLine[];
-  costs: boolean;
-  actions: boolean;
-  cells: (line: IssueLine, name: string) => { bin: ReactNode; qty: ReactNode; actions?: ReactNode };
-}) {
-  const { t } = useTranslation();
-  const none = t('common.none');
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-10 text-right">{t('inventory.receipt.form.lineNo')}</TableHead>
-          <TableHead>{t('inventory.product')}</TableHead>
-          <TableHead>{t('inventory.unit')}</TableHead>
-          <TableHead>{t('inventory.bin')}</TableHead>
-          <TableHead className="text-right">{t('inventory.qty')}</TableHead>
-          {props.costs ? (
-            <>
-              <TableHead className="text-right">{t('inventory.issues.unitCost')}</TableHead>
-              <TableHead className="text-right">{t('inventory.issues.amount')}</TableHead>
-            </>
-          ) : null}
-          {props.actions ? (
-            <TableHead>
-              <span className="sr-only">{t('common.actions')}</span>
-            </TableHead>
-          ) : null}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {props.lines.map((line, index) => {
-          const cells = props.cells(
-            line,
-            t('inventory.productUnit', { product: line.productName, unit: line.unitName }),
-          );
-          return (
-            <TableRow key={line.id}>
-              <TableCell className="text-right font-mono text-muted-foreground">
-                {index + 1}
-              </TableCell>
-              <TableCell className="min-w-40 whitespace-normal">
-                {line.productName}{' '}
-                <span className="font-mono text-[13px] text-muted-foreground">
-                  {line.productSku}
-                </span>
-              </TableCell>
-              <TableCell>{line.unitName}</TableCell>
-              <TableCell>{cells.bin}</TableCell>
-              <TableCell className="text-right">{cells.qty}</TableCell>
-              {props.costs ? (
-                <>
-                  <TableCell className="text-right font-mono">
-                    {line.unitCost ? formatTugrik(line.unitCost) : none}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {line.amount ? formatTugrik(line.amount) : none}
-                  </TableCell>
-                </>
-              ) : null}
-              {props.actions ? cells.actions : null}
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
-  );
-}
-
-/** «Нийт өртөг» under the lines, for cost holders once the issue has one. */
-function IssueTotal({ detail }: { detail: IssueDetail }) {
-  const { t } = useTranslation();
-  if (!hasCosts(detail)) return null;
-  return detail.total ? (
-    <p className="text-right text-sm">
-      {t('inventory.issues.total')}:{' '}
-      <span className="font-mono font-medium">{formatTugrik(detail.total)}</span>
-    </p>
-  ) : (
-    <p className="text-[13px] text-muted-foreground">{t('inventory.issues.costHint')}</p>
-  );
-}
-
-/** A posted or cancelled issue (or a draft the user may only read). */
+/**
+ * A posted, sent or cancelled issue read by someone who does not edit it: the keeper finds the
+ * confirmation screen here while it is sent; the accountant makes a correction of a posted one.
+ */
 function IssueView({ detail }: { detail: IssueDetail }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const canManage = useHasPermission('inventory.issues.manage');
+  const canConfirm = useHasPermission('inventory.issues.confirm');
+  const mutations = useIssueMutations();
+  const action = useAction();
+  const [correctionKey, setCorrectionKey] = useState(randomUuid);
+  const correct = () =>
+    void action.run(async () => {
+      const child = await mutations.createCorrection.mutateAsync({
+        id: detail.id,
+        key: correctionKey,
+      });
+      setCorrectionKey(randomUuid());
+      toast.success(t('inventory.issues.correctionCreated'));
+      await navigate(`/inventory/issues/${child.id}`);
+    });
+  const showCorrection = canManage && detail.status === 'POSTED';
+  const showConfirm = canConfirm && detail.status === 'SENT';
   return (
     <>
+      <ReturnedBanner detail={detail} />
       <ReadOnlyHeader detail={detail} />
       <Card role="region" aria-labelledby="issue-lines-title">
         <CardHeader>
           <CardTitle id="issue-lines-title">{t('inventory.issues.linesTitle')}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
+          <CorrectionLinks detail={detail} />
+          <IssueConfirmations detail={detail} />
           <LinesTable
+            detail={detail}
             lines={detail.lines}
-            costs={hasCosts(detail)}
             actions={false}
             cells={(line) => ({
-              bin: <span className="font-mono">{line.binCode}</span>,
               qty: <span className="font-mono">{formatQty(line.enteredQty)}</span>,
             })}
           />
-          <IssueTotal detail={detail} />
+          <IssueTotals detail={detail} />
         </CardContent>
       </Card>
+      {showCorrection || showConfirm ? (
+        <StickyActions summary={t('inventory.linesCount', { count: detail.lines.length })}>
+          <ProblemAlert problem={action.problem} />
+          {showConfirm ? (
+            <Button asChild>
+              <Link to={`/inventory/issues/${detail.id}/confirm`}>
+                <ClipboardCheck />
+                {t('inventory.issues.openConfirm')}
+              </Link>
+            </Button>
+          ) : null}
+          {showCorrection ? (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={detail.correctedByIssueId !== null}
+              pending={mutations.createCorrection.isPending}
+              onClick={correct}
+            >
+              <FilePlus2 />
+              {t('inventory.issues.createCorrection')}
+            </Button>
+          ) : null}
+        </StickyActions>
+      ) : null}
     </>
   );
 }
@@ -448,12 +432,13 @@ function dateMessage(value: string): ValidationMessage | undefined {
 }
 
 /**
- * A new issue or a draft. Nothing exists until the first product is added or «Хадгалах» is
- * pressed: then the draft is created with the header (and that line) and the address becomes the
- * draft's, the page staying as it is. Each header change of a draft is saved at once (selects and
- * picks on change, texts when left). One scan box: a shelf label makes that shelf the source of the
- * next lines, a product barcode adds «Тоо» of its unit, a repeat adds to its line; scans run one
- * after another against the latest copy of the draft.
+ * A new issue, or one the accountant still edits (DRAFT, SENT, RETURNED). Nothing exists until the
+ * first product is added or «Хадгалах» is pressed: then the draft is created with the header (and
+ * that line) and the address becomes the draft's, the page staying as it is. Each header change of
+ * a draft is saved at once (selects and picks on change, texts when left). One scan box: a product
+ * barcode adds «Тоо» of its unit to its product's home warehouse (else the default), a repeat adds
+ * to its line; scans run one after another against the latest copy of the draft. «Илгээх» hands
+ * the document to the keepers (ADR-0117 #1).
  */
 function DraftEditor(props: {
   detail: IssueDetail | null;
@@ -464,11 +449,11 @@ function DraftEditor(props: {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const mutations = useIssueMutations();
-  const lookupBin = useBinLookup();
   const lookupBarcode = useBarcodeLookup();
   const snapshot = useIssueSnapshot();
   const types = useIssueExpenseTypes();
-  const warehouses = useWarehouseOptions(ISSUE_WAREHOUSES, true);
+  const accountOf = useAccountLabel();
+  const warehouses = useWarehouseOptions(ISSUE_WAREHOUSES);
   const { defaultId, remember } = useDefaultWarehouse(warehouses.options, 'issue');
   const action = useAction();
   const qty = useScanQty();
@@ -487,17 +472,16 @@ function DraftEditor(props: {
   const draftId = useRef<number | null>(detail?.id ?? null);
   const createKey = useRef(randomUuid());
   const chain = useRef<Promise<unknown>>(Promise.resolve());
-  const bin = useRef<Bin | null>(null);
-  const [activeBin, setActiveBinState] = useState<Bin | null>(null);
   const [missing, setMissing] = useState<string | null>(null);
   const [invalidQty, setInvalidQty] = useState(false);
   const [needHeader, setNeedHeader] = useState(false);
   const [added, setAdded] = useState<Added | null>(null);
-  const [confirm, setConfirm] = useState<'post' | 'cancel' | null>(null);
-  const [postKey, setPostKey] = useState(randomUuid);
+  const [confirm, setConfirm] = useState<'send' | 'cancel' | null>(null);
+  const [sendKey, setSendKey] = useState(randomUuid);
 
   const lines = detail?.lines ?? [];
-  const costs = hasCosts(detail);
+  const frozen = postedWarehouses(detail);
+  const partlyPosted = frozen.size > 0;
   const dateError = dateMessage(issuedOn) ?? fieldError(headerProblem, 'issuedOn');
   const request = recipientRequest(recipient);
   const ready =
@@ -506,6 +490,7 @@ function DraftEditor(props: {
     request !== null &&
     dateMessage(issuedOn) === undefined;
   const choices = typeChoices(types.data ?? [], detail?.expenseTypeId);
+  const account = accountOf(expenseTypeId);
 
   // «Солих» hands the focus to the search box it brings back.
   useEffect(() => {
@@ -514,10 +499,6 @@ function DraftEditor(props: {
     setFocusRecipient(false);
   }, [focusRecipient]);
 
-  const setActiveBin = (next: Bin | null) => {
-    bin.current = next;
-    setActiveBinState(next);
-  };
   const enqueue = (work: () => Promise<void>) => {
     chain.current = chain.current.then(() => action.run(work));
   };
@@ -574,20 +555,14 @@ function DraftEditor(props: {
     }
   };
 
-  /** Adds to the product's line on the active shelf, or a new line; false when nothing was added. */
+  /** Adds to the product's line (unless its warehouse is frozen), or a new line. */
   const addUnit = async (productUnitId: number, amount: string): Promise<boolean> => {
-    const shelf = bin.current;
     const id = draftId.current;
-    if (id === null) {
-      return createDraft({
-        productUnitId,
-        enteredQty: amount,
-        ...(shelf ? { binId: shelf.id } : {}),
-      });
-    }
+    if (id === null) return createDraft({ productUnitId, enteredQty: amount });
     const issue = snapshot(id) ?? detail;
+    const locked = postedWarehouses(issue ?? null);
     const same = issue?.lines.find(
-      (line) => line.productUnitId === productUnitId && (shelf === null || line.binId === shelf.id),
+      (line) => line.productUnitId === productUnitId && !locked.has(line.warehouseId),
     );
     if (same) {
       await mutations.updateLine.mutateAsync({
@@ -595,10 +570,7 @@ function DraftEditor(props: {
         body: { enteredQty: new Decimal(same.enteredQty).plus(amount).toString() },
       });
     } else {
-      await mutations.addLine.mutateAsync({
-        id,
-        body: { productUnitId, enteredQty: amount, ...(shelf ? { binId: shelf.id } : {}) },
-      });
+      await mutations.addLine.mutateAsync({ id, body: { productUnitId, enteredQty: amount } });
     }
     return true;
   };
@@ -621,55 +593,40 @@ function DraftEditor(props: {
       setMissing(null);
       setInvalidQty(false);
       setNeedHeader(false);
-      if (warehouseId === undefined) {
+      const resolved = await orNull(lookupBarcode.mutateAsync(code));
+      if (!resolved) {
+        setMissing(code);
+        entry.giveBack();
+        return;
+      }
+      if (entry.amount === null) {
+        setInvalidQty(true);
+        entry.giveBack();
+        return;
+      }
+      if (draftId.current === null && !ready) {
         flagHeader();
         entry.giveBack();
         return;
       }
-      const asBin = () => orNull(lookupBin.mutateAsync({ warehouseId, code }));
-      const label = looksLikeLabel(code);
-      const shelf = label ? await asBin() : null;
-      if (shelf) {
-        setActiveBin(shelf);
+      if (!(await addUnit(resolved.unit.id, entry.amount))) {
         entry.giveBack();
         return;
       }
-      const resolved = await orNull(lookupBarcode.mutateAsync(code));
-      if (resolved) {
-        if (entry.amount === null) {
-          setInvalidQty(true);
-          entry.giveBack();
-          return;
-        }
-        if (draftId.current === null && !ready) {
-          flagHeader();
-          entry.giveBack();
-          return;
-        }
-        if (!(await addUnit(resolved.unit.id, entry.amount))) {
-          entry.giveBack();
-          return;
-        }
-        const factor = new Decimal(resolved.unit.factorToBase);
-        setAdded({
-          qty: entry.amount,
-          unit: resolved.unit.uomName,
-          name: resolved.product.name,
-          ...(factor.equals(1)
-            ? {}
-            : {
-                base: {
-                  qty: factor.times(entry.amount).toString(),
-                  unit: resolved.product.baseUnit.uomName,
-                },
-              }),
-        });
-        return;
-      }
-      const lateShelf = label ? null : await asBin();
-      if (lateShelf) setActiveBin(lateShelf);
-      else setMissing(code);
-      entry.giveBack();
+      const factor = new Decimal(resolved.unit.factorToBase);
+      setAdded({
+        qty: entry.amount,
+        unit: resolved.unit.uomName,
+        name: resolved.product.name,
+        ...(factor.equals(1)
+          ? {}
+          : {
+              base: {
+                qty: factor.times(entry.amount).toString(),
+                unit: resolved.product.baseUnit.uomName,
+              },
+            }),
+      });
     });
   };
 
@@ -709,22 +666,22 @@ function DraftEditor(props: {
   const saveLine = (lineId: number, body: IssueLineUpdate) =>
     void action.run(() => mutations.updateLine.mutateAsync({ id: lineId, body }));
 
-  const askPost = () => {
+  const askSend = () => {
     if (!ready) {
       flagHeader();
       return;
     }
-    setPostKey(randomUuid());
+    setSendKey(randomUuid());
     action.clear();
-    setConfirm('post');
+    setConfirm('send');
   };
-  const post = () =>
+  const send = () =>
     void action.run(async () => {
       const id = draftId.current;
       if (id === null) return;
-      const posted = await mutations.post.mutateAsync({ id, key: postKey });
+      await mutations.send.mutateAsync({ id, key: sendKey });
       setConfirm(null);
-      toast.success(t('inventory.issues.posted', { number: posted.number ?? '' }));
+      toast.success(t('inventory.issues.sent'));
     });
   const cancel = () =>
     void action.run(async () => {
@@ -835,6 +792,7 @@ function DraftEditor(props: {
 
   return (
     <>
+      {detail ? <ReturnedBanner detail={detail} /> : null}
       <HeaderCard>
         <ProblemAlert
           problem={
@@ -861,36 +819,37 @@ function DraftEditor(props: {
             />
           </FormField>
           <FormField
-            label={t('inventory.warehouse')}
+            label={t('inventory.issues.defaultWarehouse')}
             htmlFor="issue-warehouse"
-            hint={detail ? t('inventory.issues.warehouseFixed') : undefined}
+            hint={t('inventory.issues.defaultWarehouseHint')}
             error={required.warehouse ? 'validation.required' : undefined}
           >
-            {detail ? (
-              <Input id="issue-warehouse" readOnly value={detail.warehouseName} />
-            ) : (
-              <WarehouseSelect
-                id="issue-warehouse"
-                options={warehouses.options}
-                value={warehouseId}
-                emptyLabel={t('inventory.pickWarehouse')}
-                onChange={(id) => {
-                  setPickedWarehouse(id);
-                  setActiveBin(null);
-                  if (id !== undefined)
-                    setRequired((previous) => ({ ...previous, warehouse: false }));
-                }}
-              />
-            )}
+            <WarehouseSelect
+              id="issue-warehouse"
+              options={warehouses.options}
+              value={warehouseId}
+              emptyLabel={t('inventory.pickWarehouse')}
+              onChange={(id) => {
+                if (id === undefined) {
+                  if (detail === null) setPickedWarehouse(undefined);
+                  return;
+                }
+                setRequired((previous) => ({ ...previous, warehouse: false }));
+                if (detail === null) setPickedWarehouse(id);
+                else if (id !== detail.warehouseId) patchHeader({ warehouseId: id });
+              }}
+            />
           </FormField>
           <FormField
             label={t('inventory.issues.expenseType')}
             htmlFor="issue-type"
+            hint={account ? <span className="font-mono">{account}</span> : undefined}
             error={typeError}
           >
             <NativeSelect
               id="issue-type"
               aria-invalid={typeError !== undefined || undefined}
+              disabled={partlyPosted}
               value={expenseTypeId ?? ''}
               onChange={(event) => {
                 const next = event.target.value
@@ -917,6 +876,7 @@ function DraftEditor(props: {
             <FormField
               label={t('inventory.issues.recipient')}
               htmlFor="issue-recipient"
+              hint={request === null ? t('inventory.issues.partyRequired') : undefined}
               error={recipientError}
             >
               <div className="flex flex-col gap-2">
@@ -926,6 +886,7 @@ function DraftEditor(props: {
                   value={recipient.kind}
                   label={(kind) => t(`inventory.issues.recipientKinds.${kind}`)}
                   onChange={(kind) => {
+                    if (partlyPosted) return;
                     setRecipientState({ ...recipient, kind });
                     setRequired((previous) => ({ ...previous, recipient: false }));
                     // A kind with a choice kept from before is that choice again.
@@ -959,11 +920,19 @@ function DraftEditor(props: {
           <CardTitle id="issue-lines-title">{t('inventory.issues.linesTitle')}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
+          {detail?.correctsIssueId !== null && detail?.correctsIssueId !== undefined ? (
+            <>
+              <CorrectionLinks detail={detail} />
+              <p className="text-[13px] text-muted-foreground">
+                {t('inventory.issues.correctionHint')}
+              </p>
+            </>
+          ) : null}
+          {detail ? <IssueConfirmations detail={detail} /> : null}
           <ScanToolbar
             scanBox={
               <div ref={scanArea}>
                 <ScanBox
-                  letters
                   autoFocus={props.focusScan}
                   label={t('inventory.scanLabel')}
                   placeholder={t('inventory.scanPlaceholder')}
@@ -982,21 +951,6 @@ function DraftEditor(props: {
             }
             status={
               <>
-                <span className="flex items-center gap-1 font-medium">
-                  {activeBin
-                    ? t('inventory.activeBin', { code: activeBin.code })
-                    : t('inventory.issues.activeBinNone')}
-                  {activeBin ? (
-                    <Button
-                      type="button"
-                      size="xs"
-                      variant="ghost"
-                      onClick={() => setActiveBin(null)}
-                    >
-                      {t('inventory.clearBin')}
-                    </Button>
-                  ) : null}
-                </span>
                 <span aria-live="polite" className="font-medium">
                   {added
                     ? added.base
@@ -1038,51 +992,55 @@ function DraftEditor(props: {
             <p className="text-sm text-muted-foreground">{t('inventory.issues.linesEmpty')}</p>
           ) : (
             <LinesTable
+              detail={detail}
               lines={lines}
-              costs={costs}
               actions
-              cells={(line, name) => ({
-                bin: (
-                  <>
-                    <span className="font-mono">{line.binCode}</span>
-                    {activeBin && activeBin.id !== line.binId ? (
-                      <Button
-                        type="button"
-                        size="xs"
-                        variant="ghost"
-                        className="ml-1"
-                        onClick={() => saveLine(line.id, { binId: activeBin.id })}
-                      >
-                        {t('inventory.moveToBin', { code: activeBin.code })}
-                      </Button>
-                    ) : null}
-                  </>
-                ),
-                qty: (
-                  <QtyInput
-                    key={line.enteredQty}
-                    label={`${t('inventory.qty')}: ${name}`}
-                    value={line.enteredQty}
-                    onScan={onScan}
-                    onSave={(enteredQty) => saveLine(line.id, { enteredQty })}
-                  />
-                ),
-                actions: (
-                  <RowActions>
-                    <RowAction
-                      label={`${t('inventory.remove')}: ${name}`}
-                      icon={Trash2}
-                      destructive
-                      onClick={() =>
-                        void action.run(() => mutations.removeLine.mutateAsync(line.id))
-                      }
+              cells={(line, name) => {
+                const locked = frozen.has(line.warehouseId);
+                return {
+                  warehouse: locked ? undefined : (
+                    <WarehouseSelect
+                      options={warehouses.options.filter((option) => !frozen.has(option.id))}
+                      value={line.warehouseId}
+                      label={t('inventory.issues.moveLineTo', { product: name })}
+                      emptyLabel={line.warehouseName}
+                      className="min-w-36"
+                      onChange={(id) => {
+                        if (id !== undefined && id !== line.warehouseId)
+                          saveLine(line.id, { warehouseId: id });
+                      }}
                     />
-                  </RowActions>
-                ),
-              })}
+                  ),
+                  qty: locked ? (
+                    <span className="font-mono">{formatQty(line.enteredQty)}</span>
+                  ) : (
+                    <QtyInput
+                      key={line.enteredQty}
+                      label={`${t('inventory.qty')}: ${name}`}
+                      value={line.enteredQty}
+                      onScan={onScan}
+                      onSave={(enteredQty) => saveLine(line.id, { enteredQty })}
+                    />
+                  ),
+                  actions: (
+                    <RowActions>
+                      {locked ? null : (
+                        <RowAction
+                          label={`${t('inventory.remove')}: ${name}`}
+                          icon={Trash2}
+                          destructive
+                          onClick={() =>
+                            void action.run(() => mutations.removeLine.mutateAsync(line.id))
+                          }
+                        />
+                      )}
+                    </RowActions>
+                  ),
+                };
+              }}
             />
           )}
-          {detail ? <IssueTotal detail={detail} /> : null}
+          {detail ? <IssueTotals detail={detail} /> : null}
         </CardContent>
       </Card>
       <StickyActions summary={t('inventory.linesCount', { count: lines.length })}>
@@ -1095,6 +1053,8 @@ function DraftEditor(props: {
             <Button
               type="button"
               variant="ghost"
+              disabled={partlyPosted}
+              title={partlyPosted ? t('inventory.issues.cancelBlocked') : undefined}
               onClick={() => {
                 action.clear();
                 setConfirm('cancel');
@@ -1102,21 +1062,27 @@ function DraftEditor(props: {
             >
               {t('inventory.issues.cancel')}
             </Button>
-            <Button type="button" disabled={lines.length === 0} onClick={askPost}>
-              {t('inventory.issues.post')}
-            </Button>
+            {detail.status === 'SENT' ? null : (
+              <Button
+                type="button"
+                disabled={lines.length === 0 || request === null}
+                onClick={askSend}
+              >
+                {t('inventory.issues.send')}
+              </Button>
+            )}
           </>
         )}
       </StickyActions>
       <ConfirmDialog
-        open={confirm === 'post'}
+        open={confirm === 'send'}
         variant="default"
-        title={t('inventory.issues.postTitle')}
-        description={t('inventory.issues.postDescription')}
-        confirmLabel={t('inventory.issues.post')}
-        pending={mutations.post.isPending}
+        title={t('inventory.issues.sendTitle')}
+        description={t('inventory.issues.sendDescription')}
+        confirmLabel={t('inventory.issues.send')}
+        pending={mutations.send.isPending}
         problem={action.problem}
-        onConfirm={post}
+        onConfirm={send}
         onClose={() => setConfirm(null)}
       />
       <ConfirmDialog
