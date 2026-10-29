@@ -69,7 +69,7 @@ describe('transfer requests', () => {
   let water: ProductJson;
   let juice: ProductJson;
   let soap: ProductJson;
-  const bins: Record<string, number> = {};
+  const bins = {} as { A1: number; A2: number; B1: number; FLOOR: number };
   const year = businessYear(new Date());
   const http = () => request(app.getHttpServer());
   const pcs = (product: ProductJson) => unitOf(product, 'PCS').id;
