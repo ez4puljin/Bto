@@ -56,47 +56,47 @@ export class InventoryAttentionService {
           .where(where)
           .limit(ATTENTION_CAP)
       ).length;
-    const none = Promise.resolve(0);
     const transferring = may('inventory.transfers.manage');
 
-    const [toShip, toReceive, toConfirm, toApprove, toReview, toCost, lowStock] = await Promise.all(
-      [
-        transferring
-          ? count(
-              transfers,
-              and(eq(transfers.status, 'REQUESTED'), within(transfers.sourceWarehouseId)),
-            )
-          : none,
-        transferring
-          ? count(
-              transfers,
-              and(eq(transfers.status, 'SHIPPED'), within(transfers.destWarehouseId)),
-            )
-          : none,
-        transferring
-          ? count(
-              transfers,
-              and(eq(transfers.status, 'COUNTED'), within(transfers.sourceWarehouseId)),
-            )
-          : none,
-        may('inventory.adjustments.approve')
-          ? count(
-              adjustments,
-              and(eq(adjustments.status, 'SUBMITTED'), within(adjustments.warehouseId)),
-            )
-          : none,
-        may('inventory.stocktakes.approve')
-          ? count(stocktakes, and(eq(stocktakes.status, 'REVIEW'), within(stocktakes.warehouseId)))
-          : none,
-        may('inventory.costs.manage')
-          ? count(
-              goodsReceipts,
-              and(eq(goodsReceipts.status, 'POSTED'), eq(goodsReceipts.costingStatus, 'PENDING')),
-            )
-          : none,
-        transferring ? this.lowStock(scope) : Promise.resolve({ count: 0, warehouseId: null }),
-      ],
-    );
+    // One small query after another: the counts are cheap, and running them side by side would
+    // hold most of the pool for one request (the test pool is 4 with a 5 s wait).
+    const toShip = transferring
+      ? await count(
+          transfers,
+          and(eq(transfers.status, 'REQUESTED'), within(transfers.sourceWarehouseId)),
+        )
+      : 0;
+    const toReceive = transferring
+      ? await count(
+          transfers,
+          and(eq(transfers.status, 'SHIPPED'), within(transfers.destWarehouseId)),
+        )
+      : 0;
+    const toConfirm = transferring
+      ? await count(
+          transfers,
+          and(eq(transfers.status, 'COUNTED'), within(transfers.sourceWarehouseId)),
+        )
+      : 0;
+    const toApprove = may('inventory.adjustments.approve')
+      ? await count(
+          adjustments,
+          and(eq(adjustments.status, 'SUBMITTED'), within(adjustments.warehouseId)),
+        )
+      : 0;
+    const toReview = may('inventory.stocktakes.approve')
+      ? await count(
+          stocktakes,
+          and(eq(stocktakes.status, 'REVIEW'), within(stocktakes.warehouseId)),
+        )
+      : 0;
+    const toCost = may('inventory.costs.manage')
+      ? await count(
+          goodsReceipts,
+          and(eq(goodsReceipts.status, 'POSTED'), eq(goodsReceipts.costingStatus, 'PENDING')),
+        )
+      : 0;
+    const lowStock = transferring ? await this.lowStock(scope) : { count: 0, warehouseId: null };
     return {
       transfersToShip: toShip,
       transfersToReceive: toReceive,
