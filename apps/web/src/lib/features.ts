@@ -4,3 +4,9 @@
  * the shelf work resumes. Tests run with the shelves on (`src/test/setup.ts`).
  */
 export const BINS_SOON = true;
+
+/**
+ * The owner (2026-10-31): a product's page carries no e-Barimt section to fill; the codes stay in
+ * the data and the accountant fills them by category on the readiness page.
+ */
+export const EBARIMT_PER_PRODUCT = false;

@@ -14,6 +14,7 @@ import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { type ProductDetail, useCatalogMutations, useCategories, useProduct } from './api';
 import { categoryPaths } from './category-tree';
+import { EBARIMT_PER_PRODUCT } from '@/lib/features';
 import { EbarimtCard } from './ebarimt-card';
 import { ImagesCard } from './images-card';
 import { ProductForm } from './product-form';
@@ -111,7 +112,7 @@ export function ProductPage() {
           />
           <UnitsCard product={detail} canManage={canManage} />
           <ProductPricesCard productId={detail.id} pending={productStage(detail) === 'PENDING'} />
-          <EbarimtCard product={detail} />
+          {EBARIMT_PER_PRODUCT ? <EbarimtCard product={detail} /> : null}
           <ProductLocationCard productId={detail.id} />
         </div>
         <div className="flex min-w-0 flex-col gap-4">
