@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, ApiSchema, OmitType } from '@nestjs/swagger';
 import {
   MAX_PO_CHANGES,
   MAX_PO_SUPPLIERS,
@@ -237,6 +237,21 @@ export class GridQueryDto {
   @Min(1)
   @Max(PO_GRID_PAGE)
   limit?: number;
+}
+
+/** The facets' query: the rows' filters, no page. */
+export class GridFacetsQueryDto extends OmitType(GridQueryDto, ['cursor', 'limit'] as const) {}
+
+@ApiSchema({ name: 'PurchaseOrderSupplierFacet' })
+export class SupplierFacetDto {
+  @ApiProperty() supplierId: number;
+  @ApiProperty({ description: 'Rows the query keeps for this supplier' }) rowCount: number;
+}
+
+@ApiSchema({ name: 'PurchaseOrderFacets' })
+export class GridFacetsDto {
+  @ApiProperty({ description: "Σ of the suppliers' rowCount" }) rowCount: number;
+  @ApiProperty({ type: [SupplierFacetDto] }) suppliers: SupplierFacetDto[];
 }
 
 @ApiSchema({ name: 'PurchaseOrderGridUnit' })

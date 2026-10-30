@@ -27883,6 +27883,85 @@
         ]
       }
     },
+    "/api/v1/purchase-orders/{id}/facets": {
+      "get": {
+        "operationId": "PurchaseOrders_facets",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Product code, name or barcode",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "filter",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "ORDERED",
+                "BELOW_MIN"
+              ]
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "description": "Rows whose home warehouse is this one",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderFacets"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "How many rows the filters keep per supplier: the filter bar's counts and its supplier list.",
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
     "/api/v1/purchase-orders/{id}/suppliers/{supplierId}/lines": {
       "put": {
         "operationId": "PurchaseOrders_saveLines",
@@ -57713,6 +57792,41 @@
           "rights",
           "receipt",
           "extra"
+        ]
+      },
+      "PurchaseOrderSupplierFacet": {
+        "type": "object",
+        "properties": {
+          "supplierId": {
+            "type": "number"
+          },
+          "rowCount": {
+            "type": "number",
+            "description": "Rows the query keeps for this supplier"
+          }
+        },
+        "required": [
+          "supplierId",
+          "rowCount"
+        ]
+      },
+      "PurchaseOrderFacets": {
+        "type": "object",
+        "properties": {
+          "rowCount": {
+            "type": "number",
+            "description": "Σ of the suppliers' rowCount"
+          },
+          "suppliers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderSupplierFacet"
+            }
+          }
+        },
+        "required": [
+          "rowCount",
+          "suppliers"
         ]
       },
       "PurchaseOrderGridChange": {

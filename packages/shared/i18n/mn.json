@@ -430,7 +430,8 @@
     "selected": "{{count}} сонгосон",
     "clearSelection": "Сонголтыг цуцлах",
     "selection": "Сонгосон мөрүүд",
-    "print": "Хэвлэх"
+    "print": "Хэвлэх",
+    "noMatches": "Илэрц алга"
   },
   "validation": {
     "required": "Заавал бөглөнө",
@@ -7467,7 +7468,11 @@
       "expandAll": "Бүгдийг дэлгэх",
       "collapseAll": "Бүгдийг хураах",
       "lineCount": "{{count}} бараа захиалсан",
-      "noLines": "Захиалаагүй"
+      "noLines": "Захиалаагүй",
+      "ordererFilter": "Захиалагч",
+      "allOrderers": "Бүх захиалагч",
+      "supplierCount": "{{count}} нийлүүлэгч",
+      "matchCount": "{{suppliers}} нийлүүлэгч · {{products}} бараа"
     },
     "history": {
       "title": "Түүх",

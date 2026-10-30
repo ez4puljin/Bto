@@ -155,6 +155,27 @@ export class ProductSuppliersService {
     return new Map(rows.map((row) => [row.productId, row.supplierId]));
   }
 
+  /** The products each of these suppliers is the main supplier of: the order grid's facets. */
+  async mainProductsOf(
+    supplierIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, number[]>> {
+    const result = new Map<number, number[]>();
+    if (supplierIds.length === 0) return result;
+    const rows = await executor
+      .select({ productId: productSuppliers.productId, supplierId: productSuppliers.supplierId })
+      .from(productSuppliers)
+      .where(
+        and(idIn(productSuppliers.supplierId, supplierIds), eq(productSuppliers.isMain, true)),
+      );
+    for (const row of rows) {
+      const list = result.get(row.supplierId);
+      if (list) list.push(row.productId);
+      else result.set(row.supplierId, [row.productId]);
+    }
+    return result;
+  }
+
   /**
    * How many of these products each supplier is the main supplier of, the most first, then by
    * name: the rep app's supplier filter (ADR-0068). A supplier with none of them is left out.

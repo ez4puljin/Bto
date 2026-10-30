@@ -360,6 +360,39 @@ describe('purchase orders and receiving', () => {
       (await rows(manager, id, supplierA, `?warehouseId=${wh2.id}`)).data.map((r) => r.productId),
     ).toEqual([salt.id]);
 
+    // The facets count the same rows per supplier (owner 2026-10-30): the filter bar's counts.
+    const facets = async (query = '') =>
+      (
+        await http()
+          .get(`/api/v1/purchase-orders/${id}/facets${query}`)
+          .set(bearer(manager))
+          .expect(200)
+      ).body as { rowCount: number; suppliers: { supplierId: number; rowCount: number }[] };
+    expect(await facets()).toEqual({
+      rowCount: 4,
+      suppliers: [
+        { supplierId: supplierA, rowCount: 3 },
+        { supplierId: supplierB, rowCount: 1 },
+      ],
+    });
+    expect((await facets(`?warehouseId=${wh2.id}`)).suppliers).toEqual([
+      { supplierId: supplierA, rowCount: 1 },
+      { supplierId: supplierB, rowCount: 1 },
+    ]);
+    expect(await facets('?filter=BELOW_MIN')).toEqual({
+      rowCount: 1,
+      suppliers: [
+        { supplierId: supplierA, rowCount: 1 },
+        { supplierId: supplierB, rowCount: 0 },
+      ],
+    });
+    expect((await facets('?q=давс')).suppliers).toEqual([
+      { supplierId: supplierA, rowCount: 1 },
+      { supplierId: supplierB, rowCount: 0 },
+    ]);
+    expect((await facets('?filter=ORDERED')).rowCount).toBe(0);
+    await http().get('/api/v1/purchase-orders/10000000/facets').set(bearer(manager)).expect(404);
+
     const box = unitOf(juice, 'BOX').id;
     const before = (await order(manager, id)).updatedAt;
     // The orderer types juice in boxes; keeper 2 types salt (their warehouse) but not flour.
@@ -370,6 +403,11 @@ describe('purchase orders and receiving', () => {
       (await save(keeper2, id, supplierA, [ordered(salt, '40'), ordered(flour, '20')]).expect(200))
         .body,
     ).toEqual({ applied: 1, conflicts: [], refused: [{ productId: flour.id, reason: 'SCOPE' }] });
+    // Ordered: juice and salt for supplier A.
+    expect((await facets('?filter=ORDERED')).suppliers).toEqual([
+      { supplierId: supplierA, rowCount: 2 },
+      { supplierId: supplierB, rowCount: 0 },
+    ]);
     // A stale page: the manager opened juice empty and is skipped, the orderer's 5 boxes stay.
     expect(
       (

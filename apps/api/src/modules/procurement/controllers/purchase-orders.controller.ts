@@ -23,6 +23,8 @@ import {
   AddSuppliersDto,
   ArrivalSaveResultDto,
   CreatePurchaseOrderDto,
+  GridFacetsDto,
+  GridFacetsQueryDto,
   GridPageDto,
   GridQueryDto,
   GridRowDto,
@@ -317,6 +319,17 @@ export class PurchaseOrdersController {
           }
         : null,
     };
+  }
+
+  /** How many rows the filters keep per supplier: the filter bar's counts and its supplier list. */
+  @Get(':id/facets')
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: GridFacetsDto })
+  facets(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: GridFacetsQueryDto,
+  ): Promise<GridFacetsDto> {
+    return this.grid.facets(id, query);
   }
 
   /**
