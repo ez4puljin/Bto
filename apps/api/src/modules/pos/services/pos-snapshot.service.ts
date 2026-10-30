@@ -6,7 +6,7 @@ import { asc, eq } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import { CatalogService, CategoriesService, TaxService } from '../../catalog';
-import { UserNamesService } from '../../identity';
+import { OrgService, UserNamesService } from '../../identity';
 import { DiscountProgramsService, PriceProfilesService, ProductPricesService } from '../../pricing';
 import { posCashiers, posTills } from '../schema';
 import type { EdgeNode } from './pos-edge-nodes.service';
@@ -36,6 +36,7 @@ export class PosSnapshotService {
     private readonly settings: PosSettingsService,
     private readonly quickButtons: PosQuickButtonsService,
     private readonly paymentTypes: PosPaymentTypesService,
+    private readonly org: OrgService,
   ) {}
 
   forNode(node: EdgeNode): Promise<PosSnapshot> {
@@ -75,6 +76,9 @@ export class PosSnapshotService {
       });
     }
     const tillRows = await this.db.select().from(posTills).where(eq(posTills.edgeNodeId, node.id));
+    const tillWarehouses = await this.org.warehouseNames([
+      ...new Set(tillRows.map((till) => till.warehouseId)),
+    ]);
     const cashierRows = await this.db.select().from(posCashiers).orderBy(asc(posCashiers.userId));
     const userIds = cashierRows.map((row) => row.userId);
     const users = await this.names.summariesOf(userIds);
@@ -108,6 +112,8 @@ export class PosSnapshotService {
           id: till.id,
           code: till.code,
           name: till.name,
+          warehouseId: till.warehouseId,
+          warehouseName: tillWarehouses.get(till.warehouseId) ?? null,
           status: till.status,
           pairingCodeHash: till.pairingCodeHash,
           pairingExpiresAt: till.pairingExpiresAt?.toISOString() ?? null,

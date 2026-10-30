@@ -13085,6 +13085,9 @@ export interface components {
         PosTill: {
             id: number;
             edgeNodeId: number;
+            /** @description The STORE warehouse it sells from (ADR-0123) */
+            warehouseId: number;
+            warehouseName: string | null;
             /** @example К3 */
             code: string;
             name: string;
@@ -13107,6 +13110,8 @@ export interface components {
         };
         PosTillRequest: {
             edgeNodeId: number;
+            /** @description A STORE warehouse of the edge’s branch; the edge’s when absent */
+            warehouseId?: number;
             /**
              * @description Capitals, digits and dashes, 1–8
              * @example К3
@@ -13122,6 +13127,8 @@ export interface components {
             drawerKick?: boolean;
         };
         PosTillPatch: {
+            /** @description A STORE warehouse of the edge’s branch */
+            warehouseId?: number;
             name?: string;
             printerHost?: string | null;
             printerPort?: number;

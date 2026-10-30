@@ -49233,6 +49233,14 @@
           "edgeNodeId": {
             "type": "number"
           },
+          "warehouseId": {
+            "type": "number",
+            "description": "The STORE warehouse it sells from (ADR-0123)"
+          },
+          "warehouseName": {
+            "type": "string",
+            "nullable": true
+          },
           "code": {
             "type": "string",
             "example": "К3"
@@ -49285,6 +49293,8 @@
         "required": [
           "id",
           "edgeNodeId",
+          "warehouseId",
+          "warehouseName",
           "code",
           "name",
           "printerHost",
@@ -49304,6 +49314,11 @@
           "edgeNodeId": {
             "type": "number",
             "minimum": 1
+          },
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "A STORE warehouse of the edge’s branch; the edge’s when absent"
           },
           "code": {
             "type": "string",
@@ -49346,6 +49361,11 @@
       "PosTillPatch": {
         "type": "object",
         "properties": {
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "A STORE warehouse of the edge’s branch"
+          },
           "name": {
             "type": "string",
             "maxLength": 120

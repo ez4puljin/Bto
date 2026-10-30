@@ -1,11 +1,20 @@
 import { randomUUID } from 'node:crypto';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { posSaleNumber, posShiftNumber } from '@tugeel/shared/pos';
 import { StockQueryService } from '../../src/modules/inventory';
 import { createHttpApp } from '../harness/apps';
 import type { ProductJson } from '../harness/catalog';
-import { expectReconciled } from '../harness/inventory';
+import { expectReconciled, inventoryApi } from '../harness/inventory';
 import { seedUser } from '../harness/identity';
-import { type OutcomeJson, posActors, posApi, posStore, saleDoc, saleEvent } from '../harness/pos';
+import {
+  type OutcomeJson,
+  posActors,
+  posApi,
+  posStore,
+  saleDoc,
+  saleEvent,
+  shiftOpenEvent,
+} from '../harness/pos';
 
 /**
  * The accept path of the centre (ADR-0063 #4, #5): a replayed sale posts POS_SALE from SALESFLOOR,
@@ -345,4 +354,84 @@ describe('pos accept', () => {
     ).body as { data: { code: string; isSystem: boolean }[] };
     return bins.data.find((bin) => bin.isSystem)?.code;
   }
+  it('sells from the till’s own STORE warehouse, not the edge’s (ADR-0123)', async () => {
+    const branchId = (store.store as { branchId: number | null }).branchId;
+    const http = store.pos.http;
+    const auth = store.pos.auth;
+    const floor2 = (
+      await http()
+        .post('/api/v1/warehouses')
+        .set(auth)
+        .send({ code: 'PA2S', name: 'Хоёрдугаар заал', kind: 'STORE', branchId })
+        .expect(201)
+    ).body as { id: number };
+    const depot = (
+      await http()
+        .post('/api/v1/warehouses')
+        .set(auth)
+        .send({ code: 'PA2W', name: 'Бөөний агуулах PA2', kind: 'WHOLESALE', branchId })
+        .expect(201)
+    ).body as { id: number };
+    // Only a STORE warehouse of the edge's branch.
+    await store.pos
+      .createTill({ edgeNodeId: store.node.id, code: 'К2', name: 'Касс 2', warehouseId: depot.id })
+      .expect(422);
+    const till2 = (
+      await store.pos
+        .createTill({
+          edgeNodeId: store.node.id,
+          code: 'К2',
+          name: 'Касс 2',
+          warehouseId: floor2.id,
+        })
+        .expect(201)
+    ).body as { id: number; warehouseId: number; warehouseName: string | null };
+    expect(till2).toMatchObject({ warehouseId: floor2.id, warehouseName: 'Хоёрдугаар заал' });
+    // A till without a warehouse takes its edge's.
+    const till3 = (
+      await store.pos
+        .createTill({ edgeNodeId: store.node.id, code: 'К3', name: 'Касс 3' })
+        .expect(201)
+    ).body as { warehouseId: number };
+    expect(till3.warehouseId).toBe(store.store.id);
+
+    const floorBefore = await onHand(cola);
+    const open = shiftOpenEvent({
+      tillCode: 'К2',
+      cashierUserId: store.cashierId,
+      number: posShiftNumber('К2', store.today, 1),
+      openingFloat: '50000',
+    });
+    const [opened] = await store.replay([open]);
+    expect(opened).toMatchObject({ status: 'APPLIED' });
+    const doc = saleDoc(
+      [{ product: cola, qty: '1' }],
+      {
+        tillCode: 'К2',
+        shiftClientId: open.clientId,
+        cashierUserId: store.cashierId,
+        number: posSaleNumber('К2', store.today, 1),
+        tenders: [{ kind: 'CASH', amount: '1300.00', tendered: '1300' }],
+      },
+      store.retailPrice,
+    );
+    const [sold] = await store.replay([saleEvent(doc)]);
+    expect(sold).toMatchObject({ status: 'APPLIED', number: doc.number });
+    // The first floor's shelf did not move; the second floor's, empty, was filled by a shortfall.
+    expect(await onHand(cola)).toBe(floorBefore);
+    const sale = await store.pos.sale(sold?.id ?? 0);
+    expect(sale).toMatchObject({ tillCode: 'К2', shortfallCount: 1 });
+    const shortfalls = await store.pos.shortfalls();
+    expect(
+      shortfalls.data.some((row) => row.productId === cola.id && row.warehouseId === floor2.id),
+    ).toBe(true);
+    const floor2Salesfloor = await inventoryApi(app, actors.admin).systemBin(
+      floor2.id,
+      'SALESFLOOR',
+    );
+    const floor2Bin = await app.get(StockQueryService).ofBin(floor2Salesfloor.id);
+    expect(
+      floor2Bin.lines.find((line) => line.product.id === cola.id)?.onHand.toFixed() ?? '0',
+    ).toBe('0');
+  });
 });

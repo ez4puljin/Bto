@@ -170,6 +170,13 @@ export const posTills = pgTable(
     edgeNodeId: ref('edge_node_id')
       .notNull()
       .references(() => posEdgeNodes.id),
+    /**
+     * The STORE warehouse this till sells from and takes returns onto (ADR-0123): the edge's by
+     * default, another of the same branch when a second sales floor keeps its own stock.
+     */
+    warehouseId: ref('warehouse_id')
+      .notNull()
+      .references(() => warehouses.id),
     code: text('code').notNull(),
     name: text('name').notNull(),
     printerHost: text('printer_host'),
@@ -190,6 +197,7 @@ export const posTills = pgTable(
   },
   (t) => [
     uniqueIndex('pos_tills_node_code').on(t.edgeNodeId, t.code),
+    index('pos_tills_warehouse_idx').on(t.warehouseId),
     check(
       'pos_tills_code_shape',
       sql`length(${t.code}) BETWEEN 1 AND ${lim(POS_LIMITS.maxTillCode)} AND ${t.code} !~ '[[:space:]]'`,

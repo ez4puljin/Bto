@@ -319,13 +319,14 @@ export class PosAcceptService {
     );
     if (original) await this.takeBack(tx, original.lines, doc.lines);
 
-    const salesfloor = await this.bins.systemBin(node.warehouseId, 'SALESFLOOR', tx);
+    // ADR-0123: the goods leave (and come back onto) the till's own sales floor.
+    const salesfloor = await this.bins.systemBin(till.warehouseId, 'SALESFLOOR', tx);
     let shortfall: { id: number; number: string } | null = null;
     if (doc.kind === 'SALE') {
       shortfall = await this.fillShortfalls(
         tx,
         actor,
-        node,
+        till.warehouseId,
         doc.number,
         sale.id,
         lines,
@@ -334,7 +335,7 @@ export class PosAcceptService {
       );
     }
     const damaged = lines.some((line) => line.damaged)
-      ? await this.bins.systemBin(node.warehouseId, 'DAMAGED', tx)
+      ? await this.bins.systemBin(till.warehouseId, 'DAMAGED', tx)
       : null;
     const movements: Movement[] = lines.map((line) => ({
       docType: 'POS' as const,
@@ -342,7 +343,7 @@ export class PosAcceptService {
       docLineId: line.id,
       movementType: doc.kind === 'SALE' ? ('POS_SALE' as const) : ('RETURN_IN' as const),
       leg: 1,
-      warehouseId: node.warehouseId,
+      warehouseId: till.warehouseId,
       binId: line.damaged && damaged ? damaged.id : salesfloor.id,
       productId: line.productId,
       qtyBase: doc.kind === 'SALE' ? line.qtyBase.negated() : line.qtyBase,
@@ -356,7 +357,7 @@ export class PosAcceptService {
     });
     const booked =
       charged && credit.gt(0)
-        ? await this.bookCredit(tx, actor, node, doc, sale.id, lines, credit, original)
+        ? await this.bookCredit(tx, actor, till.warehouseId, doc, sale.id, lines, credit, original)
         : null;
     const billed =
       locked.uses.length > 0
@@ -367,7 +368,7 @@ export class PosAcceptService {
               id: sale.id,
               number: doc.number,
               branchId: locked.uses.some((use) => use.kind === 'PARTNER')
-                ? await this.org.branchOfWarehouses([node.warehouseId], tx)
+                ? await this.org.branchOfWarehouses([till.warehouseId], tx)
                 : null,
             },
             locked,
@@ -581,7 +582,7 @@ export class PosAcceptService {
   private async bookCredit(
     tx: Tx,
     actor: Actor,
-    node: EdgeNode,
+    warehouseId: number,
     doc: SaleDoc,
     saleId: number,
     lines: readonly LineRow[],
@@ -616,8 +617,8 @@ export class PosAcceptService {
     const invoice = await this.books.invoiceSaleInTx(tx, actor, {
       number: doc.number,
       customerId: doc.customerId,
-      branchId: await this.org.branchOfWarehouses([node.warehouseId], tx),
-      warehouseId: node.warehouseId,
+      branchId: await this.org.branchOfWarehouses([warehouseId], tx),
+      warehouseId,
       lines: lines.map((line) => ({
         lineNo: line.lineNo,
         productId: line.productId,
@@ -951,7 +952,7 @@ export class PosAcceptService {
   private async fillShortfalls(
     tx: Tx,
     actor: Actor,
-    node: EdgeNode,
+    warehouseId: number,
     number: string,
     saleId: number,
     lines: readonly LineRow[],
@@ -987,7 +988,7 @@ export class PosAcceptService {
       };
     });
     const adjustment = await this.adjustments.postSystemInTx(tx, actor, {
-      warehouseId: node.warehouseId,
+      warehouseId,
       reason: 'POS_SHORTFALL',
       note: `POS ${number}`,
       lines: adjustmentLines,
@@ -997,7 +998,7 @@ export class PosAcceptService {
         saleId,
         saleLineId: firstLine.get(short.productId) ?? 0,
         productId: short.productId,
-        warehouseId: node.warehouseId,
+        warehouseId,
         qtyBase: short.qtyBase,
         adjustmentId: adjustment.id,
         adjustmentNumber: adjustment.number,

@@ -123,6 +123,20 @@ export class OrgService implements OnModuleInit {
       .orderBy(asc(warehouses.code));
   }
 
+  /** Warehouse names by id, for lists that show where something happens (unknown ids left out). */
+  async warehouseNames(
+    ids: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, string>> {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return new Map();
+    const rows = await executor
+      .select({ id: warehouses.id, name: warehouses.name })
+      .from(warehouses)
+      .where(inArray(warehouses.id, unique));
+    return new Map(rows.map((row) => [row.id, row.name]));
+  }
+
   async getWarehouse(id: number, executor: Db | Tx = this.db): Promise<Warehouse> {
     const [row] = await executor.select().from(warehouses).where(eq(warehouses.id, id));
     if (!row) throw new AppError('NOT_FOUND', `warehouse ${id} not found`, { id });

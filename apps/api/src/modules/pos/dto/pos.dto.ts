@@ -220,6 +220,8 @@ export class EdgeTokenDto {
 export class TillDto {
   @ApiProperty() id: number;
   @ApiProperty() edgeNodeId: number;
+  @ApiProperty({ description: 'The STORE warehouse it sells from (ADR-0123)' }) warehouseId: number;
+  @ApiProperty({ type: String, nullable: true }) warehouseName: string | null;
   @ApiProperty({ example: 'К3' }) code: string;
   @ApiProperty() name: string;
   @ApiProperty({ type: String, nullable: true }) printerHost: string | null;
@@ -238,6 +240,13 @@ export class TillDto {
 @ApiSchema({ name: 'PosTillRequest' })
 export class TillRequestDto {
   @ApiProperty() @IsInt() @Min(1) edgeNodeId: number;
+  @ApiPropertyOptional({
+    description: 'A STORE warehouse of the edge’s branch; the edge’s when absent',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  warehouseId?: number;
   @ApiProperty({ example: 'К3', description: 'Capitals, digits and dashes, 1–8' })
   @Transform(trimmed)
   @IsString()
@@ -271,6 +280,11 @@ export class TillRequestDto {
 
 @ApiSchema({ name: 'PosTillPatch' })
 export class TillPatchDto {
+  @ApiPropertyOptional({ description: 'A STORE warehouse of the edge’s branch' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  warehouseId?: number;
   @ApiPropertyOptional({ maxLength: POS_LIMITS.maxName })
   @IsOptional()
   @Transform(trimmed)

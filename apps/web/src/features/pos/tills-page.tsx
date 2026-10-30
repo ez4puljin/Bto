@@ -146,6 +146,7 @@ export function PosTillsPage() {
                 <TableHead>{t('pos.fields.code')}</TableHead>
                 <TableHead>{t('pos.fields.name')}</TableHead>
                 <TableHead>{t('pos.fields.node')}</TableHead>
+                <TableHead>{t('pos.fields.warehouse')}</TableHead>
                 <TableHead>{t('pos.fields.printer')}</TableHead>
                 <TableHead>{t('pos.tills.lastSale')}</TableHead>
                 <TableHead>{t('pos.fields.status')}</TableHead>
@@ -160,6 +161,7 @@ export function PosTillsPage() {
                   <TableCell className="font-mono font-medium">{till.code}</TableCell>
                   <TruncateCell text={till.name} />
                   <TableCell className="font-mono">{nodeName(till.edgeNodeId)}</TableCell>
+                  <TableCell>{till.warehouseName ?? none}</TableCell>
                   <TableCell className="font-mono">
                     {till.printerHost ? (
                       `${till.printerHost}:${till.printerPort}`
@@ -555,6 +557,12 @@ function TillForm({
   const [edgeNodeId, setEdgeNodeId] = useState<number | null>(
     till?.edgeNodeId ?? nodes[0]?.id ?? null,
   );
+  // ADR-0123: the STORE warehouse the till sells from; the edge's unless another is picked.
+  const warehouses = useWarehouses();
+  const stores = (warehouses.data ?? []).filter((warehouse) => warehouse.kind === 'STORE');
+  const [warehouseId, setWarehouseId] = useState<number | null>(till?.warehouseId ?? null);
+  const edgeWarehouseId = nodes.find((node) => node.id === edgeNodeId)?.warehouseId ?? null;
+  const chosenWarehouseId = warehouseId ?? edgeWarehouseId;
   const [code, setCode] = useState(till?.code ?? '');
   const [name, setName] = useState(till?.name ?? '');
   const [printerHost, setPrinterHost] = useState(till?.printerHost ?? '');
@@ -580,6 +588,7 @@ function TillForm({
           await mutations.updateTill.mutateAsync({
             id: till.id,
             name: name.trim(),
+            ...(chosenWarehouseId === null ? {} : { warehouseId: chosenWarehouseId }),
             printerHost: printerHost.trim() || null,
             printerPort: port,
             printerName: printerName.trim() || null,
@@ -590,6 +599,7 @@ function TillForm({
         } else {
           await mutations.createTill.mutateAsync({
             edgeNodeId: edgeNodeId ?? 0,
+            ...(chosenWarehouseId === null ? {} : { warehouseId: chosenWarehouseId }),
             code: code.trim(),
             name: name.trim(),
             printerHost: printerHost.trim() || null,
@@ -635,6 +645,24 @@ function TillForm({
             </NativeSelect>
           </FormField>
         )}
+        <FormField
+          label={t('pos.fields.warehouse')}
+          htmlFor="till-warehouse"
+          hint={t('pos.tills.warehouseHint')}
+        >
+          <NativeSelect
+            id="till-warehouse"
+            value={chosenWarehouseId ?? ''}
+            onChange={(event) => setWarehouseId(Number.parseInt(event.target.value, 10) || null)}
+          >
+            {stores.map((warehouse) => (
+              <option key={warehouse.id} value={warehouse.id}>
+                {warehouse.name}
+                {warehouse.id === edgeWarehouseId ? ` · ${t('pos.tills.edgeWarehouse')}` : ''}
+              </option>
+            ))}
+          </NativeSelect>
+        </FormField>
         <div className="grid gap-4 sm:grid-cols-[8rem_minmax(0,1fr)]">
           <FormField
             label={t('pos.fields.code')}

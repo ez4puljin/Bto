@@ -132,6 +132,7 @@ export class PosTillsController {
     return tillDto(
       await this.tills.create(ctx, {
         edgeNodeId: body.edgeNodeId,
+        warehouseId: body.warehouseId ?? null,
         code: body.code,
         name: body.name,
         printerHost: body.printerHost ?? null,

@@ -101,6 +101,8 @@ describe('supermarket pages (ADR-0063 #8)', () => {
     await waitFor(() => expect(calls(fetchMock, 'POST', '/api/v1/pos/tills')).toHaveLength(1));
     expect(await bodyOf(calls(fetchMock, 'POST', '/api/v1/pos/tills')[0])).toEqual({
       edgeNodeId: 1,
+      // ADR-0123: the edge's warehouse unless another is picked.
+      warehouseId: 3,
       code: 'К2',
       name: 'Касс 2',
       printerHost: '192.168.1.32',

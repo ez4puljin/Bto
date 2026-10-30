@@ -443,6 +443,9 @@ function StoreNodes(props: {
                           >
                             <span className="font-mono">{till.code}</span>
                             {till.name}
+                            {till.warehouseId !== props.store.id && till.warehouseName ? (
+                              <span className="text-muted-foreground">· {till.warehouseName}</span>
+                            ) : null}
                           </button>
                         ) : (
                           <>

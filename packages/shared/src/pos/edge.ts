@@ -304,6 +304,9 @@ export interface SnapshotTill {
   id: number;
   code: string;
   name: string;
+  /** The STORE warehouse the till sells from (ADR-0123); absent in older snapshots. */
+  warehouseId?: number;
+  warehouseName?: string | null;
   status: 'ACTIVE' | 'INACTIVE';
   /** sha-256 of `${id}:${code}` of the one-time pairing code the admin issued (S1). */
   pairingCodeHash: string | null;
