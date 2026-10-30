@@ -18,7 +18,13 @@ import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { databaseErrorOf } from '../../../common/errors/problem-details';
-import { type AuditEntry, type AuthContext, actorUserId, AuditService } from '../../identity';
+import {
+  type AuditEntry,
+  type AuthContext,
+  actorUserId,
+  AuditService,
+  OrgService,
+} from '../../identity';
 import {
   salesBoards,
   salesChannelDefaults,
@@ -56,6 +62,8 @@ export interface PipelineInput {
   name: string;
   visibility: PipelineVisibility;
   ownOrdersOnly: boolean;
+  /** The STORE warehouse a TRANSFER stage moves the picked goods into (ADR-0125). */
+  transferWarehouseId: number | null;
   roles: Record<PipelineRight, readonly number[]>;
   stages: readonly StageInput[];
 }
@@ -88,6 +96,7 @@ export class SalesPipelinesService {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly access: SalesAccessService,
+    private readonly org: OrgService,
   ) {}
 
   /** A pipeline the caller sees, with the rights on it and on each stage; 404 otherwise. */
@@ -115,6 +124,7 @@ export class SalesPipelinesService {
   ): Promise<number> {
     {
       await this.liveBoard(tx, input.boardId);
+      await this.checkTransferTarget(tx, input, stages);
       const [counted] = await tx
         .select({
           live: sql<string>`count(*) FILTER (WHERE archived_at IS NULL)`,
@@ -132,6 +142,7 @@ export class SalesPipelinesService {
           position: Number.parseInt(counted?.next ?? '0', 10),
           visibility: input.visibility,
           ownOrdersOnly: input.ownOrdersOnly,
+          transferWarehouseId: input.transferWarehouseId,
           createdBy: actorUserId(ctx),
         })
         .returning({ id: salesPipelines.id });
@@ -183,6 +194,7 @@ export class SalesPipelinesService {
       const removed = [...live.values()].filter((stage) => !kept.has(stage.id));
       for (const stage of removed) await this.assertStageFree(tx, stage);
       await this.assertCustomerAppStage(tx, id, stages, input.ownOrdersOnly);
+      await this.checkTransferTarget(tx, input, stages);
 
       await tx
         .update(salesPipelines)
@@ -191,6 +203,7 @@ export class SalesPipelinesService {
           name,
           visibility: input.visibility,
           ownOrdersOnly: input.ownOrdersOnly,
+          transferWarehouseId: input.transferWarehouseId,
           updatedAt: sql`now()`,
         })
         .where(eq(salesPipelines.id, id));
@@ -252,12 +265,43 @@ export class SalesPipelinesService {
           name: pipeline.name,
           visibility: pipeline.visibility,
           ownOrdersOnly: pipeline.ownOrdersOnly,
+          transferWarehouseId: pipeline.transferWarehouseId,
           roles: pipeline.roles,
         },
         after: { ...summaryOf(input, name), stages: stages.map((stage) => stage.name) },
       });
       if (entries.length > 0) await this.audit.recordMany(tx, ctx, entries);
     });
+  }
+
+  /**
+   * A TRANSFER stage needs the pipeline's store (ADR-0125), and the store is a live STORE
+   * warehouse; a pipeline without a TRANSFER stage may still name one (the stage comes later).
+   */
+  private async checkTransferTarget(
+    tx: Tx,
+    input: PipelineInput,
+    stages: readonly StageInput[],
+  ): Promise<void> {
+    const transferStage = stages.find((stage) => stage.action === 'TRANSFER');
+    if (input.transferWarehouseId === null) {
+      if (transferStage) {
+        throw new AppError(
+          'PIPELINE_TRANSFER_STAGE_NEEDS_STORE',
+          `stage ${transferStage.name} transfers, but the pipeline names no store`,
+          { stage: transferStage.name },
+        );
+      }
+      return;
+    }
+    const warehouse = await this.org.getWarehouse(input.transferWarehouseId, tx).catch(() => null);
+    if (!warehouse || warehouse.kind !== 'STORE' || warehouse.status !== 'ACTIVE') {
+      throw new AppError(
+        'PIPELINE_TRANSFER_WAREHOUSE_INVALID',
+        `warehouse ${input.transferWarehouseId} is not an active store`,
+        { warehouse: warehouse?.name ?? null },
+      );
+    }
   }
 
   /**
@@ -321,6 +365,7 @@ export class SalesPipelinesService {
           name,
           visibility: source.visibility,
           ownOrdersOnly: source.ownOrdersOnly,
+          transferWarehouseId: source.transferWarehouseId,
           roles: source.roles,
           stages,
         },
@@ -761,6 +806,7 @@ function summaryOf(input: PipelineInput, name: string) {
     name,
     visibility: input.visibility,
     ownOrdersOnly: input.ownOrdersOnly,
+    transferWarehouseId: input.transferWarehouseId,
     roles: rolesFor(input),
   };
 }

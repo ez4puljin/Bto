@@ -40,6 +40,7 @@ export function toPipelineDto(detail: PipelineDetail): SalesPipelineDto {
     position: pipeline.position,
     visibility: pipeline.visibility,
     ownOrdersOnly: pipeline.ownOrdersOnly,
+    transferWarehouseId: pipeline.transferWarehouseId,
     archivedAt: pipeline.archivedAt?.toISOString() ?? null,
     createdAt: pipeline.createdAt.toISOString(),
     roles: pipeline.roles,
@@ -68,6 +69,7 @@ const inputOf = (body: SalesPipelineRequestDto): PipelineInput => ({
   name: body.name,
   visibility: body.visibility,
   ownOrdersOnly: body.ownOrdersOnly,
+  transferWarehouseId: body.transferWarehouseId ?? null,
   roles: body.roles,
   stages: body.stages.map((stage) => ({
     id: stage.id ?? null,

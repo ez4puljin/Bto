@@ -333,7 +333,8 @@ export const salesBoards = pgTable(
 
 /**
  * A pipeline (ADR-0057 #1): a row of stages inside a board group, with who sees it and whether
- * its users see only their own orders. Archived, never deleted.
+ * its users see only their own orders; since ADR-0125 also the store warehouse its TRANSFER stage
+ * fills. Archived, never deleted.
  */
 export const salesPipelines = pgTable(
   'sales_pipelines',
@@ -346,6 +347,8 @@ export const salesPipelines = pgTable(
     position: smallint('position').notNull(),
     visibility: text('visibility', { enum: PIPELINE_VISIBILITIES }).notNull().default('PUBLIC'),
     ownOrdersOnly: boolean('own_orders_only').notNull().default(false),
+    /** The STORE warehouse a TRANSFER stage moves the picked goods into (ADR-0125); null = none. */
+    transferWarehouseId: ref('transfer_warehouse_id').references(() => warehouses.id),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdBy: userRef('created_by'),
     createdAt: createdAt(),

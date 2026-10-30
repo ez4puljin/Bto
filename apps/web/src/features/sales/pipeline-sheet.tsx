@@ -26,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
+import { useWarehouses } from '@/features/identity/api';
 import {
   type PipelineRequest,
   type SalesBoard,
@@ -71,6 +72,14 @@ export function PipelineSheet({
     pipeline?.visibility ?? 'PUBLIC',
   );
   const [ownOrdersOnly, setOwnOrdersOnly] = useState(pipeline?.ownOrdersOnly ?? false);
+  const [transferWarehouseId, setTransferWarehouseId] = useState<number | null>(
+    pipeline?.transferWarehouseId ?? null,
+  );
+  const warehouses = useWarehouses();
+  const stores = (warehouses.data ?? []).filter(
+    (entry) =>
+      entry.kind === 'STORE' && (entry.status === 'ACTIVE' || entry.id === transferWarehouseId),
+  );
   const [roles, setRoles] = useState<Record<PipelineRight, number[]>>(
     pipeline?.roles ?? { VIEW: [], MANAGE: [], ALL_ORDERS: [] },
   );
@@ -94,6 +103,7 @@ export function PipelineSheet({
     board,
     visibility,
     ownOrdersOnly,
+    transferWarehouseId,
     roles,
     stages: stages.map(({ key: _key, ...stage }) => stage),
   });
@@ -121,6 +131,7 @@ export function PipelineSheet({
         name: name.trim(),
         visibility,
         ownOrdersOnly,
+        transferWarehouseId,
         roles: {
           VIEW: visibility === 'PRIVATE' ? roles.VIEW : [],
           MANAGE: roles.MANAGE,
@@ -201,6 +212,26 @@ export function PipelineSheet({
                   onChange={(value) => setRight('VIEW', value)}
                 />
               ) : null}
+              <FormField
+                label={t('sales.pipelines.transferWarehouse')}
+                htmlFor="pipeline-transfer"
+                hint={t('sales.pipelines.transferWarehouseHint')}
+              >
+                <NativeSelect
+                  id="pipeline-transfer"
+                  value={transferWarehouseId ?? ''}
+                  onChange={(event) =>
+                    setTransferWarehouseId(Number.parseInt(event.target.value, 10) || null)
+                  }
+                >
+                  <option value="">{t('sales.pipelines.transferWarehouseNone')}</option>
+                  {stores.map((entry) => (
+                    <option key={entry.id} value={entry.id}>
+                      {entry.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </FormField>
               <RolesField
                 right="MANAGE"
                 hint={t('sales.pipelines.manageHint')}

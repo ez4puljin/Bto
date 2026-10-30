@@ -414,6 +414,13 @@
       "when": 1793385989915,
       "tag": "0059_pos_till_access",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1793392444365,
+      "tag": "0060_sales_pipeline_transfer",
+      "breakpoints": true
     }
   ]
 }

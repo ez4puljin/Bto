@@ -38,9 +38,11 @@ export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 /**
  * What a stage does when a card arrives (ADR-0056 #3): nothing; CONFIRM submits a draft (number,
  * prices, reservations — the "incomplete sale"); PICK starts picking; SALE issues the picked stock
- * out of STAGING (the "main sale"); CANCEL cancels with a reason.
+ * out of STAGING (the "main sale"); TRANSFER moves the picked goods out of STAGING into the
+ * pipeline's store warehouse as a received push transfer, no sale (ADR-0125); CANCEL cancels with
+ * a reason.
  */
-export const STAGE_ACTIONS = ['NONE', 'CONFIRM', 'PICK', 'SALE', 'CANCEL'] as const;
+export const STAGE_ACTIONS = ['NONE', 'CONFIRM', 'PICK', 'SALE', 'TRANSFER', 'CANCEL'] as const;
 export type StageAction = (typeof STAGE_ACTIONS)[number];
 
 /** The documents a stage may print when a card arrives. */

@@ -43172,6 +43172,7 @@
               "CONFIRM",
               "PICK",
               "SALE",
+              "TRANSFER",
               "CANCEL"
             ],
             "type": "string"
@@ -43254,6 +43255,11 @@
           "ownOrdersOnly": {
             "type": "boolean"
           },
+          "transferWarehouseId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The STORE warehouse a TRANSFER stage moves the picked goods into (ADR-0125)"
+          },
           "archivedAt": {
             "type": "string",
             "nullable": true,
@@ -43289,6 +43295,7 @@
           "position",
           "visibility",
           "ownOrdersOnly",
+          "transferWarehouseId",
           "archivedAt",
           "createdAt",
           "roles",
@@ -43454,6 +43461,7 @@
               "CONFIRM",
               "PICK",
               "SALE",
+              "TRANSFER",
               "CANCEL"
             ],
             "type": "string"
@@ -43496,6 +43504,12 @@
           },
           "ownOrdersOnly": {
             "type": "boolean"
+          },
+          "transferWarehouseId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The STORE warehouse a TRANSFER stage moves the picked goods into (ADR-0125)"
           },
           "roles": {
             "$ref": "#/components/schemas/SalesPipelineRoles"
@@ -43677,6 +43691,7 @@
               "CONFIRM",
               "PICK",
               "SALE",
+              "TRANSFER",
               "CANCEL"
             ],
             "type": "string",
@@ -59929,6 +59944,9 @@
           "CREDIT_BLOCKED",
           "CREDIT_NEEDS_APPROVAL",
           "ORDER_STATE_INVALID",
+          "PIPELINE_NO_TRANSFER_WAREHOUSE",
+          "PIPELINE_TRANSFER_STAGE_NEEDS_STORE",
+          "PIPELINE_TRANSFER_WAREHOUSE_INVALID",
           "EBARIMT_ATTRIBUTES_MISSING",
           "TIN_PENDING",
           "EBARIMT_INDETERMINATE",

@@ -812,4 +812,134 @@ describe('sales boards', () => {
     for (const order of [mine, theirs])
       await salesApi(app, admin).cancel(order.id, 'Тест').expect(200);
   });
+
+  it('moves the picked goods into the pipeline’s store on a TRANSFER stage (ADR-0125)', async () => {
+    const store = await inventoryApi(app, admin).warehouse('SBS1', 'STORE');
+    const body = (transferWarehouseId: number | null, stages: Record<string, unknown>[]) => ({
+      boardId,
+      name: 'Заал хөдөлгөөн',
+      visibility: 'PUBLIC',
+      ownOrdersOnly: false,
+      transferWarehouseId,
+      roles: NO_ROLES,
+      stages,
+    });
+    const stages = [
+      stageBody('Хүсэлт', 'NONE'),
+      stageBody('Нөөцлөх', 'CONFIRM'),
+      stageBody('Бэлдэх', 'PICK', { roles: { VIEW: [], EDIT: [], MOVE: [roleIds.warehouse] } }),
+      stageBody('Зааланд орсон', 'TRANSFER'),
+    ];
+    // A TRANSFER stage needs the pipeline's store, and the store is an active STORE warehouse.
+    expect(
+      ((await api(admin).createPipeline(body(null, stages)).expect(422)).body as ProblemJson).code,
+    ).toBe('PIPELINE_TRANSFER_STAGE_NEEDS_STORE');
+    expect(
+      ((await api(admin).createPipeline(body(wh.id, stages)).expect(422)).body as ProblemJson).code,
+    ).toBe('PIPELINE_TRANSFER_WAREHOUSE_INVALID');
+    const moving = (await api(admin).createPipeline(body(store.id, stages)).expect(201))
+      .body as PipelineJson & { transferWarehouseId: number | null };
+    expect(moving.transferWarehouseId).toBe(store.id);
+    const binsOf = async (productId: number) =>
+      (
+        await sql.query<{ wh: string; bin: string; on_hand: string }>(
+          `SELECT w.code AS wh, b.code AS bin, bs.on_hand::text
+             FROM bin_stock bs JOIN bins b ON b.id = bs.bin_id JOIN warehouses w ON w.id = b.warehouse_id
+            WHERE bs.product_id = $1 AND bs.on_hand <> 0 ORDER BY w.code, b.code`,
+          [productId],
+        )
+      ).rows;
+    const before = await binsOf(cola.id);
+    expect(before).toEqual([{ wh: 'SB1', bin: 'A-01-01', on_hand: expect.any(String) }]);
+    const shelfBefore = Number.parseFloat(before[0]?.on_hand ?? '0');
+
+    const orders = salesApi(app, office);
+    const draft = await orders.draft(
+      orderBody(shop.id, [{ productUnitId: pcs(cola), qty: '4' }], { pipelineId: moving.id }),
+    );
+    await api(office).move(draft.id, stage('Нөөцлөх', moving).id).expect(200);
+    // Not before the goods are picked.
+    expect(
+      (
+        (await api(office).move(draft.id, stage('Зааланд орсон', moving).id).expect(409))
+          .body as ProblemJson
+      ).code,
+    ).toBe('ORDER_STATE_INVALID');
+    await api(picker).move(draft.id, stage('Бэлдэх', moving).id).expect(200);
+    const lineId = (await orders.get(draft.id)).lines[0]?.id;
+    await http()
+      .post(`/api/v1/sales-orders/${draft.id}/pick`)
+      .set(bearer(picker))
+      .set(idempotency())
+      .send({ lines: [{ lineId, qty: '3', binId: shelf }] })
+      .expect(200);
+    const moved = (await api(office).move(draft.id, stage('Зааланд орсон', moving).id).expect(200))
+      .body as { order: OrderJson; print: string[] };
+    // Delivered to the store, not sold: no invoice, the picked quantity delivered.
+    expect(moved.order).toMatchObject({ status: 'DELIVERED', stageName: 'Зааланд орсон' });
+    expect(moved.order.lines[0]).toMatchObject({ qtyPicked: '3', qtyDelivered: '3' });
+    // One received push under the order's number: STAGING emptied, the store's floor filled.
+    const pushes = (
+      await sql.query<{
+        origin: string;
+        status: string;
+        number: string | null;
+        source: number;
+        dest: number;
+      }>(
+        `SELECT origin, status, number, source_warehouse_id::int AS source, dest_warehouse_id::int AS dest
+           FROM transfers WHERE note = $1`,
+        [draft.number],
+      )
+    ).rows;
+    expect(pushes).toEqual([
+      {
+        origin: 'PUSH',
+        status: 'RECEIVED',
+        number: expect.stringMatching(/^TR-/),
+        source: wh.id,
+        dest: store.id,
+      },
+    ]);
+    expect(await binsOf(cola.id)).toEqual([
+      { wh: 'SB1', bin: 'A-01-01', on_hand: (shelfBefore - 3).toFixed(3) },
+      { wh: 'SBS1', bin: 'SALESFLOOR', on_hand: '3.000' },
+    ]);
+    const legs = (
+      await http()
+        .get('/api/v1/stock/movements')
+        .query({ docType: 'TR', productId: cola.id })
+        .set(bearer(admin))
+        .expect(200)
+    ).body as { data: { docNumber: string | null }[] };
+    expect(legs.data.map((row) => row.docNumber)).toEqual(Array(4).fill(pushes[0]?.number));
+    const detail = await orders.get(draft.id);
+    expect(detail.events.map((event) => event.toStatus)).toEqual([
+      'DRAFT',
+      'SUBMITTED',
+      'CONFIRMED',
+      'PICKING',
+      'PACKED',
+      'DELIVERED',
+    ]);
+    expect(detail.events.at(-1)?.reason).toBe(pushes[0]?.number);
+    // Moved again into the same stage: nothing happens twice (the card already sits there).
+    await api(office).move(draft.id, stage('Зааланд орсон', moving).id).expect(200);
+    expect(await binsOf(cola.id)).toHaveLength(2);
+    // The store cannot be taken away while a stage transfers.
+    const live = (await api(admin).pipeline(moving.id)).stages
+      .filter((entry) => entry.archivedAt === null)
+      .map(kept);
+    expect(
+      (
+        (
+          await http()
+            .put(`/api/v1/sales-pipelines/${moving.id}`)
+            .set(bearer(admin))
+            .send({ ...body(null, live) })
+            .expect(422)
+        ).body as ProblemJson
+      ).code,
+    ).toBe('PIPELINE_TRANSFER_STAGE_NEEDS_STORE');
+  });
 });

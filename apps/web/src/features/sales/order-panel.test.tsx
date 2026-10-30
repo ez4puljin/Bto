@@ -48,6 +48,7 @@ const PIPELINE: Schemas['SalesPipeline'] = {
   position: 0,
   visibility: 'PUBLIC',
   ownOrdersOnly: false,
+  transferWarehouseId: null,
   archivedAt: null,
   createdAt: STAMP,
   roles: { VIEW: [], MANAGE: [], ALL_ORDERS: [] },

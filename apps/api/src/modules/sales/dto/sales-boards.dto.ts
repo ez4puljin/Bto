@@ -158,6 +158,15 @@ export class SalesPipelineRequestDto {
   @IsIn(PIPELINE_VISIBILITIES)
   visibility: PipelineVisibility;
   @ApiProperty() @IsBoolean() ownOrdersOnly: boolean;
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'The STORE warehouse a TRANSFER stage moves the picked goods into (ADR-0125)',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  transferWarehouseId?: number | null;
   @ApiProperty({ type: SalesPipelineRolesDto })
   @ValidateNested()
   @Type(() => SalesPipelineRolesDto)
@@ -207,6 +216,12 @@ export class SalesPipelineDto {
   @ApiProperty() position: number;
   @ApiProperty({ enum: PIPELINE_VISIBILITIES }) visibility: PipelineVisibility;
   @ApiProperty() ownOrdersOnly: boolean;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'The STORE warehouse a TRANSFER stage moves the picked goods into (ADR-0125)',
+  })
+  transferWarehouseId: number | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) archivedAt: string | null;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
   @ApiProperty({ type: SalesPipelineRolesDto }) roles: SalesPipelineRolesDto;

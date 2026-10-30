@@ -41,6 +41,7 @@ const PIPELINE: Schemas['SalesPipeline'] = {
   position: 0,
   visibility: 'PUBLIC',
   ownOrdersOnly: false,
+  transferWarehouseId: null,
   archivedAt: null,
   createdAt: STAMP,
   roles: { VIEW: [], MANAGE: [], ALL_ORDERS: [] },
@@ -71,6 +72,7 @@ const routes = {
     json({ pattern: '{year}{month}{day}_', digits: 4, updatedAt: null }),
   'GET /api/v1/sales-settings/channels': () => json([]),
   'GET /api/v1/branches': () => json({ data: [], nextCursor: null }),
+  'GET /api/v1/warehouses': () => json({ data: [], nextCursor: null }),
   'GET /api/v1/roles': () =>
     json({
       data: [
@@ -130,6 +132,7 @@ describe('boards and pipelines settings', () => {
       name: 'Орон нутаг',
       visibility: 'PRIVATE',
       ownOrdersOnly: true,
+      transferWarehouseId: null,
       roles: { VIEW: [2], MANAGE: [], ALL_ORDERS: [4] },
       stages: [
         {

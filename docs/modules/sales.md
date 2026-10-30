@@ -2,7 +2,7 @@
 
 Status (all built in delivery 2 on 2026-10-15):
 - **Office orders** (ADR-0055): drafts, the submit that confirms, prices frozen in parts, reservations per line in the product's home warehouse with backorders, cancelling.
-- **Boards and stages** (ADR-0056): stage actions run the submit, the picking (counts confirmed by the warehouse) and the sale (stock issued out of STAGING); rights by role; a printable pick list and delivery note.
+- **Boards and stages** (ADR-0056): stage actions run the submit, the picking (counts confirmed by the warehouse) and the sale (stock issued out of STAGING); rights by role; a printable pick list and delivery note. Since ADR-0125 a TRANSFER stage moves the picked goods into the pipeline's store instead of selling them (one received push transfer per source warehouse, the order DELIVERED, no invoice).
 - **Pipelines** (ADR-0057):
   - boards group pipelines, which hold the stages;
   - the warehouse sales page shows a pipeline as a board or as a list;
@@ -44,7 +44,7 @@ Finance answers two hooks of `sales/hooks.ts` (`CREDIT_CHECKER`, `SALE_SINK`; AD
 - Boards → pipelines → stages, as in erxes.
 - The menu «Борлуулалт» → «Агуулахын борлуулалт» (the POS page joins in delivery 9).
 - A stage's «⋯» menu: sort, print the documents of its cards, archive the finished cards, archive the stage. No favourites.
-- A pipeline has a name, a board, a visibility, manage roles and stages, plus «own orders only».
+- A pipeline has a name, a board, a visibility, manage roles and stages, plus «own orders only»; since ADR-0125 also «Шилжүүлэх дэлгүүр», the active STORE warehouse its «Дэлгүүрт шилжүүлэх» (TRANSFER) stage fills — a TRANSFER stage without it is refused (`PIPELINE_TRANSFER_STAGE_NEEDS_STORE`), as is any other warehouse (`PIPELINE_TRANSFER_WAREHOUSE_INVALID`).
 - Order numbers look like `20261005_0001`: one numbering whatever the board, given when the order is created.
 - «+» appears only on stages without an action.
 
@@ -57,8 +57,8 @@ Finance answers two hooks of `sales/hooks.ts` (`CREDIT_CHECKER`, `SALE_SINK`; AD
 | `sales_order_line_parts` | the quote's parts frozen at submit (ADR-0048 #4) | basis list; money signs; app may delete them when an order is edited (0024) |
 | `order_status_events` | every state change: from, to, reason, actor, time | `REVOKE UPDATE, DELETE, TRUNCATE` |
 | `sales_boards` | a group of pipelines: name, optional branch, position, archived | name 1–80; `REVOKE DELETE, TRUNCATE` |
-| `sales_pipelines` | a pipeline: board, name, position, `visibility` PUBLIC/PRIVATE, `own_orders_only`, archived, creator | name 1–80; `REVOKE DELETE, TRUNCATE` |
-| `sales_stages` | a pipeline's stage: name, position, `action` NONE/CONFIRM/PICK/SALE/CANCEL, `print_pick_list`, `print_delivery_note`, `card_sort` NEWEST/OLDEST/DELIVERY/TOTAL/WAITING, archived | action and sort lists; unique `(pipeline_id, id)`; `REVOKE DELETE, TRUNCATE` |
+| `sales_pipelines` | a pipeline: board, name, position, `visibility` PUBLIC/PRIVATE, `own_orders_only`, `transfer_warehouse_id` (the STORE a TRANSFER stage fills, ADR-0125; null = none), archived, creator | name 1–80; `REVOKE DELETE, TRUNCATE` |
+| `sales_stages` | a pipeline's stage: name, position, `action` NONE/CONFIRM/PICK/SALE/TRANSFER/CANCEL, `print_pick_list`, `print_delivery_note`, `card_sort` NEWEST/OLDEST/DELIVERY/TOTAL/WAITING, archived | action and sort lists; unique `(pipeline_id, id)`; `REVOKE DELETE, TRUNCATE` |
 | `sales_pipeline_roles`, `sales_stage_roles` | roles per right: pipelines VIEW / MANAGE / ALL_ORDERS, stages VIEW / EDIT / MOVE | PK (id, role, right); dropped with the role (`ON DELETE CASCADE`) |
 | `sales_channel_defaults` | per channel: the pipeline and stage its new orders land in | channel PK; `(pipeline_id, stage_id)` → the stage of that pipeline; CUSTOMER_APP only on a stage without an action in a pipeline that is not own-orders-only (the service refuses `customerAppStage` in the channel settings and in a pipeline save; ADR-0079 #5) |
 | `sales_stage_moves` | every card move: order, from, to, actor, time | `REVOKE UPDATE, DELETE, TRUNCATE` |

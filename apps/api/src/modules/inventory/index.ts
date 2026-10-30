@@ -143,6 +143,7 @@ export {
   MAX_TRANSFER_LINES,
   type TransferCount,
   type TransferCountEntry,
+  type PushInput,
   type TransferDetail,
   type TransferInput,
   type TransferLineInput,

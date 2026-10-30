@@ -43,6 +43,7 @@ import {
   ReservationService,
   StockPostingService,
   StockQueryService,
+  TransfersService,
 } from '../../inventory';
 import { CustomerAddressesService, CustomersService, type LockedCustomer } from '../../partners';
 import { PriceQuoteService } from '../../pricing';
@@ -172,6 +173,7 @@ export class SalesOrdersService implements OnModuleInit {
     private readonly stock: StockQueryService,
     private readonly scope: ScopeService,
     private readonly org: OrgService,
+    private readonly transfers: TransfersService,
     private readonly moduleRef: ModuleRef,
   ) {}
 
@@ -336,7 +338,7 @@ export class SalesOrdersService implements OnModuleInit {
   /**
    * Moves a card to a stage of its pipeline (ADR-0056 #3) and runs the stage's action in the same
    * transaction: CONFIRM submits a draft, PICK starts picking, SALE issues a picked order's stock,
-   * CANCEL cancels with the reason. The order, then the pipeline and the stage FOR SHARE (ADR-0057
+   * TRANSFER moves it into the pipeline's store (ADR-0125), CANCEL cancels with the reason. The order, then the pipeline and the stage FOR SHARE (ADR-0057
    * #4). Returns the documents the stage prints.
    */
   async move(
@@ -358,7 +360,7 @@ export class SalesOrdersService implements OnModuleInit {
           expected: 'NOT_ARCHIVED',
         });
       }
-      const { stage, rights } = await this.pipelines.stageFor(ctx, tx, input.stageId);
+      const { pipeline, stage, rights } = await this.pipelines.stageFor(ctx, tx, input.stageId);
       if (stage.pipelineId !== order.pipelineId) {
         throw invalid('stageId', 'ofPipeline', "a stage of the order's pipeline");
       }
@@ -384,6 +386,17 @@ export class SalesOrdersService implements OnModuleInit {
         case 'SALE':
           if (order.status !== 'PACKED') throw stateError(order, 'PACKED');
           await this.saleInTx(tx, ctx, order);
+          break;
+        case 'TRANSFER':
+          if (order.status !== 'PACKED') throw stateError(order, 'PACKED');
+          if (pipeline.transferWarehouseId === null) {
+            throw new AppError(
+              'PIPELINE_NO_TRANSFER_WAREHOUSE',
+              'the pipeline names no store to transfer into',
+              { pipelineId: pipeline.id },
+            );
+          }
+          await this.transferInTx(tx, ctx, order, pipeline.transferWarehouseId);
           break;
         case 'CANCEL':
           if (order.status !== 'CANCELLED') await this.cancelInTx(tx, ctx, order, input.reason);
@@ -935,6 +948,83 @@ export class SalesOrdersService implements OnModuleInit {
         lines: movements.length,
         invoice: invoice?.number ?? null,
       },
+    });
+  }
+
+  /**
+   * The pipeline's TRANSFER stage (ADR-0125): the picked goods leave STAGING for the pipeline's
+   * store as one received push transfer per source warehouse, noted with the order's number; the
+   * order is DELIVERED, with no invoice and no receivable. The stage's MOVE right is the
+   * authorisation, as for a sale.
+   */
+  private async transferInTx(
+    tx: Tx,
+    ctx: AuthContext,
+    order: OrderRow,
+    destWarehouseId: number,
+  ): Promise<void> {
+    const id = order.id;
+    const lines = await this.linesOf(tx, id);
+    const products = new Map(
+      (
+        await this.catalog.getMany(
+          lines.map((line) => line.productId),
+          tx,
+        )
+      ).map((p) => [p.id, p]),
+    );
+    const byWarehouse = new Map<number, Map<number, Decimal>>();
+    for (const line of lines) {
+      const picked = line.qtyPicked ?? new Decimal(0);
+      if (picked.isZero()) continue;
+      const perProduct = byWarehouse.get(line.warehouseId) ?? new Map<number, Decimal>();
+      perProduct.set(
+        line.productId,
+        (perProduct.get(line.productId) ?? new Decimal(0)).plus(picked),
+      );
+      byWarehouse.set(line.warehouseId, perProduct);
+    }
+    const numbers: string[] = [];
+    for (const [warehouseId, perProduct] of [...byWarehouse].sort((a, b) => a[0] - b[0])) {
+      const staging = await this.bins.systemBin(warehouseId, 'STAGING', tx);
+      const transfer = await this.transfers.pushInTx(tx, ctx, {
+        sourceWarehouseId: warehouseId,
+        destWarehouseId,
+        note: order.number,
+        lines: [...perProduct].map(([productId, qty]) => {
+          const base = products.get(productId)?.baseUnit;
+          if (!base) throw new Error(`product ${productId} has no base unit`);
+          return { productUnitId: base.id, qty, binId: staging.id };
+        }),
+      });
+      if (transfer.number) numbers.push(transfer.number);
+    }
+    await tx
+      .update(salesOrderLines)
+      .set({ qtyDelivered: sql`coalesce(qty_picked, 0)` })
+      .where(eq(salesOrderLines.orderId, id));
+    await tx
+      .update(salesOrders)
+      .set({
+        status: 'DELIVERED',
+        deliveredAt: sql`now()`,
+        deliveredBy: actorUserId(ctx),
+        updatedAt: sql`now()`,
+      })
+      .where(eq(salesOrders.id, id));
+    await this.event(
+      tx,
+      ctx,
+      id,
+      'PACKED',
+      'DELIVERED',
+      numbers.length ? numbers.join(', ') : null,
+    );
+    await this.audit.record(tx, ctx, {
+      action: 'TRANSFER',
+      entity: 'sales_orders',
+      entityId: id,
+      after: { number: order.number, warehouseId: destWarehouseId, transfers: numbers },
     });
   }
 

@@ -60,6 +60,19 @@ export interface TransferInput {
   requestId?: number;
 }
 
+/**
+ * A push moved in one step by another module's document (ADR-0125): a sales pipeline's TRANSFER
+ * stage sends an order's picked goods from the source's STAGING shelf into a store.
+ */
+export interface PushInput {
+  sourceWarehouseId: number;
+  destWarehouseId: number;
+  /** The sending document's number, kept on the transfer. */
+  note: string | null;
+  /** One line per product, in base units, with the shelf the goods leave. */
+  lines: readonly { productUnitId: number; qty: Decimal; binId: number }[];
+}
+
 /** A product the destination found that was not asked for (ADR-0116 #5). */
 export interface UnrequestedLineInput {
   productId: number;
@@ -207,6 +220,43 @@ export class TransfersService {
    */
   async createInTx(tx: Tx, ctx: AuthContext, input: TransferInput): Promise<TransferDetail> {
     this.scope.assertCanWriteWarehouse(ctx, ownerSide(input));
+    const header = await this.insertTransfer(tx, ctx, input);
+    return this.get(header.id, tx);
+  }
+
+  /**
+   * A push created, shipped and received in one transaction (ADR-0125): the goods leave the given
+   * shelves of the source for the store's sales floor, the number is drawn, the transfer ends
+   * RECEIVED. No scope check here: the caller's own right (a stage's MOVE right) is the
+   * authorisation, as for a SALE stage.
+   */
+  async pushInTx(tx: Tx, ctx: AuthContext, input: PushInput): Promise<TransferDetail> {
+    const created = await this.insertTransfer(tx, ctx, {
+      origin: 'PUSH',
+      sourceWarehouseId: input.sourceWarehouseId,
+      destWarehouseId: input.destWarehouseId,
+      note: input.note,
+      lines: input.lines.map((line) => ({ productUnitId: line.productUnitId, qty: line.qty })),
+    });
+    const lines = await this.linesOf(tx, created.id);
+    const counts: TransferCount[] = [];
+    for (const line of input.lines) {
+      const converted = await this.units.toBase(line.productUnitId, line.qty, tx);
+      const found = lines.find((row) => row.productId === converted.productId);
+      if (!found) throw new Error(`push line of unit ${line.productUnitId} was not inserted`);
+      counts.push({ lineId: found.id, binId: line.binId });
+    }
+    await this.shipInTx(tx, ctx, await this.lockHeader(tx, created.id), counts);
+    await this.receiveInTx(tx, ctx, await this.lockHeader(tx, created.id), []);
+    return this.get(created.id, tx);
+  }
+
+  /** The header and lines of a new transfer, checked (every origin); the caller checked the scope. */
+  private async insertTransfer(
+    tx: Tx,
+    ctx: AuthContext,
+    input: TransferInput,
+  ): Promise<TransferRow> {
     if (input.sourceWarehouseId === input.destWarehouseId) {
       throw invalid('destWarehouseId', 'different', 'the destination differs from the source');
     }
@@ -279,7 +329,7 @@ export class TransfersService {
       entityId: header.id,
       after: header,
     });
-    return this.get(header.id, tx);
+    return header;
   }
 
   update(ctx: AuthContext, id: number, patch: { note?: string | null }): Promise<TransferDetail> {
@@ -455,6 +505,23 @@ export class TransfersService {
     return inTransaction(this.db, async (tx) => {
       const header = await this.lockHeader(tx, id);
       this.scope.assertCanWriteWarehouse(ctx, header.sourceWarehouseId);
+      await this.shipInTx(tx, ctx, header, counts);
+      return this.get(id, tx);
+    });
+  }
+
+  /**
+   * Ships a locked header: the lines leave their shelves for TRANSIT and the number is drawn. The
+   * caller checked the scope, or a stage's right stands for it (`pushInTx`, ADR-0125).
+   */
+  private async shipInTx(
+    tx: Tx,
+    ctx: AuthContext,
+    header: TransferRow,
+    counts: readonly TransferCount[],
+  ): Promise<void> {
+    {
+      const id = header.id;
       const expected: TransferStatus = header.origin === 'REQUEST' ? 'REQUESTED' : 'DRAFT';
       assertStatus(header, expected, ['SHIPPED', 'RECEIVED']);
       const lines = await this.linesOf(tx, id);
@@ -537,8 +604,7 @@ export class TransfersService {
         },
       });
       await this.refreshRequestStatus(tx, header.requestId);
-      return this.get(id, tx);
-    });
+    }
   }
 
   /**
@@ -564,24 +630,33 @@ export class TransfersService {
           },
         );
       }
-      assertStatus(header, 'SHIPPED', ['RECEIVED']);
-      const lines = await this.linesOf(tx, id);
-      const byLine = countsByLine(lines, counts);
-      const dest = await this.org.getWarehouse(header.destWarehouseId, tx);
-      const suggested = await this.destinationBins(tx, dest, lines);
-
-      const plan: LineUpdate[] = [];
-      for (const line of lines) {
-        const count = byLine.get(line.id);
-        const shipped = line.shippedQtyBase ?? ZERO;
-        const qtyBase =
-          count?.qty === undefined ? shipped : await this.countToBase(tx, line, count);
-        const binId = count?.binId ?? suggested.get(line.productId) ?? null;
-        plan.push({ id: line.id, qtyBase, binId: qtyBase.gt(0) ? binId : null });
-      }
-      await this.postReceiveInTx(tx, ctx, header, lines, plan, dest);
+      await this.receiveInTx(tx, ctx, header, counts);
       return this.get(id, tx);
     });
+  }
+
+  /** Receives a locked SHIPPED push in one step; the caller checked the scope (or `pushInTx`). */
+  private async receiveInTx(
+    tx: Tx,
+    ctx: AuthContext,
+    header: TransferRow,
+    counts: readonly TransferCount[],
+  ): Promise<void> {
+    assertStatus(header, 'SHIPPED', ['RECEIVED']);
+    const lines = await this.linesOf(tx, header.id);
+    const byLine = countsByLine(lines, counts);
+    const dest = await this.org.getWarehouse(header.destWarehouseId, tx);
+    const suggested = await this.destinationBins(tx, dest, lines);
+
+    const plan: LineUpdate[] = [];
+    for (const line of lines) {
+      const count = byLine.get(line.id);
+      const shipped = line.shippedQtyBase ?? ZERO;
+      const qtyBase = count?.qty === undefined ? shipped : await this.countToBase(tx, line, count);
+      const binId = count?.binId ?? suggested.get(line.productId) ?? null;
+      plan.push({ id: line.id, qtyBase, binId: qtyBase.gt(0) ? binId : null });
+    }
+    await this.postReceiveInTx(tx, ctx, header, lines, plan, dest);
   }
 
   /**

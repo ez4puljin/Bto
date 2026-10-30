@@ -46,6 +46,8 @@ export interface PipelineView {
   position: number;
   visibility: PipelineVisibility;
   ownOrdersOnly: boolean;
+  /** The STORE warehouse a TRANSFER stage fills (ADR-0125); null = none. */
+  transferWarehouseId: number | null;
   archivedAt: Date | null;
   createdBy: number | null;
   createdAt: Date;
@@ -252,6 +254,7 @@ export class SalesAccessService {
         position: row.position,
         visibility: row.visibility,
         ownOrdersOnly: row.ownOrdersOnly,
+        transferWarehouseId: row.transferWarehouseId,
         archivedAt: row.archivedAt,
         createdBy: row.createdBy,
         createdAt: row.createdAt,
