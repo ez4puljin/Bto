@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { EmptyState, FilterToggle, LoadMore } from '@/components/list';
+import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +20,7 @@ import {
 } from '@/components/ui/table';
 import { formatCount, formatQty, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { useAction } from '@/lib/use-action';
 import { cn } from '@/lib/utils';
 import {
   PO_STATUSES,
@@ -26,8 +28,10 @@ import {
   type PoStatus,
   type PurchaseOrderDetail,
   type PurchaseOrderSupplier,
+  useOrdererCandidates,
   usePurchaseOrder,
   usePurchaseOrderRows,
+  useSetSupplierOrderer,
 } from './api';
 import { PoStatusBadge, StatusCountBadge } from './parts';
 
@@ -324,9 +328,14 @@ function SupplierCard(props: {
   canPrices: boolean;
 }) {
   const { t } = useTranslation();
+  const canManage = useHasPermission('procurement.orders.manage');
   const [open, setOpen] = useState(false);
   const { supplier } = props;
   const to = `${props.base}/detail?supplier=${supplier.supplierId}`;
+  const ordered = new Decimal(supplier.qtyBase);
+  const percent = ordered.isZero()
+    ? '0'
+    : Decimal.min(new Decimal(supplier.shippedBase).div(ordered).times(100).floor(), 100).toFixed();
   return (
     <section
       aria-label={supplier.supplierName}
@@ -337,7 +346,9 @@ function SupplierCard(props: {
           {supplier.supplierName}
         </Link>
         <PoStatusBadge status={supplier.status} />
-        {supplier.ordererName ? (
+        {canManage ? (
+          <OrdererSelect supplierId={supplier.supplierId} current={supplier.ordererId} />
+        ) : supplier.ordererName ? (
           <span className="text-[13px] text-muted-foreground">{supplier.ordererName}</span>
         ) : null}
         <span className="text-[13px] text-muted-foreground">
@@ -350,7 +361,16 @@ function SupplierCard(props: {
         {props.canPrices && supplier.estimatedCost ? (
           <span className="font-mono text-[13px]">{formatTugrik(supplier.estimatedCost)}</span>
         ) : null}
-        <span className="ml-auto flex items-center gap-1">
+        <span
+          className="ml-auto flex items-center gap-1.5"
+          aria-label={t('procurement.overview.shippedShare')}
+        >
+          <span className="h-1.5 w-16 overflow-hidden rounded-full bg-fill">
+            <span className="block h-full bg-success" style={{ width: `${percent}%` }} />
+          </span>
+          <span className="font-mono text-[12px] text-muted-foreground">{percent}%</span>
+        </span>
+        <span className="flex items-center gap-1">
           {supplier.lineCount > 0 ? (
             <Button
               variant="ghost"
@@ -377,6 +397,38 @@ function SupplierCard(props: {
       </div>
       {open ? <SupplierLines orderId={props.orderId} supplierId={supplier.supplierId} /> : null}
     </section>
+  );
+}
+
+/** The supplier's orderer, changed in place by a manager (the supplier's setting, not the order's). */
+function OrdererSelect({ supplierId, current }: { supplierId: number; current: number | null }) {
+  const { t } = useTranslation();
+  const candidates = useOrdererCandidates(true);
+  const save = useSetSupplierOrderer(supplierId);
+  const action = useAction();
+  return (
+    <span className="flex items-center gap-2">
+      <NativeSelect
+        variant="filter"
+        aria-label={t('procurement.orderer.field')}
+        value={current === null ? '' : String(current)}
+        disabled={save.isPending}
+        onChange={(event) => {
+          const value = event.target.value;
+          void action.run(async () => {
+            await save.mutateAsync(value === '' ? null : Number.parseInt(value, 10));
+          });
+        }}
+      >
+        <option value="">{t('procurement.orderer.none')}</option>
+        {(candidates.data ?? []).map((candidate) => (
+          <option key={candidate.id} value={candidate.id}>
+            {candidate.fullName}
+          </option>
+        ))}
+      </NativeSelect>
+      <ProblemAlert problem={action.problem} />
+    </span>
   );
 }
 

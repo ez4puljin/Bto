@@ -7389,7 +7389,8 @@
       "showLines": "Бараа харах",
       "ordered": "Захиалга",
       "remaining": "Үлдсэн",
-      "supplierSummary": "{{lines}} бараа · {{boxes}} хайрцаг · {{kg}} кг"
+      "supplierSummary": "{{lines}} бараа · {{boxes}} хайрцаг · {{kg}} кг",
+      "shippedShare": "Ачигдсан хувь"
     },
     "detail": {
       "archived": "Архивласан",
