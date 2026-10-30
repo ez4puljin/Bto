@@ -2,7 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from '@tugeel/shared/money';
 import { MAX_PO_CHANGES, PO_GRID_PAGE } from '@tugeel/shared/procurement';
 import { addDays, addMonths, businessMonthStart } from '@tugeel/shared/time';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { idIn } from '../../../common/db/days';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -37,6 +38,10 @@ import {
 const GRID_CAP = 5000;
 /** The sales columns look back this many calendar months (ADR-0118 #5). */
 const SALES_MONTHS = 12;
+/** The facets count over the whole order at once: every supplier's main products, at most. */
+const FACET_PRODUCT_CAP = 200_000;
+/** Lookups by product id go in slices this long (bound parameters). */
+const LOOKUP_SLICE = 5_000;
 
 export type GridFilter = 'ALL' | 'ORDERED' | 'BELOW_MIN';
 
@@ -47,6 +52,13 @@ export interface GridQuery {
   warehouseId?: number;
   cursor?: string;
   limit?: number;
+}
+
+/** How many rows the query keeps per supplier (owner 2026-10-30): the filter bar's counts. */
+export interface GridFacets {
+  /** Σ of the suppliers' counts. */
+  rowCount: number;
+  suppliers: { supplierId: number; rowCount: number }[];
 }
 
 export interface GridUnit {
@@ -766,6 +778,112 @@ export class PurchaseOrderGridService {
       out.push(...[...own, ...extra].sort((a, b) => a.name.localeCompare(b.name)));
     }
     return out;
+  }
+
+  /**
+   * How many rows the query keeps per supplier, over the whole order in a few statements (owner
+   * 2026-10-30): the filter bar's «N нийлүүлэгч · M бараа», and the supplier list narrowed to the
+   * suppliers with a product in the chosen warehouse. The same products as `rows` — the main
+   * products plus the ordered ones, ACTIVE, the search, the warehouse, the filter — counted, no
+   * cursor; a supplier's count stops at the grid's cap.
+   */
+  async facets(
+    orderId: number,
+    query: Pick<GridQuery, 'q' | 'filter' | 'warehouseId'>,
+  ): Promise<GridFacets> {
+    const [order] = await this.db
+      .select({ id: purchaseOrders.id })
+      .from(purchaseOrders)
+      .where(eq(purchaseOrders.id, orderId));
+    if (!order) throw notFound('purchase order', orderId);
+    const orderSuppliers = await this.db
+      .select({ id: purchaseOrderSuppliers.id, supplierId: purchaseOrderSuppliers.supplierId })
+      .from(purchaseOrderSuppliers)
+      .where(eq(purchaseOrderSuppliers.orderId, orderId))
+      .orderBy(asc(purchaseOrderSuppliers.id));
+    if (orderSuppliers.length === 0) return { rowCount: 0, suppliers: [] };
+    const lines = await this.db
+      .select({
+        orderSupplierId: purchaseOrderLines.orderSupplierId,
+        productId: purchaseOrderLines.productId,
+      })
+      .from(purchaseOrderLines)
+      .where(
+        idIn(
+          purchaseOrderLines.orderSupplierId,
+          orderSuppliers.map((row) => row.id),
+        ),
+      );
+    const orderedOf = new Map<number, number[]>();
+    for (const line of lines) {
+      const list = orderedOf.get(line.orderSupplierId);
+      if (list) list.push(line.productId);
+      else orderedOf.set(line.orderSupplierId, [line.productId]);
+    }
+    const main = await this.links.mainProductsOf(orderSuppliers.map((row) => row.supplierId));
+    // Each supplier's candidates: its main products plus the ordered ones (ORDERED: those only).
+    const candidates = new Map<number, Set<number>>();
+    const all = new Set<number>();
+    for (const row of orderSuppliers) {
+      const ordered = orderedOf.get(row.id) ?? [];
+      const set = new Set(
+        query.filter === 'ORDERED' ? ordered : [...(main.get(row.supplierId) ?? []), ...ordered],
+      );
+      candidates.set(row.supplierId, set);
+      for (const id of set) all.add(id);
+    }
+    const { ids } = await this.productQuery.orderedIds(
+      {
+        ...(query.q?.trim() ? { q: query.q.trim() } : {}),
+        status: 'ACTIVE',
+        onlyIds: [...all],
+      },
+      FACET_PRODUCT_CAP,
+    );
+    let kept = ids;
+    if (query.warehouseId !== undefined || query.filter === 'BELOW_MIN') {
+      const homes = await this.homesOf(kept);
+      if (query.warehouseId !== undefined) {
+        kept = kept.filter((id) => homes.get(id) === query.warehouseId);
+      }
+      if (query.filter === 'BELOW_MIN') {
+        const facts = await this.homeFactsOf(kept, homes);
+        kept = kept.filter((id) => {
+          const fact = facts.get(id);
+          return fact?.minQty != null && fact.onHand.lt(fact.minQty);
+        });
+      }
+    }
+    const keptSet = new Set(kept);
+    const suppliers = orderSuppliers.map((row) => {
+      let rowCount = 0;
+      for (const id of candidates.get(row.supplierId) ?? []) if (keptSet.has(id)) rowCount += 1;
+      return { supplierId: row.supplierId, rowCount: Math.min(rowCount, GRID_CAP) };
+    });
+    return { rowCount: suppliers.reduce((sum, row) => sum + row.rowCount, 0), suppliers };
+  }
+
+  /** `homeOf` in slices: the facets look up every product of the order at once. */
+  private async homesOf(productIds: readonly number[]): Promise<Map<number, number>> {
+    const homes = new Map<number, number>();
+    for (let at = 0; at < productIds.length; at += LOOKUP_SLICE) {
+      const slice = await this.locations.homeOf(productIds.slice(at, at + LOOKUP_SLICE));
+      for (const [id, home] of slice) homes.set(id, home);
+    }
+    return homes;
+  }
+
+  /** `homeFacts` in slices, as `homesOf`. */
+  private async homeFactsOf(
+    productIds: readonly number[],
+    homes: Map<number, number>,
+  ): Promise<Map<number, { onHand: Decimal; minQty: Decimal | null }>> {
+    const facts = new Map<number, { onHand: Decimal; minQty: Decimal | null }>();
+    for (let at = 0; at < productIds.length; at += LOOKUP_SLICE) {
+      const slice = await this.homeFacts(productIds.slice(at, at + LOOKUP_SLICE), homes);
+      for (const [id, fact] of slice) facts.set(id, fact);
+    }
+    return facts;
   }
 
   // -------------------------------------------------------------------------------------------

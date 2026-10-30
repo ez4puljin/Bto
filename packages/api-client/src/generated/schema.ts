@@ -6834,6 +6834,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/purchase-orders/{id}/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How many rows the filters keep per supplier: the filter bar's counts and its supplier list. */
+        get: operations["PurchaseOrders_facets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/purchase-orders/{id}/suppliers/{supplierId}/lines": {
         parameters: {
             query?: never;
@@ -15577,6 +15594,16 @@ export interface components {
             receipt: components["schemas"]["PurchaseOrderGridReceipt"] | null;
             /** @description Receipt lines of products not in the grid (first page only) */
             extra: components["schemas"]["PurchaseOrderGridRow"][];
+        };
+        PurchaseOrderSupplierFacet: {
+            supplierId: number;
+            /** @description Rows the query keeps for this supplier */
+            rowCount: number;
+        };
+        PurchaseOrderFacets: {
+            /** @description Σ of the suppliers' rowCount */
+            rowCount: number;
+            suppliers: components["schemas"]["PurchaseOrderSupplierFacet"][];
         };
         PurchaseOrderGridChange: {
             productId: number;
@@ -32170,6 +32197,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PurchaseOrderGridPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PurchaseOrders_facets: {
+        parameters: {
+            query?: {
+                /** @description Product code, name or barcode */
+                q?: string;
+                filter?: "ALL" | "ORDERED" | "BELOW_MIN";
+                /** @description Rows whose home warehouse is this one */
+                warehouseId?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderFacets"];
                 };
             };
             /** @description RFC 9457 problem details */

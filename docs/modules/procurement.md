@@ -81,6 +81,7 @@ Services (not exported beyond the module):
 | `POST /purchase-orders/:id/archive` / `…/unarchive` (`Idempotency-Key`) | manage | Out of the list and back (received, or nothing ordered: `PO_NOT_ARCHIVABLE`) |
 | `POST /purchase-orders/:id/suppliers/:supplierId/status` (`Idempotency-Key`) | read + the rule of §5 | `{to}`: one step forward or back |
 | `GET /purchase-orders/:id/suppliers/:supplierId/rows?q&filter=ALL\|ORDERED\|BELOW_MIN&warehouseId&cursor&limit` | read | The page: rows with `sales`, `line.shippedQty`, `canShip`, `receipt` (the receipt line: expected and arrived base quantity, note, confirmed, `canCount`, the prices for cost holders), `rights`, the receipt's version and totals, `extra` rows (first page) |
+| `GET /purchase-orders/:id/facets?q&filter&warehouseId` | read | `{rowCount, suppliers:[{supplierId, rowCount}]}`: how many rows the same filters keep per supplier, every supplier of the order in one answer (the filter bar's counts and its supplier list) |
 | `PUT /purchase-orders/:id/suppliers/:supplierId/lines` | `procurement.orders.edit` | `{changes:[{productId, field?, productUnitId, qty, previousUnitId, previousQty}]}` → `{applied, conflicts, refused}` |
 | `PUT /purchase-orders/:id/suppliers/:supplierId/arrivals` | read + the rule of §5 | `{changes:[{lineId, arrivedQtyBase?, note?, previousArrivedQtyBase}]}` → `{applied, conflicts, refused}` |
 | `GET /purchase-orders/:id/history?userId&supplierId&productId&cursor&limit`, `GET …/history.xlsx` | read | The history (§7), 100 a page, and as one sheet |
@@ -128,6 +129,8 @@ Other cases:
 
 **Every supplier at once (owner 2026-10-30).** An order holds up to `MAX_PO_SUPPLIERS` = 1,000 suppliers (a few hundred are active); `create` and `addSuppliers` read the suppliers in one query (not found / `SUPPLIER_INACTIVE` fail the whole request), insert the supplier rows in one statement and load no grid rows; the limit is checked before the read. The rows stay bounded per supplier (the grid's cap of 5,000 products) and per save (`MAX_PO_CHANGES`). The picker skips suppliers whose `mainProductCount` is 0 on «Бүгдийг сонгох» (they may still be ticked by hand) and names how many it skipped.
 
+**The filter bar (owner 2026-10-30).** The supplier, warehouse and orderer filters are typed into (`components/combobox.tsx`, matched in the browser by name and code with `@tugeel/shared/text`). A warehouse, a search or a filter keeps only the suppliers with a row under it: `facets` counts the rows per supplier over the whole order in a few statements (the suppliers' main products and ordered lines at once, one `orderedIds` over them, the homes and minimums looked up in slices of 5,000 ids, a supplier's count stopping at the grid's cap); the orderer filter is the detail's `ordererId`, applied in the browser. The bar shows «N нийлүүлэгч · M бараа» over the suppliers kept, and the supplier list shows each supplier's count. A chosen supplier is shown even when the other filters would hide it.
+
 **Archiving (ADR-0118 #5).** A manager archives an order that is RECEIVED, or on which nothing is ordered; `PO_NOT_ARCHIVABLE` otherwise. Archived orders leave the list (`archived=true` shows them) and cannot move.
 
 **The rows.**
@@ -170,7 +173,7 @@ All in «Агуулах → Татан авалт»:
 - **«Худалдан авах захиалга»** (`/procurement/orders`): the list with «Архив», and a new order on `?new=1` (date, note, the ticked suppliers: one list of every active supplier with its main-product count, searched in the browser by name, code, phone or TIN with `@tugeel/shared/text`, «Бүгдийг сонгох» / «Бүгдийг болих» over the listed rows with the skipped count, «Захиалга үүсгэх (N)»). A row opens the detail page.
 - **The order** (`/procurement/orders/:id`, full width, ADR-0118):
   - the header: number, status, date, author; the seven statuses as circles; «Хадгалах (n)», «Excel», «Түүх», «Хэвлэх», one step back for the filtered supplier, archive, the note and suppliers dialogs; the totals line; the yellow bar with «Дахин ачаалах»;
-  - the filter row: supplier, warehouse, search, «Захиалах ёстой», «Зөвхөн захиалсан», «Баганууд» (column groups, ADR-0050's storage under `procurement.order`);
+  - the filter row: supplier, warehouse and «Захиалагч» as pills typed into (a warehouse keeps the suppliers with a product homed there, an orderer that person's suppliers), search, «Захиалах ёстой», «Зөвхөн захиалсан», «N нийлүүлэгч · M бараа», «Баганууд» (column groups, ADR-0050's storage under `procurement.order`);
   - one table: a header row per supplier (status, «→ дараагийн шат», «N захиалаагүй», pieces · kg, orderer, receipt, «Захиалгад байхгүй бараа нэмэх», the note's amount at «Нягтлан шалгаж»), its rows with the stage columns, its footer; conflicts shown per cell. Past five suppliers the groups start closed (a chevron per header with «N бараа захиалсан», «Бүгдийг дэлгэх / хураах» in the filter bar) and a group's rows are requested only when it is opened or the supplier filter picks it; «Зөвхөн захиалсан» also hides the suppliers with nothing ordered.
 - **The history** (`/procurement/orders/:id/history`, wide): user / supplier / product filters, «Excel».
 - **The order sheets** (`/procurement/orders/:id/print?supplierId=`, browser print, ADR-0058).
@@ -181,7 +184,7 @@ The scanner screen and the receipt window are inventory's (`docs/modules/invento
 ## 9. Tests
 
 - **Integration:** `procurement.int-spec.ts`:
-  - numbering and every role rule; the rows' figures with keepers seeing no price; the warehouse filter; the stale-page conflict and refused rows; the version stamps;
+  - numbering and every role rule; the rows' figures with keepers seeing no price; the warehouse filter; the facets per supplier (all, a warehouse, below the minimum, a search, ordered, an unknown order); the stale-page conflict and refused rows; the version stamps;
   - «Ачигдаж байна»: shipped cells by the orderer, refused for a keeper and out of the status, a stale shipped cell, `NO_LINE`; Σ shipped;
   - «Ирсэн» → a draft expecting the shipped quantities (a line shipped as 0 left out; nothing shipped refused);
   - the counts on the page: 4 boxes + 2 pieces of 12 → the line in pieces with its expectation and price converted, the note; `SCOPE`, a conflict, `CONFIRMED`, a manager's count; the extra row;
@@ -192,7 +195,7 @@ The scanner screen and the receipt window are inventory's (`docs/modules/invento
   - an order of 252 suppliers created in one request under 10 s, the candidates' main-product counts, 1,001 ids and adding past the limit refused (422), an unknown id failing the whole batch (404).
 - **Integrity:** `procurement-races.spec.ts`: two saves of one empty cell → one applied, one conflict; two keepers confirming at once → posted once; two counts of one line from two pages → one applied, one conflict.
 - **Shared (Vitest):** `procurement.test.ts` (seven statuses, the editable ones, boxes × pieces, the groups a stage requires, the 1₮ check).
-- **Web:** `features/procurement/orders-pages.test.tsx` (the list with «Архив», one table with two suppliers and one request per supplier and kind, conflicts kept, shipped cells and the locked column group, the price check through the receipt's costs, the yellow bar and reload, a keeper without prices, the history page; the new-order dialog's «Бүгдийг сонгох» with the skipped count, the browser search and the one create request with its key; an order of eight suppliers with closed groups, no rows request until one opens, «Зөвхөн захиалсан» and the supplier filter opening a group).
+- **Web:** `features/procurement/orders-pages.test.tsx` (the list with «Архив», one table with two suppliers and one request per supplier and kind, conflicts kept, shipped cells and the locked column group, the price check through the receipt's costs, the yellow bar and reload, a keeper without prices, the history page; the new-order dialog's «Бүгдийг сонгох» with the skipped count, the browser search and the one create request with its key; an order of eight suppliers with closed groups, no rows request until one opens, «Зөвхөн захиалсан» and the supplier filter opening a group; the filter bar typed into: a warehouse found by its name hiding the supplier without a product there, the supplier list with its counts, the orderer filter, «N нийлүүлэгч · M бараа»; typed cells kept across a filter change and saved cell by cell beside another user's cell, which is a conflict shown with their value).
 
 ## 10. Open items
 

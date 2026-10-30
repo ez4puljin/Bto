@@ -190,6 +190,14 @@ const base = (extra: Record<string, (request: Request) => Response | Promise<Res
   'GET /api/v1/purchase-orders/7': () => json(DETAIL),
   'GET /api/v1/purchase-orders/7/version': () => json(VERSION),
   'GET /api/v1/warehouses': () => list([{ id: 1, code: 'WH1', name: 'Төв агуулах' }]),
+  'GET /api/v1/purchase-orders/7/facets': () =>
+    json({
+      rowCount: 3,
+      suppliers: [
+        { supplierId: 31, rowCount: 2 },
+        { supplierId: 32, rowCount: 1 },
+      ],
+    }),
   [`GET ${MSM_ROWS}`]: () => gridPage([COLA, WATER]),
   [`GET ${MILK_ROWS}`]: () =>
     gridPage([MILK_ROW], {
@@ -633,6 +641,14 @@ describe('a new order with every supplier', () => {
       ADMIN_ME,
       base({
         'GET /api/v1/purchase-orders/7': () => json({ ...DETAIL, suppliers: many }),
+        'GET /api/v1/purchase-orders/7/facets': () =>
+          json({
+            rowCount: 7,
+            suppliers: many.map((supplier) => ({
+              supplierId: supplier.supplierId,
+              rowCount: supplier.lineCount,
+            })),
+          }),
         ...Object.fromEntries(
           many.map((supplier) => [
             `GET /api/v1/purchase-orders/7/suppliers/${supplier.supplierId}/rows`,
@@ -680,11 +696,145 @@ describe('a new order with every supplier', () => {
     expect(screen.getByRole('button', { name: 'Дэлгэх: Нийлүүлэгч 33' })).toBeInTheDocument();
 
     // The supplier filter opens the chosen group.
-    await user.selectOptions(
-      screen.getByRole('combobox', { name: mn.procurement.detail.supplierFilter }),
-      '33',
-    );
+    await user.click(screen.getByRole('combobox', { name: mn.procurement.detail.supplierFilter }));
+    await user.click(await screen.findByRole('option', { name: /Нийлүүлэгч 33/ }));
     await waitFor(() => expect(requested).toContain('33'));
+  }, 20_000);
+});
+
+describe('the filter bar of an order', () => {
+  it('narrows the suppliers to a warehouse and an orderer, typed into, with the counts', async () => {
+    const user = userEvent.setup();
+    const seen: string[] = [];
+    const fetchMock = signedIn(
+      ADMIN_ME,
+      base({
+        'GET /api/v1/purchase-orders/7': () =>
+          json({
+            ...DETAIL,
+            suppliers: [MSM, { ...MILK, ordererId: 2, ordererName: 'Нярав Дорж' }],
+          }),
+        'GET /api/v1/purchase-orders/7/facets': (request) => {
+          const search = new URL(request.url).search;
+          seen.push(search);
+          // Only МСМ has a product homed in warehouse 1.
+          return json(
+            search.includes('warehouseId=1')
+              ? {
+                  rowCount: 2,
+                  suppliers: [
+                    { supplierId: 31, rowCount: 2 },
+                    { supplierId: 32, rowCount: 0 },
+                  ],
+                }
+              : {
+                  rowCount: 3,
+                  suppliers: [
+                    { supplierId: 31, rowCount: 2 },
+                    { supplierId: 32, rowCount: 1 },
+                  ],
+                },
+          );
+        },
+      }),
+    );
+    renderApp('/procurement/orders/7', fetchMock);
+
+    expect(await screen.findByText('2 нийлүүлэгч · 3 бараа')).toBeInTheDocument();
+    expect(screen.getAllByText('Сүү ХК').length).toBeGreaterThan(0);
+
+    // The warehouse is typed into: «төв» finds «Төв агуулах»; Сүү ХК has nothing there.
+    await user.click(screen.getByRole('combobox', { name: mn.procurement.grid.warehouse }));
+    await user.type(await screen.findByRole('searchbox', { name: mn.common.search }), 'төв');
+    await user.click(screen.getByRole('option', { name: 'Төв агуулах' }));
+    expect(await screen.findByText('1 нийлүүлэгч · 2 бараа')).toBeInTheDocument();
+    expect(screen.queryByText('Сүү ХК')).not.toBeInTheDocument();
+    expect(seen.some((search) => search.includes('warehouseId=1'))).toBe(true);
+
+    // The supplier list offers only the suppliers kept, each with its count.
+    await user.click(screen.getByRole('combobox', { name: mn.procurement.detail.supplierFilter }));
+    expect(await screen.findByRole('option', { name: /МСМ ХХК/ })).toHaveTextContent('2 бараа');
+    expect(screen.queryByRole('option', { name: /Сүү ХК/ })).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    // Back to every warehouse, then the orderer: only Сүү ХК is Нярав Дорж's.
+    await user.click(screen.getByRole('combobox', { name: mn.procurement.grid.warehouse }));
+    await user.click(
+      await screen.findByRole('option', { name: mn.procurement.detail.allWarehouses }),
+    );
+    await user.click(screen.getByRole('combobox', { name: mn.procurement.detail.ordererFilter }));
+    await user.click(await screen.findByRole('option', { name: 'Нярав Дорж' }));
+    expect(await screen.findByText('1 нийлүүлэгч · 1 бараа')).toBeInTheDocument();
+    expect(screen.getAllByText('Сүү ХК').length).toBeGreaterThan(0);
+    expect(screen.queryByText('МСМ ХХК')).not.toBeInTheDocument();
+  }, 20_000);
+
+  it('keeps the typed cells across a filter change and saves them beside a cell someone else changed', async () => {
+    const user = userEvent.setup();
+    let rows = [COLA, WATER];
+    const posted: { changes: { productId: number; qty: string }[] }[] = [];
+    const fetchMock = signedIn(
+      ADMIN_ME,
+      base({
+        [`GET ${MSM_ROWS}`]: () => gridPage(rows),
+        'PUT /api/v1/purchase-orders/7/suppliers/31/lines': async (request) => {
+          posted.push((await request.json()) as (typeof posted)[number]);
+          // Meanwhile another user ordered 4 boxes of cola; the water cell is applied.
+          rows = [
+            { ...COLA, line: { productUnitId: 101, qty: '4', qtyBase: '48', shippedQty: null } },
+            { ...WATER, line: { productUnitId: 111, qty: '5', qtyBase: '5', shippedQty: null } },
+          ];
+          return json({
+            applied: 1,
+            conflicts: [{ productId: 10, field: 'ORDERED', productUnitId: 101, qty: '4' }],
+            refused: [],
+          });
+        },
+      }),
+    );
+    renderApp('/procurement/orders/7', fetchMock);
+
+    const cola = await screen.findByRole('textbox', { name: 'Тоо: 1001 Кока кола 0.5л' });
+    await user.clear(cola);
+    await user.paste('9');
+    await user.click(screen.getByRole('textbox', { name: 'Тоо: 1002 Ус 1л' }));
+    await user.paste('5');
+    expect(screen.getByRole('button', { name: 'Хадгалах (2)' })).toBeEnabled();
+
+    // The supplier filter hides МСМ; the typed cells stay pending and come back with the group.
+    await user.click(screen.getByRole('combobox', { name: mn.procurement.detail.supplierFilter }));
+    await user.click(await screen.findByRole('option', { name: /Сүү ХК/ }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('textbox', { name: 'Тоо: 1001 Кока кола 0.5л' }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole('button', { name: 'Хадгалах (2)' })).toBeEnabled();
+    await user.click(screen.getByRole('combobox', { name: mn.procurement.detail.supplierFilter }));
+    await user.click(
+      await screen.findByRole('option', { name: mn.procurement.detail.allSuppliers }),
+    );
+    expect(await screen.findByRole('textbox', { name: 'Тоо: 1001 Кока кола 0.5л' })).toHaveValue(
+      '9',
+    );
+    expect(screen.getByRole('textbox', { name: 'Тоо: 1002 Ус 1л' })).toHaveValue('5');
+
+    // One save, cell by cell: the other user's cola is a conflict shown with their value, water is saved.
+    await user.click(screen.getByRole('button', { name: 'Хадгалах (2)' }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]?.changes.map((change) => [change.productId, change.qty])).toEqual([
+      [10, '9'],
+      [11, '5'],
+    ]);
+    const notice = await screen.findByText(mn.procurement.grid.notSavedTitle);
+    expect(notice.closest('[role="alert"]') ?? notice.parentElement).toHaveTextContent(
+      '1001 Кока кола 0.5л: одоо 4 хайрцаг',
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Тоо: 1001 Кока кола 0.5л' })).toHaveValue('4'),
+    );
+    expect(screen.getByRole('textbox', { name: 'Тоо: 1002 Ус 1л' })).toHaveValue('5');
+    expect(screen.getByRole('button', { name: 'Хадгалах (0)' })).toBeDisabled();
   }, 20_000);
 });
 

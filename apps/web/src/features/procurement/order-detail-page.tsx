@@ -16,6 +16,7 @@ import { useParams, useSearchParams } from 'react-router';
 import { useApiClient } from '@/app/api-client-context';
 import { useHasPermission } from '@/app/auth-context';
 import { ColumnChooser } from '@/components/column-chooser';
+import { Combobox } from '@/components/combobox';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DialogFormFooter, FormField } from '@/components/form';
 import { LeaveGuard } from '@/components/leave-guard';
@@ -32,8 +33,7 @@ import { useProducts } from '@/features/catalog/api';
 import { useWarehouses } from '@/features/identity/api';
 import { KEYS as INVENTORY_KEYS, useInventoryMutations } from '@/features/inventory/api';
 import { parseScanQty } from '@/features/inventory/helpers';
-import { WarehouseSelect } from '@/features/inventory/shared';
-import { formatQty } from '@/lib/money';
+import { formatCount, formatQty } from '@/lib/money';
 import { ApiProblem, problemFromError, unwrap } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
 import { toast } from '@/lib/toast';
@@ -47,6 +47,7 @@ import {
   type PurchaseOrderDetail,
   type PurchaseOrderSupplier,
   type PurchaseOrderVersion,
+  useOrderFacets,
   usePurchaseOrder,
   usePurchaseOrderMutations,
   usePurchaseOrderVersion,
@@ -158,14 +159,50 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
       ? filterParam
       : defaultFilter;
   const query: GridQuery = { q, filter, warehouseId };
+  const ordererParam = idOf(params.get('orderer'));
   const chosen =
     supplierParam === undefined
       ? undefined
       : detail.suppliers.find((supplier) => supplier.supplierId === supplierParam);
-  // «Зөвхөн захиалсан» also hides the suppliers with nothing ordered.
-  const suppliers = (chosen ? [chosen] : detail.suppliers).filter(
-    (supplier) => filter !== 'ORDERED' || supplier.lineCount > 0,
+  // The suppliers the filters keep (owner 2026-10-30): the orderer's; with a warehouse, a search or
+  // a filter, those with a row under it — the server counts the rows per supplier and the bar shows
+  // the counts; «Зөвхөн захиалсан» hides the suppliers with nothing ordered at once.
+  const facets = useOrderFacets(detail.id, query);
+  const countOf = new Map(
+    facets.data?.suppliers.map((row) => [row.supplierId, row.rowCount] as const),
   );
+  const narrowing = q !== '' || warehouseId !== undefined || filter !== 'ALL';
+  const kept = detail.suppliers.filter(
+    (supplier) =>
+      (ordererParam === undefined || supplier.ordererId === ordererParam) &&
+      (filter !== 'ORDERED' || supplier.lineCount > 0) &&
+      (!narrowing || facets.data === undefined || (countOf.get(supplier.supplierId) ?? 0) > 0),
+  );
+  const suppliers = chosen ? [chosen] : kept;
+  const productCount = facets.data
+    ? suppliers.reduce((sum, supplier) => sum + (countOf.get(supplier.supplierId) ?? 0), 0)
+    : undefined;
+  const supplierOptions = (chosen && !kept.includes(chosen) ? [chosen, ...kept] : kept).map(
+    (supplier) => ({
+      value: String(supplier.supplierId),
+      label: supplier.supplierName,
+      keys: [supplier.supplierCode],
+      hint: countOf.has(supplier.supplierId)
+        ? t('procurement.ticks.mainProducts', {
+            count: formatCount(countOf.get(supplier.supplierId) ?? 0),
+          })
+        : undefined,
+    }),
+  );
+  const orderers = new Map<number, string>();
+  for (const supplier of detail.suppliers) {
+    if (supplier.ordererId !== null) {
+      orderers.set(supplier.ordererId, supplier.ordererName ?? '');
+    }
+  }
+  const ordererOptions = [...orderers]
+    .sort((a, b) => a[1].localeCompare(b[1]))
+    .map(([userId, name]) => ({ value: String(userId), label: name }));
 
   // Groups open or closed (ADR-0118 kept for small orders): a closed group loads no rows.
   const collapsible = detail.suppliers.length > OPEN_ALL_UP_TO;
@@ -492,26 +529,30 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
           </>
         }
       >
-        <NativeSelect
-          variant="filter"
+        <Combobox
           aria-label={t('procurement.detail.supplierFilter')}
+          emptyLabel={t('procurement.detail.allSuppliers')}
           value={supplierParam === undefined ? '' : String(supplierParam)}
-          onChange={(event) => setParam('supplier', event.target.value)}
-        >
-          <option value="">{t('procurement.detail.allSuppliers')}</option>
-          {detail.suppliers.map((supplier) => (
-            <option key={supplier.supplierId} value={supplier.supplierId}>
-              {supplier.supplierName}
-            </option>
-          ))}
-        </NativeSelect>
-        <WarehouseSelect
-          variant="filter"
-          options={warehouses.data ?? []}
-          value={warehouseId}
+          options={supplierOptions}
+          onChange={(value) => setParam('supplier', value)}
+        />
+        <Combobox
+          aria-label={t('procurement.grid.warehouse')}
           emptyLabel={t('procurement.detail.allWarehouses')}
-          label={t('procurement.grid.warehouse')}
-          onChange={(value) => setParam('warehouse', value === undefined ? '' : String(value))}
+          value={warehouseId === undefined ? '' : String(warehouseId)}
+          options={(warehouses.data ?? []).map((warehouse) => ({
+            value: String(warehouse.id),
+            label: warehouse.kind === 'TRANSIT' ? t('org.kinds.TRANSIT') : warehouse.name,
+            keys: [warehouse.code],
+          }))}
+          onChange={(value) => setParam('warehouse', value)}
+        />
+        <Combobox
+          aria-label={t('procurement.detail.ordererFilter')}
+          emptyLabel={t('procurement.detail.allOrderers')}
+          value={ordererParam === undefined ? '' : String(ordererParam)}
+          options={ordererOptions}
+          onChange={(value) => setParam('orderer', value)}
         />
         <SearchField
           aria-label={t('procurement.grid.search')}
@@ -532,6 +573,14 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
           checked={filter === 'ORDERED'}
           onCheckedChange={(checked) => setParam('filter', checked ? 'ORDERED' : 'ALL')}
         />
+        <span className="text-[13px] text-muted-foreground" aria-live="polite">
+          {productCount === undefined
+            ? t('procurement.detail.supplierCount', { count: formatCount(suppliers.length) })
+            : t('procurement.detail.matchCount', {
+                suppliers: formatCount(suppliers.length),
+                products: formatCount(productCount),
+              })}
+        </span>
       </FilterBar>
       {invalid > 0 ? (
         <p role="alert" className="mb-3 text-[13px] text-destructive">

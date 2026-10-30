@@ -165,6 +165,37 @@ export function usePurchaseOrderRows(
   });
 }
 
+export type OrderFacets = Schemas['PurchaseOrderFacets'];
+
+/**
+ * How many rows the filters keep per supplier (owner 2026-10-30): the filter bar's counts and the
+ * suppliers it lists. The previous counts stay on screen while the next query loads.
+ */
+export function useOrderFacets(id: number, query: GridQuery) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.orders, id, 'facets', query],
+    enabled: id > 0,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/purchase-orders/{id}/facets', {
+          params: {
+            path: { id },
+            query: {
+              q: query.q || undefined,
+              filter: query.filter,
+              warehouseId: query.warehouseId,
+            },
+          },
+          signal,
+        }),
+      ),
+  });
+}
+
 /** The order's sheets for the suppliers: all of them, or one. */
 export function usePurchaseOrderPrint(id: number, supplierId: number | undefined) {
   const api = useApiClient();
