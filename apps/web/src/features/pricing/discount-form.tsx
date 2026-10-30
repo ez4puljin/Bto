@@ -205,7 +205,7 @@ function ProgramForm(props: {
 
   return (
     // A form page: header and card in one 768px column, the buttons at the window's foot (ADR-0066).
-    <div className="max-w-3xl">
+    <div className="max-w-3xl xl:max-w-none">
       <PageHeader
         title={t(props.programId === null ? 'pricing.programs.new' : 'pricing.programs.edit')}
         crumbs={props.crumbs}

@@ -84,7 +84,7 @@ export function AccountPage() {
   return (
     <div className="space-y-4">
       <PageHeader title={t('auth.account.title')} />
-      <div className="flex max-w-3xl flex-col gap-5">
+      <div className="flex max-w-3xl flex-col gap-5 xl:max-w-none">
         <FieldList
           title={t('auth.account.profile')}
           items={[

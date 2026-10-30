@@ -218,7 +218,7 @@ export function SupplierCreatePage() {
   };
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-3xl xl:max-w-none">
       <PageHeader title={t('partners.supplier.newTitle')} />
       <ProblemAlert problem={problemFromError(nextCode.error)} onRetry={nextCode.refetch} />
       {nextCode.isPending ? (

@@ -27,19 +27,22 @@ export function PosSettingsPage() {
   const { t } = useTranslation();
   const settings = usePosSettings();
   return (
-    <div className="max-w-3xl space-y-4">
+    <div>
       <PageHeader title={t('pos.settings.title')} description={t('pos.settings.description')} />
       <ProblemAlert problem={problemFromError(settings.error)} onRetry={settings.refetch} />
-      {settings.data ? (
-        <DetailCard
-          title={t('pos.settings.section')}
-          canEdit
-          view={<SettingsView settings={settings.data} />}
-          edit={(close) => <SettingsForm settings={settings.data} onClose={close} />}
-        />
-      ) : null}
-      <PaymentTypesCard />
-      <LoyaltyTiersCard />
+      {/* The three cards side by side from xl (owner 2026-10-30: the page hugged the left). */}
+      <div className="grid items-start gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+        {settings.data ? (
+          <DetailCard
+            title={t('pos.settings.section')}
+            canEdit
+            view={<SettingsView settings={settings.data} />}
+            edit={(close) => <SettingsForm settings={settings.data} onClose={close} />}
+          />
+        ) : null}
+        <PaymentTypesCard />
+        <LoyaltyTiersCard />
+      </div>
     </div>
   );
 }
