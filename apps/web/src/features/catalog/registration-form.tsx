@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useWarehouseOptions } from '@/features/inventory/helpers';
-import { ComingSoonNote } from '@/components/coming-soon';
+import { ComingSoonBadge } from '@/components/coming-soon';
 import { SupplierPicker } from '@/features/partners/supplier-picker';
 import { BINS_SOON } from '@/lib/features';
 import type { ValidationMessage } from '@/lib/forms';
@@ -516,7 +516,7 @@ export function RegistrationForm(props: { uoms: readonly Uom[]; categories: read
                       <span className="text-foreground/80">
                         {t('catalog.registration.fixedBin')}
                       </span>
-                      <ComingSoonNote>{t('catalog.registration.fixedBinSoon')}</ComingSoonNote>
+                      <ComingSoonBadge />
                     </div>
                   ) : (
                     <FormField
