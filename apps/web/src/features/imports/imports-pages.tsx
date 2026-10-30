@@ -110,7 +110,7 @@ export function ImportsPage() {
           <ImportKindCard key={kind} kind={kind} />
         ))}
       </div>
-      <h2 className="mt-6 mb-2.5 text-[15px] leading-tight font-semibold tracking-tight">
+      <h2 className="mt-6 mb-2.5 text-[0.9375rem] leading-tight font-semibold tracking-tight">
         {t('imports.history')}
       </h2>
       <ProblemAlert problem={problemFromError(imports.error)} onRetry={imports.refetch} />
@@ -236,7 +236,7 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
         <CardTitle>{t(`imports.kinds.${kind}`)}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-3">
-        <p className="text-[13px] text-muted-foreground">{t(`imports.kindHints.${kind}`)}</p>
+        <p className="text-[0.8125rem] text-muted-foreground">{t(`imports.kindHints.${kind}`)}</p>
         {kind === 'RECEIPTS' ? <ReceiptImportFields value={options} onChange={setOptions} /> : null}
         {kind === 'ISSUES' ? (
           <IssueImportFields value={issueWarehouse} onChange={setIssueWarehouse} />
@@ -258,7 +258,7 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
           </FormField>
         ) : null}
         {wrongType ? (
-          <p role="alert" className="text-[13px] text-destructive">
+          <p role="alert" className="text-[0.8125rem] text-destructive">
             {t('imports.xlsxOnly')}
           </p>
         ) : null}
@@ -312,7 +312,9 @@ function ReceiptImportFields(props: {
   const choices = (accounts.data ?? []).filter((account) => account.kind === method);
   return (
     <div className="grid gap-2">
-      <p className="text-[13px] text-muted-foreground">{t('imports.receiptOptions.homeHint')}</p>
+      <p className="text-[0.8125rem] text-muted-foreground">
+        {t('imports.receiptOptions.homeHint')}
+      </p>
       <NativeSelect
         aria-label={t('imports.receiptOptions.payment')}
         value={method}

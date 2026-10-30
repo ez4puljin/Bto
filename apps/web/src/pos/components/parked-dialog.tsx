@@ -78,7 +78,9 @@ function ParkedList(props: {
           return (
             <li key={basket.clientId} className="flex items-center gap-3 px-4 py-3">
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[15px] font-medium">{basket.preview}</span>
+                <span className="block truncate text-[0.9375rem] font-medium">
+                  {basket.preview}
+                </span>
                 <span className="block truncate text-xs text-muted-foreground">
                   {t('posKiosk.parked.meta', {
                     time,
@@ -87,7 +89,7 @@ function ParkedList(props: {
                   })}
                 </span>
               </span>
-              <span className="font-mono text-[15px] font-semibold">
+              <span className="font-mono text-[0.9375rem] font-semibold">
                 {formatTugrik(basket.total)}
               </span>
               <Button

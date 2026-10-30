@@ -42,11 +42,11 @@ export function HomePage() {
   return (
     <div className="flex flex-col gap-5 pt-4">
       <div>
-        <p className="text-[13px] text-muted-foreground">{formatUbToday()}</p>
-        <h1 className="mt-0.5 text-[26px] leading-tight font-semibold tracking-tight">
+        <p className="text-[0.8125rem] text-muted-foreground">{formatUbToday()}</p>
+        <h1 className="mt-0.5 text-[1.75rem] leading-tight font-semibold tracking-tight">
           {greeting}
         </h1>
-        <p className="mt-1 text-[13px] text-muted-foreground">{t('home.subtitle')}</p>
+        <p className="mt-1 text-[0.8125rem] text-muted-foreground">{t('home.subtitle')}</p>
       </div>
       <CustomerAppWarning enabled={permissions.includes('sales.boards.manage')} />
       <div className="grid gap-5 md:grid-cols-2">
@@ -94,10 +94,10 @@ function ModuleGrid({ modules }: { modules: readonly VisibleModule[] }) {
         <li key={module.key}>
           <Link
             to={modulePath(module.key)}
-            className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors hover:bg-accent/70"
+            className="group flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-[background-color,transform] duration-200 ease-apple hover:bg-accent/70 active:scale-[0.98]"
           >
-            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-secondary text-link">
-              <module.icon aria-hidden className="size-[18px]" />
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-secondary text-link transition-transform duration-200 ease-apple group-hover:scale-105">
+              <module.icon aria-hidden className="size-[1.125rem]" />
             </span>
             <span className="min-w-0 truncate">{t(module.label)}</span>
           </Link>

@@ -265,7 +265,7 @@ export function BalanceCard({
               <dt className="text-xs text-muted-foreground">{tile.label}</dt>
               <dd
                 className={cn(
-                  'truncate font-mono text-[15px] font-semibold',
+                  'truncate font-mono text-[0.9375rem] font-semibold',
                   tile.danger && 'text-destructive',
                 )}
               >

@@ -60,7 +60,7 @@ export function AttentionTiles({
 
   return (
     <section aria-labelledby="home-attention">
-      <h2 id="home-attention" className="mb-2.5 text-[15px] font-semibold tracking-tight">
+      <h2 id="home-attention" className="mb-2.5 text-[0.9375rem] font-semibold tracking-tight">
         {t('home.attention.title')}
       </h2>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(14rem,1fr))]">
@@ -79,7 +79,7 @@ export function AttentionTiles({
               </span>
               <span className="min-w-0">
                 <span className="block font-mono text-xl leading-none font-semibold">{text}</span>
-                <span className="mt-1 block text-[13px] leading-snug text-muted-foreground">
+                <span className="mt-1 block text-[0.8125rem] leading-snug text-muted-foreground">
                   {label}
                 </span>
               </span>
@@ -122,7 +122,7 @@ export function AttentionRows({ permissions }: { permissions: readonly Permissio
                 <tile.icon aria-hidden className="size-4" />
               </span>
               <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
-              <span className="shrink-0 rounded-full bg-fill px-2 py-0.5 font-mono text-[13px] font-semibold">
+              <span className="shrink-0 rounded-full bg-fill px-2 py-0.5 font-mono text-[0.8125rem] font-semibold">
                 {text}
               </span>
             </Link>

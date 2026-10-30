@@ -91,7 +91,7 @@ export function AddressesCard({
                     </div>
                   )}
                   {address.note ? (
-                    <p className="text-[13px] text-muted-foreground">{address.note}</p>
+                    <p className="text-[0.8125rem] text-muted-foreground">{address.note}</p>
                   ) : null}
                 </div>
                 {canManage ? (

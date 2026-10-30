@@ -412,7 +412,7 @@ function OrdersCard() {
                 <Badge variant="success" className="self-start">
                   {t('customerApp.orders.open')}
                 </Badge>
-                <p className="text-[13px] text-muted-foreground">
+                <p className="text-[0.8125rem] text-muted-foreground">
                   {t('customerApp.orders.openHint')}
                 </p>
               </div>

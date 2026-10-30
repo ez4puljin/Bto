@@ -121,7 +121,7 @@ export function ReceiptTotals({ detail }: { detail: ReceiptDetail }) {
   ];
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-      <p className="max-w-xl text-[13px] text-muted-foreground">
+      <p className="max-w-xl text-[0.8125rem] text-muted-foreground">
         {detail.status === 'DRAFT'
           ? t('inventory.receipt.form.pricedHint', {
               priced: totals.pricedLines,

@@ -127,7 +127,7 @@ function VatNote({ detail }: { detail: ReceiptDetail | null }) {
   const canCost = useHasPermission('inventory.costs.manage');
   if (!canCost || !detail?.supplierVatPayer || !new Decimal(detail.vatRatePct).gt(0)) return null;
   return (
-    <p className="text-[13px] text-muted-foreground">
+    <p className="text-[0.8125rem] text-muted-foreground">
       {t('inventory.receipt.form.vatNote', { rate: new Decimal(detail.vatRatePct).toString() })}
     </p>
   );
@@ -163,7 +163,7 @@ function ReadOnlyHeader({ detail }: { detail: ReceiptDetail }) {
       <dl className={HEADER_GRID}>
         {items.map(([label, value]) => (
           <div key={label} className="flex min-w-0 flex-col gap-0.5">
-            <dt className="text-[13px] text-muted-foreground">{label}</dt>
+            <dt className="text-[0.8125rem] text-muted-foreground">{label}</dt>
             <dd className="text-sm break-words">{value}</dd>
           </div>
         ))}
@@ -295,7 +295,7 @@ function LinesTable(props: {
               <TableCell className="text-right font-mono text-muted-foreground">
                 {index + 1}
               </TableCell>
-              <TableCell className="font-mono text-[13px]">{line.productSku}</TableCell>
+              <TableCell className="font-mono text-[0.8125rem]">{line.productSku}</TableCell>
               <TableCell className="whitespace-normal">{line.productName}</TableCell>
               <TableCell>{line.warehouseName}</TableCell>
               <TableCell className="font-mono">{line.binCode}</TableCell>
@@ -465,9 +465,11 @@ function ReceiptView({ detail }: { detail: ReceiptDetail }) {
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {checking ? (
-            <p className="text-[13px] text-muted-foreground">{t('inventory.receipt.check.hint')}</p>
+            <p className="text-[0.8125rem] text-muted-foreground">
+              {t('inventory.receipt.check.hint')}
+            </p>
           ) : changeable ? (
-            <p className="text-[13px] text-muted-foreground">
+            <p className="text-[0.8125rem] text-muted-foreground">
               {t('inventory.receipt.form.costHint')}
               {detail.costingStatus === 'COSTED' && detail.recostUntil
                 ? ` ${t('inventory.costing.recostUntil', { date: detail.recostUntil })}`
@@ -476,7 +478,7 @@ function ReceiptView({ detail }: { detail: ReceiptDetail }) {
           ) : null}
           <ProblemAlert problem={costs.problem} />
           {canCost && differing > 0 ? (
-            <p className="text-[13px] text-warning">
+            <p className="text-[0.8125rem] text-warning">
               {t('inventory.receipt.check.differing', { count: differing })}
             </p>
           ) : null}
@@ -505,7 +507,7 @@ function ReceiptView({ detail }: { detail: ReceiptDetail }) {
             })}
           />
           {notArrived > 0 ? (
-            <p className="text-[13px] text-muted-foreground">
+            <p className="text-[0.8125rem] text-muted-foreground">
               {t('inventory.receipt.check.notArrived', { count: notArrived })}
             </p>
           ) : null}
@@ -1034,7 +1036,7 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
           )}
           {canCost && detail ? <ReceiptTotals detail={detail} /> : null}
           {detail && detail.weightMissing > 0 && lines.length > 0 ? (
-            <p className="text-[13px] text-muted-foreground">
+            <p className="text-[0.8125rem] text-muted-foreground">
               {t('inventory.receipt.form.weightMissing', { count: detail.weightMissing })}
             </p>
           ) : null}

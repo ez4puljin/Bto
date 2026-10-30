@@ -338,7 +338,7 @@ function PaymentForm(props: {
   return (
     <form className="grid gap-4" onSubmit={submit} onKeyDown={onKeyDown} noValidate>
       {vouchers.length > 0 ? (
-        <ul aria-label={t('posKiosk.vouchers.taken')} className="space-y-1 text-[15px]">
+        <ul aria-label={t('posKiosk.vouchers.taken')} className="space-y-1 text-[0.9375rem]">
           {vouchers.map((voucher) => (
             <li key={voucher.code} className="flex items-baseline justify-between gap-3">
               <span className="truncate text-muted-foreground">
@@ -350,7 +350,7 @@ function PaymentForm(props: {
         </ul>
       ) : null}
       {member ? (
-        <p className="flex items-center gap-2 rounded-xl bg-info-soft px-4 py-2 text-[15px]">
+        <p className="flex items-center gap-2 rounded-xl bg-info-soft px-4 py-2 text-[0.9375rem]">
           <Gift aria-hidden className="size-5 text-primary" />
           <span className="min-w-0 flex-1 truncate">
             {t('posKiosk.loyalty.payLine', {
@@ -381,13 +381,13 @@ function PaymentForm(props: {
       </dl>
 
       {step === 'rows' && nothingDue ? (
-        <p className="rounded-xl bg-success-soft px-4 py-3 text-[15px] text-success">
+        <p className="rounded-xl bg-success-soft px-4 py-3 text-[0.9375rem] text-success">
           {t('posKiosk.vouchers.allPaid')}
         </p>
       ) : step === 'rows' ? (
         <>
           {rows.length === 0 ? (
-            <p className="rounded-xl bg-canvas px-4 py-3 text-[15px] text-muted-foreground">
+            <p className="rounded-xl bg-canvas px-4 py-3 text-[0.9375rem] text-muted-foreground">
               {t('posKiosk.pay.rows.empty')}
             </p>
           ) : (
@@ -395,7 +395,7 @@ function PaymentForm(props: {
               {rows.map((row, index) => (
                 <li key={row.key} className="space-y-2 rounded-xl bg-canvas p-3">
                   <div className="flex items-center gap-2">
-                    <span className="flex min-w-0 flex-1 items-center gap-2 text-[15px] font-semibold">
+                    <span className="flex min-w-0 flex-1 items-center gap-2 text-[0.9375rem] font-semibold">
                       {KIND_ICONS[row.type.kind]}
                       <span className="truncate">{row.type.name}</span>
                     </span>
@@ -437,7 +437,7 @@ function PaymentForm(props: {
                           type="button"
                           variant="outline"
                           onMouseDown={keepFocus}
-                          className="h-11 px-3 font-mono text-[15px]"
+                          className="h-11 px-3 font-mono text-[0.9375rem]"
                           onClick={() => updateRow(row.key, { amount: fieldMoney(amount) })}
                         >
                           {formatTugrik(amount.toFixed(2))}
@@ -485,7 +485,7 @@ function PaymentForm(props: {
                           setPin(event.target.value.replace(/[^0-9]/g, '').slice(0, 4))
                         }
                       />
-                      <span className="text-[13px] text-muted-foreground">
+                      <span className="text-[0.8125rem] text-muted-foreground">
                         {pointsBad
                           ? t('posKiosk.loyalty.pointsBad', {
                               balance: formatMnt(balance.toFixed(2)),
@@ -503,7 +503,7 @@ function PaymentForm(props: {
             <KioskAlert>{t('posKiosk.pay.rows.noTypes')}</KioskAlert>
           ) : (
             <div role="group" aria-label={t('posKiosk.pay.rows.add')} className="space-y-1.5">
-              <p className="text-[13px] font-medium text-muted-foreground">
+              <p className="text-[0.8125rem] font-medium text-muted-foreground">
                 {t('posKiosk.pay.rows.add')}
               </p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -513,7 +513,7 @@ function PaymentForm(props: {
                     type="button"
                     variant="outline"
                     onMouseDown={keepFocus}
-                    className="h-12 justify-start gap-2 text-[15px] font-semibold"
+                    className="h-12 justify-start gap-2 text-[0.9375rem] font-semibold"
                     disabled={
                       (type.kind === 'CREDIT' && creditRow !== null) ||
                       (type.kind === 'POINTS' && pointsRow !== null)
@@ -539,7 +539,7 @@ function PaymentForm(props: {
         </>
       ) : (
         <section aria-labelledby="pay-receipt-title" className="space-y-3">
-          <h3 id="pay-receipt-title" className="text-[15px] font-semibold">
+          <h3 id="pay-receipt-title" className="text-[0.9375rem] font-semibold">
             {t('posKiosk.pay.receiptChoice.title')}
           </h3>
           <div className="grid grid-cols-2 gap-2">
@@ -588,14 +588,14 @@ function PaymentForm(props: {
       )}
 
       {creditRow && step === 'rows' ? (
-        <p className="rounded-xl bg-warning-soft px-4 py-3 text-[15px] text-warning">
+        <p className="rounded-xl bg-warning-soft px-4 py-3 text-[0.9375rem] text-warning">
           {t('posKiosk.pay.receiptChoice.noVat')}
         </p>
       ) : null}
 
       {overLimit !== null ? (
         <div role="alert" className="space-y-2 rounded-xl bg-warning-soft p-3 text-warning">
-          <p className="flex items-center gap-2 text-[15px] font-semibold">
+          <p className="flex items-center gap-2 text-[0.9375rem] font-semibold">
             <TriangleAlert aria-hidden className="size-5" />
             {t('posKiosk.pay.credit.overLimitTitle')}
           </p>
@@ -662,7 +662,7 @@ function Figure(props: {
             : 'bg-canvas',
       )}
     >
-      <dt className="text-[13px] font-medium">{props.label}</dt>
+      <dt className="text-[0.8125rem] font-medium">{props.label}</dt>
       <dd
         className={cn(
           'font-mono font-semibold tracking-tight',
@@ -700,7 +700,10 @@ function CustomerSection(props: {
       : t('posKiosk.pay.credit.available', { amount: formatTugrik(customer.available) });
   return (
     <section aria-labelledby="pay-customer-title" className="space-y-2 rounded-xl bg-canvas p-3">
-      <h3 id="pay-customer-title" className="flex items-center gap-2 text-[15px] font-semibold">
+      <h3
+        id="pay-customer-title"
+        className="flex items-center gap-2 text-[0.9375rem] font-semibold"
+      >
         <User aria-hidden className="size-5 text-primary" />
         {t('posKiosk.pay.credit.title')}
       </h3>
@@ -811,7 +814,7 @@ function BuyerSection(props: {
   });
   return (
     <section aria-labelledby="pay-buyer-title" className="space-y-2 rounded-xl bg-canvas p-3">
-      <h3 id="pay-buyer-title" className="flex items-center gap-2 text-[15px] font-semibold">
+      <h3 id="pay-buyer-title" className="flex items-center gap-2 text-[0.9375rem] font-semibold">
         <Building2 aria-hidden className="size-5 text-primary" />
         {t('posKiosk.pay.buyer.title')}
       </h3>

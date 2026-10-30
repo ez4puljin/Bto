@@ -138,7 +138,7 @@ function InvoiceSheet({ invoice, narrow }: { invoice: InvoiceDetail; narrow: boo
               {!narrow ? <td className={cell}>{line.lineNo}</td> : null}
               <td className={cell}>
                 {line.productName}
-                {narrow ? <span className="block text-[10px]">{line.uomName}</span> : null}
+                {narrow ? <span className="block text-[0.625rem]">{line.uomName}</span> : null}
               </td>
               <td className={cn(cell, 'text-right font-mono')}>{line.qty}</td>
               {!narrow ? <td className={cell}>{line.uomName}</td> : null}
@@ -173,7 +173,7 @@ function InvoiceSheet({ invoice, narrow }: { invoice: InvoiceDetail; narrow: boo
       <footer
         className={cn(
           'flex justify-between gap-4',
-          narrow ? 'mt-3 flex-col text-[10px]' : 'mt-10 text-sm',
+          narrow ? 'mt-3 flex-col text-[0.625rem]' : 'mt-10 text-sm',
         )}
       >
         <p>
@@ -184,7 +184,7 @@ function InvoiceSheet({ invoice, narrow }: { invoice: InvoiceDetail; narrow: boo
       <p
         className={cn(
           'text-muted-foreground print:text-foreground',
-          narrow ? 'mt-2 text-[10px]' : 'mt-4 text-xs',
+          narrow ? 'mt-2 text-[0.625rem]' : 'mt-4 text-xs',
         )}
       >
         {t('sales.print.printedAt', { at: formatUbDateTime(Date.now()) })}
@@ -222,7 +222,9 @@ function VoucherSheet({ payment, narrow }: { payment: PaymentDetail; narrow: boo
         <p className={narrow ? 'mt-1' : 'mt-3'}>{payment.description}</p>
       ) : null}
       {payment.allocations.length > 0 ? (
-        <ul className={cn('flex flex-col gap-0.5', narrow ? 'mt-2 text-[10px]' : 'mt-4 text-sm')}>
+        <ul
+          className={cn('flex flex-col gap-0.5', narrow ? 'mt-2 text-[0.625rem]' : 'mt-4 text-sm')}
+        >
           {payment.allocations
             .filter((allocation) => allocation.voidedAt === null)
             .map((allocation) => (
@@ -236,7 +238,7 @@ function VoucherSheet({ payment, narrow }: { payment: PaymentDetail; narrow: boo
       <footer
         className={cn(
           'flex justify-between gap-4',
-          narrow ? 'mt-3 flex-col text-[10px]' : 'mt-10 text-sm',
+          narrow ? 'mt-3 flex-col text-[0.625rem]' : 'mt-10 text-sm',
         )}
       >
         <p>
@@ -249,7 +251,7 @@ function VoucherSheet({ payment, narrow }: { payment: PaymentDetail; narrow: boo
       <p
         className={cn(
           'text-muted-foreground print:text-foreground',
-          narrow ? 'mt-2 text-[10px]' : 'mt-4 text-xs',
+          narrow ? 'mt-2 text-[0.625rem]' : 'mt-4 text-xs',
         )}
       >
         {t('sales.print.printedAt', { at: formatUbDateTime(Date.now()) })}

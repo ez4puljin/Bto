@@ -111,13 +111,13 @@ export function SupplierTicks(props: {
         </Button>
       </div>
       <div className="flex flex-wrap items-center gap-1.5" aria-live="polite">
-        <span className="text-[13px] text-muted-foreground">
+        <span className="text-[0.8125rem] text-muted-foreground">
           {props.value.size > 0
             ? t('procurement.ticks.chosen', { count: formatCount(props.value.size) })
             : t('procurement.ticks.none')}
         </span>
         {skipped > 0 ? (
-          <span className="text-[13px] text-muted-foreground">
+          <span className="text-[0.8125rem] text-muted-foreground">
             · {t('procurement.ticks.skippedNoMain', { count: formatCount(skipped) })}
           </span>
         ) : null}
@@ -162,10 +162,10 @@ export function SupplierTicks(props: {
           })}
         </ul>
         {candidates.isPending ? (
-          <p className="px-3 py-2 text-[13px] text-muted-foreground">{t('common.loading')}</p>
+          <p className="px-3 py-2 text-[0.8125rem] text-muted-foreground">{t('common.loading')}</p>
         ) : null}
         {!candidates.isPending && listed.length === 0 ? (
-          <p className="px-3 py-2 text-[13px] text-muted-foreground">
+          <p className="px-3 py-2 text-[0.8125rem] text-muted-foreground">
             {t('procurement.ticks.empty')}
           </p>
         ) : null}

@@ -452,15 +452,15 @@ export function OrderProducts({
             })}
           </p>
           {invalid ? (
-            <p className="text-[13px] text-destructive">{t('sales.panel.products.badQty')}</p>
+            <p className="text-[0.8125rem] text-destructive">{t('sales.panel.products.badQty')}</p>
           ) : null}
           {!frozen && lines.length > 0 ? (
-            <p className="text-[13px] text-muted-foreground">
+            <p className="text-[0.8125rem] text-muted-foreground">
               {t('sales.panel.products.estimated')}
             </p>
           ) : null}
           {dirty && order.status === 'CONFIRMED' ? (
-            <p className="text-[13px] text-warning">{t('sales.panel.products.repriceHint')}</p>
+            <p className="text-[0.8125rem] text-warning">{t('sales.panel.products.repriceHint')}</p>
           ) : null}
         </div>
         {editable ? (

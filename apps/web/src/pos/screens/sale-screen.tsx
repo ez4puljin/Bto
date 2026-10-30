@@ -538,7 +538,7 @@ export function SaleScreen(props: {
           <Button
             type="button"
             variant="outline"
-            className="h-11 w-full max-w-lg justify-start gap-2 px-4 text-[15px] font-normal text-muted-foreground"
+            className="h-11 w-full max-w-lg justify-start gap-2 px-4 text-[0.9375rem] font-normal text-muted-foreground"
             onMouseDown={keepFocus}
             onClick={() => setDialog('search')}
           >
@@ -566,27 +566,36 @@ export function SaleScreen(props: {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onCloseAutoFocus={refocus}>
-              <DropdownMenuItem className="h-11 text-[15px]" onSelect={() => setDialog('returns')}>
+              <DropdownMenuItem
+                className="h-11 text-[0.9375rem]"
+                onSelect={() => setDialog('returns')}
+              >
                 <Undo2 />
                 {t('posKiosk.menu.returns')}
               </DropdownMenuItem>
-              <DropdownMenuItem className="h-11 text-[15px]" onSelect={() => setDialog('parked')}>
+              <DropdownMenuItem
+                className="h-11 text-[0.9375rem]"
+                onSelect={() => setDialog('parked')}
+              >
                 <ArchiveRestore />
                 {t('posKiosk.menu.parked')}
               </DropdownMenuItem>
-              <DropdownMenuItem className="h-11 text-[15px]" onSelect={() => setDialog('history')}>
+              <DropdownMenuItem
+                className="h-11 text-[0.9375rem]"
+                onSelect={() => setDialog('history')}
+              >
                 <History />
                 {t('posKiosk.menu.history')}
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="h-11 text-[15px]"
+                className="h-11 text-[0.9375rem]"
                 onSelect={() => setDialog('daySummary')}
               >
                 <CalendarCheck />
                 {t('posKiosk.menu.daySummary')}
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="h-11 text-[15px]"
+                className="h-11 text-[0.9375rem]"
                 onSelect={() => printTest(props.session.till.name, new Date().toISOString())}
               >
                 <Printer />
@@ -594,7 +603,7 @@ export function SaleScreen(props: {
               </DropdownMenuItem>
               {ebarimt?.provider === 'posapi' ? (
                 <DropdownMenuItem
-                  className="h-11 text-[15px]"
+                  className="h-11 text-[0.9375rem]"
                   onSelect={() => setDialog('ebarimt')}
                 >
                   <ReceiptText />
@@ -606,12 +615,12 @@ export function SaleScreen(props: {
                   ) : null}
                 </DropdownMenuItem>
               ) : null}
-              <DropdownMenuItem className="h-11 text-[15px]" onSelect={props.onCloseShift}>
+              <DropdownMenuItem className="h-11 text-[0.9375rem]" onSelect={props.onCloseShift}>
                 <LockKeyhole />
                 {t('posKiosk.menu.closeShift')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="h-11 text-[15px]" onSelect={props.onSignOut}>
+              <DropdownMenuItem className="h-11 text-[0.9375rem]" onSelect={props.onSignOut}>
                 <LogOut />
                 {t('posKiosk.menu.logout')}
               </DropdownMenuItem>
@@ -674,7 +683,7 @@ export function SaleScreen(props: {
                 {notice}
               </p>
             ) : (
-              <p className="hidden min-w-0 flex-1 truncate text-right text-[13px] text-muted-foreground xl:block">
+              <p className="hidden min-w-0 flex-1 truncate text-right text-[0.8125rem] text-muted-foreground xl:block">
                 {t('posKiosk.sale.keys')}
               </p>
             )}
@@ -699,7 +708,7 @@ export function SaleScreen(props: {
             <div
               className={cn('space-y-1', fresh || cart.lines.length === 0 ? null : 'opacity-60')}
             >
-              <p className="text-[15px] font-medium text-muted-foreground">
+              <p className="text-[0.9375rem] font-medium text-muted-foreground">
                 {t('posKiosk.sale.total')}
               </p>
               <p
@@ -709,7 +718,7 @@ export function SaleScreen(props: {
                 {formatTugrik(totals?.total ?? '0')}
               </p>
             </div>
-            <dl className="space-y-1.5 border-t border-border pt-3 text-[15px]">
+            <dl className="space-y-1.5 border-t border-border pt-3 text-[0.9375rem]">
               {totals && new Decimal(totals.discountTotal).gt(0) ? (
                 <>
                   <div className="flex justify-between">

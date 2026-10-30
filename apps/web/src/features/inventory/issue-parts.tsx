@@ -94,7 +94,7 @@ export function LinesTable(props: {
               </TableCell>
               <TableCell className="whitespace-normal">
                 {line.productName}{' '}
-                <span className="font-mono text-[13px] text-muted-foreground">
+                <span className="font-mono text-[0.8125rem] text-muted-foreground">
                   {line.productSku}
                 </span>
               </TableCell>
@@ -116,7 +116,7 @@ export function LinesTable(props: {
                 {line.binCode ? (
                   <span className="font-mono">{line.binCode}</span>
                 ) : (
-                  <span className="text-[13px] text-muted-foreground">
+                  <span className="text-[0.8125rem] text-muted-foreground">
                     {t('inventory.issues.binPending')}
                   </span>
                 )}
@@ -164,7 +164,9 @@ export function IssueTotals({ detail }: { detail: IssueDetail }) {
             <span className="font-mono font-medium">{formatTugrik(detail.saleTotal)}</span>
           </p>
         ) : (
-          <p className="text-[13px] text-muted-foreground">{t('inventory.issues.salePending')}</p>
+          <p className="text-[0.8125rem] text-muted-foreground">
+            {t('inventory.issues.salePending')}
+          </p>
         )
       ) : null}
       {hasCosts(detail) ? (
@@ -174,7 +176,7 @@ export function IssueTotals({ detail }: { detail: IssueDetail }) {
             <span className="font-mono font-medium">{formatTugrik(detail.total)}</span>
           </p>
         ) : (
-          <p className="text-[13px] text-muted-foreground">{t('inventory.issues.costHint')}</p>
+          <p className="text-[0.8125rem] text-muted-foreground">{t('inventory.issues.costHint')}</p>
         )
       ) : null}
     </div>
@@ -192,7 +194,7 @@ export function IssueConfirmations({ detail }: { detail: IssueDetail }) {
   const rows = new Map(detail.confirmations.map((row) => [row.warehouseId, row]));
   return (
     <ul
-      className="flex flex-wrap gap-2 text-[13px]"
+      className="flex flex-wrap gap-2 text-[0.8125rem]"
       aria-label={t('inventory.issues.confirmations.title')}
     >
       {detail.warehouses.map((warehouse) => {

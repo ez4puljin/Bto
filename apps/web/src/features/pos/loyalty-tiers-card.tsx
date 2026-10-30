@@ -155,7 +155,7 @@ function TiersForm({ tiers, onClose }: { tiers: LoyaltyTier[]; onClose: () => vo
         <div className="flex flex-col gap-2">
           <div
             aria-hidden
-            className="hidden gap-2 text-[13px] text-muted-foreground sm:grid sm:grid-cols-[minmax(0,1fr)_12rem_7rem_2.25rem]"
+            className="hidden gap-2 text-[0.8125rem] text-muted-foreground sm:grid sm:grid-cols-[minmax(0,1fr)_12rem_7rem_2.25rem]"
           >
             <span>{t('posLoyalty.tiers.columns.name')}</span>
             <span>{t('posLoyalty.tiers.columns.from')}</span>

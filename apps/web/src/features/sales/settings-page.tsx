@@ -222,7 +222,7 @@ export function SalesSettingsPage() {
           </h2>
           {/* Why «Дамжлага нэмэх» waits (ADR-0066): a disabled button never says it itself. */}
           {!tree.isPending && (!board || board.archivedAt !== null) ? (
-            <p className="text-[13px] text-muted-foreground">
+            <p className="text-[0.8125rem] text-muted-foreground">
               {board ? t('sales.pipelines.boardArchived') : t('sales.pipelines.needBoard')}
             </p>
           ) : null}

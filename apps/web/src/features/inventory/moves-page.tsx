@@ -112,7 +112,7 @@ export function BinMovesPage() {
           <MoveForm key={warehouseId} warehouseId={warehouseId} onPending={setPending} />
         </div>
       ) : null}
-      <h2 className="mb-2 text-[15px] font-semibold tracking-tight">
+      <h2 className="mb-2 text-[0.9375rem] font-semibold tracking-tight">
         {t('inventory.moves.history')}
       </h2>
       <ProblemAlert problem={problemFromError(moves.error)} onRetry={moves.refetch} />
@@ -273,7 +273,7 @@ function MoveForm({
         <CardTitle>{t('inventory.moves.create')}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <p className="text-[13px] text-muted-foreground">{t('inventory.moves.hint')}</p>
+        <p className="text-[0.8125rem] text-muted-foreground">{t('inventory.moves.hint')}</p>
         <ScanToolbar
           scanBox={
             <ScanBox

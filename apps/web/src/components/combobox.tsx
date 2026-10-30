@@ -83,7 +83,7 @@ export function Combobox(props: {
           aria-controls={open ? listId : undefined}
           data-active={props.value !== '' ? 'true' : undefined}
           className={cn(
-            'inline-flex h-8 max-w-64 items-center gap-1.5 rounded-full border border-border bg-background pr-2 pl-3 text-[13px] font-medium shadow-control outline-none hover:bg-accent focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring data-[active=true]:border-transparent data-[active=true]:bg-secondary data-[active=true]:text-secondary-foreground',
+            'inline-flex h-8.5 max-w-64 items-center gap-1.5 rounded-full border border-border bg-background pr-2 pl-3 text-[0.8125rem] font-medium shadow-control outline-none hover:bg-accent focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring data-[active=true]:border-transparent data-[active=true]:bg-secondary data-[active=true]:text-secondary-foreground',
             props.className,
           )}
         >
@@ -109,7 +109,7 @@ export function Combobox(props: {
               aria-controls={listId}
               aria-activedescendant={matches.length > 0 ? `${ids}-option-${current}` : undefined}
               placeholder={t('common.search')}
-              className="h-8 rounded-lg pl-8 md:text-[13px]"
+              className="h-8 rounded-lg pl-8 md:text-[0.8125rem]"
               value={search}
               onChange={(event) => {
                 setSearch(event.target.value);
@@ -142,7 +142,7 @@ export function Combobox(props: {
                   />
                   <span className="min-w-0 flex-1 truncate">{option.label}</span>
                   {option.hint ? (
-                    <span className="shrink-0 text-[13px] text-muted-foreground">
+                    <span className="shrink-0 text-[0.8125rem] text-muted-foreground">
                       {option.hint}
                     </span>
                   ) : null}

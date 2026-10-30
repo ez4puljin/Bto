@@ -18,7 +18,7 @@ export function RefreshControl() {
   return (
     <>
       {state.data || refresh.data ? (
-        <span className="text-[13px] text-muted-foreground">
+        <span className="text-[0.8125rem] text-muted-foreground">
           {at
             ? t('reports.common.refreshedAt', { time: refreshedText(at) })
             : t('reports.common.neverRefreshed')}
@@ -65,17 +65,17 @@ export function SummaryTile(props: {
 }) {
   return (
     <div className="rounded-xl bg-card px-4 py-3 shadow-card ring-1 ring-black/[0.06]">
-      <p className="text-[13px] text-muted-foreground">{props.label}</p>
+      <p className="text-[0.8125rem] text-muted-foreground">{props.label}</p>
       <p
         className={cn(
-          'font-mono text-[18px] font-semibold',
+          'font-mono text-[1.125rem] font-semibold',
           props.tone === 'warning' && 'text-warning',
           props.tone === 'destructive' && 'text-destructive',
         )}
       >
         {props.value}
       </p>
-      {props.hint ? <p className="text-[12px] text-muted-foreground">{props.hint}</p> : null}
+      {props.hint ? <p className="text-[0.75rem] text-muted-foreground">{props.hint}</p> : null}
     </div>
   );
 }
@@ -93,9 +93,9 @@ export function AmountCell(props: { value: string | null; className?: string }) 
 export function PrintHeading(props: { company: string; title: string; note?: string }) {
   return (
     <div>
-      <p className="text-[13px] font-semibold">{props.company}</p>
-      <h1 className="text-[16px] font-semibold">{props.title}</h1>
-      {props.note ? <p className="text-[12px]">{props.note}</p> : null}
+      <p className="text-[0.8125rem] font-semibold">{props.company}</p>
+      <h1 className="text-[1rem] font-semibold">{props.title}</h1>
+      {props.note ? <p className="text-[0.75rem]">{props.note}</p> : null}
     </div>
   );
 }

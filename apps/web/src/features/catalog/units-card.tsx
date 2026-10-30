@@ -154,7 +154,7 @@ export function UnitsCard({ product, canManage }: { product: ProductDetail; canM
                     ) : null}
                   </div>
                   {unit.isBase ? null : (
-                    <span className="text-[13px] text-muted-foreground">{factorOf(unit)}</span>
+                    <span className="text-[0.8125rem] text-muted-foreground">{factorOf(unit)}</span>
                   )}
                   {unit.isDefaultSales || unit.isDefaultPurchase ? (
                     <div className="mt-1.5 flex flex-wrap gap-1">
@@ -174,7 +174,7 @@ export function UnitsCard({ product, canManage }: { product: ProductDetail; canM
                       {unit.barcodes.map((barcode) => (
                         <li key={barcode.id} className="flex items-center gap-2">
                           <div className="flex min-h-6 min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                            <span className="font-mono text-[13px] tabular-nums">
+                            <span className="font-mono text-[0.8125rem] tabular-nums">
                               {barcode.code}
                             </span>
                             {barcode.isPrimary ? (
@@ -231,7 +231,7 @@ export function UnitsCard({ product, canManage }: { product: ProductDetail; canM
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-[13px] text-muted-foreground sm:pt-0.5">
+                    <p className="text-[0.8125rem] text-muted-foreground sm:pt-0.5">
                       {t('catalog.units.noBarcodes')}
                     </p>
                   )}
@@ -295,7 +295,7 @@ export function UnitsCard({ product, canManage }: { product: ProductDetail; canM
 
         {history.length > 0 ? (
           <details className="group rounded-xl border border-border/90 text-sm">
-            <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-2.5 text-[13px] text-muted-foreground select-none [&::-webkit-details-marker]:hidden">
+            <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-2.5 text-[0.8125rem] text-muted-foreground select-none [&::-webkit-details-marker]:hidden">
               <ChevronRight
                 aria-hidden
                 className="size-3.5 transition-transform group-open:rotate-90"

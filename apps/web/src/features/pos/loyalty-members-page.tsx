@@ -1035,14 +1035,14 @@ function LoyaltyToCheck() {
       className="mb-4 rounded-xl border border-border bg-card p-4 shadow-card"
     >
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="loyalty-to-check" className="text-[15px] font-semibold tracking-tight">
+        <h2 id="loyalty-to-check" className="text-[0.9375rem] font-semibold tracking-tight">
           {t('posLoyalty.check.title')}
         </h2>
-        <span className="text-[13px] text-muted-foreground">
+        <span className="text-[0.8125rem] text-muted-foreground">
           {t('posLoyalty.check.count', { count: rows.length })}
         </span>
       </div>
-      <p className="mb-3 text-[13px] text-muted-foreground">{t('posLoyalty.check.hint')}</p>
+      <p className="mb-3 text-[0.8125rem] text-muted-foreground">{t('posLoyalty.check.hint')}</p>
       <ul className="flex flex-col divide-y divide-border/80 rounded-lg border border-border text-sm">
         {rows.map((row) => (
           <SaleToCheck key={row.id} row={row} />

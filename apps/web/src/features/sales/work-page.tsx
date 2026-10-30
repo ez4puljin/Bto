@@ -233,7 +233,7 @@ export function SalesWorkPage() {
               end={
                 <>
                   {count !== null ? (
-                    <span className="text-[13px] whitespace-nowrap text-muted-foreground">
+                    <span className="text-[0.8125rem] whitespace-nowrap text-muted-foreground">
                       {t('sales.work.count', { count })}
                     </span>
                   ) : null}

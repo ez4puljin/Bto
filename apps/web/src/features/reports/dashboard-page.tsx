@@ -52,7 +52,7 @@ function Delta(props: { label: string; change: Decimal | null; sense: Sense; poi
         ? t('reports.common.points', { value: amount })
         : `${amount}%`;
   return (
-    <div className="flex items-center justify-between gap-2 text-[12px]">
+    <div className="flex items-center justify-between gap-2 text-[0.75rem]">
       <span className="text-muted-foreground">{props.label}</span>
       <span className={cn('font-mono font-medium whitespace-nowrap', tone)}>
         {sign > 0 ? (
@@ -85,7 +85,7 @@ function KpiTile(props: {
         props.to && 'transition-shadow hover:ring-black/[0.12]',
       )}
     >
-      <h2 className="text-[13px] font-medium text-muted-foreground">
+      <h2 className="text-[0.8125rem] font-medium text-muted-foreground">
         {props.to ? (
           <Link
             to={props.to}
@@ -97,9 +97,9 @@ function KpiTile(props: {
           props.title
         )}
       </h2>
-      <p className="font-mono text-[24px] leading-tight font-semibold">{props.value}</p>
+      <p className="font-mono text-[1.5rem] leading-tight font-semibold">{props.value}</p>
       {props.lines?.length ? (
-        <div className="flex flex-col gap-0.5 text-[12px] text-muted-foreground">
+        <div className="flex flex-col gap-0.5 text-[0.75rem] text-muted-foreground">
           {props.lines.map((line, index) => (
             <p key={index}>{line}</p>
           ))}
@@ -224,7 +224,7 @@ function ChartCard(props: { title: string; hint?: string; children: ReactNode })
     <Card className="gap-2">
       <CardHeader>
         <CardTitle>{props.title}</CardTitle>
-        {props.hint ? <p className="text-[12px] text-muted-foreground">{props.hint}</p> : null}
+        {props.hint ? <p className="text-[0.75rem] text-muted-foreground">{props.hint}</p> : null}
       </CardHeader>
       <CardContent>{props.children}</CardContent>
     </Card>
@@ -295,13 +295,13 @@ function AlertCard(props: {
       aria-label={props.title}
       className="flex flex-col gap-2 rounded-xl bg-card px-4 py-3 shadow-card ring-1 ring-black/[0.06]"
     >
-      <h3 className="flex items-center gap-2 text-[15px] font-semibold">
+      <h3 className="flex items-center gap-2 text-[0.9375rem] font-semibold">
         <Icon aria-hidden className="size-4 text-muted-foreground" />
         {props.title}
       </h3>
-      {props.hint ? <p className="text-[12px] text-muted-foreground">{props.hint}</p> : null}
+      {props.hint ? <p className="text-[0.75rem] text-muted-foreground">{props.hint}</p> : null}
       <div className="flex-1">{props.children}</div>
-      {props.footer ? <div className="text-[13px]">{props.footer}</div> : null}
+      {props.footer ? <div className="text-[0.8125rem]">{props.footer}</div> : null}
     </section>
   );
 }
@@ -311,10 +311,10 @@ const LINK = 'text-link underline-offset-2 hover:underline';
 function Alerts({ data }: { data: Dashboard }) {
   const { t } = useTranslation();
   const { alerts } = data;
-  const empty = (text: string) => <p className="text-[13px] text-muted-foreground">{text}</p>;
+  const empty = (text: string) => <p className="text-[0.8125rem] text-muted-foreground">{text}</p>;
   return (
     <section aria-labelledby="dashboard-alerts" className="flex flex-col gap-2">
-      <h2 id="dashboard-alerts" className="text-[17px] font-semibold">
+      <h2 id="dashboard-alerts" className="text-[1.0625rem] font-semibold">
         {t('reports.dashboard.alerts.title')}
       </h2>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -335,7 +335,7 @@ function Alerts({ data }: { data: Dashboard }) {
                 {alerts.overdue.map((row) => (
                   <li
                     key={row.partyId}
-                    className="flex items-baseline justify-between gap-2 text-[13px]"
+                    className="flex items-baseline justify-between gap-2 text-[0.8125rem]"
                   >
                     <span className="min-w-0">
                       {row.customerId ? (
@@ -349,7 +349,7 @@ function Alerts({ data }: { data: Dashboard }) {
                         <span className="block truncate">{row.name}</span>
                       )}
                       {row.oldestDueDate ? (
-                        <span className="text-[12px] text-muted-foreground">
+                        <span className="text-[0.75rem] text-muted-foreground">
                           {t('reports.dashboard.alerts.overdueSince', { date: row.oldestDueDate })}
                         </span>
                       ) : null}
@@ -360,7 +360,7 @@ function Alerts({ data }: { data: Dashboard }) {
                   </li>
                 ))}
               </ul>
-              <p className="mt-1.5 text-[12px] text-muted-foreground">
+              <p className="mt-1.5 text-[0.75rem] text-muted-foreground">
                 {t('reports.dashboard.alerts.overdueCount', {
                   count: formatCount(data.overdueCustomers),
                 })}
@@ -385,7 +385,7 @@ function Alerts({ data }: { data: Dashboard }) {
                 {alerts.lowStock.map((row) => (
                   <li
                     key={`${row.productId}:${row.warehouseId}`}
-                    className="flex items-baseline justify-between gap-2 text-[13px]"
+                    className="flex items-baseline justify-between gap-2 text-[0.8125rem]"
                   >
                     <span className="min-w-0">
                       <Link
@@ -394,7 +394,7 @@ function Alerts({ data }: { data: Dashboard }) {
                       >
                         {row.name}
                       </Link>
-                      <span className="text-[12px] text-muted-foreground">
+                      <span className="text-[0.75rem] text-muted-foreground">
                         {`${row.sku} · ${row.warehouseName}`}
                       </span>
                     </span>
@@ -407,7 +407,7 @@ function Alerts({ data }: { data: Dashboard }) {
                   </li>
                 ))}
               </ul>
-              <p className="mt-1.5 text-[12px] text-muted-foreground">
+              <p className="mt-1.5 text-[0.75rem] text-muted-foreground">
                 {t('reports.dashboard.alerts.lowCount', {
                   count: formatCount(alerts.lowStockCount),
                 })}
@@ -428,7 +428,7 @@ function Alerts({ data }: { data: Dashboard }) {
                 {alerts.fallingCategories.map((row) => (
                   <li
                     key={row.categoryId ?? 'none'}
-                    className="flex items-baseline justify-between gap-2 text-[13px]"
+                    className="flex items-baseline justify-between gap-2 text-[0.8125rem]"
                   >
                     {row.categoryId ? (
                       <Link
@@ -463,12 +463,12 @@ function Alerts({ data }: { data: Dashboard }) {
         <AlertCard title={t('reports.dashboard.alerts.topRepTitle')} icon={Trophy}>
           {alerts.topRep ? (
             <div className="flex flex-col gap-0.5">
-              <p className="text-[15px] font-semibold">{alerts.topRep.name}</p>
-              <p className="font-mono text-[18px] font-semibold">
+              <p className="text-[0.9375rem] font-semibold">{alerts.topRep.name}</p>
+              <p className="font-mono text-[1.125rem] font-semibold">
                 {formatTugrik(alerts.topRep.sales)}
               </p>
               {alerts.topRep.share !== null ? (
-                <p className="text-[12px] text-muted-foreground">
+                <p className="text-[0.75rem] text-muted-foreground">
                   {t('reports.dashboard.alerts.topRepShare', { share: alerts.topRep.share })}
                 </p>
               ) : null}
@@ -505,7 +505,7 @@ export function DashboardPage() {
         description={t('reports.dashboard.description')}
         meta={
           data ? (
-            <span className="font-mono text-[13px]">
+            <span className="font-mono text-[0.8125rem]">
               {t('reports.common.range', { from: data.current.from, to: data.current.to })}
             </span>
           ) : undefined
@@ -594,7 +594,7 @@ export function DashboardPrintPage() {
     <PrintFrame ready={data !== undefined} error={dashboard.error} title={title}>
       {() =>
         data ? (
-          <div className="flex flex-col gap-3 text-[12px]">
+          <div className="flex flex-col gap-3 text-[0.75rem]">
             <PrintHeading
               company={company}
               title={title}
@@ -650,7 +650,9 @@ export function DashboardPrintPage() {
                 </TableRow>
               </TableBody>
             </Table>
-            <h2 className="text-[14px] font-semibold">{t('reports.dashboard.categories.title')}</h2>
+            <h2 className="text-[0.875rem] font-semibold">
+              {t('reports.dashboard.categories.title')}
+            </h2>
             <Table>
               <TableHeader>
                 <TableRow>

@@ -320,8 +320,10 @@ function PriceEntryForm(props: {
                     key={row.unitId}
                     className="rounded-lg bg-background px-3 py-2 shadow-control ring-1 ring-black/[0.04]"
                   >
-                    <div className="text-[13px] font-medium">{unit ? unitLabel(unit) : null}</div>
-                    <dl className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 text-[13px]">
+                    <div className="text-[0.8125rem] font-medium">
+                      {unit ? unitLabel(unit) : null}
+                    </div>
+                    <dl className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 text-[0.8125rem]">
                       <dt className="text-muted-foreground">
                         {t('pricing.card.columns.wholesale')}
                       </dt>
@@ -347,7 +349,9 @@ function PriceEntryForm(props: {
               })}
             </ul>
           ) : (
-            <p className="text-[13px] text-muted-foreground">{t('pricing.dialog.previewEmpty')}</p>
+            <p className="text-[0.8125rem] text-muted-foreground">
+              {t('pricing.dialog.previewEmpty')}
+            </p>
           )}
         </section>
       </div>

@@ -73,7 +73,7 @@ function SheetContent({
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "fixed z-50 flex flex-col gap-4 overflow-y-auto [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] bg-popover p-5 text-sm text-popover-foreground shadow-dialog ring-1 ring-black/[0.06] duration-200 outline-none *:shrink-0 data-open:animate-in data-closed:animate-out",
+          "fixed z-50 flex flex-col gap-4 overflow-y-auto [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] bg-popover p-5 text-sm text-popover-foreground shadow-dialog ring-1 ring-black/[0.06] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] outline-none *:shrink-0 data-open:animate-in data-closed:animate-out data-closed:duration-200",
           side === "right" &&
             "inset-y-0 right-0 h-full w-full border-l sm:max-w-xl data-open:slide-in-from-right data-closed:slide-out-to-right",
           side === "left" &&
@@ -141,7 +141,7 @@ function SheetTitle({
     <SheetPrimitive.Title
       data-slot="sheet-title"
       className={cn(
-        "font-heading text-[17px] leading-snug font-semibold tracking-tight",
+        "font-heading text-[1.0625rem] leading-snug font-semibold tracking-tight",
         className
       )}
       {...props}
@@ -156,7 +156,7 @@ function SheetDescription({
   return (
     <SheetPrimitive.Description
       data-slot="sheet-description"
-      className={cn("text-[13px] text-muted-foreground", className)}
+      className={cn("text-[0.8125rem] text-muted-foreground", className)}
       {...props}
     />
   )

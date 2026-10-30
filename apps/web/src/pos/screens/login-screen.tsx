@@ -50,8 +50,10 @@ export function LoginScreen({ onNewCashier }: { onNewCashier: () => void }) {
       <div className="mb-5 flex items-center gap-3">
         <BrandMark className="size-12 text-xl" />
         <div className="min-w-0">
-          <p className="truncate text-[15px] font-semibold">{companyName ?? t('brand.company')}</p>
-          <p className="truncate text-[13px] text-muted-foreground">
+          <p className="truncate text-[0.9375rem] font-semibold">
+            {companyName ?? t('brand.company')}
+          </p>
+          <p className="truncate text-[0.8125rem] text-muted-foreground">
             {t('posKiosk.header.till', { code: till.code, name: till.name })}
           </p>
         </div>
@@ -84,7 +86,7 @@ function CashierPicker(props: { cashiers: readonly Cashier[]; onPick: (userId: n
         <h1 id="login-title" className="text-2xl font-semibold tracking-tight">
           {t('posKiosk.login.title')}
         </h1>
-        <p className="text-[13px] text-muted-foreground">{t('posKiosk.login.hint')}</p>
+        <p className="text-[0.8125rem] text-muted-foreground">{t('posKiosk.login.hint')}</p>
       </div>
       {props.cashiers.length === 0 ? (
         <KioskAlert tone="info">{t('posKiosk.login.noCashiers')}</KioskAlert>
@@ -194,7 +196,7 @@ function PinEntry(props: {
         <h1 id="pin-title" className="text-xl font-semibold tracking-tight">
           {cashier.fullName}
         </h1>
-        <p className="text-[13px] text-muted-foreground">{t('posKiosk.login.pinHint')}</p>
+        <p className="text-[0.8125rem] text-muted-foreground">{t('posKiosk.login.pinHint')}</p>
       </div>
       <div
         role="img"
@@ -226,7 +228,7 @@ function PinEntry(props: {
           label={t('posKiosk.login.clear')}
           onPress={() => update('')}
           disabled={login.isPending}
-          className="text-[15px]"
+          className="text-[0.9375rem]"
         >
           {t('posKiosk.login.clearShort')}
         </PadButton>

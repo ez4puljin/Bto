@@ -82,7 +82,7 @@ function Figures({ summary }: { summary: EdgeDaySummary }) {
   const { t } = useTranslation();
   return (
     <section aria-label={t('posKiosk.daySummary.figures')} className="space-y-3">
-      <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-[15px]">
+      <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-[0.9375rem]">
         <dt className="text-muted-foreground">{t('posKiosk.daySummary.till')}</dt>
         <dd className="text-right font-semibold">{summary.tillName}</dd>
         <dt className="text-muted-foreground">{t('posKiosk.daySummary.date')}</dt>
@@ -101,7 +101,7 @@ function Figures({ summary }: { summary: EdgeDaySummary }) {
           })}
         </dd>
       </dl>
-      <table className="w-full text-[15px]">
+      <table className="w-full text-[0.9375rem]">
         <caption className="sr-only">{t('posKiosk.daySummary.payments')}</caption>
         <tbody className="divide-y divide-border rounded-xl ring-1 ring-border">
           {summary.payments.length === 0 ? (
@@ -124,7 +124,7 @@ function Figures({ summary }: { summary: EdgeDaySummary }) {
           )}
         </tbody>
       </table>
-      <div className="flex items-center justify-between rounded-xl bg-muted px-4 py-3 text-[15px]">
+      <div className="flex items-center justify-between rounded-xl bg-muted px-4 py-3 text-[0.9375rem]">
         <span className="font-medium">{t('posKiosk.daySummary.expectedCash')}</span>
         <span data-testid="day-expected" className="font-mono text-lg font-semibold">
           {formatTugrik(summary.expectedCash)}
@@ -180,13 +180,13 @@ function CountForm({ summary }: { summary: EdgeDaySummary }) {
 
   return (
     <section aria-label={t('posKiosk.daySummary.countTitle')} className="space-y-3">
-      <h3 className="text-[15px] font-semibold">{t('posKiosk.daySummary.countTitle')}</h3>
+      <h3 className="text-[0.9375rem] font-semibold">{t('posKiosk.daySummary.countTitle')}</h3>
       <div className="grid grid-cols-2 gap-x-6 gap-y-2">
         {DENOMINATIONS.map((note) => {
           const value = counts[note] ?? '';
           return (
             <label key={note} className="flex items-center gap-3">
-              <span className="w-20 shrink-0 text-right font-mono text-[15px]">
+              <span className="w-20 shrink-0 text-right font-mono text-[0.9375rem]">
                 {formatCount(note)}
               </span>
               <Input
@@ -205,7 +205,7 @@ function CountForm({ summary }: { summary: EdgeDaySummary }) {
           );
         })}
       </div>
-      <dl className="space-y-1 border-t border-border pt-3 text-[15px]">
+      <dl className="space-y-1 border-t border-border pt-3 text-[0.9375rem]">
         <div className="flex justify-between">
           <dt className="font-medium">{t('posKiosk.daySummary.handedOver')}</dt>
           <dd data-testid="day-counted" className="font-mono text-lg font-semibold">

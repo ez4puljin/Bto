@@ -134,7 +134,7 @@ function DocumentSheet({ detail, number }: { detail: ReceiptDetail; number: stri
           ],
         ]}
       />
-      <table className="w-full border-collapse text-[12px]">
+      <table className="w-full border-collapse text-[0.75rem]">
         <thead>
           <tr className="text-left">
             <th className={cell}>{t('inventory.receipt.form.lineNo')}</th>
@@ -271,7 +271,7 @@ function WarehouseSheets({ detail, number }: { detail: ReceiptDetail; number: st
               title={t('inventory.receipt.print.warehouseTitle')}
               extra={[[t('inventory.receipt.print.warehouseName'), warehouse.name]]}
             />
-            <table className="w-full border-collapse text-[12px]">
+            <table className="w-full border-collapse text-[0.75rem]">
               <thead>
                 <tr className="text-left">
                   <th className={cell}>{t('inventory.receipt.form.lineNo')}</th>

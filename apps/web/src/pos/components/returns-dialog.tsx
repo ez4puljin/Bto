@@ -219,7 +219,7 @@ function ReturnsPanel(props: {
               return (
                 <li key={line.lineNo} className="flex items-center gap-3 px-4 py-3">
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-medium">{line.name}</span>
+                    <span className="block truncate text-[0.9375rem] font-medium">{line.name}</span>
                     <span className="block truncate text-xs text-muted-foreground">
                       {t('posKiosk.returns.sold', {
                         qty: formatQty(line.qty),
@@ -255,7 +255,7 @@ function ReturnsPanel(props: {
               );
             })}
           </ul>
-          <p className="flex items-baseline justify-between text-[15px]">
+          <p className="flex items-baseline justify-between text-[0.9375rem]">
             <span className="text-muted-foreground">{t('posKiosk.returns.total')}</span>
             <span data-testid="return-total" className="font-mono text-2xl font-semibold">
               {formatTugrik(total.toFixed(2))}

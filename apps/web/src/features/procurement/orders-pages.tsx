@@ -388,7 +388,7 @@ function SupplierSheet(props: {
           ))}
         </ol>
       ) : sheet.lines.length > 0 ? (
-        <table className="w-full border-collapse text-[12px]">
+        <table className="w-full border-collapse text-[0.75rem]">
           <thead>
             <tr className="text-left">
               <th className={cell}>{t('procurement.print.lineNo')}</th>

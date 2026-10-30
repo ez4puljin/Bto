@@ -184,7 +184,7 @@ function UsedList({ batch, narrow }: { batch: VoucherBatchDetail; narrow: boolea
       {uses.length === 0 ? (
         <p>{t('pos.vouchers.print.usedEmpty')}</p>
       ) : (
-        <table className={cn('w-full', narrow ? 'text-[11px]' : '')}>
+        <table className={cn('w-full', narrow ? 'text-[0.6875rem]' : '')}>
           <thead>
             <tr className="border-b border-foreground text-left">
               <th className="py-1 pr-2">{t('pos.vouchers.fields.code')}</th>

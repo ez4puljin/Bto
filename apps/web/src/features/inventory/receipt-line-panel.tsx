@@ -393,7 +393,7 @@ export function ReceiptLinePanel(props: {
             <div
               role="radiogroup"
               aria-label={t('inventory.receipt.panel.scope')}
-              className="inline-flex w-fit rounded-full border border-border p-0.5 text-[13px]"
+              className="inline-flex w-fit rounded-full border border-border p-0.5 text-[0.8125rem]"
             >
               {(['supplier', 'all'] as const).map((value) => (
                 <button
@@ -425,7 +425,7 @@ export function ReceiptLinePanel(props: {
               `${ids}-product`,
               product ? (
                 <div className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-input bg-muted/40 px-3 text-sm">
-                  <span className="shrink-0 font-mono text-[13px] text-muted-foreground">
+                  <span className="shrink-0 font-mono text-[0.8125rem] text-muted-foreground">
                     {product.sku}
                   </span>
                   <span className="min-w-0 flex-1 truncate" title={product.name}>
@@ -539,11 +539,11 @@ export function ReceiptLinePanel(props: {
                                 chooseProduct(match);
                               }}
                             >
-                              <span className="shrink-0 font-mono text-[13px] text-muted-foreground">
+                              <span className="shrink-0 font-mono text-[0.8125rem] text-muted-foreground">
                                 {match.sku}
                               </span>
                               <span className="min-w-0 flex-1 truncate">{match.name}</span>
-                              <span className="shrink-0 text-[13px] text-muted-foreground">
+                              <span className="shrink-0 text-[0.8125rem] text-muted-foreground">
                                 {match.units.map((candidate) => candidate.uomName).join(' / ')}
                                 {match.weightKg
                                   ? ` · ${t('inventory.receipt.form.weight', { kg: formatQty(match.weightKg) })}`
@@ -725,7 +725,7 @@ export function ReceiptLinePanel(props: {
         {product ? (
           <dl
             aria-label={t('inventory.receipt.panel.infoLabel')}
-            className="flex flex-wrap gap-x-6 gap-y-1 rounded-lg bg-muted/50 px-3 py-2 text-[13px]"
+            className="flex flex-wrap gap-x-6 gap-y-1 rounded-lg bg-muted/50 px-3 py-2 text-[0.8125rem]"
           >
             <Info label={t('inventory.receipt.panel.home')}>
               {home === undefined

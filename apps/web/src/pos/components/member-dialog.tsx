@@ -89,7 +89,7 @@ function MemberPanel(props: {
       {found ? (
         <section
           aria-label={t('posKiosk.loyalty.found')}
-          className="space-y-1 rounded-xl bg-canvas p-4 text-[15px]"
+          className="space-y-1 rounded-xl bg-canvas p-4 text-[0.9375rem]"
         >
           <p className="text-lg font-semibold">{found.name}</p>
           <p className="font-mono text-muted-foreground">{found.phone}</p>

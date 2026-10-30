@@ -230,7 +230,7 @@ export function SupplierGroup(props: SupplierGroupProps) {
             <span className="font-semibold">{name}</span>
             <PoStatusBadge status={supplier.status} />
             {!open ? (
-              <span className="text-[13px] text-muted-foreground">
+              <span className="text-[0.8125rem] text-muted-foreground">
                 {supplier.lineCount > 0
                   ? t('procurement.detail.lineCount', { count: formatCount(supplier.lineCount) })
                   : t('procurement.detail.noLines')}
@@ -265,24 +265,24 @@ export function SupplierGroup(props: SupplierGroupProps) {
               </Button>
             ) : null}
             {notOrdered !== null && notOrdered > 0 ? (
-              <span className="text-[13px] text-muted-foreground">
+              <span className="text-[0.8125rem] text-muted-foreground">
                 {t('procurement.detail.notOrdered', { count: formatCount(notOrdered) })}
               </span>
             ) : null}
-            <span className="font-mono text-[13px] text-muted-foreground">
+            <span className="font-mono text-[0.8125rem] text-muted-foreground">
               {t('procurement.detail.piecesKg', {
                 pieces: formatQty(supplier.qtyBase),
                 kg: formatQty(new Decimal(supplier.weightKg).toDecimalPlaces(1).toString()),
               })}
             </span>
-            <span className="text-[13px] text-muted-foreground">
+            <span className="text-[0.8125rem] text-muted-foreground">
               {t('procurement.supplier.orderer')}:{' '}
               {supplier.ordererName ?? t('procurement.supplier.noOrderer')}
             </span>
             {supplier.receiptId !== null ? (
               <Link
                 to={`/inventory/receipts/${supplier.receiptId}`}
-                className="font-mono text-[13px] text-link underline-offset-4 hover:underline"
+                className="font-mono text-[0.8125rem] text-link underline-offset-4 hover:underline"
               >
                 {supplier.receiptNumber ??
                   t('procurement.supplier.receiptDraft', { id: supplier.receiptId })}
@@ -301,7 +301,7 @@ export function SupplierGroup(props: SupplierGroupProps) {
               </Button>
             ) : null}
             {supplier.canPrice && first?.rights.price ? (
-              <label className="ml-auto flex items-center gap-1.5 text-[13px]">
+              <label className="ml-auto flex items-center gap-1.5 text-[0.8125rem]">
                 <span>{t('procurement.detail.noteAmount')}</span>
                 <Input
                   inputMode="decimal"
@@ -357,7 +357,7 @@ export function SupplierGroup(props: SupplierGroupProps) {
       ) : null}
       {!open ? null : (
         <TableRow className="bg-muted/30 hover:bg-muted/30">
-          <TableCell {...span} className="h-9 text-[13px]">
+          <TableCell {...span} className="h-9 text-[0.8125rem]">
             <div className="flex flex-wrap gap-x-5 gap-y-1 font-mono">
               <span>
                 {t('procurement.detail.piecesKg', {
@@ -653,7 +653,7 @@ function ProductRow(
                   onChange={(event) => props.onEdit({ ...arrival, note: event.target.value })}
                 />
               ) : (
-                <span className="text-[13px]">{row.receipt?.note}</span>
+                <span className="text-[0.8125rem]">{row.receipt?.note}</span>
               )
             ) : null}
           </TableCell>

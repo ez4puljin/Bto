@@ -401,7 +401,7 @@ function ReceiveRow(props: {
       <TableCell className="text-right font-mono text-muted-foreground">
         {props.index + 1}
       </TableCell>
-      <TableCell className="font-mono text-[13px]">{line.productSku}</TableCell>
+      <TableCell className="font-mono text-[0.8125rem]">{line.productSku}</TableCell>
       <TableCell className="min-w-40 whitespace-normal">{line.productName}</TableCell>
       <TableCell>{line.warehouseName}</TableCell>
       <TableCell>{line.unitName}</TableCell>

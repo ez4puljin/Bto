@@ -156,7 +156,9 @@ export function ProductSearch({
             aria-controls={shown ? listId : undefined}
             aria-activedescendant={shown && rows.length > 0 ? optionId(index) : undefined}
             placeholder={t('inventory.productSearchPlaceholder')}
-            className={variant === 'filter' ? 'h-8 rounded-full pl-3 md:text-[13px]' : undefined}
+            className={
+              variant === 'filter' ? 'h-8 rounded-full pl-3 md:text-[0.8125rem]' : undefined
+            }
             value={search}
             onFocus={() => setOpen(true)}
             onChange={(event) => {
@@ -217,11 +219,11 @@ export function ProductSearch({
                     onMouseEnter={() => setHighlight({ q, index: position })}
                     onClick={() => pick(product)}
                   >
-                    <span className="shrink-0 font-mono text-[13px] text-muted-foreground">
+                    <span className="shrink-0 font-mono text-[0.8125rem] text-muted-foreground">
                       {product.sku}
                     </span>
                     <span className="min-w-0 flex-1 truncate">{product.name}</span>
-                    <span className="shrink-0 text-[13px] font-medium text-link">{label}</span>
+                    <span className="shrink-0 text-[0.8125rem] font-medium text-link">{label}</span>
                   </button>
                 </li>
               ))}

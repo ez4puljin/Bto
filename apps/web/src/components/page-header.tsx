@@ -77,12 +77,12 @@ export function PageHeader({
       {shown.length > 0 ? (
         linked ? (
           <nav aria-label={t('shell.breadcrumb')} className="mb-1 print:hidden">
-            <ol className="flex flex-wrap items-center gap-1 text-[13px] text-muted-foreground">
+            <ol className="flex flex-wrap items-center gap-1 text-[0.8125rem] text-muted-foreground">
               {items}
             </ol>
           </nav>
         ) : (
-          <ol className="mb-1 flex flex-wrap items-center gap-1 text-[13px] text-muted-foreground print:hidden">
+          <ol className="mb-1 flex flex-wrap items-center gap-1 text-[0.8125rem] text-muted-foreground print:hidden">
             {items}
           </ol>
         )
@@ -92,18 +92,18 @@ export function PageHeader({
           {media ? <div className="shrink-0">{media}</div> : null}
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <h1 className="text-[26px] leading-tight font-semibold tracking-tight text-balance">
+              <h1 className="text-[1.75rem] leading-tight font-semibold tracking-tight text-balance">
                 {title}
               </h1>
               {trail?.exact ? <FavoriteToggle path={trail.item.to} /> : null}
             </div>
             {meta ? (
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-[0.8125rem] text-muted-foreground">
                 {meta}
               </div>
             ) : null}
             {description ? (
-              <p className="mt-1 max-w-3xl text-[13px] text-muted-foreground">{description}</p>
+              <p className="mt-1 max-w-3xl text-[0.8125rem] text-muted-foreground">{description}</p>
             ) : null}
           </div>
         </div>

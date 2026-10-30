@@ -59,7 +59,7 @@ export function PickForm({ order }: { order: SalesOrder }) {
   return (
     <section className="rounded-xl border border-border p-3">
       <h3 className="text-sm font-semibold">{t('sales.pick.title')}</h3>
-      <p className="mt-0.5 mb-2 text-[13px] text-muted-foreground">{t('sales.pick.hint')}</p>
+      <p className="mt-0.5 mb-2 text-[0.8125rem] text-muted-foreground">{t('sales.pick.hint')}</p>
       <Table>
         <TableHeader>
           <TableRow>
@@ -128,7 +128,7 @@ export function PickForm({ order }: { order: SalesOrder }) {
       <ProblemAlert problem={action.problem} />
       <div className="mt-3 flex flex-wrap items-center justify-end gap-3">
         {info.data && missing > 0 ? (
-          <p className="mr-auto text-[13px] text-warning">
+          <p className="mr-auto text-[0.8125rem] text-warning">
             {t('sales.pick.missingBins', { count: missing })}
           </p>
         ) : null}

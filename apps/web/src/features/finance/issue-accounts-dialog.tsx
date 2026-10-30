@@ -87,7 +87,7 @@ export function IssueAccountsDialog({
                 </TableCell>
                 <TableCell>
                   {row.seeded || !canSet ? (
-                    <span className="text-[13px]">
+                    <span className="text-[0.8125rem]">
                       {row.accountCode ? `${row.accountCode} · ${row.accountName ?? ''}` : ''}
                       {row.seeded ? (
                         <Badge variant="outline" className="ml-2">

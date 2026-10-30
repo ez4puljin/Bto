@@ -605,7 +605,7 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
           checked={filter === 'ORDERED'}
           onCheckedChange={(checked) => setParam('filter', checked ? 'ORDERED' : 'ALL')}
         />
-        <span className="text-[13px] text-muted-foreground" aria-live="polite">
+        <span className="text-[0.8125rem] text-muted-foreground" aria-live="polite">
           {productCount === undefined
             ? t('procurement.detail.supplierCount', { count: formatCount(suppliers.length) })
             : t('procurement.detail.matchCount', {
@@ -615,7 +615,7 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
         </span>
       </FilterBar>
       {invalid > 0 ? (
-        <p role="alert" className="mb-3 text-[13px] text-destructive">
+        <p role="alert" className="mb-3 text-[0.8125rem] text-destructive">
           {t('procurement.grid.invalid', { count: invalid })}
         </p>
       ) : null}

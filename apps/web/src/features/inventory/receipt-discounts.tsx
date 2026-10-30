@@ -214,7 +214,7 @@ export function ReceiptDiscountsCard(props: {
             </div>
             {adding === 'LINES' ? (
               <fieldset className="flex flex-col gap-1.5">
-                <legend className="mb-1 text-[13px] text-muted-foreground">
+                <legend className="mb-1 text-[0.8125rem] text-muted-foreground">
                   {text('chooseLines')}
                 </legend>
                 {priced.map((line) => {
@@ -272,7 +272,7 @@ export function ReceiptDiscountsCard(props: {
               <TableBody>
                 {freeLines.map((line) => (
                   <TableRow key={line.id}>
-                    <TableCell className="font-mono text-[13px]">{line.productSku}</TableCell>
+                    <TableCell className="font-mono text-[0.8125rem]">{line.productSku}</TableCell>
                     <TableCell className="whitespace-normal">{line.productName}</TableCell>
                     <TableCell>{line.warehouseName}</TableCell>
                     <TableCell>{line.unitName}</TableCell>

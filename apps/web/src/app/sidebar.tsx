@@ -71,7 +71,7 @@ export function Sidebar(props: {
       )}
     >
       <div className="flex h-14 shrink-0 items-center gap-2 px-4">
-        <span className="flex min-w-0 items-center gap-2 text-[17px] font-semibold tracking-tight">
+        <span className="flex min-w-0 items-center gap-2 text-[1.0625rem] font-semibold tracking-tight">
           <span
             aria-hidden
             className="grid size-7 shrink-0 place-items-center rounded-lg bg-primary text-sm font-bold text-primary-foreground"

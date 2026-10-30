@@ -220,7 +220,7 @@ export function HorizontalBars(props: {
       height={height}
       label={props.label}
       list={
-        <ul className="sr-only has-[a:focus-visible]:not-sr-only has-[a:focus-visible]:mt-2 has-[a:focus-visible]:flex has-[a:focus-visible]:flex-col has-[a:focus-visible]:gap-1 has-[a:focus-visible]:text-[13px]">
+        <ul className="sr-only has-[a:focus-visible]:not-sr-only has-[a:focus-visible]:mt-2 has-[a:focus-visible]:flex has-[a:focus-visible]:flex-col has-[a:focus-visible]:gap-1 has-[a:focus-visible]:text-[0.8125rem]">
           {props.items.map((item) => {
             const text = [item.label, formatTugrik(item.value), item.extra]
               .filter(Boolean)

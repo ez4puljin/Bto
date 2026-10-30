@@ -82,7 +82,9 @@ export function SupplierPicker(props: {
         id={props.id}
         type="search"
         autoComplete="off"
-        className={props.variant === 'filter' ? 'h-8 rounded-full pl-3 md:text-[13px]' : undefined}
+        className={
+          props.variant === 'filter' ? 'h-8 rounded-full pl-3 md:text-[0.8125rem]' : undefined
+        }
         placeholder={t('partners.supplierPicker.search')}
         aria-invalid={props.invalid ? true : undefined}
         aria-describedby={props.describedBy}

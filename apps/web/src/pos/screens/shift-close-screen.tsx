@@ -30,13 +30,15 @@ import { kioskKeys, useParked } from '../queries';
 function Figure(props: { label: string; value: ReactNode; strong?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-2">
-      <dt className={cn('text-[15px]', props.strong ? 'font-semibold' : 'text-muted-foreground')}>
+      <dt
+        className={cn('text-[0.9375rem]', props.strong ? 'font-semibold' : 'text-muted-foreground')}
+      >
         {props.label}
       </dt>
       <dd
         className={cn(
           'text-right font-mono',
-          props.strong ? 'text-xl font-semibold' : 'text-[15px] font-medium',
+          props.strong ? 'text-xl font-semibold' : 'text-[0.9375rem] font-medium',
         )}
       >
         {props.value}
@@ -67,7 +69,7 @@ function VarianceTile({ variance }: { variance: Decimal | null }) {
       role="status"
       className={cn('flex items-baseline justify-between rounded-xl px-4 py-3', tone)}
     >
-      <span className="text-[15px] font-medium">{t('pos.fields.variance')}</span>
+      <span className="text-[0.9375rem] font-medium">{t('pos.fields.variance')}</span>
       <span className="font-mono text-2xl font-semibold tracking-tight">{text}</span>
     </div>
   );
@@ -139,7 +141,7 @@ export function ShiftCloseScreen(props: {
             <h1 className="text-2xl font-semibold tracking-tight">
               {t('posKiosk.shiftClose.title')}
             </h1>
-            <p className="text-[13px] text-muted-foreground">
+            <p className="text-[0.8125rem] text-muted-foreground">
               {t('posKiosk.shiftClose.description', { number: shift.number })}
             </p>
           </div>
@@ -158,7 +160,7 @@ export function ShiftCloseScreen(props: {
               aria-labelledby="close-expected"
               className="rounded-xl bg-card p-5 shadow-card ring-1 ring-black/[0.06]"
             >
-              <h2 id="close-expected" className="mb-2 text-[15px] font-semibold">
+              <h2 id="close-expected" className="mb-2 text-[0.9375rem] font-semibold">
                 {t('posKiosk.shiftClose.expected')}
               </h2>
               <dl className="divide-y divide-border">
@@ -195,11 +197,11 @@ export function ShiftCloseScreen(props: {
               onSubmit={submit}
               noValidate
             >
-              <h2 id="close-count" className="text-[15px] font-semibold">
+              <h2 id="close-count" className="text-[0.9375rem] font-semibold">
                 {t('posKiosk.shiftClose.count')}
               </h2>
               <div className="space-y-1.5">
-                <Label htmlFor="close-counted" className="text-[15px]">
+                <Label htmlFor="close-counted" className="text-[0.9375rem]">
                   {t('pos.fields.countedCash')}
                 </Label>
                 <Input
@@ -223,7 +225,7 @@ export function ShiftCloseScreen(props: {
                 ) : null}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="close-float" className="text-[15px]">
+                <Label htmlFor="close-float" className="text-[0.9375rem]">
                   {t('pos.fields.floatKept')}
                 </Label>
                 <Input
@@ -246,7 +248,7 @@ export function ShiftCloseScreen(props: {
                 ) : null}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="close-note" className="text-[15px]">
+                <Label htmlFor="close-note" className="text-[0.9375rem]">
                   {t('pos.fields.note')}
                 </Label>
                 <Textarea
@@ -317,7 +319,7 @@ export function ShiftSummaryScreen(props: {
             <h1 id="z-title" className="text-2xl font-semibold tracking-tight">
               {t('posKiosk.z.title')}
             </h1>
-            <p className="text-[13px] text-muted-foreground">
+            <p className="text-[0.8125rem] text-muted-foreground">
               {t('posKiosk.z.description', { number: summary.number })}
             </p>
           </div>

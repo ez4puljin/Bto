@@ -81,7 +81,7 @@ export function OrderActivity({ order, limit }: { order: SalesOrder; limit?: num
                 <span className="font-medium">{actor}</span> {entry.text}
               </p>
               {entry.detail ? (
-                <p className="text-[13px] text-muted-foreground">{entry.detail}</p>
+                <p className="text-[0.8125rem] text-muted-foreground">{entry.detail}</p>
               ) : null}
             </div>
             <time

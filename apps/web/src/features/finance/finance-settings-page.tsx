@@ -283,7 +283,7 @@ function NumberingForm({
                 }
               />
               {/* A visible label; the name keeps the row's so the four fields stay apart. */}
-              <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
+              <label className="flex items-center gap-2 text-[0.8125rem] text-muted-foreground">
                 {t('finance.settings.digits')}
                 <Input
                   aria-label={`${t('finance.settings.digits')}: ${t(`finance.settings.${PATTERN_KEYS[kind]}`)}`}

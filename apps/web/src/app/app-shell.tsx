@@ -7,6 +7,7 @@ import { PAGE_WIDTHS, type PageWidth, widthOf } from '@/app/page-width';
 import { Sidebar } from '@/app/sidebar';
 import { TopBar } from '@/app/top-bar';
 import { rememberRecentPage } from '@/lib/recent-pages';
+import { cn } from '@/lib/utils';
 
 /**
  * The frame of every signed-in page (ADR-0042, ADR-0114): the top bar with the modules, the page
@@ -87,7 +88,12 @@ export function AppShell() {
         inert={menuOpen ? true : undefined}
         className="min-w-0 flex-1 px-4 pt-5 pb-10 md:px-8 print:p-0"
       >
-        <div data-width={width} className={PAGE_WIDTHS[width]}>
+        {/* A new path rises in (`page-enter`); a changed query (a dialog, a filter) keeps the page. */}
+        <div
+          key={location.pathname}
+          data-width={width}
+          className={cn(PAGE_WIDTHS[width], 'page-enter motion-reduce:animate-none')}
+        >
           <Outlet />
         </div>
       </main>

@@ -231,7 +231,7 @@ function Tile(props: {
   const { t } = useTranslation();
   const body = (
     <>
-      <span className="flex items-start gap-1.5 text-[13px] leading-snug text-muted-foreground">
+      <span className="flex items-start gap-1.5 text-[0.8125rem] leading-snug text-muted-foreground">
         {props.tone === 'good' ? (
           <CircleCheck aria-hidden className="mt-px size-3.5 shrink-0 text-success" />
         ) : null}

@@ -770,7 +770,7 @@ function TransferDraftEditor(props: {
                 <>
                   {message ? <span className="text-destructive">{message}</span> : null}
                   {qty.value !== '1' ? (
-                    <span className="text-[13px] text-muted-foreground">
+                    <span className="text-[0.8125rem] text-muted-foreground">
                       {t('inventory.scanQtyHint')}
                     </span>
                   ) : null}

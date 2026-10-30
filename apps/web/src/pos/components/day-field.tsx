@@ -6,7 +6,7 @@ export function DayField(props: { value: string; onChange: (day: string) => void
   const { t } = useTranslation();
   const today = todayInUb();
   return (
-    <label className="inline-flex h-12 shrink-0 items-center gap-2 rounded-lg border border-input bg-background pl-3 text-[15px] shadow-control focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
+    <label className="inline-flex h-12 shrink-0 items-center gap-2 rounded-lg border border-input bg-background pl-3 text-[0.9375rem] shadow-control focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
       <span className="text-muted-foreground">{t('posKiosk.history.day')}</span>
       <input
         type="date"

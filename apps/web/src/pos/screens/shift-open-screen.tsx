@@ -61,12 +61,12 @@ export function ShiftOpenScreen(props: { session: EdgeSession; onSignOut: () => 
             <h1 className="text-2xl font-semibold tracking-tight">
               {t('posKiosk.shiftOpen.title')}
             </h1>
-            <p className="text-[13px] text-muted-foreground">
+            <p className="text-[0.8125rem] text-muted-foreground">
               {t('posKiosk.shiftOpen.hint', { date: props.session.businessDate })}
             </p>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="shift-float" className="text-[15px]">
+            <Label htmlFor="shift-float" className="text-[0.9375rem]">
               {t('pos.fields.openingFloat')}
             </Label>
             <Input

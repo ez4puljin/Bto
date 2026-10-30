@@ -379,7 +379,7 @@ function AppCard({ segment }: { segment: Segment }) {
             ) : null}
           </div>
         ) : null}
-        <p className="text-[13px] text-muted-foreground">{t('segments.app.orderHint')}</p>
+        <p className="text-[0.8125rem] text-muted-foreground">{t('segments.app.orderHint')}</p>
       </CardContent>
     </Card>
   );
@@ -551,7 +551,7 @@ function SegmentForm(props: {
                 description={t('segments.conditionsHint')}
                 // The live count (or what the rules miss) beside the conditions' title.
                 action={
-                  <p role="status" className="max-w-[55%] text-right text-[13px] tabular-nums">
+                  <p role="status" className="max-w-[55%] text-right text-[0.8125rem] tabular-nums">
                     {issueShown ? (
                       <span className="text-destructive">
                         {t(`segments.issues.${issueShown.issue}`)}

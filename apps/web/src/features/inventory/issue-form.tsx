@@ -173,7 +173,7 @@ function ReadOnlyHeader({ detail }: { detail: IssueDetail }) {
       account ? (
         <>
           {detail.expenseTypeName}{' '}
-          <span className="font-mono text-[13px] text-muted-foreground">{account}</span>
+          <span className="font-mono text-[0.8125rem] text-muted-foreground">{account}</span>
         </>
       ) : (
         detail.expenseTypeName
@@ -190,7 +190,7 @@ function ReadOnlyHeader({ detail }: { detail: IssueDetail }) {
       <dl className={HEADER_GRID}>
         {items.map(([label, value]) => (
           <div key={label} className="flex min-w-0 flex-col gap-0.5">
-            <dt className="text-[13px] text-muted-foreground">{label}</dt>
+            <dt className="text-[0.8125rem] text-muted-foreground">{label}</dt>
             <dd className="text-sm break-words">{value}</dd>
           </div>
         ))}
@@ -923,7 +923,7 @@ function DraftEditor(props: {
           {detail?.correctsIssueId !== null && detail?.correctsIssueId !== undefined ? (
             <>
               <CorrectionLinks detail={detail} />
-              <p className="text-[13px] text-muted-foreground">
+              <p className="text-[0.8125rem] text-muted-foreground">
                 {t('inventory.issues.correctionHint')}
               </p>
             </>
@@ -980,7 +980,7 @@ function DraftEditor(props: {
                   </span>
                 ) : null}
                 {qty.value !== '1' ? (
-                  <span className="text-[13px] text-muted-foreground">
+                  <span className="text-[0.8125rem] text-muted-foreground">
                     {t('inventory.scanQtyHint')}
                   </span>
                 ) : null}
