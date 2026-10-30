@@ -1,9 +1,11 @@
 import { Decimal } from '@tugeel/shared/money';
+import { nextPoStatus, previousPoStatus } from '@tugeel/shared/procurement';
 import { ChevronDown, History, RefreshCw, Table2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EmptyState, FilterToggle, LoadMore } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
@@ -20,7 +22,9 @@ import {
 } from '@/components/ui/table';
 import { formatCount, formatQty, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
+import { randomUuid } from '@/lib/uuid';
 import { cn } from '@/lib/utils';
 import {
   PO_STATUSES,
@@ -30,6 +34,7 @@ import {
   type PurchaseOrderSupplier,
   useOrdererCandidates,
   usePurchaseOrder,
+  usePurchaseOrderMutations,
   usePurchaseOrderRows,
   useSetSupplierOrderer,
 } from './api';
@@ -98,6 +103,36 @@ function Overview({ detail, onRefresh }: { detail: PurchaseOrderDetail; onRefres
   const canPrices = useHasPermission('procurement.prices.read');
   const [status, setStatus] = useState<PoStatus | null>(null);
   const base = `/procurement/orders/${detail.id}`;
+
+  // A supplier's status moves from its card; «Ирсэн» asks first (it makes the draft receipt).
+  const mutations = usePurchaseOrderMutations();
+  const moveAction = useAction();
+  const confirmAction = useAction();
+  const [arriving, setArriving] = useState<PurchaseOrderSupplier | null>(null);
+  const move = async (supplier: PurchaseOrderSupplier, to: PoStatus) => {
+    await mutations.move.mutateAsync({
+      key: randomUuid(),
+      id: detail.id,
+      supplierId: supplier.supplierId,
+      to,
+    });
+    toast.success(
+      t('procurement.supplier.moved', {
+        name: supplier.supplierName,
+        status: t(`procurement.status.${to}`),
+      }),
+    );
+  };
+  const step = (supplier: PurchaseOrderSupplier, by: 1 | -1) => {
+    const to = by === 1 ? nextPoStatus(supplier.status) : previousPoStatus(supplier.status);
+    if (!to) return;
+    if (to === 'ARRIVED' && by === 1) {
+      confirmAction.clear();
+      setArriving(supplier);
+      return;
+    }
+    void moveAction.run(() => move(supplier, to));
+  };
 
   const counts = PO_STATUSES.map((value) => ({
     status: value,
@@ -205,6 +240,7 @@ function Overview({ detail, onRefresh }: { detail: PurchaseOrderDetail; onRefres
         ))}
       </div>
 
+      <ProblemAlert problem={moveAction.problem} />
       {ordered.length === 0 ? (
         <EmptyState title={t('procurement.overview.empty')} />
       ) : (
@@ -219,10 +255,28 @@ function Overview({ detail, onRefresh }: { detail: PurchaseOrderDetail; onRefres
               suppliers={suppliers}
               canPrices={canPrices}
               open={ordered.length <= 3}
+              onStep={step}
             />
           ))}
         </div>
       )}
+      <ConfirmDialog
+        open={arriving !== null}
+        variant="default"
+        title={t('procurement.supplier.arriveTitle', { name: arriving?.supplierName ?? '' })}
+        description={t('procurement.supplier.arriveDescription')}
+        confirmLabel={t('procurement.supplier.arriveConfirm')}
+        pending={mutations.move.isPending}
+        problem={confirmAction.problem}
+        onConfirm={() => {
+          const supplier = arriving;
+          if (!supplier) return;
+          void confirmAction
+            .run(() => move(supplier, 'ARRIVED'))
+            .then((done) => done && setArriving(null));
+        }}
+        onClose={() => setArriving(null)}
+      />
     </>
   );
 }
@@ -248,6 +302,7 @@ function OrdererGroup(props: {
   suppliers: readonly PurchaseOrderSupplier[];
   canPrices: boolean;
   open: boolean;
+  onStep: (supplier: PurchaseOrderSupplier, by: 1 | -1) => void;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(props.open);
@@ -312,6 +367,7 @@ function OrdererGroup(props: {
               orderId={props.orderId}
               supplier={supplier}
               canPrices={props.canPrices}
+              onStep={props.onStep}
             />
           ))}
         </div>
@@ -326,12 +382,15 @@ function SupplierCard(props: {
   orderId: number;
   supplier: PurchaseOrderSupplier;
   canPrices: boolean;
+  onStep: (supplier: PurchaseOrderSupplier, by: 1 | -1) => void;
 }) {
   const { t } = useTranslation();
   const canManage = useHasPermission('procurement.orders.manage');
   const [open, setOpen] = useState(false);
   const { supplier } = props;
   const to = `${props.base}/detail?supplier=${supplier.supplierId}`;
+  const next = nextPoStatus(supplier.status);
+  const previous = previousPoStatus(supplier.status);
   const ordered = new Decimal(supplier.qtyBase);
   const percent = ordered.isZero()
     ? '0'
@@ -371,6 +430,26 @@ function SupplierCard(props: {
           <span className="font-mono text-[12px] text-muted-foreground">{percent}%</span>
         </span>
         <span className="flex items-center gap-1">
+          {supplier.canMoveBack && previous ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={t('procurement.supplier.backNamed', { name: supplier.supplierName })}
+              onClick={() => props.onStep(supplier, -1)}
+            >
+              {t('procurement.supplier.backTo', { status: t(`procurement.status.${previous}`) })}
+            </Button>
+          ) : null}
+          {supplier.canMoveNext && next ? (
+            <Button
+              variant="outline"
+              size="sm"
+              aria-label={t('procurement.supplier.nextNamed', { name: supplier.supplierName })}
+              onClick={() => props.onStep(supplier, 1)}
+            >
+              {t('procurement.supplier.nextTo', { status: t(`procurement.status.${next}`) })}
+            </Button>
+          ) : null}
           {supplier.lineCount > 0 ? (
             <Button
               variant="ghost"
