@@ -12,6 +12,8 @@ Repo `tugeel`, packages `@tugeel/*`. On screen the system is called **Bto** (Б�
 
 Pace since 2026-10-29 (ADR-0120): build fast, the owner tests by hand on the development server, fix from what is seen; automated tests stay where stock, money or rights move.
 
+Direct mode since 2026-10-30 (owner): one chat works in the main checkout on `main` with `pnpm dev` running; the owner says the change, Claude edits at once and names the page to refresh, the owner checks in the browser; on the owner's «Болсон» run `pnpm typecheck && pnpm lint`, commit and push to `main` (CI runs the full check afterwards). Light changes need no branch, pull request, interview or ADR; a guarded change adds its integration suite before the push and migrates bto_main at once. A request that contradicts an Accepted ADR or the books is questioned before it is built.
+
 1. Read `docs/STATUS.md` (current state, the "Next session" prompt) and the brief you were given. For a **guarded** change (stock, money, identity, migrations — ADR-0120 #1) also read `docs/architecture.md` §4, §12 and the module's §5 subsection, `docs/modules/<module>.md` and the ADRs the brief names; never re-argue an Accepted ADR, write a superseding one instead. A **light** change (screens, menus, lists, prints, texts) reads `docs/ui.md` and the screen's code.
 2. One slice or screen per session, in its own worktree; start an implementation session in plan mode when the change is guarded or the brief leaves a design choice open.
 3. On a `TODO-VERIFY` item: stop and ask the owner; never resolve a business unknown by guessing. Interview rounds are for new modules; an existing screen is changed from what the owner says after trying it.
