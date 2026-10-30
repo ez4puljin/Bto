@@ -35,13 +35,24 @@ import {
 } from './pipelines-api';
 
 /** A board: its name and, if any, the branch it is for (ADR-0057 #1). */
-export function BoardDialog({ board, onClose }: { board: SalesBoard | null; onClose: () => void }) {
+export function BoardDialog({
+  board,
+  presetBranchId,
+  onClose,
+}: {
+  board: SalesBoard | null;
+  /** The branch of a new board, chosen by the structure page's button. */
+  presetBranchId?: number | undefined;
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
   const branches = useBranches();
   const mutations = useSalesMutations();
   const action = useAction();
   const [name, setName] = useState(board?.name ?? '');
-  const [branchId, setBranchId] = useState(board?.branchId ? String(board.branchId) : '');
+  const [branchId, setBranchId] = useState(
+    board?.branchId ? String(board.branchId) : presetBranchId ? String(presetBranchId) : '',
+  );
   const save = () =>
     void action.run(async () => {
       const body = { name: name.trim(), branchId: branchId ? Number.parseInt(branchId, 10) : null };

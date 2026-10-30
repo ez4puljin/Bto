@@ -370,20 +370,23 @@ function SwitchRow(props: {
   );
 }
 
-function NodeDialog({
+export function NodeDialog({
   open,
   node,
+  presetWarehouseId,
   onClose,
 }: {
   open: boolean;
   node: EdgeNode | null;
+  /** The supermarket a new POS belongs to, chosen by the structure page's button. */
+  presetWarehouseId?: number | undefined;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
       {open ? (
-        <NodeForm node={node} onClose={onClose} />
+        <NodeForm node={node} presetWarehouseId={presetWarehouseId} onClose={onClose} />
       ) : (
         <DialogContent closeLabel={t('common.close')} />
       )}
@@ -391,14 +394,24 @@ function NodeDialog({
   );
 }
 
-function NodeForm({ node, onClose }: { node: EdgeNode | null; onClose: () => void }) {
+function NodeForm({
+  node,
+  presetWarehouseId,
+  onClose,
+}: {
+  node: EdgeNode | null;
+  presetWarehouseId?: number | undefined;
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
   const warehouses = useWarehouses();
   const mutations = usePosMutations();
   const action = useAction();
   const [code, setCode] = useState(node?.code ?? '');
   const [name, setName] = useState(node?.name ?? '');
-  const [warehouseId, setWarehouseId] = useState<number | null>(node?.warehouseId ?? null);
+  const [warehouseId, setWarehouseId] = useState<number | null>(
+    node?.warehouseId ?? presetWarehouseId ?? null,
+  );
   const [status, setStatus] = useState<EdgeNode['status']>(node?.status ?? 'ACTIVE');
   const [checked, setChecked] = useState(false);
   const stores = (warehouses.data ?? []).filter((warehouse) => warehouse.kind === 'STORE');
@@ -504,7 +517,7 @@ function NodeForm({ node, onClose }: { node: EdgeNode | null; onClose: () => voi
   );
 }
 
-function TillDialog({
+export function TillDialog({
   open,
   till,
   nodes,

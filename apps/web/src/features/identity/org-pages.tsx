@@ -165,7 +165,7 @@ export function BranchesPage() {
   );
 }
 
-function BranchDialog({ branch, onClose }: { branch: Branch | 'new'; onClose: () => void }) {
+export function BranchDialog({ branch, onClose }: { branch: Branch | 'new'; onClose: () => void }) {
   const { t } = useTranslation();
   const mutations = useIdentityMutations();
   const isNew = branch === 'new';
@@ -386,11 +386,14 @@ export function WarehousesPage() {
   );
 }
 
-function WarehouseDialog({
+export function WarehouseDialog({
   warehouse,
+  preset,
   onClose,
 }: {
   warehouse: Warehouse | 'new';
+  /** A new warehouse's kind and branch, chosen by the structure page's button. */
+  preset?: { kind: 'WHOLESALE' | 'STORE'; branchId: number } | undefined;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -400,7 +403,13 @@ function WarehouseDialog({
   const form = useForm<WarehouseValues>({
     resolver: zodResolver(warehouseSchema),
     defaultValues: isNew
-      ? { code: '', name: '', kind: 'WHOLESALE', branchId: '', status: 'ACTIVE' }
+      ? {
+          code: '',
+          name: '',
+          kind: preset?.kind ?? 'WHOLESALE',
+          branchId: preset ? String(preset.branchId) : '',
+          status: 'ACTIVE',
+        }
       : {
           code: warehouse.code,
           name: warehouse.name,

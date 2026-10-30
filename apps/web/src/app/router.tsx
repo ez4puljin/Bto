@@ -18,6 +18,7 @@ import { CompanyPage } from '@/features/company/company-page';
 import { BranchesPage, WarehousesPage } from '@/features/identity/org-pages';
 import { RolesPage } from '@/features/identity/roles-page';
 import { SettingsPage } from '@/features/identity/settings-page';
+import { StructurePage } from '@/features/identity/structure-page';
 import { UserDetailPage } from '@/features/identity/user-detail-page';
 import { UsersPage } from '@/features/identity/users-page';
 import { AdjustmentPage, AdjustmentsPage } from '@/features/inventory/adjustments-pages';
@@ -640,6 +641,15 @@ export const routes: RouteObject[] = [
             ),
           },
           { path: 'company', handle: { width: 'reading' }, element: <CompanyPage /> },
+          {
+            path: 'structure',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="identity.org.manage">
+                <StructurePage />
+              </RequirePermission>
+            ),
+          },
           { path: 'branches', handle: { width: 'wide' }, element: <BranchesPage /> },
           { path: 'warehouses', handle: { width: 'wide' }, element: <WarehousesPage /> },
           {

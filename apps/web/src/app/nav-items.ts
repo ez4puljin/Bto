@@ -34,6 +34,7 @@ import {
   type LucideIcon,
   Megaphone,
   Monitor,
+  Network,
   Move,
   Package,
   PackageCheck,
@@ -399,6 +400,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { to: '/roles', label: 'nav.roles', icon: ShieldCheck, permission: 'identity.users.read' },
       // ADR-0084: the Finance Core company; everyone reads it, finance.settings.manage edits it.
       { to: '/company', label: 'nav.company', icon: Briefcase, permission: 'finance.read' },
+      {
+        to: '/structure',
+        label: 'nav.structure',
+        icon: Network,
+        permission: 'identity.org.manage',
+      },
       {
         to: '/branches',
         label: 'nav.branches',

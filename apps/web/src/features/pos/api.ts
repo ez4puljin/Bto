@@ -70,27 +70,30 @@ export function usePosSettings(options: { enabled?: boolean } = {}) {
   });
 }
 
-export function useEdgeNodes() {
+export function useEdgeNodes(enabled = true) {
   const api = useApiClient();
   return useQuery({
     queryKey: POS_KEYS.nodes,
+    enabled,
     queryFn: async ({ signal }) => unwrap(await api.GET('/api/v1/pos/edge-nodes', { signal })),
   });
 }
 
-export function useTills(edgeNodeId?: number) {
+export function useTills(edgeNodeId?: number, enabled = true) {
   const api = useApiClient();
   return useQuery({
     queryKey: [...POS_KEYS.tills, edgeNodeId ?? 'all'],
+    enabled,
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/v1/pos/tills', { params: { query: { edgeNodeId } }, signal })),
   });
 }
 
-export function useCashiers() {
+export function useCashiers(enabled = true) {
   const api = useApiClient();
   return useQuery({
     queryKey: POS_KEYS.cashiers,
+    enabled,
     queryFn: async ({ signal }) => unwrap(await api.GET('/api/v1/pos/cashiers', { signal })),
   });
 }
