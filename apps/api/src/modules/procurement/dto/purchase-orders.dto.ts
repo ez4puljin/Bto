@@ -468,7 +468,20 @@ export class GridQueryDto {
 }
 
 /** The facets' query: the rows' filters, no page. */
-export class GridFacetsQueryDto extends OmitType(GridQueryDto, ['cursor', 'limit'] as const) {}
+export class GridFacetsQueryDto extends OmitType(GridQueryDto, ['cursor', 'limit'] as const) {
+  @ApiPropertyOptional({ description: 'Only this supplier of the order' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  supplierId?: number;
+  @ApiPropertyOptional({ description: 'Only the suppliers this user orders from' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  ordererId?: number;
+}
 
 @ApiSchema({ name: 'PurchaseOrderSupplierFacet' })
 export class SupplierFacetDto {

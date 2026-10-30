@@ -32799,6 +32799,10 @@ export interface operations {
                 warehouseId?: number;
                 /** @description Rows whose product is in this category or under it */
                 categoryId?: number;
+                /** @description Only this supplier of the order */
+                supplierId?: number;
+                /** @description Only the suppliers this user orders from */
+                ordererId?: number;
             };
             header?: never;
             path: {
