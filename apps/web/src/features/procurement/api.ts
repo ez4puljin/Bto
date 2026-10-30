@@ -32,6 +32,7 @@ export type HistoryRow = Schemas['PurchaseOrderHistoryRow'];
 export type PurchaseOrderPrint = Schemas['PurchaseOrderPrint'];
 export type OrdererCandidate = Schemas['OrdererCandidate'];
 export type SupplierOrderer = Schemas['SupplierOrderer'];
+export type SupplierCandidate = Schemas['PurchaseOrderSupplierCandidate'];
 export type GridFilter = 'ALL' | 'ORDERED' | 'BELOW_MIN';
 
 /** A supplier's statuses inside an order, in their order (ADR-0115, ADR-0118). */
@@ -44,6 +45,7 @@ export const KEYS = {
   orders: ['procurement', 'orders'] as const,
   orderers: ['procurement', 'supplier-orderers'] as const,
   candidates: ['procurement', 'orderer-candidates'] as const,
+  supplierCandidates: ['procurement', 'supplier-candidates'] as const,
 };
 
 /** Idempotent routes take the key from the caller: one key per user intent (ADR-0004). */
@@ -129,11 +131,16 @@ export interface GridQuery {
  * arrived, its receipt line beside them. The rows never refetch on their own (a typed cell must not
  * be swept away): the page reloads them on «Дахин ачаалах» or after its own saves.
  */
-export function usePurchaseOrderRows(id: number, supplierId: number, query: GridQuery) {
+export function usePurchaseOrderRows(
+  id: number,
+  supplierId: number,
+  query: GridQuery,
+  options: { enabled?: boolean } = {},
+) {
   const api = useApiClient();
   return useInfiniteQuery({
     queryKey: [...rowsKey(id, supplierId), query],
-    enabled: id > 0 && supplierId > 0,
+    enabled: id > 0 && supplierId > 0 && (options.enabled ?? true),
     initialPageParam: undefined as string | undefined,
     staleTime: Number.POSITIVE_INFINITY,
     refetchOnWindowFocus: false,
@@ -364,6 +371,21 @@ export function usePurchaseOrderMutations() {
         INVENTORY_KEYS.receipts,
       ),
   };
+}
+
+/**
+ * Every active supplier with its main-product count, one list for the supplier picker; read once a
+ * minute at most, searched in the browser.
+ */
+export function useSupplierCandidates(enabled = true) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: KEYS.supplierCandidates,
+    enabled,
+    staleTime: 60_000,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/procurement/supplier-candidates', { signal })).data,
+  });
 }
 
 /** Staff who may be named a supplier's orderer. */

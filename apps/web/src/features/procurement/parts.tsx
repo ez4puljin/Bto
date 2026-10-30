@@ -1,13 +1,15 @@
-import { useDeferredValue, useState } from 'react';
+import { matchesQuery, queryTerms, searchKeys } from '@tugeel/shared/text';
+import { SquareCheckBig, SquareMinus } from 'lucide-react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FilterChip, LoadMore, SearchField } from '@/components/list';
+import { FilterChip, SearchField } from '@/components/list';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useSuppliers } from '@/features/partners/api';
 import { formatCount } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
-import type { PoStatus } from './api';
+import { type PoStatus, type SupplierCandidate, useSupplierCandidates } from './api';
 
 const STATUS_VARIANT = {
   PREPARING: 'secondary',
@@ -26,8 +28,10 @@ export function PoStatusBadge({ status }: { status: PoStatus }) {
 }
 
 /**
- * Ticks over the active suppliers, searched by name, code, phone or TIN; the ticked ones stay
- * while the search changes and show as chips above the list. `exclude`: already in the order.
+ * Ticks over the active suppliers, searched in the browser by name, code, phone or TIN over the one
+ * list the server gives (with each supplier's main-product count); the ticked ones stay while the
+ * search changes and show as chips above the list. «Бүгдийг сонгох» ticks every listed supplier
+ * with at least one main product and names how many it skipped. `exclude`: already in the order.
  */
 export function SupplierTicks(props: {
   id: string;
@@ -38,31 +42,74 @@ export function SupplierTicks(props: {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const q = useDeferredValue(search.trim());
-  const suppliers = useSuppliers({ q, status: 'ACTIVE' }, { limit: 50 });
-  const rows = suppliers.data?.pages.flatMap((page) => page.data) ?? [];
+  const candidates = useSupplierCandidates();
+  const all = candidates.data ?? NO_CANDIDATES;
+  const keyed = useMemo(
+    () =>
+      all.map((row) => ({
+        row,
+        keys: searchKeys(row.name, [row.code, row.phone ?? '', row.tin ?? '']),
+      })),
+    [all],
+  );
+  const terms = useMemo(() => queryTerms(q), [q]);
+  const listed =
+    terms.length === 0
+      ? all
+      : keyed.filter(({ keys }) => matchesQuery(keys, terms)).map(({ row }) => row);
+  const free = (row: SupplierCandidate) => !(props.exclude?.has(row.id) ?? false);
+  const eligible = listed.filter((row) => free(row) && row.mainProductCount > 0);
+  const skipped = listed.filter((row) => free(row) && row.mainProductCount === 0).length;
+  const allChosen = eligible.length > 0 && eligible.every((row) => props.value.has(row.id));
   const toggle = (id: number, name: string, checked: boolean) => {
     const next = new Map(props.value);
     if (checked) next.set(id, name);
     else next.delete(id);
     props.onChange(next);
   };
+  const toggleAll = () => {
+    const next = new Map(props.value);
+    for (const row of eligible) {
+      if (allChosen) next.delete(row.id);
+      else next.set(row.id, row.name);
+    }
+    props.onChange(next);
+  };
 
   return (
     <div className="flex flex-col gap-2">
-      <SearchField
-        id={props.id}
-        className="sm:w-full"
-        aria-label={t('procurement.ticks.search')}
-        placeholder={t('procurement.ticks.searchPlaceholder')}
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-      />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <SearchField
+          id={props.id}
+          className="sm:w-full"
+          aria-label={t('procurement.ticks.search')}
+          placeholder={t('procurement.ticks.searchPlaceholder')}
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          disabled={eligible.length === 0}
+          onClick={toggleAll}
+        >
+          {allChosen ? <SquareMinus /> : <SquareCheckBig />}
+          {t(allChosen ? 'procurement.ticks.clearAll' : 'procurement.ticks.selectAll')}
+        </Button>
+      </div>
       <div className="flex flex-wrap items-center gap-1.5" aria-live="polite">
         <span className="text-[13px] text-muted-foreground">
           {props.value.size > 0
             ? t('procurement.ticks.chosen', { count: formatCount(props.value.size) })
             : t('procurement.ticks.none')}
         </span>
+        {skipped > 0 ? (
+          <span className="text-[13px] text-muted-foreground">
+            · {t('procurement.ticks.skippedNoMain', { count: formatCount(skipped) })}
+          </span>
+        ) : null}
         {[...props.value].map(([id, name]) => (
           <FilterChip
             key={id}
@@ -73,10 +120,10 @@ export function SupplierTicks(props: {
           </FilterChip>
         ))}
       </div>
-      <ProblemAlert problem={problemFromError(suppliers.error)} onRetry={suppliers.refetch} />
+      <ProblemAlert problem={problemFromError(candidates.error)} onRetry={candidates.refetch} />
       <div className="max-h-72 overflow-y-auto rounded-lg border border-border">
         <ul className="flex flex-col divide-y divide-border/80">
-          {rows.map((row) => {
+          {listed.map((row) => {
             const inOrder = props.exclude?.has(row.id) ?? false;
             return (
               <li key={row.id}>
@@ -88,6 +135,13 @@ export function SupplierTicks(props: {
                   />
                   <span className="min-w-0 flex-1 truncate">{row.name}</span>
                   <span className="font-mono text-xs text-muted-foreground">{row.code}</span>
+                  <span className="w-24 shrink-0 text-right text-xs text-muted-foreground">
+                    {row.mainProductCount > 0
+                      ? t('procurement.ticks.mainProducts', {
+                          count: formatCount(row.mainProductCount),
+                        })
+                      : t('procurement.ticks.noMainProducts')}
+                  </span>
                   {inOrder ? (
                     <Badge variant="outline">{t('procurement.ticks.inOrder')}</Badge>
                   ) : null}
@@ -96,16 +150,17 @@ export function SupplierTicks(props: {
             );
           })}
         </ul>
-        {suppliers.isPending ? (
+        {candidates.isPending ? (
           <p className="px-3 py-2 text-[13px] text-muted-foreground">{t('common.loading')}</p>
         ) : null}
-        {!suppliers.isPending && rows.length === 0 ? (
+        {!candidates.isPending && listed.length === 0 ? (
           <p className="px-3 py-2 text-[13px] text-muted-foreground">
             {t('procurement.ticks.empty')}
           </p>
         ) : null}
-        <LoadMore query={suppliers} />
       </div>
     </div>
   );
 }
+
+const NO_CANDIDATES: readonly SupplierCandidate[] = [];

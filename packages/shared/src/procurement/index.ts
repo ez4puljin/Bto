@@ -70,8 +70,11 @@ export function previousPoStatus(status: PoSupplierStatus): PoSupplierStatus | n
   return index > 0 ? (PO_MANUAL_STATUSES[index - 1] ?? null) : null;
 }
 
-/** Most suppliers one order may hold, and the grid's page. */
-export const MAX_PO_SUPPLIERS = 200;
+/**
+ * Most suppliers one order may hold (every active supplier at once: a few hundred today), and the
+ * grid's page. The rows stay bounded per supplier (the grid's cap) and per save (`MAX_PO_CHANGES`).
+ */
+export const MAX_PO_SUPPLIERS = 1000;
 export const PO_GRID_PAGE = 200;
 /** Most cells one save may send. */
 export const MAX_PO_CHANGES = 2000;

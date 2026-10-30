@@ -598,6 +598,24 @@ export class SetOrdererDto {
   userId: number | null;
 }
 
+@ApiSchema({ name: 'PurchaseOrderSupplierCandidate' })
+export class SupplierCandidateDto {
+  @ApiProperty() id: number;
+  @ApiProperty() code: string;
+  @ApiProperty() name: string;
+  @ApiProperty({ type: String, nullable: true }) phone: string | null;
+  @ApiProperty({ type: String, nullable: true }) tin: string | null;
+  @ApiProperty({ description: 'Active products this supplier is the main supplier of' })
+  mainProductCount: number;
+}
+
+@ApiSchema({ name: 'PurchaseOrderSupplierCandidatePage' })
+export class SupplierCandidatePageDto {
+  @ApiProperty({ type: [SupplierCandidateDto] }) data: SupplierCandidateDto[];
+  @ApiProperty({ type: String, nullable: true, description: 'Always null: one list' })
+  nextCursor: string | null;
+}
+
 @ApiSchema({ name: 'OrdererCandidate' })
 export class OrdererCandidateDto {
   @ApiProperty() id: number;

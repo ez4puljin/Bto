@@ -1,6 +1,6 @@
 import { Decimal } from '@tugeel/shared/money';
 import { type PoColumnGroup, splitBoxes } from '@tugeel/shared/procurement';
-import { ArrowLeft, ArrowRight, PackagePlus, PackageSearch } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ChevronRight, PackagePlus, PackageSearch } from 'lucide-react';
 import { type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
@@ -166,6 +166,14 @@ export interface SupplierGroupProps {
   onEnter: (event: KeyboardEvent<HTMLInputElement>) => void;
   /** The first page's facts the page needs (the receipt's version for the price check). */
   onPage?: (supplierId: number, page: GridPage) => void;
+  /**
+   * Whether the group's rows are shown and loaded; a closed group is one header row with its
+   * counts, and its rows are never requested (an order of hundreds of suppliers stays one page).
+   */
+  open: boolean;
+  /** Shows the chevron: orders with more suppliers than fit open at once. */
+  collapsible: boolean;
+  onToggle: (supplierId: number) => void;
 }
 
 /**
@@ -174,8 +182,8 @@ export interface SupplierGroupProps {
  */
 export function SupplierGroup(props: SupplierGroupProps) {
   const { t } = useTranslation();
-  const { supplier, view, edits, orderId } = props;
-  const rows = usePurchaseOrderRows(orderId, supplier.supplierId, props.query);
+  const { supplier, view, edits, orderId, open } = props;
+  const rows = usePurchaseOrderRows(orderId, supplier.supplierId, props.query, { enabled: open });
   const first = rows.data?.pages[0];
   const loaded = rows.data?.pages.flatMap((page) => page.data) ?? [];
   const extra = first?.extra ?? [];
@@ -210,8 +218,33 @@ export function SupplierGroup(props: SupplierGroupProps) {
       <TableRow className="bg-accent/40 hover:bg-accent/40">
         <TableCell {...span} className="h-10 py-1.5">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {props.collapsible ? (
+              <Button
+                size="icon-xs"
+                variant="ghost"
+                aria-expanded={open}
+                aria-label={t(open ? 'procurement.detail.collapse' : 'procurement.detail.expand', {
+                  name,
+                })}
+                title={t(open ? 'procurement.detail.collapse' : 'procurement.detail.expand', {
+                  name,
+                })}
+                onClick={() => props.onToggle(supplier.supplierId)}
+              >
+                <ChevronRight
+                  className={cn('size-4 transition-transform', open ? 'rotate-90' : undefined)}
+                />
+              </Button>
+            ) : null}
             <span className="font-semibold">{name}</span>
             <PoStatusBadge status={supplier.status} />
+            {!open ? (
+              <span className="text-[13px] text-muted-foreground">
+                {supplier.lineCount > 0
+                  ? t('procurement.detail.lineCount', { count: formatCount(supplier.lineCount) })
+                  : t('procurement.detail.noLines')}
+              </span>
+            ) : null}
             {supplier.canMoveBack ? (
               <Button
                 size="xs"
@@ -300,17 +333,17 @@ export function SupplierGroup(props: SupplierGroupProps) {
           </div>
         </TableCell>
       </TableRow>
-      {rows.error ? (
+      {open && rows.error ? (
         <TableRow>
           <TableCell {...span}>
             <ProblemAlert problem={problemFromError(rows.error)} onRetry={rows.refetch} />
           </TableCell>
         </TableRow>
       ) : null}
-      {rows.isPending ? <SkeletonRows columns={columns} rows={3} /> : null}
-      {loaded.map((row) => describe(row, false))}
-      {extra.map((row) => describe(row, true))}
-      {!rows.isPending && loaded.length === 0 && extra.length === 0 ? (
+      {open && rows.isPending ? <SkeletonRows columns={columns} rows={3} /> : null}
+      {open ? loaded.map((row) => describe(row, false)) : null}
+      {open ? extra.map((row) => describe(row, true)) : null}
+      {open && !rows.isPending && loaded.length === 0 && extra.length === 0 ? (
         <TableRow>
           <TableCell {...span} className="h-auto py-2">
             <EmptyState
@@ -324,47 +357,51 @@ export function SupplierGroup(props: SupplierGroupProps) {
           </TableCell>
         </TableRow>
       ) : null}
-      {rows.hasNextPage ? (
+      {open && rows.hasNextPage ? (
         <TableRow>
           <TableCell {...span} className="h-auto py-1">
             <LoadMore query={rows} />
           </TableCell>
         </TableRow>
       ) : null}
-      <TableRow className="bg-muted/30 hover:bg-muted/30">
-        <TableCell {...span} className="h-9 text-[13px]">
-          <div className="flex flex-wrap gap-x-5 gap-y-1 font-mono">
-            <span>
-              {t('procurement.detail.piecesKg', {
-                pieces: formatQty(supplier.qtyBase),
-                kg: formatQty(new Decimal(supplier.weightKg).toDecimalPlaces(1).toString()),
-              })}
-            </span>
-            {supplier.arrivedBase !== null ? (
+      {!open ? null : (
+        <TableRow className="bg-muted/30 hover:bg-muted/30">
+          <TableCell {...span} className="h-9 text-[13px]">
+            <div className="flex flex-wrap gap-x-5 gap-y-1 font-mono">
               <span>
-                {t('procurement.detail.arrivedTotal', { pieces: formatQty(supplier.arrivedBase) })}
-              </span>
-            ) : null}
-            {view.canPrices && supplier.estimatedCost !== null ? (
-              <span>
-                {t('procurement.detail.estimated')} {formatTugrik(supplier.estimatedCost)}
-              </span>
-            ) : null}
-            {view.canPrices && supplier.finalAmount !== null ? (
-              <span>
-                {t('procurement.detail.final')} {formatTugrik(supplier.finalAmount)}
-              </span>
-            ) : null}
-            {view.canPrices && supplier.priceDiffCount !== null ? (
-              <span>
-                {t('procurement.detail.priceDiffCount', {
-                  count: formatCount(supplier.priceDiffCount),
+                {t('procurement.detail.piecesKg', {
+                  pieces: formatQty(supplier.qtyBase),
+                  kg: formatQty(new Decimal(supplier.weightKg).toDecimalPlaces(1).toString()),
                 })}
               </span>
-            ) : null}
-          </div>
-        </TableCell>
-      </TableRow>
+              {supplier.arrivedBase !== null ? (
+                <span>
+                  {t('procurement.detail.arrivedTotal', {
+                    pieces: formatQty(supplier.arrivedBase),
+                  })}
+                </span>
+              ) : null}
+              {view.canPrices && supplier.estimatedCost !== null ? (
+                <span>
+                  {t('procurement.detail.estimated')} {formatTugrik(supplier.estimatedCost)}
+                </span>
+              ) : null}
+              {view.canPrices && supplier.finalAmount !== null ? (
+                <span>
+                  {t('procurement.detail.final')} {formatTugrik(supplier.finalAmount)}
+                </span>
+              ) : null}
+              {view.canPrices && supplier.priceDiffCount !== null ? (
+                <span>
+                  {t('procurement.detail.priceDiffCount', {
+                    count: formatCount(supplier.priceDiffCount),
+                  })}
+                </span>
+              ) : null}
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
     </TableBody>
   );
 }

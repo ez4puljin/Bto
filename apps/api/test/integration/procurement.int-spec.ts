@@ -795,6 +795,66 @@ describe('purchase orders and receiving', () => {
     expect(supplierOf(await order(manager, created.id), supplierA).status).toBe('ACCOUNTING');
   });
 
+  it('creates an order with hundreds of suppliers in one request, within the limit', async () => {
+    // Every active supplier at once (owner 2026-10-30): the candidates list carries each
+    // supplier's main-product count, the creation is one transaction with one insert.
+    const partners = partnersApi(app, admin);
+    const many: number[] = [];
+    for (let index = 0; index < 250; index += 1) {
+      many.push((await partners.supplier({ name: `Олон нийлүүлэгч ${index}` })).id);
+    }
+    const candidates = (
+      await http().get('/api/v1/procurement/supplier-candidates').set(bearer(orderer)).expect(200)
+    ).body as { data: { id: number; name: string; mainProductCount: number }[]; nextCursor: null };
+    expect(candidates.nextCursor).toBeNull();
+    expect(candidates.data.find((row) => row.id === supplierA)?.mainProductCount).toBe(3);
+    expect(candidates.data.find((row) => row.id === supplierB)?.mainProductCount).toBe(1);
+    expect(candidates.data.find((row) => row.id === many[0])?.mainProductCount).toBe(0);
+    expect(candidates.data.filter((row) => many.includes(row.id))).toHaveLength(250);
+
+    const started = Date.now();
+    const created = (
+      await http()
+        .post('/api/v1/purchase-orders')
+        .set(bearer(manager))
+        .set(idempotency())
+        .send({ supplierIds: [supplierA, ...many, supplierB] })
+        .expect(201)
+    ).body as OrderJson;
+    expect(Date.now() - started).toBeLessThan(10_000);
+    expect(created.suppliers).toHaveLength(252);
+    expect(created.status).toBe('PREPARING');
+    expect(created.suppliers.every((row) => row.status === 'PREPARING')).toBe(true);
+    const listed = (
+      await http()
+        .get(`/api/v1/purchase-orders?q=${created.number}`)
+        .set(bearer(manager))
+        .expect(200)
+    ).body as { data: { id: number; supplierCount: number }[] };
+    expect(listed.data.find((row) => row.id === created.id)?.supplierCount).toBe(252);
+
+    // Over the limit: refused by the request's shape, nothing written.
+    await http()
+      .post('/api/v1/purchase-orders')
+      .set(bearer(manager))
+      .set(idempotency())
+      .send({ supplierIds: Array.from({ length: 1001 }, (_, index) => index + 1) })
+      .expect(422);
+    // Adding past the limit to an existing order is refused before the suppliers are read.
+    await http()
+      .post(`/api/v1/purchase-orders/${created.id}/suppliers`)
+      .set(bearer(manager))
+      .send({ supplierIds: Array.from({ length: 1000 }, (_, index) => 10_000_000 + index) })
+      .expect(422);
+    // An unknown supplier in the batch fails the whole creation.
+    await http()
+      .post('/api/v1/purchase-orders')
+      .set(bearer(manager))
+      .set(idempotency())
+      .send({ supplierIds: [supplierA, 10_000_000] })
+      .expect(404);
+  }, 180_000);
+
   it('refuses «Ирсэн» when the supplier shipped nothing at all', async () => {
     const created = (
       await http()

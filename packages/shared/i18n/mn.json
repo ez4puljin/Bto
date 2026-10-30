@@ -7461,7 +7461,13 @@
         "CONFIRMED": "агуулах нь баталгаажсан",
         "NOT_FOUND": "мөр олдсонгүй"
       },
-      "pricesMissing": "Үнэ байхгүй бараа: {{products}}"
+      "pricesMissing": "Үнэ байхгүй бараа: {{products}}",
+      "expand": "Дэлгэх: {{name}}",
+      "collapse": "Хураах: {{name}}",
+      "expandAll": "Бүгдийг дэлгэх",
+      "collapseAll": "Бүгдийг хураах",
+      "lineCount": "{{count}} бараа захиалсан",
+      "noLines": "Захиалаагүй"
     },
     "history": {
       "title": "Түүх",
@@ -7556,6 +7562,7 @@
       "note": "Тэмдэглэл",
       "suppliers": "Нийлүүлэгчид",
       "submit": "Захиалга үүсгэх",
+      "submitCount": "Захиалга үүсгэх ({{count}})",
       "created": "{{number}} захиалга үүслээ"
     },
     "ticks": {
@@ -7565,7 +7572,12 @@
       "none": "Нийлүүлэгч сонгоогүй",
       "empty": "Таарах нийлүүлэгч алга",
       "inOrder": "Захиалгад байгаа",
-      "remove": "Сонголтоос хасах: {{name}}"
+      "remove": "Сонголтоос хасах: {{name}}",
+      "selectAll": "Бүгдийг сонгох",
+      "clearAll": "Бүгдийг болих",
+      "skippedNoMain": "{{count}} нийлүүлэгч үндсэн бараагүй тул орохгүй",
+      "mainProducts": "{{count}} бараа",
+      "noMainProducts": "Үндсэн бараагүй"
     },
     "order": {
       "createdBy": "Үүсгэсэн: {{name}}",
@@ -7574,9 +7586,11 @@
       "addSuppliers": "Нийлүүлэгч нэмэх",
       "addSuppliersHint": "Шинэ нийлүүлэгч «Бэлдэж» төлөвөөр орно.",
       "add": "Нэмэх",
+      "addCount": "Нэмэх ({{count}})",
       "added": "{{count}} нийлүүлэгч нэмлээ",
       "suppliers": "Захиалгын нийлүүлэгчид",
-      "noSuppliers": "Энэ захиалгад нийлүүлэгч алга"
+      "noSuppliers": "Энэ захиалгад нийлүүлэгч алга",
+      "noOrdered": "Захиалсан нийлүүлэгч алга"
     },
     "supplier": {
       "orderer": "Захиалагч",

@@ -367,7 +367,11 @@ function AddSuppliersDialog(props: { detail: PurchaseOrderDetail; onClose: () =>
         <DialogFormFooter
           pending={mutations.addSuppliers.isPending}
           disabled={suppliers.size === 0}
-          submitLabel={t('procurement.order.add')}
+          submitLabel={
+            suppliers.size > 0
+              ? t('procurement.order.addCount', { count: formatCount(suppliers.size) })
+              : t('procurement.order.add')
+          }
           onCancel={props.onClose}
         />
       </form>
