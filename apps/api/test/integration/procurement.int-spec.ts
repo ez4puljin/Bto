@@ -382,10 +382,10 @@ describe('purchase orders and receiving', () => {
       ],
     });
     expect(everyFacet.categories).toEqual([{ categoryId: juice.categoryId, rowCount: 4 }]);
-    expect((await facets(`?categoryId=${juice.categoryId}`)).rowCount).toBe(4);
+    expect((await facets(`?categoryId=${String(juice.categoryId)}`)).rowCount).toBe(4);
     expect((await facets('?categoryId=999999')).rowCount).toBe(0);
     expect(
-      (await rows(manager, id, supplierA, `?categoryId=${juice.categoryId}`)).data,
+      (await rows(manager, id, supplierA, `?categoryId=${String(juice.categoryId)}`)).data,
     ).toHaveLength(3);
     expect((await facets(`?warehouseId=${wh2.id}`)).suppliers).toEqual([
       { supplierId: supplierA, rowCount: 1 },

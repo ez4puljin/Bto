@@ -34,7 +34,11 @@ export function SupplierPicker(props: {
   const [focused, setFocused] = useState(false);
   const searchBox = useRef<HTMLInputElement>(null);
   const q = useDeferredValue(search.trim());
-  const suppliers = useSuppliers({ q, status: 'ACTIVE' }, { enabled: props.value === null });
+  // Nothing is listed until something is typed: the box is a search, not a list.
+  const suppliers = useSuppliers(
+    { q, status: 'ACTIVE' },
+    { enabled: props.value === null && q !== '' },
+  );
   const rows = (suppliers.data?.pages[0]?.data ?? []).slice(0, 8);
 
   // «Солих» hands the focus to the search box it brings back.
@@ -90,7 +94,7 @@ export function SupplierPicker(props: {
         onChange={(event) => setSearch(event.target.value)}
       />
       <ProblemAlert problem={problemFromError(suppliers.error)} onRetry={suppliers.refetch} />
-      {!open ? null : rows.length > 0 ? (
+      {!open || q === '' ? null : rows.length > 0 ? (
         <ul
           className={
             props.floating

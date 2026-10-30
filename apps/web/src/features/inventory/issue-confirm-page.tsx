@@ -1,3 +1,4 @@
+import { BINS_SOON } from '@/lib/features';
 import { Undo2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -237,7 +238,7 @@ function Confirming({ detail }: { detail: IssueDetail }) {
                 <TableHead>{t('inventory.warehouse')}</TableHead>
                 <TableHead>{t('inventory.unit')}</TableHead>
                 <TableHead className="text-right">{t('inventory.qty')}</TableHead>
-                <TableHead>{t('inventory.bin')}</TableHead>
+                {BINS_SOON ? null : <TableHead>{t('inventory.bin')}</TableHead>}
                 <TableHead>{t('inventory.status')}</TableHead>
               </TableRow>
             </TableHeader>
@@ -364,7 +365,9 @@ function ConfirmRow(props: {
       <TableCell>{line.warehouseName}</TableCell>
       <TableCell>{line.unitName}</TableCell>
       <TableCell className="text-right font-mono">{formatQty(line.enteredQty)}</TableCell>
-      <TableCell className="font-mono">{line.binCode ?? t('common.none')}</TableCell>
+      {BINS_SOON ? null : (
+        <TableCell className="font-mono">{line.binCode ?? t('common.none')}</TableCell>
+      )}
       <TableCell>
         {props.frozen ? (
           <Badge variant="success">{t('inventory.issues.confirm.frozen')}</Badge>

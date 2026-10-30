@@ -1,3 +1,4 @@
+import { BINS_SOON } from '@/lib/features';
 import type { ProblemDetails } from '@tugeel/api-client';
 import { markupPct } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
@@ -211,7 +212,7 @@ function LinesTable(props: {
     { key: 'sku', kind: 'code' },
     { key: 'product', kind: 'text', weight: 3, min: 14 },
     { key: 'warehouse', kind: 'text', weight: 1 },
-    { key: 'bin', kind: 'code', width: 8 },
+    ...(BINS_SOON ? [] : [{ key: 'bin', kind: 'code', width: 8 } as const]),
     { key: 'unit', kind: 'text', weight: 1, min: 4 },
     ...(expected ? [{ key: 'expected', kind: 'qty' } as const] : []),
     { key: 'qty', kind: 'qty' },
@@ -238,7 +239,7 @@ function LinesTable(props: {
           <TableHead>{t('inventory.sku')}</TableHead>
           <TableHead>{t('inventory.product')}</TableHead>
           <TableHead>{t('inventory.warehouse')}</TableHead>
-          <TableHead>{t('inventory.bin')}</TableHead>
+          {BINS_SOON ? null : <TableHead>{t('inventory.bin')}</TableHead>}
           <TableHead>{t('inventory.unit')}</TableHead>
           {expected ? (
             <TableHead className="text-right">{t('inventory.receipt.receive.expected')}</TableHead>
@@ -298,7 +299,7 @@ function LinesTable(props: {
               <TableCell className="font-mono text-[13px]">{line.productSku}</TableCell>
               <TableCell className="whitespace-normal">{line.productName}</TableCell>
               <TableCell>{line.warehouseName}</TableCell>
-              <TableCell className="font-mono">{line.binCode}</TableCell>
+              {BINS_SOON ? null : <TableCell className="font-mono">{line.binCode}</TableCell>}
               <TableCell>{line.unitName}</TableCell>
               {expected ? (
                 <TableCell className="text-right font-mono text-muted-foreground">

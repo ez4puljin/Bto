@@ -1,3 +1,4 @@
+import { BINS_SOON } from '@/lib/features';
 import { USER_ADJUSTMENT_REASONS } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
 import { Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
@@ -121,6 +122,7 @@ export function AdjustmentsPage() {
     <div>
       <PageHeader
         title={t('inventory.adjustments.title')}
+        description={BINS_SOON ? t('common.binsSoonHint') : undefined}
         actions={
           canManage ? (
             <Button onClick={() => setCreating(true)}>

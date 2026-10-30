@@ -1,3 +1,4 @@
+import { BINS_SOON } from '@/lib/features';
 import { Decimal } from '@tugeel/shared/money';
 import { ArrowLeftRight, Plus, Printer, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -2175,13 +2176,13 @@ function TransferLinesView({ detail }: { detail: TransferDetail }) {
             <TableRow>
               <TableHead>{t('inventory.product')}</TableHead>
               <TableHead className="text-right">{t(requestedLabel(detail.origin))}</TableHead>
-              <TableHead>{t('inventory.transfer.fromBin')}</TableHead>
+              {BINS_SOON ? null : <TableHead>{t('inventory.transfer.fromBin')}</TableHead>}
               <TableHead className="text-right">{t('inventory.transfer.shipped')}</TableHead>
               {withCounts ? (
                 <TableHead className="text-right">{t('inventory.transfer.counted')}</TableHead>
               ) : null}
               <TableHead className="text-right">{t('inventory.transfer.received')}</TableHead>
-              <TableHead>{t('inventory.transfer.toBin')}</TableHead>
+              {BINS_SOON ? null : <TableHead>{t('inventory.transfer.toBin')}</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -2205,7 +2206,11 @@ function TransferLinesView({ detail }: { detail: TransferDetail }) {
                         unit: line.unitName,
                       })}
                 </TableCell>
-                <TableCell className="font-mono">{line.fromBinCode ?? t('common.none')}</TableCell>
+                {BINS_SOON ? null : (
+                  <TableCell className="font-mono">
+                    {line.fromBinCode ?? t('common.none')}
+                  </TableCell>
+                )}
                 <TableCell className="text-right font-mono">
                   {line.unrequested ? t('common.none') : <ShippedQty line={line} />}
                 </TableCell>
@@ -2213,7 +2218,9 @@ function TransferLinesView({ detail }: { detail: TransferDetail }) {
                   <TableCell className="text-right font-mono">{counted(line)}</TableCell>
                 ) : null}
                 <TableCell className="text-right font-mono">{received(line)}</TableCell>
-                <TableCell className="font-mono">{line.toBinCode ?? t('common.none')}</TableCell>
+                {BINS_SOON ? null : (
+                  <TableCell className="font-mono">{line.toBinCode ?? t('common.none')}</TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>

@@ -3,6 +3,9 @@ import { cleanup, configure } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 import { clearToasts } from '@/lib/toast';
 
+// The shelves are on hold on screen (lib/features.ts); the tests cover the shelf paths as built.
+vi.mock('@/lib/features', () => ({ BINS_SOON: false }));
+
 // `pnpm check` runs every workspace's tests at once; a page that waits for sign-in, then its
 // data, can need more than the default 1 s under that load (the first test of a file booting the
 // app took 3.3 s on 2026-10-14). A longer wait, not a retry.

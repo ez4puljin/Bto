@@ -1,3 +1,4 @@
+import { BINS_SOON } from '@/lib/features';
 import { Decimal } from '@tugeel/shared/money';
 import { PRINT_KINDS, type PrintKind } from '@tugeel/shared/sales';
 import { Fragment } from 'react';
@@ -227,7 +228,7 @@ function PickList({ order, narrow }: { order: SalesOrder; narrow: boolean }) {
                         : `${t('sales.print.picked')}: ${plainDecimal(line.qtyPicked)}`}
                     </span>
                   </p>
-                  {line.pickBinCode ? (
+                  {line.pickBinCode && !BINS_SOON ? (
                     <p>
                       {t('sales.pick.bin')}: {line.pickBinCode}
                     </p>
@@ -245,7 +246,9 @@ function PickList({ order, narrow }: { order: SalesOrder; narrow: boolean }) {
                   <th className="py-1 pr-2 font-medium">{t('sales.order.product')}</th>
                   <th className="py-1 pr-2 text-right font-medium">{t('sales.order.qty')}</th>
                   <th className="py-1 pr-2 text-right font-medium">{t('sales.print.baseQty')}</th>
-                  <th className="py-1 pr-2 font-medium">{t('sales.pick.bin')}</th>
+                  {BINS_SOON ? null : (
+                    <th className="py-1 pr-2 font-medium">{t('sales.pick.bin')}</th>
+                  )}
                   <th className="py-1 font-medium">{t('sales.print.picked')}</th>
                 </tr>
               </thead>
@@ -264,7 +267,9 @@ function PickList({ order, narrow }: { order: SalesOrder; narrow: boolean }) {
                     <td className="py-1 pr-2 text-right font-mono">
                       {qty(line.qtyApproved, line.baseUnitName)}
                     </td>
-                    <td className="py-1 pr-2 font-mono">{line.pickBinCode ?? ''}</td>
+                    {BINS_SOON ? null : (
+                      <td className="py-1 pr-2 font-mono">{line.pickBinCode ?? ''}</td>
+                    )}
                     <td className="py-1 font-mono">
                       {line.qtyPicked === null ? '☐ ______' : plainDecimal(line.qtyPicked)}
                     </td>

@@ -1,3 +1,4 @@
+import { BINS_SOON } from '@/lib/features';
 import { Decimal } from '@tugeel/shared/money';
 import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -275,7 +276,7 @@ function WarehouseSheets({ detail, number }: { detail: ReceiptDetail; number: st
               <thead>
                 <tr className="text-left">
                   <th className={cell}>{t('inventory.receipt.form.lineNo')}</th>
-                  <th className={cell}>{t('inventory.bin')}</th>
+                  {BINS_SOON ? null : <th className={cell}>{t('inventory.bin')}</th>}
                   <th className={cell}>{t('inventory.sku')}</th>
                   <th className={cell}>{t('inventory.product')}</th>
                   <th className={cell}>{t('inventory.unit')}</th>
@@ -287,7 +288,9 @@ function WarehouseSheets({ detail, number }: { detail: ReceiptDetail; number: st
                 {lines.map((line, index) => (
                   <tr key={line.id}>
                     <td className={cn(cell, 'text-right')}>{index + 1}</td>
-                    <td className={cn(cell, 'font-mono font-semibold')}>{line.binCode}</td>
+                    {BINS_SOON ? null : (
+                      <td className={cn(cell, 'font-mono font-semibold')}>{line.binCode}</td>
+                    )}
                     <td className={cn(cell, 'font-mono')}>{line.productSku}</td>
                     <td className={cell}>{line.productName}</td>
                     <td className={cell}>{line.unitName}</td>

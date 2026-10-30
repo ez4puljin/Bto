@@ -1,3 +1,5 @@
+import { ComingSoonBadge, ComingSoonNote } from '@/components/coming-soon';
+import { BINS_SOON } from '@/lib/features';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
@@ -105,7 +107,11 @@ export function ProductLocationCard({ productId }: { productId: number }) {
                 <span className="font-medium">{warehouseName(row.warehouseId)}</span>
                 <span>
                   {t('inventory.location.fixedBin')}{' '}
-                  <span className="font-mono">{row.defaultBinCode ?? t('common.none')}</span>
+                  {BINS_SOON ? (
+                    <ComingSoonBadge />
+                  ) : (
+                    <span className="font-mono">{row.defaultBinCode ?? t('common.none')}</span>
+                  )}
                 </span>
                 {row.minQty ? <span>{`${t('inventory.location.min')} ${row.minQty}`}</span> : null}
                 {row.maxQty ? <span>{`${t('inventory.location.max')} ${row.maxQty}`}</span> : null}
@@ -199,11 +205,16 @@ function LocationDialog(props: {
               onChange={pick}
             />
           </FormField>
-          <FormField label={t('inventory.location.binCode')} htmlFor="location-bin">
+          <FormField
+            label={t('inventory.location.binCode')}
+            htmlFor="location-bin"
+            hint={BINS_SOON ? <ComingSoonNote /> : undefined}
+          >
             <Input
               id="location-bin"
               className="font-mono sm:w-44"
               autoComplete="off"
+              disabled={BINS_SOON}
               placeholder={t('inventory.bins.codePlaceholder')}
               value={binCode}
               onChange={(event) => setBinCode(event.target.value)}
