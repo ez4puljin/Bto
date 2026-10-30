@@ -174,129 +174,133 @@ export function UserDetailPage() {
       />
       <ProblemAlert problem={asking ? null : mutationProblem} />
 
-      <DetailCard
-        title={t('users.detail.profile')}
-        canEdit={canManage}
-        view={<UserFacts detail={detail} />}
-        edit={(close) => (
-          <div className="flex flex-col gap-4">
-            {isSelf ? (
-              <Alert>
-                <AlertDescription>{t('users.detail.selfNote')}</AlertDescription>
-              </Alert>
-            ) : null}
-            <UserForm
-              lockUsername
-              lockAccess={isSelf}
-              submitLabel={t('common.save')}
-              onCancel={close}
-              onSubmit={async (values) => {
-                if (await save(values)) close();
-              }}
-              defaultValues={{
-                username: detail.username,
-                fullName: detail.fullName,
-                phone: detail.phone?.replace(/^\+976/, '') ?? '',
-                roleIds: detail.roleIds,
-                branchIds: detail.scopes.branchIds,
-                warehouseIds: detail.scopes.warehouseIds,
-              }}
-            />
-          </div>
-        )}
-      />
+      <div className="grid items-start gap-4 xl:grid-cols-2">
+        <DetailCard
+          title={t('users.detail.profile')}
+          canEdit={canManage}
+          view={<UserFacts detail={detail} />}
+          edit={(close) => (
+            <div className="flex flex-col gap-4">
+              {isSelf ? (
+                <Alert>
+                  <AlertDescription>{t('users.detail.selfNote')}</AlertDescription>
+                </Alert>
+              ) : null}
+              <UserForm
+                lockUsername
+                lockAccess={isSelf}
+                submitLabel={t('common.save')}
+                onCancel={close}
+                onSubmit={async (values) => {
+                  if (await save(values)) close();
+                }}
+                defaultValues={{
+                  username: detail.username,
+                  fullName: detail.fullName,
+                  phone: detail.phone?.replace(/^\+976/, '') ?? '',
+                  roleIds: detail.roleIds,
+                  branchIds: detail.scopes.branchIds,
+                  warehouseIds: detail.scopes.warehouseIds,
+                }}
+              />
+            </div>
+          )}
+        />
 
-      {canManage ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('users.detail.sessions')}</CardTitle>
-            {sessions.data?.length ? (
-              <CardAction>
-                <Button size="sm" variant="outline" onClick={() => setAsking('revokeAll')}>
-                  {t('users.detail.revokeAll')}
-                </Button>
-              </CardAction>
-            ) : null}
-          </CardHeader>
-          {/* The table runs to the card's edges: its first column lines up with the title. */}
-          <CardContent className={sessions.data?.length ? 'px-0' : undefined}>
-            {sessions.data?.length ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('users.detail.device')}</TableHead>
-                    <TableHead>{t('users.detail.started')}</TableHead>
-                    <TableHead>{t('users.detail.lastUsed')}</TableHead>
-                    <TableHead>{t('users.detail.ends')}</TableHead>
-                    <TableHead>
-                      <span className="sr-only">{t('common.actions')}</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sessions.data.map((session) => (
-                    <TableRow key={session.id}>
-                      <TruncateCell
-                        text={`${session.ip ?? t('common.none')}${session.userAgent ? ` · ${session.userAgent}` : ''}`}
-                      />
-                      <TableCell className="font-mono">{when(session.createdAt)}</TableCell>
-                      <TableCell className="font-mono">{when(session.lastUsedAt)}</TableCell>
-                      <TableCell className="font-mono">{when(session.expiresAt)}</TableCell>
-                      <RowActions>
-                        <RowAction
-                          label={`${t('users.detail.revoke')}: ${session.ip ?? session.id}`}
-                          icon={LogOut}
-                          destructive
-                          onClick={() => setAsking({ sessionId: session.id })}
-                        />
-                      </RowActions>
+        {canManage ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('users.detail.sessions')}</CardTitle>
+              {sessions.data?.length ? (
+                <CardAction>
+                  <Button size="sm" variant="outline" onClick={() => setAsking('revokeAll')}>
+                    {t('users.detail.revokeAll')}
+                  </Button>
+                </CardAction>
+              ) : null}
+            </CardHeader>
+            {/* The table runs to the card's edges: its first column lines up with the title. */}
+            <CardContent className={sessions.data?.length ? 'px-0' : undefined}>
+              {sessions.data?.length ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t('users.detail.device')}</TableHead>
+                      <TableHead>{t('users.detail.started')}</TableHead>
+                      <TableHead>{t('users.detail.lastUsed')}</TableHead>
+                      <TableHead>{t('users.detail.ends')}</TableHead>
+                      <TableHead>
+                        <span className="sr-only">{t('common.actions')}</span>
+                      </TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <p className="text-sm text-muted-foreground">{t('users.detail.noSessions')}</p>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
+                  </TableHeader>
+                  <TableBody>
+                    {sessions.data.map((session) => (
+                      <TableRow key={session.id}>
+                        <TruncateCell
+                          text={`${session.ip ?? t('common.none')}${session.userAgent ? ` · ${session.userAgent}` : ''}`}
+                        />
+                        <TableCell className="font-mono">{when(session.createdAt)}</TableCell>
+                        <TableCell className="font-mono">{when(session.lastUsedAt)}</TableCell>
+                        <TableCell className="font-mono">{when(session.expiresAt)}</TableCell>
+                        <RowActions>
+                          <RowAction
+                            label={`${t('users.detail.revoke')}: ${session.ip ?? session.id}`}
+                            icon={LogOut}
+                            destructive
+                            onClick={() => setAsking({ sessionId: session.id })}
+                          />
+                        </RowActions>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-sm text-muted-foreground">{t('users.detail.noSessions')}</p>
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
 
-      <ConfirmDialog
-        open={asking === 'code'}
-        variant="default"
-        title={t('users.detail.issueCodeTitle')}
-        description={t('users.detail.issueCodeDescription')}
-        confirmLabel={t('users.detail.issueCode')}
-        pending={mutations.issueCode.isPending}
-        problem={problemFromError(mutations.issueCode.error)}
-        onConfirm={confirm}
-        onClose={() => setAsking(null)}
-      />
-      <ConfirmDialog
-        open={asking === 'disable'}
-        title={t('users.detail.disableTitle')}
-        description={t('users.detail.disableDescription')}
-        confirmLabel={t('users.detail.disable')}
-        pending={mutations.updateUser.isPending}
-        problem={problemFromError(mutations.updateUser.error)}
-        onConfirm={confirm}
-        onClose={() => setAsking(null)}
-      />
-      <ConfirmDialog
-        open={asking === 'revokeAll' || (typeof asking === 'object' && asking !== null)}
-        title={
-          asking === 'revokeAll' ? t('users.detail.revokeAllTitle') : t('users.detail.revokeTitle')
-        }
-        description={t('users.detail.revokeDescription')}
-        confirmLabel={
-          asking === 'revokeAll' ? t('users.detail.revokeAll') : t('users.detail.revoke')
-        }
-        pending={mutations.revokeSession.isPending}
-        problem={problemFromError(mutations.revokeSession.error)}
-        onConfirm={confirm}
-        onClose={() => setAsking(null)}
-      />
-      <CodeDialog code={code} name={detail.fullName} onClose={() => setCode(null)} />
+        <ConfirmDialog
+          open={asking === 'code'}
+          variant="default"
+          title={t('users.detail.issueCodeTitle')}
+          description={t('users.detail.issueCodeDescription')}
+          confirmLabel={t('users.detail.issueCode')}
+          pending={mutations.issueCode.isPending}
+          problem={problemFromError(mutations.issueCode.error)}
+          onConfirm={confirm}
+          onClose={() => setAsking(null)}
+        />
+        <ConfirmDialog
+          open={asking === 'disable'}
+          title={t('users.detail.disableTitle')}
+          description={t('users.detail.disableDescription')}
+          confirmLabel={t('users.detail.disable')}
+          pending={mutations.updateUser.isPending}
+          problem={problemFromError(mutations.updateUser.error)}
+          onConfirm={confirm}
+          onClose={() => setAsking(null)}
+        />
+        <ConfirmDialog
+          open={asking === 'revokeAll' || (typeof asking === 'object' && asking !== null)}
+          title={
+            asking === 'revokeAll'
+              ? t('users.detail.revokeAllTitle')
+              : t('users.detail.revokeTitle')
+          }
+          description={t('users.detail.revokeDescription')}
+          confirmLabel={
+            asking === 'revokeAll' ? t('users.detail.revokeAll') : t('users.detail.revoke')
+          }
+          pending={mutations.revokeSession.isPending}
+          problem={problemFromError(mutations.revokeSession.error)}
+          onConfirm={confirm}
+          onClose={() => setAsking(null)}
+        />
+        <CodeDialog code={code} name={detail.fullName} onClose={() => setCode(null)} />
+      </div>
     </div>
   );
 }

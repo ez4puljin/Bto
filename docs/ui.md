@@ -89,7 +89,7 @@ Feature pieces other screens reuse (ADR-0044, ADR-0047):
 
 ## 4. Page patterns
 
-- **Page width** (ADR-0066, ADR-0119). Every page route says how wide it runs (`handle: { width }`, a test checks): `wide` (the whole width the shell leaves, lists, books, logs, documents with lines, records with a side column, tools whose result is a table) and `full` (the sales work page, the home page) take the screen; `reading` (1400px) for settings, `/new` forms, small tools and single-card records. Pages sit at the left, so the title never jumps; only the sign-in pages are centred.
+- **Page width** (ADR-0066, ADR-0119). Every page route says how wide it runs (`handle: { width }`, a test checks): `wide` (the whole width the shell leaves, lists, books, logs, documents with lines, records with a side column, tools whose result is a table) and `full` (the sales work page, the home page) take the screen; `reading` for settings, `/new` forms, small tools and single-card records — since 2026-10-30 it too takes the whole width (its 1400px cap left the right of a 1920 screen empty): a form keeps its own column caps up to `xl` (`max-w-3xl xl:max-w-none`), and a page of two or three short cards lays them side by side from `xl` (`grid items-start gap-4 xl:grid-cols-2`). Pages sit at the left, so the title never jumps; only the sign-in pages are centred.
 - **List page.** The pieces go in this order:
   1. `PageHeader` (title; actions = the main «Шинэ …» button);
   2. `FilterBar` (search, filter pills, toggles);

@@ -23,10 +23,10 @@ describe('page widths (ADR-0066)', () => {
 });
 
 describe('page widths (ADR-0119)', () => {
-  it('lets wide and full pages take the whole width and caps reading pages at 1400px', () => {
+  it('lets every width take the whole frame (reading lost its 1400px cap on 2026-10-30)', () => {
     expect(PAGE_WIDTHS.wide).toBe('max-w-none');
     expect(PAGE_WIDTHS.full).toBe('max-w-none');
-    expect(PAGE_WIDTHS.reading).toBe('max-w-[87.5rem]');
+    expect(PAGE_WIDTHS.reading).toBe('max-w-none');
     // Pages sit at the left: no page is centred by its width class.
     for (const value of Object.values(PAGE_WIDTHS)) expect(value).not.toContain('mx-auto');
   });

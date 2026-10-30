@@ -77,102 +77,105 @@ export function FinanceSettingsPage() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<MoneyAccount | null>(null);
   return (
-    <div className="space-y-4">
+    <div>
       <PageHeader title={t('finance.settings.title')} />
       <ProblemAlert problem={problemFromError(numbering.error)} onRetry={numbering.refetch} />
-      {numbering.data ? (
-        <DetailCard
-          title={t('finance.settings.numbering')}
-          canEdit
-          view={<NumberingView numbering={numbering.data} />}
-          edit={(close) => <NumberingForm numbering={numbering.data} onClose={close} />}
-        />
-      ) : null}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <div>
-            <CardTitle>{t('finance.settings.moneyAccounts')}</CardTitle>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {t('finance.settings.moneyAccountsDescription')}
-            </p>
-          </div>
-          <Button size="sm" onClick={() => setCreating(true)}>
-            <Plus />
-            {t('finance.actions.newMoneyAccount')}
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <ProblemAlert
-            problem={problemFromError(moneyAccounts.error)}
-            onRetry={moneyAccounts.refetch}
+      {/* The numbering beside the money accounts from xl (owner 2026-10-30: the page hugged the left). */}
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        {numbering.data ? (
+          <DetailCard
+            title={t('finance.settings.numbering')}
+            canEdit
+            view={<NumberingView numbering={numbering.data} />}
+            edit={(close) => <NumberingForm numbering={numbering.data} onClose={close} />}
           />
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('finance.fields.code')}</TableHead>
-                <TableHead>{t('finance.fields.name')}</TableHead>
-                <TableHead>{t('finance.fields.kind')}</TableHead>
-                <TableHead>{t('finance.fields.branch')}</TableHead>
-                <TableHead>{t('finance.fields.account')}</TableHead>
-                <TableHead className="text-right">{t('finance.fields.balance')}</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(moneyAccounts.data ?? []).map((account) => (
-                <TableRow
-                  key={account.id}
-                  className={account.status === 'INACTIVE' ? 'text-muted-foreground' : undefined}
-                >
-                  <TableCell className="font-mono">{account.code}</TableCell>
-                  <TableCell>
-                    {account.name}
-                    {account.bankAccountNo ? (
-                      <span className="ml-2 font-mono text-xs text-muted-foreground">
-                        {account.bankAccountNo}
-                      </span>
-                    ) : null}
-                    {account.showToCustomers ? (
-                      <Badge variant="default" className="ml-2">
-                        {t('finance.settings.shownToCustomers')}
-                      </Badge>
-                    ) : null}
-                    {account.status === 'INACTIVE' ? (
-                      <Badge variant="secondary" className="ml-2">
-                        {t('finance.accountStatuses.INACTIVE')}
-                      </Badge>
-                    ) : null}
-                  </TableCell>
-                  <TableCell>{t(`finance.moneyKinds.${account.kind}`)}</TableCell>
-                  <TableCell>{account.branchName ?? ''}</TableCell>
-                  <TableCell className="font-mono">{account.glAccountCode}</TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatTugrik(account.balance)}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu modal={false}>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon-xs"
-                          aria-label={`${account.code}: ${t('common.actions')}`}
-                        >
-                          <Ellipsis />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => setEditing(account)}>
-                          {t('common.edit')}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+        ) : null}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
+            <div>
+              <CardTitle>{t('finance.settings.moneyAccounts')}</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t('finance.settings.moneyAccountsDescription')}
+              </p>
+            </div>
+            <Button size="sm" onClick={() => setCreating(true)}>
+              <Plus />
+              {t('finance.actions.newMoneyAccount')}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <ProblemAlert
+              problem={problemFromError(moneyAccounts.error)}
+              onRetry={moneyAccounts.refetch}
+            />
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('finance.fields.code')}</TableHead>
+                  <TableHead>{t('finance.fields.name')}</TableHead>
+                  <TableHead>{t('finance.fields.kind')}</TableHead>
+                  <TableHead>{t('finance.fields.branch')}</TableHead>
+                  <TableHead>{t('finance.fields.account')}</TableHead>
+                  <TableHead className="text-right">{t('finance.fields.balance')}</TableHead>
+                  <TableHead className="w-10" />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {(moneyAccounts.data ?? []).map((account) => (
+                  <TableRow
+                    key={account.id}
+                    className={account.status === 'INACTIVE' ? 'text-muted-foreground' : undefined}
+                  >
+                    <TableCell className="font-mono">{account.code}</TableCell>
+                    <TableCell>
+                      {account.name}
+                      {account.bankAccountNo ? (
+                        <span className="ml-2 font-mono text-xs text-muted-foreground">
+                          {account.bankAccountNo}
+                        </span>
+                      ) : null}
+                      {account.showToCustomers ? (
+                        <Badge variant="default" className="ml-2">
+                          {t('finance.settings.shownToCustomers')}
+                        </Badge>
+                      ) : null}
+                      {account.status === 'INACTIVE' ? (
+                        <Badge variant="secondary" className="ml-2">
+                          {t('finance.accountStatuses.INACTIVE')}
+                        </Badge>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>{t(`finance.moneyKinds.${account.kind}`)}</TableCell>
+                    <TableCell>{account.branchName ?? ''}</TableCell>
+                    <TableCell className="font-mono">{account.glAccountCode}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatTugrik(account.balance)}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu modal={false}>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={`${account.code}: ${t('common.actions')}`}
+                          >
+                            <Ellipsis />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onSelect={() => setEditing(account)}>
+                            {t('common.edit')}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
       {creating ? (
         <MoneyAccountDialog open account={null} onClose={() => setCreating(false)} />
       ) : null}

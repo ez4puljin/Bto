@@ -369,6 +369,17 @@ const MEASURE = String.raw`(() => {
     const style = getComputedStyle(el);
     return style.textOverflow === 'ellipsis' && el.scrollWidth > el.clientWidth + 1;
   }).length;
+  // How much of the page box the content really uses: the rightmost visible edge inside it.
+  let contentWidth = null;
+  if (frame && frameBox) {
+    let right = frameBox.left;
+    for (const el of frame.querySelectorAll('*')) {
+      if (el.offsetParent === null) continue;
+      const box = el.getBoundingClientRect();
+      if (box.width > 0 && box.height > 0 && box.right <= frameBox.right + 0.5) right = Math.max(right, box.right);
+    }
+    contentWidth = Math.round(right - frameBox.left);
+  }
   let dialogFacts = null;
   if (dialog) {
     const box = dialog.getBoundingClientRect();
@@ -391,6 +402,7 @@ const MEASURE = String.raw`(() => {
     pageOverflowX: Math.max(0, doc.scrollWidth - vw),
     pageHeight: doc.scrollHeight,
     frame: frameBox ? { left: Math.round(frameBox.left), width: Math.round(frameBox.width) } : null,
+    contentWidth,
     firstRowTop: firstRow ? Math.round(firstRow.getBoundingClientRect().top) : null,
     rows: rows.length,
     visibleRows: rows.filter(visible).length,
@@ -419,6 +431,9 @@ function gallery(report) {
     if (!m) return '';
     const parts = [
       m.pageOverflowX > 0 ? `<b class="bad">page +${m.pageOverflowX}px →</b>` : '',
+      m.frame && m.contentWidth !== null
+        ? (m.contentWidth < m.frame.width * 0.75 ? `<b class="bad">uses ${m.contentWidth}/${m.frame.width}px</b>` : `uses ${m.contentWidth}/${m.frame.width}px`)
+        : '',
       m.firstRowTop !== null ? `row 1 at ${m.firstRowTop}px` : '',
       m.rows ? `${m.visibleRows}/${m.rows} rows seen` : '',
       m.scrollers.length

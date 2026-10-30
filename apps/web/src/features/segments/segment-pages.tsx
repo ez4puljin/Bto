@@ -266,28 +266,30 @@ export function SegmentPage() {
         }
       />
       <ProblemAlert problem={problemFromError(counts.error)} onRetry={counts.refetch} />
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {data.definition ? t('segments.conditions') : t('segments.list.title')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {data.description ? (
-            <FieldList items={[{ label: t('segments.description'), value: data.description }]} />
-          ) : null}
-          {data.definition ? (
-            <DefinitionText entity={data.entity} definition={data.definition} />
-          ) : (
-            <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-              <p>{t('segments.list.hint')}</p>
-              {/* Only those who may change its products are told how. */}
-              {canManage ? <p>{t('segments.list.howTo')}</p> : null}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      {data.entity === 'PRODUCT' ? <AppCard segment={data} /> : null}
+      <div className="grid items-start gap-4 xl:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {data.definition ? t('segments.conditions') : t('segments.list.title')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            {data.description ? (
+              <FieldList items={[{ label: t('segments.description'), value: data.description }]} />
+            ) : null}
+            {data.definition ? (
+              <DefinitionText entity={data.entity} definition={data.definition} />
+            ) : (
+              <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+                <p>{t('segments.list.hint')}</p>
+                {/* Only those who may change its products are told how. */}
+                {canManage ? <p>{t('segments.list.howTo')}</p> : null}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        {data.entity === 'PRODUCT' ? <AppCard segment={data} /> : null}
+      </div>
       <ConfirmDialog
         open={asking}
         title={t('segments.archiveTitle', { name: data.name })}
@@ -325,7 +327,7 @@ function AppCard({ segment }: { segment: Segment }) {
   const move = (direction: 'UP' | 'DOWN') =>
     void action.run(() => mutations.moveInApp.mutateAsync({ id: segment.id, direction }));
   return (
-    <Card role="region" aria-label={t('segments.app.title')} className="mt-4">
+    <Card role="region" aria-label={t('segments.app.title')}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Smartphone aria-hidden className="size-4 text-muted-foreground" />
