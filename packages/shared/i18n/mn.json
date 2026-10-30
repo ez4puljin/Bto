@@ -7385,7 +7385,11 @@
       "openOrderer": "Дэлгэрэнгүй: {{name}}",
       "openSupplier": "Дэлгэрэнгүй: {{name}}",
       "lines": "Бараа",
-      "empty": "Энэ төлөвт нийлүүлэгч алга"
+      "empty": "Энэ төлөвт нийлүүлэгч алга",
+      "showLines": "Бараа харах",
+      "ordered": "Захиалга",
+      "remaining": "Үлдсэн",
+      "supplierSummary": "{{lines}} бараа · {{boxes}} хайрцаг · {{kg}} кг"
     },
     "detail": {
       "archived": "Архивласан",

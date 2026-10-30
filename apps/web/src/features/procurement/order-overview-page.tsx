@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
-import { ChevronHead, EmptyState, FilterToggle, LinkRow, TruncateCell } from '@/components/list';
+import { EmptyState, FilterToggle, LoadMore } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
@@ -22,10 +22,12 @@ import { problemFromError } from '@/lib/problem';
 import { cn } from '@/lib/utils';
 import {
   PO_STATUSES,
+  type GridRow,
   type PoStatus,
   type PurchaseOrderDetail,
   type PurchaseOrderSupplier,
   usePurchaseOrder,
+  usePurchaseOrderRows,
 } from './api';
 import { PoStatusBadge, StatusCountBadge } from './parts';
 
@@ -207,6 +209,7 @@ function Overview({ detail, onRefresh }: { detail: PurchaseOrderDetail; onRefres
             <OrdererGroup
               key={ordererId ?? 'none'}
               base={base}
+              orderId={detail.id}
               ordererId={ordererId}
               name={suppliers[0]?.ordererName ?? null}
               suppliers={suppliers}
@@ -235,6 +238,7 @@ function Tile({ label, value }: { label: string; value: string }) {
 /** One orderer's suppliers: the header with the group's totals, the rows under it when opened. */
 function OrdererGroup(props: {
   base: string;
+  orderId: number;
   ordererId: number | null;
   name: string | null;
   suppliers: readonly PurchaseOrderSupplier[];
@@ -296,61 +300,144 @@ function OrdererGroup(props: {
         ) : null}
       </div>
       {open ? (
+        <div className="flex flex-col gap-2 border-t border-border/80 p-3">
+          {props.suppliers.map((supplier) => (
+            <SupplierCard
+              key={supplier.supplierId}
+              base={props.base}
+              orderId={props.orderId}
+              supplier={supplier}
+              canPrices={props.canPrices}
+            />
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/** A supplier as a card: its status, orderer and totals; «Бараа харах» unfolds its ordered lines. */
+function SupplierCard(props: {
+  base: string;
+  orderId: number;
+  supplier: PurchaseOrderSupplier;
+  canPrices: boolean;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const { supplier } = props;
+  const to = `${props.base}/detail?supplier=${supplier.supplierId}`;
+  return (
+    <section
+      aria-label={supplier.supplierName}
+      className="rounded-lg border border-border/80 bg-background"
+    >
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+        <Link to={to} className="text-[14px] font-semibold underline-offset-4 hover:underline">
+          {supplier.supplierName}
+        </Link>
+        <PoStatusBadge status={supplier.status} />
+        {supplier.ordererName ? (
+          <span className="text-[13px] text-muted-foreground">{supplier.ordererName}</span>
+        ) : null}
+        <span className="text-[13px] text-muted-foreground">
+          {t('procurement.overview.supplierSummary', {
+            lines: formatCount(supplier.lineCount),
+            boxes: formatQty(supplier.boxes),
+            kg: formatQty(new Decimal(supplier.weightKg).toDecimalPlaces(1).toString()),
+          })}
+        </span>
+        {props.canPrices && supplier.estimatedCost ? (
+          <span className="font-mono text-[13px]">{formatTugrik(supplier.estimatedCost)}</span>
+        ) : null}
+        <span className="ml-auto flex items-center gap-1">
+          {supplier.lineCount > 0 ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-expanded={open}
+              onClick={() => setOpen((value) => !value)}
+            >
+              <ChevronDown
+                aria-hidden
+                className={cn('size-4 transition-transform', !open && '-rotate-90')}
+              />
+              {t(open ? 'common.close' : 'procurement.overview.showLines')}
+            </Button>
+          ) : null}
+          <Button variant="outline" size="sm" asChild>
+            <Link
+              to={to}
+              aria-label={t('procurement.overview.openSupplier', { name: supplier.supplierName })}
+            >
+              {t('procurement.overview.detail')}
+            </Link>
+          </Button>
+        </span>
+      </div>
+      {open ? <SupplierLines orderId={props.orderId} supplierId={supplier.supplierId} /> : null}
+    </section>
+  );
+}
+
+/** The supplier's ordered lines (200 a page): code, name, ordered, shipped and what is still to come. */
+function SupplierLines({ orderId, supplierId }: { orderId: number; supplierId: number }) {
+  const { t } = useTranslation();
+  const rows = usePurchaseOrderRows(orderId, supplierId, { filter: 'ORDERED' });
+  const data = rows.data?.pages.flatMap((page) => page.data) ?? [];
+  return (
+    <div className="border-t border-border/80">
+      <ProblemAlert problem={problemFromError(rows.error)} onRetry={rows.refetch} />
+      {rows.isPending ? (
+        <p className="px-3 py-2 text-sm text-muted-foreground">{t('common.loading')}</p>
+      ) : null}
+      {data.length > 0 ? (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{t('procurement.overview.suppliers')}</TableHead>
-              <TableHead>{t('procurement.orders.status')}</TableHead>
-              <TableHead className="text-right">{t('procurement.overview.lines')}</TableHead>
-              <TableHead className="text-right">{t('procurement.overview.boxes')}</TableHead>
-              <TableHead className="text-right">{t('procurement.overview.pieces')}</TableHead>
-              <TableHead className="text-right">{t('procurement.detail.columns.kg')}</TableHead>
-              {props.canPrices ? (
-                <TableHead className="text-right">{t('procurement.overview.estimated')}</TableHead>
-              ) : null}
-              <ChevronHead />
+              <TableHead>{t('procurement.detail.columns.sku')}</TableHead>
+              <TableHead>{t('procurement.detail.columns.name')}</TableHead>
+              <TableHead className="text-right">{t('procurement.overview.ordered')}</TableHead>
+              <TableHead className="text-right">
+                {t('procurement.detail.columns.shipped')}
+              </TableHead>
+              <TableHead className="text-right">{t('procurement.overview.remaining')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {props.suppliers.map((supplier) => (
-              <LinkRow
-                key={supplier.supplierId}
-                to={`${props.base}/detail?supplier=${supplier.supplierId}`}
-              >
-                <TruncateCell text={supplier.supplierName}>
-                  <Link
-                    to={`${props.base}/detail?supplier=${supplier.supplierId}`}
-                    className="font-medium underline-offset-4 hover:underline"
-                    aria-label={t('procurement.overview.openSupplier', {
-                      name: supplier.supplierName,
-                    })}
-                  >
-                    {supplier.supplierName}
-                  </Link>
-                </TruncateCell>
-                <TableCell>
-                  <PoStatusBadge status={supplier.status} />
-                </TableCell>
-                <TableCell className="text-right font-mono">
-                  {formatCount(supplier.lineCount)}
-                </TableCell>
-                <TableCell className="text-right font-mono">{formatQty(supplier.boxes)}</TableCell>
-                <TableCell className="text-right font-mono">
-                  {formatQty(supplier.qtyBase)}
-                </TableCell>
-                <TableCell className="text-right font-mono">
-                  {formatQty(new Decimal(supplier.weightKg).toDecimalPlaces(1).toString())}
-                </TableCell>
-                {props.canPrices ? (
-                  <TableCell className="text-right font-mono">
-                    {supplier.estimatedCost ? formatTugrik(supplier.estimatedCost) : ''}
-                  </TableCell>
-                ) : null}
-              </LinkRow>
+            {data.map((row) => (
+              <LineRow key={row.productId} row={row} />
             ))}
           </TableBody>
         </Table>
       ) : null}
-    </section>
+      <LoadMore query={rows} />
+    </div>
+  );
+}
+
+function LineRow({ row }: { row: GridRow }) {
+  const line = row.line;
+  if (!line) return null;
+  const unit = row.units.find((candidate) => candidate.id === line.productUnitId);
+  const shipped = line.shippedQty === null ? null : new Decimal(line.shippedQty);
+  const remaining = shipped === null ? new Decimal(line.qty) : new Decimal(line.qty).minus(shipped);
+  return (
+    <TableRow>
+      <TableCell className="font-mono">{row.sku}</TableCell>
+      <TableCell>{row.name}</TableCell>
+      <TableCell className="text-right font-mono">
+        {formatQty(line.qty)}
+        {unit ? ` ${unit.name}` : ''}
+      </TableCell>
+      <TableCell
+        className={cn('text-right font-mono', shipped && !shipped.isZero() && 'text-success')}
+      >
+        {shipped ? formatQty(shipped.toFixed()) : formatQty('0')}
+      </TableCell>
+      <TableCell className={cn('text-right font-mono', !remaining.isZero() && 'text-warning')}>
+        {formatQty(remaining.toFixed())}
+      </TableCell>
+    </TableRow>
   );
 }
