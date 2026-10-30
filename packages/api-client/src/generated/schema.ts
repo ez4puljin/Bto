@@ -6687,6 +6687,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/purchase-orders/{id}/suppliers/{supplierId}/invoice-checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The AI's checks of a supplier's invoice photos (ADR-0122), newest first. */
+        get: operations["PurchaseOrders_invoiceChecksOf"];
+        put?: never;
+        /**
+         * Runs the AI check of an uploaded invoice photo against the supplier's ordered lines
+         *     (ADR-0122): managers, the supplier's orderer and cost holders; 503 while no model is set.
+         */
+        post: operations["PurchaseOrders_runInvoiceCheck"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchase-orders/invoice-checks/{checkId}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The photo of an invoice check, streamed to order readers. */
+        get: operations["PurchaseOrders_invoiceCheckImage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/purchase-orders/{id}/loads": {
         parameters: {
             query?: never;
@@ -6720,6 +6758,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/purchase-orders/{id}/loads/{loadId}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Sets what a load carries of the given lines (ADR-0122); a quantity of 0 takes a line off. */
+        put: operations["PurchaseOrders_setLoadLines"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchase-orders/{id}/load-lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The order's lines with what rides on which truck (ADR-0122), for the loading screen. */
+        get: operations["PurchaseOrders_loadLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/purchase-orders/{id}/suppliers/{supplierId}/load": {
         parameters: {
             query?: never;
@@ -6728,7 +6800,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Puts a supplier on one of the order's loads, or takes it off with null. */
+        /** Puts a whole supplier (everything still off a truck) on a load, or takes all of it off (null). */
         put: operations["PurchaseOrders_assignLoad"];
         post?: never;
         delete?: never;
@@ -7550,7 +7622,7 @@ export interface components {
         };
         FileUploadRequest: {
             /** @enum {string} */
-            kind: "catalog.product_image" | "catalog.product_thumb" | "notifications.notice_image" | "catalog.category_image" | "customer.banner_image" | "inventory.receipt_note" | "imports.source";
+            kind: "catalog.product_image" | "catalog.product_thumb" | "notifications.notice_image" | "catalog.category_image" | "customer.banner_image" | "inventory.receipt_note" | "procurement.invoice_image" | "imports.source";
             /** @example image/jpeg */
             contentType: string;
             sizeBytes: number;
@@ -15456,6 +15528,51 @@ export interface components {
         SupplierEntries: {
             data: components["schemas"]["SupplierEntry"][];
         };
+        PurchaseOrderInvoiceCheckLine: {
+            productId: number | null;
+            sku: string | null;
+            /** @description The name as printed on the invoice */
+            invoiceName: string;
+            invoiceQty: string | null;
+            invoiceUnitPrice: string | null;
+            invoiceAmount: string | null;
+            orderedQty: string | null;
+            orderedUnit: string | null;
+            /** @enum {string} */
+            status: "MATCH" | "QTY_DIFF" | "PRICE_DIFF" | "NOT_ORDERED" | "MISSING" | "UNREADABLE";
+            note: string;
+        };
+        PurchaseOrderInvoiceCheckResult: {
+            invoiceTotal: string | null;
+            invoiceLineCount: number | null;
+            totalsMatch: boolean;
+            lines: components["schemas"]["PurchaseOrderInvoiceCheckLine"][];
+            /** @description The model’s explanation, in Mongolian */
+            summary: string;
+        };
+        PurchaseOrderInvoiceCheck: {
+            id: number;
+            orderId: number;
+            supplierId: number;
+            /** @enum {string} */
+            status: "PENDING" | "DONE" | "FAILED";
+            model: string | null;
+            /** @description The invoice total the model read */
+            invoiceTotal: string | null;
+            /** @description The order’s estimate at the time */
+            orderedTotal: string | null;
+            result: components["schemas"]["PurchaseOrderInvoiceCheckResult"] | null;
+            errorReason: string | null;
+            createdBy: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            finishedAt: string | null;
+        };
+        RunInvoiceCheckDto: {
+            /** @description An uploaded photo of kind procurement.invoice_image */
+            fileId: number;
+        };
         AddLoadDto: {
             truckId: number;
             note?: string | null;
@@ -15493,8 +15610,10 @@ export interface components {
             noteTotalAmount: string | null;
             receiptId: number | null;
             receiptNumber: string | null;
-            /** @description The load (truck) it rides on */
-            loadId: number | null;
+            /** @description The loads (trucks) its lines ride on (ADR-0122) */
+            loadIds: number[];
+            /** @description Σ quantity on the loads, in the lines’ own unit (boxes) */
+            loadedBoxes: string;
             canEdit: boolean;
             /** @description May type the shipped quantities now */
             canShip: boolean;
@@ -15505,15 +15624,24 @@ export interface components {
             canMoveNext: boolean;
             canMoveBack: boolean;
         };
+        PurchaseOrderLoadItem: {
+            lineId: number;
+            supplierId: number;
+            productId: number;
+            /** @description In the line’s own unit (boxes) */
+            qty: string;
+        };
         PurchaseOrderLoad: {
             id: number;
             truckId: number;
             truckName: string;
             plate: string | null;
             capacityKg: string | null;
+            /** @description The truck is still active */
+            truckActive: boolean;
             note: string | null;
-            /** @description The suppliers on this load */
-            supplierIds: number[];
+            /** @description What rides on this load, by line */
+            items: components["schemas"]["PurchaseOrderLoadItem"][];
         };
         PurchaseOrderDetail: {
             id: number;
@@ -15540,6 +15668,44 @@ export interface components {
             suppliers: components["schemas"]["PurchaseOrderSupplier"][];
             /** @description The trucks named on the order (ADR-0121) */
             loads: components["schemas"]["PurchaseOrderLoad"][];
+        };
+        LoadLineInputDto: {
+            supplierId: number;
+            productId: number;
+            /** @description In the line’s unit; 0 takes the line off this load */
+            qty: string;
+        };
+        SetLoadLinesDto: {
+            lines: components["schemas"]["LoadLineInputDto"][];
+        };
+        PurchaseOrderLoadLineLoad: {
+            loadId: number;
+            /** @description On this load, in the line’s unit */
+            qty: string;
+        };
+        PurchaseOrderLoadLine: {
+            lineId: number;
+            supplierId: number;
+            supplierName: string;
+            productId: number;
+            sku: string;
+            productName: string;
+            unitName: string;
+            /** @description Ordered, in the line’s unit */
+            qty: string;
+            /** @description Base units per line unit */
+            factor: string;
+            /** @description kg of one line unit */
+            unitWeightKg: string | null;
+            /** @description What rides on which load */
+            loads: components["schemas"]["PurchaseOrderLoadLineLoad"][];
+            /** @description Still off every truck, in the line’s unit */
+            remaining: string;
+        };
+        PurchaseOrderLoadLinesPage: {
+            data: components["schemas"]["PurchaseOrderLoadLine"][];
+            nextCursor: string | null;
+            total: number;
         };
         AssignLoadDto: {
             /** @description The load, or null to take the supplier off */
@@ -15789,7 +15955,7 @@ export interface components {
             userId: number | null;
             userName: string | null;
             /** @enum {string} */
-            kind: "CREATED" | "NOTE" | "SUPPLIERS_ADDED" | "SUPPLIER_REMOVED" | "STATUS" | "ORDER_QTY" | "SHIPPED_QTY" | "ARRIVED_QTY" | "LINE_NOTE" | "LINE_ADDED" | "LINE_REMOVED" | "RECEIPT_CONFIRMED" | "RECEIPT_WITHDRAWN" | "RECEIPT_POSTED" | "RECEIPT_CANCELLED" | "PRICES" | "ARCHIVED" | "UNARCHIVED";
+            kind: "CREATED" | "NOTE" | "SUPPLIERS_ADDED" | "SUPPLIER_REMOVED" | "STATUS" | "ORDER_QTY" | "SHIPPED_QTY" | "ARRIVED_QTY" | "LINE_NOTE" | "LINE_ADDED" | "LINE_REMOVED" | "RECEIPT_CONFIRMED" | "RECEIPT_WITHDRAWN" | "RECEIPT_POSTED" | "RECEIPT_CANCELLED" | "PRICES" | "ARCHIVED" | "UNARCHIVED" | "LOAD_ADDED" | "LOAD_REMOVED" | "LOADED" | "INVOICE_CHECKED";
             supplierId: number | null;
             supplierName: string | null;
             productId: number | null;
@@ -15880,7 +16046,7 @@ export interface components {
             isActive?: boolean;
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "ISSUE_LINES_UNCHECKED" | "ISSUE_WAREHOUSE_CONFIRMED" | "ISSUE_PARTLY_POSTED" | "ISSUE_RECIPIENT_KIND" | "ISSUE_CORRECTION_OPEN" | "ISSUE_NOT_SENT" | "PO_NOT_ARCHIVABLE" | "PO_NOT_EDITABLE" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "TRANSFER_LINES_UNCOUNTED" | "TRANSFER_REQUEST_EMPTY" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "ISSUE_LINES_UNCHECKED" | "ISSUE_WAREHOUSE_CONFIRMED" | "ISSUE_PARTLY_POSTED" | "ISSUE_RECIPIENT_KIND" | "ISSUE_CORRECTION_OPEN" | "ISSUE_NOT_SENT" | "PO_NOT_ARCHIVABLE" | "PO_NOT_EDITABLE" | "PO_LOAD_OVER" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "TRANSFER_LINES_UNCOUNTED" | "TRANSFER_REQUEST_EMPTY" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -31967,6 +32133,101 @@ export interface operations {
             };
         };
     };
+    PurchaseOrders_invoiceChecksOf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                supplierId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderInvoiceCheck"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PurchaseOrders_runInvoiceCheck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                supplierId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunInvoiceCheckDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderInvoiceCheck"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PurchaseOrders_invoiceCheckImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                checkId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The photo */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     PurchaseOrders_addLoad: {
         parameters: {
             query?: never;
@@ -32022,6 +32283,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PurchaseOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PurchaseOrders_setLoadLines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                loadId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetLoadLinesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PurchaseOrders_loadLines: {
+        parameters: {
+            query?: {
+                q?: string;
+                supplierId?: number;
+                /** @description Only lines with something off every truck */
+                unassigned?: "true" | "false";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderLoadLinesPage"];
                 };
             };
             /** @description RFC 9457 problem details */

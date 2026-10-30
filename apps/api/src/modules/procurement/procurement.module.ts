@@ -8,6 +8,7 @@ import {
   SupplierOrderersController,
   TrucksController,
 } from './controllers/purchase-orders.controller';
+import { InvoiceCheckFlowService } from './services/invoice-check-flow.service';
 import { OrderHistoryService } from './services/order-history.service';
 import { OrderLoadsService } from './services/order-loads.service';
 import { OrderProgressService } from './services/order-progress.service';
@@ -29,6 +30,7 @@ import { SupplierOrderersService } from './services/supplier-orderers.service';
     OrderProgressService,
     OrderHistoryService,
     OrderLoadsService,
+    InvoiceCheckFlowService,
     { provide: RECEIPT_PROGRESS, useExisting: OrderProgressService },
   ],
   exports: [
@@ -37,6 +39,7 @@ import { SupplierOrderersService } from './services/supplier-orderers.service';
     SupplierOrderersService,
     OrderHistoryService,
     OrderLoadsService,
+    InvoiceCheckFlowService,
     RECEIPT_PROGRESS,
   ],
 })

@@ -7,14 +7,15 @@ import {
   check,
   date,
   index,
+  jsonb,
   pgTable,
   text,
   timestamp,
   unique,
 } from 'drizzle-orm/pg-core';
-import { factor, qty } from '../../common/db/types';
+import { factor, money, qty } from '../../common/db/types';
 import { productUnits, products } from '../catalog/schema';
-import { users } from '../identity/schema';
+import { files, users } from '../identity/schema';
 import { goodsReceipts } from '../inventory/schema';
 import { suppliers } from '../partners/schema';
 
@@ -75,8 +76,6 @@ export const purchaseOrderSuppliers = pgTable(
     status: text('status', { enum: PO_SUPPLIER_STATUSES }).notNull().default('PREPARING'),
     /** The goods receipt made when the supplier arrived (NULL before, and after a step back). */
     receiptId: ref('receipt_id').references(() => goodsReceipts.id),
-    /** The truck load this supplier rides on (ADR-0121); NULL while unassigned. */
-    loadId: ref('load_id').references(() => purchaseOrderLoads.id),
     statusChangedAt: timestamp('status_changed_at', { withTimezone: true }).notNull().defaultNow(),
     statusChangedBy: userRef('status_changed_by'),
     createdAt: createdAt(),
@@ -85,7 +84,6 @@ export const purchaseOrderSuppliers = pgTable(
     unique('purchase_order_suppliers_key').on(t.orderId, t.supplierId),
     unique('purchase_order_suppliers_receipt_key').on(t.receiptId),
     index('purchase_order_suppliers_supplier_idx').on(t.supplierId, t.orderId),
-    index('purchase_order_suppliers_load_idx').on(t.loadId),
     check('purchase_order_suppliers_status', inList(t.status, PO_SUPPLIER_STATUSES)),
     check(
       'purchase_order_suppliers_receipt',
@@ -132,7 +130,6 @@ export const purchaseOrderLines = pgTable(
   ],
 );
 
-/** The staff member who orders from a supplier (one per supplier, owner 2026-10-29). */
 /** A company truck (ADR-0121): a name, its plate and what it carries, in kg. */
 export const trucks = pgTable(
   'trucks',
@@ -154,8 +151,9 @@ export const trucks = pgTable(
 );
 
 /**
- * One truck's load on an order (ADR-0121): the suppliers assigned to it ride together. A truck
- * appears once per order; removing the load sets its suppliers back to unassigned.
+ * One truck's load on an order (ADR-0121): a truck appears once per order. What rides on it is
+ * said by line (`purchase_order_loads_lines`, ADR-0122): a supplier's goods may be split over
+ * several trucks; removing the load frees its lines.
  */
 export const purchaseOrderLoads = pgTable(
   'purchase_order_loads',
@@ -180,6 +178,70 @@ export const purchaseOrderLoads = pgTable(
   ],
 );
 
+/**
+ * A quantity of one order line on one load (ADR-0122), in the line's own unit (boxes): the sum
+ * over the loads of a line never exceeds its ordered quantity; a line not here is unassigned.
+ */
+export const purchaseOrderLoadLines = pgTable(
+  'purchase_order_load_lines',
+  {
+    id: id(),
+    loadId: ref('load_id')
+      .notNull()
+      .references(() => purchaseOrderLoads.id),
+    lineId: ref('line_id')
+      .notNull()
+      .references(() => purchaseOrderLines.id),
+    qty: qty('qty').notNull(),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('purchase_order_load_lines_key').on(t.loadId, t.lineId),
+    index('purchase_order_load_lines_line_idx').on(t.lineId),
+    check('purchase_order_load_lines_qty', sql`${t.qty} > 0`),
+  ],
+);
+
+export const PO_INVOICE_CHECK_STATUSES = ['PENDING', 'DONE', 'FAILED'] as const;
+export type PoInvoiceCheckStatus = (typeof PO_INVOICE_CHECK_STATUSES)[number];
+
+/**
+ * The AI's reading of a supplier's final invoice (ADR-0122): the photo (a private file of
+ * identity's), what the model read from it and how it compares with the ordered lines. `result`
+ * holds the structured comparison; the prompt and the raw answer are never stored (ADR-0045 #7).
+ */
+export const purchaseOrderInvoiceChecks = pgTable(
+  'purchase_order_invoice_checks',
+  {
+    id: id(),
+    orderSupplierId: ref('order_supplier_id')
+      .notNull()
+      .references(() => purchaseOrderSuppliers.id),
+    fileId: ref('file_id')
+      .notNull()
+      .references(() => files.id),
+    status: text('status', { enum: PO_INVOICE_CHECK_STATUSES }).notNull().default('PENDING'),
+    /** The model that answered, as the provider reports it. */
+    model: text('model'),
+    /** The invoice's total as the model read it. */
+    invoiceTotal: money('invoice_total'),
+    /** Σ ordered × last price per base unit at the time of the check (the order's estimate). */
+    orderedTotal: money('ordered_total'),
+    result: jsonb('result'),
+    errorReason: text('error_reason'),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('purchase_order_invoice_checks_supplier_idx').on(t.orderSupplierId),
+    check('purchase_order_invoice_checks_status', inList(t.status, PO_INVOICE_CHECK_STATUSES)),
+  ],
+);
+
+/** The staff member who orders from a supplier (one per supplier, owner 2026-10-29). */
 export const supplierOrderers = pgTable(
   'supplier_orderers',
   {

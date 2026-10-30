@@ -158,5 +158,9 @@ export const PO_HISTORY_KINDS = [
   'PRICES',
   'ARCHIVED',
   'UNARCHIVED',
+  'LOAD_ADDED',
+  'LOAD_REMOVED',
+  'LOADED',
+  'INVOICE_CHECKED',
 ] as const;
 export type PoHistoryKind = (typeof PO_HISTORY_KINDS)[number];

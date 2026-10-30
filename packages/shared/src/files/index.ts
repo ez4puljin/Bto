@@ -61,6 +61,13 @@ export const FILE_KINDS = {
     visibility: 'private',
     permissions: ['inventory.receipts.manage', 'inventory.costs.manage'],
   },
+  /** A supplier's invoice photographed for the AI check (ADR-0122), private: order managers, orderers and cost holders. */
+  'procurement.invoice_image': {
+    contentTypes: IMAGE_TYPES,
+    maxBytes: 5 * 1024 * 1024,
+    visibility: 'private',
+    permissions: ['procurement.orders.manage', 'procurement.orders.edit', 'inventory.costs.manage'],
+  },
   /** An Excel sheet for the importer (ADR-0036): kept privately as the record of what was imported. */
   'imports.source': {
     contentTypes: [XLSX_CONTENT_TYPE],

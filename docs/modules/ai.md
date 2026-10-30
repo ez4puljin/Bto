@@ -106,6 +106,8 @@ None: nothing imports `modules/ai`. Inside the module:
 - **Statuses.** `ANSWERED`, `CLARIFY` (the model asks back), `UNSUPPORTED` (the data is not there), `REFUSED` (the guard refused twice), `FAILED` (the database failed). Each is a normal 200 answer.
 - **Others' data.** A conversation or question of someone else is 404. A report's SQL is always copied on the server; SQL from the client is never accepted. Every run and export passes the guard again.
 
+**Images in a request (ADR-0122 #7).** A user turn of `LlmRequest.messages` may be parts — text and images as base64 with their media type — and every client maps them to its provider (Anthropic content blocks, OpenAI Responses `input_image` data URLs, Ollama `images`). The assistant keeps sending text; procurement's invoice check (`invoice-check-flow.service.ts`, `docs/modules/procurement.md`) is the first caller with a photo. The same rules hold: the call runs between transactions, nothing of the prompt or the answer is stored or logged.
+
 ## 6. Error codes introduced
 
 `AI_NOT_CONFIGURED` (503: no provider, or no `AI_DATABASE_URL`), `AI_PROVIDER_FAILED` (502: timeout, network, HTTP error, refusal, unreadable answer; `params.reason`, `status`, `providerCode`), `AI_QUERY_FAILED` (422: a question or report run again, or exported, no longer runs; `params.code`). Also used: `NOT_FOUND`, `FORBIDDEN`, `VALIDATION_FAILED`, `IDEMPOTENCY_KEY_IN_PROGRESS`.

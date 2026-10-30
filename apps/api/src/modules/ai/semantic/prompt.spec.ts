@@ -1,4 +1,5 @@
 import mn from '@tugeel/shared/i18n/mn.json';
+import { textOf } from '../../../integrations/llm';
 import { guardSql } from '../sql/sql-guard';
 import { AI_DATASETS } from './datasets';
 import {
@@ -71,7 +72,7 @@ describe('the prompt of the AI assistant (ADR-0045 #6)', () => {
       rows,
       truncated: true,
     });
-    const content = request.messages[0]?.content ?? '';
+    const content = textOf(request.messages[0]?.content ?? '');
     const data = JSON.parse(content.split('<result>\n')[1]?.split('\n</result>')[0] ?? '{}') as {
       rows: string[][];
       rowsGiven: number;

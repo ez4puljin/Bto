@@ -5,6 +5,7 @@ import {
   type LlmClient,
   type LlmConfig,
   LlmError,
+  type LlmMessage,
   type LlmRequest,
   type LlmResult,
 } from './llm.types';
@@ -56,10 +57,7 @@ export class OpenAiClient implements LlmClient {
       {
         model: this.config.model,
         instructions: request.instructions,
-        input: request.messages.map((message) => ({
-          role: message.role,
-          content: message.content,
-        })),
+        input: request.messages.map(openAiMessage),
         max_output_tokens: request.maxOutputTokens,
         store: false,
         ...(request.output && {
@@ -105,4 +103,17 @@ export class OpenAiClient implements LlmClient {
       },
     };
   }
+}
+
+/** A turn as the Responses API takes it: text, or input parts with images as data URLs. */
+function openAiMessage(message: LlmMessage) {
+  if (typeof message.content === 'string') return { role: message.role, content: message.content };
+  return {
+    role: message.role,
+    content: message.content.map((part) =>
+      part.type === 'text'
+        ? { type: 'input_text', text: part.text }
+        : { type: 'input_image', image_url: `data:${part.mediaType};base64,${part.data}` },
+    ),
+  };
 }

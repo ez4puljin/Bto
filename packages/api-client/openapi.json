@@ -27179,6 +27179,164 @@
         ]
       }
     },
+    "/api/v1/purchase-orders/{id}/suppliers/{supplierId}/invoice-checks": {
+      "get": {
+        "operationId": "PurchaseOrders_invoiceChecksOf",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PurchaseOrderInvoiceCheck"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The AI's checks of a supplier's invoice photos (ADR-0122), newest first.",
+        "tags": [
+          "procurement"
+        ]
+      },
+      "post": {
+        "operationId": "PurchaseOrders_runInvoiceCheck",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunInvoiceCheckDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderInvoiceCheck"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Runs the AI check of an uploaded invoice photo against the supplier's ordered lines\n(ADR-0122): managers, the supplier's orderer and cost holders; 503 while no model is set.",
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
+    "/api/v1/purchase-orders/invoice-checks/{checkId}/image": {
+      "get": {
+        "operationId": "PurchaseOrders_invoiceCheckImage",
+        "parameters": [
+          {
+            "name": "checkId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The photo"
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The photo of an invoice check, streamed to order readers.",
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
     "/api/v1/purchase-orders/{id}/loads": {
       "post": {
         "operationId": "PurchaseOrders_addLoad",
@@ -27297,6 +27455,166 @@
         ]
       }
     },
+    "/api/v1/purchase-orders/{id}/loads/{loadId}/lines": {
+      "put": {
+        "operationId": "PurchaseOrders_setLoadLines",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "loadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetLoadLinesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sets what a load carries of the given lines (ADR-0122); a quantity of 0 takes a line off.",
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
+    "/api/v1/purchase-orders/{id}/load-lines": {
+      "get": {
+        "operationId": "PurchaseOrders_loadLines",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "unassigned",
+            "required": false,
+            "in": "query",
+            "description": "Only lines with something off every truck",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 10,
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderLoadLinesPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The order's lines with what rides on which truck (ADR-0122), for the loading screen.",
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
     "/api/v1/purchase-orders/{id}/suppliers/{supplierId}/load": {
       "put": {
         "operationId": "PurchaseOrders_assignLoad",
@@ -27355,7 +27673,7 @@
             "bearer": []
           }
         ],
-        "summary": "Puts a supplier on one of the order's loads, or takes it off with null.",
+        "summary": "Puts a whole supplier (everything still off a truck) on a load, or takes all of it off (null).",
         "tags": [
           "procurement"
         ]
@@ -30546,6 +30864,7 @@
               "catalog.category_image",
               "customer.banner_image",
               "inventory.receipt_note",
+              "procurement.invoice_image",
               "imports.source"
             ],
             "type": "string"
@@ -57339,6 +57658,191 @@
           "data"
         ]
       },
+      "PurchaseOrderInvoiceCheckLine": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number",
+            "nullable": true
+          },
+          "sku": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoiceName": {
+            "type": "string",
+            "description": "The name as printed on the invoice"
+          },
+          "invoiceQty": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoiceUnitPrice": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoiceAmount": {
+            "type": "string",
+            "nullable": true
+          },
+          "orderedQty": {
+            "type": "string",
+            "nullable": true
+          },
+          "orderedUnit": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "MATCH",
+              "QTY_DIFF",
+              "PRICE_DIFF",
+              "NOT_ORDERED",
+              "MISSING",
+              "UNREADABLE"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "productId",
+          "sku",
+          "invoiceName",
+          "invoiceQty",
+          "invoiceUnitPrice",
+          "invoiceAmount",
+          "orderedQty",
+          "orderedUnit",
+          "status",
+          "note"
+        ]
+      },
+      "PurchaseOrderInvoiceCheckResult": {
+        "type": "object",
+        "properties": {
+          "invoiceTotal": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoiceLineCount": {
+            "type": "number",
+            "nullable": true
+          },
+          "totalsMatch": {
+            "type": "boolean"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderInvoiceCheckLine"
+            }
+          },
+          "summary": {
+            "type": "string",
+            "description": "The model’s explanation, in Mongolian"
+          }
+        },
+        "required": [
+          "invoiceTotal",
+          "invoiceLineCount",
+          "totalsMatch",
+          "lines",
+          "summary"
+        ]
+      },
+      "PurchaseOrderInvoiceCheck": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "orderId": {
+            "type": "number"
+          },
+          "supplierId": {
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "DONE",
+              "FAILED"
+            ],
+            "type": "string"
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoiceTotal": {
+            "type": "string",
+            "nullable": true,
+            "description": "The invoice total the model read"
+          },
+          "orderedTotal": {
+            "type": "string",
+            "nullable": true,
+            "description": "The order’s estimate at the time"
+          },
+          "result": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PurchaseOrderInvoiceCheckResult"
+              }
+            ]
+          },
+          "errorReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "orderId",
+          "supplierId",
+          "status",
+          "model",
+          "invoiceTotal",
+          "orderedTotal",
+          "result",
+          "errorReason",
+          "createdBy",
+          "createdAt",
+          "finishedAt"
+        ]
+      },
+      "RunInvoiceCheckDto": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "An uploaded photo of kind procurement.invoice_image"
+          }
+        },
+        "required": [
+          "fileId"
+        ]
+      },
       "AddLoadDto": {
         "type": "object",
         "properties": {
@@ -57451,10 +57955,16 @@
             "type": "string",
             "nullable": true
           },
-          "loadId": {
-            "type": "number",
-            "nullable": true,
-            "description": "The load (truck) it rides on"
+          "loadIds": {
+            "description": "The loads (trucks) its lines ride on (ADR-0122)",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "loadedBoxes": {
+            "type": "string",
+            "description": "Σ quantity on the loads, in the lines’ own unit (boxes)"
           },
           "canEdit": {
             "type": "boolean"
@@ -57500,13 +58010,38 @@
           "noteTotalAmount",
           "receiptId",
           "receiptNumber",
-          "loadId",
+          "loadIds",
+          "loadedBoxes",
           "canEdit",
           "canShip",
           "canCount",
           "canPrice",
           "canMoveNext",
           "canMoveBack"
+        ]
+      },
+      "PurchaseOrderLoadItem": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number"
+          },
+          "supplierId": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "qty": {
+            "type": "string",
+            "description": "In the line’s own unit (boxes)"
+          }
+        },
+        "required": [
+          "lineId",
+          "supplierId",
+          "productId",
+          "qty"
         ]
       },
       "PurchaseOrderLoad": {
@@ -57529,15 +58064,19 @@
             "type": "string",
             "nullable": true
           },
+          "truckActive": {
+            "type": "boolean",
+            "description": "The truck is still active"
+          },
           "note": {
             "type": "string",
             "nullable": true
           },
-          "supplierIds": {
-            "description": "The suppliers on this load",
+          "items": {
+            "description": "What rides on this load, by line",
             "type": "array",
             "items": {
-              "type": "number"
+              "$ref": "#/components/schemas/PurchaseOrderLoadItem"
             }
           }
         },
@@ -57547,8 +58086,9 @@
           "truckName",
           "plate",
           "capacityKg",
+          "truckActive",
           "note",
-          "supplierIds"
+          "items"
         ]
       },
       "PurchaseOrderDetail": {
@@ -57635,6 +58175,146 @@
           "canArchive",
           "suppliers",
           "loads"
+        ]
+      },
+      "LoadLineInputDto": {
+        "type": "object",
+        "properties": {
+          "supplierId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "productId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "qty": {
+            "type": "string",
+            "description": "In the line’s unit; 0 takes the line off this load"
+          }
+        },
+        "required": [
+          "supplierId",
+          "productId",
+          "qty"
+        ]
+      },
+      "SetLoadLinesDto": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LoadLineInputDto"
+            }
+          }
+        },
+        "required": [
+          "lines"
+        ]
+      },
+      "PurchaseOrderLoadLineLoad": {
+        "type": "object",
+        "properties": {
+          "loadId": {
+            "type": "number"
+          },
+          "qty": {
+            "type": "string",
+            "description": "On this load, in the line’s unit"
+          }
+        },
+        "required": [
+          "loadId",
+          "qty"
+        ]
+      },
+      "PurchaseOrderLoadLine": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number"
+          },
+          "supplierId": {
+            "type": "number"
+          },
+          "supplierName": {
+            "type": "string"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "unitName": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "string",
+            "description": "Ordered, in the line’s unit"
+          },
+          "factor": {
+            "type": "string",
+            "description": "Base units per line unit"
+          },
+          "unitWeightKg": {
+            "type": "string",
+            "nullable": true,
+            "description": "kg of one line unit"
+          },
+          "loads": {
+            "description": "What rides on which load",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderLoadLineLoad"
+            }
+          },
+          "remaining": {
+            "type": "string",
+            "description": "Still off every truck, in the line’s unit"
+          }
+        },
+        "required": [
+          "lineId",
+          "supplierId",
+          "supplierName",
+          "productId",
+          "sku",
+          "productName",
+          "unitName",
+          "qty",
+          "factor",
+          "unitWeightKg",
+          "loads",
+          "remaining"
+        ]
+      },
+      "PurchaseOrderLoadLinesPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderLoadLine"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor",
+          "total"
         ]
       },
       "AssignLoadDto": {
@@ -58565,7 +59245,11 @@
               "RECEIPT_CANCELLED",
               "PRICES",
               "ARCHIVED",
-              "UNARCHIVED"
+              "UNARCHIVED",
+              "LOAD_ADDED",
+              "LOAD_REMOVED",
+              "LOADED",
+              "INVOICE_CHECKED"
             ],
             "type": "string"
           },
@@ -59016,6 +59700,7 @@
           "ISSUE_NOT_SENT",
           "PO_NOT_ARCHIVABLE",
           "PO_NOT_EDITABLE",
+          "PO_LOAD_OVER",
           "PO_SUPPLIER_EMPTY",
           "PO_STATUS_INVALID",
           "SALE_PRICE_NO_TERMS",

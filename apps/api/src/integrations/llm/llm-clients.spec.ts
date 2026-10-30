@@ -22,6 +22,15 @@ const REQUEST: LlmRequest = {
   maxOutputTokens: 4000,
 };
 
+/** A user turn with a picture (ADR-0122). */
+const IMAGE_TURN: LlmRequest['messages'][number] = {
+  role: 'user',
+  content: [
+    { type: 'text', text: 'read it' },
+    { type: 'image', mediaType: 'image/jpeg', data: 'AAAA' },
+  ],
+};
+
 interface Call {
   url: string;
   headers: Record<string, string>;
@@ -111,6 +120,20 @@ describe('OpenAI Responses client', () => {
         },
       },
     });
+  });
+
+  it('sends an image turn as input parts with a data URL', async () => {
+    const { fetchFn, calls } = fakeFetch(openAiAnswer());
+    await client('openai', fetchFn).complete({ ...REQUEST, messages: [IMAGE_TURN] });
+    expect(calls[0]?.body.input).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'input_text', text: 'read it' },
+          { type: 'input_image', image_url: 'data:image/jpeg;base64,AAAA' },
+        ],
+      },
+    ]);
   });
 
   it('asks for plain text without a schema and honours a base URL', async () => {
@@ -216,6 +239,20 @@ describe('Anthropic Messages client', () => {
     });
   });
 
+  it('sends an image turn as base64 content blocks', async () => {
+    const { fetchFn, calls } = fakeFetch(anthropicAnswer());
+    await client('anthropic', fetchFn).complete({ ...REQUEST, messages: [IMAGE_TURN] });
+    expect(calls[0]?.body.messages).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'read it' },
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'AAAA' } },
+        ],
+      },
+    ]);
+  });
+
   it('turns a refusal or a cut answer into errors and reads the error type', async () => {
     const refused = anthropicAnswer({ stop_reason: 'refusal', content: [] });
     expect(
@@ -265,6 +302,18 @@ describe('Ollama chat client', () => {
       options: { num_predict: 4000 },
       format: REQUEST.output?.schema,
     });
+  });
+
+  it('sends an image turn as text with the images beside it', async () => {
+    const { fetchFn, calls } = fakeFetch(ollamaAnswer());
+    await client('ollama', fetchFn, { apiKey: undefined }).complete({
+      ...REQUEST,
+      messages: [IMAGE_TURN],
+    });
+    expect(calls[0]?.body.messages).toEqual([
+      { role: 'system', content: 'Answer with SQL.' },
+      { role: 'user', content: 'read it', images: ['AAAA'] },
+    ]);
   });
 
   it('sends a configured key as a bearer token and reports a cut answer', async () => {

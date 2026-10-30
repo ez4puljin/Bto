@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Accepted |
+| Status | Accepted (#3–#5 amended by ADR-0122: loads by line, a trucks page) |
 | Date | 2026-10-30 |
 | Deciders | Owner («Захиалга өөрөө төлөв байх ёсгүй», «Машин нэмэх, нийлүүлэгчийг машинд хуваарлах дутуу байна», 2026-10-30, after reading Butenorgil's order window with Claude), Claude (the direct-mode session) |
 | Amends | ADR-0115 #1 and ADR-0118 #1 (the order's own status leaves the screens: it stays in the table as the lowest supplier status, for the list's filter only), ADR-0118 #2 (the detail table moves to `/procurement/orders/:id/detail`; the order opens on a front page) |

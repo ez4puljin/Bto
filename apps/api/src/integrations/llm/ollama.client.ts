@@ -5,8 +5,10 @@ import {
   type LlmClient,
   type LlmConfig,
   LlmError,
+  type LlmMessage,
   type LlmRequest,
   type LlmResult,
+  textOf,
 } from './llm.types';
 
 /** A local Ollama; from a container use http://host.docker.internal:11434/api. */
@@ -42,7 +44,10 @@ export class OllamaClient implements LlmClient {
       this.config.apiKey ? { authorization: `Bearer ${this.config.apiKey}` } : {},
       {
         model: this.config.model,
-        messages: [{ role: 'system', content: request.instructions }, ...request.messages],
+        messages: [
+          { role: 'system', content: request.instructions },
+          ...request.messages.map(ollamaMessage),
+        ],
         stream: false,
         options: { num_predict: request.maxOutputTokens },
         ...(request.output && { format: request.output.schema }),
@@ -64,4 +69,15 @@ export class OllamaClient implements LlmClient {
       },
     };
   }
+}
+
+/** A turn as Ollama's chat takes it: the text, with the images as base64 beside it. */
+function ollamaMessage(message: LlmMessage) {
+  if (typeof message.content === 'string') return message;
+  const images = message.content.flatMap((part) => (part.type === 'image' ? [part.data] : []));
+  return {
+    role: message.role,
+    content: textOf(message.content),
+    ...(images.length > 0 && { images }),
+  };
 }

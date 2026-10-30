@@ -61,6 +61,7 @@ import { PurchaseOrderPrintPage, PurchaseOrdersPage } from '@/features/procureme
 import { PurchaseOrderDetailPage } from '@/features/procurement/order-detail-page';
 import { PurchaseOrderOverviewPage } from '@/features/procurement/order-overview-page';
 import { PurchaseOrderHistoryPage } from '@/features/procurement/order-history-page';
+import { TrucksPage } from '@/features/procurement/trucks-page';
 import { ReceiptReceivePage } from '@/features/inventory/receipt-receive-page';
 import { ModulePage } from '@/features/home/module-page';
 import { AiPage } from '@/features/ai/ai-page';
@@ -420,6 +421,15 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission="procurement.orders.read">
                 <PurchaseOrderHistoryPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: 'procurement/trucks',
+            handle: { width: 'reading' },
+            element: (
+              <RequirePermission permission="procurement.orders.read">
+                <TrucksPage />
               </RequirePermission>
             ),
           },

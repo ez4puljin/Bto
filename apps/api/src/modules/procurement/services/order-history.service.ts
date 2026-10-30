@@ -187,6 +187,14 @@ export class OrderHistoryService {
       if (audit.action === 'CREATE') return [{ ...base, kind: 'CREATED', to: text(after.number) }];
       if (audit.action === 'ARCHIVE') return [{ ...base, kind: 'ARCHIVED' }];
       if (audit.action === 'UNARCHIVE') return [{ ...base, kind: 'UNARCHIVED' }];
+      if (audit.action === 'LOAD_ADD') {
+        return [
+          { ...base, kind: 'LOAD_ADDED', to: text(after.truckName), detail: text(after.note) },
+        ];
+      }
+      if (audit.action === 'LOAD_REMOVE') {
+        return [{ ...base, kind: 'LOAD_REMOVED', from: text(before.truckName) }];
+      }
       if ('note' in after) {
         return [{ ...base, kind: 'NOTE', from: text(before.note), to: text(after.note) }];
       }
@@ -224,6 +232,42 @@ export class OrderHistoryService {
             productId,
             from: qtyOf(before.shippedQty, before.productUnitId),
             to: qtyOf(shipped.qty, before.productUnitId),
+          },
+        ];
+      }
+      if (audit.action === 'LOAD_ASSIGN') {
+        return [
+          {
+            ...base,
+            kind: 'LOADED',
+            supplierId,
+            to: after.loadId === null ? null : text(after.truckName),
+            detail: after.loadId === null ? L.kind.LOADED_OFF : null,
+          },
+        ];
+      }
+      if (audit.action === 'LOAD_LINE') {
+        const loaded = record(after.loaded);
+        return [
+          {
+            ...base,
+            kind: 'LOADED',
+            supplierId,
+            productId,
+            from: text(before.loaded),
+            to: text(loaded.qty),
+            detail: text(loaded.truckName),
+          },
+        ];
+      }
+      if (audit.action === 'INVOICE_CHECK') {
+        return [
+          {
+            ...base,
+            kind: 'INVOICE_CHECKED',
+            supplierId,
+            to: text(after.invoiceTotal),
+            detail: text(after.summary),
           },
         ];
       }

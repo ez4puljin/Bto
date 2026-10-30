@@ -177,6 +177,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: ClipboardList,
         permission: 'procurement.orders.read',
       },
+      {
+        to: '/procurement/trucks',
+        label: 'nav.trucks',
+        icon: Truck,
+        permission: 'procurement.orders.read',
+      },
     ],
   },
   {

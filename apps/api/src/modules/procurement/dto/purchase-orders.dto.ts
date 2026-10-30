@@ -97,8 +97,10 @@ export class PurchaseOrderSupplierDto {
   @ApiProperty({ type: String, nullable: true }) noteTotalAmount: string | null;
   @ApiProperty({ type: Number, nullable: true }) receiptId: number | null;
   @ApiProperty({ type: String, nullable: true }) receiptNumber: string | null;
-  @ApiProperty({ type: Number, nullable: true, description: 'The load (truck) it rides on' })
-  loadId: number | null;
+  @ApiProperty({ type: [Number], description: 'The loads (trucks) its lines ride on (ADR-0122)' })
+  loadIds: number[];
+  @ApiProperty({ description: 'Σ quantity on the loads, in the lines’ own unit (boxes)' })
+  loadedBoxes: string;
   @ApiProperty() canEdit: boolean;
   @ApiProperty({ description: 'May type the shipped quantities now' }) canShip: boolean;
   @ApiProperty({ description: 'May type a count on at least one line now' }) canCount: boolean;
@@ -137,6 +139,14 @@ export class UpdateTruckDto extends PartialType(CreateTruckDto) {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
 }
 
+@ApiSchema({ name: 'PurchaseOrderLoadItem' })
+export class OrderLoadItemDto {
+  @ApiProperty() lineId: number;
+  @ApiProperty() supplierId: number;
+  @ApiProperty() productId: number;
+  @ApiProperty({ description: 'In the line’s own unit (boxes)' }) qty: string;
+}
+
 @ApiSchema({ name: 'PurchaseOrderLoad' })
 export class OrderLoadDto {
   @ApiProperty() id: number;
@@ -144,8 +154,75 @@ export class OrderLoadDto {
   @ApiProperty() truckName: string;
   @ApiProperty({ type: String, nullable: true }) plate: string | null;
   @ApiProperty({ type: String, nullable: true }) capacityKg: string | null;
+  @ApiProperty({ description: 'The truck is still active' }) truckActive: boolean;
   @ApiProperty({ type: String, nullable: true }) note: string | null;
-  @ApiProperty({ type: [Number], description: 'The suppliers on this load' }) supplierIds: number[];
+  @ApiProperty({ type: [OrderLoadItemDto], description: 'What rides on this load, by line' })
+  items: OrderLoadItemDto[];
+}
+
+export class LoadLineInputDto {
+  @ApiProperty() @IsInt() @Min(1) supplierId: number;
+  @ApiProperty() @IsInt() @Min(1) productId: number;
+  @ApiProperty({ description: 'In the line’s unit; 0 takes the line off this load' })
+  @Matches(QTY)
+  qty: string;
+}
+
+export class SetLoadLinesDto {
+  @ApiProperty({ type: [LoadLineInputDto] })
+  @IsArray()
+  @ArrayMaxSize(500)
+  @ValidateNested({ each: true })
+  @Type(() => LoadLineInputDto)
+  lines: LoadLineInputDto[];
+}
+
+export class LoadLinesQueryDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) q?: string;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) supplierId?: number;
+  @ApiPropertyOptional({ description: 'Only lines with something off every truck' })
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  unassigned?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(10) cursor?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  limit?: number;
+}
+
+@ApiSchema({ name: 'PurchaseOrderLoadLineLoad' })
+export class LoadLineLoadDto {
+  @ApiProperty() loadId: number;
+  @ApiProperty({ description: 'On this load, in the line’s unit' }) qty: string;
+}
+
+@ApiSchema({ name: 'PurchaseOrderLoadLine' })
+export class LoadLineDto {
+  @ApiProperty() lineId: number;
+  @ApiProperty() supplierId: number;
+  @ApiProperty() supplierName: string;
+  @ApiProperty() productId: number;
+  @ApiProperty() sku: string;
+  @ApiProperty() productName: string;
+  @ApiProperty() unitName: string;
+  @ApiProperty({ description: 'Ordered, in the line’s unit' }) qty: string;
+  @ApiProperty({ description: 'Base units per line unit' }) factor: string;
+  @ApiProperty({ type: String, nullable: true, description: 'kg of one line unit' })
+  unitWeightKg: string | null;
+  @ApiProperty({ type: [LoadLineLoadDto], description: 'What rides on which load' })
+  loads: LoadLineLoadDto[];
+  @ApiProperty({ description: 'Still off every truck, in the line’s unit' }) remaining: string;
+}
+
+@ApiSchema({ name: 'PurchaseOrderLoadLinesPage' })
+export class LoadLinesPageDto {
+  @ApiProperty({ type: [LoadLineDto] }) data: LoadLineDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
+  @ApiProperty() total: number;
 }
 
 export class AddLoadDto {
@@ -169,6 +246,65 @@ export class AssignLoadDto {
   @IsInt()
   @Min(1)
   loadId: number | null;
+}
+
+export const INVOICE_LINE_STATUS_VALUES = [
+  'MATCH',
+  'QTY_DIFF',
+  'PRICE_DIFF',
+  'NOT_ORDERED',
+  'MISSING',
+  'UNREADABLE',
+] as const;
+
+@ApiSchema({ name: 'PurchaseOrderInvoiceCheckLine' })
+export class InvoiceCheckLineDto {
+  @ApiProperty({ type: Number, nullable: true }) productId: number | null;
+  @ApiProperty({ type: String, nullable: true }) sku: string | null;
+  @ApiProperty({ description: 'The name as printed on the invoice' }) invoiceName: string;
+  @ApiProperty({ type: String, nullable: true }) invoiceQty: string | null;
+  @ApiProperty({ type: String, nullable: true }) invoiceUnitPrice: string | null;
+  @ApiProperty({ type: String, nullable: true }) invoiceAmount: string | null;
+  @ApiProperty({ type: String, nullable: true }) orderedQty: string | null;
+  @ApiProperty({ type: String, nullable: true }) orderedUnit: string | null;
+  @ApiProperty({ enum: INVOICE_LINE_STATUS_VALUES })
+  status: (typeof INVOICE_LINE_STATUS_VALUES)[number];
+  @ApiProperty() note: string;
+}
+
+@ApiSchema({ name: 'PurchaseOrderInvoiceCheckResult' })
+export class InvoiceCheckResultDto {
+  @ApiProperty({ type: String, nullable: true }) invoiceTotal: string | null;
+  @ApiProperty({ type: Number, nullable: true }) invoiceLineCount: number | null;
+  @ApiProperty() totalsMatch: boolean;
+  @ApiProperty({ type: [InvoiceCheckLineDto] }) lines: InvoiceCheckLineDto[];
+  @ApiProperty({ description: 'The model’s explanation, in Mongolian' }) summary: string;
+}
+
+@ApiSchema({ name: 'PurchaseOrderInvoiceCheck' })
+export class InvoiceCheckDto {
+  @ApiProperty() id: number;
+  @ApiProperty() orderId: number;
+  @ApiProperty() supplierId: number;
+  @ApiProperty({ enum: ['PENDING', 'DONE', 'FAILED'] }) status: 'PENDING' | 'DONE' | 'FAILED';
+  @ApiProperty({ type: String, nullable: true }) model: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'The invoice total the model read' })
+  invoiceTotal: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'The order’s estimate at the time' })
+  orderedTotal: string | null;
+  @ApiProperty({ type: InvoiceCheckResultDto, nullable: true })
+  result: InvoiceCheckResultDto | null;
+  @ApiProperty({ type: String, nullable: true }) errorReason: string | null;
+  @ApiProperty({ type: String, nullable: true }) createdBy: string | null;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) finishedAt: string | null;
+}
+
+export class RunInvoiceCheckDto {
+  @ApiProperty({ description: 'An uploaded photo of kind procurement.invoice_image' })
+  @IsInt()
+  @Min(1)
+  fileId: number;
 }
 
 @ApiSchema({ name: 'PurchaseOrderDetail' })

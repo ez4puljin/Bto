@@ -921,7 +921,7 @@ describe('purchase orders and receiving', () => {
         .code,
     ).toBe('PO_SUPPLIER_EMPTY');
   });
-  it('names trucks on an order and puts whole suppliers on their loads (ADR-0121)', async () => {
+  it('names trucks on an order and loads suppliers whole or by line (ADR-0121, ADR-0122)', async () => {
     // Trucks are the manager's; readers only list them.
     await http()
       .post('/api/v1/procurement/trucks')
@@ -941,10 +941,25 @@ describe('purchase orders and receiving', () => {
       .set(bearer(manager))
       .send({ name: 'Туршилтын машин' })
       .expect(422);
+    const second = (
+      await http()
+        .post('/api/v1/procurement/trucks')
+        .set(bearer(manager))
+        .send({ name: 'Туршилтын машин 2' })
+        .expect(201)
+    ).body as { id: number };
     const listed = (await http().get('/api/v1/procurement/trucks').set(bearer(orderer)).expect(200))
       .body as { id: number }[];
     expect(listed.map((row) => row.id)).toContain(truck.id);
 
+    type LoadJson = {
+      id: number;
+      truckId: number;
+      truckActive: boolean;
+      items: { lineId: number; supplierId: number; productId: number; qty: string }[];
+    };
+    type LoadedSupplier = SupplierJson & { loadIds: number[]; loadedBoxes: string };
+    type LoadedOrder = OrderJson & { loads: LoadJson[]; suppliers: LoadedSupplier[] };
     const created = (
       await http()
         .post('/api/v1/purchase-orders')
@@ -952,10 +967,15 @@ describe('purchase orders and receiving', () => {
         .set(idempotency())
         .send({ supplierIds: [supplierA, supplierB] })
         .expect(201)
-    ).body as OrderJson & { loads: { id: number; truckId: number; supplierIds: number[] }[] };
+    ).body as LoadedOrder;
     expect(created.loads).toEqual([]);
+    await save(manager, created.id, supplierA, [
+      ordered(juice, '10', 'BOX'),
+      ordered(flour, '20'),
+    ]).expect(200);
+    await save(manager, created.id, supplierB, [ordered(soap, '6')]).expect(200);
 
-    // One load per truck per order; a supplier rides on one load or none.
+    // One load per truck per order.
     const withLoad = (
       await http()
         .post(`/api/v1/purchase-orders/${created.id}/loads`)
@@ -963,7 +983,7 @@ describe('purchase orders and receiving', () => {
         .set(idempotency())
         .send({ truckId: truck.id })
         .expect(200)
-    ).body as typeof created;
+    ).body as LoadedOrder;
     expect(withLoad.loads).toHaveLength(1);
     const loadId = withLoad.loads[0]?.id ?? 0;
     await http()
@@ -972,16 +992,36 @@ describe('purchase orders and receiving', () => {
       .set(idempotency())
       .send({ truckId: truck.id })
       .expect(422);
+    const other = (
+      await http()
+        .post(`/api/v1/purchase-orders/${created.id}/loads`)
+        .set(bearer(manager))
+        .set(idempotency())
+        .send({ truckId: second.id })
+        .expect(200)
+    ).body as LoadedOrder;
+    const otherId = other.loads.find((load) => load.truckId === second.id)?.id ?? 0;
+
+    // A whole supplier at once: every line's quantity lands on the load.
     const assigned = (
       await http()
         .put(`/api/v1/purchase-orders/${created.id}/suppliers/${supplierA}/load`)
         .set(bearer(manager))
         .send({ loadId })
         .expect(200)
-    ).body as typeof created & { suppliers: (SupplierJson & { loadId: number | null })[] };
-    expect(assigned.loads[0]?.supplierIds).toEqual([supplierA]);
-    expect(assigned.suppliers.find((row) => row.supplierId === supplierA)?.loadId).toBe(loadId);
-    expect(assigned.suppliers.find((row) => row.supplierId === supplierB)?.loadId).toBeNull();
+    ).body as LoadedOrder;
+    const firstLoad = assigned.loads.find((load) => load.id === loadId);
+    expect(firstLoad?.items.map((item) => [item.productId, item.qty]).sort()).toEqual(
+      [
+        [juice.id, '10'],
+        [flour.id, '20'],
+      ].sort(),
+    );
+    expect(supplierOf(assigned, supplierA) as LoadedSupplier).toMatchObject({
+      loadIds: [loadId],
+      loadedBoxes: '30',
+    });
+    expect((supplierOf(assigned, supplierB) as LoadedSupplier).loadIds).toEqual([]);
     await http()
       .put(`/api/v1/purchase-orders/${created.id}/suppliers/${supplierB}/load`)
       .set(bearer(manager))
@@ -993,14 +1033,107 @@ describe('purchase orders and receiving', () => {
       .send({ loadId: null })
       .expect(403);
 
-    // Taking the truck off frees its suppliers.
+    // Part of a line moves to the second truck; more than the line has left is refused.
+    await http()
+      .put(`/api/v1/purchase-orders/${created.id}/loads/${otherId}/lines`)
+      .set(bearer(manager))
+      .send({ lines: [{ supplierId: supplierA, productId: juice.id, qty: '4' }] })
+      .expect(422)
+      .expect((response) => expect(response.body).toMatchObject({ code: 'PO_LOAD_OVER' }));
+    await http()
+      .put(`/api/v1/purchase-orders/${created.id}/loads/${loadId}/lines`)
+      .set(bearer(manager))
+      .send({ lines: [{ supplierId: supplierA, productId: juice.id, qty: '6' }] })
+      .expect(200);
+    const split = (
+      await http()
+        .put(`/api/v1/purchase-orders/${created.id}/loads/${otherId}/lines`)
+        .set(bearer(manager))
+        .send({
+          lines: [
+            { supplierId: supplierA, productId: juice.id, qty: '4' },
+            { supplierId: supplierB, productId: soap.id, qty: '6' },
+          ],
+        })
+        .expect(200)
+    ).body as LoadedOrder;
+    expect((supplierOf(split, supplierA) as LoadedSupplier).loadIds.sort()).toEqual(
+      [loadId, otherId].sort(),
+    );
+    expect(supplierOf(split, supplierB) as LoadedSupplier).toMatchObject({
+      loadIds: [otherId],
+      loadedBoxes: '6',
+    });
+
+    // The loading screen's lines: ordered, on which load, remaining; the unassigned filter.
+    const lines = (
+      await http()
+        .get(`/api/v1/purchase-orders/${created.id}/load-lines`)
+        .set(bearer(orderer))
+        .expect(200)
+    ).body as {
+      data: {
+        productId: number;
+        qty: string;
+        remaining: string;
+        loads: { loadId: number; qty: string }[];
+      }[];
+      total: number;
+    };
+    expect(lines.total).toBe(3);
+    const juiceLine = lines.data.find((line) => line.productId === juice.id);
+    expect(juiceLine).toMatchObject({ qty: '10', remaining: '0' });
+    expect(juiceLine?.loads.map((load) => load.qty).sort()).toEqual(['4', '6']);
+    expect(
+      (
+        (
+          await http()
+            .get(`/api/v1/purchase-orders/${created.id}/load-lines?unassigned=true`)
+            .set(bearer(orderer))
+            .expect(200)
+        ).body as { total: number }
+      ).total,
+    ).toBe(0);
+
+    // Taking a truck off frees what rode on it; a deactivated truck keeps its name on the order.
+    await http()
+      .patch(`/api/v1/procurement/trucks/${second.id}`)
+      .set(bearer(manager))
+      .send({ isActive: false })
+      .expect(200);
+    const named = await order(manager, created.id);
+    expect((named as LoadedOrder).loads.find((load) => load.id === otherId)).toMatchObject({
+      truckActive: false,
+    });
     const freed = (
       await http()
         .delete(`/api/v1/purchase-orders/${created.id}/loads/${loadId}`)
         .set(bearer(manager))
         .expect(200)
-    ).body as typeof assigned;
-    expect(freed.loads).toEqual([]);
-    expect(freed.suppliers.every((row) => row.loadId === null)).toBe(true);
+    ).body as LoadedOrder;
+    expect(freed.loads.map((load) => load.id)).toEqual([otherId]);
+    expect(supplierOf(freed, supplierA) as LoadedSupplier).toMatchObject({
+      loadIds: [otherId],
+      loadedBoxes: '4',
+    });
+    const page = await history(manager, created.id);
+    expect(page.data.map((row) => row.kind)).toEqual(
+      expect.arrayContaining(['LOAD_ADDED', 'LOADED', 'LOAD_REMOVED']),
+    );
+
+    // The invoice check needs a configured model: none in tests, so it answers 503.
+    await http()
+      .post(`/api/v1/purchase-orders/${created.id}/suppliers/${supplierA}/invoice-checks`)
+      .set(bearer(manager))
+      .send({ fileId: 1 })
+      .expect(503);
+    expect(
+      (
+        await http()
+          .get(`/api/v1/purchase-orders/${created.id}/suppliers/${supplierA}/invoice-checks`)
+          .set(bearer(orderer))
+          .expect(200)
+      ).body,
+    ).toEqual([]);
   });
 });

@@ -2,10 +2,27 @@ import type { LlmProvider } from '../../common/config/env.schema';
 
 export type { LlmProvider };
 
-/** One turn of the conversation sent to the model; the instructions travel separately. */
+/** A part of a user turn: text, or an image as base64 bytes with their media type. */
+export type LlmContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image'; mediaType: 'image/jpeg' | 'image/png' | 'image/webp'; data: string };
+
+/**
+ * One turn of the conversation sent to the model; the instructions travel separately. A user turn
+ * may be parts (text and images, ADR-0122); an assistant turn is text.
+ */
 export interface LlmMessage {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | LlmContentPart[];
+}
+
+/** The text of a turn, images left out (for providers and logs that take text only). */
+export function textOf(content: LlmMessage['content']): string {
+  if (typeof content === 'string') return content;
+  return content
+    .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+    .map((part) => part.text)
+    .join('\n');
 }
 
 /** A JSON schema the answer must follow (structured output); every provider enforces it. */

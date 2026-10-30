@@ -10,15 +10,24 @@ import {
   Post,
   Put,
   Query,
+  Res,
   StreamableFile,
 } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
+import { pipeline } from 'node:stream/promises';
 import { XLSX_CONTENT_TYPE } from '@tugeel/shared/files';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { Decimal } from '@tugeel/shared/money';
+import type { Response } from 'express';
 import { type ExcelColumn, tableWorkbook } from '../../../common/excel/table-workbook';
 import { xlsxFile } from '../../../common/excel/xlsx-file';
-import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
+import {
+  Authenticated,
+  type AuthContext,
+  CurrentUser,
+  Idempotent,
+  RequirePermission,
+} from '../../identity';
 import {
   AddLoadDto,
   AddSuppliersDto,
@@ -34,6 +43,9 @@ import {
   GridSaveResultDto,
   HistoryPageDto,
   HistoryQueryDto,
+  InvoiceCheckDto,
+  LoadLinesPageDto,
+  LoadLinesQueryDto,
   MoveSupplierDto,
   OrdererCandidateDto,
   PrintDto,
@@ -42,8 +54,10 @@ import {
   PurchaseOrderListQueryDto,
   PurchaseOrderPageDto,
   PurchaseOrderVersionDto,
+  RunInvoiceCheckDto,
   SaveArrivalsDto,
   SaveGridDto,
+  SetLoadLinesDto,
   SetOrdererDto,
   SupplierCandidatePageDto,
   SupplierOrdererDto,
@@ -51,6 +65,10 @@ import {
   UpdatePurchaseOrderDto,
   UpdateTruckDto,
 } from '../dto/purchase-orders.dto';
+import {
+  InvoiceCheckFlowService,
+  type InvoiceCheckView,
+} from '../services/invoice-check-flow.service';
 import { OrderHistoryService } from '../services/order-history.service';
 import { OrderLoadsService, type Truck } from '../services/order-loads.service';
 import { type GridRow, PurchaseOrderGridService } from '../services/purchase-order-grid.service';
@@ -92,6 +110,7 @@ function toDetailDto(order: PurchaseOrderDetail): PurchaseOrderDetailDto {
       finalAmount: money(supplier.finalAmount),
       noteTotalQty: fixed(supplier.noteTotalQty),
       noteTotalAmount: money(supplier.noteTotalAmount),
+      loadedBoxes: supplier.loadedBoxes.toFixed(),
     })),
     loads: order.loads.map((load) => ({
       id: load.id,
@@ -99,13 +118,22 @@ function toDetailDto(order: PurchaseOrderDetail): PurchaseOrderDetailDto {
       truckName: load.truckName,
       plate: load.plate,
       capacityKg: fixed(load.capacityKg),
+      truckActive: load.truckActive,
       note: load.note,
-      supplierIds: load.supplierIds,
+      items: load.items.map((item) => ({ ...item, qty: item.qty.toFixed() })),
     })),
   };
 }
 
 const toTruckDto = (truck: Truck): TruckDto => ({ ...truck, capacityKg: fixed(truck.capacityKg) });
+
+const toInvoiceCheckDto = (check: InvoiceCheckView): InvoiceCheckDto => ({
+  ...check,
+  invoiceTotal: money(check.invoiceTotal),
+  orderedTotal: money(check.orderedTotal),
+  createdAt: check.createdAt.toISOString(),
+  finishedAt: check.finishedAt?.toISOString() ?? null,
+});
 
 function toRowDto(row: GridRow, withPrices: boolean, withCosts: boolean): GridRowDto {
   return {
@@ -179,7 +207,55 @@ export class PurchaseOrdersController {
     private readonly grid: PurchaseOrderGridService,
     private readonly orderHistory: OrderHistoryService,
     private readonly loads: OrderLoadsService,
+    private readonly invoiceChecks: InvoiceCheckFlowService,
   ) {}
+
+  /** The AI's checks of a supplier's invoice photos (ADR-0122), newest first. */
+  @Get(':id/suppliers/:supplierId/invoice-checks')
+  @Authenticated()
+  @ApiOkResponse({ type: [InvoiceCheckDto] })
+  async invoiceChecksOf(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('supplierId', ParseIntPipe) supplierId: number,
+  ): Promise<InvoiceCheckDto[]> {
+    return (await this.invoiceChecks.list(ctx, id, supplierId)).map(toInvoiceCheckDto);
+  }
+
+  /**
+   * Runs the AI check of an uploaded invoice photo against the supplier's ordered lines
+   * (ADR-0122): managers, the supplier's orderer and cost holders; 503 while no model is set.
+   */
+  @Post(':id/suppliers/:supplierId/invoice-checks')
+  @HttpCode(200)
+  @Authenticated()
+  @ApiOkResponse({ type: InvoiceCheckDto })
+  async runInvoiceCheck(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('supplierId', ParseIntPipe) supplierId: number,
+    @Body() body: RunInvoiceCheckDto,
+  ): Promise<InvoiceCheckDto> {
+    return toInvoiceCheckDto(await this.invoiceChecks.run(ctx, id, supplierId, body.fileId));
+  }
+
+  /** The photo of an invoice check, streamed to order readers. */
+  @Get('invoice-checks/:checkId/image')
+  @Authenticated()
+  @ApiProduces('image/jpeg', 'image/png', 'image/webp')
+  @ApiOkResponse({ description: 'The photo' })
+  async invoiceCheckImage(
+    @CurrentUser() ctx: AuthContext,
+    @Param('checkId', ParseIntPipe) checkId: number,
+    @Res() response: Response,
+  ): Promise<void> {
+    const { file, body } = await this.invoiceChecks.image(ctx, checkId);
+    response.status(200);
+    response.setHeader('Content-Type', file.contentType);
+    response.setHeader('Content-Length', String(file.sizeBytes));
+    response.setHeader('Cache-Control', 'private, no-store');
+    await pipeline(body, response);
+  }
 
   /** Names a truck on the order (ADR-0121): one load per truck per order. */
   @Post(':id/loads')
@@ -208,7 +284,60 @@ export class PurchaseOrdersController {
     return toDetailDto(await this.orders.get(ctx, id));
   }
 
-  /** Puts a supplier on one of the order's loads, or takes it off with null. */
+  /** Sets what a load carries of the given lines (ADR-0122); a quantity of 0 takes a line off. */
+  @Put(':id/loads/:loadId/lines')
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: PurchaseOrderDetailDto })
+  async setLoadLines(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('loadId', ParseIntPipe) loadId: number,
+    @Body() body: SetLoadLinesDto,
+  ): Promise<PurchaseOrderDetailDto> {
+    await this.loads.setLines(
+      ctx,
+      id,
+      loadId,
+      body.lines.map((line) => ({
+        supplierId: line.supplierId,
+        productId: line.productId,
+        qty: new Decimal(line.qty),
+      })),
+    );
+    return toDetailDto(await this.orders.get(ctx, id));
+  }
+
+  /** The order's lines with what rides on which truck (ADR-0122), for the loading screen. */
+  @Get(':id/load-lines')
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: LoadLinesPageDto })
+  async loadLines(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: LoadLinesQueryDto,
+  ): Promise<LoadLinesPageDto> {
+    await this.orders.get(ctx, id);
+    const page = await this.loads.lines(id, {
+      q: query.q,
+      supplierId: query.supplierId,
+      unassigned: query.unassigned === 'true',
+      cursor: query.cursor,
+      limit: query.limit,
+    });
+    return {
+      ...page,
+      data: page.data.map((line) => ({
+        ...line,
+        qty: line.qty.toFixed(),
+        factor: line.factor.toFixed(),
+        unitWeightKg: fixed(line.unitWeightKg),
+        loads: line.loads.map((load) => ({ loadId: load.loadId, qty: load.qty.toFixed() })),
+        remaining: line.remaining.toFixed(),
+      })),
+    };
+  }
+
+  /** Puts a whole supplier (everything still off a truck) on a load, or takes all of it off (null). */
   @Put(':id/suppliers/:supplierId/load')
   @RequirePermission(MANAGE)
   @ApiOkResponse({ type: PurchaseOrderDetailDto })

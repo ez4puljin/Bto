@@ -5,6 +5,7 @@ import {
   type LlmClient,
   type LlmConfig,
   LlmError,
+  type LlmMessage,
   type LlmRequest,
   type LlmResult,
 } from './llm.types';
@@ -39,7 +40,7 @@ export class AnthropicClient implements LlmClient {
       {
         model: this.config.model,
         system: request.instructions,
-        messages: request.messages,
+        messages: request.messages.map(anthropicMessage),
         max_tokens: request.maxOutputTokens,
         ...(request.output && {
           output_config: { format: { type: 'json_schema', schema: request.output.schema } },
@@ -68,4 +69,20 @@ export class AnthropicClient implements LlmClient {
       usage: { inputTokens: answer.usage.input_tokens, outputTokens: answer.usage.output_tokens },
     };
   }
+}
+
+/** A turn as the Messages API takes it: a string, or content blocks with images as base64. */
+function anthropicMessage(message: LlmMessage) {
+  if (typeof message.content === 'string') return message;
+  return {
+    role: message.role,
+    content: message.content.map((part) =>
+      part.type === 'text'
+        ? { type: 'text', text: part.text }
+        : {
+            type: 'image',
+            source: { type: 'base64', media_type: part.mediaType, data: part.data },
+          },
+    ),
+  };
 }

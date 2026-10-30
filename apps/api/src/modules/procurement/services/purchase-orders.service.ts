@@ -94,8 +94,10 @@ export interface PurchaseOrderSupplierView {
   /** The draft or posted receipt from «Ирсэн» on. */
   receiptId: number | null;
   receiptNumber: string | null;
-  /** The truck load it rides on (ADR-0121), or null. */
-  loadId: number | null;
+  /** The loads (trucks) some of its lines ride on (ADR-0122); empty while unassigned. */
+  loadIds: number[];
+  /** Σ quantity on the loads, in the lines' own unit (boxes). */
+  loadedBoxes: Decimal;
   /** What the caller may do now. */
   canEdit: boolean;
   canShip: boolean;
@@ -560,6 +562,7 @@ export class PurchaseOrdersService {
           ]),
         )
       : null;
+    const loads = await this.loads.loadsOf(order.id, executor);
     const names = await this.userNames.namesOf(
       [
         ...orderers.values(),
@@ -646,7 +649,20 @@ export class PurchaseOrdersService {
             noteTotalAmount: detail?.noteTotalAmount ?? null,
             receiptId: row.receiptId,
             receiptNumber: detail?.number ?? null,
-            loadId: row.loadId,
+            loadIds: [
+              ...new Set(
+                loads
+                  .filter((load) => load.items.some((item) => item.supplierId === row.supplierId))
+                  .map((load) => load.id),
+              ),
+            ],
+            loadedBoxes: loads.reduce(
+              (sum, load) =>
+                load.items
+                  .filter((item) => item.supplierId === row.supplierId)
+                  .reduce((inner, item) => inner.plus(item.qty), sum),
+              zero,
+            ),
             canEdit: editRight(ctx, row.status, ordererId) !== null,
             canShip: canShip(ctx, row.status, ordererId),
             canCount:
@@ -664,7 +680,7 @@ export class PurchaseOrdersService {
           };
         })
         .sort((a, b) => a.supplierName.localeCompare(b.supplierName)),
-      loads: await this.loads.loadsOf(order.id, executor),
+      loads,
     };
   }
 

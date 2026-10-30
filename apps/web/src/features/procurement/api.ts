@@ -34,6 +34,10 @@ export type OrdererCandidate = Schemas['OrdererCandidate'];
 export type SupplierOrderer = Schemas['SupplierOrderer'];
 export type Truck = Schemas['Truck'];
 export type PurchaseOrderLoad = Schemas['PurchaseOrderLoad'];
+export type PurchaseOrderLoadItem = Schemas['PurchaseOrderLoadItem'];
+export type LoadLine = Schemas['PurchaseOrderLoadLine'];
+export type InvoiceCheck = Schemas['PurchaseOrderInvoiceCheck'];
+export type InvoiceCheckLine = Schemas['PurchaseOrderInvoiceCheckLine'];
 export type SupplierCandidate = Schemas['PurchaseOrderSupplierCandidate'];
 export type GridFilter = 'ALL' | 'ORDERED' | 'BELOW_MIN';
 
@@ -47,6 +51,7 @@ export const KEYS = {
   orders: ['procurement', 'orders'] as const,
   orderers: ['procurement', 'supplier-orderers'] as const,
   trucks: ['procurement', 'trucks'] as const,
+  invoiceChecks: ['procurement', 'invoice-checks'] as const,
   candidates: ['procurement', 'orderer-candidates'] as const,
   supplierCandidates: ['procurement', 'supplier-candidates'] as const,
 };
@@ -364,9 +369,34 @@ export function usePurchaseOrderMutations() {
             params: { path: { id, loadId } },
           }),
         ),
-      onSuccess: orderChanged,
+      onSuccess: async (order) => {
+        await orderChanged(order);
+        await invalidate([...KEYS.orders, order.id, 'load-lines']);
+      },
     }),
-    /** A supplier put on a load, or taken off with null. */
+    /** What a load carries of the given lines (ADR-0122); 0 takes a line off it. */
+    setLoadLines: useMutation({
+      mutationFn: async ({
+        id,
+        loadId,
+        lines,
+      }: {
+        id: number;
+        loadId: number;
+        lines: { supplierId: number; productId: number; qty: string }[];
+      }) =>
+        unwrap(
+          await api.PUT('/api/v1/purchase-orders/{id}/loads/{loadId}/lines', {
+            params: { path: { id, loadId } },
+            body: { lines },
+          }),
+        ),
+      onSuccess: async (order) => {
+        await orderChanged(order);
+        await invalidate([...KEYS.orders, order.id, 'load-lines']);
+      },
+    }),
+    /** A whole supplier put on a load (everything still off a truck), or taken off every load with null. */
     assignLoad: useMutation({
       mutationFn: async ({
         id,
@@ -383,7 +413,10 @@ export function usePurchaseOrderMutations() {
             body: { loadId },
           }),
         ),
-      onSuccess: orderChanged,
+      onSuccess: async (order) => {
+        await orderChanged(order);
+        await invalidate([...KEYS.orders, order.id, 'load-lines']);
+      },
     }),
     archive: useMutation({
       mutationFn: async ({ key, id, archived }: { key: string; id: number; archived: boolean }) =>
@@ -506,13 +539,123 @@ export function useSetSupplierOrderer(supplierId: number) {
 }
 
 /** The company's active trucks (ADR-0121), for the order's «Машин нэмэх». */
-export function useTrucks(enabled = true) {
+export function useTrucks(enabled = true, all = false) {
   const api = useApiClient();
   return useQuery({
-    queryKey: KEYS.trucks,
+    queryKey: [...KEYS.trucks, all ? 'all' : 'active'],
     enabled,
     staleTime: 60_000,
-    queryFn: async ({ signal }) => unwrap(await api.GET('/api/v1/procurement/trucks', { signal })),
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/procurement/trucks', {
+          params: { query: all ? { all: 'true' } : {} },
+          signal,
+        }),
+      ),
+  });
+}
+
+export function useUpdateTruck() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      ...body
+    }: {
+      id: number;
+      name?: string;
+      plate?: string | null;
+      capacityKg?: string | null;
+      isActive?: boolean;
+    }) =>
+      unwrap(
+        await api.PATCH('/api/v1/procurement/trucks/{id}', { params: { path: { id } }, body }),
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: KEYS.trucks });
+    },
+  });
+}
+
+/**
+ * The order's lines for the loading dialog (ADR-0122): ordered, on which truck, remaining; searched
+ * by code, name or supplier, narrowed to a supplier or to the unassigned, 200 a page.
+ */
+export function useLoadLines(
+  id: number,
+  query: { q?: string; supplierId?: number; unassigned?: boolean },
+  enabled = true,
+) {
+  const api = useApiClient();
+  return useInfiniteQuery({
+    queryKey: [...KEYS.orders, id, 'load-lines', query],
+    enabled: id > 0 && enabled,
+    initialPageParam: undefined as string | undefined,
+    staleTime: 30_000,
+    queryFn: async ({ pageParam, signal }) =>
+      unwrap(
+        await api.GET('/api/v1/purchase-orders/{id}/load-lines', {
+          params: {
+            path: { id },
+            query: {
+              q: query.q || undefined,
+              supplierId: query.supplierId,
+              unassigned: query.unassigned ? 'true' : undefined,
+              cursor: pageParam,
+              limit: 200,
+            },
+          },
+          signal,
+        }),
+      ),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** The AI's checks of a supplier's invoice photos (ADR-0122), newest first. */
+export function useInvoiceChecks(id: number, supplierId: number, enabled = true) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.invoiceChecks, id, supplierId],
+    enabled: id > 0 && supplierId > 0 && enabled,
+    staleTime: 30_000,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/purchase-orders/{id}/suppliers/{supplierId}/invoice-checks', {
+          params: { path: { id, supplierId } },
+          signal,
+        }),
+      ),
+  });
+}
+
+/** Runs the AI check of an uploaded invoice photo; the call lasts as long as the model takes. */
+export function useRunInvoiceCheck() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      supplierId,
+      fileId,
+    }: {
+      id: number;
+      supplierId: number;
+      fileId: number;
+    }) =>
+      unwrap(
+        await api.POST('/api/v1/purchase-orders/{id}/suppliers/{supplierId}/invoice-checks', {
+          params: { path: { id, supplierId } },
+          body: { fileId },
+        }),
+      ),
+    onSuccess: async (check) => {
+      await queryClient.invalidateQueries({
+        queryKey: [...KEYS.invoiceChecks, check.orderId, check.supplierId],
+      });
+    },
   });
 }
 

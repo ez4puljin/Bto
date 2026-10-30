@@ -3,6 +3,8 @@ export { ANTHROPIC_BASE_URL, ANTHROPIC_VERSION, AnthropicClient } from './anthro
 export { createLlmClient, llmConfigFromEnv } from './create-llm-client';
 export { LLM_CLIENT, LlmModule } from './llm.module';
 export {
+  type LlmContentPart,
+  textOf,
   type FetchFn,
   type LlmClient,
   type LlmConfig,

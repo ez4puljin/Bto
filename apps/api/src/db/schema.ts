@@ -72,6 +72,8 @@ export {
 export { importDocuments, importJobs, importRows } from '../modules/imports/schema';
 export {
   purchaseOrderLines,
+  purchaseOrderInvoiceChecks,
+  purchaseOrderLoadLines,
   purchaseOrderLoads,
   purchaseOrders,
   purchaseOrderSuppliers,
