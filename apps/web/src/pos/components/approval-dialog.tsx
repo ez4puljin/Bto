@@ -107,7 +107,7 @@ export function ApprovalForm({
     >
       <ul
         className={cn(
-          'space-y-1 rounded-lg bg-muted px-3 py-2 text-[15px]',
+          'space-y-1 rounded-lg bg-muted px-3 py-2 text-[0.9375rem]',
           request.items.length === 0 && 'hidden',
         )}
       >

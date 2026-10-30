@@ -68,7 +68,7 @@ export function FactChips({ facts }: { facts: { label: string; value: ReactNode 
       {facts.map((fact) => (
         <div
           key={fact.label}
-          className="flex items-stretch overflow-hidden rounded-lg border border-border text-[13px]"
+          className="flex items-stretch overflow-hidden rounded-lg border border-border text-[0.8125rem]"
         >
           <dt className="flex items-center bg-fill px-2.5 py-1.5 text-muted-foreground">
             {fact.label}
@@ -104,7 +104,7 @@ export function TotalsGrid({
     <div className={columns === 3 ? 'grid gap-2 sm:grid-cols-3' : 'grid gap-2 sm:grid-cols-4'}>
       {items.map(([label, value]) => (
         <div key={label} className="rounded-lg border border-border px-3 py-2">
-          <div className="text-[12px] text-muted-foreground">{label}</div>
+          <div className="text-[0.75rem] text-muted-foreground">{label}</div>
           <div className="font-mono text-sm font-semibold">{value}</div>
         </div>
       ))}

@@ -45,7 +45,7 @@ export function SearchField({ className, ...props }: ComponentProps<'input'>) {
         aria-hidden
         className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
       />
-      <Input type="search" {...props} className="h-8 rounded-full pl-9 md:text-[13px]" />
+      <Input type="search" {...props} className="h-8.5 rounded-full pl-9 md:text-[0.8125rem]" />
     </div>
   );
 }
@@ -59,7 +59,7 @@ export function FilterToggle(props: {
   return (
     <label
       className={cn(
-        'inline-flex h-8 cursor-pointer items-center gap-2 rounded-full border px-3 text-[13px] font-medium shadow-control transition-colors select-none',
+        'inline-flex h-8.5 cursor-pointer items-center gap-2 rounded-full border px-3 text-[0.8125rem] font-medium shadow-control transition-colors duration-200 select-none',
         props.checked
           ? 'border-transparent bg-secondary text-secondary-foreground'
           : 'border-border bg-background hover:bg-accent',
@@ -83,7 +83,7 @@ export function DateFilter(props: {
   return (
     <label
       data-active={props.value ? 'true' : undefined}
-      className="group inline-flex h-8 items-center gap-2 rounded-full border border-border bg-background pl-3 text-[13px] font-medium shadow-control focus-within:border-ring focus-within:ring-1 focus-within:ring-ring hover:bg-accent data-[active=true]:border-transparent data-[active=true]:bg-secondary data-[active=true]:text-secondary-foreground"
+      className="group inline-flex h-8.5 items-center gap-2 rounded-full border border-border bg-background pl-3 text-[0.8125rem] font-medium shadow-control focus-within:border-ring focus-within:ring-1 focus-within:ring-ring hover:bg-accent data-[active=true]:border-transparent data-[active=true]:bg-secondary data-[active=true]:text-secondary-foreground"
     >
       <span className="text-muted-foreground group-data-[active=true]:text-secondary-foreground">
         {props.label}
@@ -105,7 +105,7 @@ export function FilterChip(props: {
   onClear: () => void;
 }) {
   return (
-    <span className="inline-flex h-8 max-w-full items-center gap-1 rounded-full bg-secondary pr-1 pl-3 text-[13px] font-medium text-secondary-foreground">
+    <span className="inline-flex h-8.5 max-w-full items-center gap-1 rounded-full bg-secondary pr-1 pl-3 text-[0.8125rem] font-medium text-secondary-foreground">
       <span className="min-w-0 truncate">{props.children}</span>
       <Button
         size="icon-xs"
@@ -137,7 +137,7 @@ export function SegmentedControl<T extends string>(props: {
     <div
       role="tablist"
       aria-label={props.name}
-      className="inline-flex rounded-lg bg-black/[0.05] p-0.5"
+      className="inline-flex rounded-full bg-black/[0.05] p-0.5"
     >
       {props.options.map((value) => {
         const selected = value === props.value;
@@ -148,7 +148,7 @@ export function SegmentedControl<T extends string>(props: {
             role="tab"
             aria-selected={selected}
             className={cn(
-              'h-7 rounded-[8px] px-3 text-[13px] font-medium transition-[color,background-color,box-shadow] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+              'h-7.5 rounded-full px-3.5 text-[0.8125rem] font-medium transition-[color,background-color,box-shadow] duration-200 ease-apple outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
               selected
                 ? 'bg-background text-foreground shadow-control'
                 : 'text-muted-foreground hover:text-foreground',

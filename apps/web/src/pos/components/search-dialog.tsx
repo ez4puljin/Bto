@@ -138,7 +138,7 @@ function SearchPanel({ onPick }: { onPick: (product: EdgeProductHit, unitId: num
               )}
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[15px] font-medium">{option.product.name}</p>
+                <p className="truncate text-[0.9375rem] font-medium">{option.product.name}</p>
                 <p className="truncate text-xs text-muted-foreground">
                   {option.product.sku} ·{' '}
                   {option.unit.isBase
@@ -152,7 +152,7 @@ function SearchPanel({ onPick }: { onPick: (product: EdgeProductHit, unitId: num
               </div>
               <span
                 className={cn(
-                  'shrink-0 font-mono text-[15px] font-semibold',
+                  'shrink-0 font-mono text-[0.9375rem] font-semibold',
                   priced ? null : 'font-sans text-warning',
                 )}
               >

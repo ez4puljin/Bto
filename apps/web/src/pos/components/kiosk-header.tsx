@@ -41,7 +41,7 @@ export function StatusPill() {
       role="status"
       aria-label={t('posKiosk.status.label', { status: state.text })}
       className={cn(
-        'inline-flex h-8 shrink-0 items-center gap-2 rounded-full px-3 text-[13px] font-medium whitespace-nowrap',
+        'inline-flex h-8 shrink-0 items-center gap-2 rounded-full px-3 text-[0.8125rem] font-medium whitespace-nowrap',
         state.tone,
       )}
     >
@@ -70,10 +70,10 @@ export function KioskHeader(props: {
         <div className="flex min-w-0 items-center gap-3">
           <BrandMark />
           <div className="min-w-0 leading-tight">
-            <p className="truncate text-[15px] font-semibold">
+            <p className="truncate text-[0.9375rem] font-semibold">
               {session.companyName ?? t('brand.company')}
             </p>
-            <p className="truncate text-[13px] text-muted-foreground">
+            <p className="truncate text-[0.8125rem] text-muted-foreground">
               {t('posKiosk.header.till', { code: session.till.code, name: session.till.name })}
             </p>
           </div>
@@ -84,7 +84,7 @@ export function KioskHeader(props: {
           <div className="flex items-center gap-2">
             <UserRound aria-hidden className="size-5 text-muted-foreground" />
             <div className="leading-tight">
-              <p className="max-w-48 truncate text-[13px] font-semibold">
+              <p className="max-w-48 truncate text-[0.8125rem] font-semibold">
                 {session.cashier.fullName}
               </p>
               <p className="font-mono text-xs text-muted-foreground">{session.businessDate}</p>
@@ -96,7 +96,7 @@ export function KioskHeader(props: {
       {health.isError ? (
         // Losing the store's own server stops every sale: a strip across the screen, not only the
         // pill (ADR-0113). The pill's status line already announces it.
-        <div className="flex shrink-0 items-center gap-3 bg-destructive px-4 py-2.5 text-[15px] text-primary-foreground">
+        <div className="flex shrink-0 items-center gap-3 bg-destructive px-4 py-2.5 text-[0.9375rem] text-primary-foreground">
           <TriangleAlert aria-hidden className="size-5 shrink-0" />
           <p>
             <span className="font-semibold">{t('posKiosk.status.edgeDown')}</span>

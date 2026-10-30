@@ -120,12 +120,14 @@ function PriceCheckPanel() {
                 onClick={() => setShown(product)}
               >
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-medium">{product.name}</span>
+                  <span className="block truncate text-[0.9375rem] font-medium">
+                    {product.name}
+                  </span>
                   <span className="block truncate text-xs text-muted-foreground">
                     {product.sku}
                   </span>
                 </span>
-                <span className="shrink-0 font-mono text-[15px] font-semibold">
+                <span className="shrink-0 font-mono text-[0.9375rem] font-semibold">
                   {product.units[0]?.price
                     ? formatTugrik(product.units[0].price)
                     : t('posKiosk.sale.unpriced')}
@@ -165,7 +167,7 @@ function ProductPrices({ product }: { product: EdgeProductHit }) {
           {t('posKiosk.priceCheck.sku', { sku: product.sku })}
         </p>
       </header>
-      <table className="w-full text-[15px]">
+      <table className="w-full text-[0.9375rem]">
         <thead>
           <tr className="text-left text-xs text-muted-foreground">
             <th className="py-1 font-medium">{t('posKiosk.priceCheck.unit')}</th>

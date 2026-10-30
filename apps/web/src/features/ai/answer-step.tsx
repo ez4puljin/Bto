@@ -21,7 +21,7 @@ export function HowComputed({ sql, repaired }: { sql: string; repaired?: boolean
   const { t } = useTranslation();
   return (
     <details className="group rounded-xl border border-border/90 text-sm">
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-2 text-[13px] text-muted-foreground select-none [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-2 text-[0.8125rem] text-muted-foreground select-none [&::-webkit-details-marker]:hidden">
         <ChevronRight aria-hidden className="size-3.5 transition-transform group-open:rotate-90" />
         {t('ai.answer.howComputed')}
       </summary>

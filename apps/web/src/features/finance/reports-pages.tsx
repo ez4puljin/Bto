@@ -307,10 +307,10 @@ export function TrialBalancePrintPage() {
     <PrintFrame ready={report.data !== undefined} error={report.error} title={title}>
       {() =>
         report.data ? (
-          <div className="flex flex-col gap-3 text-[12px]">
+          <div className="flex flex-col gap-3 text-[0.75rem]">
             <div>
-              <p className="text-[13px] font-semibold">{company}</p>
-              <h1 className="text-[16px] font-semibold">{title}</h1>
+              <p className="text-[0.8125rem] font-semibold">{company}</p>
+              <h1 className="text-[1rem] font-semibold">{title}</h1>
             </div>
             <TrialBalanceTable report={report.data} print />
           </div>
@@ -375,13 +375,13 @@ function VatSheet({ report, print }: { report: VatReport; print?: boolean }) {
       <div className="grid gap-3 sm:grid-cols-3">
         {summary.map(([label, value]) => (
           <div key={label} className="rounded-lg border border-border p-3">
-            <p className="text-[13px] text-muted-foreground">{label}</p>
-            <p className="font-mono text-[18px] font-semibold">{formatMnt(value)}</p>
+            <p className="text-[0.8125rem] text-muted-foreground">{label}</p>
+            <p className="font-mono text-[1.125rem] font-semibold">{formatMnt(value)}</p>
           </div>
         ))}
       </div>
       <div>
-        <h2 className="mb-1.5 text-[14px] font-semibold">{t('finance.reports.vat.groups')}</h2>
+        <h2 className="mb-1.5 text-[0.875rem] font-semibold">{t('finance.reports.vat.groups')}</h2>
         <VatTable columns={VAT_GROUP_COLUMNS} print={print}>
           <TableHeader>
             <TableRow>
@@ -397,7 +397,7 @@ function VatSheet({ report, print }: { report: VatReport; print?: boolean }) {
                 <TableCell>
                   {t(`finance.reports.vat.docTypes.${docTypeOf(group)}`)}
                   {group.linesWithoutBase > 0 ? (
-                    <span className="ml-2 text-[12px] text-muted-foreground">
+                    <span className="ml-2 text-[0.75rem] text-muted-foreground">
                       {t('finance.reports.vat.withoutBase', { count: group.linesWithoutBase })}
                     </span>
                   ) : null}
@@ -415,9 +415,11 @@ function VatSheet({ report, print }: { report: VatReport; print?: boolean }) {
         </VatTable>
       </div>
       <div>
-        <h2 className="mb-1.5 text-[14px] font-semibold">{t('finance.reports.vat.documents')}</h2>
+        <h2 className="mb-1.5 text-[0.875rem] font-semibold">
+          {t('finance.reports.vat.documents')}
+        </h2>
         {report.truncated ? (
-          <p className="mb-1.5 text-[13px] text-muted-foreground">
+          <p className="mb-1.5 text-[0.8125rem] text-muted-foreground">
             {t('finance.reports.vat.truncated')}
           </p>
         ) : null}
@@ -553,10 +555,10 @@ export function VatPrintPage() {
     <PrintFrame ready={report.data !== undefined} error={report.error} title={title}>
       {() =>
         report.data ? (
-          <div className="flex flex-col gap-3 text-[12px]">
+          <div className="flex flex-col gap-3 text-[0.75rem]">
             <div>
-              <p className="text-[13px] font-semibold">{company}</p>
-              <h1 className="text-[16px] font-semibold">{title}</h1>
+              <p className="text-[0.8125rem] font-semibold">{company}</p>
+              <h1 className="text-[1rem] font-semibold">{title}</h1>
             </div>
             <VatSheet report={report.data} print />
           </div>
@@ -608,7 +610,7 @@ export function YearCloseCard() {
         <CardTitle>{t('finance.reports.yearClose.title')}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <p className="text-[13px] text-muted-foreground">
+        <p className="text-[0.8125rem] text-muted-foreground">
           {t('finance.reports.yearClose.description')}
         </p>
         <div className="flex flex-wrap items-end gap-3">
@@ -624,7 +626,7 @@ export function YearCloseCard() {
           </FormField>
           {figures.map(([label, amount]) => (
             <div key={label} className="pb-1">
-              <p className="text-[12px] text-muted-foreground">{label}</p>
+              <p className="text-[0.75rem] text-muted-foreground">{label}</p>
               <p className="font-mono font-medium">{formatMnt(amount)}</p>
             </div>
           ))}

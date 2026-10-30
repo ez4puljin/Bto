@@ -54,7 +54,7 @@ function EntryText({ entry }: { entry: Entry }) {
     return (
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">{entry.notice.title}</span>
-        <span className="block truncate text-[13px] text-muted-foreground">
+        <span className="block truncate text-[0.8125rem] text-muted-foreground">
           {t(`notifications.kinds.${entry.notice.kind}`)}
         </span>
       </span>
@@ -66,7 +66,7 @@ function EntryText({ entry }: { entry: Entry }) {
       <span className="block truncate font-medium">
         {t('shell.orderSold', { number: item.orderNumber })}
       </span>
-      <span className="block truncate text-[13px] text-muted-foreground">
+      <span className="block truncate text-[0.8125rem] text-muted-foreground">
         {t('shell.orderSoldTo', {
           customer: item.customerName,
           total: item.orderTotal === null ? '' : formatTugrik(item.orderTotal),
@@ -135,7 +135,7 @@ export function InboxBell() {
           {inbox.unread > 0 ? (
             <span
               aria-hidden
-              className="absolute top-1 right-1 grid h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[10px] leading-none font-semibold text-primary-foreground"
+              className="absolute top-1 right-1 grid h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[0.625rem] leading-none font-semibold text-primary-foreground"
             >
               {inbox.unread > 99 ? '99+' : formatCount(inbox.unread)}
             </span>

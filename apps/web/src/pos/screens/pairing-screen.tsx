@@ -50,14 +50,14 @@ export function PairingScreen({ onPaired }: { onPaired: () => void }) {
           <BrandMark className="size-12 text-xl" />
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">{t('posKiosk.pair.title')}</h1>
-            <p className="text-[13px] text-muted-foreground">{t('posKiosk.pair.hint')}</p>
+            <p className="text-[0.8125rem] text-muted-foreground">{t('posKiosk.pair.hint')}</p>
           </div>
         </div>
         {notice === 'POS_DEVICE_UNKNOWN' ? (
           <KioskAlert tone="warning">{t('errors.POS_DEVICE_UNKNOWN')}</KioskAlert>
         ) : null}
         <div className="space-y-1.5">
-          <Label htmlFor="pair-till" className="text-[15px]">
+          <Label htmlFor="pair-till" className="text-[0.9375rem]">
             {t('posKiosk.pair.tillCode')}
           </Label>
           <Input
@@ -80,7 +80,7 @@ export function PairingScreen({ onPaired }: { onPaired: () => void }) {
           ) : null}
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="pair-code" className="text-[15px]">
+          <Label htmlFor="pair-code" className="text-[0.9375rem]">
             {t('posKiosk.pair.pairingCode')}
           </Label>
           <Input

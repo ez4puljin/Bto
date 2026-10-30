@@ -56,7 +56,9 @@ export function ContactsCard(props: {
                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-0.5">
                   <span className="font-medium">{contact.name ?? t('common.none')}</span>
                   {contact.position ? (
-                    <span className="text-[13px] text-muted-foreground">{contact.position}</span>
+                    <span className="text-[0.8125rem] text-muted-foreground">
+                      {contact.position}
+                    </span>
                   ) : null}
                   {contact.phone ? (
                     <a className="font-mono text-sm text-link" href={`tel:${contact.phone}`}>
@@ -64,7 +66,7 @@ export function ContactsCard(props: {
                     </a>
                   ) : null}
                   {contact.note ? (
-                    <span className="basis-full text-[13px] text-muted-foreground">
+                    <span className="basis-full text-[0.8125rem] text-muted-foreground">
                       {contact.note}
                     </span>
                   ) : null}

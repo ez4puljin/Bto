@@ -227,7 +227,9 @@ function Change({ row }: { row: HistoryRow }) {
           ) : null}
         </span>
       ) : null}
-      {row.detail ? <span className="text-[13px] text-muted-foreground">{row.detail}</span> : null}
+      {row.detail ? (
+        <span className="text-[0.8125rem] text-muted-foreground">{row.detail}</span>
+      ) : null}
     </span>
   );
 }

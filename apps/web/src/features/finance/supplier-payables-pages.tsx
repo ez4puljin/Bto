@@ -263,7 +263,7 @@ function PayableCard({ balance }: { balance: SupplierBalance }) {
         <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <div className="min-w-0 rounded-lg border border-border px-3 py-2">
             <dt className="text-xs text-muted-foreground">{t('finance.payables.owed')}</dt>
-            <dd className="truncate font-mono text-[15px] font-semibold">
+            <dd className="truncate font-mono text-[0.9375rem] font-semibold">
               {formatTugrik(balance.balance)}
             </dd>
             {prepaid ? (
@@ -272,7 +272,7 @@ function PayableCard({ balance }: { balance: SupplierBalance }) {
           </div>
           <div className="min-w-0 rounded-lg border border-border px-3 py-2">
             <dt className="text-xs text-muted-foreground">{t('finance.payables.oldestBill')}</dt>
-            <dd className="truncate font-mono text-[15px] font-semibold">
+            <dd className="truncate font-mono text-[0.9375rem] font-semibold">
               {balance.oldestBillDate ?? '—'}
             </dd>
           </div>

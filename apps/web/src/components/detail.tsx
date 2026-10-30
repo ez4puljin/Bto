@@ -129,7 +129,7 @@ export function FieldList(props: {
                 '@min-[80rem]:nth-last-[2]:border-b-0 @min-[80rem]:even:border-l @min-[80rem]:even:border-border/80',
             )}
           >
-            <dt className="text-[13px] leading-snug text-muted-foreground">{item.label}</dt>
+            <dt className="text-[0.8125rem] leading-snug text-muted-foreground">{item.label}</dt>
             <div className="min-w-0">
               <dd className="text-sm break-words">
                 {item.value === null || item.value === undefined || item.value === ''

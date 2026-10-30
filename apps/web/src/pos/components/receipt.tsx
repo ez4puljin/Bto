@@ -59,15 +59,17 @@ export function ReceiptView({
       className={cn(
         'bg-background font-mono leading-relaxed text-foreground',
         paper
-          ? 'w-full px-1 py-2 text-[11px]'
-          : 'mx-auto w-full max-w-sm rounded-xl border border-dashed border-input px-5 py-4 text-[13px]',
+          ? 'w-full px-1 py-2 text-[0.6875rem]'
+          : 'mx-auto w-full max-w-sm rounded-xl border border-dashed border-input px-5 py-4 text-[0.8125rem]',
       )}
     >
       <header className="space-y-1 border-b border-dashed border-input pb-3 text-center">
         {receipt.title ? (
-          <p className="font-sans text-[15px] font-semibold">{receipt.title}</p>
+          <p className="font-sans text-[0.9375rem] font-semibold">{receipt.title}</p>
         ) : null}
-        <p className={cn('font-sans', receipt.title ? 'text-xs' : 'text-[15px] font-semibold')}>
+        <p
+          className={cn('font-sans', receipt.title ? 'text-xs' : 'text-[0.9375rem] font-semibold')}
+        >
           {facts.merchantName ?? receipt.companyName ?? t('brand.company')}
         </p>
         {real && facts.merchantTin ? (
@@ -173,8 +175,8 @@ export function ReceiptView({
               <dd className="text-right text-muted-foreground">{`−${formatMnt(voucher.amount)}`}</dd>
             </Fragment>
           ))}
-        <dt className="font-sans text-[15px] font-semibold">{t('pos.fields.total')}</dt>
-        <dd className="text-right text-[15px] font-semibold">{formatTugrik(receipt.total)}</dd>
+        <dt className="font-sans text-[0.9375rem] font-semibold">{t('pos.fields.total')}</dt>
+        <dd className="text-right text-[0.9375rem] font-semibold">{formatTugrik(receipt.total)}</dd>
         {credit ? null : (
           <>
             <dt className="text-muted-foreground">{t('posKiosk.receipt.vatIncluded')}</dt>
@@ -390,7 +392,7 @@ export function ReceiptDialog(props: {
         {receipt && !refund && new Decimal(receipt.change).gt(0) ? (
           // The change to hand back, large above the receipt (ADR-0113).
           <p className="flex items-baseline justify-between rounded-xl bg-success-soft px-4 py-3 text-success">
-            <span className="text-[15px] font-medium">{t('posKiosk.pay.change')}</span>
+            <span className="text-[0.9375rem] font-medium">{t('posKiosk.pay.change')}</span>
             <span className="font-mono text-3xl font-semibold tracking-tight">
               {formatTugrik(receipt.change)}
             </span>

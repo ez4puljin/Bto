@@ -337,10 +337,10 @@ function SectionHeading(props: {
   return (
     <div className="mb-2 flex flex-wrap items-end justify-between gap-2 px-1">
       <div className="min-w-0">
-        <h2 id={props.id} className="text-[15px] font-semibold tracking-tight">
+        <h2 id={props.id} className="text-[0.9375rem] font-semibold tracking-tight">
           {props.title}
         </h2>
-        <p className="text-[13px] text-muted-foreground">{props.description}</p>
+        <p className="text-[0.8125rem] text-muted-foreground">{props.description}</p>
       </div>
       {props.action}
     </div>
@@ -362,7 +362,7 @@ function SwitchRow(props: {
       </Label>
       <div className="flex items-center gap-2.5">
         {props.state ? (
-          <span className="text-[13px] text-muted-foreground">{props.state}</span>
+          <span className="text-[0.8125rem] text-muted-foreground">{props.state}</span>
         ) : null}
         <Switch id={props.id} checked={props.checked} onCheckedChange={props.onChange} />
       </div>

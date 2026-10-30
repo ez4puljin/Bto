@@ -19,9 +19,11 @@ export function StickyActions(props: { summary?: ReactNode; children: ReactNode 
   }, []);
   return (
     <div className="sticky bottom-3 z-30 print:hidden">
-      <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl bg-background/95 px-3 py-2.5 shadow-popover ring-1 ring-black/[0.06] backdrop-blur-md">
+      <div className="flex flex-wrap items-center justify-end gap-2 rounded-2xl bg-background/95 px-3 py-2.5 shadow-popover ring-1 ring-black/[0.06] backdrop-blur-md [&>button]:grow sm:[&>button]:grow-0">
         {props.summary ? (
-          <div className="mr-auto min-w-0 text-[13px] text-muted-foreground">{props.summary}</div>
+          <div className="mr-auto min-w-0 text-[0.8125rem] text-muted-foreground">
+            {props.summary}
+          </div>
         ) : null}
         {props.children}
       </div>

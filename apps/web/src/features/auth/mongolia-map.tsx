@@ -244,7 +244,7 @@ function MapLabel(props: {
         <span
           className={cn(
             'leading-tight font-semibold',
-            props.tone === 'main' ? 'text-base' : 'text-[15px]',
+            props.tone === 'main' ? 'text-base' : 'text-[0.9375rem]',
           )}
         >
           {props.title}
@@ -252,7 +252,7 @@ function MapLabel(props: {
         {props.badge ? (
           <span
             className={cn(
-              'rounded-full px-2 py-px text-[11px] font-semibold',
+              'rounded-full px-2 py-px text-[0.6875rem] font-semibold',
               props.tone === 'main' ? 'bg-[#0a84ff] text-white' : 'bg-[#64d2ff]/25 text-[#bfe9ff]',
             )}
           >

@@ -171,7 +171,7 @@ function HistoryRow(props: {
             {sale.customerName ? ` · ${sale.customerName}` : null}
           </span>
         </span>
-        <span className="font-mono text-[15px] font-semibold">
+        <span className="font-mono text-[0.9375rem] font-semibold">
           {refund ? '−' : null}
           {formatTugrik(sale.total)}
         </span>

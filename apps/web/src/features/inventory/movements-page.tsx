@@ -398,7 +398,7 @@ function ShelfFilter({ onFind }: { onFind: (code: string) => void }) {
         placeholder={t('inventory.movements.binPlaceholder')}
         autoComplete="off"
         spellCheck={false}
-        className="h-8 rounded-full font-mono md:text-[13px]"
+        className="h-8 rounded-full font-mono md:text-[0.8125rem]"
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => {

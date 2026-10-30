@@ -15,7 +15,7 @@ export function ComingSoonBadge() {
 export function ComingSoonNote({ children }: { children?: ReactNode }) {
   const { t } = useTranslation();
   return (
-    <span className="inline-flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
+    <span className="inline-flex flex-wrap items-center gap-2 text-[0.8125rem] text-muted-foreground">
       <ComingSoonBadge />
       {children ?? t('common.binsSoonHint')}
     </span>
@@ -33,7 +33,7 @@ export function ComingSoonPage({ title, hint }: { title: string; hint?: string }
           icon={Clock}
           title={t('common.comingSoon')}
           action={
-            <p className="max-w-md text-[13px] text-muted-foreground">
+            <p className="max-w-md text-[0.8125rem] text-muted-foreground">
               {hint ?? t('common.binsSoonHint')}
             </p>
           }

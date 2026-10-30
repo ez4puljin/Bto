@@ -107,7 +107,7 @@ export function ReceiptNoteCard(props: { detail: ReceiptDetail; editable: boolea
               onBlur={() => save('noteTotalAmount', amount)}
             />
           </FormField>
-          <div className="flex flex-wrap items-center gap-2 pb-1.5 text-[13px]">
+          <div className="flex flex-wrap items-center gap-2 pb-1.5 text-[0.8125rem]">
             <span className="text-muted-foreground">
               {t('inventory.receipt.note.counted', { qty: formatQty(counted.toString()) })}
             </span>
@@ -174,7 +174,7 @@ export function ReceiptConfirmations({ detail }: { detail: ReceiptDetail }) {
       aria-label={t('inventory.receipt.confirmations.title')}
     >
       <ProblemAlert problem={action.problem} />
-      <ul className="flex flex-wrap gap-2 text-[13px]">
+      <ul className="flex flex-wrap gap-2 text-[0.8125rem]">
         {detail.warehouses.map((warehouse) => {
           const row = done.get(warehouse.id);
           const mine = writable === null || writable.has(warehouse.id);

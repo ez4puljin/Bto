@@ -70,7 +70,7 @@ function QuickPanel({ onPick }: { onPick: (product: EdgeProductHit, unitId: numb
               role="tab"
               aria-selected={entry.id === group?.id}
               className={cn(
-                'h-11 rounded-full px-4 text-[15px] font-medium ring-1 ring-border transition-colors',
+                'h-11 rounded-full px-4 text-[0.9375rem] font-medium ring-1 ring-border transition-colors',
                 entry.id === group?.id
                   ? 'bg-primary text-primary-foreground ring-primary'
                   : 'bg-background hover:bg-accent',
@@ -104,7 +104,7 @@ function QuickPanel({ onPick }: { onPick: (product: EdgeProductHit, unitId: numb
                 setAdded(name);
               }}
             >
-              <span className="line-clamp-2 text-[15px] leading-snug font-medium">{name}</span>
+              <span className="line-clamp-2 text-[0.9375rem] leading-snug font-medium">{name}</span>
               <span className="flex items-baseline justify-between gap-2 text-sm">
                 <span className="truncate text-muted-foreground">{unit?.uomName}</span>
                 <span className="font-mono font-semibold">

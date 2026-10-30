@@ -307,8 +307,8 @@ function Tile({ label, value }: { label: string; value: string }) {
       aria-label={label}
       className="flex flex-col gap-1 rounded-xl bg-card px-4 py-3 shadow-card ring-1 ring-black/[0.06]"
     >
-      <h2 className="text-[13px] font-medium text-muted-foreground">{label}</h2>
-      <p className="font-mono text-[24px] leading-tight font-semibold">{value}</p>
+      <h2 className="text-[0.8125rem] font-medium text-muted-foreground">{label}</h2>
+      <p className="font-mono text-[1.5rem] leading-tight font-semibold">{value}</p>
     </section>
   );
 }
@@ -351,9 +351,9 @@ function OrdererGroup(props: {
               !open && '-rotate-90',
             )}
           />
-          <span className="truncate text-[15px] font-semibold">{name}</span>
+          <span className="truncate text-[0.9375rem] font-semibold">{name}</span>
         </button>
-        <span className="text-[13px] text-muted-foreground">
+        <span className="text-[0.8125rem] text-muted-foreground">
           {t('procurement.overview.groupSummary', {
             suppliers: formatCount(totals.suppliers),
             boxes: formatQty(totals.boxes.toFixed()),
@@ -361,14 +361,16 @@ function OrdererGroup(props: {
             kg: formatQty(totals.kg.toDecimalPlaces(1).toString()),
           })}
         </span>
-        <span className="text-[13px] text-muted-foreground">
+        <span className="text-[0.8125rem] text-muted-foreground">
           {t('procurement.overview.onLoad', {
             on: formatCount(onLoad),
             off: formatCount(props.suppliers.length - onLoad),
           })}
         </span>
         {props.canPrices ? (
-          <span className="font-mono text-[13px]">{formatTugrik(totals.estimated.toFixed(2))}</span>
+          <span className="font-mono text-[0.8125rem]">
+            {formatTugrik(totals.estimated.toFixed(2))}
+          </span>
         ) : null}
         <span className="flex flex-wrap items-center gap-1.5">
           {counts.map((entry) => (
@@ -439,7 +441,7 @@ function SupplierCard(props: {
       className="rounded-lg border border-border/80 bg-background"
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
-        <Link to={to} className="text-[14px] font-semibold underline-offset-4 hover:underline">
+        <Link to={to} className="text-[0.875rem] font-semibold underline-offset-4 hover:underline">
           {supplier.supplierName}
         </Link>
         <PoStatusBadge status={supplier.status} />
@@ -460,9 +462,9 @@ function SupplierCard(props: {
         {canManage ? (
           <OrdererSelect supplierId={supplier.supplierId} current={supplier.ordererId} />
         ) : supplier.ordererName ? (
-          <span className="text-[13px] text-muted-foreground">{supplier.ordererName}</span>
+          <span className="text-[0.8125rem] text-muted-foreground">{supplier.ordererName}</span>
         ) : null}
-        <span className="text-[13px] text-muted-foreground">
+        <span className="text-[0.8125rem] text-muted-foreground">
           {t('procurement.overview.supplierSummary', {
             lines: formatCount(supplier.lineCount),
             boxes: formatQty(supplier.boxes),
@@ -470,7 +472,7 @@ function SupplierCard(props: {
           })}
         </span>
         {props.canPrices && supplier.estimatedCost ? (
-          <span className="font-mono text-[13px]">{formatTugrik(supplier.estimatedCost)}</span>
+          <span className="font-mono text-[0.8125rem]">{formatTugrik(supplier.estimatedCost)}</span>
         ) : null}
         <span
           className="ml-auto flex items-center gap-1.5"
@@ -479,7 +481,7 @@ function SupplierCard(props: {
           <span className="h-1.5 w-16 overflow-hidden rounded-full bg-fill">
             <span className="block h-full bg-success" style={{ width: `${percent}%` }} />
           </span>
-          <span className="font-mono text-[12px] text-muted-foreground">{percent}%</span>
+          <span className="font-mono text-[0.75rem] text-muted-foreground">{percent}%</span>
         </span>
         <span className="flex items-center gap-1">
           {supplier.canMoveBack && previous ? (

@@ -112,7 +112,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100svh-2rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] rounded-2xl bg-popover p-5 text-sm text-popover-foreground shadow-dialog ring-1 ring-black/[0.06] duration-150 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-[0.97] data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-[0.97]",
+          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100svh-2rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] rounded-2xl bg-popover p-5 text-sm text-popover-foreground shadow-dialog ring-1 ring-black/[0.06] duration-200 ease-apple outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:duration-150 data-closed:fade-out-0 data-closed:zoom-out-95",
           DIALOG_SIZES[size],
           className
         )}
@@ -190,7 +190,7 @@ function DialogTitle({
     <DialogPrimitive.Title
       data-slot="dialog-title"
       className={cn(
-        "font-heading pr-8 text-[17px] leading-snug font-semibold tracking-tight",
+        "font-heading pr-8 text-[1.0625rem] leading-snug font-semibold tracking-tight",
         className
       )}
       {...props}
@@ -206,7 +206,7 @@ function DialogDescription({
     <DialogPrimitive.Description
       data-slot="dialog-description"
       className={cn(
-        "text-[13px] text-muted-foreground *:[a]:text-link *:[a]:underline *:[a]:underline-offset-3",
+        "text-[0.8125rem] text-muted-foreground *:[a]:text-link *:[a]:underline *:[a]:underline-offset-3",
         className
       )}
       {...props}

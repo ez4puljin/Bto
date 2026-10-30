@@ -25,10 +25,10 @@ export function DaySummarySlip({
   return (
     <article
       aria-label={t('posKiosk.daySummary.slip.label')}
-      className="w-full space-y-3 bg-background px-1 py-2 font-mono text-[11px] leading-relaxed text-foreground"
+      className="w-full space-y-3 bg-background px-1 py-2 font-mono text-[0.6875rem] leading-relaxed text-foreground"
     >
       <header className="space-y-0.5 border-b border-dashed border-input pb-2 text-center">
-        <p className="font-sans text-[15px] font-semibold">
+        <p className="font-sans text-[0.9375rem] font-semibold">
           {t('posKiosk.daySummary.slip.till', { till })}
         </p>
         <p>{summary.day}</p>
@@ -79,9 +79,9 @@ export function TestSlip({ tillName, printedAt }: { tillName: string; printedAt:
   return (
     <article
       aria-label={t('posKiosk.printTest.label')}
-      className="w-full space-y-1 bg-background px-1 py-2 text-center font-mono text-[11px] leading-relaxed text-foreground"
+      className="w-full space-y-1 bg-background px-1 py-2 text-center font-mono text-[0.6875rem] leading-relaxed text-foreground"
     >
-      <p className="font-sans text-[15px] font-semibold">
+      <p className="font-sans text-[0.9375rem] font-semibold">
         {t('posKiosk.daySummary.slip.till', { till: tillName })}
       </p>
       <p>{dayjs(printedAt).tz(BUSINESS_TZ).format('YYYY-MM-DD HH:mm')}</p>

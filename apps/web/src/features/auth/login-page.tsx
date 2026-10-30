@@ -87,7 +87,7 @@ export function LoginPage() {
         <Button type="submit" size="lg" className="mt-1 w-full" disabled={isSubmitting}>
           {t('auth.login.submit')}
         </Button>
-        <Link to="/set-password" className="text-center text-[13px] text-link hover:underline">
+        <Link to="/set-password" className="text-center text-[0.8125rem] text-link hover:underline">
           {t('auth.login.setPasswordLink')}
         </Link>
       </form>

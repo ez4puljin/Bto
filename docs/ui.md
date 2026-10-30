@@ -20,7 +20,11 @@ How screens are built in `apps/web` (ADR-0042, desktop density and widths ADR-00
 | `toggle` | `#248A3D` | a `Switch` that is on (4.4:1 against its white thumb) |
 | `shadow-card`, `shadow-control`, `shadow-popover`, `shadow-dialog` | faint | cards, buttons and fields, menus, dialogs |
 
-Radius: cards `rounded-xl` (12px), buttons and fields `rounded-lg` (10px), dialogs `rounded-2xl` (16px), pills `rounded-full`. Never write a colour literal in a page; use the tokens.
+Radius (`--radius: 0.875rem`, since 2026-10-30): cards `rounded-xl` (14px), fields and menus `rounded-lg` (12px), dialogs `rounded-2xl` (18px); **every button, filter pill and segmented control is a capsule** (`rounded-full`, the owner's choice of Apple's newer look). Never write a colour literal in a page; use the tokens.
+
+**Scale** (2026-10-30; the owner found everything small on a 1366 laptop and smaller on a 1920 monitor): the main app's root font is 17px, 18px from 1600px and 19px from 1900px wide (`html[data-app='web']` in `index.css`; the till's `pos.html` and paper stay at 16px). Everything is sized in rem — text (`text-sm`, `text-[0.8125rem]`, never `text-[13px]`), controls, rows, the lists' column widths — so the whole screen grows with the window. The sizes below are at a 16px root.
+
+**Motion** (2026-10-30): one easing for things that open, move or lift, `ease-apple` (`cubic-bezier(.2,.8,.2,1)`), 200ms on buttons and pills (colour, shadow and a press to 0.97), 200ms zoom-and-fade on dialogs (150ms out), 300ms on sheets (`cubic-bezier(.32,.72,0,1)`, 200ms out), a 320ms rise of 8px when a page's path changes (`page-enter` on the shell's page box; a query change — a dialog, a filter — keeps the page), a lift on the home and module tiles. Motion conveys a change of place or state, nothing else; `prefers-reduced-motion` ends it all at once.
 
 **Status colours.**
 
@@ -38,7 +42,7 @@ Radius: cards `rounded-xl` (12px), buttons and fields `rounded-lg` (10px), dialo
 - 14px body (`text-sm`, set on `body`); 13px for secondary lines, labels and pills (`text-[13px]`); 12px for table heads, captions and the uppercase section titles (`text-xs`). Nothing on screen is smaller than 12px; only the 80 mm paper goes below (ADR-0113).
 - Card titles 15px semibold; dialog titles 17px; page titles 26px (from `PageHeader`).
 - `font-mono` means numbers and codes: it is Inter with tabular figures, so columns line up. Table cells are `tabular-nums` already.
-- Density (ADR-0066): table rows 36px (`h-9 py-1.5`), heads 32px, a row's icon buttons 28px (`RowAction`), a list's thumbnail 32px; the filter bar keeps 12px below it; the page starts 20px below the window's top. Inputs and buttons stay 36px (`sm`, 32px, in the filter bar).
+- Density (ADR-0066, at a 16px root — the root scale above grows every value): table rows 36px (`h-9 py-1.5`), heads 32px, a row's icon buttons 28px (`RowAction`), a list's thumbnail 32px; the filter bar keeps 12px below it; the page starts 20px below the window's top. Inputs, selects and buttons are 40px (`h-10`; `lg` 44px); the filter bar's pills, search and `sm` buttons 34px (`h-8.5`); `xs` 26px. Icon buttons match (`icon` 40, `icon-sm` 34, `icon-xs` 26).
 - Money in lists, cards and panels reads `formatTugrik` («12,000₮»); journals and ledgers (debit, credit, balance) read `formatMnt` without the sign; quantities read `formatQty` («12,000», «1.5»); counts `formatCount` (`lib/money.ts`).
 - All text goes through `t('key')` (ESLint G4/G5); keys live in `packages/shared/i18n/mn.json`.
 

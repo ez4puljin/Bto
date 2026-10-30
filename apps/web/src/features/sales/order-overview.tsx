@@ -242,7 +242,9 @@ function StageProgress({
           })}
         </ol>
       </div>
-      {blocked ? <p className="text-[13px] text-warning">{t('sales.panel.saveFirst')}</p> : null}
+      {blocked ? (
+        <p className="text-[0.8125rem] text-warning">{t('sales.panel.saveFirst')}</p>
+      ) : null}
     </section>
   );
 }

@@ -219,7 +219,7 @@ export function OrderHeader(props: {
       />
       {props.focus ? null : (
         <dl
-          className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-muted-foreground"
+          className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-[0.8125rem] text-muted-foreground"
           aria-label={t('procurement.detail.totals')}
         >
           <Fact
@@ -304,15 +304,15 @@ function SupplierStrip({
       aria-label={supplier.supplierName}
       className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-card px-4 py-3 shadow-card ring-1 ring-black/[0.06]"
     >
-      <span className="text-[17px] font-semibold">{supplier.supplierName}</span>
+      <span className="text-[1.0625rem] font-semibold">{supplier.supplierName}</span>
       <PoStatusBadge status={supplier.status} />
-      <span className="font-mono text-[13px] text-muted-foreground">
+      <span className="font-mono text-[0.8125rem] text-muted-foreground">
         {t('procurement.detail.piecesKg', {
           pieces: formatQty(supplier.qtyBase),
           kg: formatQty(new Decimal(supplier.weightKg).toDecimalPlaces(1).toString()),
         })}
       </span>
-      <span className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+      <span className="flex items-center gap-1.5 text-[0.8125rem] text-muted-foreground">
         {t('procurement.supplier.orderer')}:
         {canManage ? (
           <OrdererInline supplierId={supplier.supplierId} current={supplier.ordererId} />
@@ -325,7 +325,7 @@ function SupplierStrip({
       {supplier.receiptId !== null ? (
         <Link
           to={`/inventory/receipts/${supplier.receiptId}`}
-          className="font-mono text-[13px] text-link underline-offset-4 hover:underline"
+          className="font-mono text-[0.8125rem] text-link underline-offset-4 hover:underline"
         >
           {supplier.receiptNumber ??
             t('procurement.supplier.receiptDraft', { id: supplier.receiptId })}
@@ -397,7 +397,7 @@ export function StatusSteps(props: {
             <span
               aria-current={current ? 'step' : undefined}
               className={cn(
-                'flex h-8 items-center gap-2 rounded-full px-3 text-[13px]',
+                'flex h-8 items-center gap-2 rounded-full px-3 text-[0.8125rem]',
                 current && 'bg-primary font-semibold text-white shadow-control',
                 done && 'bg-success-soft text-success',
                 !lit && 'text-muted-foreground',
@@ -406,7 +406,7 @@ export function StatusSteps(props: {
             >
               <span
                 className={cn(
-                  'flex size-5 items-center justify-center rounded-full text-[11px] font-semibold',
+                  'flex size-5 items-center justify-center rounded-full text-[0.6875rem] font-semibold',
                   current ? 'bg-white/25' : done ? 'bg-success text-white' : 'bg-background/80',
                 )}
               >

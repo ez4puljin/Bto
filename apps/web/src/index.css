@@ -49,7 +49,7 @@
   --chart-3: #ff9500;
   --chart-4: #af52de;
   --chart-5: #5ac8fa;
-  --radius: 0.75rem;
+  --radius: 0.875rem;
   --sidebar: #f9f9fb;
   --sidebar-foreground: #1d1d1f;
   --sidebar-primary: #0071e3;
@@ -127,6 +127,29 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+  /*
+   * The scale of the main app (the owner, 2026-10-30: everything read small on a 1366 laptop and
+   * smaller still on a 1920 monitor): the root font grows with the window, and every rem size —
+   * text, controls, rows, column widths — grows with it. The till (pos.html) and paper keep 16px.
+   */
+  html[data-app='web'] {
+    font-size: 17px;
+  }
+  @media (min-width: 1600px) {
+    html[data-app='web'] {
+      font-size: 18px;
+    }
+  }
+  @media (min-width: 1900px) {
+    html[data-app='web'] {
+      font-size: 19px;
+    }
+  }
+  @media print {
+    html[data-app='web'] {
+      font-size: 16px;
+    }
   }
   body {
     @apply bg-canvas text-sm text-foreground font-sans;
@@ -226,6 +249,26 @@
     opacity: 1;
     margin-top: 0;
   }
+}
+
+/* A page arriving: a short rise and fade (app-shell); reduced motion ends it at once (above). */
+@keyframes bto-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@utility page-enter {
+  animation: bto-page-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+/* Apple-like easing for things that open and move (dialogs, sheets, lifts). */
+@utility ease-apple {
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --tw-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @layer components {

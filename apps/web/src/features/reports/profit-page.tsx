@@ -343,7 +343,7 @@ function DocumentsSheet(props: {
           <PanelSection title={t(`${columns}.title`)}>
             <ProblemAlert problem={problemFromError(documents.error)} onRetry={documents.refetch} />
             {documents.data?.more ? (
-              <p className="text-[13px] text-muted-foreground">{t(`${columns}.more`)}</p>
+              <p className="text-[0.8125rem] text-muted-foreground">{t(`${columns}.more`)}</p>
             ) : null}
             {documents.data && documents.data.rows.length === 0 ? (
               <EmptyState title={t(`${columns}.empty`)} />
@@ -457,7 +457,7 @@ export function ProfitPage() {
         description={t('reports.profit.description')}
         meta={
           report.data ? (
-            <span className="text-[13px]">
+            <span className="text-[0.8125rem]">
               {t('reports.profit.threshold', { threshold: report.data.threshold })}
             </span>
           ) : undefined
@@ -570,7 +570,7 @@ export function ProfitPrintPage() {
     <PrintFrame ready={report.data !== undefined} error={report.error} title={title}>
       {() =>
         report.data ? (
-          <div className="flex flex-col gap-3 text-[12px]">
+          <div className="flex flex-col gap-3 text-[0.75rem]">
             <PrintHeading company={company} title={title} note={notes.join(' · ') || NONE} />
             <ProfitTable report={report.data} />
           </div>

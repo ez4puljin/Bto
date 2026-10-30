@@ -188,7 +188,7 @@ export function OpeningCheckPage() {
           />
         </FormField>
         {report.data ? (
-          <p className="self-end pb-1.5 text-[13px] text-muted-foreground">
+          <p className="self-end pb-1.5 text-[0.8125rem] text-muted-foreground">
             {report.data.opening
               ? t('finance.reports.openingCheck.opening', report.data.opening)
               : t('finance.reports.openingCheck.noOpening')}
@@ -227,10 +227,10 @@ export function OpeningCheckPrintPage() {
     <PrintFrame ready={report.data !== undefined} error={report.error} title={title}>
       {() =>
         report.data ? (
-          <div className="flex flex-col gap-3 text-[12px]">
+          <div className="flex flex-col gap-3 text-[0.75rem]">
             <div>
-              <p className="text-[13px] font-semibold">{company}</p>
-              <h1 className="text-[16px] font-semibold">{title}</h1>
+              <p className="text-[0.8125rem] font-semibold">{company}</p>
+              <h1 className="text-[1rem] font-semibold">{title}</h1>
             </div>
             <OpeningCheckTable report={report.data} print />
             <p>{t('finance.reports.openingCheck.statement', { date: report.data.date })}</p>

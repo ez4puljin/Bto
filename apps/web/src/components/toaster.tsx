@@ -26,7 +26,7 @@ export function Toaster() {
           key={item.id}
           role="status"
           className={cn(
-            'pointer-events-auto flex max-w-full items-center gap-2.5 rounded-full py-2 pr-2 pl-4 text-[13px] font-medium text-background shadow-popover animate-in fade-in-0 slide-in-from-bottom-2',
+            'pointer-events-auto flex max-w-full items-center gap-2.5 rounded-full py-2 pr-2 pl-4 text-[0.8125rem] font-medium text-background shadow-popover animate-in fade-in-0 slide-in-from-bottom-2',
             item.tone === 'warning' ? 'bg-destructive' : 'bg-foreground/95',
           )}
         >

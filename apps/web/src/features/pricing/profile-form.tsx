@@ -343,7 +343,7 @@ export function ProfileValuesDialog(props: { profile: PriceProfile | null; onClo
                   <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                     {t('pricing.profiles.example', { price: formatMnt(EXAMPLE_PRICE.toFixed(0)) })}
                   </h3>
-                  <p className="text-[13px] text-muted-foreground">
+                  <p className="text-[0.8125rem] text-muted-foreground">
                     {t('pricing.profiles.exampleEmpty')}
                   </p>
                 </div>
@@ -476,13 +476,13 @@ export function ProfileExample({
         <ul className="divide-y divide-border/80 rounded-lg bg-background shadow-control ring-1 ring-black/[0.04]">
           {rows.map((row) => (
             <li key={row.key} className="flex items-baseline justify-between gap-3 px-3 py-1.5">
-              <span className="min-w-0 text-[13px]">
+              <span className="min-w-0 text-[0.8125rem]">
                 <span>{row.basis}</span>
                 {row.markup ? (
                   <span className="ml-1.5 font-mono text-muted-foreground">{row.markup}</span>
                 ) : null}
               </span>
-              <span className="font-mono text-[13px] font-medium">{money(row.price)}</span>
+              <span className="font-mono text-[0.8125rem] font-medium">{money(row.price)}</span>
             </li>
           ))}
         </ul>

@@ -237,7 +237,7 @@ function GroupEditor(props: {
       className="flex flex-col gap-2 rounded-xl border border-border/90 bg-background p-3"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <h4 className="text-[13px] font-semibold">{title}</h4>
+        <h4 className="text-[0.8125rem] font-semibold">{title}</h4>
         {group.conditions.length > 1 ? (
           <MatchSelect
             label={t('segments.conditionsMatch', { n: index + 1 })}

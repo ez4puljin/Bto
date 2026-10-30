@@ -53,13 +53,15 @@ export function AuthLayout(props: { title: string; description?: string; childre
         <header className="relative flex items-center gap-3 px-12 pt-11 [@media(max-height:760px)]:pt-7">
           <BrandMark size="lg" />
           <div>
-            <p className="text-[26px] leading-none font-semibold tracking-tight">{t('app.name')}</p>
+            <p className="text-[1.625rem] leading-none font-semibold tracking-tight">
+              {t('app.name')}
+            </p>
             <p className="mt-1.5 text-sm text-white/65">{t('brand.tagline')}</p>
           </div>
         </header>
         <div className="relative flex flex-1 flex-col justify-center px-10 py-8 xl:px-14 [@media(max-height:760px)]:py-3">
           {/* Its full margin stays: the main branch's label reaches above the map. */}
-          <p className="mb-6 text-[13px] font-medium tracking-wide text-[#64d2ff] uppercase">
+          <p className="mb-6 text-[0.8125rem] font-medium tracking-wide text-[#64d2ff] uppercase">
             {t('brand.mapTitle')}
           </p>
           <div style={{ maxWidth: MAP_MAX_WIDTH }}>
@@ -110,7 +112,7 @@ export function AuthLayout(props: { title: string; description?: string; childre
                 <p className="mt-1 text-xs text-muted-foreground">{t('brand.tagline')}</p>
               </div>
             </div>
-            <h1 className="text-[28px] leading-tight font-semibold tracking-tight">
+            <h1 className="text-[1.75rem] leading-tight font-semibold tracking-tight">
               {props.title}
             </h1>
             {props.description ? (

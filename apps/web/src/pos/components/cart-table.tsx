@@ -43,7 +43,7 @@ export function CartTable(props: CartTableProps) {
   }
   return (
     <div className="min-h-0 flex-1 overflow-auto rounded-xl bg-card shadow-card ring-1 ring-black/[0.06] [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin]">
-      <table className="w-full text-[15px]" aria-label={t('posKiosk.sale.cart')}>
+      <table className="w-full text-[0.9375rem]" aria-label={t('posKiosk.sale.cart')}>
         <thead className="sticky top-0 z-10 bg-card">
           <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
             <th scope="col" className="h-10 w-12 pl-4 font-medium">
@@ -136,7 +136,7 @@ function CartRow(
         <p className="line-clamp-2 font-medium break-words" title={line.name}>
           {line.name}
         </p>
-        <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[13px] text-muted-foreground">
+        <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[0.8125rem] text-muted-foreground">
           <span className="shrink-0 rounded-full bg-fill px-2 font-medium text-foreground">
             {line.uomName}
           </span>

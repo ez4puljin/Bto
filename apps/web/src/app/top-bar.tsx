@@ -63,7 +63,7 @@ export function TopBar(props: {
         </Button>
         <Link
           to="/"
-          className="mr-2 flex shrink-0 items-center gap-2 rounded-md text-[17px] font-semibold tracking-tight"
+          className="mr-2 flex shrink-0 items-center gap-2 rounded-md text-[1.0625rem] font-semibold tracking-tight"
         >
           <span
             aria-hidden
@@ -82,19 +82,19 @@ export function TopBar(props: {
           ))}
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-0.5">
-          {/* A pill with its shortcut from `xl`, an icon button below. */}
+          {/* A pill with its shortcut from `2xl` (the modules need the room at 1366 since the root scale), an icon button below. */}
           <button
             type="button"
-            className="grid size-9 place-items-center rounded-lg text-foreground transition-colors hover:bg-black/[0.05] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none xl:mr-1 xl:flex xl:h-8 xl:w-44 xl:items-center xl:gap-2 xl:bg-black/[0.05] xl:px-2.5 xl:text-[13px] xl:text-muted-foreground xl:hover:bg-black/[0.08]"
+            className="grid size-9 place-items-center rounded-full text-foreground transition-colors duration-200 hover:bg-black/[0.05] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none 2xl:mr-1 2xl:flex 2xl:h-8.5 2xl:w-44 2xl:items-center 2xl:gap-2 2xl:bg-black/[0.05] 2xl:px-3 2xl:text-[0.8125rem] 2xl:text-muted-foreground 2xl:hover:bg-black/[0.08]"
             aria-keyshortcuts="Control+K Meta+K"
             title={t('shell.search')}
             onClick={props.onSearch}
           >
             <Search aria-hidden className="size-4" />
-            <span className="sr-only flex-1 text-left xl:not-sr-only">{t('shell.search')}</span>
+            <span className="sr-only flex-1 text-left 2xl:not-sr-only">{t('shell.search')}</span>
             <kbd
               aria-hidden
-              className="hidden rounded border border-black/10 bg-background px-1 font-sans text-xs text-muted-foreground xl:inline"
+              className="hidden rounded border border-black/10 bg-background px-1 font-sans text-xs text-muted-foreground 2xl:inline"
             >
               {t(isMac ? 'shell.shortcutMac' : 'shell.shortcut')}
             </kbd>
@@ -154,7 +154,7 @@ function ModuleMenu({
           <button
             type="button"
             className={cn(
-              'flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium whitespace-nowrap text-foreground/80 transition-colors hover:bg-black/[0.04] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none aria-expanded:bg-black/[0.05] aria-expanded:text-foreground',
+              'flex h-8.5 items-center gap-1.5 rounded-full px-3 text-sm font-medium whitespace-nowrap text-foreground/80 transition-colors duration-200 hover:bg-black/[0.04] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none aria-expanded:bg-black/[0.05] aria-expanded:text-foreground',
               active && 'bg-secondary text-secondary-foreground hover:bg-secondary',
             )}
           >
@@ -239,7 +239,7 @@ function FavoritesMenu({ permissions }: { permissions: readonly Permission[] }) 
         <DropdownMenuLabel>{t('shell.favorites')}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {visible.length === 0 ? (
-          <p className="px-2 py-4 text-[13px] leading-snug text-muted-foreground">
+          <p className="px-2 py-4 text-[0.8125rem] leading-snug text-muted-foreground">
             {t('shell.noFavorites')}
           </p>
         ) : (

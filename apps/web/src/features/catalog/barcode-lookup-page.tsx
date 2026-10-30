@@ -65,12 +65,12 @@ export function BarcodeLookupPage() {
             </span>
             <div className="min-w-0">
               <h2 className="font-semibold">{t('scan.cardTitle')}</h2>
-              <p className="text-[13px] text-muted-foreground">{t('scan.hint')}</p>
+              <p className="text-[0.8125rem] text-muted-foreground">{t('scan.hint')}</p>
             </div>
           </div>
           <ScanBox onScan={scan} />
           {/* The last result stays in view while the next code is looked up. */}
-          <p role="status" className="text-[13px] text-muted-foreground empty:hidden">
+          <p role="status" className="text-[0.8125rem] text-muted-foreground empty:hidden">
             {lookup.isPending ? t('common.loading') : null}
           </p>
         </CardContent>
@@ -156,7 +156,7 @@ function ScanResult({ entry }: { entry: ScanEntry }) {
             >
               {product.name}
             </Link>
-            <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2 text-[0.8125rem] text-muted-foreground">
               <span className="font-mono">{product.sku}</span>
               {productStage(product) === 'ACTIVE' ? null : <ProductStageBadge product={product} />}
             </div>
@@ -170,7 +170,7 @@ function ScanResult({ entry }: { entry: ScanEntry }) {
                   })}
             </span>
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="font-mono text-[13px]">{barcode.code}</span>
+              <span className="font-mono text-[0.8125rem]">{barcode.code}</span>
               {barcode.isPrimary ? (
                 <Badge variant="secondary">{t('catalog.units.primary')}</Badge>
               ) : null}

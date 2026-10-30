@@ -265,7 +265,7 @@ function PropertiesForm({
         </div>
       </div>
       {order.status === 'CONFIRMED' ? (
-        <p className="text-[13px] text-warning">{t('sales.panel.properties.repriceHint')}</p>
+        <p className="text-[0.8125rem] text-warning">{t('sales.panel.properties.repriceHint')}</p>
       ) : null}
       <ProblemAlert problem={action.problem} />
       <FormFooter>

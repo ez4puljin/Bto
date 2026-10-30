@@ -129,8 +129,8 @@ export function LoadsPanel({
     <aside className="flex w-full flex-col gap-3 xl:w-[26rem] xl:shrink-0">
       <div className="flex flex-wrap items-center gap-2">
         <TruckIcon aria-hidden className="size-4 text-muted-foreground" />
-        <h2 className="text-[15px] font-semibold">{t('procurement.overview.loads')}</h2>
-        <span className="font-mono text-[13px] text-muted-foreground">
+        <h2 className="text-[0.9375rem] font-semibold">{t('procurement.overview.loads')}</h2>
+        <span className="font-mono text-[0.8125rem] text-muted-foreground">
           {formatCount(detail.loads.length)}
         </span>
         {canManage ? (
@@ -188,8 +188,8 @@ export function LoadsPanel({
         className="rounded-xl border border-dashed border-warning/60 bg-warning-soft/40 p-3"
       >
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h3 className="text-[14px] font-semibold">{t('procurement.overview.unassigned')}</h3>
-          <span className="ml-auto text-[13px] text-muted-foreground">
+          <h3 className="text-[0.875rem] font-semibold">{t('procurement.overview.unassigned')}</h3>
+          <span className="ml-auto text-[0.8125rem] text-muted-foreground">
             {t('procurement.overview.unassignedSummary', {
               suppliers: formatCount(unassigned.length),
               boxes: formatQty(remainingBoxes.toFixed()),
@@ -197,7 +197,7 @@ export function LoadsPanel({
           </span>
         </div>
         {unassigned.length === 0 ? (
-          <p className="pt-2 text-[13px] text-muted-foreground">
+          <p className="pt-2 text-[0.8125rem] text-muted-foreground">
             {t('procurement.overview.allAssigned')}
           </p>
         ) : (
@@ -205,7 +205,7 @@ export function LoadsPanel({
             {unassigned.map(({ supplier, remaining }) => (
               <li
                 key={supplier.supplierId}
-                className="flex items-center gap-2 rounded-md bg-background px-2 py-1 text-[13px]"
+                className="flex items-center gap-2 rounded-md bg-background px-2 py-1 text-[0.8125rem]"
               >
                 <span className="min-w-0 flex-1 truncate">{supplier.supplierName}</span>
                 <span className="font-mono text-muted-foreground">
@@ -304,14 +304,14 @@ function LoadCard(props: {
       className="rounded-xl bg-card p-3 shadow-card ring-1 ring-black/[0.06]"
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="text-[14px] font-semibold">{load.truckName}</span>
+        <span className="text-[0.875rem] font-semibold">{load.truckName}</span>
         {load.plate ? (
-          <span className="font-mono text-[13px] text-muted-foreground">{load.plate}</span>
+          <span className="font-mono text-[0.8125rem] text-muted-foreground">{load.plate}</span>
         ) : null}
         {!load.truckActive ? (
           <Badge variant="secondary">{t('procurement.trucks.inactive')}</Badge>
         ) : null}
-        <span className="text-[13px] text-muted-foreground">
+        <span className="text-[0.8125rem] text-muted-foreground">
           {t('procurement.overview.loadSummary', {
             suppliers: formatCount(props.riders.length),
             boxes: formatQty(boxes.toFixed()),
@@ -347,7 +347,7 @@ function LoadCard(props: {
           <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-fill">
             <span className="block h-full bg-primary" style={{ width: `${fill ?? '0'}%` }} />
           </span>
-          <span className="font-mono text-[12px] text-muted-foreground">
+          <span className="font-mono text-[0.75rem] text-muted-foreground">
             {fill}% · {t('procurement.overview.capacity', { kg: formatQty(capacity.toFixed()) })}
           </span>
         </div>
@@ -357,7 +357,7 @@ function LoadCard(props: {
           {props.riders.map((rider) => (
             <li
               key={rider.supplier.supplierId}
-              className="flex items-center gap-2 rounded-md bg-fill/60 px-2 py-1 text-[13px]"
+              className="flex items-center gap-2 rounded-md bg-fill/60 px-2 py-1 text-[0.8125rem]"
             >
               <span className="min-w-0 flex-1 truncate">{rider.supplier.supplierName}</span>
               {rider.partial ? (
@@ -462,7 +462,9 @@ export function LoadLinesDialog(props: {
           {t('procurement.overview.loadLinesTitle', { truck: load.truckName })}
         </DialogTitle>
       </DialogHeader>
-      <p className="text-[13px] text-muted-foreground">{t('procurement.overview.loadLinesHint')}</p>
+      <p className="text-[0.8125rem] text-muted-foreground">
+        {t('procurement.overview.loadLinesHint')}
+      </p>
       <div className="flex flex-wrap items-center gap-2">
         <NativeSelect
           aria-label={t('procurement.overview.loads')}
@@ -589,7 +591,7 @@ export function LoadLinesDialog(props: {
         <LoadMore query={lines} />
       </div>
       <DialogFooter>
-        <span className="mr-auto text-[13px] text-muted-foreground">
+        <span className="mr-auto text-[0.8125rem] text-muted-foreground">
           {t('procurement.overview.changedLines', { count: changes.length })}
         </span>
         <Button variant="outline" onClick={props.onClose}>

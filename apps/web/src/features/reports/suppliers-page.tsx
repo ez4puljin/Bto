@@ -338,7 +338,7 @@ export function SuppliersPrintPage() {
     <PrintFrame ready={report.data !== undefined} error={report.error} title={title}>
       {() =>
         report.data ? (
-          <div className="flex flex-col gap-3 text-[12px]">
+          <div className="flex flex-col gap-3 text-[0.75rem]">
             <PrintHeading
               company={company}
               title={title}

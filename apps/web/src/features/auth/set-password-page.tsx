@@ -106,7 +106,7 @@ export function SetPasswordPage() {
         <Button type="submit" size="lg" className="mt-1 w-full" disabled={isSubmitting}>
           {t('auth.setPassword.submit')}
         </Button>
-        <Link to="/login" className="text-center text-[13px] text-link hover:underline">
+        <Link to="/login" className="text-center text-[0.8125rem] text-link hover:underline">
           {t('auth.setPassword.backToLogin')}
         </Link>
       </form>

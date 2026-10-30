@@ -99,7 +99,7 @@ export function InvoiceCheckPanel(props: {
     >
       <div className="flex flex-wrap items-center gap-2">
         <ScanSearch aria-hidden className="size-4 text-muted-foreground" />
-        <h3 className="text-[14px] font-semibold">{t('procurement.overview.invoiceTitle')}</h3>
+        <h3 className="text-[0.875rem] font-semibold">{t('procurement.overview.invoiceTitle')}</h3>
         {props.canRun ? (
           <>
             <input
@@ -141,7 +141,7 @@ export function InvoiceCheckPanel(props: {
         ) : null}
       </div>
       {run.isPending ? (
-        <p className="text-[13px] text-muted-foreground">
+        <p className="text-[0.8125rem] text-muted-foreground">
           {t('procurement.overview.invoiceRunning')}
         </p>
       ) : null}
@@ -149,7 +149,9 @@ export function InvoiceCheckPanel(props: {
       {current ? (
         <CheckResult check={current} canPrices={props.canPrices} onView={() => view(current)} />
       ) : checks.isPending ? null : (
-        <p className="text-[13px] text-muted-foreground">{t('procurement.overview.invoiceNone')}</p>
+        <p className="text-[0.8125rem] text-muted-foreground">
+          {t('procurement.overview.invoiceNone')}
+        </p>
       )}
     </div>
   );
@@ -173,7 +175,7 @@ function CheckResult({
   const differing = result?.lines.filter((line) => line.status !== 'MATCH').length ?? 0;
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8125rem] text-muted-foreground">
         <span>
           {t('procurement.overview.invoiceBy', {
             by: check.createdBy ?? '',
@@ -187,12 +189,12 @@ function CheckResult({
         </Button>
       </div>
       {check.status === 'FAILED' ? (
-        <p className="text-[13px] text-destructive">
+        <p className="text-[0.8125rem] text-destructive">
           {t('procurement.overview.invoiceFailed', { reason: check.errorReason ?? '' })}
         </p>
       ) : null}
       {check.status === 'PENDING' ? (
-        <p className="text-[13px] text-muted-foreground">
+        <p className="text-[0.8125rem] text-muted-foreground">
           {t('procurement.overview.invoiceRunning')}
         </p>
       ) : null}
@@ -236,7 +238,7 @@ function CheckResult({
               </Badge>
             )}
           </div>
-          <div className="rounded-lg bg-info-soft/60 px-3 py-2 text-[13px] whitespace-pre-wrap">
+          <div className="rounded-lg bg-info-soft/60 px-3 py-2 text-[0.8125rem] whitespace-pre-wrap">
             <span className="font-medium">{t('procurement.overview.invoiceSummary')}: </span>
             {result.summary}
           </div>
@@ -302,7 +304,7 @@ function CheckResult({
                           </TableCell>
                         </>
                       ) : null}
-                      <TableCell className="max-w-[22rem] text-[12px] text-muted-foreground">
+                      <TableCell className="max-w-[22rem] text-[0.75rem] text-muted-foreground">
                         {line.note}
                       </TableCell>
                     </TableRow>
@@ -328,10 +330,10 @@ function Stat({
 }) {
   return (
     <span className="flex flex-col rounded-lg bg-fill/60 px-3 py-1.5">
-      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <span className="text-[0.6875rem] text-muted-foreground">{label}</span>
       <span
         className={cn(
-          'font-mono text-[14px] font-semibold',
+          'font-mono text-[0.875rem] font-semibold',
           tone === 'success' && 'text-success',
           tone === 'warning' && 'text-warning',
         )}

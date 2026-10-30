@@ -762,7 +762,7 @@ function UseToCheck({ use }: { use: VoucherUse }) {
         </span>
       </span>
       {use.reviewedAt ? (
-        <span className="text-[13px] text-muted-foreground">
+        <span className="text-[0.8125rem] text-muted-foreground">
           {[
             t('pos.vouchers.reviewedAt', { at: formatUbDateTime(Date.parse(use.reviewedAt)) }),
             use.reviewNote,

@@ -122,15 +122,15 @@ function VoucherPanel(props: {
           {taken.map((one) => (
             <li key={one.code} className="flex items-center gap-3 py-2">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[15px] font-medium">
+                <p className="truncate text-[0.9375rem] font-medium">
                   {`${t(`posKiosk.vouchers.kinds.${one.kind}`)} · ${one.name}`}
                 </p>
-                <p className="truncate font-mono text-[13px] text-muted-foreground">
+                <p className="truncate font-mono text-[0.8125rem] text-muted-foreground">
                   {formatVoucherCode(one.code)}
                   {one.partnerName ? ` · ${one.partnerName}` : ''}
                 </p>
               </div>
-              <span className="font-mono text-[15px]">{`−${formatMnt(one.amount)}₮`}</span>
+              <span className="font-mono text-[0.9375rem]">{`−${formatMnt(one.amount)}₮`}</span>
               <Button
                 type="button"
                 variant="ghost"
@@ -146,10 +146,10 @@ function VoucherPanel(props: {
           ))}
         </ul>
       ) : (
-        <p className="text-[15px] text-muted-foreground">{t('posKiosk.vouchers.none')}</p>
+        <p className="text-[0.9375rem] text-muted-foreground">{t('posKiosk.vouchers.none')}</p>
       )}
       {quote.data ? (
-        <dl className="space-y-1.5 rounded-xl bg-canvas px-4 py-3 text-[15px]">
+        <dl className="space-y-1.5 rounded-xl bg-canvas px-4 py-3 text-[0.9375rem]">
           <div className="flex justify-between">
             <dt className="text-muted-foreground">{t('posKiosk.vouchers.before')}</dt>
             <dd className="font-mono">

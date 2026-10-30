@@ -313,7 +313,7 @@ export function AgingPage() {
         description={t('reports.aging.description')}
         meta={
           report.data ? (
-            <span className="text-[13px]">
+            <span className="text-[0.8125rem]">
               {t('reports.aging.asOf', { date: report.data.date })}
             </span>
           ) : undefined
@@ -401,7 +401,7 @@ export function AgingPrintPage() {
     <PrintFrame ready={report.data !== undefined} error={report.error} title={title}>
       {() =>
         report.data ? (
-          <div className="flex flex-col gap-3 text-[12px]">
+          <div className="flex flex-col gap-3 text-[0.75rem]">
             <PrintHeading
               company={company}
               title={title}

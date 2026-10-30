@@ -150,7 +150,7 @@ export function PeriodsPage() {
                     {t(`finance.periods.statuses.${row.status}`)}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-[13px] text-muted-foreground">
+                <TableCell className="text-[0.8125rem] text-muted-foreground">
                   {row.lastEvent ? <EventText event={row.lastEvent} /> : null}
                 </TableCell>
                 <TableCell>
@@ -175,7 +175,7 @@ export function PeriodsPage() {
           <EmptyState icon={CalendarCheck} title={t('finance.periods.empty')} />
         ) : null}
       </ListCard>
-      <h2 className="mt-6 mb-2.5 text-[15px] leading-tight font-semibold tracking-tight">
+      <h2 className="mt-6 mb-2.5 text-[0.9375rem] leading-tight font-semibold tracking-tight">
         {t('finance.periods.history')}
       </h2>
       <ListCard>

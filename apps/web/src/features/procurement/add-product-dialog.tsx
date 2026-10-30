@@ -94,7 +94,7 @@ export function AddProductDialog(props: {
           {t('procurement.overview.addProductTitle', { name: props.supplier.supplierName })}
         </DialogTitle>
       </DialogHeader>
-      <p className="text-[13px] text-muted-foreground">
+      <p className="text-[0.8125rem] text-muted-foreground">
         {t('procurement.overview.addProductHint')}{' '}
         <Link to="/catalog/products/new" className="text-link underline-offset-4 hover:underline">
           {t('procurement.overview.registerProduct')}

@@ -22,10 +22,10 @@ export function RouteErrorBoundary() {
       <span className="grid size-11 place-items-center rounded-full bg-danger-soft text-destructive">
         <TriangleAlert aria-hidden className="size-5" />
       </span>
-      <p role="alert" className="text-[15px] font-medium text-foreground">
+      <p role="alert" className="text-[0.9375rem] font-medium text-foreground">
         {title}
       </p>
-      <p className="text-[13px] text-muted-foreground">
+      <p className="text-[0.8125rem] text-muted-foreground">
         {notFound ? t('errors.notFoundHint') : t('errors.unexpectedHint')}
       </p>
       {notFound ? null : (

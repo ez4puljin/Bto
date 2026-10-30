@@ -203,7 +203,9 @@ function ShiftBody({ shift }: { shift: Shift }) {
         />
         {shift.note ? (
           <p className="rounded-lg border border-border px-3 py-2 text-sm whitespace-pre-wrap">
-            <span className="mr-2 text-[12px] text-muted-foreground">{t('pos.fields.note')}</span>
+            <span className="mr-2 text-[0.75rem] text-muted-foreground">
+              {t('pos.fields.note')}
+            </span>
             {shift.note}
           </p>
         ) : null}

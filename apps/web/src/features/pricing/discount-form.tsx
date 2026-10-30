@@ -570,7 +570,10 @@ function StepsEditor(props: {
       {draft.steps.map((step, index) => (
         <div key={index} className="flex flex-wrap items-end gap-3 px-3.5 py-3">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`step-threshold-${index}`} className="text-[13px] text-foreground/80">
+            <Label
+              htmlFor={`step-threshold-${index}`}
+              className="text-[0.8125rem] text-foreground/80"
+            >
               {thresholdHead}
             </Label>
             <Input
@@ -583,7 +586,7 @@ function StepsEditor(props: {
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`step-value-${index}`} className="text-[13px] text-foreground/80">
+            <Label htmlFor={`step-value-${index}`} className="text-[0.8125rem] text-foreground/80">
               {valueHead}
             </Label>
             <Input
