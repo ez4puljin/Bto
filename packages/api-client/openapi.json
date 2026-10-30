@@ -28447,6 +28447,26 @@
               "minimum": 1,
               "type": "number"
             }
+          },
+          {
+            "name": "supplierId",
+            "required": false,
+            "in": "query",
+            "description": "Only this supplier of the order",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "ordererId",
+            "required": false,
+            "in": "query",
+            "description": "Only the suppliers this user orders from",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
           }
         ],
         "responses": {

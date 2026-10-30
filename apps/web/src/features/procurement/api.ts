@@ -182,10 +182,14 @@ export type OrderFacets = Schemas['PurchaseOrderFacets'];
  * How many rows the filters keep per supplier (owner 2026-10-30): the filter bar's counts and the
  * suppliers it lists. The previous counts stay on screen while the next query loads.
  */
-export function useOrderFacets(id: number, query: GridQuery) {
+export function useOrderFacets(
+  id: number,
+  query: GridQuery,
+  scope: { supplierId?: number; ordererId?: number } = {},
+) {
   const api = useApiClient();
   return useQuery({
-    queryKey: [...KEYS.orders, id, 'facets', query],
+    queryKey: [...KEYS.orders, id, 'facets', query, scope],
     enabled: id > 0,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
@@ -200,6 +204,8 @@ export function useOrderFacets(id: number, query: GridQuery) {
               filter: query.filter,
               warehouseId: query.warehouseId,
               categoryId: query.categoryId,
+              supplierId: scope.supplierId,
+              ordererId: scope.ordererId,
             },
           },
           signal,

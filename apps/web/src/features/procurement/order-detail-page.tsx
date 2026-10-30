@@ -178,7 +178,12 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
   // The suppliers the filters keep (owner 2026-10-30): the orderer's; with a warehouse, a search or
   // a filter, those with a row under it — the server counts the rows per supplier and the bar shows
   // the counts; «Зөвхөн захиалсан» hides the suppliers with nothing ordered at once.
-  const facets = useOrderFacets(detail.id, query);
+  // The facets count the suppliers on screen only: the chosen one, else the orderer's (the
+  // category list then offers that supplier's categories alone, owner 2026-10-30).
+  const facets = useOrderFacets(detail.id, query, {
+    supplierId: supplierParam,
+    ordererId: supplierParam === undefined ? ordererParam : undefined,
+  });
   const countOf = new Map(
     facets.data?.suppliers.map((row) => [row.supplierId, row.rowCount] as const),
   );
@@ -188,7 +193,11 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
     (supplier) =>
       (ordererParam === undefined || supplier.ordererId === ordererParam) &&
       (filter !== 'ORDERED' || supplier.lineCount > 0) &&
-      (!narrowing || facets.data === undefined || (countOf.get(supplier.supplierId) ?? 0) > 0),
+      // With one supplier chosen the facets count it alone: the list keeps every supplier then.
+      (!narrowing ||
+        chosen !== undefined ||
+        facets.data === undefined ||
+        (countOf.get(supplier.supplierId) ?? 0) > 0),
   );
   const suppliers = chosen ? [chosen] : kept;
   // One supplier on screen (chosen, or the only one the filters keep): its facts sit in the header.

@@ -19,7 +19,12 @@ import {
   StockQueryService,
 } from '../../inventory';
 import { ProductSuppliersService, SuppliersService } from '../../partners';
-import { purchaseOrderLines, purchaseOrders, purchaseOrderSuppliers } from '../schema';
+import {
+  purchaseOrderLines,
+  purchaseOrders,
+  purchaseOrderSuppliers,
+  supplierOrderers,
+} from '../schema';
 import {
   canCount,
   canPrice,
@@ -57,6 +62,12 @@ export interface GridQuery {
 }
 
 /** How many rows the query keeps per supplier (owner 2026-10-30): the filter bar's counts. */
+/** The facets' narrowing to the suppliers on screen (owner 2026-10-30): one, or an orderer's. */
+export interface FacetScope {
+  supplierId?: number;
+  ordererId?: number;
+}
+
 export interface GridFacets {
   /** Σ of the suppliers' counts. */
   rowCount: number;
@@ -794,18 +805,44 @@ export class PurchaseOrderGridService {
    */
   async facets(
     orderId: number,
-    query: Pick<GridQuery, 'q' | 'filter' | 'warehouseId' | 'categoryId'>,
+    query: Pick<GridQuery, 'q' | 'filter' | 'warehouseId' | 'categoryId'> & FacetScope,
   ): Promise<GridFacets> {
     const [order] = await this.db
       .select({ id: purchaseOrders.id })
       .from(purchaseOrders)
       .where(eq(purchaseOrders.id, orderId));
     if (!order) throw notFound('purchase order', orderId);
-    const orderSuppliers = await this.db
+    let orderSuppliers = await this.db
       .select({ id: purchaseOrderSuppliers.id, supplierId: purchaseOrderSuppliers.supplierId })
       .from(purchaseOrderSuppliers)
-      .where(eq(purchaseOrderSuppliers.orderId, orderId))
+      .where(
+        and(
+          eq(purchaseOrderSuppliers.orderId, orderId),
+          query.supplierId === undefined
+            ? undefined
+            : eq(purchaseOrderSuppliers.supplierId, query.supplierId),
+        ),
+      )
       .orderBy(asc(purchaseOrderSuppliers.id));
+    if (query.ordererId !== undefined && orderSuppliers.length > 0) {
+      const theirs = new Set(
+        (
+          await this.db
+            .select({ supplierId: supplierOrderers.supplierId })
+            .from(supplierOrderers)
+            .where(
+              and(
+                eq(supplierOrderers.userId, query.ordererId),
+                idIn(
+                  supplierOrderers.supplierId,
+                  orderSuppliers.map((row) => row.supplierId),
+                ),
+              ),
+            )
+        ).map((row) => row.supplierId),
+      );
+      orderSuppliers = orderSuppliers.filter((row) => theirs.has(row.supplierId));
+    }
     if (orderSuppliers.length === 0) return { rowCount: 0, suppliers: [], categories: [] };
     const lines = await this.db
       .select({
