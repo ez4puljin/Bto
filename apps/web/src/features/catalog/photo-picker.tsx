@@ -1,6 +1,7 @@
 import { ImagePlus, LoaderCircle, X } from 'lucide-react';
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { cn } from '@/lib/utils';
 import { FieldError } from '@/components/field-error';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -20,6 +21,8 @@ export function PhotoPicker(props: {
   id: string;
   uploads: PhotoUploads;
   error?: ValidationMessage | null;
+  /** The registration form: the first dropzone spans the column until a photo is added. */
+  wide?: boolean;
 }) {
   const { t } = useTranslation();
   const input = useRef<HTMLInputElement>(null);
@@ -42,7 +45,13 @@ export function PhotoPicker(props: {
           void add(files);
         }}
       />
-      <ul className="grid grid-cols-3 gap-2.5 @md:grid-cols-5">
+      <ul
+        className={
+          props.wide && photos.length === 0
+            ? 'grid grid-cols-1 gap-2.5'
+            : 'grid grid-cols-3 gap-2.5 @md:grid-cols-5'
+        }
+      >
         {photos.map((photo, index) => (
           <li
             key={photo.key}
@@ -86,7 +95,10 @@ export function PhotoPicker(props: {
           <li>
             <button
               type="button"
-              className="flex aspect-square w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-ring hover:text-foreground focus-visible:border-ring focus-visible:outline-none"
+              className={cn(
+                'flex w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-ring hover:text-foreground focus-visible:border-ring focus-visible:outline-none',
+                props.wide && photos.length === 0 ? 'h-32' : 'aspect-square',
+              )}
               onClick={() => input.current?.click()}
             >
               <ImagePlus aria-hidden className="size-5 opacity-70" />

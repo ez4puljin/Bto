@@ -98,7 +98,6 @@ export function RegistrationForm(props: { uoms: readonly Uom[]; categories: read
   const box = uoms.find((uom) => uom.code === 'BOX');
   const baseOptions = uoms.filter((uom) => uom.id !== box?.id);
   const unitOptions = baseOptions.filter((uom) => String(uom.id) !== baseUomId);
-  const baseName = uoms.find((uom) => String(uom.id) === baseUomId)?.name ?? '';
 
   // The category's suggestion fills the code (ADR-0044 #1); it may be typed over.
   useEffect(() => {
@@ -203,11 +202,7 @@ export function RegistrationForm(props: { uoms: readonly Uom[]; categories: read
   const sku = form.watch('sku');
   const supplier = form.watch('supplier');
   const homeWarehouseId = form.watch('homeWarehouseId');
-  const boxFactor = form.watch('boxFactor');
   const baseBarcodes = form.watch('baseBarcodes');
-  const categoryPath = tree.find((node) => String(node.category.id) === categoryId)?.path ?? null;
-  const warehouseName =
-    warehouses.options.find((warehouse) => String(warehouse.id) === homeWarehouseId)?.name ?? null;
   const readyPhotos = uploads.photos.filter((photo) => photo.status === 'ready').length;
   const checklist: {
     key: 'category' | 'name' | 'unit' | 'barcode' | 'supplier' | 'warehouse' | 'photo';
@@ -221,10 +216,9 @@ export function RegistrationForm(props: { uoms: readonly Uom[]; categories: read
     { key: 'warehouse', done: Boolean(homeWarehouseId) },
     { key: 'photo', done: readyPhotos > 0 },
   ];
-  const doneCount = checklist.filter((item) => item.done).length;
 
   return (
-    <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
+    <form className="flex flex-col gap-4 pb-28" noValidate onSubmit={(event) => void submit(event)}>
       {registered ? (
         <Alert className="border-transparent bg-success-soft">
           <CircleCheck aria-hidden className="text-success" />
@@ -295,58 +289,147 @@ export function RegistrationForm(props: { uoms: readonly Uom[]; categories: read
               </FormSection>
 
               <FormSection step={2} title={t('catalog.registration.sectionUnits')} plain>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <FormField
-                    label={t('catalog.product.baseUnit')}
-                    htmlFor="registration-base-unit"
-                    hint={t('catalog.product.baseUnitHint')}
-                    error={errors.baseUomId?.message}
-                  >
-                    <NativeSelect id="registration-base-unit" {...form.register('baseUomId')}>
-                      {baseOptions.map((uom) => (
-                        <option key={uom.id} value={String(uom.id)}>
-                          {uom.name}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  </FormField>
-                  <FormField
-                    label={t('catalog.registration.boxFactor')}
-                    htmlFor="registration-box-factor"
-                    hint={t('catalog.registration.boxFactorHint', { unit: baseName })}
-                    error={errors.boxFactor?.message}
-                  >
-                    <Input
-                      id="registration-box-factor"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      className="font-mono"
-                      {...form.register('boxFactor')}
-                    />
-                  </FormField>
-                  <FormField
-                    label={t('catalog.product.weight')}
-                    htmlFor="registration-weight"
-                    hint={t('catalog.registration.weightHint')}
-                    error={errors.weightKg?.message}
-                  >
-                    <Input
-                      id="registration-weight"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      className="font-mono"
-                      {...form.register('weightKg')}
-                    />
-                  </FormField>
+                <div className="flex flex-col gap-5">
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <FormField
+                      label={t('catalog.product.baseUnit')}
+                      htmlFor="registration-base-unit"
+                      hint={t('catalog.product.baseUnitHint')}
+                      error={errors.baseUomId?.message}
+                    >
+                      <NativeSelect id="registration-base-unit" {...form.register('baseUomId')}>
+                        {baseOptions.map((uom) => (
+                          <option key={uom.id} value={String(uom.id)}>
+                            {uom.name}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    </FormField>
+                    <FormField
+                      label={t('catalog.registration.boxFactor')}
+                      htmlFor="registration-box-factor"
+                      error={errors.boxFactor?.message}
+                    >
+                      <Input
+                        id="registration-box-factor"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        className="font-mono"
+                        {...form.register('boxFactor')}
+                      />
+                    </FormField>
+                    <FormField
+                      label={t('catalog.product.weight')}
+                      htmlFor="registration-weight"
+                      error={errors.weightKg?.message}
+                    >
+                      <Input
+                        id="registration-weight"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        className="font-mono"
+                        {...form.register('weightKg')}
+                      />
+                    </FormField>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-medium">{t('catalog.product.extraUnits')}</h4>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => units.append({ uomId: '', factorToBase: '', barcodes: [] })}
+                      >
+                        <Plus />
+                        {t('catalog.product.addUnit')}
+                      </Button>
+                    </div>
+                    {units.fields.length === 0 ? (
+                      <p className="rounded-lg border border-dashed border-border bg-muted/30 px-4 py-2.5 text-sm text-muted-foreground">
+                        {t('catalog.product.noExtraUnits')}
+                      </p>
+                    ) : (
+                      <div className="flex flex-col gap-3">
+                        {units.fields.map((field, index) => {
+                          const prefix = `registration-unit-${field.id}`;
+                          const unitErrors = errors.units?.[index];
+                          return (
+                            <div
+                              key={field.id}
+                              className="relative grid gap-4 rounded-xl border border-border/90 bg-background p-4 pr-12 md:grid-cols-[10rem_8rem_minmax(0,1fr)]"
+                            >
+                              <FormField
+                                label={t('catalog.product.unit')}
+                                htmlFor={`${prefix}-uom`}
+                                error={unitErrors?.uomId?.message}
+                              >
+                                <NativeSelect
+                                  id={`${prefix}-uom`}
+                                  {...form.register(`units.${index}.uomId`)}
+                                >
+                                  <option value="">{t('catalog.product.chooseUnit')}</option>
+                                  {unitOptions.map((uom) => (
+                                    <option key={uom.id} value={String(uom.id)}>
+                                      {uom.name}
+                                    </option>
+                                  ))}
+                                </NativeSelect>
+                              </FormField>
+                              <FormField
+                                label={t('catalog.product.factor')}
+                                htmlFor={`${prefix}-factor`}
+                                error={unitErrors?.factorToBase?.message}
+                              >
+                                <Input
+                                  id={`${prefix}-factor`}
+                                  inputMode="decimal"
+                                  autoComplete="off"
+                                  className="font-mono"
+                                  {...form.register(`units.${index}.factorToBase`)}
+                                />
+                              </FormField>
+                              <FormField
+                                label={t('catalog.product.unitBarcodes')}
+                                htmlFor={`${prefix}-barcodes`}
+                              >
+                                <Controller
+                                  control={form.control}
+                                  name={`units.${index}.barcodes`}
+                                  render={({ field: barcodes }) => (
+                                    <BarcodeList
+                                      id={`${prefix}-barcodes`}
+                                      label={t('catalog.product.unitBarcodes')}
+                                      value={barcodes.value}
+                                      onChange={barcodes.onChange}
+                                      isRepeated={isRepeated}
+                                    />
+                                  )}
+                                />
+                              </FormField>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                className="absolute top-3 right-3 text-muted-foreground hover:bg-danger-soft hover:text-destructive"
+                                aria-label={t('catalog.product.removeUnit')}
+                                title={t('catalog.product.removeUnit')}
+                                onClick={() => units.remove(index)}
+                              >
+                                <Trash2 />
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </FormSection>
 
-              <FormSection
-                step={3}
-                title={t('catalog.registration.sectionBarcodes')}
-                description={t('catalog.registration.barcodesHint')}
-                plain
-              >
+              <FormSection step={3} title={t('catalog.registration.sectionBarcodes')} plain>
                 <div className="grid gap-4 md:grid-cols-2">
                   <FormField
                     label={t('catalog.registration.baseBarcodes')}
@@ -386,102 +469,6 @@ export function RegistrationForm(props: { uoms: readonly Uom[]; categories: read
                   </FormField>
                 </div>
               </FormSection>
-
-              <FormSection
-                title={t('catalog.product.extraUnits')}
-                description={t('catalog.registration.extraUnitsHint')}
-                plain
-                action={
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => units.append({ uomId: '', factorToBase: '', barcodes: [] })}
-                  >
-                    <Plus />
-                    {t('catalog.product.addUnit')}
-                  </Button>
-                }
-              >
-                {units.fields.length === 0 ? (
-                  <p className="rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
-                    {t('catalog.product.noExtraUnits')}
-                  </p>
-                ) : (
-                  <div className="flex flex-col gap-3">
-                    {units.fields.map((field, index) => {
-                      const prefix = `registration-unit-${field.id}`;
-                      const unitErrors = errors.units?.[index];
-                      return (
-                        <div
-                          key={field.id}
-                          className="relative grid gap-4 rounded-xl border border-border/90 bg-background p-4 pr-12 md:grid-cols-[10rem_8rem_minmax(0,1fr)]"
-                        >
-                          <FormField
-                            label={t('catalog.product.unit')}
-                            htmlFor={`${prefix}-uom`}
-                            error={unitErrors?.uomId?.message}
-                          >
-                            <NativeSelect
-                              id={`${prefix}-uom`}
-                              {...form.register(`units.${index}.uomId`)}
-                            >
-                              <option value="">{t('catalog.product.chooseUnit')}</option>
-                              {unitOptions.map((uom) => (
-                                <option key={uom.id} value={String(uom.id)}>
-                                  {uom.name}
-                                </option>
-                              ))}
-                            </NativeSelect>
-                          </FormField>
-                          <FormField
-                            label={t('catalog.product.factor')}
-                            htmlFor={`${prefix}-factor`}
-                            error={unitErrors?.factorToBase?.message}
-                          >
-                            <Input
-                              id={`${prefix}-factor`}
-                              inputMode="decimal"
-                              autoComplete="off"
-                              className="font-mono"
-                              {...form.register(`units.${index}.factorToBase`)}
-                            />
-                          </FormField>
-                          <FormField
-                            label={t('catalog.product.unitBarcodes')}
-                            htmlFor={`${prefix}-barcodes`}
-                          >
-                            <Controller
-                              control={form.control}
-                              name={`units.${index}.barcodes`}
-                              render={({ field: barcodes }) => (
-                                <BarcodeList
-                                  id={`${prefix}-barcodes`}
-                                  label={t('catalog.product.unitBarcodes')}
-                                  value={barcodes.value}
-                                  onChange={barcodes.onChange}
-                                  isRepeated={isRepeated}
-                                />
-                              )}
-                            />
-                          </FormField>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            className="absolute top-3 right-3 text-muted-foreground hover:bg-danger-soft hover:text-destructive"
-                            aria-label={t('catalog.product.removeUnit')}
-                            title={t('catalog.product.removeUnit')}
-                            onClick={() => units.remove(index)}
-                          >
-                            <Trash2 />
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </FormSection>
             </CardContent>
           </Card>
         </div>
@@ -489,7 +476,7 @@ export function RegistrationForm(props: { uoms: readonly Uom[]; categories: read
         <div className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-20">
           <Card>
             <CardContent className="flex flex-col gap-6">
-              <FormSection step={4} title={t('catalog.registration.sectionPlace')} plain>
+              <FormSection title={t('catalog.registration.sectionPlace')} plain>
                 <div className="flex flex-col gap-4">
                   <FormField
                     label={t('catalog.registration.supplier')}
@@ -524,94 +511,78 @@ export function RegistrationForm(props: { uoms: readonly Uom[]; categories: read
                       ))}
                     </NativeSelect>
                   </FormField>
-                  <FormField
-                    label={t('catalog.registration.fixedBin')}
-                    htmlFor="registration-bin"
-                    hint={BINS_SOON ? <ComingSoonNote /> : t('catalog.registration.fixedBinHint')}
-                    error={errors.fixedBinCode?.message}
-                  >
-                    <Input
-                      id="registration-bin"
-                      autoComplete="off"
-                      spellCheck={false}
-                      disabled={BINS_SOON}
-                      className="font-mono uppercase sm:w-44"
-                      {...form.register('fixedBinCode')}
-                    />
-                  </FormField>
+                  {BINS_SOON ? (
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                      <span className="text-foreground/80">
+                        {t('catalog.registration.fixedBin')}
+                      </span>
+                      <ComingSoonNote>{t('catalog.registration.fixedBinSoon')}</ComingSoonNote>
+                    </div>
+                  ) : (
+                    <FormField
+                      label={t('catalog.registration.fixedBin')}
+                      htmlFor="registration-bin"
+                      hint={t('catalog.registration.fixedBinHint')}
+                      error={errors.fixedBinCode?.message}
+                    >
+                      <Input
+                        id="registration-bin"
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="font-mono uppercase sm:w-44"
+                        {...form.register('fixedBinCode')}
+                      />
+                    </FormField>
+                  )}
                 </div>
               </FormSection>
 
               <FormSection
-                step={5}
                 title={t('catalog.registration.sectionPhotos')}
                 description={t('catalog.registration.photosHint')}
                 plain
               >
-                <FormField label={t('catalog.registration.photos')} htmlFor="registration-photos">
-                  <PhotoPicker id="registration-photos" uploads={uploads} error={photoError} />
-                </FormField>
+                <label htmlFor="registration-photos" className="sr-only">
+                  {t('catalog.registration.photos')}
+                </label>
+                <PhotoPicker id="registration-photos" uploads={uploads} error={photoError} wide />
               </FormSection>
             </CardContent>
           </Card>
-
-          <section
-            aria-label={t('catalog.registration.summary')}
-            className="rounded-xl bg-card px-4 py-3 shadow-card ring-1 ring-black/[0.06]"
-          >
-            <div className="flex items-baseline justify-between gap-3">
-              <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                {t('catalog.registration.summary')}
-              </h3>
-              <span className="font-mono text-xs text-muted-foreground">
-                {doneCount}/{checklist.length}
-              </span>
-            </div>
-            <p className="mt-2 truncate text-[0.9375rem] font-semibold">
-              {name.trim() ? name : t('catalog.registration.summaryNoName')}
-            </p>
-            <p className="truncate text-[0.8125rem] text-muted-foreground">
-              {[sku ? `№ ${sku}` : null, categoryPath].filter(Boolean).join(' · ') ||
-                t('catalog.registration.summaryNoCategory')}
-            </p>
-            <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-[0.8125rem]">
-              <dt className="text-muted-foreground">{t('catalog.product.baseUnit')}</dt>
-              <dd className="truncate">
-                {baseName}
-                {boxFactor
-                  ? ` · ${t('catalog.registration.summaryBox', { factor: boxFactor })}`
-                  : ''}
-              </dd>
-              <dt className="text-muted-foreground">{t('catalog.registration.supplier')}</dt>
-              <dd className="truncate">{supplier?.name ?? '—'}</dd>
-              <dt className="text-muted-foreground">{t('catalog.registration.homeWarehouse')}</dt>
-              <dd className="truncate">{warehouseName ?? '—'}</dd>
-            </dl>
-            <ul className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-[0.8125rem]">
-              {checklist.map((item) => (
-                <li
-                  key={item.key}
-                  className={cn('flex items-center gap-1.5', !item.done && 'text-muted-foreground')}
-                >
-                  {item.done ? (
-                    <CircleCheck aria-hidden className="size-3.5 text-success" />
-                  ) : (
-                    <Circle aria-hidden className="size-3.5" />
-                  )}
-                  {t(`catalog.registration.check.${item.key}`)}
-                </li>
-              ))}
-            </ul>
-          </section>
         </div>
       </div>
 
       <ProblemAlert problem={problem ?? problemFromError(warehouses.error)} />
       <StickyActions
         summary={
-          name.trim()
-            ? t('catalog.registration.saveSummary', { sku, name })
-            : t('catalog.registration.saveHint')
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="truncate font-medium text-foreground">
+              {name.trim()
+                ? t('catalog.registration.saveSummary', { sku, name })
+                : t('catalog.registration.summaryNoName')}
+            </span>
+            <ul
+              className="flex flex-wrap items-center gap-1.5"
+              aria-label={t('catalog.registration.summary')}
+            >
+              {checklist.map((item) => (
+                <li
+                  key={item.key}
+                  className={cn(
+                    'inline-flex h-6 items-center gap-1 rounded-full px-2 text-[0.75rem]',
+                    item.done ? 'bg-success-soft text-success' : 'bg-fill text-muted-foreground',
+                  )}
+                >
+                  {item.done ? (
+                    <CircleCheck aria-hidden className="size-3" />
+                  ) : (
+                    <Circle aria-hidden className="size-3" />
+                  )}
+                  {t(`catalog.registration.check.${item.key}`)}
+                </li>
+              ))}
+            </ul>
+          </div>
         }
       >
         <Button type="button" variant="ghost" onClick={() => void navigate('/catalog/products')}>

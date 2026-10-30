@@ -67,7 +67,8 @@ export function BarcodeEntry(props: {
         />
         <Button
           type="button"
-          variant="outline"
+          variant="ghost"
+          className="shrink-0 text-link"
           disabled={props.disabled}
           onClick={() => void add()}
         >
