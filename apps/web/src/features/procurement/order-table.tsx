@@ -1,5 +1,5 @@
 import { Decimal } from '@tugeel/shared/money';
-import { type PoColumnGroup, splitBoxes } from '@tugeel/shared/procurement';
+import { splitBoxes } from '@tugeel/shared/procurement';
 import { ArrowLeft, ArrowRight, ChevronRight, PackagePlus, PackageSearch } from 'lucide-react';
 import { type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -35,17 +35,8 @@ import {
   rowLabel,
   shippedEditOf,
 } from './order-edits';
+import { type ColumnView, shows } from './order-columns';
 import { PoStatusBadge } from './parts';
-
-/** Which groups the signed-in user sees at all, beyond the hidden ones (ADR-0118 #5). */
-export interface ColumnView {
-  hidden: ReadonlySet<string>;
-  canPrices: boolean;
-  canCosts: boolean;
-}
-
-const shows = (view: ColumnView, group: PoColumnGroup) =>
-  !view.hidden.has(group) && (group !== 'pricing' || view.canCosts);
 
 /** The columns of each group, for the header and the group rows' spans. */
 function columnCount(view: ColumnView): number {

@@ -6,6 +6,7 @@ import { Link } from 'react-router';
 import type { ProductLocation } from '@/features/inventory/api';
 import type { ProductSupplierLink } from '@/features/partners/api';
 import type { CurrentTerms } from '@/features/pricing/api';
+import type { ColumnKind } from '@/lib/column-layout';
 import { formatMnt } from '@/lib/money';
 import type { ProductListItem } from './api';
 import { ProductStageBadge } from './product-stage-badge';
@@ -36,6 +37,18 @@ export const DEFAULT_HIDDEN_PRODUCT_COLUMNS: readonly ProductColumnKey[] = [
   'fixedBins',
 ];
 
+/**
+ * What that user sees hidden on a screen of 1600px or more (ADR-0119): the base unit, the weight
+ * and the home warehouse fit there too.
+ */
+export const WIDE_DEFAULT_HIDDEN_PRODUCT_COLUMNS: readonly ProductColumnKey[] = [
+  'units',
+  'priceProfile',
+  'baseBarcodes',
+  'unitBarcodes',
+  'fixedBins',
+];
+
 /** What the cells read besides the row; `suppliers`, `locations`, `prices` are undefined until loaded. */
 export interface ProductCellContext {
   t: TFunction;
@@ -48,6 +61,14 @@ export interface ProductCellContext {
 
 export interface ProductColumn {
   key: ProductColumnKey;
+  /** How the column is sized in the list's layout (ADR-0119, `lib/column-layout.ts`). */
+  kind: ColumnKind;
+  /** A text column's share of the spare width (default 1). */
+  weight?: number;
+  /** A text column's narrowest width in rem (default 8). */
+  min?: number;
+  /** A fixed column's width in rem when the kind's default does not fit its values. */
+  width?: number;
   /** Read from another module per page, only while the column shows. */
   source?: 'suppliers' | 'locations' | 'prices';
   /** Numbers and money: right-aligned in the head and the cells, tabular figures. */
@@ -122,8 +143,9 @@ function supplierText(row: ProductListItem, ctx: ProductCellContext): string | u
 export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
   {
     key: 'image',
+    kind: 'image',
     // A 32px photo keeps the row at 36px (ADR-0066).
-    className: 'w-12 px-2 py-0.5',
+    className: 'px-2 py-0.5',
     cell: (row) =>
       row.thumbUrl ? (
         <img src={row.thumbUrl} alt="" loading="lazy" className="size-8 rounded-md object-cover" />
@@ -133,12 +155,15 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
         </div>
       ),
   },
-  { key: 'sku', className: 'font-mono', cell: (row) => row.sku },
+  { key: 'sku', kind: 'code', className: 'font-mono', cell: (row) => row.sku },
   {
     key: 'name',
-    // The name takes the spare width, never less than 11rem: with many columns the list scrolls.
-    truncate: { text: (row) => row.name, fill: true },
-    className: 'min-w-44',
+    // The name takes the largest share of the spare width, never less than 12rem: with many
+    // columns the list scrolls.
+    kind: 'text',
+    weight: 3,
+    min: 12,
+    truncate: { text: (row) => row.name },
     cell: (row) => (
       <Link
         to={`/catalog/products/${row.id}`}
@@ -150,13 +175,16 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
   },
   {
     key: 'category',
+    kind: 'text',
+    weight: 2.5,
     truncate: { text: (row, ctx) => ctx.categoryPath(row.categoryId) },
-    className: 'max-w-40 text-muted-foreground min-[1440px]:max-w-64',
+    className: 'text-muted-foreground',
     cell: (row, ctx) => categoryCell(ctx.categoryPath(row.categoryId), ctx),
   },
-  { key: 'baseUnit', cell: (row) => row.baseUnit.uomName },
+  { key: 'baseUnit', kind: 'text', weight: 0.5, min: 5, cell: (row) => row.baseUnit.uomName },
   {
     key: 'units',
+    kind: 'text',
     cell: (row, ctx) =>
       lines(
         otherUnits(row).map((unit) =>
@@ -171,6 +199,7 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
   },
   {
     key: 'warehousePrice',
+    kind: 'money',
     source: 'prices',
     numeric: true,
     cell: (row, ctx) => {
@@ -183,15 +212,18 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
   },
   {
     key: 'priceProfile',
+    kind: 'text',
     source: 'prices',
     cell: (row, ctx) => (ctx.prices ? text(termsOf(row, ctx)?.profileName, ctx) : null),
   },
   {
     key: 'baseBarcodes',
+    kind: 'text',
     cell: (row, ctx) => lines(row.units.find((unit) => unit.isBase)?.barcodes ?? [], ctx, true),
   },
   {
     key: 'unitBarcodes',
+    kind: 'text',
     cell: (row, ctx) =>
       lines(
         otherUnits(row).flatMap((unit) =>
@@ -203,9 +235,10 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
         true,
       ),
   },
-  { key: 'weight', numeric: true, cell: (row, ctx) => text(row.weightKg, ctx) },
+  { key: 'weight', kind: 'qty', numeric: true, cell: (row, ctx) => text(row.weightKg, ctx) },
   {
     key: 'homeWarehouse',
+    kind: 'text',
     source: 'locations',
     cell: (row, ctx) => {
       if (!ctx.locations) return null;
@@ -215,6 +248,7 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
   },
   {
     key: 'fixedBins',
+    kind: 'text',
     source: 'locations',
     cell: (row, ctx) => {
       if (!ctx.locations) return null;
@@ -235,9 +269,10 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
   },
   {
     key: 'supplier',
+    kind: 'text',
+    weight: 2,
     source: 'suppliers',
     truncate: { text: supplierText },
-    className: 'max-w-40 min-[1800px]:max-w-64',
     cell: (row, ctx) => {
       const shown = supplierText(row, ctx);
       if (shown === undefined) return null;
@@ -246,6 +281,7 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
   },
   {
     key: 'status',
+    kind: 'status',
     cell: (row) => <ProductStageBadge product={row} />,
   },
 ];

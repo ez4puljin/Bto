@@ -12,6 +12,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SkeletonRows,
   SpacerCell,
@@ -34,14 +35,8 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatCount } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
@@ -71,6 +66,16 @@ const positiveId = (value: string | null) => {
   const id = Number.parseInt(value ?? '', 10);
   return Number.isSafeInteger(id) && id > 0 ? id : undefined;
 };
+
+/** The list's columns (ADR-0119). */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'sku', kind: 'code' },
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
+  { key: 'category', kind: 'text', weight: 2 },
+  { key: 'missing', kind: 'text', weight: 2, min: 12 },
+  { key: 'spacer', kind: 'spacer' },
+  { key: 'chevron', kind: 'chevron' },
+];
 
 /**
  * What e-Barimt receipts still miss, product by product, and bulk assignment by category that only
@@ -152,7 +157,7 @@ export function ReadinessPage() {
         </NativeSelect>
       </FilterBar>
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('catalog.products.columns.sku')}</TableHead>
@@ -168,7 +173,7 @@ export function ReadinessPage() {
             {rows.map((row) => (
               <LinkRow key={row.product.id} to={`/catalog/products/${row.product.id}`}>
                 <TableCell className="font-mono">{row.product.sku}</TableCell>
-                <TruncateCell text={row.product.name} className="max-w-72">
+                <TruncateCell text={row.product.name}>
                   <Link
                     to={`/catalog/products/${row.product.id}`}
                     className="font-medium underline-offset-4 hover:underline"
@@ -178,7 +183,7 @@ export function ReadinessPage() {
                 </TruncateCell>
                 <TruncateCell
                   text={paths.get(row.product.categoryId) ?? t('common.none')}
-                  className="max-w-56 text-muted-foreground"
+                  className="text-muted-foreground"
                 />
                 <TableCell>
                   <div className="flex gap-1">
@@ -193,7 +198,7 @@ export function ReadinessPage() {
               </LinkRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!products.isPending && rows.length === 0 ? (
           <EmptyState
             icon={CircleCheck}

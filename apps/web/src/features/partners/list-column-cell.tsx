@@ -3,17 +3,10 @@ import type { ReactNode } from 'react';
 import { TruncateCell } from '@/components/list';
 import { TableCell, TableHead } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import type { ListColumn } from './list-columns';
 
-/** A column of a partner list (`customer-columns`, `supplier-columns`) as its cells read it. */
-export interface ListColumn<Row> {
-  key: string;
-  /** Money and counts: right-aligned in the head and the cells. */
-  numeric?: boolean;
-  /** Long text on one line with «…» and the whole text on hover; `fill` takes the spare width. */
-  truncate?: { text: (row: Row, t: TFunction) => string; fill?: boolean };
-  className?: string;
-  cell: (row: Row, t: TFunction) => ReactNode;
-}
+// The column descriptor and its layout helper live in `list-columns.ts` (no components there).
+export type { ListColumn } from './list-columns';
 
 /** A column's head, aligned like its cells. */
 export function ListColumnHead(props: { numeric?: boolean | undefined; children: ReactNode }) {

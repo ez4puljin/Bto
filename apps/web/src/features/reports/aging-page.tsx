@@ -10,6 +10,7 @@ import {
   FilterBar,
   FilterToggle,
   ListCard,
+  ListTable,
   SearchField,
   SkeletonRows,
   TruncateCell,
@@ -30,6 +31,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useCompanyName } from '@/features/company/api';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { saveBlob } from '@/lib/download';
 import { formatMnt, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
@@ -77,12 +79,25 @@ function filterParams(filter: AgingFilter) {
   };
 }
 
+/** The aging's columns on screen (ADR-0119): code, name, group, the buckets, credit, total, oldest. */
+const AGING_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'code', kind: 'code' },
+  { key: 'name', kind: 'text', weight: 3, min: 14 },
+  { key: 'group', kind: 'text', weight: 1 },
+  ...AGING_BUCKETS.map((bucket): ColumnSpec => ({ key: bucket, kind: 'money' })),
+  { key: 'credit', kind: 'money' },
+  { key: 'total', kind: 'money', width: 10 },
+  { key: 'oldest', kind: 'date' },
+  { key: 'chevron', kind: 'chevron' },
+];
+
+/** With `onOpen` (the screen) the columns are sized by the layout; on paper the table lays itself out. */
 function AgingTable(props: { report: Aging; onOpen?: (row: AgingRow) => void }) {
   const { t } = useTranslation();
   const { report } = props;
   const columns = 'reports.aging.columns';
-  return (
-    <Table>
+  const body = (
+    <>
       <TableHeader>
         <TableRow>
           <TableHead>{t(`${columns}.code`)}</TableHead>
@@ -157,7 +172,12 @@ function AgingTable(props: { report: Aging; onOpen?: (row: AgingRow) => void }) 
           {props.onOpen ? <TableCell /> : null}
         </TableRow>
       </TableBody>
-    </Table>
+    </>
+  );
+  return props.onOpen ? (
+    <ListTable columns={AGING_COLUMNS}>{body}</ListTable>
+  ) : (
+    <Table>{body}</Table>
   );
 }
 

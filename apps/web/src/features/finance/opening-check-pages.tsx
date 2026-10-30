@@ -5,7 +5,7 @@ import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import { FormField } from '@/components/form';
-import { EmptyState, FilterBar, ListCard, SkeletonRows } from '@/components/list';
+import { EmptyState, FilterBar, ListCard, ListTable, SkeletonRows } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { PrintFrame } from '@/components/print-frame';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -20,6 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useCompanyName } from '@/features/company/api';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatMnt } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useAction } from '@/lib/use-action';
@@ -52,7 +53,17 @@ function byAccount(rows: readonly OpeningCheckRow[]) {
   }));
 }
 
-function OpeningCheckTable({ report }: { report: OpeningCheck }) {
+/** The check's columns (ADR-0119): account code, party code and name, the two sides. */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'accountCode', kind: 'code' },
+  { key: 'partyCode', kind: 'number' },
+  { key: 'partyName', kind: 'text', weight: 3, min: 14 },
+  { key: 'debit', kind: 'money', width: 10 },
+  { key: 'credit', kind: 'money', width: 10 },
+];
+
+/** On screen the columns are sized by the layout; on paper (`print`) the table lays itself out. */
+function OpeningCheckTable({ report, print }: { report: OpeningCheck; print?: boolean }) {
   const { t } = useTranslation();
   const columns = 'finance.reports.openingCheck.columns';
   const amounts = (balance: string) =>
@@ -61,8 +72,8 @@ function OpeningCheckTable({ report }: { report: OpeningCheck }) {
         {value}
       </TableCell>
     ));
-  return (
-    <Table>
+  const body = (
+    <>
       <TableHeader>
         <TableRow>
           <TableHead>{t(`${columns}.accountCode`)}</TableHead>
@@ -112,8 +123,9 @@ function OpeningCheckTable({ report }: { report: OpeningCheck }) {
           <TableCell className="text-right font-mono">{formatMnt(report.credit)}</TableCell>
         </TableRow>
       </TableBody>
-    </Table>
+    </>
   );
+  return print ? <Table>{body}</Table> : <ListTable columns={COLUMNS}>{body}</ListTable>;
 }
 
 /**
@@ -220,7 +232,7 @@ export function OpeningCheckPrintPage() {
               <p className="text-[13px] font-semibold">{company}</p>
               <h1 className="text-[16px] font-semibold">{title}</h1>
             </div>
-            <OpeningCheckTable report={report.data} />
+            <OpeningCheckTable report={report.data} print />
             <p>{t('finance.reports.openingCheck.statement', { date: report.data.date })}</p>
             <Table>
               <TableHeader>

@@ -20,6 +20,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SegmentedControl,
   SkeletonRows,
@@ -36,15 +37,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatCount } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
@@ -82,6 +77,15 @@ function useCountText() {
         ? t('segments.countUnavailable')
         : t(`segments.countOf.${entity}`, { count: formatCount(count) });
 }
+
+/** The list's columns (ADR-0119): the name with its badges, the description, the count. */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'name', kind: 'text', weight: 3, min: 14 },
+  { key: 'description', kind: 'text', weight: 2 },
+  { key: 'count', kind: 'count', width: 8 },
+  { key: 'spacer', kind: 'spacer' },
+  { key: 'chevron', kind: 'chevron' },
+];
 
 /**
  * Segments (ADR-0049): the saved conditions of one entity at a time, by name, with how many records
@@ -130,13 +134,11 @@ export function SegmentsPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(segments.error) ?? problemFromError(counts.error)} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('segments.columns.name')}</TableHead>
-              <TableHead className="hidden md:table-cell">
-                {t('segments.columns.description')}
-              </TableHead>
+              <TableHead>{t('segments.columns.description')}</TableHead>
               <TableHead className="text-right">{t('segments.columns.count')}</TableHead>
               <SpacerHead />
               <ChevronHead />
@@ -166,7 +168,7 @@ export function SegmentsPage() {
                 </TableCell>
                 <TruncateCell
                   text={row.description ?? t('common.none')}
-                  className="hidden text-muted-foreground md:table-cell"
+                  className="text-muted-foreground"
                 />
                 <TableCell className="text-right tabular-nums">
                   {countText(entity, counts.data ? (countOf.get(row.id) ?? null) : undefined)}
@@ -175,7 +177,7 @@ export function SegmentsPage() {
               </LinkRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {empty ? <EmptyState icon={Shapes} title={t('segments.empty')} /> : null}
         <LoadMore query={segments} />
       </ListCard>

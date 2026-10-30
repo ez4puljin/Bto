@@ -4,23 +4,24 @@ import { matchesQuery, queryTerms, searchKeys } from '@tugeel/shared/text';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FilterBar, ListCard, RowAction, RowActions, SearchField } from '@/components/list';
+import {
+  FilterBar,
+  ListCard,
+  ListTable,
+  RowAction,
+  RowActions,
+  SearchField,
+} from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { isQty, useWarehouseName } from '@/features/inventory/helpers';
 import { ProductSearch } from '@/features/inventory/shared';
 import { useLinesQuote } from '@/features/pricing/api';
 import { UnitSelect } from '@/features/pricing/quote-table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatMnt, formatQty, formatTugrik, plainDecimal } from '@/lib/money';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
@@ -68,6 +69,31 @@ const linesOf = (order: SalesOrder): EditLine[] =>
 
 const isPicked = (line: SalesOrderLine | undefined) =>
   line !== undefined && line.qtyPicked !== null && new Decimal(line.qtyPicked).gt(0);
+
+/**
+ * The table's columns (ADR-0119) as the order's state shows them: the reserved, backordered and
+ * picked quantities carry their unit (the picked one its bin too), the unit price may list the
+ * parts of a pack, and an editable order ends its rows with «Хасах».
+ */
+function lineColumns(flags: {
+  confirmed: boolean;
+  backordered: boolean;
+  picked: boolean;
+  editable: boolean;
+}): ColumnSpec[] {
+  return [
+    { key: 'product', kind: 'text', weight: 3, min: 14 },
+    { key: 'warehouse', kind: 'text', weight: 1 },
+    { key: 'unit', kind: 'text', weight: 1, min: 9 },
+    { key: 'qty', kind: 'qty', width: 8 },
+    { key: 'unitPrice', kind: 'money', width: 11 },
+    { key: 'amount', kind: 'money' },
+    ...(flags.confirmed ? [{ key: 'reserved', kind: 'qty', width: 9 } as const] : []),
+    ...(flags.backordered ? [{ key: 'backordered', kind: 'qty', width: 9 } as const] : []),
+    ...(flags.picked ? [{ key: 'picked', kind: 'qty', width: 12 } as const] : []),
+    ...(flags.editable ? [{ key: 'remove', kind: 'actions', actions: 1 } as const] : []),
+  ];
+}
 
 /**
  * «Бараа» (ADR-0059, erxes's Products): the order's lines with a search by name or code, a filter by
@@ -182,6 +208,12 @@ export function OrderProducts({
   const anyPicked = order.lines.some((line) => line.qtyPicked !== null);
   const invalid = lines.some((line) => !isQty(line.qty));
   const blocked = rows.some((row) => row.problem !== null);
+  const backordered = order.lines.filter((line) => new Decimal(line.qtyBackordered).gt(0));
+  const hasBackordered = backordered.length > 0;
+  const columns = useMemo(
+    () => lineColumns({ confirmed, backordered: hasBackordered, picked: anyPicked, editable }),
+    [confirmed, hasBackordered, anyPicked, editable],
+  );
 
   const change = (next: EditLine[]) => setEdits(next);
   const update = (key: string, patch: Partial<EditLine>) =>
@@ -198,8 +230,6 @@ export function OrderProducts({
       setAdding(false);
       toast.success(t('sales.panel.products.saved'));
     });
-
-  const backordered = order.lines.filter((line) => new Decimal(line.qtyBackordered).gt(0));
 
   return (
     <div className="flex flex-col gap-3">
@@ -270,7 +300,7 @@ export function OrderProducts({
         />
       ) : null}
       <ListCard>
-        <Table>
+        <ListTable columns={columns}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('sales.order.product')}</TableHead>
@@ -327,7 +357,7 @@ export function OrderProducts({
                         aria-label={`${t('sales.order.qty')}: ${line.name}`}
                         aria-invalid={badQty || undefined}
                         inputMode="decimal"
-                        className="ml-auto w-24 text-right font-mono"
+                        className="ml-auto w-full text-right font-mono"
                         value={line.qty}
                         onChange={(event) => update(line.key, { qty: event.target.value.trim() })}
                       />
@@ -400,7 +430,7 @@ export function OrderProducts({
               );
             })}
           </TableBody>
-        </Table>
+        </ListTable>
         {lines.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-muted-foreground">
             {editable ? t('sales.panel.products.emptyEditable') : t('sales.panel.products.empty')}

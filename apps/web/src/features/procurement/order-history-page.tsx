@@ -6,6 +6,7 @@ import {
   EmptyState,
   FilterBar,
   ListCard,
+  ListTable,
   LoadMore,
   SearchField,
   SkeletonRows,
@@ -15,15 +16,9 @@ import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatUbDateTime } from '@/lib/dayjs';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { saveBlob } from '@/lib/download';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
@@ -47,6 +42,16 @@ const idOf = (value: string | null | undefined) => {
  * quantities, the keepers' notes, the receipt's steps, the prices — filtered by user, supplier and
  * product, with an Excel of the same rows.
  */
+/** The columns of an order's history (ADR-0119). */
+const HISTORY_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'at', kind: 'datetime' },
+  { key: 'user', kind: 'text', weight: 1 },
+  { key: 'action', kind: 'text', weight: 1, min: 9 },
+  { key: 'supplier', kind: 'text', weight: 2 },
+  { key: 'product', kind: 'text', weight: 3, min: 12 },
+  { key: 'change', kind: 'text', weight: 2, min: 12 },
+];
+
 export function PurchaseOrderHistoryPage() {
   const { t } = useTranslation();
   const id = idOf(useParams().id) ?? 0;
@@ -141,7 +146,7 @@ export function PurchaseOrderHistoryPage() {
       <ProblemAlert problem={exporting.problem} />
       <ProblemAlert problem={problemFromError(history.error)} onRetry={history.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={HISTORY_COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('procurement.history.at')}</TableHead>
@@ -173,7 +178,7 @@ export function PurchaseOrderHistoryPage() {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!history.isPending && shown.length === 0 ? (
           <EmptyState
             icon={History}

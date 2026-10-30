@@ -27,6 +27,8 @@ export type ListColumn = (typeof LIST_COLUMNS)[number];
 export const LOCKED_COLUMNS: readonly ListColumn[] = ['number'];
 /** What a user who never chose sees hidden, so the list fits a laptop beside the panel (ADR-0066). */
 const DEFAULT_HIDDEN: readonly ListColumn[] = ['createdBy', 'channel', 'createdAt'];
+/** On a screen of 1600px or more every column fits (ADR-0119). */
+const WIDE_DEFAULT_HIDDEN: readonly ListColumn[] = [];
 
 export interface ListFilters {
   scope: ListScope;
@@ -76,7 +78,13 @@ export function listFiltersActive(filters: ListFilters): boolean {
 
 /** Each user's columns of the list, kept in this browser (ADR-0050). */
 export function useListColumns() {
-  return useHiddenColumns('salesOrders', LIST_COLUMNS, LOCKED_COLUMNS, DEFAULT_HIDDEN);
+  return useHiddenColumns(
+    'salesOrders',
+    LIST_COLUMNS,
+    LOCKED_COLUMNS,
+    DEFAULT_HIDDEN,
+    WIDE_DEFAULT_HIDDEN,
+  );
 }
 
 export type ListColumns = ReturnType<typeof useListColumns>;

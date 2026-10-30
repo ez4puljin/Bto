@@ -13,6 +13,7 @@ import {
   FilterToggle,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SearchField,
   SkeletonRows,
@@ -21,7 +22,8 @@ import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableHeader, TableRow } from '@/components/ui/table';
+import { TableBody, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
@@ -39,8 +41,10 @@ import {
   CUSTOMER_COLUMNS,
   DEFAULT_HIDDEN_CUSTOMER_COLUMNS,
   LOCKED_CUSTOMER_COLUMNS,
+  WIDE_DEFAULT_HIDDEN_CUSTOMER_COLUMNS,
 } from './customer-columns';
 import { ListColumnCell, ListColumnHead } from './list-column-cell';
+import { columnSpecs } from './list-columns';
 import { PARTNER_STATUSES } from './partner-schema';
 
 const FLAGS = ['tinPending', 'gpsMissing', 'creditHold'] as const;
@@ -48,6 +52,7 @@ const FLAGS = ['tinPending', 'gpsMissing', 'creditHold'] as const;
 const APP_FILTERS: readonly AppAccountFilter[] = ['ACTIVE', 'DISABLED', 'NONE'];
 /** The list's name in the column-choice key (ADR-0050). */
 const COLUMNS_LIST = 'partners.customers';
+const CHEVRON_COLUMN: ColumnSpec = { key: 'chevron', kind: 'chevron' };
 type Flag = (typeof FLAGS)[number];
 
 const isKind = (value: string | null): value is CustomerKind =>
@@ -103,12 +108,15 @@ export function CustomersPage() {
     CUSTOMER_COLUMN_KEYS,
     LOCKED_CUSTOMER_COLUMNS,
     DEFAULT_HIDDEN_CUSTOMER_COLUMNS,
+    WIDE_DEFAULT_HIDDEN_CUSTOMER_COLUMNS,
   );
   const { hidden } = columnState;
   const columns = useMemo(
     () => CUSTOMER_COLUMNS.filter((column) => !hidden.has(column.key)),
     [hidden],
   );
+  // The layout of the shown columns and the chevron (ADR-0119).
+  const specs = useMemo(() => [...columnSpecs(columns), CHEVRON_COLUMN], [columns]);
   const filtered = Boolean(
     q ||
     kind ||
@@ -242,7 +250,7 @@ export function CustomersPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(customers.error)} onRetry={customers.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={specs}>
           <TableHeader>
             <TableRow>
               {columns.map((column) => (
@@ -263,7 +271,7 @@ export function CustomersPage() {
               </LinkRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!customers.isPending && rows.length === 0 ? (
           <EmptyState
             icon={Store}

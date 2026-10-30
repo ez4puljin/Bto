@@ -6,6 +6,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
   EmptyState,
   ListCard,
+  ListTable,
   LoadMore,
   RowAction,
   RowActions,
@@ -17,14 +18,8 @@ import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { RecordSheet } from '@/components/record-sheet';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { saveBlob } from '@/lib/download';
 import { problemFromError } from '@/lib/problem';
@@ -34,6 +29,14 @@ import { HowComputed } from './answer-step';
 import { type AiReport, type AiResult, useAiMutations, useReports } from './api';
 import { ReportNameDialog } from './report-name-dialog';
 import { ResultTable } from './result-table';
+
+/** The list's columns (ADR-0119): the name, its author, when it changed, four actions. */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'name', kind: 'text', weight: 3, min: 14 },
+  { key: 'createdBy', kind: 'text', weight: 2 },
+  { key: 'updatedAt', kind: 'datetime' },
+  { key: 'actions', kind: 'actions', actions: 4 },
+];
 
 /**
  * «Тайлангууд» (ADR-0045 #8): reports saved from answers. Every holder of `ai.ask` runs one or
@@ -87,13 +90,13 @@ export function AiReportsPage() {
         problem={panelOpen ? null : (action.problem ?? problemFromError(reports.error))}
       />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('ai.report.nameLabel')}</TableHead>
               <TableHead>{t('ai.report.createdBy')}</TableHead>
               <TableHead>{t('ai.report.updatedAt')}</TableHead>
-              <TableHead className="w-px">
+              <TableHead>
                 <span className="sr-only">{t('common.actions')}</span>
               </TableHead>
             </TableRow>
@@ -102,7 +105,7 @@ export function AiReportsPage() {
             {reports.isPending ? <SkeletonRows columns={4} /> : null}
             {rows.map((report) => (
               <TableRow key={report.id}>
-                <TruncateCell fill text={report.name} className="font-medium" />
+                <TruncateCell text={report.name} className="font-medium" />
                 <TableCell>{report.createdBy.fullName}</TableCell>
                 <TableCell className="font-mono">
                   {formatUbDateTime(Date.parse(report.updatedAt))}
@@ -142,7 +145,7 @@ export function AiReportsPage() {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {rows.length === 0 && !reports.isPending ? (
           <EmptyState
             icon={FileChartColumn}

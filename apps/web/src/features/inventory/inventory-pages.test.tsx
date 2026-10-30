@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { components } from '@tugeel/api-client';
 import mn from '@tugeel/shared/i18n/mn.json';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   ACCOUNTANT_ME,
   bodyOf,
@@ -17,6 +17,7 @@ import {
   warehouses,
   WH1,
 } from '@/test/inventory-fixtures';
+import { WIDE_SCREEN } from '@/lib/use-media-query';
 import { ADMIN_ME, findSidebar, json, problem, renderApp, signedIn } from '@/test/render-app';
 
 type Schemas = components['schemas'];
@@ -221,6 +222,13 @@ describe('movement history', () => {
   });
 
   it('filters by document type through the URL and shows costs to cost holders', async () => {
+    // A wide screen (ADR-0119): the costs start shown; a laptop would hide them.
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === WIDE_SCREEN,
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+    }));
     const fetchMock = signedIn(ACCOUNTANT_ME, {
       'GET /api/v1/warehouses': warehouses,
       'GET /api/v1/stock/movements': () =>
@@ -265,6 +273,7 @@ describe('movement history', () => {
     expect(localStorage.getItem(`tugeel.stockMovements.hiddenColumns.v1:${ACCOUNTANT_ME.id}`)).toBe(
       JSON.stringify(['value']),
     );
+    vi.unstubAllGlobals();
   });
 
   it('opens the history from a product’s stock page and from each of its shelves', async () => {

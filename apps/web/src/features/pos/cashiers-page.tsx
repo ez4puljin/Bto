@@ -6,6 +6,7 @@ import { DialogFormFooter, FormField } from '@/components/form';
 import {
   EmptyState,
   ListCard,
+  ListTable,
   RowAction,
   RowActions,
   SkeletonRows,
@@ -25,15 +26,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useUsers } from '@/features/identity/api';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
@@ -41,6 +36,17 @@ import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
 import { type Cashier, useCashiers, usePosMutations } from './api';
 import { ActiveBadge } from './badges';
+
+/** The list's columns (ADR-0119); the status cell may hold a second badge with a time. */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'cashier', kind: 'text', weight: 3, min: 12 },
+  { key: 'user', kind: 'code', width: 9 },
+  { key: 'status', kind: 'text', weight: 2, min: 10 },
+  { key: 'pinSetAt', kind: 'datetime' },
+  { key: 'pinSetBy', kind: 'text', weight: 1 },
+  { key: 'spacer', kind: 'spacer' },
+  { key: 'actions', kind: 'actions', actions: 3 },
+];
 
 /** «Кассчин» (ADR-0063 #6): who works the tills and their PINs, set by the admin, never shown. */
 export function PosCashiersPage() {
@@ -85,7 +91,7 @@ export function PosCashiersPage() {
       />
       <ProblemAlert problem={problemFromError(cashiers.error) ?? action.problem} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('pos.fields.cashier')}</TableHead>
@@ -94,7 +100,7 @@ export function PosCashiersPage() {
               <TableHead>{t('pos.fields.pinSetAt')}</TableHead>
               <TableHead>{t('pos.fields.pinSetBy')}</TableHead>
               <SpacerHead />
-              <TableHead className="w-px" />
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -157,7 +163,7 @@ export function PosCashiersPage() {
               );
             })}
           </TableBody>
-        </Table>
+        </ListTable>
         {!cashiers.isPending && (cashiers.data ?? []).length === 0 ? (
           <EmptyState icon={KeyRound} title={t('pos.cashiers.empty')} />
         ) : null}

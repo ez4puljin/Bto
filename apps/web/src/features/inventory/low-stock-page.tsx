@@ -8,6 +8,7 @@ import {
   EmptyState,
   FilterBar,
   ListCard,
+  ListTable,
   LoadMore,
   SkeletonRows,
   TruncateCell,
@@ -17,15 +18,9 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useProductSuppliersOf } from '@/features/partners/api';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
@@ -103,7 +98,20 @@ export function LowStockPage() {
     });
 
   const wholesale = warehouse?.kind === 'WHOLESALE';
-  const columns = 6 + (requestable ? 1 : 0) + (isStore ? 1 : 0) + (wholesale ? 1 : 0);
+  // The columns this list shows (ADR-0119): the ticks for a requester, the home warehouse at a
+  // store, the main supplier at a wholesale warehouse.
+  const columnSpec: ColumnSpec[] = [
+    ...(requestable ? [{ key: 'select', kind: 'check' } as const] : []),
+    { key: 'product', kind: 'text', weight: 3, min: 14 },
+    { key: 'status', kind: 'status' },
+    { key: 'onHand', kind: 'qty', width: 8.5 },
+    { key: 'min', kind: 'qty' },
+    { key: 'max', kind: 'qty' },
+    { key: 'suggested', kind: 'qty' },
+    ...(isStore ? [{ key: 'home', kind: 'text', weight: 1 } as const] : []),
+    ...(wholesale ? [{ key: 'supplier', kind: 'text', weight: 2 } as const] : []),
+  ];
+  const columns = columnSpec.length;
 
   return (
     <div>
@@ -138,11 +146,11 @@ export function LowStockPage() {
         <>
           <ProblemAlert problem={problemFromError(low.error)} onRetry={low.refetch} />
           <ListCard scroll>
-            <Table>
+            <ListTable columns={columnSpec}>
               <TableHeader>
                 <TableRow>
                   {requestable ? (
-                    <TableHead className="w-10">
+                    <TableHead>
                       <Checkbox
                         aria-label={t('inventory.lowStock.selectAll')}
                         checked={allChosen}
@@ -232,7 +240,7 @@ export function LowStockPage() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </ListTable>
             {!low.isPending && rows.length === 0 ? (
               <EmptyState icon={PackageMinus} title={t('inventory.lowStock.empty')} />
             ) : null}

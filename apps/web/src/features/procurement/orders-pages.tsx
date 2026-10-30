@@ -13,6 +13,7 @@ import {
   FilterToggle,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SearchField,
   SkeletonRows,
@@ -32,16 +33,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCompanyName } from '@/features/company/api';
 import { BUSINESS_TZ } from '@/lib/dayjs';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatCount, formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
@@ -69,6 +64,17 @@ const idOf = (value: string | null | undefined) => {
  * Purchase orders by supplier (ADR-0115): every order with its lowest status and its suppliers,
  * filtered by number, status and «Миний нийлүүлэгч»; managers start a new one from a dialog.
  */
+/** The columns of the order list (ADR-0119): number, date, suppliers, their count, note, status, chevron. */
+const ORDER_LIST_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'number', kind: 'number' },
+  { key: 'date', kind: 'date' },
+  { key: 'suppliers', kind: 'text', weight: 3, min: 12 },
+  { key: 'supplierCount', kind: 'count' },
+  { key: 'note', kind: 'text', weight: 2 },
+  { key: 'status', kind: 'status' },
+  { key: 'chevron', kind: 'chevron' },
+];
+
 export function PurchaseOrdersPage() {
   const { t } = useTranslation();
   const canManage = useHasPermission('procurement.orders.manage');
@@ -139,7 +145,7 @@ export function PurchaseOrdersPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(orders.error)} onRetry={orders.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={ORDER_LIST_COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('procurement.orders.number')}</TableHead>
@@ -187,7 +193,7 @@ export function PurchaseOrdersPage() {
               </LinkRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!orders.isPending && rows.length === 0 ? (
           <EmptyState
             icon={ClipboardList}

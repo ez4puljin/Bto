@@ -3,7 +3,7 @@ import { ArrowRight, ImageOff, ScanBarcode } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
-import { ListCard } from '@/components/list';
+import { ListCard, ListTable } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { ScanBox } from '@/components/scan-box';
@@ -11,14 +11,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { problemFromError } from '@/lib/problem';
 import { type BarcodeResolution, useBarcodeLookup } from './api';
 import { productStage } from './product-stage';
@@ -32,6 +26,13 @@ interface ScanEntry {
 }
 
 const RECENT_SCANS = 10;
+
+/** The recent scans' columns (ADR-0119): the barcode, the product (wrapping), its unit. */
+const RECENT_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'code', kind: 'number', width: 11 },
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
+  { key: 'unit', kind: 'text', weight: 1 },
+];
 
 /**
  * Scan or type a barcode and see the product and unit it belongs to (SPEC §5.2): the check for
@@ -81,7 +82,7 @@ export function BarcodeLookupPage() {
             {t('scan.recent')}
           </h2>
           <ListCard>
-            <Table>
+            <ListTable columns={RECENT_COLUMNS}>
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('scan.label')}</TableHead>
@@ -113,7 +114,7 @@ export function BarcodeLookupPage() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </ListTable>
           </ListCard>
         </section>
       ) : null}

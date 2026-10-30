@@ -1,11 +1,11 @@
 import type { TFunction } from 'i18next';
-import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Badge } from '@/components/ui/badge';
 import { formatTugrik } from '@/lib/money';
 import type { CustomerListItem } from './api';
 import { MapLink } from './gps-field';
 import { contactCell, none, text } from './list-cells';
+import type { ListColumn } from './list-column-cell';
 import { localPhone } from './phone';
 
 /** «Хугацаа хэтэрсэн · MM/DD-оос»: the oldest due date of the overdue debt. */
@@ -61,14 +61,25 @@ export const DEFAULT_HIDDEN_CUSTOMER_COLUMNS: readonly CustomerColumnKey[] = [
   'app',
 ];
 
-export interface CustomerColumn {
+/**
+ * What that user sees hidden on a screen of 1600px or more (ADR-0119): the credit limit and the
+ * settlement group fit there too; the address and the contact would squeeze the names again.
+ */
+export const WIDE_DEFAULT_HIDDEN_CUSTOMER_COLUMNS: readonly CustomerColumnKey[] = [
+  'regNo',
+  'consumerNo',
+  'vatPayer',
+  'cityPayer',
+  'address',
+  'gps',
+  'contact',
+  'note',
+  'app',
+];
+
+/** A column of the customer list, sized by the layout (ADR-0119). */
+export interface CustomerColumn extends ListColumn<CustomerListItem> {
   key: CustomerColumnKey;
-  /** Money and counts: right-aligned in the head and the cells. */
-  numeric?: boolean;
-  /** Long text on one line with «…» and the whole text on hover; `fill` takes the spare width. */
-  truncate?: { text: (row: CustomerListItem, t: TFunction) => string; fill?: boolean };
-  className?: string;
-  cell: (row: CustomerListItem, t: TFunction) => ReactNode;
 }
 
 /** A payer flag, or «Шалгаагүй» while the tax status was never checked. */
@@ -82,12 +93,14 @@ const payer = (row: CustomerListItem, value: boolean, t: TFunction) =>
   );
 
 export const CUSTOMER_COLUMNS: readonly CustomerColumn[] = [
-  { key: 'code', className: 'font-mono', cell: (row) => row.code },
+  { key: 'code', kind: 'code', className: 'font-mono', cell: (row) => row.code },
   {
     key: 'name',
-    // The name takes the spare width, never less than 14rem: with many columns the list scrolls.
-    truncate: { text: (row) => row.name, fill: true },
-    className: 'min-w-56',
+    // The name takes the largest share of the spare width, never less than 14rem.
+    kind: 'text',
+    weight: 3,
+    min: 14,
+    truncate: { text: (row) => row.name },
     cell: (row) => (
       <Link
         to={`/partners/customers/${row.id}`}
@@ -100,14 +113,24 @@ export const CUSTOMER_COLUMNS: readonly CustomerColumn[] = [
   {
     // The office's category (ADR-0107), the Erkhet group at the migration.
     key: 'category',
+    kind: 'text',
+    weight: 2,
     truncate: { text: (row, t) => row.categoryName ?? t('common.none') },
-    className: 'max-w-48',
     cell: (row, t) => text(row.categoryName, t),
   },
-  { key: 'kind', cell: (row, t) => t(`partners.kinds.${row.kind}`) },
-  { key: 'regNo', className: 'font-mono', cell: (row, t) => text(row.regNo, t) },
+  {
+    key: 'kind',
+    kind: 'text',
+    weight: 0.5,
+    min: 5.5,
+    cell: (row, t) => t(`partners.kinds.${row.kind}`),
+  },
+  { key: 'regNo', kind: 'number', className: 'font-mono', cell: (row, t) => text(row.regNo, t) },
   {
     key: 'tin',
+    kind: 'number',
+    // Holds the «ТТД хүлээгдэж буй» pill of a customer whose number is still awaited.
+    width: 10,
     cell: (row, t) =>
       row.tin ? (
         <span className="font-mono">{row.tin}</span>
@@ -117,21 +140,31 @@ export const CUSTOMER_COLUMNS: readonly CustomerColumn[] = [
         none(t)
       ),
   },
-  { key: 'consumerNo', className: 'font-mono', cell: (row, t) => text(row.consumerNo, t) },
+  {
+    key: 'consumerNo',
+    kind: 'number',
+    className: 'font-mono',
+    cell: (row, t) => text(row.consumerNo, t),
+  },
   {
     key: 'phone',
+    kind: 'number',
+    width: 8,
     className: 'font-mono',
     cell: (row, t) => (row.phone ? localPhone(row.phone) : none(t)),
   },
-  { key: 'vatPayer', cell: (row, t) => payer(row, row.vatPayer, t) },
-  { key: 'cityPayer', cell: (row, t) => payer(row, row.cityPayer, t) },
+  { key: 'vatPayer', kind: 'status', width: 6, cell: (row, t) => payer(row, row.vatPayer, t) },
+  { key: 'cityPayer', kind: 'status', width: 6, cell: (row, t) => payer(row, row.cityPayer, t) },
   {
     key: 'address',
+    kind: 'text',
+    weight: 2,
     truncate: { text: (row, t) => row.address ?? t('common.none') },
     cell: (row, t) => text(row.address, t),
   },
   {
     key: 'gps',
+    kind: 'status',
     cell: (row, t) =>
       row.gps ? (
         <MapLink lat={row.gps.lat} lng={row.gps.lng} />
@@ -139,9 +172,10 @@ export const CUSTOMER_COLUMNS: readonly CustomerColumn[] = [
         <Badge variant="warning">{t('partners.addresses.noGps')}</Badge>
       ),
   },
-  { key: 'contact', cell: (row, t) => contactCell(row.contact, t) },
+  { key: 'contact', kind: 'text', weight: 2, cell: (row, t) => contactCell(row.contact, t) },
   {
     key: 'creditLimit',
+    kind: 'money',
     numeric: true,
     cell: (row, t) =>
       row.creditLimit === null ? (
@@ -154,11 +188,14 @@ export const CUSTOMER_COLUMNS: readonly CustomerColumn[] = [
   },
   {
     key: 'settlementGroup',
+    kind: 'text',
     cell: (row, t) => t(`partners.settlement.groups.${row.settlementGroup}`),
   },
   {
     // ADR-0101: an overdue debt only reminds, in red; it never blocks an order.
     key: 'overdue',
+    kind: 'money',
+    width: 9,
     numeric: true,
     cell: (row, t) =>
       row.overdue === null ? (
@@ -171,6 +208,7 @@ export const CUSTOMER_COLUMNS: readonly CustomerColumn[] = [
   },
   {
     key: 'creditHold',
+    kind: 'status',
     cell: (row, t) =>
       row.creditHold ? (
         <div className="flex items-center gap-2">
@@ -187,12 +225,15 @@ export const CUSTOMER_COLUMNS: readonly CustomerColumn[] = [
   },
   {
     key: 'note',
+    kind: 'text',
+    weight: 2,
     truncate: { text: (row, t) => row.note ?? t('common.none') },
     cell: (row, t) => text(row.note, t),
   },
   {
     // The customer app «Bto300» (ADR-0079 #11): open, closed, or no account.
     key: 'app',
+    kind: 'status',
     cell: (row, t) =>
       row.appAccount === null ? (
         none(t)
@@ -204,6 +245,7 @@ export const CUSTOMER_COLUMNS: readonly CustomerColumn[] = [
   },
   {
     key: 'status',
+    kind: 'status',
     cell: (row, t) => (
       <Badge variant={row.status === 'ACTIVE' ? 'success' : 'secondary'}>
         {t(`partners.status.${row.status}`)}

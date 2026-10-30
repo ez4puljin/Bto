@@ -1,9 +1,13 @@
 import { ChevronRight, Inbox, type LucideIcon, Search, X } from 'lucide-react';
 import {
   type ComponentProps,
+  createContext,
   type ReactNode,
+  type Ref,
   type RefObject,
+  useContext,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -12,7 +16,8 @@ import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { TableCell, TableHead, TableRow } from '@/components/ui/table';
+import { Table, TableCell, TableHead, TableRow } from '@/components/ui/table';
+import { columnLayout, type ColumnSpec } from '@/lib/column-layout';
 import { cn } from '@/lib/utils';
 
 /*
@@ -183,6 +188,93 @@ export function ListCard(props: { children: ReactNode; className?: string; scrol
   );
 }
 
+/** True inside a `ListTable` whose columns are sized by the layout rather than by their content. */
+const ColumnLayoutContext = createContext(false);
+
+/**
+ * A list's table with sized columns (ADR-0119): when its box is at least as wide as the spec's
+ * minimum, `table-layout: fixed` with a `<colgroup>` from `lib/column-layout.ts` — codes, dates,
+ * money, counts and status pills keep a fixed width, the text columns get their minimum and share
+ * the rest by weight, a cell wider than its column is cut with «…». In a narrower box (a laptop
+ * showing a wide register) the table keeps the browser's own layout and scrolls sideways in its
+ * card, as before. The spec must have one entry per cell of a row — the checkbox, the spacer and
+ * the chevron or the actions included. Widths are in rem; the box is measured in px.
+ */
+export function ListTable(props: {
+  columns: readonly ColumnSpec[];
+  children: ReactNode;
+  className?: string;
+  ref?: Ref<HTMLTableElement>;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const available = useBoxWidth(box);
+  const layout = useMemo(
+    () => (available === null ? null : columnLayout(props.columns, available)),
+    [props.columns, available],
+  );
+  const sized = layout !== null && available !== null && available >= layout.minWidth;
+  return (
+    <div ref={box} data-slot="list-table" className="min-w-0">
+      <ColumnLayoutContext value={sized}>
+        <Table
+          ref={props.ref}
+          data-layout={sized ? 'columns' : undefined}
+          className={cn(
+            sized &&
+              'table-fixed [&_td]:overflow-hidden [&_td]:text-ellipsis [&_th]:overflow-hidden [&_th]:text-ellipsis',
+            props.className,
+          )}
+        >
+          {sized ? (
+            <colgroup>
+              {props.columns.map((column, index) => (
+                <col key={column.key} style={{ width: `${layout.widths[index]}rem` }} />
+              ))}
+            </colgroup>
+          ) : null}
+          {props.children}
+        </Table>
+      </ColumnLayoutContext>
+    </div>
+  );
+}
+
+/**
+ * The width of a box in rem, kept current as the window or the page resizes; null until measured
+ * (and in jsdom, whose boxes have no size).
+ */
+function useBoxWidth(ref: RefObject<HTMLElement | null>): number | null {
+  const [width, setWidth] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const measure = () => {
+      const px = element.clientWidth;
+      const next = px > 0 ? px / remPx() : null;
+      setWidth((previous) => (previous === next ? previous : next));
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(element);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [ref]);
+  return width;
+}
+
+/** The root font size in px (1rem), read once. */
+let rem: number | null = null;
+function remPx(): number {
+  if (rem === null) {
+    const size = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+    rem = Number.isFinite(size) && size > 0 ? size : 16;
+  }
+  return rem;
+}
+
 /** A scrolling card: its own table box stops scrolling and the header cells stick to its top. */
 const SCROLLING_CARD =
   'overflow-auto [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] print:max-h-none! print:overflow-visible [&_[data-slot=table-container]]:overflow-visible [&_[data-slot=table-head]]:sticky [&_[data-slot=table-head]]:top-0 [&_[data-slot=table-head]]:z-10 [&_[data-slot=table-head]]:bg-card [&_[data-slot=table-head]]:shadow-[inset_0_-1px_0_var(--color-border)]';
@@ -309,7 +401,8 @@ function opensRecord(event: {
 
 /**
  * Long text in a row (a product or customer name): one line cut with «…», the whole text on hover.
- * `fill` gives the column the table's spare width (the main column of a short list).
+ * Inside a `ListTable` the column's width comes from the layout; elsewhere the text is capped at
+ * 24rem and `fill` gives the column the table's spare width (the main column of a short list).
  */
 export function TruncateCell(props: {
   text: string;
@@ -317,9 +410,13 @@ export function TruncateCell(props: {
   className?: string;
   fill?: boolean;
 }) {
+  const sized = useContext(ColumnLayoutContext);
   return (
-    <TableCell className={cn(props.fill && 'w-full max-w-0', props.className)}>
-      <span className={cn('block truncate', !props.fill && 'max-w-[24rem]')} title={props.text}>
+    <TableCell className={cn(!sized && props.fill && 'w-full max-w-0', props.className)}>
+      <span
+        className={cn('block truncate', !sized && !props.fill && 'max-w-[24rem]')}
+        title={props.text}
+      >
         {props.children ?? props.text}
       </span>
     </TableCell>

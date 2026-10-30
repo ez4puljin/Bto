@@ -11,6 +11,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SearchField,
   SkeletonRows,
@@ -27,19 +28,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { problemFromError, settle } from '@/lib/problem';
 import { useCreateParam } from '@/lib/use-create-param';
 import { type PasswordCode, useIdentityMutations, useRoles, useUsers } from './api';
 import { UserForm, type UserFormValues } from './user-form';
+
+/** The users list's columns (ADR-0119); the status may hold a second badge («Түгжээтэй»). */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'username', kind: 'code', width: 9 },
+  { key: 'fullName', kind: 'text', weight: 3, min: 12 },
+  { key: 'roles', kind: 'text', weight: 2, min: 10 },
+  { key: 'status', kind: 'status', width: 11 },
+  { key: 'lastLogin', kind: 'datetime' },
+  { key: 'chevron', kind: 'chevron' },
+];
 
 const EMPTY_USER: UserFormValues = {
   username: '',
@@ -119,7 +124,7 @@ export function UsersPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(users.error)} onRetry={users.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('users.columns.username')}</TableHead>
@@ -172,7 +177,7 @@ export function UsersPage() {
               </LinkRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!users.isPending && rows.length === 0 ? (
           <EmptyState
             icon={Users}

@@ -8,6 +8,7 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -20,7 +21,14 @@ import { Combobox } from '@/components/combobox';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DialogFormFooter, FormField } from '@/components/form';
 import { LeaveGuard } from '@/components/leave-guard';
-import { EmptyState, FilterBar, FilterToggle, ListCard, SearchField } from '@/components/list';
+import {
+  EmptyState,
+  FilterBar,
+  FilterToggle,
+  ListCard,
+  ListTable,
+  SearchField,
+} from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -28,7 +36,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Table } from '@/components/ui/table';
 import { useProducts } from '@/features/catalog/api';
 import { useWarehouses } from '@/features/identity/api';
 import { KEYS as INVENTORY_KEYS, useInventoryMutations } from '@/features/inventory/api';
@@ -64,7 +71,8 @@ import {
   useCanTypeOnOrder,
 } from './order-edits';
 import { OrderHeader } from './order-header';
-import { type ColumnView, OrderTableHead, SupplierGroup } from './order-table';
+import { type ColumnView, orderColumns } from './order-columns';
+import { OrderTableHead, SupplierGroup } from './order-table';
 
 type ReceiptCosting = components['schemas']['ReceiptCosting'];
 
@@ -227,6 +235,10 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
   const locked = requiredGroupsFor(detail.suppliers.map((supplier) => supplier.status));
   const columns = useHiddenColumns(COLUMNS_LIST, GROUP_KEYS, locked);
   const view: ColumnView = { hidden: columns.hidden, canPrices, canCosts };
+  const specs = useMemo(
+    () => orderColumns({ hidden: columns.hidden, canPrices, canCosts }),
+    [columns.hidden, canPrices, canCosts],
+  );
 
   // The typed cells, over every supplier; nothing is written until «Хадгалах».
   const [edits, setEdits] = useState<ReadonlyMap<string, CellEdit>>(new Map());
@@ -638,7 +650,7 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
               )}
             />
           ) : (
-            <Table>
+            <ListTable columns={specs}>
               <OrderTableHead view={view} />
               {suppliers.map((supplier) => (
                 <SupplierGroup
@@ -659,7 +671,7 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
                   onToggle={toggleGroup}
                 />
               ))}
-            </Table>
+            </ListTable>
           )}
         </ListCard>
       </div>

@@ -8,9 +8,10 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DocumentHeader } from '@/components/document-layout';
 import { FormField } from '@/components/form';
 import { LeaveGuard } from '@/components/leave-guard';
-import { RowAction, RowActions } from '@/components/list';
+import { ListTable, RowAction, RowActions } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { ProblemAlert } from '@/components/problem-alert';
 import { StickyActions } from '@/components/sticky-actions';
@@ -18,16 +19,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { type PickedSupplier, SupplierPicker } from '@/features/partners/supplier-picker';
 import { useCurrentPricesOf } from '@/features/pricing/api';
+import type { ColumnSpec } from '@/lib/column-layout';
 import type { ValidationMessage } from '@/lib/forms';
 import { formatMnt, formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
@@ -209,11 +204,37 @@ function LinesTable(props: {
   const current = useCurrentPricesOf(productIds, productIds.length > 0);
   const priceOf = new Map((current.data ?? []).map((row) => [row.productId, row.warehousePrice]));
   const expected = props.lines.some((line) => line.expectedQty !== null);
+  const check = props.prices && props.previous !== undefined;
+  // One entry per cell, under the same conditions as the header cells (ADR-0119).
+  const columns: ColumnSpec[] = [
+    { key: 'lineNo', kind: 'count', width: 3 },
+    { key: 'sku', kind: 'code' },
+    { key: 'product', kind: 'text', weight: 3, min: 14 },
+    { key: 'warehouse', kind: 'text', weight: 1 },
+    { key: 'bin', kind: 'code', width: 8 },
+    { key: 'unit', kind: 'text', weight: 1, min: 4 },
+    ...(expected ? [{ key: 'expected', kind: 'qty' } as const] : []),
+    { key: 'qty', kind: 'qty' },
+    { key: 'weight', kind: 'qty' },
+    ...(check
+      ? [{ key: 'previous', kind: 'qty', width: 8 } as const, { key: 'diff', kind: 'qty' } as const]
+      : []),
+    ...(props.prices
+      ? [
+          { key: 'unitPrice', kind: 'money' } as const,
+          { key: 'amount', kind: 'money' } as const,
+          { key: 'freeGoods', kind: 'status', width: 6 } as const,
+        ]
+      : []),
+    { key: 'salePrice', kind: 'money' },
+    ...(props.prices ? [{ key: 'markup', kind: 'percent' } as const] : []),
+    ...(props.actions ? [{ key: 'actions', kind: 'actions', actions: 2 } as const] : []),
+  ];
   return (
-    <Table ref={props.table}>
+    <ListTable ref={props.table} columns={columns}>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-10 text-right">{t('inventory.receipt.form.lineNo')}</TableHead>
+          <TableHead className="text-right">{t('inventory.receipt.form.lineNo')}</TableHead>
           <TableHead>{t('inventory.sku')}</TableHead>
           <TableHead>{t('inventory.product')}</TableHead>
           <TableHead>{t('inventory.warehouse')}</TableHead>
@@ -224,7 +245,7 @@ function LinesTable(props: {
           ) : null}
           <TableHead className="text-right">{t('inventory.qty')}</TableHead>
           <TableHead className="text-right">{t('inventory.receipt.form.weightColumn')}</TableHead>
-          {props.prices && props.previous ? (
+          {check ? (
             <>
               <TableHead className="text-right">{t('inventory.receipt.check.previous')}</TableHead>
               <TableHead className="text-right">{t('inventory.receipt.check.diff')}</TableHead>
@@ -275,7 +296,7 @@ function LinesTable(props: {
                 {index + 1}
               </TableCell>
               <TableCell className="font-mono text-[13px]">{line.productSku}</TableCell>
-              <TableCell className="min-w-40 whitespace-normal">{line.productName}</TableCell>
+              <TableCell className="whitespace-normal">{line.productName}</TableCell>
               <TableCell>{line.warehouseName}</TableCell>
               <TableCell className="font-mono">{line.binCode}</TableCell>
               <TableCell>{line.unitName}</TableCell>
@@ -317,7 +338,7 @@ function LinesTable(props: {
           );
         })}
       </TableBody>
-    </Table>
+    </ListTable>
   );
 }
 
@@ -833,124 +854,131 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
     ? 'validation.moneyAccountRequired'
     : fieldError(headerProblem, 'moneyAccountId');
 
-  return (
-    <>
-      <HeaderCard note={<VatNote detail={detail} />}>
-        <ProblemAlert problem={generalProblem(headerProblem)} />
-        <div className={EDITOR_GRID}>
-          <FormField
-            label={t('inventory.receipt.form.date')}
-            htmlFor="receipt-date"
-            error={fieldError(headerProblem, 'supplierDocDate')}
-          >
-            <Input
-              id="receipt-date"
-              type="date"
-              value={docDate}
-              onChange={(event) => setDocDate(event.target.value)}
-              onBlur={() => {
-                if (detail !== null && docDate !== (detail.supplierDocDate ?? '')) {
-                  patchHeader({ supplierDocDate: docDate || null });
+  // From 1600px the header and «Падааны нийт» sit side by side (ADR-0119).
+  const header = (
+    <HeaderCard note={<VatNote detail={detail} />}>
+      <ProblemAlert problem={generalProblem(headerProblem)} />
+      <div className={EDITOR_GRID}>
+        <FormField
+          label={t('inventory.receipt.form.date')}
+          htmlFor="receipt-date"
+          error={fieldError(headerProblem, 'supplierDocDate')}
+        >
+          <Input
+            id="receipt-date"
+            type="date"
+            value={docDate}
+            onChange={(event) => setDocDate(event.target.value)}
+            onBlur={() => {
+              if (detail !== null && docDate !== (detail.supplierDocDate ?? '')) {
+                patchHeader({ supplierDocDate: docDate || null });
+              }
+            }}
+          />
+        </FormField>
+        <FormField
+          label={t('inventory.receipts.supplier')}
+          htmlFor="receipt-supplier"
+          error={supplierError}
+        >
+          <SupplierPicker
+            floating
+            id="receipt-supplier"
+            value={supplier}
+            invalid={supplierError !== undefined}
+            onChange={(next) => {
+              const before = supplier;
+              setSupplier(next);
+              if (next) {
+                setRequired((previous) => ({ ...previous, supplier: false }));
+                if (next.id !== detail?.supplierId) {
+                  patchHeader({ supplierId: next.id }, () => setSupplier(before));
                 }
-              }}
-            />
-          </FormField>
-          <FormField
-            label={t('inventory.receipts.supplier')}
-            htmlFor="receipt-supplier"
-            error={supplierError}
+              }
+            }}
+          />
+        </FormField>
+        <FormField
+          label={t('inventory.receipt.supplierDocNo')}
+          htmlFor="receipt-doc-no"
+          error={fieldError(headerProblem, 'supplierDocNo')}
+        >
+          <Input
+            id="receipt-doc-no"
+            maxLength={50}
+            value={docNo}
+            onChange={(event) => setDocNo(event.target.value)}
+            onBlur={() => leaveText('supplierDocNo', docNo)}
+          />
+        </FormField>
+        <FormField
+          label={t('inventory.receipt.form.note')}
+          htmlFor="receipt-note"
+          error={fieldError(headerProblem, 'note')}
+        >
+          <Input
+            id="receipt-note"
+            maxLength={500}
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            onBlur={() => leaveText('note', note)}
+          />
+        </FormField>
+        <FormField label={t('inventory.receipt.form.payment')} htmlFor="receipt-payment">
+          <NativeSelect
+            id="receipt-payment"
+            value={method}
+            onChange={(event) => {
+              const next = PAYMENT_METHODS.find((value) => value === event.target.value);
+              if (next) changeMethod(next);
+            }}
           >
-            <SupplierPicker
-              floating
-              id="receipt-supplier"
-              value={supplier}
-              invalid={supplierError !== undefined}
-              onChange={(next) => {
-                const before = supplier;
-                setSupplier(next);
-                if (next) {
-                  setRequired((previous) => ({ ...previous, supplier: false }));
-                  if (next.id !== detail?.supplierId) {
-                    patchHeader({ supplierId: next.id }, () => setSupplier(before));
-                  }
-                }
-              }}
-            />
-          </FormField>
+            {PAYMENT_METHODS.map((value) => (
+              <option key={value} value={value}>
+                {t(`inventory.receipt.paymentMethods.${value}`)}
+              </option>
+            ))}
+          </NativeSelect>
+        </FormField>
+        {method === 'CREDIT' ? null : (
           <FormField
-            label={t('inventory.receipt.supplierDocNo')}
-            htmlFor="receipt-doc-no"
-            error={fieldError(headerProblem, 'supplierDocNo')}
+            label={t('inventory.receipt.form.account')}
+            htmlFor="receipt-account"
+            error={accountError}
           >
-            <Input
-              id="receipt-doc-no"
-              maxLength={50}
-              value={docNo}
-              onChange={(event) => setDocNo(event.target.value)}
-              onBlur={() => leaveText('supplierDocNo', docNo)}
-            />
-          </FormField>
-          <FormField
-            label={t('inventory.receipt.form.note')}
-            htmlFor="receipt-note"
-            error={fieldError(headerProblem, 'note')}
-          >
-            <Input
-              id="receipt-note"
-              maxLength={500}
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              onBlur={() => leaveText('note', note)}
-            />
-          </FormField>
-          <FormField label={t('inventory.receipt.form.payment')} htmlFor="receipt-payment">
             <NativeSelect
-              id="receipt-payment"
-              value={method}
+              id="receipt-account"
+              aria-invalid={accountError !== undefined || undefined}
+              value={accountId ?? ''}
               onChange={(event) => {
-                const next = PAYMENT_METHODS.find((value) => value === event.target.value);
-                if (next) changeMethod(next);
+                const next = event.target.value ? Number.parseInt(event.target.value, 10) : null;
+                const before = accountId;
+                setAccountId(next);
+                setRequired((previous) => ({ ...previous, account: false }));
+                patchHeader({ moneyAccountId: next }, () => setAccountId(before));
               }}
             >
-              {PAYMENT_METHODS.map((value) => (
-                <option key={value} value={value}>
-                  {t(`inventory.receipt.paymentMethods.${value}`)}
+              <option value="">{t('inventory.receipt.form.pickAccount')}</option>
+              {methodAccounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}
                 </option>
               ))}
             </NativeSelect>
           </FormField>
-          {method === 'CREDIT' ? null : (
-            <FormField
-              label={t('inventory.receipt.form.account')}
-              htmlFor="receipt-account"
-              error={accountError}
-            >
-              <NativeSelect
-                id="receipt-account"
-                aria-invalid={accountError !== undefined || undefined}
-                value={accountId ?? ''}
-                onChange={(event) => {
-                  const next = event.target.value ? Number.parseInt(event.target.value, 10) : null;
-                  const before = accountId;
-                  setAccountId(next);
-                  setRequired((previous) => ({ ...previous, account: false }));
-                  patchHeader({ moneyAccountId: next }, () => setAccountId(before));
-                }}
-              >
-                <option value="">{t('inventory.receipt.form.pickAccount')}</option>
-                {methodAccounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-              </NativeSelect>
-            </FormField>
-          )}
-        </div>
-        <ProblemAlert problem={problemFromError(accounts.error)} onRetry={accounts.refetch} />
-        {detail ? <ReceiptConfirmations detail={detail} /> : null}
-      </HeaderCard>
-      {detail ? <ReceiptNoteCard detail={detail} editable /> : null}
+        )}
+      </div>
+      <ProblemAlert problem={problemFromError(accounts.error)} onRetry={accounts.refetch} />
+      {detail ? <ReceiptConfirmations detail={detail} /> : null}
+    </HeaderCard>
+  );
+
+  return (
+    <>
+      <DocumentHeader
+        main={header}
+        side={detail ? <ReceiptNoteCard detail={detail} editable /> : undefined}
+      />
       <ReceiptLinePanel
         supplierId={supplier?.id}
         editing={editing}

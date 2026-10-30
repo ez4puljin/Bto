@@ -8,6 +8,7 @@ import {
   EmptyState,
   FilterBar,
   ListCard,
+  ListTable,
   SearchField,
   SkeletonRows,
   TruncateCell,
@@ -29,6 +30,7 @@ import {
 } from '@/components/ui/table';
 import { useCompanyName } from '@/features/company/api';
 import { DateRangeFilter } from '@/features/finance/date-range-filter';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { saveBlob } from '@/lib/download';
 import { formatMnt, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
@@ -48,14 +50,23 @@ import { AmountCell, ExcelButton, PrintHeading, PrintLink, RefreshControl } from
 
 const AMOUNTS = ['purchases', 'purchasesExVat', 'otherBills', 'payments', 'balance'] as const;
 
+/** The report's columns on screen (ADR-0119): code, name, the five amounts, the chevron. */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'code', kind: 'code' },
+  { key: 'name', kind: 'text', weight: 3, min: 14 },
+  ...AMOUNTS.map((key): ColumnSpec => ({ key, kind: 'money', width: 10 })),
+  { key: 'chevron', kind: 'chevron' },
+];
+
+/** With `onOpen` (the screen) the columns are sized by the layout; on paper the table lays itself out. */
 function SuppliersTable(props: {
   report: SupplierReport;
   onOpen?: (row: SupplierReportRow) => void;
 }) {
   const { t } = useTranslation();
   const columns = 'reports.suppliers.columns';
-  return (
-    <Table>
+  const body = (
+    <>
       <TableHeader>
         <TableRow>
           <TableHead>{t(`${columns}.code`)}</TableHead>
@@ -108,8 +119,9 @@ function SuppliersTable(props: {
           {props.onOpen ? <TableCell /> : null}
         </TableRow>
       </TableBody>
-    </Table>
+    </>
   );
+  return props.onOpen ? <ListTable columns={COLUMNS}>{body}</ListTable> : <Table>{body}</Table>;
 }
 
 const LINK = 'text-link underline-offset-2 hover:underline';

@@ -10,6 +10,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   RowAction,
   SearchField,
@@ -31,14 +32,8 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
@@ -61,6 +56,19 @@ const ISSUE_WAREHOUSES = ['WHOLESALE', 'STORE'] as const;
 
 const isStatus = (value: string | null): value is IssueStatus =>
   ISSUE_STATUSES.some((status) => status === value);
+
+/** The issues list's columns (ADR-0119). */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'number', kind: 'number' },
+  { key: 'date', kind: 'date' },
+  { key: 'parts', kind: 'text', weight: 2, min: 12 },
+  { key: 'expenseType', kind: 'text', weight: 2 },
+  { key: 'recipient', kind: 'text', weight: 2 },
+  { key: 'lines', kind: 'count' },
+  { key: 'status', kind: 'status' },
+  { key: 'chevron', kind: 'chevron' },
+];
+
 const positiveId = (value: string | null) => {
   const id = Number.parseInt(value ?? '', 10);
   return Number.isSafeInteger(id) && id > 0 ? id : undefined;
@@ -173,7 +181,7 @@ export function IssuesPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(issues.error)} onRetry={issues.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('inventory.number')}</TableHead>
@@ -201,7 +209,7 @@ export function IssuesPage() {
                 <TableCell className="font-mono">{issue.issuedOn}</TableCell>
                 <TableCell>
                   <span className="flex items-center gap-1.5">
-                    <span className="block max-w-[16rem] truncate">
+                    <span className="block min-w-0 truncate">
                       {(issue.warehouseIds.length > 0 ? issue.warehouseIds : [issue.warehouseId])
                         .map(warehouseName)
                         .join(', ')}
@@ -231,7 +239,7 @@ export function IssuesPage() {
               </LinkRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!issues.isPending && rows.length === 0 ? (
           <EmptyState icon={PackageOpen} title={t('inventory.issues.empty')} />
         ) : null}

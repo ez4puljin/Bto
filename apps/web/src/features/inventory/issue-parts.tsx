@@ -2,16 +2,11 @@ import { Check, Lock } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
+import { ListTable } from '@/components/list';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatTugrik } from '@/lib/money';
 import type { IssueDetail, IssueLine } from './api';
@@ -35,11 +30,32 @@ export function LinesTable(props: {
   const costs = hasCosts(props.detail);
   const sale = isDamageCharge(props.detail);
   const frozen = postedWarehouses(props.detail);
+  // One entry per cell, under the same conditions as the header cells (ADR-0119). While the lines
+  // are edited the warehouse is a select and the quantity a box.
+  const columns: ColumnSpec[] = [
+    { key: 'lineNo', kind: 'count', width: 3 },
+    { key: 'product', kind: 'text', weight: 3, min: 14 },
+    { key: 'warehouse', kind: 'text', weight: 1, min: props.actions ? 10.5 : 8 },
+    { key: 'unit', kind: 'text', weight: 1, min: 4 },
+    // The shelf, or «Нярав батлахад тогтоно» until the keeper confirms.
+    { key: 'bin', kind: 'code', width: 11 },
+    { key: 'qty', kind: 'qty', width: props.actions ? 8 : 6.5 },
+    ...(sale
+      ? [
+          { key: 'salePrice', kind: 'money' } as const,
+          { key: 'saleAmount', kind: 'money' } as const,
+        ]
+      : []),
+    ...(costs
+      ? [{ key: 'unitCost', kind: 'money' } as const, { key: 'amount', kind: 'money' } as const]
+      : []),
+    ...(props.actions ? [{ key: 'actions', kind: 'actions', actions: 1 } as const] : []),
+  ];
   return (
-    <Table>
+    <ListTable columns={columns}>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-10 text-right">{t('inventory.receipt.form.lineNo')}</TableHead>
+          <TableHead className="text-right">{t('inventory.receipt.form.lineNo')}</TableHead>
           <TableHead>{t('inventory.product')}</TableHead>
           <TableHead>{t('inventory.issues.lineWarehouse')}</TableHead>
           <TableHead>{t('inventory.unit')}</TableHead>
@@ -76,7 +92,7 @@ export function LinesTable(props: {
               <TableCell className="text-right font-mono text-muted-foreground">
                 {index + 1}
               </TableCell>
-              <TableCell className="min-w-40 whitespace-normal">
+              <TableCell className="whitespace-normal">
                 {line.productName}{' '}
                 <span className="font-mono text-[13px] text-muted-foreground">
                   {line.productSku}
@@ -131,7 +147,7 @@ export function LinesTable(props: {
           );
         })}
       </TableBody>
-    </Table>
+    </ListTable>
   );
 }
 

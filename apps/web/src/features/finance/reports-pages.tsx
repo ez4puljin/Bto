@@ -1,13 +1,13 @@
 import { Decimal } from '@tugeel/shared/money';
 import { addMonths, businessDate } from '@tugeel/shared/time';
 import { Download, Printer, Scale } from 'lucide-react';
-import { Fragment, useState } from 'react';
+import { Fragment, type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FormField } from '@/components/form';
-import { EmptyState, FilterBar, ListCard, SkeletonRows } from '@/components/list';
+import { EmptyState, FilterBar, ListCard, ListTable, SkeletonRows } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { PrintFrame } from '@/components/print-frame';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -26,6 +26,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useCompanyName } from '@/features/company/api';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatMnt } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
@@ -70,7 +71,20 @@ function byGroup(rows: readonly TrialBalanceRow[]) {
   });
 }
 
-function TrialBalanceTable({ report }: { report: TrialBalance }) {
+/** The trial balance's columns (ADR-0119): code, name, six amounts. */
+const TRIAL_BALANCE_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'code', kind: 'code' },
+  { key: 'name', kind: 'text', weight: 3, min: 14 },
+  { key: 'openingDebit', kind: 'money' },
+  { key: 'openingCredit', kind: 'money' },
+  { key: 'debit', kind: 'money' },
+  { key: 'credit', kind: 'money' },
+  { key: 'closingDebit', kind: 'money' },
+  { key: 'closingCredit', kind: 'money' },
+];
+
+/** On screen the columns are sized by the layout; on paper (`print`) the table lays itself out. */
+function TrialBalanceTable({ report, print }: { report: TrialBalance; print?: boolean }) {
   const { t } = useTranslation();
   const columns = 'finance.reports.trialBalance.columns';
   const groups = byGroup(report.data);
@@ -89,8 +103,8 @@ function TrialBalanceTable({ report }: { report: TrialBalance }) {
       ))}
     </>
   );
-  return (
-    <Table>
+  const body = (
+    <>
       <TableHeader>
         <TableRow>
           <TableHead>{t(`${columns}.code`)}</TableHead>
@@ -157,7 +171,12 @@ function TrialBalanceTable({ report }: { report: TrialBalance }) {
           {amounts(report)}
         </TableRow>
       </TableBody>
-    </Table>
+    </>
+  );
+  return print ? (
+    <Table>{body}</Table>
+  ) : (
+    <ListTable columns={TRIAL_BALANCE_COLUMNS}>{body}</ListTable>
   );
 }
 
@@ -293,7 +312,7 @@ export function TrialBalancePrintPage() {
               <p className="text-[13px] font-semibold">{company}</p>
               <h1 className="text-[16px] font-semibold">{title}</h1>
             </div>
-            <TrialBalanceTable report={report.data} />
+            <TrialBalanceTable report={report.data} print />
           </div>
         ) : null
       }
@@ -319,7 +338,27 @@ function docTypeOf(row: {
   return DOC_TYPES.find((type) => type === row.docType) ?? 'OTHER';
 }
 
-function VatSheet({ report }: { report: VatReport }) {
+/** The VAT groups' columns (ADR-0119): the document type, base, output and input VAT. */
+const VAT_GROUP_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'type', kind: 'text', weight: 3, min: 14 },
+  { key: 'base', kind: 'money', width: 10 },
+  { key: 'output', kind: 'money', width: 10 },
+  { key: 'input', kind: 'money', width: 10 },
+];
+
+/** The VAT documents' columns: date, entry number, document number (with a «Буцаалт» badge), type, amounts. */
+const VAT_DOCUMENT_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'date', kind: 'date' },
+  { key: 'entry', kind: 'number' },
+  { key: 'document', kind: 'number', width: 14 },
+  { key: 'type', kind: 'text', weight: 2, min: 12 },
+  { key: 'base', kind: 'money', width: 10 },
+  { key: 'output', kind: 'money', width: 10 },
+  { key: 'input', kind: 'money', width: 10 },
+];
+
+/** On screen the tables' columns are sized by the layout; on paper (`print`) they lay themselves out. */
+function VatSheet({ report, print }: { report: VatReport; print?: boolean }) {
   const { t } = useTranslation();
   const columns = 'finance.reports.vat.columns';
   const payable = new Decimal(report.payable);
@@ -343,7 +382,7 @@ function VatSheet({ report }: { report: VatReport }) {
       </div>
       <div>
         <h2 className="mb-1.5 text-[14px] font-semibold">{t('finance.reports.vat.groups')}</h2>
-        <Table>
+        <VatTable columns={VAT_GROUP_COLUMNS} print={print}>
           <TableHeader>
             <TableRow>
               <TableHead>{t(`${columns}.type`)}</TableHead>
@@ -373,7 +412,7 @@ function VatSheet({ report }: { report: VatReport }) {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </VatTable>
       </div>
       <div>
         <h2 className="mb-1.5 text-[14px] font-semibold">{t('finance.reports.vat.documents')}</h2>
@@ -382,7 +421,7 @@ function VatSheet({ report }: { report: VatReport }) {
             {t('finance.reports.vat.truncated')}
           </p>
         ) : null}
-        <Table>
+        <VatTable columns={VAT_DOCUMENT_COLUMNS} print={print}>
           <TableHeader>
             <TableRow>
               <TableHead>{t(`${columns}.date`)}</TableHead>
@@ -414,9 +453,18 @@ function VatSheet({ report }: { report: VatReport }) {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </VatTable>
       </div>
     </div>
+  );
+}
+
+/** A VAT table: sized columns on screen, the plain table on paper. */
+function VatTable(props: { columns: readonly ColumnSpec[]; print?: boolean; children: ReactNode }) {
+  return props.print ? (
+    <Table>{props.children}</Table>
+  ) : (
+    <ListTable columns={props.columns}>{props.children}</ListTable>
   );
 }
 
@@ -510,7 +558,7 @@ export function VatPrintPage() {
               <p className="text-[13px] font-semibold">{company}</p>
               <h1 className="text-[16px] font-semibold">{title}</h1>
             </div>
-            <VatSheet report={report.data} />
+            <VatSheet report={report.data} print />
           </div>
         ) : null
       }

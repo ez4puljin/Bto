@@ -10,6 +10,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SearchField,
   SkeletonRows,
@@ -20,14 +21,8 @@ import {
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatCount, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
@@ -40,6 +35,21 @@ const isKind = (value: string | null): value is SaleKind =>
   SALE_KINDS.some((entry) => entry === value);
 const isEbarimt = (value: string | null): value is EbarimtStatus =>
   EBARIMT_STATUSES.some((entry) => entry === value);
+
+/** The sales list's columns (ADR-0119). */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'number', kind: 'number' },
+  { key: 'soldAt', kind: 'datetime' },
+  { key: 'till', kind: 'code' },
+  { key: 'cashier', kind: 'text', weight: 2, min: 10 },
+  { key: 'kind', kind: 'status' },
+  { key: 'total', kind: 'money' },
+  { key: 'cash', kind: 'money' },
+  { key: 'card', kind: 'money' },
+  { key: 'ebarimt', kind: 'status' },
+  { key: 'spacer', kind: 'spacer' },
+  { key: 'chevron', kind: 'chevron' },
+];
 
 /**
  * «Кассын борлуулалт» (ADR-0063 #3): the tills' sales and returns as the edge replayed them; search
@@ -149,7 +159,7 @@ export function PosSalesPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(sales.error)} onRetry={sales.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('pos.fields.number')}</TableHead>
@@ -203,7 +213,7 @@ export function PosSalesPage() {
               );
             })}
           </TableBody>
-        </Table>
+        </ListTable>
         {!sales.isPending && rows.length === 0 ? (
           <EmptyState
             icon={ReceiptText}

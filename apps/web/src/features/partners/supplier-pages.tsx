@@ -11,6 +11,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SearchField,
   SkeletonRows,
@@ -21,7 +22,8 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableHeader, TableRow } from '@/components/ui/table';
+import { TableBody, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
 import { toast } from '@/lib/toast';
@@ -40,6 +42,7 @@ import { segmentParam } from '@/features/segments/segment-definition';
 import { SegmentFilter } from '@/features/segments/segment-filter';
 import { ContactsCard } from './contacts-card';
 import { ListColumnCell, ListColumnHead } from './list-column-cell';
+import { columnSpecs } from './list-columns';
 import {
   emptySupplier,
   PARTNER_STATUSES,
@@ -53,11 +56,13 @@ import {
   LOCKED_SUPPLIER_COLUMNS,
   SUPPLIER_COLUMN_KEYS,
   SUPPLIER_COLUMNS,
+  WIDE_DEFAULT_HIDDEN_SUPPLIER_COLUMNS,
 } from './supplier-columns';
 import { SupplierFacts, SupplierForm } from './supplier-form';
 
 /** The list's name in the column-choice key (ADR-0050). */
 const COLUMNS_LIST = 'partners.suppliers';
+const CHEVRON_COLUMN: ColumnSpec = { key: 'chevron', kind: 'chevron' };
 
 const isStatus = (value: string | null): value is PartnerStatus =>
   PARTNER_STATUSES.some((status) => status === value);
@@ -83,12 +88,15 @@ export function SuppliersPage() {
     SUPPLIER_COLUMN_KEYS,
     LOCKED_SUPPLIER_COLUMNS,
     DEFAULT_HIDDEN_SUPPLIER_COLUMNS,
+    WIDE_DEFAULT_HIDDEN_SUPPLIER_COLUMNS,
   );
   const { hidden } = columnState;
   const columns = useMemo(
     () => SUPPLIER_COLUMNS.filter((column) => !hidden.has(column.key)),
     [hidden],
   );
+  // The layout of the shown columns and the chevron (ADR-0119).
+  const specs = useMemo(() => [...columnSpecs(columns), CHEVRON_COLUMN], [columns]);
   const filtered = Boolean(q || status || segmentId);
   const clearFilters = () => {
     setSearch('');
@@ -153,7 +161,7 @@ export function SuppliersPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(suppliers.error)} onRetry={suppliers.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={specs}>
           <TableHeader>
             <TableRow>
               {columns.map((column) => (
@@ -174,7 +182,7 @@ export function SuppliersPage() {
               </LinkRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!suppliers.isPending && rows.length === 0 ? (
           <EmptyState
             icon={Factory}
@@ -269,7 +277,7 @@ export function SupplierPage() {
           </>
         }
       />
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_26rem] xl:items-start">
         <div className="flex min-w-0 flex-col gap-4">
           <DetailCard
             title={t('partners.supplier.info')}

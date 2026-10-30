@@ -93,7 +93,7 @@ export function ProductPage() {
           </>
         }
       />
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_26rem] xl:items-start">
         <div className="flex min-w-0 flex-col gap-4">
           <DetailCard
             title={t('catalog.product.info')}

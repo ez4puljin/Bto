@@ -1,6 +1,6 @@
 import type { RouteObject } from 'react-router';
 import { describe, expect, it } from 'vitest';
-import { widthOf } from '@/app/page-width';
+import { PAGE_WIDTHS, widthOf } from '@/app/page-width';
 import { routes } from '@/app/router';
 
 /** The pages inside the shell: its index and the routes with a relative path, at any depth. */
@@ -19,5 +19,15 @@ describe('page widths (ADR-0066)', () => {
       .filter((route) => widthOf(route.handle) === null)
       .map((route) => route.path ?? '(index)');
     expect(missing).toEqual([]);
+  });
+});
+
+describe('page widths (ADR-0119)', () => {
+  it('lets wide and full pages take the whole width and caps reading pages at 1400px', () => {
+    expect(PAGE_WIDTHS.wide).toBe('max-w-none');
+    expect(PAGE_WIDTHS.full).toBe('max-w-none');
+    expect(PAGE_WIDTHS.reading).toBe('max-w-[87.5rem]');
+    // Pages sit at the left: no page is centred by its width class.
+    for (const value of Object.values(PAGE_WIDTHS)) expect(value).not.toContain('mx-auto');
   });
 });

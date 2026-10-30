@@ -9,6 +9,7 @@ import {
   EmptyState,
   FilterBar,
   ListCard,
+  ListTable,
   LoadMore,
   RowAction,
   RowActions,
@@ -30,6 +31,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useBarcodeLookup } from '@/features/catalog/api';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
@@ -43,6 +45,15 @@ import { isQty, looksLikeLabel, useWarehouseName, useWarehouseOptions } from './
 import { ProductSearch, ScanToolbar, WarehouseSelect } from './shared';
 
 const SHELF_KINDS = ['WHOLESALE', 'STORE'] as const;
+
+/** The moves history's columns (ADR-0119); the note wraps. */
+const HISTORY_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'number', kind: 'number' },
+  { key: 'date', kind: 'date' },
+  { key: 'warehouse', kind: 'text', weight: 1 },
+  { key: 'lines', kind: 'count' },
+  { key: 'note', kind: 'text', weight: 2 },
+];
 
 interface Item {
   productUnitId: number;
@@ -106,7 +117,7 @@ export function BinMovesPage() {
       </h2>
       <ProblemAlert problem={problemFromError(moves.error)} onRetry={moves.refetch} />
       <ListCard>
-        <Table>
+        <ListTable columns={HISTORY_COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('inventory.number')}</TableHead>
@@ -128,7 +139,7 @@ export function BinMovesPage() {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!moves.isPending && rows.length === 0 ? (
           <EmptyState icon={Move} title={t('inventory.moves.empty')} />
         ) : null}

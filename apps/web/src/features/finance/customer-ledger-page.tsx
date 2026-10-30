@@ -5,20 +5,21 @@ import { type ReactNode, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
-import { EmptyState, FilterBar, ListCard, LoadMore, SkeletonRows } from '@/components/list';
+import {
+  EmptyState,
+  FilterBar,
+  ListCard,
+  ListTable,
+  LoadMore,
+  SkeletonRows,
+} from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatMnt, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
@@ -33,6 +34,16 @@ import {
   useCustomerLedger,
 } from './api';
 import { PaymentDialog } from './payment-dialog';
+
+/** The ledger's columns (ADR-0119): date, kind, document number, two sides, balance after. */
+const LEDGER_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'date', kind: 'date' },
+  { key: 'kind', kind: 'text', weight: 1 },
+  { key: 'document', kind: 'number' },
+  { key: 'debit', kind: 'money' },
+  { key: 'credit', kind: 'money' },
+  { key: 'balanceAfter', kind: 'money', width: 10 },
+];
 
 /**
  * One customer's receivables (ADR-0060 #4): the balance with its aging and credit terms, then the
@@ -126,7 +137,7 @@ export function CustomerLedgerPage() {
         </FilterBar>
         <ProblemAlert problem={problemFromError(ledger.error)} onRetry={ledger.refetch} />
         <ListCard scroll>
-          <Table>
+          <ListTable columns={LEDGER_COLUMNS}>
             <TableHeader>
               <TableRow>
                 <TableHead>{t('finance.fields.date')}</TableHead>
@@ -158,7 +169,7 @@ export function CustomerLedgerPage() {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </ListTable>
           {!ledger.isPending && rows.length === 0 ? (
             <EmptyState title={t('finance.balances.ledgerEmpty')} />
           ) : null}

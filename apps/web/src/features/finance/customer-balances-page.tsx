@@ -9,6 +9,7 @@ import {
   FilterToggle,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SearchField,
   SkeletonRows,
@@ -17,14 +18,8 @@ import {
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatMnt, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
@@ -36,7 +31,19 @@ import { useCustomerBalances } from './api';
  * are plain figures under one «Насжилт (₮)» header, so the table fits a laptop (ADR-0066).
  */
 /** A header of two lines beside the aging group (rows of numbers below it stay narrow). */
-const WRAPPING_HEAD = 'max-w-28 text-right whitespace-normal';
+const WRAPPING_HEAD = 'text-right whitespace-normal';
+
+/** One entry per leaf column (ADR-0119): the customer, three figures, the aging, group, limit. */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'customer', kind: 'text', weight: 3, min: 14 },
+  { key: 'balance', kind: 'money', width: 10 },
+  { key: 'openInvoices', kind: 'count' },
+  { key: 'overdue', kind: 'money', width: 10 },
+  ...AGING_BUCKETS.map((bucket): ColumnSpec => ({ key: bucket, kind: 'money' })),
+  { key: 'settlementGroup', kind: 'text', weight: 1 },
+  { key: 'creditLimit', kind: 'money', width: 10 },
+  { key: 'chevron', kind: 'chevron' },
+];
 
 export function CustomerBalancesPage() {
   const { t } = useTranslation();
@@ -69,7 +76,7 @@ export function CustomerBalancesPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(balances.error)} onRetry={balances.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead rowSpan={2}>{t('finance.fields.customer')}</TableHead>
@@ -91,7 +98,8 @@ export function CustomerBalancesPage() {
               <TableHead rowSpan={2} className={WRAPPING_HEAD}>
                 {t('finance.balances.creditLimit')}
               </TableHead>
-              <TableHead aria-hidden rowSpan={2} className="w-9 pl-0" />
+              {/* ChevronHead takes no rowSpan: the chevron's head spans both rows by hand. */}
+              <TableHead aria-hidden rowSpan={2} className="pl-0" />
             </TableRow>
             <TableRow>
               {AGING_BUCKETS.map((bucket) => (
@@ -106,7 +114,7 @@ export function CustomerBalancesPage() {
             {balances.isPending ? <SkeletonRows columns={AGING_BUCKETS.length + 7} /> : null}
             {rows.map((row) => (
               <LinkRow key={row.customerId} to={`/finance/customers/${row.customerId}`}>
-                <TruncateCell text={`${row.name} · ${row.code}`} fill className="min-w-44">
+                <TruncateCell text={`${row.name} · ${row.code}`}>
                   <Link
                     to={`/finance/customers/${row.customerId}`}
                     className="font-medium underline-offset-4 hover:underline"
@@ -142,7 +150,7 @@ export function CustomerBalancesPage() {
               </LinkRow>
             ))}
           </TableBody>
-        </Table>
+        </ListTable>
         {!balances.isPending && rows.length === 0 ? (
           <EmptyState icon={Landmark} title={t('finance.balances.empty')} />
         ) : null}

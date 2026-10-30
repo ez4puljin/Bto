@@ -88,13 +88,16 @@ export interface Field {
 
 /**
  * The reading side of a DetailCard: rows of label and value inside a hairline box, like the
- * form's `FormSection` / `FormRow`, so the card does not jump when «Засах» opens the form.
+ * form's `FormSection` / `FormRow`, so the card does not jump when «Засах» opens the form. In a
+ * box 80rem wide or more (the main column of a record on a 1920px screen, ADR-0119) the rows run
+ * two to a line; `columns={1}` keeps one for values that run long.
  */
 export function FieldList(props: {
   items: readonly Field[];
   title?: string;
   description?: string;
   className?: string;
+  columns?: 1 | 2;
 }) {
   const { t } = useTranslation();
   return (
@@ -111,11 +114,20 @@ export function FieldList(props: {
           ) : null}
         </div>
       ) : null}
-      <dl className="@container divide-y divide-border/80 overflow-hidden rounded-xl border border-border/90">
+      <dl
+        className={cn(
+          '@container grid overflow-hidden rounded-xl border border-border/90',
+          props.columns !== 1 && '@min-[80rem]:grid-cols-2',
+        )}
+      >
         {props.items.map((item) => (
           <div
             key={item.label}
-            className="grid gap-1 px-3.5 py-2.5 @md:grid-cols-[11rem_minmax(0,1fr)] @md:gap-4"
+            className={cn(
+              'grid gap-1 border-b border-border/80 px-3.5 py-2.5 last:border-b-0 @md:grid-cols-[11rem_minmax(0,1fr)] @md:gap-4',
+              props.columns !== 1 &&
+                '@min-[80rem]:nth-last-[2]:border-b-0 @min-[80rem]:even:border-l @min-[80rem]:even:border-border/80',
+            )}
           >
             <dt className="text-[13px] leading-snug text-muted-foreground">{item.label}</dt>
             <div className="min-w-0">

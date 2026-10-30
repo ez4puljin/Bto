@@ -23,6 +23,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SearchField,
   SkeletonRows,
@@ -54,6 +55,7 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { CustomerPicker, type PickedCustomer } from '@/features/partners/customer-picker';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatCount, formatTugrik } from '@/lib/money';
 import { problemFromError, settle } from '@/lib/problem';
@@ -77,6 +79,20 @@ const isKind = (value: string | null): value is VoucherBatchKind =>
   VOUCHER_KINDS.some((kind) => kind === value);
 const isStatus = (value: string | null): value is VoucherBatchStatus =>
   STATUSES.some((status) => status === value);
+
+/** The batches list's columns (ADR-0119); the validity is two dates, the use a «3 / 100». */
+const COLUMNS: readonly ColumnSpec[] = [
+  { key: 'number', kind: 'number' },
+  { key: 'kind', kind: 'text', weight: 1 },
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
+  { key: 'value', kind: 'money' },
+  { key: 'partner', kind: 'text', weight: 2, min: 10 },
+  { key: 'validity', kind: 'date', width: 14 },
+  { key: 'used', kind: 'count', width: 6 },
+  { key: 'status', kind: 'status' },
+  { key: 'spacer', kind: 'spacer' },
+  { key: 'chevron', kind: 'chevron' },
+];
 
 function VoucherStatusBadge({ status }: { status: VoucherBatchStatus }) {
   const { t } = useTranslation();
@@ -162,7 +178,7 @@ export function PosVouchersPage() {
       </FilterBar>
       <ProblemAlert problem={problemFromError(batches.error)} onRetry={batches.refetch} />
       <ListCard scroll>
-        <Table>
+        <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
               <TableHead>{t('pos.vouchers.fields.number')}</TableHead>
@@ -196,9 +212,7 @@ export function PosVouchersPage() {
                       <span className="text-muted-foreground">{t('pos.fields.none')}</span>
                     )}
                   </TruncateCell>
-                  <TableCell className="font-mono whitespace-nowrap">
-                    {`${row.validFrom} – ${row.validTo}`}
-                  </TableCell>
+                  <TableCell className="font-mono">{`${row.validFrom} – ${row.validTo}`}</TableCell>
                   <TableCell className="text-right font-mono">
                     {t('pos.vouchers.usedOf', {
                       used: formatCount(row.redeemed),
@@ -213,7 +227,7 @@ export function PosVouchersPage() {
               );
             })}
           </TableBody>
-        </Table>
+        </ListTable>
         {!batches.isPending && rows.length === 0 ? (
           <EmptyState
             icon={TicketPercent}

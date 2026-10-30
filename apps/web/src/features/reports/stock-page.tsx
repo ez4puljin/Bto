@@ -1,5 +1,5 @@
 import { PackageSearch } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import {
@@ -8,6 +8,7 @@ import {
   FilterBar,
   LinkRow,
   ListCard,
+  ListTable,
   LoadMore,
   SearchField,
   SegmentedControl,
@@ -28,6 +29,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useCompanyName } from '@/features/company/api';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { saveBlob } from '@/lib/download';
 import { formatCount, formatQty, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
@@ -83,6 +85,25 @@ function filterParams(filter: StockFilter) {
   };
 }
 
+/** The report's columns on screen (ADR-0119), the value only when costs are shown. */
+function stockColumns(costs: boolean): readonly ColumnSpec[] {
+  return [
+    { key: 'sku', kind: 'code' },
+    { key: 'name', kind: 'text', weight: 3, min: 14 },
+    { key: 'category', kind: 'text', weight: 2 },
+    { key: 'onHand', kind: 'qty' },
+    ...(costs ? [{ key: 'value', kind: 'money' } as const] : []),
+    { key: 'sold', kind: 'qty' },
+    { key: 'cover', kind: 'count' },
+    { key: 'lastSale', kind: 'date' },
+    { key: 'sinceSale', kind: 'count' },
+    // Two badges («Удаан», «Бага») side by side.
+    { key: 'status', kind: 'status', width: 11 },
+    { key: 'chevron', kind: 'chevron' },
+  ];
+}
+
+/** With `links` (the screen) the columns are sized by the layout; on paper the table lays itself out. */
 function StockTable(props: {
   rows: readonly StockReportRow[];
   slowDays: number;
@@ -91,8 +112,9 @@ function StockTable(props: {
 }) {
   const { t } = useTranslation();
   const columns = 'reports.stock.columns';
-  return (
-    <Table>
+  const spec = useMemo(() => stockColumns(props.costs), [props.costs]);
+  const body = (
+    <>
       <TableHeader>
         <TableRow>
           <TableHead>{t(`${columns}.sku`)}</TableHead>
@@ -140,7 +162,7 @@ function StockTable(props: {
               <TableCell className="text-right font-mono">
                 {row.daysSinceSale === null ? NONE : formatCount(row.daysSinceSale)}
               </TableCell>
-              <TableCell className="whitespace-nowrap">
+              <TableCell>
                 {row.slow ? <Badge variant="warning">{t('reports.stock.slow')}</Badge> : null}
                 {row.low ? (
                   <Badge variant="destructive" className={row.slow ? 'ml-1' : undefined}>
@@ -159,8 +181,9 @@ function StockTable(props: {
           );
         })}
       </TableBody>
-    </Table>
+    </>
   );
+  return props.links ? <ListTable columns={spec}>{body}</ListTable> : <Table>{body}</Table>;
 }
 
 function StockTiles({ report }: { report: StockReport }) {

@@ -4,23 +4,17 @@ import { useTranslation } from 'react-i18next';
 import { useHasPermission } from '@/app/auth-context';
 import { FieldError } from '@/components/field-error';
 import { LeaveGuard } from '@/components/leave-guard';
-import { EmptyState, ListCard, RowAction, RowActions } from '@/components/list';
+import { EmptyState, ListCard, ListTable, RowAction, RowActions } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { StickyActions } from '@/components/sticky-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { type ProductSummary, type ProductUnit, useProduct } from '@/features/catalog/api';
 import { ProductSearch } from '@/features/inventory/shared';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { plainDecimal } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
@@ -43,6 +37,18 @@ const draftOf = (groups: readonly QuickGroup[]): DraftGroup[] =>
   groups.map((group) => ({ key: `g${group.id}`, name: group.name, buttons: group.buttons }));
 
 let newGroups = 0;
+
+/** A group's button table (ADR-0119): the label is an input for a manager, who also gets actions. */
+const BUTTON_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'number', kind: 'count' },
+  { key: 'product', kind: 'text', weight: 3, min: 14 },
+  { key: 'unit', kind: 'text', weight: 1 },
+  { key: 'buttonLabel', kind: 'text', weight: 2, min: 12 },
+];
+const MANAGED_BUTTON_COLUMNS: readonly ColumnSpec[] = [
+  ...BUTTON_COLUMNS,
+  { key: 'actions', kind: 'actions', actions: 3 },
+];
 
 /** The list with the entry at `index` moved one place by `delta` (−1 up, +1 down). */
 function moved<T>(list: readonly T[], index: number, delta: number): T[] {
@@ -269,14 +275,14 @@ function GroupCard(props: {
           ) : null}
         </div>
         {buttons.length > 0 ? (
-          <Table>
+          <ListTable columns={canManage ? MANAGED_BUTTON_COLUMNS : BUTTON_COLUMNS}>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10 text-right">{t('pos.fields.number')}</TableHead>
+                <TableHead className="text-right">{t('pos.fields.number')}</TableHead>
                 <TableHead>{t('pos.fields.product')}</TableHead>
                 <TableHead>{t('pos.fields.unit')}</TableHead>
                 <TableHead>{t('pos.fields.buttonLabel')}</TableHead>
-                {canManage ? <TableHead className="w-px" /> : null}
+                {canManage ? <TableHead /> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -285,7 +291,7 @@ function GroupCard(props: {
                   <TableCell className="text-right font-mono text-muted-foreground">
                     {at + 1}
                   </TableCell>
-                  <TableCell className="min-w-48 whitespace-normal">
+                  <TableCell className="whitespace-normal">
                     <span className="font-mono text-muted-foreground">{button.productSku}</span>{' '}
                     {button.productName}
                     {button.sellable ? null : (
@@ -303,7 +309,7 @@ function GroupCard(props: {
                     {canManage ? (
                       <Input
                         aria-label={`${t('pos.fields.buttonLabel')}: ${named(button)}`}
-                        className="h-8 sm:w-56"
+                        className="h-8"
                         placeholder={button.productName}
                         value={button.label ?? ''}
                         maxLength={MAX_TEXT}
@@ -346,7 +352,7 @@ function GroupCard(props: {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </ListTable>
         ) : (
           <p className="px-4 py-3 text-sm text-muted-foreground">
             {t('pos.quickButtons.groupEmpty')}
