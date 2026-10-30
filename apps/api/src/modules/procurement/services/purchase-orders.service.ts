@@ -33,6 +33,7 @@ import {
   ReceiptsService,
 } from '../../inventory';
 import { ProductSuppliersService, SuppliersService, type SupplierSummary } from '../../partners';
+import { type OrderLoad, OrderLoadsService } from './order-loads.service';
 import {
   purchaseOrderLines,
   purchaseOrders,
@@ -93,6 +94,8 @@ export interface PurchaseOrderSupplierView {
   /** The draft or posted receipt from «Ирсэн» on. */
   receiptId: number | null;
   receiptNumber: string | null;
+  /** The truck load it rides on (ADR-0121), or null. */
+  loadId: number | null;
   /** What the caller may do now. */
   canEdit: boolean;
   canShip: boolean;
@@ -116,6 +119,7 @@ export interface PurchaseOrderDetail {
   /** A manager may archive it now (received, or nothing ordered). */
   canArchive: boolean;
   suppliers: PurchaseOrderSupplierView[];
+  loads: OrderLoad[];
 }
 
 export interface PurchaseOrderSummary {
@@ -189,6 +193,7 @@ export class PurchaseOrdersService {
     private readonly links: ProductSuppliersService,
     private readonly locations: ProductLocationsService,
     private readonly receipts: ReceiptsService,
+    private readonly loads: OrderLoadsService,
   ) {}
 
   /**
@@ -641,6 +646,7 @@ export class PurchaseOrdersService {
             noteTotalAmount: detail?.noteTotalAmount ?? null,
             receiptId: row.receiptId,
             receiptNumber: detail?.number ?? null,
+            loadId: row.loadId,
             canEdit: editRight(ctx, row.status, ordererId) !== null,
             canShip: canShip(ctx, row.status, ordererId),
             canCount:
@@ -658,6 +664,7 @@ export class PurchaseOrdersService {
           };
         })
         .sort((a, b) => a.supplierName.localeCompare(b.supplierName)),
+      loads: await this.loads.loadsOf(order.id, executor),
     };
   }
 

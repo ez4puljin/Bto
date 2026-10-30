@@ -56,6 +56,7 @@ const MSM: Schemas['PurchaseOrderSupplier'] = {
   noteTotalAmount: null,
   receiptId: null,
   receiptNumber: null,
+  loadId: null,
   canEdit: true,
   canShip: false,
   canCount: false,
@@ -91,6 +92,7 @@ const DETAIL: Schemas['PurchaseOrderDetail'] = {
   archivedBy: null,
   canArchive: false,
   suppliers: [MSM, MILK],
+  loads: [],
 };
 const VERSION: Schemas['PurchaseOrderVersion'] = { updatedAt: STAMP, receiptsUpdatedAt: null };
 

@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
   bigint,
+  boolean,
   check,
   date,
   index,
@@ -74,6 +75,8 @@ export const purchaseOrderSuppliers = pgTable(
     status: text('status', { enum: PO_SUPPLIER_STATUSES }).notNull().default('PREPARING'),
     /** The goods receipt made when the supplier arrived (NULL before, and after a step back). */
     receiptId: ref('receipt_id').references(() => goodsReceipts.id),
+    /** The truck load this supplier rides on (ADR-0121); NULL while unassigned. */
+    loadId: ref('load_id').references(() => purchaseOrderLoads.id),
     statusChangedAt: timestamp('status_changed_at', { withTimezone: true }).notNull().defaultNow(),
     statusChangedBy: userRef('status_changed_by'),
     createdAt: createdAt(),
@@ -82,6 +85,7 @@ export const purchaseOrderSuppliers = pgTable(
     unique('purchase_order_suppliers_key').on(t.orderId, t.supplierId),
     unique('purchase_order_suppliers_receipt_key').on(t.receiptId),
     index('purchase_order_suppliers_supplier_idx').on(t.supplierId, t.orderId),
+    index('purchase_order_suppliers_load_idx').on(t.loadId),
     check('purchase_order_suppliers_status', inList(t.status, PO_SUPPLIER_STATUSES)),
     check(
       'purchase_order_suppliers_receipt',
@@ -129,6 +133,53 @@ export const purchaseOrderLines = pgTable(
 );
 
 /** The staff member who orders from a supplier (one per supplier, owner 2026-10-29). */
+/** A company truck (ADR-0121): a name, its plate and what it carries, in kg. */
+export const trucks = pgTable(
+  'trucks',
+  {
+    id: id(),
+    name: text('name').notNull(),
+    plate: text('plate'),
+    capacityKg: qty('capacity_kg'),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('trucks_name_key').on(t.name),
+    check('trucks_name', sql`length(${t.name}) BETWEEN 1 AND 80`),
+    check('trucks_plate', sql`${t.plate} IS NULL OR length(${t.plate}) BETWEEN 1 AND 20`),
+    check('trucks_capacity', sql`${t.capacityKg} IS NULL OR ${t.capacityKg} > 0`),
+  ],
+);
+
+/**
+ * One truck's load on an order (ADR-0121): the suppliers assigned to it ride together. A truck
+ * appears once per order; removing the load sets its suppliers back to unassigned.
+ */
+export const purchaseOrderLoads = pgTable(
+  'purchase_order_loads',
+  {
+    id: id(),
+    orderId: ref('order_id')
+      .notNull()
+      .references(() => purchaseOrders.id),
+    truckId: ref('truck_id')
+      .notNull()
+      .references(() => trucks.id),
+    note: text('note'),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('purchase_order_loads_key').on(t.orderId, t.truckId),
+    check(
+      'purchase_order_loads_note',
+      sql`${t.note} IS NULL OR length(${t.note}) BETWEEN 1 AND 300`,
+    ),
+  ],
+);
+
 export const supplierOrderers = pgTable(
   'supplier_orderers',
   {

@@ -1,4 +1,10 @@
-import { ApiProperty, ApiPropertyOptional, ApiSchema, OmitType } from '@nestjs/swagger';
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  ApiSchema,
+  OmitType,
+  PartialType,
+} from '@nestjs/swagger';
 import {
   MAX_PO_CHANGES,
   MAX_PO_SUPPLIERS,
@@ -91,12 +97,78 @@ export class PurchaseOrderSupplierDto {
   @ApiProperty({ type: String, nullable: true }) noteTotalAmount: string | null;
   @ApiProperty({ type: Number, nullable: true }) receiptId: number | null;
   @ApiProperty({ type: String, nullable: true }) receiptNumber: string | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'The load (truck) it rides on' })
+  loadId: number | null;
   @ApiProperty() canEdit: boolean;
   @ApiProperty({ description: 'May type the shipped quantities now' }) canShip: boolean;
   @ApiProperty({ description: 'May type a count on at least one line now' }) canCount: boolean;
   @ApiProperty({ description: 'May run the price check now' }) canPrice: boolean;
   @ApiProperty() canMoveNext: boolean;
   @ApiProperty() canMoveBack: boolean;
+}
+
+@ApiSchema({ name: 'Truck' })
+export class TruckDto {
+  @ApiProperty() id: number;
+  @ApiProperty() name: string;
+  @ApiProperty({ type: String, nullable: true }) plate: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'What it carries, kg' })
+  capacityKg: string | null;
+  @ApiProperty() isActive: boolean;
+}
+
+export class CreateTruckDto {
+  @ApiProperty() @Transform(trimmed) @IsString() @MaxLength(80) name: string;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @Transform(trimmed)
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(20)
+  plate?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'kg, up to 3 decimals' })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @Matches(QTY)
+  capacityKg?: string | null;
+}
+
+export class UpdateTruckDto extends PartialType(CreateTruckDto) {
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+}
+
+@ApiSchema({ name: 'PurchaseOrderLoad' })
+export class OrderLoadDto {
+  @ApiProperty() id: number;
+  @ApiProperty() truckId: number;
+  @ApiProperty() truckName: string;
+  @ApiProperty({ type: String, nullable: true }) plate: string | null;
+  @ApiProperty({ type: String, nullable: true }) capacityKg: string | null;
+  @ApiProperty({ type: String, nullable: true }) note: string | null;
+  @ApiProperty({ type: [Number], description: 'The suppliers on this load' }) supplierIds: number[];
+}
+
+export class AddLoadDto {
+  @ApiProperty() @IsInt() @Min(1) truckId: number;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @Transform(trimmed)
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(300)
+  note?: string | null;
+}
+
+export class AssignLoadDto {
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'The load, or null to take the supplier off',
+  })
+  @ValidateIf((_, value) => value !== null)
+  @IsInt()
+  @Min(1)
+  loadId: number | null;
 }
 
 @ApiSchema({ name: 'PurchaseOrderDetail' })
@@ -114,6 +186,8 @@ export class PurchaseOrderDetailDto {
   @ApiProperty({ type: String, nullable: true }) archivedBy: string | null;
   @ApiProperty({ description: 'A manager may archive it now' }) canArchive: boolean;
   @ApiProperty({ type: [PurchaseOrderSupplierDto] }) suppliers: PurchaseOrderSupplierDto[];
+  @ApiProperty({ type: [OrderLoadDto], description: 'The trucks named on the order (ADR-0121)' })
+  loads: OrderLoadDto[];
 }
 
 @ApiSchema({ name: 'PurchaseOrderVersion' })

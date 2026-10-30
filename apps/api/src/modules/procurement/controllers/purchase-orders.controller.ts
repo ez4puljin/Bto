@@ -20,8 +20,11 @@ import { type ExcelColumn, tableWorkbook } from '../../../common/excel/table-wor
 import { xlsxFile } from '../../../common/excel/xlsx-file';
 import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
 import {
+  AddLoadDto,
   AddSuppliersDto,
   ArrivalSaveResultDto,
+  AssignLoadDto,
+  CreateTruckDto,
   CreatePurchaseOrderDto,
   GridFacetsDto,
   GridFacetsQueryDto,
@@ -44,9 +47,12 @@ import {
   SetOrdererDto,
   SupplierCandidatePageDto,
   SupplierOrdererDto,
+  TruckDto,
   UpdatePurchaseOrderDto,
+  UpdateTruckDto,
 } from '../dto/purchase-orders.dto';
 import { OrderHistoryService } from '../services/order-history.service';
+import { OrderLoadsService, type Truck } from '../services/order-loads.service';
 import { type GridRow, PurchaseOrderGridService } from '../services/purchase-order-grid.service';
 import {
   type PurchaseOrderDetail,
@@ -87,8 +93,19 @@ function toDetailDto(order: PurchaseOrderDetail): PurchaseOrderDetailDto {
       noteTotalQty: fixed(supplier.noteTotalQty),
       noteTotalAmount: money(supplier.noteTotalAmount),
     })),
+    loads: order.loads.map((load) => ({
+      id: load.id,
+      truckId: load.truckId,
+      truckName: load.truckName,
+      plate: load.plate,
+      capacityKg: fixed(load.capacityKg),
+      note: load.note,
+      supplierIds: load.supplierIds,
+    })),
   };
 }
+
+const toTruckDto = (truck: Truck): TruckDto => ({ ...truck, capacityKg: fixed(truck.capacityKg) });
 
 function toRowDto(row: GridRow, withPrices: boolean, withCosts: boolean): GridRowDto {
   return {
@@ -161,7 +178,49 @@ export class PurchaseOrdersController {
     private readonly orders: PurchaseOrdersService,
     private readonly grid: PurchaseOrderGridService,
     private readonly orderHistory: OrderHistoryService,
+    private readonly loads: OrderLoadsService,
   ) {}
+
+  /** Names a truck on the order (ADR-0121): one load per truck per order. */
+  @Post(':id/loads')
+  @HttpCode(200)
+  @RequirePermission(MANAGE)
+  @Idempotent()
+  @ApiOkResponse({ type: PurchaseOrderDetailDto })
+  async addLoad(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: AddLoadDto,
+  ): Promise<PurchaseOrderDetailDto> {
+    await this.loads.addLoad(ctx, id, body.truckId, body.note ?? null);
+    return toDetailDto(await this.orders.get(ctx, id));
+  }
+
+  @Delete(':id/loads/:loadId')
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: PurchaseOrderDetailDto })
+  async removeLoad(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('loadId', ParseIntPipe) loadId: number,
+  ): Promise<PurchaseOrderDetailDto> {
+    await this.loads.removeLoad(ctx, id, loadId);
+    return toDetailDto(await this.orders.get(ctx, id));
+  }
+
+  /** Puts a supplier on one of the order's loads, or takes it off with null. */
+  @Put(':id/suppliers/:supplierId/load')
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: PurchaseOrderDetailDto })
+  async assignLoad(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('supplierId', ParseIntPipe) supplierId: number,
+    @Body() body: AssignLoadDto,
+  ): Promise<PurchaseOrderDetailDto> {
+    await this.loads.assign(ctx, id, supplierId, body.loadId);
+    return toDetailDto(await this.orders.get(ctx, id));
+  }
 
   @Get()
   @RequirePermission(READ)
@@ -527,6 +586,53 @@ export class PurchaseOrdersController {
         };
       }),
     };
+  }
+}
+
+/** The company's trucks (ADR-0121): read by order readers, kept by managers. */
+@ApiTags('procurement')
+@Controller('procurement/trucks')
+export class TrucksController {
+  constructor(private readonly loads: OrderLoadsService) {}
+
+  @Get()
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: [TruckDto] })
+  async list(@Query('all') all?: string): Promise<TruckDto[]> {
+    return (await this.loads.trucks(all === 'true')).map(toTruckDto);
+  }
+
+  @Post()
+  @RequirePermission(MANAGE)
+  @ApiCreatedResponse({ type: TruckDto })
+  async create(@CurrentUser() ctx: AuthContext, @Body() body: CreateTruckDto): Promise<TruckDto> {
+    return toTruckDto(
+      await this.loads.createTruck(ctx, {
+        name: body.name,
+        plate: body.plate ?? null,
+        capacityKg: body.capacityKg ? new Decimal(body.capacityKg) : null,
+      }),
+    );
+  }
+
+  @Patch(':id')
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: TruckDto })
+  async update(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateTruckDto,
+  ): Promise<TruckDto> {
+    return toTruckDto(
+      await this.loads.updateTruck(ctx, id, {
+        ...(body.name === undefined ? {} : { name: body.name }),
+        ...(body.plate === undefined ? {} : { plate: body.plate }),
+        ...(body.capacityKg === undefined
+          ? {}
+          : { capacityKg: body.capacityKg === null ? null : new Decimal(body.capacityKg) }),
+        ...(body.isActive === undefined ? {} : { isActive: body.isActive }),
+      }),
+    );
   }
 }
 

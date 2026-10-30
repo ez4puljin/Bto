@@ -72,9 +72,11 @@ export {
 export { importDocuments, importJobs, importRows } from '../modules/imports/schema';
 export {
   purchaseOrderLines,
+  purchaseOrderLoads,
   purchaseOrders,
   purchaseOrderSuppliers,
   supplierOrderers,
+  trucks,
 } from '../modules/procurement/schema';
 export {
   discountPrograms,

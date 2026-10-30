@@ -32,6 +32,8 @@ export type HistoryRow = Schemas['PurchaseOrderHistoryRow'];
 export type PurchaseOrderPrint = Schemas['PurchaseOrderPrint'];
 export type OrdererCandidate = Schemas['OrdererCandidate'];
 export type SupplierOrderer = Schemas['SupplierOrderer'];
+export type Truck = Schemas['Truck'];
+export type PurchaseOrderLoad = Schemas['PurchaseOrderLoad'];
 export type SupplierCandidate = Schemas['PurchaseOrderSupplierCandidate'];
 export type GridFilter = 'ALL' | 'ORDERED' | 'BELOW_MIN';
 
@@ -44,6 +46,7 @@ export const isPoStatus = (value: string | null): value is PoStatus =>
 export const KEYS = {
   orders: ['procurement', 'orders'] as const,
   orderers: ['procurement', 'supplier-orderers'] as const,
+  trucks: ['procurement', 'trucks'] as const,
   candidates: ['procurement', 'orderer-candidates'] as const,
   supplierCandidates: ['procurement', 'supplier-candidates'] as const,
 };
@@ -343,6 +346,45 @@ export function usePurchaseOrderMutations() {
         await invalidate(INVENTORY_KEYS.receipts);
       },
     }),
+    /** A truck named on the order (ADR-0121). */
+    addLoad: useMutation({
+      mutationFn: async ({ key, id, truckId }: { key: string; id: number; truckId: number }) =>
+        unwrap(
+          await api.POST('/api/v1/purchase-orders/{id}/loads', {
+            params: { path: { id }, header: idempotencyKey(key) },
+            body: { truckId },
+          }),
+        ),
+      onSuccess: orderChanged,
+    }),
+    removeLoad: useMutation({
+      mutationFn: async ({ id, loadId }: { id: number; loadId: number }) =>
+        unwrap(
+          await api.DELETE('/api/v1/purchase-orders/{id}/loads/{loadId}', {
+            params: { path: { id, loadId } },
+          }),
+        ),
+      onSuccess: orderChanged,
+    }),
+    /** A supplier put on a load, or taken off with null. */
+    assignLoad: useMutation({
+      mutationFn: async ({
+        id,
+        supplierId,
+        loadId,
+      }: {
+        id: number;
+        supplierId: number;
+        loadId: number | null;
+      }) =>
+        unwrap(
+          await api.PUT('/api/v1/purchase-orders/{id}/suppliers/{supplierId}/load', {
+            params: { path: { id, supplierId } },
+            body: { loadId },
+          }),
+        ),
+      onSuccess: orderChanged,
+    }),
     archive: useMutation({
       mutationFn: async ({ key, id, archived }: { key: string; id: number; archived: boolean }) =>
         unwrap(
@@ -459,6 +501,29 @@ export function useSetSupplierOrderer(supplierId: number) {
     onSuccess: async (orderer) => {
       queryClient.setQueryData([...KEYS.orderers, supplierId], orderer);
       await queryClient.invalidateQueries({ queryKey: KEYS.orders });
+    },
+  });
+}
+
+/** The company's active trucks (ADR-0121), for the order's «Машин нэмэх». */
+export function useTrucks(enabled = true) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: KEYS.trucks,
+    enabled,
+    staleTime: 60_000,
+    queryFn: async ({ signal }) => unwrap(await api.GET('/api/v1/procurement/trucks', { signal })),
+  });
+}
+
+export function useCreateTruck() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { name: string; plate: string | null; capacityKg: string | null }) =>
+      unwrap(await api.POST('/api/v1/procurement/trucks', { body })),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: KEYS.trucks });
     },
   });
 }

@@ -921,4 +921,86 @@ describe('purchase orders and receiving', () => {
         .code,
     ).toBe('PO_SUPPLIER_EMPTY');
   });
+  it('names trucks on an order and puts whole suppliers on their loads (ADR-0121)', async () => {
+    // Trucks are the manager's; readers only list them.
+    await http()
+      .post('/api/v1/procurement/trucks')
+      .set(bearer(orderer))
+      .send({ name: 'Туршилтын машин' })
+      .expect(403);
+    const truck = (
+      await http()
+        .post('/api/v1/procurement/trucks')
+        .set(bearer(manager))
+        .send({ name: 'Туршилтын машин', plate: '1234 УБА', capacityKg: '5000' })
+        .expect(201)
+    ).body as { id: number; capacityKg: string | null; isActive: boolean };
+    expect(truck).toMatchObject({ capacityKg: '5000', isActive: true });
+    await http()
+      .post('/api/v1/procurement/trucks')
+      .set(bearer(manager))
+      .send({ name: 'Туршилтын машин' })
+      .expect(422);
+    const listed = (await http().get('/api/v1/procurement/trucks').set(bearer(orderer)).expect(200))
+      .body as { id: number }[];
+    expect(listed.map((row) => row.id)).toContain(truck.id);
+
+    const created = (
+      await http()
+        .post('/api/v1/purchase-orders')
+        .set(bearer(manager))
+        .set(idempotency())
+        .send({ supplierIds: [supplierA, supplierB] })
+        .expect(201)
+    ).body as OrderJson & { loads: { id: number; truckId: number; supplierIds: number[] }[] };
+    expect(created.loads).toEqual([]);
+
+    // One load per truck per order; a supplier rides on one load or none.
+    const withLoad = (
+      await http()
+        .post(`/api/v1/purchase-orders/${created.id}/loads`)
+        .set(bearer(manager))
+        .set(idempotency())
+        .send({ truckId: truck.id })
+        .expect(200)
+    ).body as typeof created;
+    expect(withLoad.loads).toHaveLength(1);
+    const loadId = withLoad.loads[0]?.id ?? 0;
+    await http()
+      .post(`/api/v1/purchase-orders/${created.id}/loads`)
+      .set(bearer(manager))
+      .set(idempotency())
+      .send({ truckId: truck.id })
+      .expect(422);
+    const assigned = (
+      await http()
+        .put(`/api/v1/purchase-orders/${created.id}/suppliers/${supplierA}/load`)
+        .set(bearer(manager))
+        .send({ loadId })
+        .expect(200)
+    ).body as typeof created & { suppliers: (SupplierJson & { loadId: number | null })[] };
+    expect(assigned.loads[0]?.supplierIds).toEqual([supplierA]);
+    expect(assigned.suppliers.find((row) => row.supplierId === supplierA)?.loadId).toBe(loadId);
+    expect(assigned.suppliers.find((row) => row.supplierId === supplierB)?.loadId).toBeNull();
+    await http()
+      .put(`/api/v1/purchase-orders/${created.id}/suppliers/${supplierB}/load`)
+      .set(bearer(manager))
+      .send({ loadId: loadId + 1000 })
+      .expect(404);
+    await http()
+      .put(`/api/v1/purchase-orders/${created.id}/suppliers/${supplierA}/load`)
+      .set(bearer(orderer))
+      .send({ loadId: null })
+      .expect(403);
+
+    // Taking the truck off frees its suppliers.
+    const freed = (
+      await http()
+        .delete(`/api/v1/purchase-orders/${created.id}/loads/${loadId}`)
+        .set(bearer(manager))
+        .expect(200)
+    ).body as typeof assigned;
+    expect(freed.loads).toEqual([]);
+    expect(freed.suppliers.every((row) => row.loadId === null)).toBe(true);
+  });
 });

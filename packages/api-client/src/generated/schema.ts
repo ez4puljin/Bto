@@ -6687,6 +6687,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/purchase-orders/{id}/loads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Names a truck on the order (ADR-0121): one load per truck per order. */
+        post: operations["PurchaseOrders_addLoad"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchase-orders/{id}/loads/{loadId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["PurchaseOrders_removeLoad"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchase-orders/{id}/suppliers/{supplierId}/load": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Puts a supplier on one of the order's loads, or takes it off with null. */
+        put: operations["PurchaseOrders_assignLoad"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/purchase-orders": {
         parameters: {
             query?: never;
@@ -7006,6 +7056,38 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/procurement/trucks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Trucks_list"];
+        put?: never;
+        post: operations["Trucks_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/procurement/trucks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["Trucks_update"];
         trace?: never;
     };
 }
@@ -15374,37 +15456,9 @@ export interface components {
         SupplierEntries: {
             data: components["schemas"]["SupplierEntry"][];
         };
-        PurchaseOrderStatusCount: {
-            /** @enum {string} */
-            status: "PREPARING" | "SENT" | "SHIPPING" | "IN_TRANSIT" | "ARRIVED" | "ACCOUNTING" | "RECEIVED";
-            count: number;
-        };
-        PurchaseOrderSummary: {
-            id: number;
-            number: string;
-            /** Format: date */
-            orderDate: string;
-            note: string | null;
-            /** @enum {string} */
-            status: "PREPARING" | "SENT" | "SHIPPING" | "IN_TRANSIT" | "ARRIVED" | "ACCOUNTING" | "RECEIVED";
-            supplierCount: number;
-            supplierNames: string[];
-            /** @description Suppliers per status, zeros left out */
-            statusCounts: components["schemas"]["PurchaseOrderStatusCount"][];
-            /** Format: date-time */
-            archivedAt: string | null;
-            /** Format: date-time */
-            createdAt: string;
-        };
-        PurchaseOrderPage: {
-            data: components["schemas"]["PurchaseOrderSummary"][];
-            nextCursor: string | null;
-        };
-        PurchaseOrderCreateRequest: {
-            /** Format: date */
-            orderDate?: string | null;
+        AddLoadDto: {
+            truckId: number;
             note?: string | null;
-            supplierIds: number[];
         };
         PurchaseOrderSupplier: {
             supplierId: number;
@@ -15439,6 +15493,8 @@ export interface components {
             noteTotalAmount: string | null;
             receiptId: number | null;
             receiptNumber: string | null;
+            /** @description The load (truck) it rides on */
+            loadId: number | null;
             canEdit: boolean;
             /** @description May type the shipped quantities now */
             canShip: boolean;
@@ -15448,6 +15504,16 @@ export interface components {
             canPrice: boolean;
             canMoveNext: boolean;
             canMoveBack: boolean;
+        };
+        PurchaseOrderLoad: {
+            id: number;
+            truckId: number;
+            truckName: string;
+            plate: string | null;
+            capacityKg: string | null;
+            note: string | null;
+            /** @description The suppliers on this load */
+            supplierIds: number[];
         };
         PurchaseOrderDetail: {
             id: number;
@@ -15472,6 +15538,44 @@ export interface components {
             /** @description A manager may archive it now */
             canArchive: boolean;
             suppliers: components["schemas"]["PurchaseOrderSupplier"][];
+            /** @description The trucks named on the order (ADR-0121) */
+            loads: components["schemas"]["PurchaseOrderLoad"][];
+        };
+        AssignLoadDto: {
+            /** @description The load, or null to take the supplier off */
+            loadId: number | null;
+        };
+        PurchaseOrderStatusCount: {
+            /** @enum {string} */
+            status: "PREPARING" | "SENT" | "SHIPPING" | "IN_TRANSIT" | "ARRIVED" | "ACCOUNTING" | "RECEIVED";
+            count: number;
+        };
+        PurchaseOrderSummary: {
+            id: number;
+            number: string;
+            /** Format: date */
+            orderDate: string;
+            note: string | null;
+            /** @enum {string} */
+            status: "PREPARING" | "SENT" | "SHIPPING" | "IN_TRANSIT" | "ARRIVED" | "ACCOUNTING" | "RECEIVED";
+            supplierCount: number;
+            supplierNames: string[];
+            /** @description Suppliers per status, zeros left out */
+            statusCounts: components["schemas"]["PurchaseOrderStatusCount"][];
+            /** Format: date-time */
+            archivedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PurchaseOrderPage: {
+            data: components["schemas"]["PurchaseOrderSummary"][];
+            nextCursor: string | null;
+        };
+        PurchaseOrderCreateRequest: {
+            /** Format: date */
+            orderDate?: string | null;
+            note?: string | null;
+            supplierIds: number[];
         };
         PurchaseOrderVersion: {
             /** Format: date-time */
@@ -15753,6 +15857,27 @@ export interface components {
         SupplierOrdererRequest: {
             /** @description null removes the orderer */
             userId: number | null;
+        };
+        Truck: {
+            id: number;
+            name: string;
+            plate: string | null;
+            /** @description What it carries, kg */
+            capacityKg: string | null;
+            isActive: boolean;
+        };
+        CreateTruckDto: {
+            name: string;
+            plate?: string | null;
+            /** @description kg, up to 3 decimals */
+            capacityKg?: string | null;
+        };
+        UpdateTruckDto: {
+            name?: string;
+            plate?: string | null;
+            /** @description kg, up to 3 decimals */
+            capacityKg?: string | null;
+            isActive?: boolean;
         };
         /** @enum {string} */
         ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "ISSUE_LINES_UNCHECKED" | "ISSUE_WAREHOUSE_CONFIRMED" | "ISSUE_PARTLY_POSTED" | "ISSUE_RECIPIENT_KIND" | "ISSUE_CORRECTION_OPEN" | "ISSUE_NOT_SENT" | "PO_NOT_ARCHIVABLE" | "PO_NOT_EDITABLE" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "TRANSFER_LINES_UNCOUNTED" | "TRANSFER_REQUEST_EMPTY" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE";
@@ -31842,6 +31967,109 @@ export interface operations {
             };
         };
     };
+    PurchaseOrders_addLoad: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddLoadDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PurchaseOrders_removeLoad: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                loadId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PurchaseOrders_assignLoad: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                supplierId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignLoadDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     PurchaseOrders_list: {
         parameters: {
             query?: {
@@ -32567,6 +32795,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SupplierOrderer"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Trucks_list: {
+        parameters: {
+            query?: {
+                all?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Truck"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Trucks_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTruckDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Truck"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Trucks_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTruckDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Truck"];
                 };
             };
             /** @description RFC 9457 problem details */

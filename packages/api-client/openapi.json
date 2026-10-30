@@ -27179,6 +27179,188 @@
         ]
       }
     },
+    "/api/v1/purchase-orders/{id}/loads": {
+      "post": {
+        "operationId": "PurchaseOrders_addLoad",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddLoadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Names a truck on the order (ADR-0121): one load per truck per order.",
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
+    "/api/v1/purchase-orders/{id}/loads/{loadId}": {
+      "delete": {
+        "operationId": "PurchaseOrders_removeLoad",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "loadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
+    "/api/v1/purchase-orders/{id}/suppliers/{supplierId}/load": {
+      "put": {
+        "operationId": "PurchaseOrders_assignLoad",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignLoadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Puts a supplier on one of the order's loads, or takes it off with null.",
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
     "/api/v1/purchase-orders": {
       "get": {
         "operationId": "PurchaseOrders_list",
@@ -28526,6 +28708,153 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SupplierOrderer"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
+    "/api/v1/procurement/trucks": {
+      "get": {
+        "operationId": "Trucks_list",
+        "parameters": [
+          {
+            "name": "all",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Truck"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "procurement"
+        ]
+      },
+      "post": {
+        "operationId": "Trucks_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTruckDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Truck"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
+    "/api/v1/procurement/trucks/{id}": {
+      "patch": {
+        "operationId": "Trucks_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTruckDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Truck"
                 }
               }
             }
@@ -57010,6 +57339,318 @@
           "data"
         ]
       },
+      "AddLoadDto": {
+        "type": "object",
+        "properties": {
+          "truckId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "truckId"
+        ]
+      },
+      "PurchaseOrderSupplier": {
+        "type": "object",
+        "properties": {
+          "supplierId": {
+            "type": "number"
+          },
+          "supplierCode": {
+            "type": "string"
+          },
+          "supplierName": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PREPARING",
+              "SENT",
+              "SHIPPING",
+              "IN_TRANSIT",
+              "ARRIVED",
+              "ACCOUNTING",
+              "RECEIVED"
+            ],
+            "type": "string"
+          },
+          "statusChangedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ordererId": {
+            "type": "number",
+            "nullable": true
+          },
+          "ordererName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "boxes": {
+            "type": "string",
+            "description": "Σ ordered quantity in the lines’ own unit (boxes)"
+          },
+          "qtyBase": {
+            "type": "string",
+            "description": "Σ ordered base quantity"
+          },
+          "weightKg": {
+            "type": "string",
+            "description": "Σ weight, kg (products with a weight)"
+          },
+          "shippedBase": {
+            "type": "string",
+            "description": "Σ shipped quantity, base units (lines typed at «Ачигдаж»)"
+          },
+          "arrivedBase": {
+            "type": "string",
+            "nullable": true,
+            "description": "Σ counted base quantity of the receipt (null before the receipt)"
+          },
+          "uncheckedLines": {
+            "type": "number",
+            "description": "Receipt lines not yet counted"
+          },
+          "estimatedCost": {
+            "type": "string",
+            "nullable": true,
+            "description": "Σ ordered × last price per base unit (price readers)"
+          },
+          "finalAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "The receipt’s payable so far (price readers; null before the receipt)"
+          },
+          "priceDiffCount": {
+            "type": "number",
+            "nullable": true,
+            "description": "Lines priced differently from the product’s previous price (posted receipt, price readers)"
+          },
+          "noteTotalQty": {
+            "type": "string",
+            "nullable": true
+          },
+          "noteTotalAmount": {
+            "type": "string",
+            "nullable": true
+          },
+          "receiptId": {
+            "type": "number",
+            "nullable": true
+          },
+          "receiptNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "loadId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The load (truck) it rides on"
+          },
+          "canEdit": {
+            "type": "boolean"
+          },
+          "canShip": {
+            "type": "boolean",
+            "description": "May type the shipped quantities now"
+          },
+          "canCount": {
+            "type": "boolean",
+            "description": "May type a count on at least one line now"
+          },
+          "canPrice": {
+            "type": "boolean",
+            "description": "May run the price check now"
+          },
+          "canMoveNext": {
+            "type": "boolean"
+          },
+          "canMoveBack": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "supplierId",
+          "supplierCode",
+          "supplierName",
+          "status",
+          "statusChangedAt",
+          "ordererId",
+          "ordererName",
+          "lineCount",
+          "boxes",
+          "qtyBase",
+          "weightKg",
+          "shippedBase",
+          "arrivedBase",
+          "uncheckedLines",
+          "estimatedCost",
+          "finalAmount",
+          "priceDiffCount",
+          "noteTotalQty",
+          "noteTotalAmount",
+          "receiptId",
+          "receiptNumber",
+          "loadId",
+          "canEdit",
+          "canShip",
+          "canCount",
+          "canPrice",
+          "canMoveNext",
+          "canMoveBack"
+        ]
+      },
+      "PurchaseOrderLoad": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "truckId": {
+            "type": "number"
+          },
+          "truckName": {
+            "type": "string"
+          },
+          "plate": {
+            "type": "string",
+            "nullable": true
+          },
+          "capacityKg": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "supplierIds": {
+            "description": "The suppliers on this load",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "truckId",
+          "truckName",
+          "plate",
+          "capacityKg",
+          "note",
+          "supplierIds"
+        ]
+      },
+      "PurchaseOrderDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "PO-2026-000001"
+          },
+          "orderDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "PREPARING",
+              "SENT",
+              "SHIPPING",
+              "IN_TRANSIT",
+              "ARRIVED",
+              "ACCOUNTING",
+              "RECEIVED"
+            ],
+            "type": "string",
+            "description": "The lowest supplier status"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "archivedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "canArchive": {
+            "type": "boolean",
+            "description": "A manager may archive it now"
+          },
+          "suppliers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderSupplier"
+            }
+          },
+          "loads": {
+            "description": "The trucks named on the order (ADR-0121)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderLoad"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "orderDate",
+          "note",
+          "status",
+          "createdBy",
+          "createdAt",
+          "updatedAt",
+          "archivedAt",
+          "archivedBy",
+          "canArchive",
+          "suppliers",
+          "loads"
+        ]
+      },
+      "AssignLoadDto": {
+        "type": "object",
+        "properties": {
+          "loadId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The load, or null to take the supplier off"
+          }
+        },
+        "required": [
+          "loadId"
+        ]
+      },
       "PurchaseOrderStatusCount": {
         "type": "object",
         "properties": {
@@ -57145,231 +57786,6 @@
         },
         "required": [
           "supplierIds"
-        ]
-      },
-      "PurchaseOrderSupplier": {
-        "type": "object",
-        "properties": {
-          "supplierId": {
-            "type": "number"
-          },
-          "supplierCode": {
-            "type": "string"
-          },
-          "supplierName": {
-            "type": "string"
-          },
-          "status": {
-            "enum": [
-              "PREPARING",
-              "SENT",
-              "SHIPPING",
-              "IN_TRANSIT",
-              "ARRIVED",
-              "ACCOUNTING",
-              "RECEIVED"
-            ],
-            "type": "string"
-          },
-          "statusChangedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "ordererId": {
-            "type": "number",
-            "nullable": true
-          },
-          "ordererName": {
-            "type": "string",
-            "nullable": true
-          },
-          "lineCount": {
-            "type": "number"
-          },
-          "boxes": {
-            "type": "string",
-            "description": "Σ ordered quantity in the lines’ own unit (boxes)"
-          },
-          "qtyBase": {
-            "type": "string",
-            "description": "Σ ordered base quantity"
-          },
-          "weightKg": {
-            "type": "string",
-            "description": "Σ weight, kg (products with a weight)"
-          },
-          "shippedBase": {
-            "type": "string",
-            "description": "Σ shipped quantity, base units (lines typed at «Ачигдаж»)"
-          },
-          "arrivedBase": {
-            "type": "string",
-            "nullable": true,
-            "description": "Σ counted base quantity of the receipt (null before the receipt)"
-          },
-          "uncheckedLines": {
-            "type": "number",
-            "description": "Receipt lines not yet counted"
-          },
-          "estimatedCost": {
-            "type": "string",
-            "nullable": true,
-            "description": "Σ ordered × last price per base unit (price readers)"
-          },
-          "finalAmount": {
-            "type": "string",
-            "nullable": true,
-            "description": "The receipt’s payable so far (price readers; null before the receipt)"
-          },
-          "priceDiffCount": {
-            "type": "number",
-            "nullable": true,
-            "description": "Lines priced differently from the product’s previous price (posted receipt, price readers)"
-          },
-          "noteTotalQty": {
-            "type": "string",
-            "nullable": true
-          },
-          "noteTotalAmount": {
-            "type": "string",
-            "nullable": true
-          },
-          "receiptId": {
-            "type": "number",
-            "nullable": true
-          },
-          "receiptNumber": {
-            "type": "string",
-            "nullable": true
-          },
-          "canEdit": {
-            "type": "boolean"
-          },
-          "canShip": {
-            "type": "boolean",
-            "description": "May type the shipped quantities now"
-          },
-          "canCount": {
-            "type": "boolean",
-            "description": "May type a count on at least one line now"
-          },
-          "canPrice": {
-            "type": "boolean",
-            "description": "May run the price check now"
-          },
-          "canMoveNext": {
-            "type": "boolean"
-          },
-          "canMoveBack": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "supplierId",
-          "supplierCode",
-          "supplierName",
-          "status",
-          "statusChangedAt",
-          "ordererId",
-          "ordererName",
-          "lineCount",
-          "boxes",
-          "qtyBase",
-          "weightKg",
-          "shippedBase",
-          "arrivedBase",
-          "uncheckedLines",
-          "estimatedCost",
-          "finalAmount",
-          "priceDiffCount",
-          "noteTotalQty",
-          "noteTotalAmount",
-          "receiptId",
-          "receiptNumber",
-          "canEdit",
-          "canShip",
-          "canCount",
-          "canPrice",
-          "canMoveNext",
-          "canMoveBack"
-        ]
-      },
-      "PurchaseOrderDetail": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "number"
-          },
-          "number": {
-            "type": "string",
-            "example": "PO-2026-000001"
-          },
-          "orderDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "note": {
-            "type": "string",
-            "nullable": true
-          },
-          "status": {
-            "enum": [
-              "PREPARING",
-              "SENT",
-              "SHIPPING",
-              "IN_TRANSIT",
-              "ARRIVED",
-              "ACCOUNTING",
-              "RECEIVED"
-            ],
-            "type": "string",
-            "description": "The lowest supplier status"
-          },
-          "createdBy": {
-            "type": "string",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "archivedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "archivedBy": {
-            "type": "string",
-            "nullable": true
-          },
-          "canArchive": {
-            "type": "boolean",
-            "description": "A manager may archive it now"
-          },
-          "suppliers": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PurchaseOrderSupplier"
-            }
-          }
-        },
-        "required": [
-          "id",
-          "number",
-          "orderDate",
-          "note",
-          "status",
-          "createdBy",
-          "createdAt",
-          "updatedAt",
-          "archivedAt",
-          "archivedBy",
-          "canArchive",
-          "suppliers"
         ]
       },
       "PurchaseOrderVersion": {
@@ -58439,6 +58855,80 @@
         "required": [
           "userId"
         ]
+      },
+      "Truck": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "plate": {
+            "type": "string",
+            "nullable": true
+          },
+          "capacityKg": {
+            "type": "string",
+            "nullable": true,
+            "description": "What it carries, kg"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "plate",
+          "capacityKg",
+          "isActive"
+        ]
+      },
+      "CreateTruckDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "plate": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 20
+          },
+          "capacityKg": {
+            "type": "string",
+            "nullable": true,
+            "description": "kg, up to 3 decimals"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateTruckDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "plate": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 20
+          },
+          "capacityKg": {
+            "type": "string",
+            "nullable": true,
+            "description": "kg, up to 3 decimals"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
       },
       "ErrorCode": {
         "type": "string",

@@ -6,8 +6,10 @@ import { PartnersModule } from '../partners';
 import {
   PurchaseOrdersController,
   SupplierOrderersController,
+  TrucksController,
 } from './controllers/purchase-orders.controller';
 import { OrderHistoryService } from './services/order-history.service';
+import { OrderLoadsService } from './services/order-loads.service';
 import { OrderProgressService } from './services/order-progress.service';
 import { PurchaseOrderGridService } from './services/purchase-order-grid.service';
 import { PurchaseOrdersService } from './services/purchase-orders.service';
@@ -26,6 +28,7 @@ import { SupplierOrderersService } from './services/supplier-orderers.service';
     SupplierOrderersService,
     OrderProgressService,
     OrderHistoryService,
+    OrderLoadsService,
     { provide: RECEIPT_PROGRESS, useExisting: OrderProgressService },
   ],
   exports: [
@@ -33,6 +36,7 @@ import { SupplierOrderersService } from './services/supplier-orderers.service';
     PurchaseOrderGridService,
     SupplierOrderersService,
     OrderHistoryService,
+    OrderLoadsService,
     RECEIPT_PROGRESS,
   ],
 })
@@ -41,6 +45,6 @@ export class ProcurementModule {}
 /** The HTTP side of procurement (api only). */
 @Module({
   imports: [ProcurementModule],
-  controllers: [PurchaseOrdersController, SupplierOrderersController],
+  controllers: [PurchaseOrdersController, SupplierOrderersController, TrucksController],
 })
 export class ProcurementHttpModule {}

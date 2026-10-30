@@ -26,7 +26,7 @@ The scope is in `docs/workflows.md` §4 (slice 1, four question rounds of 2026-1
 
 **Menu.** A «Татан авалт» group inside «Агуулах».
 
-## 2. Owned tables (migrations `0052_procurement`, `0055_po_detail`)
+## 2. Owned tables (migrations `0052_procurement`, `0055_po_detail`, `0056_po_loads`)
 
 | Table | What | Guards |
 |---|---|---|
@@ -34,6 +34,10 @@ The scope is in `docs/workflows.md` §4 (slice 1, four question rounds of 2026-1
 | `purchase_order_suppliers` | A supplier inside an order: `status`, `receipt_id` (the draft or posted goods receipt from «Ирсэн» on) and `status_changed_at/by`. | (order, supplier) unique; `receipt_id` unique; CHECK `receipt_id IS NOT NULL ⇔ status ∈ {ARRIVED, ACCOUNTING, RECEIVED}`; deleted only by `removeSupplier` in «Бэлдэж» |
 | `purchase_order_lines` | An ordered product: `product_unit_id`, `qty`, `factor_snapshot`, `qty_base`, `shipped_qty` (in the line's unit; NULL until typed, 0 = not shipped), `updated_by/at`. | (order supplier, product) unique; qty > 0 (a zero deletes the row); `shipped_qty IS NULL OR ≥ 0` |
 | `supplier_orderers` | The orderer of a supplier, by user. | Primary key on the supplier; index on the user |
+| `trucks` | A company truck (ADR-0121): `name`, `plate`, `capacity_kg`, `is_active`. Kept by managers from the order's «Шинэ машин…» dialog. | Name unique and 1–80; plate NULL or 1–20; capacity NULL or > 0 |
+| `purchase_order_loads` | A truck named on an order (ADR-0121): `order_id`, `truck_id`, `note`, `created_by`. Removing one sets its suppliers' `load_id` back to NULL. | (order, truck) unique; note NULL or 1–300 |
+
+`purchase_order_suppliers.load_id` (ADR-0121) names the load the supplier rides on, NULL while unassigned; a supplier is on one load or none.
 
 Inventory's side of the same migrations is listed in `docs/modules/inventory.md`: the receipt lines' `expected_qty`, `checked_at` and `note`; the receipts' note totals, photo and origin; `goods_receipt_confirmations`.
 
@@ -88,6 +92,8 @@ Services (not exported beyond the module):
 | `GET /purchase-orders/:id/export.xlsx` | read | The order as one sheet (prices for price readers) |
 | `GET /purchase-orders/:id/print?supplierId` | read | The order sheets |
 | `GET /procurement/orderer-candidates`, `GET/PUT /procurement/supplier-orderers/:supplierId` | read / manage | The orderers |
+| `GET/POST /procurement/trucks`, `PATCH /procurement/trucks/:id` | read / manage | The company's trucks (ADR-0121; `?all=true` lists the inactive ones too) |
+| `POST /purchase-orders/:id/loads` (idempotent), `DELETE …/loads/:loadId`, `PUT …/suppliers/:supplierId/load {loadId | null}` | manage | A truck named on the order, taken off (its suppliers freed), a supplier put on a load or taken off; each answers the order detail with `loads[]` and the suppliers' `loadId` |
 | `GET /procurement/supplier-candidates` | read | Every ACTIVE supplier by name with `mainProductCount` (active products it is the main supplier of), one list (`nextCursor` null): the supplier picker's «Бүгдийг сонгох» |
 
 ## 5. Rules worth knowing

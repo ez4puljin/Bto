@@ -1,17 +1,20 @@
 import { Decimal } from '@tugeel/shared/money';
 import { nextPoStatus, previousPoStatus } from '@tugeel/shared/procurement';
-import { ChevronDown, History, RefreshCw, Table2 } from 'lucide-react';
-import { useState } from 'react';
+import { ChevronDown, History, RefreshCw, Table2, Truck as TruckIcon, X } from 'lucide-react';
+import { type FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DialogFormFooter, FormField } from '@/components/form';
 import { EmptyState, FilterToggle, LoadMore } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -31,12 +34,15 @@ import {
   type GridRow,
   type PoStatus,
   type PurchaseOrderDetail,
+  type PurchaseOrderLoad,
   type PurchaseOrderSupplier,
+  useCreateTruck,
   useOrdererCandidates,
   usePurchaseOrder,
   usePurchaseOrderMutations,
   usePurchaseOrderRows,
   useSetSupplierOrderer,
+  useTrucks,
 } from './api';
 import { PoStatusBadge, StatusCountBadge } from './parts';
 
@@ -101,8 +107,10 @@ function sumOf(suppliers: readonly PurchaseOrderSupplier[]): Totals {
 function Overview({ detail, onRefresh }: { detail: PurchaseOrderDetail; onRefresh: () => void }) {
   const { t } = useTranslation();
   const canPrices = useHasPermission('procurement.prices.read');
+  const canManage = useHasPermission('procurement.orders.manage');
   const [status, setStatus] = useState<PoStatus | null>(null);
   const base = `/procurement/orders/${detail.id}`;
+  const truckOfLoad = new Map(detail.loads.map((load) => [load.id, load.truckName]));
 
   // A supplier's status moves from its card; «Ирсэн» asks first (it makes the draft receipt).
   const mutations = usePurchaseOrderMutations();
@@ -220,46 +228,52 @@ function Overview({ detail, onRefresh }: { detail: PurchaseOrderDetail; onRefres
         ) : null}
       </div>
 
-      <div
-        className="mb-3 flex flex-wrap items-center gap-2"
-        role="group"
-        aria-label={t('procurement.overview.statuses')}
-      >
-        <FilterToggle
-          label={`${t('procurement.overview.all')} · ${formatCount(detail.suppliers.length)}`}
-          checked={status === null}
-          onCheckedChange={() => setStatus(null)}
-        />
-        {counts.map((entry) => (
-          <FilterToggle
-            key={entry.status}
-            label={`${t(`procurement.status.${entry.status}`)} · ${formatCount(entry.count)}`}
-            checked={status === entry.status}
-            onCheckedChange={(checked) => setStatus(checked ? entry.status : null)}
-          />
-        ))}
-      </div>
-
-      <ProblemAlert problem={moveAction.problem} />
-      {ordered.length === 0 ? (
-        <EmptyState title={t('procurement.overview.empty')} />
-      ) : (
-        <div className="flex flex-col gap-3">
-          {ordered.map(([ordererId, suppliers]) => (
-            <OrdererGroup
-              key={ordererId ?? 'none'}
-              base={base}
-              orderId={detail.id}
-              ordererId={ordererId}
-              name={suppliers[0]?.ordererName ?? null}
-              suppliers={suppliers}
-              canPrices={canPrices}
-              open={ordered.length <= 3}
-              onStep={step}
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
+        <div className="min-w-0 flex-1">
+          <div
+            className="mb-3 flex flex-wrap items-center gap-2"
+            role="group"
+            aria-label={t('procurement.overview.statuses')}
+          >
+            <FilterToggle
+              label={`${t('procurement.overview.all')} · ${formatCount(detail.suppliers.length)}`}
+              checked={status === null}
+              onCheckedChange={() => setStatus(null)}
             />
-          ))}
+            {counts.map((entry) => (
+              <FilterToggle
+                key={entry.status}
+                label={`${t(`procurement.status.${entry.status}`)} · ${formatCount(entry.count)}`}
+                checked={status === entry.status}
+                onCheckedChange={(checked) => setStatus(checked ? entry.status : null)}
+              />
+            ))}
+          </div>
+
+          <ProblemAlert problem={moveAction.problem} />
+          {ordered.length === 0 ? (
+            <EmptyState title={t('procurement.overview.empty')} />
+          ) : (
+            <div className="flex flex-col gap-3">
+              {ordered.map(([ordererId, suppliers]) => (
+                <OrdererGroup
+                  key={ordererId ?? 'none'}
+                  base={base}
+                  orderId={detail.id}
+                  ordererId={ordererId}
+                  name={suppliers[0]?.ordererName ?? null}
+                  suppliers={suppliers}
+                  canPrices={canPrices}
+                  open={ordered.length <= 3}
+                  onStep={step}
+                  truckOfLoad={truckOfLoad}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      )}
+        <LoadsPanel detail={detail} canManage={canManage && detail.archivedAt === null} />
+      </div>
       <ConfirmDialog
         open={arriving !== null}
         variant="default"
@@ -303,11 +317,13 @@ function OrdererGroup(props: {
   canPrices: boolean;
   open: boolean;
   onStep: (supplier: PurchaseOrderSupplier, by: 1 | -1) => void;
+  truckOfLoad: ReadonlyMap<number, string>;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(props.open);
   const totals = sumOf(props.suppliers);
   const name = props.name ?? t('procurement.supplier.noOrderer');
+  const onLoad = props.suppliers.filter((supplier) => supplier.loadId !== null).length;
   const counts = PO_STATUSES.map((value) => ({
     status: value,
     count: props.suppliers.filter((supplier) => supplier.status === value).length,
@@ -339,6 +355,12 @@ function OrdererGroup(props: {
             kg: formatQty(totals.kg.toDecimalPlaces(1).toString()),
           })}
         </span>
+        <span className="text-[13px] text-muted-foreground">
+          {t('procurement.overview.onLoad', {
+            on: formatCount(onLoad),
+            off: formatCount(props.suppliers.length - onLoad),
+          })}
+        </span>
         {props.canPrices ? (
           <span className="font-mono text-[13px]">{formatTugrik(totals.estimated.toFixed(2))}</span>
         ) : null}
@@ -368,11 +390,324 @@ function OrdererGroup(props: {
               supplier={supplier}
               canPrices={props.canPrices}
               onStep={props.onStep}
+              truckName={
+                supplier.loadId === null ? null : (props.truckOfLoad.get(supplier.loadId) ?? null)
+              }
             />
           ))}
         </div>
       ) : null}
     </section>
+  );
+}
+
+/**
+ * The trucks named on the order and what rides on each (ADR-0121): «Машин нэмэх» makes a load from
+ * an active truck (or a new one), the unassigned suppliers below are put on a load from their row,
+ * a load's row takes a supplier off, and a load can be taken off the order (its suppliers freed).
+ */
+function LoadsPanel({ detail, canManage }: { detail: PurchaseOrderDetail; canManage: boolean }) {
+  const { t } = useTranslation();
+  const mutations = usePurchaseOrderMutations();
+  const trucks = useTrucks(canManage);
+  const action = useAction();
+  const [creating, setCreating] = useState(false);
+  const onOrder = new Set(detail.loads.map((load) => load.truckId));
+  const candidates = (trucks.data ?? []).filter((truck) => !onOrder.has(truck.id));
+  const bySupplier = new Map(detail.suppliers.map((supplier) => [supplier.supplierId, supplier]));
+  const unassigned = detail.suppliers.filter(
+    (supplier) => supplier.loadId === null && supplier.lineCount > 0,
+  );
+  const unassignedTotals = sumOf(unassigned);
+  const busy =
+    mutations.addLoad.isPending || mutations.removeLoad.isPending || mutations.assignLoad.isPending;
+
+  const addTruck = (truckId: number, name: string) =>
+    void action.run(async () => {
+      await mutations.addLoad.mutateAsync({ key: randomUuid(), id: detail.id, truckId });
+      toast.success(t('procurement.overview.loadAdded', { name }));
+    });
+  const removeLoad = (load: PurchaseOrderLoad) =>
+    void action.run(async () => {
+      await mutations.removeLoad.mutateAsync({ id: detail.id, loadId: load.id });
+      toast.success(t('procurement.overview.loadRemoved', { name: load.truckName }));
+    });
+  const assign = (supplierId: number, loadId: number | null) =>
+    void action.run(async () => {
+      await mutations.assignLoad.mutateAsync({ id: detail.id, supplierId, loadId });
+    });
+
+  return (
+    <aside className="flex w-full flex-col gap-3 xl:w-[26rem] xl:shrink-0">
+      <div className="flex flex-wrap items-center gap-2">
+        <TruckIcon aria-hidden className="size-4 text-muted-foreground" />
+        <h2 className="text-[15px] font-semibold">{t('procurement.overview.loads')}</h2>
+        <span className="font-mono text-[13px] text-muted-foreground">
+          {formatCount(detail.loads.length)}
+        </span>
+        {canManage ? (
+          <NativeSelect
+            variant="filter"
+            className="ml-auto"
+            aria-label={t('procurement.overview.addTruck')}
+            value=""
+            disabled={busy}
+            onChange={(event) => {
+              const value = event.target.value;
+              if (value === 'new') setCreating(true);
+              else if (value !== '') {
+                const truck = candidates.find((candidate) => String(candidate.id) === value);
+                if (truck) addTruck(truck.id, truck.name);
+              }
+            }}
+          >
+            <option value="">{t('procurement.overview.addTruck')}</option>
+            {candidates.map((truck) => (
+              <option key={truck.id} value={truck.id}>
+                {truck.plate ? `${truck.name} (${truck.plate})` : truck.name}
+              </option>
+            ))}
+            <option value="new">{t('procurement.overview.newTruck')}</option>
+          </NativeSelect>
+        ) : null}
+      </div>
+      <ProblemAlert problem={action.problem} />
+      {detail.loads.length === 0 ? (
+        <section className="rounded-xl bg-card shadow-card ring-1 ring-black/[0.06]">
+          <EmptyState
+            icon={TruckIcon}
+            title={t(
+              canManage ? 'procurement.overview.noLoadsHint' : 'procurement.overview.noLoads',
+            )}
+          />
+        </section>
+      ) : (
+        detail.loads.map((load) => (
+          <LoadCard
+            key={load.id}
+            load={load}
+            suppliers={load.supplierIds.flatMap((id) => bySupplier.get(id) ?? [])}
+            canManage={canManage}
+            busy={busy}
+            onRemove={() => removeLoad(load)}
+            onTakeOff={(supplierId) => assign(supplierId, null)}
+          />
+        ))
+      )}
+      <section
+        aria-label={t('procurement.overview.unassigned')}
+        className="rounded-xl border border-dashed border-warning/60 bg-warning-soft/40 p-3"
+      >
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h3 className="text-[14px] font-semibold">{t('procurement.overview.unassigned')}</h3>
+          <span className="ml-auto text-[13px] text-muted-foreground">
+            {t('procurement.overview.loadSummary', {
+              suppliers: formatCount(unassignedTotals.suppliers),
+              boxes: formatQty(unassignedTotals.boxes.toFixed()),
+              kg: formatQty(unassignedTotals.kg.toDecimalPlaces(1).toString()),
+            })}
+          </span>
+        </div>
+        {unassigned.length === 0 ? (
+          <p className="pt-2 text-[13px] text-muted-foreground">
+            {t('procurement.overview.allAssigned')}
+          </p>
+        ) : (
+          <ul className="mt-2 flex flex-col gap-1">
+            {unassigned.map((supplier) => (
+              <li
+                key={supplier.supplierId}
+                className="flex items-center gap-2 rounded-md bg-background px-2 py-1 text-[13px]"
+              >
+                <span className="min-w-0 flex-1 truncate">{supplier.supplierName}</span>
+                <span className="font-mono text-muted-foreground">{formatQty(supplier.boxes)}</span>
+                {canManage && detail.loads.length > 0 ? (
+                  <NativeSelect
+                    variant="filter"
+                    aria-label={t('procurement.overview.assignTo', { name: supplier.supplierName })}
+                    value=""
+                    disabled={busy}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (value !== '') assign(supplier.supplierId, Number.parseInt(value, 10));
+                    }}
+                  >
+                    <option value="">{t('procurement.overview.noTruck')}</option>
+                    {detail.loads.map((load) => (
+                      <option key={load.id} value={load.id}>
+                        {load.truckName}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      <Dialog open={creating} onOpenChange={setCreating}>
+        {creating ? (
+          <NewTruckDialog
+            onClose={() => setCreating(false)}
+            onCreated={(truck) => {
+              setCreating(false);
+              addTruck(truck.id, truck.name);
+            }}
+          />
+        ) : null}
+      </Dialog>
+    </aside>
+  );
+}
+
+function LoadCard(props: {
+  load: PurchaseOrderLoad;
+  suppliers: PurchaseOrderSupplier[];
+  canManage: boolean;
+  busy: boolean;
+  onRemove: () => void;
+  onTakeOff: (supplierId: number) => void;
+}) {
+  const { t } = useTranslation();
+  const { load } = props;
+  const totals = sumOf(props.suppliers);
+  const capacity = load.capacityKg ? new Decimal(load.capacityKg) : null;
+  const fill =
+    capacity && !capacity.isZero()
+      ? Decimal.min(totals.kg.div(capacity).times(100).floor(), 100).toFixed()
+      : null;
+  return (
+    <section
+      aria-label={load.truckName}
+      className="rounded-xl bg-card p-3 shadow-card ring-1 ring-black/[0.06]"
+    >
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="text-[14px] font-semibold">{load.truckName}</span>
+        {load.plate ? (
+          <span className="font-mono text-[13px] text-muted-foreground">{load.plate}</span>
+        ) : null}
+        <span className="text-[13px] text-muted-foreground">
+          {t('procurement.overview.loadSummary', {
+            suppliers: formatCount(totals.suppliers),
+            boxes: formatQty(totals.boxes.toFixed()),
+            kg: formatQty(totals.kg.toDecimalPlaces(1).toString()),
+          })}
+        </span>
+        {props.canManage ? (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="ml-auto text-muted-foreground"
+            aria-label={t('procurement.overview.removeLoad', { name: load.truckName })}
+            disabled={props.busy}
+            onClick={props.onRemove}
+          >
+            <X aria-hidden />
+          </Button>
+        ) : null}
+      </div>
+      {capacity ? (
+        <div className="mt-2 flex items-center gap-2" aria-label={t('procurement.overview.fill')}>
+          <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-fill">
+            <span className="block h-full bg-primary" style={{ width: `${fill ?? '0'}%` }} />
+          </span>
+          <span className="font-mono text-[12px] text-muted-foreground">
+            {fill}% · {t('procurement.overview.capacity', { kg: formatQty(capacity.toFixed()) })}
+          </span>
+        </div>
+      ) : null}
+      {props.suppliers.length > 0 ? (
+        <ul className="mt-2 flex flex-col gap-1">
+          {props.suppliers.map((supplier) => (
+            <li
+              key={supplier.supplierId}
+              className="flex items-center gap-2 rounded-md bg-fill/60 px-2 py-1 text-[13px]"
+            >
+              <span className="min-w-0 flex-1 truncate">{supplier.supplierName}</span>
+              <span className="font-mono text-muted-foreground">{formatQty(supplier.boxes)}</span>
+              {props.canManage ? (
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-muted-foreground"
+                  aria-label={t('procurement.overview.takeOff', { name: supplier.supplierName })}
+                  disabled={props.busy}
+                  onClick={() => props.onTakeOff(supplier.supplierId)}
+                >
+                  <X aria-hidden />
+                </Button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
+/** A truck registered from the order: name, plate and what it carries. */
+function NewTruckDialog(props: {
+  onClose: () => void;
+  onCreated: (truck: { id: number; name: string }) => void;
+}) {
+  const { t } = useTranslation();
+  const create = useCreateTruck();
+  const action = useAction();
+  const [name, setName] = useState('');
+  const [plate, setPlate] = useState('');
+  const [capacity, setCapacity] = useState('');
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    void action.run(async () => {
+      const truck = await create.mutateAsync({
+        name: name.trim(),
+        plate: plate.trim() === '' ? null : plate.trim(),
+        capacityKg: capacity.trim() === '' ? null : capacity.trim(),
+      });
+      toast.success(t('procurement.overview.truckCreated', { name: truck.name }));
+      props.onCreated(truck);
+    });
+  };
+  return (
+    <DialogContent size="sm" closeLabel={t('common.close')}>
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        <DialogHeader>
+          <DialogTitle>{t('procurement.overview.newTruckTitle')}</DialogTitle>
+        </DialogHeader>
+        <ProblemAlert problem={action.problem} />
+        <FormField label={t('procurement.overview.truckName')} htmlFor="truck-name">
+          <Input
+            id="truck-name"
+            value={name}
+            maxLength={80}
+            autoFocus
+            onChange={(event) => setName(event.target.value)}
+          />
+        </FormField>
+        <FormField label={t('procurement.overview.truckPlate')} htmlFor="truck-plate">
+          <Input
+            id="truck-plate"
+            value={plate}
+            maxLength={20}
+            onChange={(event) => setPlate(event.target.value)}
+          />
+        </FormField>
+        <FormField label={t('procurement.overview.truckCapacity')} htmlFor="truck-capacity">
+          <Input
+            id="truck-capacity"
+            inputMode="decimal"
+            value={capacity}
+            onChange={(event) => setCapacity(event.target.value)}
+          />
+        </FormField>
+        <DialogFormFooter
+          pending={create.isPending}
+          disabled={name.trim() === ''}
+          submitLabel={t('procurement.overview.truckCreate')}
+          onCancel={props.onClose}
+        />
+      </form>
+    </DialogContent>
   );
 }
 
@@ -383,6 +718,7 @@ function SupplierCard(props: {
   supplier: PurchaseOrderSupplier;
   canPrices: boolean;
   onStep: (supplier: PurchaseOrderSupplier, by: 1 | -1) => void;
+  truckName: string | null;
 }) {
   const { t } = useTranslation();
   const canManage = useHasPermission('procurement.orders.manage');
@@ -405,6 +741,12 @@ function SupplierCard(props: {
           {supplier.supplierName}
         </Link>
         <PoStatusBadge status={supplier.status} />
+        {props.truckName ? (
+          <Badge variant="outline" className="gap-1">
+            <TruckIcon aria-hidden className="size-3" />
+            {props.truckName}
+          </Badge>
+        ) : null}
         {canManage ? (
           <OrdererSelect supplierId={supplier.supplierId} current={supplier.ordererId} />
         ) : supplier.ordererName ? (
