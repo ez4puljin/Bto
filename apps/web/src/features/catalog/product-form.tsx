@@ -3,7 +3,7 @@ import type { ProblemDetails } from '@tugeel/api-client';
 import { useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { FormFooter, FormRow, FormSection } from '@/components/form';
+import { FormField, FormFooter, FormSection } from '@/components/form';
 import { NativeSelect } from '@/components/native-select';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
@@ -59,70 +59,74 @@ export function ProductForm(props: {
     <form className="flex flex-col gap-5" noValidate onSubmit={(event) => void submit(event)}>
       <ProblemAlert problem={problem} />
       <fieldset disabled={props.readOnly} className="flex min-w-0 flex-col gap-5">
-        <FormSection title={t('catalog.product.sectionGeneral')}>
-          <FormRow
-            label={t('catalog.product.sku')}
-            htmlFor="product-sku"
-            error={errors.sku?.message}
-          >
-            <Input
-              id="product-sku"
-              inputMode="numeric"
-              autoComplete="off"
-              className="font-mono sm:w-44"
-              {...form.register('sku')}
-            />
-          </FormRow>
-          <FormRow
-            label={t('catalog.product.name')}
-            htmlFor="product-name"
-            error={errors.name?.message}
-          >
-            <Input id="product-name" autoComplete="off" {...form.register('name')} />
-          </FormRow>
-          <FormRow
-            label={t('catalog.product.category')}
-            htmlFor="product-category"
-            error={errors.categoryId?.message}
-          >
-            <NativeSelect id="product-category" {...form.register('categoryId')}>
-              <option value="">{t('catalog.product.chooseCategory')}</option>
-              {tree.map((node) => (
-                <option key={node.category.id} value={String(node.category.id)}>
-                  {node.path}
-                </option>
-              ))}
-            </NativeSelect>
-          </FormRow>
-          <FormRow
-            label={t('catalog.product.weight')}
-            htmlFor="product-weight"
-            error={errors.weightKg?.message}
-          >
-            <Input
-              id="product-weight"
-              inputMode="decimal"
-              autoComplete="off"
-              className="font-mono sm:w-36"
-              {...form.register('weightKg')}
-            />
-          </FormRow>
-          <FormRow label={t('catalog.product.status')} htmlFor="product-status" align="center">
-            <Controller
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <div className="flex items-center gap-2.5">
-                  <Switch
-                    id="product-status"
-                    checked={field.value === 'ACTIVE'}
-                    onCheckedChange={(checked) => field.onChange(checked ? 'ACTIVE' : 'INACTIVE')}
-                  />
-                  <span className="text-sm">{t(`catalog.products.status.${field.value}`)}</span>
-                </div>
-              )}
-            />
-          </FormRow>
+        <FormSection title={t('catalog.product.sectionGeneral')} plain>
+          <div className="grid gap-4 md:grid-cols-[11rem_minmax(0,1fr)]">
+            <FormField
+              label={t('catalog.product.sku')}
+              htmlFor="product-sku"
+              error={errors.sku?.message}
+            >
+              <Input
+                id="product-sku"
+                inputMode="numeric"
+                autoComplete="off"
+                className="font-mono"
+                {...form.register('sku')}
+              />
+            </FormField>
+            <FormField
+              label={t('catalog.product.name')}
+              htmlFor="product-name"
+              error={errors.name?.message}
+            >
+              <Input id="product-name" autoComplete="off" {...form.register('name')} />
+            </FormField>
+          </div>
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_11rem_11rem] md:items-end">
+            <FormField
+              label={t('catalog.product.category')}
+              htmlFor="product-category"
+              error={errors.categoryId?.message}
+            >
+              <NativeSelect id="product-category" {...form.register('categoryId')}>
+                <option value="">{t('catalog.product.chooseCategory')}</option>
+                {tree.map((node) => (
+                  <option key={node.category.id} value={String(node.category.id)}>
+                    {node.path}
+                  </option>
+                ))}
+              </NativeSelect>
+            </FormField>
+            <FormField
+              label={t('catalog.product.weight')}
+              htmlFor="product-weight"
+              error={errors.weightKg?.message}
+            >
+              <Input
+                id="product-weight"
+                inputMode="decimal"
+                autoComplete="off"
+                className="font-mono"
+                {...form.register('weightKg')}
+              />
+            </FormField>
+            <FormField label={t('catalog.product.status')} htmlFor="product-status">
+              <Controller
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <div className="flex h-10 items-center gap-2.5">
+                    <Switch
+                      id="product-status"
+                      checked={field.value === 'ACTIVE'}
+                      onCheckedChange={(checked) => field.onChange(checked ? 'ACTIVE' : 'INACTIVE')}
+                    />
+                    <span className="text-sm">{t(`catalog.products.status.${field.value}`)}</span>
+                  </div>
+                )}
+              />
+            </FormField>
+          </div>
         </FormSection>
       </fieldset>
       {props.readOnly ? null : (

@@ -55,27 +55,45 @@ export function FormSection(props: {
   action?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** A numbered step in a long form (the product registration): a small circle before the title. */
+  step?: number;
+  /** No hairline box: the children lay themselves out (a grid of `FormField`s). */
+  plain?: boolean;
 }) {
   return (
     <section className={cn('flex flex-col gap-2', props.className)}>
       {props.title || props.description || props.action ? (
         <div className="flex items-end justify-between gap-3 px-1">
-          <div className="min-w-0">
-            {props.title ? (
-              <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                {props.title}
-              </h3>
+          <div className="flex min-w-0 items-start gap-2.5">
+            {props.step !== undefined ? (
+              <span
+                aria-hidden
+                className="mt-px flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[0.6875rem] font-semibold text-white"
+              >
+                {props.step}
+              </span>
             ) : null}
-            {props.description ? (
-              <p className="mt-0.5 text-xs text-muted-foreground">{props.description}</p>
-            ) : null}
+            <div className="min-w-0">
+              {props.title ? (
+                <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                  {props.title}
+                </h3>
+              ) : null}
+              {props.description ? (
+                <p className="mt-0.5 text-xs text-muted-foreground">{props.description}</p>
+              ) : null}
+            </div>
           </div>
           {props.action}
         </div>
       ) : null}
-      <div className="divide-y divide-border/80 overflow-hidden rounded-xl border border-border/90 bg-background">
-        {props.children}
-      </div>
+      {props.plain ? (
+        props.children
+      ) : (
+        <div className="divide-y divide-border/80 overflow-hidden rounded-xl border border-border/90 bg-background">
+          {props.children}
+        </div>
+      )}
     </section>
   );
 }
