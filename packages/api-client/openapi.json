@@ -28332,6 +28332,16 @@
             }
           },
           {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "Rows whose product is in this category or under it",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
             "name": "cursor",
             "required": false,
             "in": "query",
@@ -28423,6 +28433,16 @@
             "required": false,
             "in": "query",
             "description": "Rows whose home warehouse is this one",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "Rows whose product is in this category or under it",
             "schema": {
               "minimum": 1,
               "type": "number"
@@ -58943,6 +58963,22 @@
           "rowCount"
         ]
       },
+      "CategoryFacetDto": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "number"
+          },
+          "rowCount": {
+            "type": "number",
+            "description": "Rows in this category (the other filters applied)"
+          }
+        },
+        "required": [
+          "categoryId",
+          "rowCount"
+        ]
+      },
       "PurchaseOrderFacets": {
         "type": "object",
         "properties": {
@@ -58955,11 +58991,19 @@
             "items": {
               "$ref": "#/components/schemas/PurchaseOrderSupplierFacet"
             }
+          },
+          "categories": {
+            "description": "The products’ own categories, most rows first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryFacetDto"
+            }
           }
         },
         "required": [
           "rowCount",
-          "suppliers"
+          "suppliers",
+          "categories"
         ]
       },
       "PurchaseOrderGridChange": {

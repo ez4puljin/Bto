@@ -451,6 +451,12 @@ export class GridQueryDto {
   @IsInt()
   @Min(1)
   warehouseId?: number;
+  @ApiPropertyOptional({ description: 'Rows whose product is in this category or under it' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  categoryId?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) cursor?: string;
   @ApiPropertyOptional({ maximum: PO_GRID_PAGE })
   @IsOptional()
@@ -470,10 +476,21 @@ export class SupplierFacetDto {
   @ApiProperty({ description: 'Rows the query keeps for this supplier' }) rowCount: number;
 }
 
+export class CategoryFacetDto {
+  @ApiProperty() categoryId: number;
+  @ApiProperty({ description: 'Rows in this category (the other filters applied)' })
+  rowCount: number;
+}
+
 @ApiSchema({ name: 'PurchaseOrderFacets' })
 export class GridFacetsDto {
   @ApiProperty({ description: "Σ of the suppliers' rowCount" }) rowCount: number;
   @ApiProperty({ type: [SupplierFacetDto] }) suppliers: SupplierFacetDto[];
+  @ApiProperty({
+    type: [CategoryFacetDto],
+    description: 'The products’ own categories, most rows first',
+  })
+  categories: CategoryFacetDto[];
 }
 
 @ApiSchema({ name: 'PurchaseOrderGridUnit' })

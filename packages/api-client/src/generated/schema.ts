@@ -15879,10 +15879,17 @@ export interface components {
             /** @description Rows the query keeps for this supplier */
             rowCount: number;
         };
+        CategoryFacetDto: {
+            categoryId: number;
+            /** @description Rows in this category (the other filters applied) */
+            rowCount: number;
+        };
         PurchaseOrderFacets: {
             /** @description Σ of the suppliers' rowCount */
             rowCount: number;
             suppliers: components["schemas"]["PurchaseOrderSupplierFacet"][];
+            /** @description The products’ own categories, most rows first */
+            categories: components["schemas"]["CategoryFacetDto"][];
         };
         PurchaseOrderGridChange: {
             productId: number;
@@ -32749,6 +32756,8 @@ export interface operations {
                 filter?: "ALL" | "ORDERED" | "BELOW_MIN";
                 /** @description Rows whose home warehouse is this one */
                 warehouseId?: number;
+                /** @description Rows whose product is in this category or under it */
+                categoryId?: number;
                 cursor?: string;
                 limit?: number;
             };
@@ -32788,6 +32797,8 @@ export interface operations {
                 filter?: "ALL" | "ORDERED" | "BELOW_MIN";
                 /** @description Rows whose home warehouse is this one */
                 warehouseId?: number;
+                /** @description Rows whose product is in this category or under it */
+                categoryId?: number;
             };
             header?: never;
             path: {

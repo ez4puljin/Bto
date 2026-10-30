@@ -7534,6 +7534,8 @@
       "supplierFilter": "Нийлүүлэгч",
       "allSuppliers": "Бүх нийлүүлэгч",
       "allWarehouses": "Бүх агуулах",
+      "categoryFilter": "Ангилал",
+      "allCategories": "Бүх ангилал",
       "belowMin": "Захиалах ёстой",
       "orderedOnly": "Зөвхөн захиалсан",
       "groups": {

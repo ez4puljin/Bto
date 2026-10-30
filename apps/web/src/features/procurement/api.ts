@@ -132,6 +132,8 @@ export interface GridQuery {
   q?: string;
   filter: GridFilter;
   warehouseId?: number;
+  /** Products in this category or under it (owner 2026-10-30). */
+  categoryId?: number;
 }
 
 /**
@@ -161,6 +163,7 @@ export function usePurchaseOrderRows(
               q: query.q || undefined,
               filter: query.filter,
               warehouseId: query.warehouseId,
+              categoryId: query.categoryId,
               cursor: pageParam,
               limit: 200,
             },
@@ -196,6 +199,7 @@ export function useOrderFacets(id: number, query: GridQuery) {
               q: query.q || undefined,
               filter: query.filter,
               warehouseId: query.warehouseId,
+              categoryId: query.categoryId,
             },
           },
           signal,

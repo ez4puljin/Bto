@@ -36,7 +36,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { useProducts } from '@/features/catalog/api';
+import { useCategories, useProducts } from '@/features/catalog/api';
 import { useWarehouses } from '@/features/identity/api';
 import { KEYS as INVENTORY_KEYS, useInventoryMutations } from '@/features/inventory/api';
 import { parseScanQty } from '@/features/inventory/helpers';
@@ -166,12 +166,15 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
     filterParam === 'ORDERED' || filterParam === 'BELOW_MIN' || filterParam === 'ALL'
       ? filterParam
       : defaultFilter;
-  const query: GridQuery = { q, filter, warehouseId };
+  const categoryId = idOf(params.get('category'));
+  const query: GridQuery = { q, filter, warehouseId, categoryId };
   const ordererParam = idOf(params.get('orderer'));
   const chosen =
     supplierParam === undefined
       ? undefined
       : detail.suppliers.find((supplier) => supplier.supplierId === supplierParam);
+  const categories = useCategories();
+  const categoryName = new Map((categories.data ?? []).map((row) => [row.id, row.name]));
   // The suppliers the filters keep (owner 2026-10-30): the orderer's; with a warehouse, a search or
   // a filter, those with a row under it — the server counts the rows per supplier and the bar shows
   // the counts; «Зөвхөн захиалсан» hides the suppliers with nothing ordered at once.
@@ -179,7 +182,8 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
   const countOf = new Map(
     facets.data?.suppliers.map((row) => [row.supplierId, row.rowCount] as const),
   );
-  const narrowing = q !== '' || warehouseId !== undefined || filter !== 'ALL';
+  const narrowing =
+    q !== '' || warehouseId !== undefined || categoryId !== undefined || filter !== 'ALL';
   const kept = detail.suppliers.filter(
     (supplier) =>
       (ordererParam === undefined || supplier.ordererId === ordererParam) &&
@@ -187,6 +191,13 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
       (!narrowing || facets.data === undefined || (countOf.get(supplier.supplierId) ?? 0) > 0),
   );
   const suppliers = chosen ? [chosen] : kept;
+  // One supplier on screen (chosen, or the only one the filters keep): its facts sit in the header.
+  const focus = chosen ?? (kept.length === 1 ? kept[0] : undefined);
+  const categoryOptions = (facets.data?.categories ?? []).map((row) => ({
+    value: String(row.categoryId),
+    label: categoryName.get(row.categoryId) ?? String(row.categoryId),
+    hint: formatCount(row.rowCount),
+  }));
   const productCount = facets.data
     ? suppliers.reduce((sum, supplier) => sum + (countOf.get(supplier.supplierId) ?? 0), 0)
     : undefined;
@@ -519,7 +530,9 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
         onSave={save}
         stale={stale}
         onReload={() => (dirty ? setConfirmReload(true) : void reload())}
-        onStepBack={(supplier) => step(supplier, -1)}
+        focus={focus}
+        movePending={mutations.move.isPending}
+        onStep={step}
       />
       <FilterBar
         end={
@@ -558,6 +571,13 @@ function OrderDetail({ detail }: { detail: PurchaseOrderDetail }) {
             keys: [warehouse.code],
           }))}
           onChange={(value) => setParam('warehouse', value)}
+        />
+        <Combobox
+          aria-label={t('procurement.detail.categoryFilter')}
+          emptyLabel={t('procurement.detail.allCategories')}
+          value={categoryId === undefined ? '' : String(categoryId)}
+          options={categoryOptions}
+          onChange={(value) => setParam('category', value)}
         />
         <Combobox
           aria-label={t('procurement.detail.ordererFilter')}

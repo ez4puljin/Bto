@@ -195,9 +195,11 @@ const base = (extra: Record<string, (request: Request) => Response | Promise<Res
   'GET /api/v1/purchase-orders/7': () => json(DETAIL),
   'GET /api/v1/purchase-orders/7/version': () => json(VERSION),
   'GET /api/v1/warehouses': () => list([{ id: 1, code: 'WH1', name: 'Төв агуулах' }]),
+  'GET /api/v1/categories': () => list([]),
   'GET /api/v1/purchase-orders/7/facets': () =>
     json({
       rowCount: 3,
+      categories: [],
       suppliers: [
         { supplierId: 31, rowCount: 2 },
         { supplierId: 32, rowCount: 1 },
@@ -727,6 +729,7 @@ describe('the filter bar of an order', () => {
             search.includes('warehouseId=1')
               ? {
                   rowCount: 2,
+                  categories: [],
                   suppliers: [
                     { supplierId: 31, rowCount: 2 },
                     { supplierId: 32, rowCount: 0 },
@@ -734,6 +737,7 @@ describe('the filter bar of an order', () => {
                 }
               : {
                   rowCount: 3,
+                  categories: [],
                   suppliers: [
                     { supplierId: 31, rowCount: 2 },
                     { supplierId: 32, rowCount: 1 },

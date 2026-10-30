@@ -50,6 +50,8 @@ export interface GridQuery {
   filter?: GridFilter;
   /** Rows whose home warehouse is this one. */
   warehouseId?: number;
+  /** Rows whose product is in this category or under it (owner 2026-10-30). */
+  categoryId?: number;
   cursor?: string;
   limit?: number;
 }
@@ -59,6 +61,8 @@ export interface GridFacets {
   /** Σ of the suppliers' counts. */
   rowCount: number;
   suppliers: { supplierId: number; rowCount: number }[];
+  /** The products' own categories among the rows the other filters keep, with their counts. */
+  categories: { categoryId: number; rowCount: number }[];
 }
 
 export interface GridUnit {
@@ -277,6 +281,7 @@ export class PurchaseOrderGridService {
     const { ids: ordered } = await this.productQuery.orderedIds(
       {
         ...(query.q?.trim() ? { q: query.q.trim() } : {}),
+        ...(query.categoryId === undefined ? {} : { categoryId: query.categoryId }),
         status: 'ACTIVE',
         onlyIds: [...new Set([...main, ...lineOf.keys()])],
       },
@@ -789,7 +794,7 @@ export class PurchaseOrderGridService {
    */
   async facets(
     orderId: number,
-    query: Pick<GridQuery, 'q' | 'filter' | 'warehouseId'>,
+    query: Pick<GridQuery, 'q' | 'filter' | 'warehouseId' | 'categoryId'>,
   ): Promise<GridFacets> {
     const [order] = await this.db
       .select({ id: purchaseOrders.id })
@@ -801,7 +806,7 @@ export class PurchaseOrderGridService {
       .from(purchaseOrderSuppliers)
       .where(eq(purchaseOrderSuppliers.orderId, orderId))
       .orderBy(asc(purchaseOrderSuppliers.id));
-    if (orderSuppliers.length === 0) return { rowCount: 0, suppliers: [] };
+    if (orderSuppliers.length === 0) return { rowCount: 0, suppliers: [], categories: [] };
     const lines = await this.db
       .select({
         orderSupplierId: purchaseOrderLines.orderSupplierId,
@@ -832,7 +837,9 @@ export class PurchaseOrderGridService {
       candidates.set(row.supplierId, set);
       for (const id of set) all.add(id);
     }
-    const { ids } = await this.productQuery.orderedIds(
+    // Every candidate with its category (the index rows), before the category filter: the
+    // category list offers what the other filters keep; the chosen category then narrows the rows.
+    const indexed = await this.productQuery.index(
       {
         ...(query.q?.trim() ? { q: query.q.trim() } : {}),
         status: 'ACTIVE',
@@ -840,7 +847,8 @@ export class PurchaseOrderGridService {
       },
       FACET_PRODUCT_CAP,
     );
-    let kept = ids;
+    const categoryOf = new Map(indexed.map((row) => [row.id, row.categoryId]));
+    let kept = indexed.map((row) => row.id);
     if (query.warehouseId !== undefined || query.filter === 'BELOW_MIN') {
       const homes = await this.homesOf(kept);
       if (query.warehouseId !== undefined) {
@@ -854,13 +862,33 @@ export class PurchaseOrderGridService {
         });
       }
     }
+    const categoryCounts = new Map<number, number>();
+    for (const id of kept) {
+      const categoryId = categoryOf.get(id);
+      if (categoryId !== undefined) {
+        categoryCounts.set(categoryId, (categoryCounts.get(categoryId) ?? 0) + 1);
+      }
+    }
+    if (query.categoryId !== undefined) {
+      const { ids: inCategory } = await this.productQuery.orderedIds(
+        { categoryId: query.categoryId, status: 'ACTIVE', onlyIds: kept },
+        FACET_PRODUCT_CAP,
+      );
+      kept = inCategory;
+    }
     const keptSet = new Set(kept);
     const suppliers = orderSuppliers.map((row) => {
       let rowCount = 0;
       for (const id of candidates.get(row.supplierId) ?? []) if (keptSet.has(id)) rowCount += 1;
       return { supplierId: row.supplierId, rowCount: Math.min(rowCount, GRID_CAP) };
     });
-    return { rowCount: suppliers.reduce((sum, row) => sum + row.rowCount, 0), suppliers };
+    return {
+      rowCount: suppliers.reduce((sum, row) => sum + row.rowCount, 0),
+      suppliers,
+      categories: [...categoryCounts.entries()]
+        .map(([categoryId, rowCount]) => ({ categoryId, rowCount }))
+        .sort((a, b) => b.rowCount - a.rowCount || a.categoryId - b.categoryId),
+    };
   }
 
   /** `homeOf` in slices: the facets look up every product of the order at once. */

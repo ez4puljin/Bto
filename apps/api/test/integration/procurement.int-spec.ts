@@ -367,19 +367,31 @@ describe('purchase orders and receiving', () => {
           .get(`/api/v1/purchase-orders/${id}/facets${query}`)
           .set(bearer(manager))
           .expect(200)
-      ).body as { rowCount: number; suppliers: { supplierId: number; rowCount: number }[] };
-    expect(await facets()).toEqual({
+      ).body as {
+        rowCount: number;
+        suppliers: { supplierId: number; rowCount: number }[];
+        categories: { categoryId: number; rowCount: number }[];
+      };
+    // The four test products share one category; its facet carries them all (ADR-0122 follow-up).
+    const everyFacet = await facets();
+    expect(everyFacet).toMatchObject({
       rowCount: 4,
       suppliers: [
         { supplierId: supplierA, rowCount: 3 },
         { supplierId: supplierB, rowCount: 1 },
       ],
     });
+    expect(everyFacet.categories).toEqual([{ categoryId: juice.categoryId, rowCount: 4 }]);
+    expect((await facets(`?categoryId=${juice.categoryId}`)).rowCount).toBe(4);
+    expect((await facets('?categoryId=999999')).rowCount).toBe(0);
+    expect(
+      (await rows(manager, id, supplierA, `?categoryId=${juice.categoryId}`)).data,
+    ).toHaveLength(3);
     expect((await facets(`?warehouseId=${wh2.id}`)).suppliers).toEqual([
       { supplierId: supplierA, rowCount: 1 },
       { supplierId: supplierB, rowCount: 1 },
     ]);
-    expect(await facets('?filter=BELOW_MIN')).toEqual({
+    expect(await facets('?filter=BELOW_MIN')).toMatchObject({
       rowCount: 1,
       suppliers: [
         { supplierId: supplierA, rowCount: 1 },

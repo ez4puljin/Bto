@@ -1,8 +1,11 @@
 import { Decimal } from '@tugeel/shared/money';
+import { nextPoStatus, poStatusRank, previousPoStatus } from '@tugeel/shared/procurement';
 import {
   Archive,
   ArchiveRestore,
   ArrowLeft,
+  ArrowRight,
+  Check,
   FileSpreadsheet,
   History,
   NotebookPen,
@@ -16,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { DialogFormFooter, FormField } from '@/components/form';
+import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -39,10 +43,12 @@ import {
   PO_STATUSES,
   type PurchaseOrderDetail,
   type PurchaseOrderSupplier,
+  useOrdererCandidates,
   usePurchaseOrderDownloads,
   usePurchaseOrderMutations,
+  useSetSupplierOrderer,
 } from './api';
-import { SupplierTicks } from './parts';
+import { PoStatusBadge, SupplierTicks } from './parts';
 
 /**
  * The order's head (ADR-0118 #3): number, date, status and author; the seven statuses as circles
@@ -60,7 +66,10 @@ export function OrderHeader(props: {
   onSave: () => void;
   stale: boolean;
   onReload: () => void;
-  onStepBack: (supplier: PurchaseOrderSupplier) => void;
+  /** The one supplier on screen, if one: its facts and status moves sit in the header. */
+  focus: PurchaseOrderSupplier | undefined;
+  movePending: boolean;
+  onStep: (supplier: PurchaseOrderSupplier, by: 1 | -1) => void;
 }) {
   const { t } = useTranslation();
   const { detail } = props;
@@ -134,19 +143,6 @@ export function OrderHeader(props: {
                 >
                   <Plus />
                 </Button>
-                {props.chosen?.canMoveBack ? (
-                  <Button
-                    variant="outline"
-                    title={t('procurement.detail.stepBackTitle', {
-                      name: props.chosen.supplierName,
-                    })}
-                    disabled={mutations.move.isPending}
-                    onClick={() => props.chosen && props.onStepBack(props.chosen)}
-                  >
-                    <ArrowLeft />
-                    {t('procurement.detail.stepBack')}
-                  </Button>
-                ) : null}
                 {detail.canArchive || archived ? (
                   <Button
                     variant="outline"
@@ -214,36 +210,44 @@ export function OrderHeader(props: {
         }
       />
       <ProblemAlert problem={exporting.problem ?? archiving.problem} />
-      <StatusCounts suppliers={detail.suppliers} />
-      <dl
-        className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-muted-foreground"
-        aria-label={t('procurement.detail.totals')}
-      >
-        <Fact
-          label={t('procurement.detail.totalPieces')}
-          value={formatQty(totals.pieces.toFixed())}
-        />
-        <Fact
-          label={t('procurement.detail.totalKg')}
-          value={formatQty(totals.kg.toDecimalPlaces(1).toString())}
-        />
-        {canPrices ? (
-          <>
-            <Fact
-              label={t('procurement.detail.estimated')}
-              value={formatTugrik(totals.estimated.toFixed(2))}
-            />
-            <Fact
-              label={t('procurement.detail.final')}
-              value={formatTugrik(totals.final.toFixed(2))}
-            />
-            <Fact
-              label={t('procurement.detail.priceDiffs')}
-              value={t('procurement.detail.priceDiffCount', { count: formatCount(totals.diffs) })}
-            />
-          </>
-        ) : null}
-      </dl>
+      {props.focus ? <SupplierStrip supplier={props.focus} canManage={canManage} /> : null}
+      <StatusSteps
+        suppliers={detail.suppliers}
+        focus={props.focus}
+        pending={props.movePending}
+        onStep={props.onStep}
+      />
+      {props.focus ? null : (
+        <dl
+          className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-muted-foreground"
+          aria-label={t('procurement.detail.totals')}
+        >
+          <Fact
+            label={t('procurement.detail.totalPieces')}
+            value={formatQty(totals.pieces.toFixed())}
+          />
+          <Fact
+            label={t('procurement.detail.totalKg')}
+            value={formatQty(totals.kg.toDecimalPlaces(1).toString())}
+          />
+          {canPrices ? (
+            <>
+              <Fact
+                label={t('procurement.detail.estimated')}
+                value={formatTugrik(totals.estimated.toFixed(2))}
+              />
+              <Fact
+                label={t('procurement.detail.final')}
+                value={formatTugrik(totals.final.toFixed(2))}
+              />
+              <Fact
+                label={t('procurement.detail.priceDiffs')}
+                value={t('procurement.detail.priceDiffCount', { count: formatCount(totals.diffs) })}
+              />
+            </>
+          ) : null}
+        </dl>
+      )}
       {props.stale ? (
         <Alert className="mb-3 border-transparent bg-warning-soft shadow-none!">
           <TriangleAlert />
@@ -283,39 +287,168 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** The seven statuses in order, each with how many suppliers stand in it (the order has none). */
-export function StatusCounts({ suppliers }: { suppliers: readonly PurchaseOrderSupplier[] }) {
+/**
+ * The focused supplier's facts (owner 2026-10-30): name, status, pieces · kg, the orderer (changed
+ * in place by a manager) and the receipt, in the header instead of the group row.
+ */
+function SupplierStrip({
+  supplier,
+  canManage,
+}: {
+  supplier: PurchaseOrderSupplier;
+  canManage: boolean;
+}) {
   const { t } = useTranslation();
   return (
+    <section
+      aria-label={supplier.supplierName}
+      className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-card px-4 py-3 shadow-card ring-1 ring-black/[0.06]"
+    >
+      <span className="text-[17px] font-semibold">{supplier.supplierName}</span>
+      <PoStatusBadge status={supplier.status} />
+      <span className="font-mono text-[13px] text-muted-foreground">
+        {t('procurement.detail.piecesKg', {
+          pieces: formatQty(supplier.qtyBase),
+          kg: formatQty(new Decimal(supplier.weightKg).toDecimalPlaces(1).toString()),
+        })}
+      </span>
+      <span className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+        {t('procurement.supplier.orderer')}:
+        {canManage ? (
+          <OrdererInline supplierId={supplier.supplierId} current={supplier.ordererId} />
+        ) : (
+          <span className="text-foreground">
+            {supplier.ordererName ?? t('procurement.supplier.noOrderer')}
+          </span>
+        )}
+      </span>
+      {supplier.receiptId !== null ? (
+        <Link
+          to={`/inventory/receipts/${supplier.receiptId}`}
+          className="font-mono text-[13px] text-link underline-offset-4 hover:underline"
+        >
+          {supplier.receiptNumber ??
+            t('procurement.supplier.receiptDraft', { id: supplier.receiptId })}
+        </Link>
+      ) : null}
+    </section>
+  );
+}
+
+function OrdererInline({ supplierId, current }: { supplierId: number; current: number | null }) {
+  const { t } = useTranslation();
+  const candidates = useOrdererCandidates(true);
+  const save = useSetSupplierOrderer(supplierId);
+  const action = useAction();
+  return (
+    <>
+      <NativeSelect
+        variant="filter"
+        aria-label={t('procurement.orderer.field')}
+        value={current === null ? '' : String(current)}
+        disabled={save.isPending}
+        onChange={(event) => {
+          const value = event.target.value;
+          void action.run(async () => {
+            await save.mutateAsync(value === '' ? null : Number.parseInt(value, 10));
+          });
+        }}
+      >
+        <option value="">{t('procurement.orderer.none')}</option>
+        {(candidates.data ?? []).map((candidate) => (
+          <option key={candidate.id} value={candidate.id}>
+            {candidate.fullName}
+          </option>
+        ))}
+      </NativeSelect>
+      <ProblemAlert problem={action.problem} />
+    </>
+  );
+}
+
+/**
+ * The seven statuses in order (the order itself has none). Without a focused supplier each shows
+ * how many suppliers stand in it; with one, its road: the steps behind it ticked, the current one
+ * lit with «Буцаах» and «→ дараагийн» beside it where the rights allow, the next ones muted.
+ */
+export function StatusSteps(props: {
+  suppliers: readonly PurchaseOrderSupplier[];
+  focus?: PurchaseOrderSupplier | undefined;
+  pending?: boolean;
+  onStep?: (supplier: PurchaseOrderSupplier, by: 1 | -1) => void;
+}) {
+  const { t } = useTranslation();
+  const { focus } = props;
+  const focusRank = focus ? poStatusRank(focus.status) : null;
+  const next = focus ? nextPoStatus(focus.status) : null;
+  const previous = focus ? previousPoStatus(focus.status) : null;
+  return (
     <ol
-      className="mb-3 flex flex-wrap items-center gap-1.5"
+      className="mb-3 flex flex-wrap items-center gap-y-2"
       aria-label={t('procurement.detail.steps')}
     >
       {PO_STATUSES.map((status, position) => {
-        const count = suppliers.filter((supplier) => supplier.status === status).length;
+        const count = props.suppliers.filter((supplier) => supplier.status === status).length;
+        const done = focusRank !== null && position < focusRank;
+        const current = focusRank !== null && position === focusRank;
+        const lit = focusRank === null ? count > 0 : done || current;
         return (
-          <li key={status} className="flex items-center gap-1">
+          <li key={status} className="flex items-center">
             <span
+              aria-current={current ? 'step' : undefined}
               className={cn(
-                'flex size-6 items-center justify-center rounded-full text-xs font-semibold',
-                count > 0 ? 'bg-primary text-white' : 'bg-fill text-muted-foreground',
+                'flex h-8 items-center gap-2 rounded-full px-3 text-[13px]',
+                current && 'bg-primary font-semibold text-white shadow-control',
+                done && 'bg-success-soft text-success',
+                !lit && 'text-muted-foreground',
+                lit && !current && !done && 'bg-fill font-medium',
               )}
             >
-              {position + 1}
-            </span>
-            <span className={cn('text-[13px]', count === 0 && 'text-muted-foreground')}>
+              <span
+                className={cn(
+                  'flex size-5 items-center justify-center rounded-full text-[11px] font-semibold',
+                  current ? 'bg-white/25' : done ? 'bg-success text-white' : 'bg-background/80',
+                )}
+              >
+                {done ? <Check aria-hidden className="size-3" /> : position + 1}
+              </span>
               {t(`procurement.status.${status}`)}
+              {focusRank === null ? (
+                <span className="font-mono font-semibold">{formatCount(count)}</span>
+              ) : null}
             </span>
-            <span
-              className={cn(
-                'font-mono text-[13px] font-semibold',
-                count === 0 && 'text-muted-foreground',
-              )}
-            >
-              {formatCount(count)}
-            </span>
+            {current && focus ? (
+              <span className="ml-1.5 flex items-center gap-1">
+                {focus.canMoveBack && previous ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={t('procurement.supplier.backNamed', { name: focus.supplierName })}
+                    disabled={props.pending}
+                    onClick={() => props.onStep?.(focus, -1)}
+                  >
+                    <ArrowLeft />
+                    {t('procurement.supplier.backTo', {
+                      status: t(`procurement.status.${previous}`),
+                    })}
+                  </Button>
+                ) : null}
+                {focus.canMoveNext && next ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    aria-label={t('procurement.supplier.nextNamed', { name: focus.supplierName })}
+                    disabled={props.pending}
+                    onClick={() => props.onStep?.(focus, 1)}
+                  >
+                    <ArrowRight />
+                    {t('procurement.supplier.nextTo', { status: t(`procurement.status.${next}`) })}
+                  </Button>
+                ) : null}
+              </span>
+            ) : null}
             {position < PO_STATUSES.length - 1 ? (
-              <span className="mx-1 h-px w-4 bg-border" aria-hidden />
+              <span className="mx-1.5 h-px w-4 bg-border" aria-hidden />
             ) : null}
           </li>
         );
