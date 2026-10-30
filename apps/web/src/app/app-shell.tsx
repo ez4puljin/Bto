@@ -88,9 +88,14 @@ export function AppShell() {
         inert={menuOpen ? true : undefined}
         className="min-w-0 flex-1 px-4 pt-5 pb-10 md:px-8 print:p-0"
       >
-        {/* A new path rises in (`page-enter`); a changed query (a dialog, a filter) keeps the page. */}
+        {/*
+         * A new page rises in (`page-enter`): the key is the module and the page (the first two
+         * segments), so a record's own moves — /receipts/new → /receipts/12 on the first scan, an
+         * order → its detail — keep the page mounted, its typed state and its focus; a changed
+         * query (a dialog, a filter) keeps it too.
+         */}
         <div
-          key={location.pathname}
+          key={location.pathname.split('/').slice(0, 3).join('/')}
           data-width={width}
           className={cn(PAGE_WIDTHS[width], 'page-enter motion-reduce:animate-none')}
         >
