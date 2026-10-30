@@ -407,6 +407,13 @@
       "when": 1793382656034,
       "tag": "0058_pos_till_warehouse",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1793385989915,
+      "tag": "0059_pos_till_access",
+      "breakpoints": true
     }
   ]
 }

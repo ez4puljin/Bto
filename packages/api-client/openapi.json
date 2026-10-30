@@ -20728,6 +20728,62 @@
         ]
       }
     },
+    "/api/v1/pos/tills/{id}/access": {
+      "put": {
+        "operationId": "PosTills_setAccess",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosTillAccess"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosTill"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Who works the till and what it sells (ADR-0124); the lists replace the old ones.",
+        "tags": [
+          "pos"
+        ]
+      }
+    },
     "/api/v1/pos/tills/{id}/pairing-code": {
       "post": {
         "operationId": "PosTills_pairingCode",
@@ -49241,6 +49297,27 @@
             "type": "string",
             "nullable": true
           },
+          "cashierUserIds": {
+            "description": "Who may sign in here (ADR-0124); empty: every cashier",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "supervisorUserIds": {
+            "description": "Who may approve here; empty: every supervisor",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "categoryIds": {
+            "description": "The categories it sells, subtrees included; empty: everything",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
           "code": {
             "type": "string",
             "example": "К3"
@@ -49295,6 +49372,9 @@
           "edgeNodeId",
           "warehouseId",
           "warehouseName",
+          "cashierUserIds",
+          "supervisorUserIds",
+          "categoryIds",
           "code",
           "name",
           "printerHost",
@@ -49397,6 +49477,37 @@
           }
         }
       },
+      "PosTillAccess": {
+        "type": "object",
+        "properties": {
+          "cashierUserIds": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "supervisorUserIds": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "categoryIds": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "cashierUserIds",
+          "supervisorUserIds",
+          "categoryIds"
+        ]
+      },
       "PosPairingCode": {
         "type": "object",
         "properties": {
@@ -49456,6 +49567,10 @@
             "type": "string",
             "nullable": true,
             "format": "date-time"
+          },
+          "supervisor": {
+            "type": "boolean",
+            "description": "Holds pos.till.supervise: may approve at a till"
           }
         },
         "required": [
@@ -49467,7 +49582,8 @@
           "pinSetAt",
           "pinSetByName",
           "failedCount",
-          "lockedUntil"
+          "lockedUntil",
+          "supervisor"
         ]
       },
       "PosPinRequest": {
@@ -59830,6 +59946,9 @@
           "POS_TILL_BUSY",
           "POS_TILL_INACTIVE",
           "POS_CASHIER_INACTIVE",
+          "POS_CASHIER_NOT_ON_TILL",
+          "POS_SUPERVISOR_NOT_ON_TILL",
+          "POS_PRODUCT_NOT_ON_TILL",
           "POS_RETURN_EXCEEDS",
           "POS_RETURN_WINDOW",
           "POS_NUMBER_TAKEN",

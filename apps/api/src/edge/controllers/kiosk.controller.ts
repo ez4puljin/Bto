@@ -170,7 +170,7 @@ export class KioskController {
     const till = loaded.tills.get(kiosk.device.tillCode);
     return {
       till: { code: kiosk.device.tillCode, name: till?.name ?? kiosk.device.tillCode },
-      cashiers: this.auth.cashiers(),
+      cashiers: this.auth.cashiers(kiosk.device.tillCode),
       companyName: loaded.snapshot.company.name,
     };
   }
@@ -228,13 +228,13 @@ export class KioskController {
   }
 
   @Get('products/search')
-  search(@Query() query: SearchQueryDto): EdgeProductHit[] {
-    return this.checkout.search(query.q);
+  search(@Kiosk() kiosk: KioskContext, @Query() query: SearchQueryDto): EdgeProductHit[] {
+    return this.checkout.search(query.q, kiosk.device.tillCode);
   }
 
   @Get('products/barcode/:code')
-  barcode(@Param('code') code: string): EdgeBarcodeHit {
-    return this.checkout.barcode(code);
+  barcode(@Kiosk() kiosk: KioskContext, @Param('code') code: string): EdgeBarcodeHit {
+    return this.checkout.barcode(code, kiosk.device.tillCode);
   }
 
   @Post('quote')
@@ -316,13 +316,13 @@ export class KioskController {
   // ADR-0104: quick buttons, approvals, voids, parked baskets and returns.
 
   @Get('quick-buttons')
-  quickButtons(): EdgeQuickGroup[] {
-    return this.checkout.quickGroups();
+  quickButtons(@Kiosk() kiosk: KioskContext): EdgeQuickGroup[] {
+    return this.checkout.quickGroups(kiosk.device.tillCode);
   }
 
   @Get('supervisors')
-  supervisors(): EdgeSupervisor[] {
-    return this.auth.supervisors();
+  supervisors(@Kiosk() kiosk: KioskContext): EdgeSupervisor[] {
+    return this.auth.supervisors(kiosk.device.tillCode);
   }
 
   /**

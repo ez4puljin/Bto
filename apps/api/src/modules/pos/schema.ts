@@ -33,6 +33,7 @@ import {
   index,
   integer,
   pgTable,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -40,7 +41,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { factor, jsonValue, money, percent, qty } from '../../common/db/types';
-import { productUnits, products, VAT_TYPES } from '../catalog/schema';
+import { categories, productUnits, products, VAT_TYPES } from '../catalog/schema';
 import { creditNotes, invoices } from '../finance/schema';
 import { users, warehouses } from '../identity/schema';
 import { adjustments } from '../inventory/schema';
@@ -211,6 +212,50 @@ export const posTills = pgTable(
       sql`(${t.pairingCodeHash} IS NULL) = (${t.pairingExpiresAt} IS NULL)`,
     ),
   ],
+);
+
+export const POS_TILL_ROLES = ['CASHIER', 'SUPERVISOR'] as const;
+export type PosTillRole = (typeof POS_TILL_ROLES)[number];
+
+/**
+ * Who works a till (ADR-0124): the cashiers who may sign in at it and the supervisors who may
+ * approve at it. A till with no rows of a role admits everyone the store admits for that role.
+ */
+export const posTillUsers = pgTable(
+  'pos_till_users',
+  {
+    tillId: ref('till_id')
+      .notNull()
+      .references(() => posTills.id),
+    userId: ref('user_id')
+      .notNull()
+      .references(() => users.id),
+    role: text('role', { enum: POS_TILL_ROLES }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.tillId, t.userId, t.role] }),
+    index('pos_till_users_user_idx').on(t.userId),
+    check('pos_till_users_role', inList(t.role, POS_TILL_ROLES)),
+  ],
+);
+
+/**
+ * What a till sells (ADR-0124): the categories (with everything under them) its products come
+ * from. A till with no rows sells the whole snapshot.
+ */
+export const posTillCategories = pgTable(
+  'pos_till_categories',
+  {
+    tillId: ref('till_id')
+      .notNull()
+      .references(() => posTills.id),
+    categoryId: ref('category_id')
+      .notNull()
+      .references(() => categories.id),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.tillId, t.categoryId] })],
 );
 
 /** A browser the edge bound to a till (S2); listed so the admin sees which screens are tills. */

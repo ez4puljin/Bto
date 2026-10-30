@@ -32,6 +32,11 @@ export const NODE: Schemas['PosEdgeNode'] = {
 export const TILL: Schemas['PosTill'] = {
   id: 11,
   edgeNodeId: 1,
+  warehouseId: 3,
+  warehouseName: 'Заал',
+  cashierUserIds: [],
+  supervisorUserIds: [],
+  categoryIds: [],
   code: 'К1',
   name: 'Касс 1',
   printerHost: '192.168.1.31',
@@ -47,6 +52,7 @@ export const TILL: Schemas['PosTill'] = {
 
 export const CASHIER: Schemas['PosCashier'] = {
   userId: 7,
+  supervisor: false,
   username: 'bolor',
   fullName: 'Кассчин Болор',
   userStatus: 'ACTIVE',

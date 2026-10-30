@@ -26,6 +26,7 @@ import {
   PaymentTypesRequestDto,
   QuickButtonsRequestDto,
   QuickGroupDto,
+  TillAccessDto,
   TillDto,
   TillPatchDto,
   TillRequestDto,
@@ -151,6 +152,18 @@ export class PosTillsController {
     @Body() body: TillPatchDto,
   ): Promise<TillDto> {
     return tillDto(await this.tills.update(ctx, id, body));
+  }
+
+  /** Who works the till and what it sells (ADR-0124); the lists replace the old ones. */
+  @Put(':id/access')
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: TillDto })
+  async setAccess(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: TillAccessDto,
+  ): Promise<TillDto> {
+    return tillDto(await this.tills.setAccess(ctx, id, body));
   }
 
   @Post(':id/pairing-code')

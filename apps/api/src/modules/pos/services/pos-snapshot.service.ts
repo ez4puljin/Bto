@@ -13,6 +13,7 @@ import type { EdgeNode } from './pos-edge-nodes.service';
 import { PosPaymentTypesService } from './pos-payment-types.service';
 import { PosQuickButtonsService } from './pos-quick-buttons.service';
 import { PosSettingsService } from './pos-settings.service';
+import { PosTillsService } from './pos-tills.service';
 
 /**
  * What a store's edge needs to sell offline (ADR-0063 #2, ADR-0067): its node and tills (with the
@@ -37,6 +38,7 @@ export class PosSnapshotService {
     private readonly quickButtons: PosQuickButtonsService,
     private readonly paymentTypes: PosPaymentTypesService,
     private readonly org: OrgService,
+    private readonly tills: PosTillsService,
   ) {}
 
   forNode(node: EdgeNode): Promise<PosSnapshot> {
@@ -79,6 +81,11 @@ export class PosSnapshotService {
     const tillWarehouses = await this.org.warehouseNames([
       ...new Set(tillRows.map((till) => till.warehouseId)),
     ]);
+    const accessOf = new Map(
+      await Promise.all(
+        tillRows.map(async (till) => [till.id, await this.tills.accessOf(till.id)] as const),
+      ),
+    );
     const cashierRows = await this.db.select().from(posCashiers).orderBy(asc(posCashiers.userId));
     const userIds = cashierRows.map((row) => row.userId);
     const users = await this.names.summariesOf(userIds);
@@ -114,6 +121,9 @@ export class PosSnapshotService {
           name: till.name,
           warehouseId: till.warehouseId,
           warehouseName: tillWarehouses.get(till.warehouseId) ?? null,
+          cashierUserIds: [...(accessOf.get(till.id)?.cashiers ?? [])],
+          supervisorUserIds: [...(accessOf.get(till.id)?.supervisors ?? [])],
+          categoryIds: [...(accessOf.get(till.id)?.categories ?? [])],
           status: till.status,
           pairingCodeHash: till.pairingCodeHash,
           pairingExpiresAt: till.pairingExpiresAt?.toISOString() ?? null,

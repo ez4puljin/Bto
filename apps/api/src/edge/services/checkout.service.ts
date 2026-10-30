@@ -83,8 +83,20 @@ export class CheckoutService {
    * Products by name, SKU or barcode (ADR-0104): a typed barcode first, then an exact SKU, then
    * the names and SKUs that match strictly, then those that match by sound (Latin or Cyrillic).
    */
-  search(query: string): EdgeProductHit[] {
+  /** The categories a till sells (ADR-0124), subtrees expanded by the centre; null = everything. */
+  private soldAt(tillCode: string | undefined): ReadonlySet<number> | null {
+    if (tillCode === undefined) return null;
+    const list = this.store.get().tills.get(tillCode)?.categoryIds;
+    return list && list.length > 0 ? new Set(list) : null;
+  }
+
+  private sells(sold: ReadonlySet<number> | null, product: SnapshotProduct): boolean {
+    return sold === null || sold.has(product.categoryId);
+  }
+
+  search(query: string, tillCode?: string): EdgeProductHit[] {
     const loaded = this.store.get();
+    const sold = this.soldAt(tillCode);
     const terms = queryTerms(query);
     if (terms.length === 0) return [];
     const first: SnapshotProduct[] = [];
@@ -106,18 +118,20 @@ export class CheckoutService {
     }
     const seen = new Set<number>();
     return [...first, ...strict, ...loose]
+      .filter((product) => this.sells(sold, product))
       .filter((product) => !seen.has(product.id) && seen.add(product.id))
       .slice(0, SEARCH_LIMIT)
       .map((product) => this.hit(loaded, product));
   }
 
   /** The F7 panel (ADR-0104): the admin's groups with today's prices. */
-  quickGroups(): EdgeQuickGroup[] {
+  quickGroups(tillCode?: string): EdgeQuickGroup[] {
     const loaded = this.store.get();
+    const sold = this.soldAt(tillCode);
     return (loaded.snapshot.quickGroups ?? []).flatMap((group) => {
       const buttons = group.buttons.flatMap((button) => {
         const found = loaded.units.get(button.unitId);
-        return found
+        return found && this.sells(sold, found.product)
           ? [
               {
                 label: button.label,
@@ -131,13 +145,23 @@ export class CheckoutService {
     });
   }
 
-  barcode(code: string): EdgeBarcodeHit {
+  barcode(code: string, tillCode?: string): EdgeBarcodeHit {
     const loaded = this.store.get();
     const classified = classifyBarcode(code);
     const unitId = classified.ok ? loaded.barcodes.get(classified.value.lookupKey) : undefined;
     const found = unitId === undefined ? undefined : loaded.units.get(unitId);
     if (!found || unitId === undefined) {
       throw new AppError('NOT_FOUND', `barcode ${code} not found`, { code });
+    }
+    if (!this.sells(this.soldAt(tillCode), found.product)) {
+      throw new AppError(
+        'POS_PRODUCT_NOT_ON_TILL',
+        `product ${found.product.id} is not sold at ${tillCode ?? ''}`,
+        {
+          productId: found.product.id,
+          tillCode: tillCode ?? null,
+        },
+      );
     }
     return { product: this.hit(loaded, found.product), unitId };
   }
@@ -210,6 +234,21 @@ export class CheckoutService {
       .where(eq(edgeSales.clientId, request.clientId));
     if (existing) return existing.receipt;
     const loaded = this.store.get();
+    // ADR-0124: nothing outside the till's categories is sold here.
+    const sold = this.soldAt(tillCode);
+    for (const line of request.lines) {
+      const found = loaded.units.get(line.productUnitId);
+      if (found && !this.sells(sold, found.product)) {
+        throw new AppError(
+          'POS_PRODUCT_NOT_ON_TILL',
+          `product ${found.product.id} is not sold at ${tillCode}`,
+          {
+            productId: found.product.id,
+            tillCode,
+          },
+        );
+      }
+    }
     const codes = request.codes ?? [];
     // ADR-0110: a supervisor's PIN once for the sale's codes (owner 2026-10-27), always.
     const approver = codes.length > 0 ? await this.voucherApprover(request) : null;

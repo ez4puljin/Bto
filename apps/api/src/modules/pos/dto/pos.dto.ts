@@ -222,6 +222,18 @@ export class TillDto {
   @ApiProperty() edgeNodeId: number;
   @ApiProperty({ description: 'The STORE warehouse it sells from (ADR-0123)' }) warehouseId: number;
   @ApiProperty({ type: String, nullable: true }) warehouseName: string | null;
+  @ApiProperty({
+    type: [Number],
+    description: 'Who may sign in here (ADR-0124); empty: every cashier',
+  })
+  cashierUserIds: number[];
+  @ApiProperty({ type: [Number], description: 'Who may approve here; empty: every supervisor' })
+  supervisorUserIds: number[];
+  @ApiProperty({
+    type: [Number],
+    description: 'The categories it sells, subtrees included; empty: everything',
+  })
+  categoryIds: number[];
   @ApiProperty({ example: 'К3' }) code: string;
   @ApiProperty() name: string;
   @ApiProperty({ type: String, nullable: true }) printerHost: string | null;
@@ -308,6 +320,25 @@ export class TillPatchDto {
   @ApiPropertyOptional({ enum: POS_STATUSES }) @IsOptional() @IsIn(POS_STATUSES) status?: PosStatus;
 }
 
+@ApiSchema({ name: 'PosTillAccess' })
+export class TillAccessDto {
+  @ApiProperty({ type: [Number] })
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsInt({ each: true })
+  cashierUserIds: number[];
+  @ApiProperty({ type: [Number] })
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsInt({ each: true })
+  supervisorUserIds: number[];
+  @ApiProperty({ type: [Number] })
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsInt({ each: true })
+  categoryIds: number[];
+}
+
 @ApiSchema({ name: 'PosTillsQuery' })
 export class TillsQueryDto {
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) edgeNodeId?: number;
@@ -332,6 +363,8 @@ export class CashierDto {
   @ApiProperty({ type: String, nullable: true }) pinSetByName: string | null;
   @ApiProperty() failedCount: number;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) lockedUntil: string | null;
+  @ApiProperty({ description: 'Holds pos.till.supervise: may approve at a till' })
+  supervisor: boolean;
 }
 
 @ApiSchema({ name: 'PosPinRequest' })

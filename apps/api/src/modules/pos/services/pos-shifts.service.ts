@@ -129,6 +129,17 @@ export class PosShiftsService {
     if (existing) return { id: existing.id, number: existing.number, created: false };
     const till = await this.tills.activeByCode(node.id, doc.tillCode, tx);
     await this.cashiers.assertActive(doc.cashierUserId, tx);
+    const access = await this.tills.accessOf(till.id, tx);
+    if (access.cashiers && !access.cashiers.has(doc.cashierUserId)) {
+      throw new AppError(
+        'POS_CASHIER_NOT_ON_TILL',
+        `cashier ${doc.cashierUserId} is not on ${till.code}`,
+        {
+          userId: doc.cashierUserId,
+          tillCode: till.code,
+        },
+      );
+    }
     if (doc.openingFloat.isNegative() || doc.openingFloat.decimalPlaces() > MONEY_SCALE) {
       throw invalid('openingFloat', 'money', 'a non-negative amount with 2 decimals');
     }

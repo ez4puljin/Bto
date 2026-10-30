@@ -3,7 +3,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { posSaleNumber, posShiftNumber } from '@tugeel/shared/pos';
 import { StockQueryService } from '../../src/modules/inventory';
 import { createHttpApp } from '../harness/apps';
-import type { ProductJson } from '../harness/catalog';
+import { catalogApi, type ProductJson } from '../harness/catalog';
 import { expectReconciled, inventoryApi } from '../harness/inventory';
 import { seedUser } from '../harness/identity';
 import {
@@ -433,5 +433,76 @@ describe('pos accept', () => {
     expect(
       floor2Bin.lines.find((line) => line.product.id === cola.id)?.onHand.toFixed() ?? '0',
     ).toBe('0');
+  });
+  it('keeps a till to its own cashiers, approvers and categories (ADR-0124)', async () => {
+    const till3 = (
+      await store.pos
+        .createTill({ edgeNodeId: store.node.id, code: 'К4', name: 'Касс 4' })
+        .expect(201)
+    ).body as { id: number };
+    const other = await catalogApi(app, actors.admin).category('Архи PA');
+    const access = (body: Record<string, unknown>) =>
+      store.pos.http().put(`/api/v1/pos/tills/${till3.id}/access`).set(store.pos.auth).send(body);
+    // Only cashiers of the store go on a till.
+    await access({ cashierUserIds: [999999], supervisorUserIds: [], categoryIds: [] }).expect(422);
+    const limited = (
+      await access({
+        cashierUserIds: [store.supervisorId],
+        supervisorUserIds: [store.supervisorId],
+        categoryIds: [other],
+      }).expect(200)
+    ).body as { cashierUserIds: number[]; supervisorUserIds: number[]; categoryIds: number[] };
+    expect(limited).toMatchObject({
+      cashierUserIds: [store.supervisorId],
+      supervisorUserIds: [store.supervisorId],
+      categoryIds: [other],
+    });
+    const cashiers = (
+      await store.pos.http().get('/api/v1/pos/cashiers').set(store.pos.auth).expect(200)
+    ).body as { userId: number; supervisor: boolean }[];
+    expect(cashiers.find((row) => row.userId === store.supervisorId)?.supervisor).toBe(true);
+    expect(cashiers.find((row) => row.userId === store.cashierId)?.supervisor).toBe(false);
+
+    // A cashier off the list cannot open a shift there; the listed one can.
+    const [refused] = await store.replay([
+      shiftOpenEvent({
+        tillCode: 'К4',
+        cashierUserId: store.cashierId,
+        number: posShiftNumber('К4', store.today, 1),
+        openingFloat: '50000',
+      }),
+    ]);
+    expect(refused).toMatchObject({ status: 'REJECTED', code: 'POS_CASHIER_NOT_ON_TILL' });
+    const open = shiftOpenEvent({
+      tillCode: 'К4',
+      cashierUserId: store.supervisorId,
+      number: posShiftNumber('К4', store.today, 2),
+      openingFloat: '50000',
+    });
+    const [opened] = await store.replay([open]);
+    expect(opened).toMatchObject({ status: 'APPLIED' });
+
+    // A product outside the till's categories is not sold there; inside, it is.
+    const sale = (seq: number) =>
+      saleDoc(
+        [{ product: cola, qty: '1' }],
+        {
+          tillCode: 'К4',
+          shiftClientId: open.clientId,
+          cashierUserId: store.supervisorId,
+          number: posSaleNumber('К4', store.today, seq),
+          tenders: [{ kind: 'CASH', amount: '1300.00', tendered: '1300' }],
+        },
+        store.retailPrice,
+      );
+    const [outside] = await store.replay([saleEvent(sale(1))]);
+    expect(outside).toMatchObject({ status: 'REJECTED', code: 'POS_PRODUCT_NOT_ON_TILL' });
+    await access({
+      cashierUserIds: [store.supervisorId],
+      supervisorUserIds: [],
+      categoryIds: [cola.categoryId],
+    }).expect(200);
+    const [inside] = await store.replay([saleEvent(sale(2))]);
+    expect(inside).toMatchObject({ status: 'APPLIED' });
   });
 });

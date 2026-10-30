@@ -1,4 +1,4 @@
-import { KeyRound, Monitor, Pencil, Plus, QrCode } from 'lucide-react';
+import { KeyRound, Monitor, Pencil, Plus, QrCode, ShieldCheck } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHasPermission } from '@/app/auth-context';
@@ -30,6 +30,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { TillAccessDialog } from './till-access-dialog';
 import { useWarehouses } from '@/features/identity/api';
 import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
@@ -82,6 +83,7 @@ export function PosTillsPage() {
   const [newNode, setNewNode] = useCreateParam('node');
   const [editingNode, setEditingNode] = useState<EdgeNode | null>(null);
   const [editingTill, setEditingTill] = useState<Till | null>(null);
+  const [accessTill, setAccessTill] = useState<Till | null>(null);
   const [tokenFor, setTokenFor] = useState<EdgeNode | null>(null);
   const [shown, setShown] = useState<{ title: string; description: string; code: string } | null>(
     null,
@@ -104,6 +106,20 @@ export function PosTillsPage() {
       .then((ok) => {
         if (ok) setTokenFor(null);
       });
+  };
+  // «3 кассчин · 1 хянагч · 2 ангилал», or «бүгд» for a till without lists (ADR-0124).
+  const accessSummary = (till: Till): string => {
+    const parts: string[] = [];
+    if (till.cashierUserIds.length) {
+      parts.push(t('pos.tills.access.cashierCount', { count: till.cashierUserIds.length }));
+    }
+    if (till.supervisorUserIds.length) {
+      parts.push(t('pos.tills.access.supervisorCount', { count: till.supervisorUserIds.length }));
+    }
+    if (till.categoryIds.length) {
+      parts.push(t('pos.tills.access.categoryCount', { count: till.categoryIds.length }));
+    }
+    return parts.length ? parts.join(' · ') : t('pos.tills.access.everything');
   };
   const pairingCode = (till: Till) => {
     void action.run(async () => {
@@ -147,6 +163,7 @@ export function PosTillsPage() {
                 <TableHead>{t('pos.fields.name')}</TableHead>
                 <TableHead>{t('pos.fields.node')}</TableHead>
                 <TableHead>{t('pos.fields.warehouse')}</TableHead>
+                <TableHead>{t('pos.tills.access.column')}</TableHead>
                 <TableHead>{t('pos.fields.printer')}</TableHead>
                 <TableHead>{t('pos.tills.lastSale')}</TableHead>
                 <TableHead>{t('pos.fields.status')}</TableHead>
@@ -162,6 +179,9 @@ export function PosTillsPage() {
                   <TruncateCell text={till.name} />
                   <TableCell className="font-mono">{nodeName(till.edgeNodeId)}</TableCell>
                   <TableCell>{till.warehouseName ?? none}</TableCell>
+                  <TableCell className="text-[0.8125rem] text-muted-foreground">
+                    {accessSummary(till)}
+                  </TableCell>
                   <TableCell className="font-mono">
                     {till.printerHost ? (
                       `${till.printerHost}:${till.printerPort}`
@@ -185,6 +205,11 @@ export function PosTillsPage() {
                           label={`${t('pos.actions.pairingCode')}: ${till.code}`}
                           icon={QrCode}
                           onClick={() => pairingCode(till)}
+                        />
+                        <RowAction
+                          label={`${t('pos.tills.access.action')}: ${till.code}`}
+                          icon={ShieldCheck}
+                          onClick={() => setAccessTill(till)}
                         />
                         <RowAction
                           label={`${t('pos.actions.edit')}: ${till.code}`}
@@ -296,6 +321,9 @@ export function PosTillsPage() {
           else setNewNode(false);
         }}
       />
+      {accessTill ? (
+        <TillAccessDialog till={accessTill} onClose={() => setAccessTill(null)} />
+      ) : null}
       <TillDialog
         open={newTill || editingTill !== null}
         till={editingTill}

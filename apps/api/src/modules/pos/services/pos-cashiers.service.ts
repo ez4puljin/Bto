@@ -19,6 +19,8 @@ export interface Cashier {
   pinSetByName: string | null;
   failedCount: number;
   lockedUntil: Date | null;
+  /** Holds `pos.till.supervise` (ADR-0124: the admin's supervisor picker). */
+  supervisor: boolean;
 }
 
 /** Wrong PINs before a cashier waits (the kiosk shows the lock); the count resets on success. */
@@ -44,6 +46,10 @@ export class PosCashiersService {
     const setBy = await this.names.namesOf(
       rows.flatMap((row) => (row.pinSetBy === null ? [] : [row.pinSetBy])),
     );
+    const supervisors = await this.names.holdersOf(
+      'pos.till.supervise',
+      rows.map((row) => row.userId),
+    );
     const cashiers: Cashier[] = [];
     for (const row of rows) {
       const user = users.get(row.userId);
@@ -58,6 +64,7 @@ export class PosCashiersService {
         pinSetByName: row.pinSetBy === null ? null : (setBy.get(row.pinSetBy) ?? null),
         failedCount: row.failedCount,
         lockedUntil: row.lockedUntil,
+        supervisor: supervisors.has(row.userId),
       });
     }
     cashiers.sort((a, b) => a.fullName.localeCompare(b.fullName, 'mn') || a.userId - b.userId);

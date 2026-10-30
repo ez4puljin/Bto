@@ -4,6 +4,7 @@ import {
   KeyRound,
   Monitor,
   Pencil,
+  ShieldCheck,
   Plus,
   Store,
   Warehouse as WarehouseIcon,
@@ -18,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { type EdgeNode, type Till, useCashiers, useEdgeNodes, useTills } from '@/features/pos/api';
+import { TillAccessDialog } from '@/features/pos/till-access-dialog';
 import { NodeDialog, TillDialog } from '@/features/pos/tills-page';
 import { type SalesBoard, useBoardTree } from '@/features/sales/pipelines-api';
 import { BoardDialog } from '@/features/sales/settings-dialogs';
@@ -36,6 +38,7 @@ type Dialogs =
     }
   | { kind: 'node'; node: EdgeNode | null; warehouseId?: number }
   | { kind: 'till'; till: Till | null; node: EdgeNode }
+  | { kind: 'tillAccess'; till: Till }
   | { kind: 'board'; board: SalesBoard | null; branchId?: number }
   | null;
 
@@ -207,6 +210,9 @@ export function StructurePage() {
       ) : null}
       {dialog?.kind === 'till' ? (
         <TillDialog open till={dialog.till} nodes={[dialog.node]} onClose={close} />
+      ) : null}
+      {dialog?.kind === 'tillAccess' ? (
+        <TillAccessDialog till={dialog.till} onClose={close} />
       ) : null}
       <Dialog open={dialog?.kind === 'board'} onOpenChange={(open) => !open && close()}>
         {dialog?.kind === 'board' ? (
@@ -456,6 +462,21 @@ function StoreNodes(props: {
                       </Badge>
                     ))
                   )}
+                  {props.canPos
+                    ? tills.map((till) => (
+                        <Button
+                          key={`access-${till.id}`}
+                          variant="ghost"
+                          size="xs"
+                          className="text-muted-foreground"
+                          aria-label={t('pos.tills.access.actionNamed', { name: till.name })}
+                          onClick={() => props.onOpen({ kind: 'tillAccess', till })}
+                        >
+                          <ShieldCheck aria-hidden />
+                          {till.code}
+                        </Button>
+                      ))
+                    : null}
                   {props.canPos ? (
                     <Button
                       variant="ghost"

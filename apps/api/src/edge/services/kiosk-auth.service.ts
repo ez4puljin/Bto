@@ -49,18 +49,22 @@ export class KioskAuthService {
     this.pepper = Buffer.from(config.get('POS_PIN_PEPPER'));
   }
 
-  /** The till's sign-in list: active cashiers with a PIN, by name. */
-  cashiers(): { userId: number; fullName: string }[] {
+  /** The till's sign-in list: active cashiers with a PIN, by name — the till's own when it has a list (ADR-0124). */
+  cashiers(tillCode?: string): { userId: number; fullName: string }[] {
+    const allowed = this.allowedOf(tillCode, 'cashierUserIds');
     return [...this.store.get().cashiers.values()]
       .filter((cashier) => cashier.status === 'ACTIVE' && cashier.pinHash !== null)
+      .filter((cashier) => allowed === null || allowed.has(cashier.userId))
       .map((cashier) => ({ userId: cashier.userId, fullName: cashier.fullName }))
       .sort((a, b) => a.fullName.localeCompare(b.fullName, 'mn'));
   }
 
-  /** Who may approve at the till: active cashiers holding `pos.till.supervise`, by name. */
-  supervisors(): EdgeSupervisor[] {
+  /** Who may approve at the till: active cashiers holding `pos.till.supervise`, by name — the till's own when it has a list (ADR-0124). */
+  supervisors(tillCode?: string): EdgeSupervisor[] {
+    const allowed = this.allowedOf(tillCode, 'supervisorUserIds');
     return [...this.store.get().cashiers.values()]
       .filter((cashier) => cashier.supervisor && cashier.status === 'ACTIVE' && cashier.pinHash)
+      .filter((cashier) => allowed === null || allowed.has(cashier.userId))
       .map((cashier) => ({ userId: cashier.userId, fullName: cashier.fullName }))
       .sort((a, b) => a.fullName.localeCompare(b.fullName, 'mn'));
   }
@@ -70,7 +74,17 @@ export class KioskAuthService {
    * may approve their own action when they are one). Without an approval: null when the store's settings do
    * not ask for one, else `POS_SUPERVISOR_REQUIRED`.
    */
-  async approve(approval: EdgeApproval | null): Promise<SnapshotCashier | null> {
+  /** A till's list of a role as a set, or null when the till has none (everyone admitted). */
+  allowedOf(
+    tillCode: string | undefined,
+    role: 'cashierUserIds' | 'supervisorUserIds',
+  ): ReadonlySet<number> | null {
+    if (tillCode === undefined) return null;
+    const list = this.store.get().tills.get(tillCode)?.[role];
+    return list && list.length > 0 ? new Set(list) : null;
+  }
+
+  async approve(approval: EdgeApproval | null, tillCode?: string): Promise<SnapshotCashier | null> {
     if (!approval) {
       if (this.store.get().snapshot.settings.supervisorRequired) {
         throw new AppError('POS_SUPERVISOR_REQUIRED', 'a supervisor must approve this');
@@ -78,6 +92,17 @@ export class KioskAuthService {
       return null;
     }
     const supervisor = await this.verifyPin(approval.supervisorUserId, approval.pin);
+    const allowed = this.allowedOf(tillCode, 'supervisorUserIds');
+    if (allowed && !allowed.has(supervisor.userId)) {
+      throw new AppError(
+        'POS_SUPERVISOR_NOT_ON_TILL',
+        `user ${supervisor.userId} does not approve here`,
+        {
+          userId: supervisor.userId,
+          tillCode: tillCode ?? null,
+        },
+      );
+    }
     if (!supervisor.supervisor) {
       throw new AppError('POS_SUPERVISOR_REQUIRED', `user ${supervisor.userId} cannot approve`, {
         userId: supervisor.userId,
@@ -87,6 +112,17 @@ export class KioskAuthService {
   }
 
   async login(device: BoundDevice, userId: number, pin: string): Promise<EdgeLoginResponse> {
+    const allowed = this.allowedOf(device.tillCode, 'cashierUserIds');
+    if (allowed && !allowed.has(userId)) {
+      throw new AppError(
+        'POS_CASHIER_NOT_ON_TILL',
+        `cashier ${userId} is not on ${device.tillCode}`,
+        {
+          userId,
+          tillCode: device.tillCode,
+        },
+      );
+    }
     const cashier = await this.verifyPin(userId, pin);
     const claims: KioskClaims = {
       sub: userId,

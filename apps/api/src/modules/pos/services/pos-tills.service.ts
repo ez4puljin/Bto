@@ -1,13 +1,14 @@
 import { createHash, randomInt } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { isTillCode, normalizeTillCode, POS_LIMITS, type PosStatus } from '@tugeel/shared/pos';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
+import { CategoriesService } from '../../catalog';
 import { AuditService, type AuthContext, OrgService } from '../../identity';
-import { posTills } from '../schema';
+import { posCashiers, posTillCategories, posTills, posTillUsers } from '../schema';
 import { PosEdgeNodesService } from './pos-edge-nodes.service';
 
 export interface Till {
@@ -16,6 +17,11 @@ export interface Till {
   /** The STORE warehouse it sells from (ADR-0123). */
   warehouseId: number;
   warehouseName: string | null;
+  /** ADR-0124: the users who may sign in / approve at it (empty: everyone the store admits). */
+  cashierUserIds: number[];
+  supervisorUserIds: number[];
+  /** ADR-0124: the categories it sells, with everything under them (empty: everything). */
+  categoryIds: number[];
   code: string;
   name: string;
   printerHost: string | null;
@@ -54,6 +60,20 @@ export interface TillPatch {
 
 type TillRow = typeof posTills.$inferSelect;
 
+export interface TillAccessInput {
+  cashierUserIds: readonly number[];
+  supervisorUserIds: readonly number[];
+  categoryIds: readonly number[];
+}
+
+/** What the accept path checks a document against (ADR-0124); null = no restriction. */
+export interface TillAccess {
+  cashiers: ReadonlySet<number> | null;
+  supervisors: ReadonlySet<number> | null;
+  /** Every category id the till sells, the subtrees expanded. */
+  categories: ReadonlySet<number> | null;
+}
+
 /** The tills of the store (owner 2026-10-16: eight, each with its printer and drawer). */
 @Injectable()
 export class PosTillsService {
@@ -62,6 +82,7 @@ export class PosTillsService {
     private readonly audit: AuditService,
     private readonly nodes: PosEdgeNodesService,
     private readonly org: OrgService,
+    private readonly categories: CategoriesService,
   ) {}
 
   async list(filter: { edgeNodeId?: number } = {}): Promise<Till[]> {
@@ -199,7 +220,100 @@ export class PosTillsService {
       [...new Set(rows.map((row) => row.warehouseId))],
       executor,
     );
-    return rows.map((row) => view(row, names.get(row.warehouseId) ?? null));
+    const ids = rows.map((row) => row.id);
+    const users = ids.length
+      ? await executor.select().from(posTillUsers).where(inArray(posTillUsers.tillId, ids))
+      : [];
+    const cats = ids.length
+      ? await executor
+          .select()
+          .from(posTillCategories)
+          .where(inArray(posTillCategories.tillId, ids))
+      : [];
+    return rows.map((row) =>
+      view(row, names.get(row.warehouseId) ?? null, {
+        cashierUserIds: users
+          .filter((u) => u.tillId === row.id && u.role === 'CASHIER')
+          .map((u) => u.userId),
+        supervisorUserIds: users
+          .filter((u) => u.tillId === row.id && u.role === 'SUPERVISOR')
+          .map((u) => u.userId),
+        categoryIds: cats.filter((c) => c.tillId === row.id).map((c) => c.categoryId),
+      }),
+    );
+  }
+
+  /**
+   * Sets who works the till and what it sells (ADR-0124): the lists replace the old ones; every
+   * user must be a cashier of the store, every category must exist.
+   */
+  async setAccess(ctx: AuthContext, id: number, input: TillAccessInput): Promise<Till> {
+    const cashierIds = [...new Set(input.cashierUserIds)];
+    const supervisorIds = [...new Set(input.supervisorUserIds)];
+    const categoryIds = [...new Set(input.categoryIds)];
+    await inTransaction(this.db, async (tx) => {
+      const before = await this.get(id, tx);
+      const wanted = [...new Set([...cashierIds, ...supervisorIds])];
+      if (wanted.length > 0) {
+        const known = new Set(
+          (
+            await tx
+              .select({ userId: posCashiers.userId })
+              .from(posCashiers)
+              .where(inArray(posCashiers.userId, wanted))
+          ).map((row) => row.userId),
+        );
+        const missing = wanted.find((userId) => !known.has(userId));
+        if (missing !== undefined) {
+          throw invalid('cashierUserIds', 'cashier', `user ${missing} is not a cashier`);
+        }
+      }
+      for (const categoryId of categoryIds) await this.categories.get(categoryId, tx);
+      await tx.delete(posTillUsers).where(eq(posTillUsers.tillId, id));
+      await tx.delete(posTillCategories).where(eq(posTillCategories.tillId, id));
+      const userRows = [
+        ...cashierIds.map((userId) => ({ tillId: id, userId, role: 'CASHIER' as const })),
+        ...supervisorIds.map((userId) => ({ tillId: id, userId, role: 'SUPERVISOR' as const })),
+      ];
+      if (userRows.length) await tx.insert(posTillUsers).values(userRows);
+      if (categoryIds.length) {
+        await tx
+          .insert(posTillCategories)
+          .values(categoryIds.map((categoryId) => ({ tillId: id, categoryId })));
+      }
+      await this.audit.record(tx, ctx, {
+        action: 'ACCESS',
+        entity: 'pos_tills',
+        entityId: id,
+        before: {
+          cashierUserIds: before.cashierUserIds,
+          supervisorUserIds: before.supervisorUserIds,
+          categoryIds: before.categoryIds,
+        },
+        after: { cashierUserIds: cashierIds, supervisorUserIds: supervisorIds, categoryIds },
+      });
+    });
+    return this.get(id);
+  }
+
+  /** The till's restrictions with the category subtrees expanded (ADR-0124). */
+  async accessOf(tillId: number, executor: Db | Tx = this.db): Promise<TillAccess> {
+    const users = await executor.select().from(posTillUsers).where(eq(posTillUsers.tillId, tillId));
+    const cats = await executor
+      .select({ categoryId: posTillCategories.categoryId })
+      .from(posTillCategories)
+      .where(eq(posTillCategories.tillId, tillId));
+    const cashiers = users.filter((u) => u.role === 'CASHIER').map((u) => u.userId);
+    const supervisors = users.filter((u) => u.role === 'SUPERVISOR').map((u) => u.userId);
+    const expanded = new Set<number>();
+    for (const row of cats) {
+      for (const id of await this.categories.subtreeIds(row.categoryId, executor)) expanded.add(id);
+    }
+    return {
+      cashiers: cashiers.length ? new Set(cashiers) : null,
+      supervisors: supervisors.length ? new Set(supervisors) : null,
+      categories: cats.length ? expanded : null,
+    };
   }
 
   private async viewOne(row: TillRow, executor: Db | Tx = this.db): Promise<Till> {
@@ -253,12 +367,21 @@ function cleanHost(value: string | null | undefined): string | null {
   return host;
 }
 
-function view(row: TillRow, warehouseName: string | null = null): Till {
+function view(
+  row: TillRow,
+  warehouseName: string | null = null,
+  access: Pick<Till, 'cashierUserIds' | 'supervisorUserIds' | 'categoryIds'> = {
+    cashierUserIds: [],
+    supervisorUserIds: [],
+    categoryIds: [],
+  },
+): Till {
   return {
     id: row.id,
     edgeNodeId: row.edgeNodeId,
     warehouseId: row.warehouseId,
     warehouseName,
+    ...access,
     code: row.code,
     name: row.name,
     printerHost: row.printerHost,

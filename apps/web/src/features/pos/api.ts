@@ -312,6 +312,20 @@ export function usePosMutations() {
         unwrap(await api.POST('/api/v1/pos/tills', { body })),
       onSuccess: () => refresh(POS_KEYS.tills),
     }),
+    /** Who works the till and what it sells (ADR-0124); the lists replace the old ones. */
+    setTillAccess: useMutation({
+      mutationFn: async ({
+        id,
+        ...body
+      }: {
+        id: number;
+        cashierUserIds: number[];
+        supervisorUserIds: number[];
+        categoryIds: number[];
+      }) =>
+        unwrap(await api.PUT('/api/v1/pos/tills/{id}/access', { params: { path: { id } }, body })),
+      onSuccess: () => refresh(POS_KEYS.tills),
+    }),
     updateTill: useMutation({
       mutationFn: async ({ id, ...body }: TillPatch & { id: number }) =>
         unwrap(await api.PUT('/api/v1/pos/tills/{id}', { params: { path: { id } }, body })),

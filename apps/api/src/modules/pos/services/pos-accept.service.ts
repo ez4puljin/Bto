@@ -185,6 +185,29 @@ export class PosAcceptService {
       });
     }
     await this.cashiers.assertActive(doc.cashierUserId, tx);
+    // ADR-0124: the till's own lists of who works it and what it sells.
+    const access = await this.tills.accessOf(till.id, tx);
+    if (access.cashiers && !access.cashiers.has(doc.cashierUserId)) {
+      throw new AppError(
+        'POS_CASHIER_NOT_ON_TILL',
+        `cashier ${doc.cashierUserId} is not on ${till.code}`,
+        {
+          userId: doc.cashierUserId,
+          tillCode: till.code,
+        },
+      );
+    }
+    if (
+      doc.approvedByUserId !== null &&
+      access.supervisors &&
+      !access.supervisors.has(doc.approvedByUserId)
+    ) {
+      throw new AppError(
+        'POS_SUPERVISOR_NOT_ON_TILL',
+        `user ${doc.approvedByUserId} does not approve at ${till.code}`,
+        { userId: doc.approvedByUserId, tillCode: till.code },
+      );
+    }
     const settings = await this.settings.get(tx);
     if (doc.kind === 'RETURN' && settings.supervisorRequired && doc.approvedByUserId === null) {
       throw invalid('approvedByUserId', 'required', 'a return needs a supervisor');
@@ -197,6 +220,22 @@ export class PosAcceptService {
     const soldDay = businessDate(doc.soldAt);
     const paymentNames = await this.checkPaymentTypes(tx, doc);
     const products = await this.productsOf(tx, doc.lines);
+    if (access.categories && doc.kind === 'SALE') {
+      const outside = doc.lines.find((line) => {
+        const product = products.get(line.productId);
+        return product !== undefined && !access.categories?.has(product.categoryId);
+      });
+      if (outside) {
+        throw new AppError(
+          'POS_PRODUCT_NOT_ON_TILL',
+          `product ${outside.productId} is not sold at ${till.code}`,
+          {
+            productId: outside.productId,
+            tillCode: till.code,
+          },
+        );
+      }
+    }
     await this.checkUnits(tx, doc.lines);
     await this.checkMoney(tx, doc, soldDay, products);
     const original =
