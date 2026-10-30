@@ -41,8 +41,10 @@ type Dialogs =
 
 /**
  * «Байгууллагын бүтэц» (owner 2026-10-31): the one page a new installation is set up from, in the
- * order the data needs — branches, their warehouses and supermarkets, each supermarket's POS
- * (the store edge) and its tills, the cashiers, and each branch's sales boards. Everything is
+ * order the data needs. One system is one branch (registered once, Kharkhorin is its own
+ * installation, ADR-0084): its warehouses and supermarkets, each supermarket's one Edge (the
+ * store server) and the Edge's POS (the tills, each selling on its own), the cashiers, and the
+ * sales boards. Everything is
  * added or changed in place through the same dialogs the separate pages use; the separate pages
  * stay for the details (pairing, printers, PINs, pipelines).
  */
@@ -68,11 +70,10 @@ export function StructurePage() {
   const boardList = boards.data ?? [];
   const stores = warehouseList.filter((warehouse) => warehouse.kind === 'STORE');
   const steps: {
-    key: 'branches' | 'warehouses' | 'stores' | 'nodes' | 'tills' | 'cashiers' | 'boards';
+    key: 'warehouses' | 'stores' | 'nodes' | 'tills' | 'cashiers' | 'boards';
     icon: typeof Building2;
     count: number;
   }[] = [
-    { key: 'branches', icon: Building2, count: branchList.length },
     {
       key: 'warehouses',
       icon: WarehouseIcon,
@@ -91,7 +92,7 @@ export function StructurePage() {
         title={t('org.structure.title')}
         description={t('org.structure.description')}
         actions={
-          canOrg ? (
+          canOrg && !branches.isPending && branchList.length === 0 ? (
             <Button onClick={() => setDialog({ kind: 'branch', branch: 'new' })}>
               <Plus aria-hidden />
               {t('org.structure.addBranch')}
@@ -101,7 +102,7 @@ export function StructurePage() {
       />
       <ProblemAlert problem={problemFromError(branches.error ?? warehouses.error)} />
       <ol
-        className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7"
+        className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6"
         aria-label={t('org.structure.steps')}
       >
         {steps.map((step, index) => {
@@ -395,7 +396,7 @@ function StoreNodes(props: {
       <div className="flex items-center gap-2">
         <Monitor aria-hidden className="size-3.5 text-muted-foreground" />
         <span className="text-[0.8125rem] font-medium">{t('org.structure.nodes')}</span>
-        {props.canPos ? (
+        {props.canPos && props.nodes.length === 0 ? (
           <Button
             variant="ghost"
             size="sm"
