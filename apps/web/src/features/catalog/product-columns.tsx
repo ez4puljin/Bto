@@ -1,3 +1,4 @@
+import { BINS_SOON } from '@/lib/features';
 import type { ProductListColumn } from '@tugeel/shared/catalog';
 import type { TFunction } from 'i18next';
 import { ImageOff } from 'lucide-react';
@@ -251,6 +252,7 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
     kind: 'text',
     source: 'locations',
     cell: (row, ctx) => {
+      if (BINS_SOON) return none(ctx);
       if (!ctx.locations) return null;
       return lines(
         (ctx.locations.get(row.id) ?? []).flatMap((location) =>

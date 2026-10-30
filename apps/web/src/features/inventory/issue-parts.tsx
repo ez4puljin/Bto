@@ -1,3 +1,4 @@
+import { BINS_SOON } from '@/lib/features';
 import { Check, Lock } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,7 +39,7 @@ export function LinesTable(props: {
     { key: 'warehouse', kind: 'text', weight: 1, min: props.actions ? 10.5 : 8 },
     { key: 'unit', kind: 'text', weight: 1, min: 4 },
     // The shelf, or «Нярав батлахад тогтоно» until the keeper confirms.
-    { key: 'bin', kind: 'code', width: 11 },
+    ...(BINS_SOON ? [] : [{ key: 'bin', kind: 'code', width: 11 } as const]),
     { key: 'qty', kind: 'qty', width: props.actions ? 8 : 6.5 },
     ...(sale
       ? [
@@ -59,7 +60,7 @@ export function LinesTable(props: {
           <TableHead>{t('inventory.product')}</TableHead>
           <TableHead>{t('inventory.issues.lineWarehouse')}</TableHead>
           <TableHead>{t('inventory.unit')}</TableHead>
-          <TableHead>{t('inventory.bin')}</TableHead>
+          {BINS_SOON ? null : <TableHead>{t('inventory.bin')}</TableHead>}
           <TableHead className="text-right">{t('inventory.qty')}</TableHead>
           {sale ? (
             <>
@@ -112,15 +113,17 @@ export function LinesTable(props: {
                 )}
               </TableCell>
               <TableCell>{line.unitName}</TableCell>
-              <TableCell>
-                {line.binCode ? (
-                  <span className="font-mono">{line.binCode}</span>
-                ) : (
-                  <span className="text-[0.8125rem] text-muted-foreground">
-                    {t('inventory.issues.binPending')}
-                  </span>
-                )}
-              </TableCell>
+              {BINS_SOON ? null : (
+                <TableCell>
+                  {line.binCode ? (
+                    <span className="font-mono">{line.binCode}</span>
+                  ) : (
+                    <span className="text-[0.8125rem] text-muted-foreground">
+                      {t('inventory.issues.binPending')}
+                    </span>
+                  )}
+                </TableCell>
+              )}
               <TableCell className="text-right">{cells.qty}</TableCell>
               {sale ? (
                 <>

@@ -15,7 +15,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useWarehouseOptions } from '@/features/inventory/helpers';
+import { ComingSoonNote } from '@/components/coming-soon';
 import { SupplierPicker } from '@/features/partners/supplier-picker';
+import { BINS_SOON } from '@/lib/features';
 import type { ValidationMessage } from '@/lib/forms';
 import { problemFromError } from '@/lib/problem';
 import { randomUuid } from '@/lib/uuid';
@@ -476,13 +478,14 @@ export function RegistrationForm(props: { uoms: readonly Uom[]; categories: read
               <FormRow
                 label={t('catalog.registration.fixedBin')}
                 htmlFor="registration-bin"
-                hint={t('catalog.registration.fixedBinHint')}
+                hint={BINS_SOON ? <ComingSoonNote /> : t('catalog.registration.fixedBinHint')}
                 error={errors.fixedBinCode?.message}
               >
                 <Input
                   id="registration-bin"
                   autoComplete="off"
                   spellCheck={false}
+                  disabled={BINS_SOON}
                   className="font-mono uppercase sm:w-44"
                   {...form.register('fixedBinCode')}
                 />

@@ -1,3 +1,4 @@
+import { BINS_SOON } from '@/lib/features';
 import { cleanBarcode } from '@tugeel/shared/gtin';
 import { History } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -239,7 +240,7 @@ export function MovementsPage() {
           onFrom={(value) => update({ from: value })}
           onTo={(value) => update({ to: value })}
         />
-        {binId !== undefined ? (
+        {BINS_SOON ? null : binId !== undefined ? (
           <FilterChip
             clearLabel={t('inventory.movements.clearBin')}
             onClear={() => update({ bin: undefined })}
@@ -308,7 +309,9 @@ export function MovementsPage() {
                   {shown('warehouse') ? (
                     <TableCell>{warehouseName(row.warehouseId)}</TableCell>
                   ) : null}
-                  {shown('bin') ? <TableCell className="font-mono">{row.binCode}</TableCell> : null}
+                  {shown('bin') && !BINS_SOON ? (
+                    <TableCell className="font-mono">{row.binCode}</TableCell>
+                  ) : null}
                   {shown('product') ? (
                     <TruncateCell text={`${row.product.sku} ${row.product.name}`}>
                       <Link

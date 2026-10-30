@@ -1,3 +1,4 @@
+import { BINS_SOON } from '@/lib/features';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NativeSelect } from '@/components/native-select';
@@ -66,7 +67,7 @@ export function PickForm({ order }: { order: SalesOrder }) {
             <TableHead>{t('sales.order.product')}</TableHead>
             <TableHead className="text-right">{t('sales.order.reserved')}</TableHead>
             <TableHead>{t('sales.pick.qty')}</TableHead>
-            <TableHead>{t('sales.pick.bin')}</TableHead>
+            {BINS_SOON ? null : <TableHead>{t('sales.pick.bin')}</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -98,28 +99,33 @@ export function PickForm({ order }: { order: SalesOrder }) {
                     }
                   />
                 </TableCell>
-                <TableCell>
-                  <NativeSelect
-                    aria-label={`${t('sales.pick.bin')}: ${line.productName}`}
-                    value={lines[line.id]?.binId ?? ''}
-                    onChange={(event) =>
-                      setLines((current) => ({
-                        ...current,
-                        [line.id]: { qty: current[line.id]?.qty ?? '0', binId: event.target.value },
-                      }))
-                    }
-                  >
-                    <option value="">{t('sales.pick.chooseBin')}</option>
-                    {(own?.bins ?? []).map((bin) => (
-                      <option key={bin.id} value={bin.id}>
-                        {t('sales.pick.binOption', {
-                          code: bin.code,
-                          onHand: formatQty(bin.onHand),
-                        })}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </TableCell>
+                {BINS_SOON ? null : (
+                  <TableCell>
+                    <NativeSelect
+                      aria-label={`${t('sales.pick.bin')}: ${line.productName}`}
+                      value={lines[line.id]?.binId ?? ''}
+                      onChange={(event) =>
+                        setLines((current) => ({
+                          ...current,
+                          [line.id]: {
+                            qty: current[line.id]?.qty ?? '0',
+                            binId: event.target.value,
+                          },
+                        }))
+                      }
+                    >
+                      <option value="">{t('sales.pick.chooseBin')}</option>
+                      {(own?.bins ?? []).map((bin) => (
+                        <option key={bin.id} value={bin.id}>
+                          {t('sales.pick.binOption', {
+                            code: bin.code,
+                            onHand: formatQty(bin.onHand),
+                          })}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </TableCell>
+                )}
               </TableRow>
             );
           })}

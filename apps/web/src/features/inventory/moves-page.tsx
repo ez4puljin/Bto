@@ -1,3 +1,5 @@
+import { ComingSoonPage } from '@/components/coming-soon';
+import { BINS_SOON } from '@/lib/features';
 import { Move, Trash2 } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -95,6 +97,9 @@ export function BinMovesPage() {
     else setWarehouse(id);
   };
 
+  if (BINS_SOON) {
+    return <ComingSoonPage title={t('inventory.moves.title')} hint={t('common.binsSoonPage')} />;
+  }
   return (
     <div>
       <PageHeader title={t('inventory.moves.title')} />

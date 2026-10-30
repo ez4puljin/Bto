@@ -1,3 +1,4 @@
+import { BINS_SOON } from '@/lib/features';
 import { MAX_STOCKTAKE_BINS } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
 import { ClipboardCheck, Plus, X } from 'lucide-react';
@@ -126,6 +127,7 @@ export function StocktakesPage() {
     <div>
       <PageHeader
         title={t('inventory.stocktakes.title')}
+        description={BINS_SOON ? t('common.binsSoonHint') : undefined}
         actions={
           canManage ? (
             <Button onClick={() => setCreating(true)}>

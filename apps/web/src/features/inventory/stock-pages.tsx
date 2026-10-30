@@ -1,3 +1,5 @@
+import { ComingSoonNote } from '@/components/coming-soon';
+import { BINS_SOON } from '@/lib/features';
 import { Boxes, History } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -265,7 +267,9 @@ export function StockProductPage() {
           <CardTitle>{t('inventory.stock.byBin')}</CardTitle>
         </CardHeader>
         <CardContent>
-          {detail.bins.length === 0 ? (
+          {BINS_SOON ? (
+            <ComingSoonNote />
+          ) : detail.bins.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('inventory.stock.noStock')}</p>
           ) : (
             <Table>

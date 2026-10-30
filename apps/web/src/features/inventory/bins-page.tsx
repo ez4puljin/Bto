@@ -1,3 +1,5 @@
+import { ComingSoonPage } from '@/components/coming-soon';
+import { BINS_SOON } from '@/lib/features';
 import { Archive, ArchiveRestore, LayoutGrid, Plus, Trash2 } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -87,6 +89,9 @@ export function BinsPage() {
   const setWarehouse = (id: number | undefined) =>
     setParam('warehouseId', id === undefined ? null : String(id));
 
+  if (BINS_SOON) {
+    return <ComingSoonPage title={t('inventory.bins.title')} hint={t('common.binsSoonPage')} />;
+  }
   return (
     <div>
       <PageHeader
