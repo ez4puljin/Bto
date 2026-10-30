@@ -155,7 +155,7 @@ function Overview({ detail, onRefresh }: { detail: PurchaseOrderDetail; onRefres
         }
       />
 
-      <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <Tile label={t('procurement.overview.suppliers')} value={formatCount(totals.suppliers)} />
         <Tile label={t('procurement.overview.boxes')} value={formatQty(totals.boxes.toFixed())} />
         <Tile label={t('procurement.overview.pieces')} value={formatQty(totals.pieces.toFixed())} />
