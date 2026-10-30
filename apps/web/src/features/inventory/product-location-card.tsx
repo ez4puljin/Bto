@@ -31,7 +31,14 @@ const SHELF_KINDS = ['WHOLESALE', 'STORE'] as const;
  * Where a product lives (owner, 2026-10-11): its home wholesale warehouse (the only one it is
  * received into), its fixed shelf and low/high levels per warehouse, and its stock there.
  */
-export function ProductLocationCard({ productId }: { productId: number }) {
+export function ProductLocationCard({
+  productId,
+  stockLink = true,
+}: {
+  productId: number;
+  /** The product page shows «Үлдэгдэл харах» in its header already. */
+  stockLink?: boolean;
+}) {
   const { t } = useTranslation();
   const canSetHome = useHasPermission('inventory.setup.manage');
   const canLocate = useHasPermission('inventory.locations.manage');
@@ -57,9 +64,11 @@ export function ProductLocationCard({ productId }: { productId: number }) {
               {t('inventory.location.edit')}
             </Button>
           ) : null}
-          <Button size="sm" variant="ghost" asChild>
-            <Link to={`/inventory/stock/${productId}`}>{t('inventory.location.stockLink')}</Link>
-          </Button>
+          {stockLink ? (
+            <Button size="sm" variant="ghost" asChild>
+              <Link to={`/inventory/stock/${productId}`}>{t('inventory.location.stockLink')}</Link>
+            </Button>
+          ) : null}
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 text-sm">

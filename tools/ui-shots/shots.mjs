@@ -6,7 +6,7 @@
 // No dependency: Node's WebSocket speaks the DevTools protocol. The password comes from a
 // gitignored file (`username password` per line) and is never printed.
 //
-//   pnpm ui:shots -- --out tmp/ui-shots/before [--only receipt] [--sizes 1366x633,1920x969]
+//   pnpm ui:shots -- --out tmp/ui-shots/before [--only receipt] [--sizes 1366x633,1920x969] [--ids product=10885]
 //                    [--user admin] [--logins tmp/dev-logins.txt] [--web …] [--api …]
 //
 // Needs `pnpm dev` (web on 5173, api on 3300). Chrome: CHROME_PATH, else the usual install paths.
@@ -469,6 +469,11 @@ async function main() {
   mkdirSync(out, { recursive: true });
   const session = await signIn();
   const ids = await discover(session.accessToken);
+  // --ids product=10885,supplier=5: the records to open instead of the first ones found.
+  for (const pair of String(args.ids ?? '').split(',').filter(Boolean)) {
+    const [name, id] = pair.split('=');
+    if (name && id) ids[name] = id;
+  }
   console.log(`ids found: ${Object.keys(ids).join(', ') || 'none'}`);
   const { cdp, stop } = await launch();
   const state = watch(cdp);

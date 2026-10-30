@@ -38,7 +38,7 @@ export function ProductSuppliersCard({ productId }: { productId: number }) {
         <CardTitle>{t('partners.productSuppliers.title')}</CardTitle>
         {canManage ? (
           <CardAction>
-            <Button size="sm" variant="secondary" onClick={() => setAdding(true)}>
+            <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
               <Plus />
               {t('partners.productSuppliers.add')}
             </Button>
@@ -52,22 +52,28 @@ export function ProductSuppliersCard({ productId }: { productId: number }) {
         ) : null}
         <ul className="flex flex-col divide-y">
           {rows.map((link) => (
-            <li key={link.id} className="flex flex-wrap items-center gap-2 py-2">
-              <span className="font-mono text-sm text-muted-foreground">{link.supplier.code}</span>
+            <li key={link.id} className="flex items-center gap-2 py-2">
+              <span className="shrink-0 font-mono text-sm text-muted-foreground">
+                {link.supplier.code}
+              </span>
               <Link
                 to={`/partners/suppliers/${link.supplier.id}`}
-                className="font-medium underline-offset-4 hover:underline"
+                className="min-w-0 flex-1 truncate font-medium underline-offset-4 hover:underline"
               >
                 {link.supplier.name}
               </Link>
               {link.isMain ? (
-                <Badge variant="secondary">{t('partners.productSuppliers.main')}</Badge>
+                <Star
+                  role="img"
+                  aria-label={t('partners.productSuppliers.main')}
+                  className="size-4 shrink-0 fill-warning text-warning"
+                />
               ) : null}
               {link.supplier.status === 'ACTIVE' ? null : (
                 <Badge variant="outline">{t(`partners.status.${link.supplier.status}`)}</Badge>
               )}
               {canManage ? (
-                <span className="-my-1 ml-auto flex gap-0.5">
+                <span className="-my-1 ml-auto flex shrink-0 gap-0.5">
                   {link.isMain ? (
                     <RowActionSpacer />
                   ) : (

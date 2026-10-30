@@ -260,7 +260,8 @@ describe('product prices card', () => {
     });
     renderApp('/catalog/products/7', fetchMock);
     const user = userEvent.setup();
-    expect(await screen.findByText('1,000₮ / ш')).toBeInTheDocument();
+    // The price shows in the key-figure strip and in the card (2026-10-31).
+    expect((await screen.findAllByText('1,000₮ / ш')).length).toBeGreaterThan(0);
     expect(screen.getByRole('link', { name: 'Жишээ: Ундаа' })).toHaveAttribute(
       'href',
       '/pricing/profiles/4',
@@ -307,7 +308,7 @@ describe('product prices card', () => {
     });
     expect(posted?.headers.get('Idempotency-Key')).toMatch(UUID);
     expect(await screen.findByRole('status')).toHaveTextContent(mn.pricing.dialog.saved);
-    expect(await screen.findByText('1,100₮ / ш')).toBeInTheDocument();
+    expect((await screen.findAllByText('1,100₮ / ш')).length).toBeGreaterThan(0);
   });
 
   it('prices a product without packs at the warehouse price, without a whole unit', async () => {
@@ -354,7 +355,7 @@ describe('product prices card', () => {
       }),
     );
     expect(await screen.findByText(mn.pricing.card.problems.GONE)).toBeInTheDocument();
-    expect(screen.getByText('1,000₮ / ш')).toBeInTheDocument();
+    expect(screen.getAllByText('1,000₮ / ш').length).toBeGreaterThan(0);
     expect(screen.queryByText(mn.pricing.card.noPacks)).toBeNull();
     expect(screen.queryByRole('button', { name: mn.pricing.card.set })).toBeNull();
   });

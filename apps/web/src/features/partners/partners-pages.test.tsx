@@ -1069,7 +1069,10 @@ describe('product suppliers card', () => {
       'href',
       '/partners/suppliers/3',
     );
-    expect(screen.getByText(mn.partners.productSuppliers.main)).toBeInTheDocument();
+    // The main supplier wears a filled star named «Үндсэн» (2026-10-31).
+    expect(
+      screen.getByRole('img', { name: mn.partners.productSuppliers.main }),
+    ).toBeInTheDocument();
 
     await user.click(
       screen.getByRole('button', { name: `${mn.partners.productSuppliers.makeMain}: Номин Трейд` }),

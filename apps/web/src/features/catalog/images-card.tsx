@@ -71,19 +71,11 @@ export function ImagesCard({ product, canManage }: { product: ProductDetail; can
     <Card>
       <CardHeader>
         <CardTitle>{t('catalog.images.title')}</CardTitle>
-        {canManage ? (
+        {canManage && product.images.length > 0 ? (
           <CardAction>
-            <input
-              ref={input}
-              type="file"
-              accept={ACCEPT}
-              multiple
-              hidden
-              onChange={(event) => void addFiles(Array.from(event.target.files ?? []))}
-            />
             <Button
               size="sm"
-              variant="secondary"
+              variant="outline"
               disabled={uploading}
               onClick={() => input.current?.click()}
             >
@@ -94,6 +86,18 @@ export function ImagesCard({ product, canManage }: { product: ProductDetail; can
         ) : null}
       </CardHeader>
       <CardContent className="@container flex flex-col gap-3">
+        {canManage ? (
+          <>
+            <input
+              ref={input}
+              type="file"
+              accept={ACCEPT}
+              multiple
+              hidden
+              onChange={(event) => void addFiles(Array.from(event.target.files ?? []))}
+            />
+          </>
+        ) : null}
         {unsupported ? (
           <Alert variant="destructive">
             <AlertDescription>{t('catalog.images.unsupported')}</AlertDescription>
@@ -101,10 +105,22 @@ export function ImagesCard({ product, canManage }: { product: ProductDetail; can
         ) : null}
         <ProblemAlert problem={action.problem} />
         {product.images.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-            <ImagePlus aria-hidden className="size-6 opacity-60" />
-            {t('catalog.images.empty')}
-          </div>
+          canManage ? (
+            <button
+              type="button"
+              disabled={uploading}
+              className="flex h-24 w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-sm text-muted-foreground transition-colors hover:border-ring hover:text-foreground focus-visible:border-ring focus-visible:outline-none"
+              onClick={() => input.current?.click()}
+            >
+              <ImagePlus aria-hidden className="size-5 opacity-70" />
+              {uploading ? t('catalog.images.uploading') : t('catalog.images.upload')}
+            </button>
+          ) : (
+            <div className="flex h-24 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-sm text-muted-foreground">
+              <ImagePlus aria-hidden className="size-5 opacity-60" />
+              {t('catalog.images.empty')}
+            </div>
+          )
         ) : (
           <ul className="grid grid-cols-3 gap-2.5 @md:grid-cols-4 @2xl:grid-cols-6">
             {product.images.map((image) => (

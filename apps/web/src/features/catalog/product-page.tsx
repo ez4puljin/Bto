@@ -1,4 +1,4 @@
-import { Boxes, History, Package } from 'lucide-react';
+import { Boxes, Copy, History, Package } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
@@ -7,14 +7,19 @@ import { DetailCard, FieldList } from '@/components/detail';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
+import { useProductLocations, useProductStock } from '@/features/inventory/api';
+import { useWarehouseName } from '@/features/inventory/helpers';
 import { ProductLocationCard } from '@/features/inventory/product-location-card';
 import { ProductSuppliersCard } from '@/features/partners/product-suppliers-card';
+import { useProductPrices } from '@/features/pricing/api';
 import { ProductPricesCard } from '@/features/pricing/product-prices-card';
+import { EBARIMT_PER_PRODUCT } from '@/lib/features';
+import { formatMnt, formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
+import { cn } from '@/lib/utils';
 import { type ProductDetail, useCatalogMutations, useCategories, useProduct } from './api';
 import { categoryPaths } from './category-tree';
-import { EBARIMT_PER_PRODUCT } from '@/lib/features';
 import { EbarimtCard } from './ebarimt-card';
 import { ImagesCard } from './images-card';
 import { ProductForm } from './product-form';
@@ -24,10 +29,11 @@ import { ProductStageBadge } from './product-stage-badge';
 import { UnitsCard } from './units-card';
 
 /**
- * One product: its data (read first, «Засах» to change them, ADR-0042), units with barcodes,
- * prices (and «Бүрэн болгох» while it waits for them, ADR-0044), its e-Barimt data for the
- * accountant, photos (SPEC §5.2), the suppliers it is ordered from (SPEC §5.3, ADR-0032) and where
- * it is kept. From `xl` on a side column holds the photos and suppliers (ADR-0066).
+ * One product (ADR-0042; relaid 2026-10-31 after a UI/UX review): the header names it (code,
+ * category, stage) and a strip of key figures answers what people open it for — the primary
+ * barcode, the warehouse price, what is on hand, the home warehouse. The left column then holds
+ * the units with their barcodes, the prices and the card of the remaining facts («Засах» opens
+ * the form); the right column the photos, the location and the suppliers.
  */
 export function ProductPage() {
   const { t } = useTranslation();
@@ -80,26 +86,29 @@ export function ProductPage() {
         actions={
           <>
             <Button variant="outline" asChild>
-              <Link to={`/inventory/stock/${detail.id}`}>
-                <Boxes />
-                {t('catalog.product.viewStock')}
-              </Link>
-            </Button>
-            <Button variant="outline" asChild>
               <Link to={`/inventory/movements?product=${detail.id}`}>
                 <History />
                 {t('catalog.product.viewMovements')}
               </Link>
             </Button>
+            <Button asChild>
+              <Link to={`/inventory/stock/${detail.id}`}>
+                <Boxes />
+                {t('catalog.product.viewStock')}
+              </Link>
+            </Button>
           </>
         }
       />
+      <KeyFigures detail={detail} />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_26rem] xl:items-start">
         <div className="flex min-w-0 flex-col gap-4">
+          <UnitsCard product={detail} canManage={canManage} />
+          <ProductPricesCard productId={detail.id} pending={productStage(detail) === 'PENDING'} />
           <DetailCard
             title={t('catalog.product.info')}
             canEdit={canManage}
-            view={<ProductFacts detail={detail} categoryPath={categoryPath} />}
+            view={<ProductFacts detail={detail} />}
             edit={(close) => (
               <ProductForm
                 defaultValues={productValues(detail)}
@@ -110,13 +119,11 @@ export function ProductPage() {
               />
             )}
           />
-          <UnitsCard product={detail} canManage={canManage} />
-          <ProductPricesCard productId={detail.id} pending={productStage(detail) === 'PENDING'} />
           {EBARIMT_PER_PRODUCT ? <EbarimtCard product={detail} /> : null}
-          <ProductLocationCard productId={detail.id} />
         </div>
         <div className="flex min-w-0 flex-col gap-4">
           <ImagesCard product={detail} canManage={canManage} />
+          <ProductLocationCard productId={detail.id} stockLink={false} />
           <ProductSuppliersCard productId={detail.id} />
         </div>
       </div>
@@ -124,32 +131,143 @@ export function ProductPage() {
   );
 }
 
-/** The reading side of the product's card (the e-Barimt data has its own card). */
-function ProductFacts(props: { detail: ProductDetail; categoryPath: string | undefined }) {
+/**
+ * The strip under the header: the primary barcode (copied with one click), the warehouse price
+ * when the reader may see prices, what is on hand over every warehouse, the home warehouse.
+ */
+function KeyFigures({ detail }: { detail: ProductDetail }) {
   const { t } = useTranslation();
-  const { detail } = props;
+  const stock = useProductStock(detail.id);
+  const locations = useProductLocations(detail.id);
+  const prices = useProductPrices(detail.id);
+  const warehouseName = useWarehouseName();
+  const base = detail.units.find((unit) => unit.isBase);
+  const primary =
+    detail.units.flatMap((unit) => unit.barcodes).find((barcode) => barcode.isPrimary) ??
+    base?.barcodes[0] ??
+    null;
+  const home = (locations.data ?? []).find((row) => row.isHome) ?? null;
+  const current = prices.data?.current ?? null;
+  const onHand = stock.data?.onHand ?? null;
+  const copy = () => {
+    if (!primary) return;
+    void navigator.clipboard?.writeText(primary.code).then(
+      () => toast.success(t('catalog.product.key.copied', { code: primary.code })),
+      () => undefined,
+    );
+  };
   return (
-    <div className="flex flex-col gap-5">
-      <FieldList
-        title={t('catalog.product.sectionGeneral')}
-        items={[
-          {
-            label: t('catalog.product.sku'),
-            value: <span className="font-mono">{detail.sku}</span>,
-          },
-          { label: t('catalog.product.name'), value: detail.name },
-          { label: t('catalog.product.category'), value: props.categoryPath },
-          {
-            label: t('catalog.product.weight'),
-            value: detail.weightKg ? <span className="font-mono">{detail.weightKg}</span> : null,
-          },
-          {
-            label: t('catalog.product.status'),
-            value: t(`catalog.products.status.${productStage(detail)}`),
-          },
-        ]}
-      />
+    <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <Figure label={t('catalog.product.key.barcode')}>
+        {primary ? (
+          <span className="flex items-center gap-1.5">
+            <span className="truncate font-mono tabular-nums">{primary.code}</span>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="text-muted-foreground"
+              aria-label={t('catalog.product.key.copy')}
+              title={t('catalog.product.key.copy')}
+              onClick={copy}
+            >
+              <Copy />
+            </Button>
+          </span>
+        ) : (
+          <Muted>{t('catalog.units.noBarcodes')}</Muted>
+        )}
+      </Figure>
+      <Figure label={t('catalog.product.key.price')}>
+        {current ? (
+          <span className="font-mono tabular-nums">
+            {t('pricing.card.pricePerUnit', {
+              amount: formatMnt(current.warehousePrice),
+              unit: base?.uomName ?? '',
+            })}
+          </span>
+        ) : (
+          <Muted>{t('catalog.product.key.noPrice')}</Muted>
+        )}
+      </Figure>
+      <Figure label={t('catalog.product.key.onHand')}>
+        {onHand !== null ? (
+          <span className="font-mono tabular-nums">
+            {t('inventory.qtyWithUnit', {
+              qty: formatQty(onHand),
+              unit: stock.data?.product.baseUnitName ?? base?.uomName ?? '',
+            })}
+          </span>
+        ) : (
+          <Muted>{t('common.none')}</Muted>
+        )}
+      </Figure>
+      <Figure label={t('catalog.product.key.home')}>
+        {home ? (
+          <span className="truncate">{warehouseName(home.warehouseId)}</span>
+        ) : (
+          <Muted>{t('inventory.location.noHome')}</Muted>
+        )}
+      </Figure>
     </div>
+  );
+}
+
+function Figure({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <section
+      aria-label={label}
+      className="flex min-w-0 flex-col gap-0.5 rounded-xl bg-card px-4 py-3 shadow-card ring-1 ring-black/[0.06]"
+    >
+      <span className="text-[0.75rem] font-medium tracking-wide text-muted-foreground uppercase">
+        {label}
+      </span>
+      <span className="min-w-0 truncate text-[1.0625rem] font-semibold">{children}</span>
+    </section>
+  );
+}
+
+function Muted({ children }: { children: React.ReactNode }) {
+  return (
+    <span className={cn('text-[0.9375rem] font-normal text-muted-foreground')}>{children}</span>
+  );
+}
+
+/** The reading side of the product's card: what the header does not already show. */
+function ProductFacts({ detail }: { detail: ProductDetail }) {
+  const { t } = useTranslation();
+  const base = detail.units.find((unit) => unit.isBase);
+  const box = detail.units.find((unit) => !unit.isBase && unit.uomCode === 'BOX');
+  return (
+    <FieldList
+      items={[
+        {
+          label: t('catalog.product.name'),
+          value: detail.name,
+        },
+        {
+          label: t('catalog.product.baseUnit'),
+          value: base?.uomName ?? null,
+        },
+        {
+          label: t('catalog.product.boxFactor'),
+          value: box ? (
+            <span className="font-mono">
+              {t('catalog.product.boxOf', { factor: box.factorToBase, unit: base?.uomName ?? '' })}
+            </span>
+          ) : null,
+        },
+        {
+          label: t('catalog.product.weight'),
+          value: detail.weightKg ? (
+            <span className="font-mono">{t('catalog.product.kg', { kg: detail.weightKg })}</span>
+          ) : null,
+        },
+        {
+          label: t('catalog.product.status'),
+          value: t(`catalog.products.status.${productStage(detail)}`),
+        },
+      ]}
+    />
   );
 }
 

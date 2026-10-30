@@ -102,8 +102,8 @@ export function UnitsCard({ product, canManage }: { product: ProductDetail; canM
       base: base?.uomName ?? '',
     });
   const columns = canManage
-    ? 'sm:grid-cols-[9.5rem_minmax(0,1fr)_4.5rem]'
-    : 'sm:grid-cols-[9.5rem_minmax(0,1fr)]';
+    ? 'sm:grid-cols-[12.5rem_minmax(0,1fr)_4.5rem]'
+    : 'sm:grid-cols-[12.5rem_minmax(0,1fr)]';
   // A unit's dialogs open from its «⋯» menu or its scan button; the menu item is gone by the time
   // a dialog closes, so the focus is handed back to the button by hand.
   const triggers = useRef(new Map<string, HTMLButtonElement>());
@@ -119,7 +119,7 @@ export function UnitsCard({ product, canManage }: { product: ProductDetail; canM
         <CardTitle>{t('catalog.units.title')}</CardTitle>
         {canManage ? (
           <CardAction>
-            <Button size="sm" variant="secondary" onClick={() => setAdding(true)}>
+            <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
               <Plus />
               {t('catalog.product.addUnit')}
             </Button>
@@ -157,14 +157,14 @@ export function UnitsCard({ product, canManage }: { product: ProductDetail; canM
                     <span className="text-[0.8125rem] text-muted-foreground">{factorOf(unit)}</span>
                   )}
                   {unit.isDefaultSales || unit.isDefaultPurchase ? (
-                    <div className="mt-1.5 flex flex-wrap gap-1">
-                      {unit.isDefaultSales ? (
-                        <Badge variant="outline">{t('catalog.units.defaultFor.sales')}</Badge>
-                      ) : null}
-                      {unit.isDefaultPurchase ? (
-                        <Badge variant="outline">{t('catalog.units.defaultFor.purchase')}</Badge>
-                      ) : null}
-                    </div>
+                    <span className="text-[0.75rem] whitespace-nowrap text-muted-foreground">
+                      {[
+                        unit.isDefaultSales ? t('catalog.units.defaultFor.sales') : null,
+                        unit.isDefaultPurchase ? t('catalog.units.defaultFor.purchase') : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
                   ) : null}
                 </div>
 
@@ -178,9 +178,11 @@ export function UnitsCard({ product, canManage }: { product: ProductDetail; canM
                               {barcode.code}
                             </span>
                             {barcode.isPrimary ? (
-                              <Badge variant="secondary" className={TAG}>
-                                {t('catalog.units.primary')}
-                              </Badge>
+                              <Star
+                                aria-label={t('catalog.units.primary')}
+                                role="img"
+                                className="size-3.5 fill-warning text-warning"
+                              />
                             ) : null}
                             {barcode.isInternal ? (
                               <Badge variant="outline" className={TAG}>

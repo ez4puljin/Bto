@@ -1394,7 +1394,7 @@ describe('product page', () => {
     renderApp('/catalog/products/7', signedIn(WORKER_ME, productRoutes()));
     // The card is read first (ADR-0042); a worker gets no «Засах» and no form.
     const info = within(await screen.findByRole('region', { name: mn.catalog.product.info }));
-    expect(info.getByText(COLA.name)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: COLA.name })).toBeInTheDocument();
     expect(info.queryByRole('textbox')).toBeNull();
     expect(
       screen.queryByRole('button', { name: `${mn.common.edit}: ${mn.catalog.product.info}` }),
@@ -1405,7 +1405,7 @@ describe('product page', () => {
     expect(screen.queryByRole('button', { name: unitMenu('хайрцаг') })).toBeNull();
     expect(screen.queryByRole('button', { name: mn.catalog.units.addBarcode })).toBeNull();
     expect(screen.queryByRole('button', { name: mn.catalog.units.deleteBarcode })).toBeNull();
-    expect(screen.getByText(COLA_CODE)).toBeInTheDocument();
+    expect(screen.getAllByText(COLA_CODE).length).toBeGreaterThan(0);
   });
 
   it('sends the edited product and shows that it was saved', async () => {
