@@ -5,6 +5,7 @@ import {
   lowestPoStatus,
   MAX_PO_SUPPLIERS,
   nextPoStatus,
+  PO_SUPPLIER_STATUSES,
   type PoSupplierStatus,
   previousPoStatus,
 } from '@tugeel/shared/procurement';
@@ -70,6 +71,8 @@ export interface PurchaseOrderSupplierView {
   ordererName: string | null;
   /** Ordered products and their base quantity and weight (kg, lines with a weight). */
   lineCount: number;
+  /** Σ ordered quantity in the lines' own unit (boxes for a box line). */
+  boxes: Decimal;
   qtyBase: Decimal;
   weightKg: Decimal;
   /** Σ shipped quantity in base units (lines with a shipped quantity typed). */
@@ -123,6 +126,8 @@ export interface PurchaseOrderSummary {
   status: PoSupplierStatus;
   supplierCount: number;
   supplierNames: string[];
+  /** Suppliers per status, in status order, zeros left out. */
+  statusCounts: { status: PoSupplierStatus; count: number }[];
   archivedAt: Date | null;
   createdAt: Date;
 }
@@ -600,6 +605,7 @@ export class PurchaseOrdersService {
             ordererId,
             ordererName: ordererId === null ? null : (names.get(ordererId) ?? null),
             lineCount: own.length,
+            boxes: own.reduce((sum, line) => sum.plus(line.qty), zero),
             qtyBase: own.reduce((sum, line) => sum.plus(line.qtyBase), zero),
             weightKg: own.reduce((sum, line) => {
               const weight = weights.get(line.productId);
@@ -685,7 +691,12 @@ export class PurchaseOrdersService {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const filters: SQL[] = [];
     // Spelled out: Drizzle leaves the columns of a single-table select unqualified.
-    if (query.status) filters.push(eq(purchaseOrders.status, query.status));
+    // A status filter means: a supplier of the order is in that status (the order has none itself).
+    if (query.status) {
+      filters.push(
+        sql`EXISTS (SELECT 1 FROM purchase_order_suppliers s WHERE s.order_id = purchase_orders.id AND s.status = ${query.status})`,
+      );
+    }
     filters.push(
       query.archived ? isNotNull(purchaseOrders.archivedAt) : isNull(purchaseOrders.archivedAt),
     );
@@ -717,6 +728,7 @@ export class PurchaseOrdersService {
             .select({
               orderId: purchaseOrderSuppliers.orderId,
               supplierId: purchaseOrderSuppliers.supplierId,
+              status: purchaseOrderSuppliers.status,
             })
             .from(purchaseOrderSuppliers)
             .where(
@@ -743,6 +755,10 @@ export class PurchaseOrdersService {
           supplierNames: own
             .map((link) => names.get(link.supplierId) ?? '')
             .sort((a, b) => a.localeCompare(b)),
+          statusCounts: PO_SUPPLIER_STATUSES.flatMap((status) => {
+            const count = own.filter((link) => link.status === status).length;
+            return count === 0 ? [] : [{ status, count }];
+          }),
           archivedAt: row.archivedAt,
           createdAt: row.createdAt,
         };

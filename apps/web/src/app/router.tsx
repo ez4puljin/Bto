@@ -59,6 +59,7 @@ import {
 import { HomePage } from '@/features/home/home-page';
 import { PurchaseOrderPrintPage, PurchaseOrdersPage } from '@/features/procurement/orders-pages';
 import { PurchaseOrderDetailPage } from '@/features/procurement/order-detail-page';
+import { PurchaseOrderOverviewPage } from '@/features/procurement/order-overview-page';
 import { PurchaseOrderHistoryPage } from '@/features/procurement/order-history-page';
 import { ReceiptReceivePage } from '@/features/inventory/receipt-receive-page';
 import { ModulePage } from '@/features/home/module-page';
@@ -397,6 +398,15 @@ export const routes: RouteObject[] = [
           },
           {
             path: 'procurement/orders/:id',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="procurement.orders.read">
+                <PurchaseOrderOverviewPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: 'procurement/orders/:id/detail',
             handle: { width: 'full' },
             element: (
               <RequirePermission permission="procurement.orders.read">

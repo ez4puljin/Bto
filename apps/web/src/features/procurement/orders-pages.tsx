@@ -58,7 +58,7 @@ import {
   usePurchaseOrderPrint,
   usePurchaseOrders,
 } from './api';
-import { PoStatusBadge, SupplierTicks } from './parts';
+import { StatusCountBadge, SupplierTicks } from './parts';
 
 const idOf = (value: string | null | undefined) => {
   const parsed = Number.parseInt(value ?? '', 10);
@@ -171,8 +171,14 @@ export function PurchaseOrdersPage() {
                   text={order.note ?? t('common.none')}
                 />
                 <TableCell>
-                  <span className="flex items-center gap-1.5">
-                    <PoStatusBadge status={order.status} />
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {order.statusCounts.map((entry) => (
+                      <StatusCountBadge
+                        key={entry.status}
+                        status={entry.status}
+                        count={entry.count}
+                      />
+                    ))}
                     {order.archivedAt !== null ? (
                       <Badge variant="outline">{t('procurement.detail.archived')}</Badge>
                     ) : null}

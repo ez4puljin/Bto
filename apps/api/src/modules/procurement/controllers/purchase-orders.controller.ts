@@ -77,6 +77,7 @@ function toDetailDto(order: PurchaseOrderDetail): PurchaseOrderDetailDto {
     suppliers: order.suppliers.map((supplier) => ({
       ...supplier,
       statusChangedAt: supplier.statusChangedAt.toISOString(),
+      boxes: supplier.boxes.toFixed(),
       qtyBase: supplier.qtyBase.toFixed(),
       weightKg: supplier.weightKg.toFixed(),
       shippedBase: supplier.shippedBase.toFixed(),

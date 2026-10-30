@@ -15374,6 +15374,11 @@ export interface components {
         SupplierEntries: {
             data: components["schemas"]["SupplierEntry"][];
         };
+        PurchaseOrderStatusCount: {
+            /** @enum {string} */
+            status: "PREPARING" | "SENT" | "SHIPPING" | "IN_TRANSIT" | "ARRIVED" | "ACCOUNTING" | "RECEIVED";
+            count: number;
+        };
         PurchaseOrderSummary: {
             id: number;
             number: string;
@@ -15384,6 +15389,8 @@ export interface components {
             status: "PREPARING" | "SENT" | "SHIPPING" | "IN_TRANSIT" | "ARRIVED" | "ACCOUNTING" | "RECEIVED";
             supplierCount: number;
             supplierNames: string[];
+            /** @description Suppliers per status, zeros left out */
+            statusCounts: components["schemas"]["PurchaseOrderStatusCount"][];
             /** Format: date-time */
             archivedAt: string | null;
             /** Format: date-time */
@@ -15410,6 +15417,8 @@ export interface components {
             ordererId: number | null;
             ordererName: string | null;
             lineCount: number;
+            /** @description Σ ordered quantity in the lines’ own unit (boxes) */
+            boxes: string;
             /** @description Σ ordered base quantity */
             qtyBase: string;
             /** @description Σ weight, kg (products with a weight) */

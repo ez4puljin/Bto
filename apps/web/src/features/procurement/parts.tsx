@@ -27,6 +27,17 @@ export function PoStatusBadge({ status }: { status: PoStatus }) {
   return <Badge variant={STATUS_VARIANT[status]}>{t(`procurement.status.${status}`)}</Badge>;
 }
 
+/** A status with how many suppliers of an order stand in it. */
+export function StatusCountBadge({ status, count }: { status: PoStatus; count: number }) {
+  const { t } = useTranslation();
+  return (
+    <Badge variant={STATUS_VARIANT[status]} className="gap-1">
+      <span>{t(`procurement.status.${status}`)}</span>
+      <span className="font-mono">{formatCount(count)}</span>
+    </Badge>
+  );
+}
+
 /**
  * Ticks over the active suppliers, searched in the browser by name, code, phone or TIN over the one
  * list the server gives (with each supplier's main-product count); the ticked ones stay while the

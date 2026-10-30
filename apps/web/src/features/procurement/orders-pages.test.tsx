@@ -29,6 +29,7 @@ const SUMMARY: Schemas['PurchaseOrderSummary'] = {
   status: 'PREPARING',
   supplierCount: 2,
   supplierNames: ['МСМ ХХК', 'Сүү ХК'],
+  statusCounts: [{ status: 'PREPARING', count: 2 }],
   archivedAt: null,
   createdAt: STAMP,
 };
@@ -42,6 +43,7 @@ const MSM: Schemas['PurchaseOrderSupplier'] = {
   ordererId: 1,
   ordererName: 'Админ Бат',
   lineCount: 1,
+  boxes: '2',
   qtyBase: '24',
   weightKg: '12',
   shippedBase: '0',
@@ -256,7 +258,7 @@ describe('purchase orders', () => {
         },
       }),
     );
-    renderApp('/procurement/orders/7', fetchMock);
+    renderApp('/procurement/orders/7/detail', fetchMock);
 
     // Both suppliers' group rows sit in the one table, with the status steps above.
     expect((await screen.findAllByText('МСМ ХХК')).length).toBeGreaterThan(0);
@@ -343,7 +345,7 @@ describe('purchase orders', () => {
         },
       }),
     );
-    renderApp('/procurement/orders/7?supplier=31', fetchMock);
+    renderApp('/procurement/orders/7/detail?supplier=31', fetchMock);
 
     const cola = await screen.findByRole('textbox', { name: 'Тоо: 1001 Кока кола 0.5л' });
     await user.clear(cola);
@@ -375,7 +377,7 @@ describe('purchase orders', () => {
         },
       }),
     );
-    renderApp('/procurement/orders/7', fetchMock);
+    renderApp('/procurement/orders/7/detail', fetchMock);
 
     const shipped = await screen.findByRole('textbox', { name: 'Ачигдсан: 1001 Кока кола 0.5л' });
     await user.type(shipped, '1');
@@ -493,7 +495,7 @@ describe('purchase orders', () => {
         },
       }),
     );
-    renderApp('/procurement/orders/7', fetchMock);
+    renderApp('/procurement/orders/7/detail', fetchMock);
 
     const price = await screen.findByRole('textbox', { name: 'Нэгж үнэ: 2001 Сүү 1л' });
     expect(price).toHaveValue('2000');
@@ -521,7 +523,7 @@ describe('purchase orders', () => {
         },
       }),
     );
-    renderApp('/procurement/orders/7', fetchMock);
+    renderApp('/procurement/orders/7/detail', fetchMock);
     await screen.findAllByText('МСМ ХХК');
     expect(screen.queryByText(mn.procurement.detail.staleTitle)).not.toBeInTheDocument();
 
@@ -555,7 +557,7 @@ describe('purchase orders', () => {
         [`GET ${MILK_ROWS}`]: () => gridPage([MILK_ROW].map(withoutPrices) as never),
       }),
     });
-    renderApp('/procurement/orders/7', fetchMock);
+    renderApp('/procurement/orders/7/detail', fetchMock);
 
     expect(
       await screen.findByRole('textbox', { name: 'Тоо: 1001 Кока кола 0.5л' }),
@@ -660,7 +662,7 @@ describe('a new order with every supplier', () => {
         ),
       }),
     );
-    renderApp('/procurement/orders/7', fetchMock);
+    renderApp('/procurement/orders/7/detail', fetchMock);
 
     // Eight closed headers, their counts, and not one rows request.
     expect(await screen.findByRole('button', { name: 'Дэлгэх: МСМ ХХК' })).toHaveAttribute(
@@ -738,7 +740,7 @@ describe('the filter bar of an order', () => {
         },
       }),
     );
-    renderApp('/procurement/orders/7', fetchMock);
+    renderApp('/procurement/orders/7/detail', fetchMock);
 
     expect(await screen.findByText('2 нийлүүлэгч · 3 бараа')).toBeInTheDocument();
     expect(screen.getAllByText('Сүү ХК').length).toBeGreaterThan(0);
@@ -792,7 +794,7 @@ describe('the filter bar of an order', () => {
         },
       }),
     );
-    renderApp('/procurement/orders/7', fetchMock);
+    renderApp('/procurement/orders/7/detail', fetchMock);
 
     const cola = await screen.findByRole('textbox', { name: 'Тоо: 1001 Кока кола 0.5л' });
     await user.clear(cola);

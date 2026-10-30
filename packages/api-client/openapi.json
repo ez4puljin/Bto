@@ -57010,6 +57010,30 @@
           "data"
         ]
       },
+      "PurchaseOrderStatusCount": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "PREPARING",
+              "SENT",
+              "SHIPPING",
+              "IN_TRANSIT",
+              "ARRIVED",
+              "ACCOUNTING",
+              "RECEIVED"
+            ],
+            "type": "string"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "status",
+          "count"
+        ]
+      },
       "PurchaseOrderSummary": {
         "type": "object",
         "properties": {
@@ -57048,6 +57072,13 @@
               "type": "string"
             }
           },
+          "statusCounts": {
+            "description": "Suppliers per status, zeros left out",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderStatusCount"
+            }
+          },
           "archivedAt": {
             "type": "string",
             "nullable": true,
@@ -57066,6 +57097,7 @@
           "status",
           "supplierCount",
           "supplierNames",
+          "statusCounts",
           "archivedAt",
           "createdAt"
         ]
@@ -57154,6 +57186,10 @@
           "lineCount": {
             "type": "number"
           },
+          "boxes": {
+            "type": "string",
+            "description": "Σ ordered quantity in the lines’ own unit (boxes)"
+          },
           "qtyBase": {
             "type": "string",
             "description": "Σ ordered base quantity"
@@ -57237,6 +57273,7 @@
           "ordererId",
           "ordererName",
           "lineCount",
+          "boxes",
           "qtyBase",
           "weightKg",
           "shippedBase",

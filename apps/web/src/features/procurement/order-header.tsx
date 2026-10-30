@@ -37,13 +37,12 @@ import { cn } from '@/lib/utils';
 import { randomUuid } from '@/lib/uuid';
 import {
   PO_STATUSES,
-  type PoStatus,
   type PurchaseOrderDetail,
   type PurchaseOrderSupplier,
   usePurchaseOrderDownloads,
   usePurchaseOrderMutations,
 } from './api';
-import { PoStatusBadge, SupplierTicks } from './parts';
+import { SupplierTicks } from './parts';
 
 /**
  * The order's head (ADR-0118 #3): number, date, status and author; the seven statuses as circles
@@ -99,10 +98,12 @@ export function OrderHeader(props: {
       <PageHeader
         title={detail.number}
         description={detail.note ?? undefined}
-        crumbs={[{ label: t('procurement.orders.title'), to: '/procurement/orders' }]}
+        crumbs={[
+          { label: t('procurement.orders.title'), to: '/procurement/orders' },
+          { label: detail.number, to: `/procurement/orders/${detail.id}` },
+        ]}
         meta={
           <>
-            <PoStatusBadge status={detail.status} />
             {archived ? <Badge variant="outline">{t('procurement.detail.archived')}</Badge> : null}
             <span className="font-mono">{detail.orderDate}</span>
             {detail.createdBy ? (
@@ -213,7 +214,7 @@ export function OrderHeader(props: {
         }
       />
       <ProblemAlert problem={exporting.problem ?? archiving.problem} />
-      <StatusSteps current={detail.status} />
+      <StatusCounts suppliers={detail.suppliers} />
       <dl
         className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-muted-foreground"
         aria-label={t('procurement.detail.totals')}
@@ -282,40 +283,36 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** The seven statuses as numbered circles: green done, blue current, grey ahead. */
-export function StatusSteps({ current }: { current: PoStatus }) {
+/** The seven statuses in order, each with how many suppliers stand in it (the order has none). */
+export function StatusCounts({ suppliers }: { suppliers: readonly PurchaseOrderSupplier[] }) {
   const { t } = useTranslation();
-  const index = PO_STATUSES.indexOf(current);
   return (
     <ol
-      className="mb-3 flex flex-wrap items-center gap-1"
+      className="mb-3 flex flex-wrap items-center gap-1.5"
       aria-label={t('procurement.detail.steps')}
     >
       {PO_STATUSES.map((status, position) => {
-        const state = position < index ? 'done' : position === index ? 'current' : 'next';
+        const count = suppliers.filter((supplier) => supplier.status === status).length;
         return (
-          <li
-            key={status}
-            aria-current={state === 'current' ? 'step' : undefined}
-            className="flex items-center gap-1"
-          >
+          <li key={status} className="flex items-center gap-1">
             <span
               className={cn(
                 'flex size-6 items-center justify-center rounded-full text-xs font-semibold',
-                state === 'done' && 'bg-success text-white',
-                state === 'current' && 'bg-primary text-white',
-                state === 'next' && 'bg-fill text-muted-foreground',
+                count > 0 ? 'bg-primary text-white' : 'bg-fill text-muted-foreground',
               )}
             >
               {position + 1}
             </span>
+            <span className={cn('text-[13px]', count === 0 && 'text-muted-foreground')}>
+              {t(`procurement.status.${status}`)}
+            </span>
             <span
               className={cn(
-                'text-[13px]',
-                state === 'current' ? 'font-semibold' : 'text-muted-foreground',
+                'font-mono text-[13px] font-semibold',
+                count === 0 && 'text-muted-foreground',
               )}
             >
-              {t(`procurement.status.${status}`)}
+              {formatCount(count)}
             </span>
             {position < PO_STATUSES.length - 1 ? (
               <span className="mx-1 h-px w-4 bg-border" aria-hidden />

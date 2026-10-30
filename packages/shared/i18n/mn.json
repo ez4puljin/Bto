@@ -7369,6 +7369,24 @@
     }
   },
   "procurement": {
+    "overview": {
+      "detail": "Дэлгэрэнгүй",
+      "refresh": "Шинэчлэх",
+      "suppliers": "Нийлүүлэгч",
+      "boxes": "Хайрцаг",
+      "pieces": "Ширхэг",
+      "kg": "Жин",
+      "estimated": "Тооцоолсон дүн",
+      "final": "Нийт дүн",
+      "all": "Бүгд",
+      "statuses": "Нийлүүлэгчдийн төлөв",
+      "byOrderer": "Захиалагчаар",
+      "groupSummary": "{{suppliers}} нийлүүлэгч · {{boxes}} хайрцаг · {{pieces}} ш · {{kg}} кг",
+      "openOrderer": "Дэлгэрэнгүй: {{name}}",
+      "openSupplier": "Дэлгэрэнгүй: {{name}}",
+      "lines": "Бараа",
+      "empty": "Энэ төлөвт нийлүүлэгч алга"
+    },
     "detail": {
       "archived": "Архивласан",
       "archive": "Архивлах",
@@ -7379,7 +7397,7 @@
       "print": "Хэвлэх",
       "stepBack": "Нэг шат буцаах",
       "stepBackTitle": "{{name}}: нэг шат буцаах",
-      "steps": "Статусын алхмууд",
+      "steps": "Нийлүүлэгчдийн төлөв",
       "totals": "Захиалгын нийт",
       "totalPieces": "Нийт ш",
       "totalKg": "кг",
@@ -7548,7 +7566,7 @@
       "title": "Худалдан авах захиалга",
       "create": "Шинэ захиалга",
       "searchPlaceholder": "Захиалгын дугаараар хайх",
-      "status": "Төлөв",
+      "status": "Нийлүүлэгчдийн төлөв",
       "allStatuses": "Бүх төлөв",
       "mine": "Миний нийлүүлэгч",
       "archived": "Архив",

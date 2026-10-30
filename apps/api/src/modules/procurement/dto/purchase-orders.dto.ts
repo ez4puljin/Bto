@@ -56,6 +56,7 @@ export class PurchaseOrderSupplierDto {
   @ApiProperty({ type: Number, nullable: true }) ordererId: number | null;
   @ApiProperty({ type: String, nullable: true }) ordererName: string | null;
   @ApiProperty() lineCount: number;
+  @ApiProperty({ description: 'Σ ordered quantity in the lines’ own unit (boxes)' }) boxes: string;
   @ApiProperty({ description: 'Σ ordered base quantity' }) qtyBase: string;
   @ApiProperty({ description: 'Σ weight, kg (products with a weight)' }) weightKg: string;
   @ApiProperty({ description: 'Σ shipped quantity, base units (lines typed at «Ачигдаж»)' })
@@ -122,6 +123,12 @@ export class PurchaseOrderVersionDto {
   receiptsUpdatedAt: string | null;
 }
 
+@ApiSchema({ name: 'PurchaseOrderStatusCount' })
+export class PurchaseOrderStatusCountDto {
+  @ApiProperty({ enum: PO_SUPPLIER_STATUSES }) status: PoSupplierStatus;
+  @ApiProperty() count: number;
+}
+
 @ApiSchema({ name: 'PurchaseOrderSummary' })
 export class PurchaseOrderSummaryDto {
   @ApiProperty() id: number;
@@ -131,6 +138,11 @@ export class PurchaseOrderSummaryDto {
   @ApiProperty({ enum: PO_SUPPLIER_STATUSES }) status: PoSupplierStatus;
   @ApiProperty() supplierCount: number;
   @ApiProperty({ type: [String] }) supplierNames: string[];
+  @ApiProperty({
+    type: [PurchaseOrderStatusCountDto],
+    description: 'Suppliers per status, zeros left out',
+  })
+  statusCounts: PurchaseOrderStatusCountDto[];
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) archivedAt: string | null;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
 }
