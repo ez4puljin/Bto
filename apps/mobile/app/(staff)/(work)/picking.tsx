@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ArrowLeftRight, ChevronRight, PackageSearch } from 'lucide-react-native';
+import { ChevronRight, PackageSearch } from 'lucide-react-native';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, SectionList, StyleSheet, View } from 'react-native';
@@ -11,20 +11,22 @@ import { initialsOf } from '../../../src/format/format';
 import { PickStatusPill } from '../../../src/picking/pills';
 import { type WorkGroup, workGroups } from '../../../src/picking/sections';
 import type { PickWork } from '../../../src/picking/types';
-import { isRep, mayRequestTransfers } from '../../../src/state/phase';
+import { isRep } from '../../../src/state/phase';
 import { useSignedIn } from '../../../src/state/session';
 import { colors, fonts, radii, spacing, type } from '../../../src/theme/tokens';
 import { Separator } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
-import { HeaderIconButton, StoreHeader } from '../../../src/ui/store-header';
+import { StoreHeader } from '../../../src/ui/store-header';
+import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 import { Text } from '../../../src/ui/text';
 
 /**
  * «Бэлтгэл» (ADR-0132): the keeper's parts from `GET /sales-picks`, in sections — to take, mine,
  * others', done today — each row the order's number and the part's pill, the customer, the
  * warehouse, «N бараа» and the delivery date; a tap opens the part. Pull to refresh; the list
- * re-reads every 15 s. The initials open the profile; a seller finds «Шилжүүлэг» in the header.
+ * re-reads every 15 s. A tab of the work menu; a rep opens it from «Нүүр» (the back arrow, the
+ * initials to the profile).
  */
 export default function PickingHomeScreen() {
   const { t } = useTranslation();
@@ -32,6 +34,7 @@ export default function PickingHomeScreen() {
   const insets = useSafeAreaInsets();
   const { me } = useSignedIn();
   const rep = isRep(me);
+  const barInset = useStoreTabBarInset();
   const work = usePickWork();
   const sections = useMemo(() => workGroups(work.data ?? [], me.id), [work.data, me.id]);
 
@@ -89,24 +92,17 @@ export default function PickingHomeScreen() {
         title={t('mobile.picking.title')}
         {...(rep ? { onBack: () => router.back() } : {})}
         right={
-          <View style={styles.headerRight}>
-            {!rep && mayRequestTransfers(me) ? (
-              <HeaderIconButton
-                icon={<ArrowLeftRight size={22} strokeWidth={2} color={colors.primaryForeground} />}
-                label={t('mobile.transfers.title')}
-                onPress={() => router.push('/transfers')}
-              />
-            ) : null}
+          rep ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('mobile.tabs.profile')}
-              onPress={() => router.push(rep ? '/profile' : '/store-profile')}
+              onPress={() => router.push('/profile')}
               hitSlop={7}
               style={({ pressed }) => [styles.avatar, pressed && styles.faded]}
             >
               <Text style={styles.avatarText}>{initialsOf(me.fullName)}</Text>
             </Pressable>
-          </View>
+          ) : null
         }
       />
       <SectionList<PickWork, WorkGroup>
@@ -115,7 +111,7 @@ export default function PickingHomeScreen() {
         stickySectionHeadersEnabled={false}
         contentContainerStyle={[
           styles.list,
-          { paddingBottom: Math.max(insets.bottom, spacing.md) },
+          { paddingBottom: rep ? Math.max(insets.bottom, spacing.md) : barInset },
         ]}
         renderSectionHeader={({ section }) => (
           <Text accessibilityRole="header" style={[type.sectionHeader, styles.sectionHeader]}>
@@ -147,7 +143,6 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0, gap: 2 },
   pressed: { backgroundColor: colors.accent },
   faded: { opacity: 0.7 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   avatar: {
     width: 34,
     height: 34,

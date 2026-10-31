@@ -32,6 +32,7 @@ import { ChoiceChip, PillButton, Segmented } from '../../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
 import { StoreHeader } from '../../../src/ui/store-header';
+import { useStoreTabBarHeight, useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 import { Text } from '../../../src/ui/text';
 
 /**
@@ -46,6 +47,8 @@ export default function TransfersHomeScreen() {
   const insets = useSafeAreaInsets();
   const { me } = useSignedIn();
   const rep = isRep(me);
+  const barInset = useStoreTabBarInset();
+  const barHeight = useStoreTabBarHeight();
   const context = useTransferContext();
   const stores = useMemo(() => context.data?.storeWarehouses ?? [], [context.data]);
   const [storeId, setStoreId] = useState<number | null>(null);
@@ -113,15 +116,17 @@ export default function TransfersHomeScreen() {
         title={t('mobile.transfers.title')}
         {...(rep ? { onBack: () => router.back() } : {})}
         right={
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('mobile.tabs.profile')}
-            onPress={() => router.push(rep ? '/profile' : '/store-profile')}
-            hitSlop={7}
-            style={({ pressed }) => [styles.avatar, pressed && styles.faded]}
-          >
-            <Text style={styles.avatarText}>{initialsOf(me.fullName)}</Text>
-          </Pressable>
+          rep ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('mobile.tabs.profile')}
+              onPress={() => router.push('/profile')}
+              hitSlop={7}
+              style={({ pressed }) => [styles.avatar, pressed && styles.faded]}
+            >
+              <Text style={styles.avatarText}>{initialsOf(me.fullName)}</Text>
+            </Pressable>
+          ) : null
         }
       >
         {stores.length > 1 ? (
@@ -180,7 +185,7 @@ export default function TransfersHomeScreen() {
             ItemSeparatorComponent={() => <View style={styles.separator} />}
             contentContainerStyle={[
               styles.list,
-              { paddingBottom: Math.max(insets.bottom, spacing.md) + 90 },
+              { paddingBottom: (rep ? Math.max(insets.bottom, spacing.md) : barInset) + 90 },
             ]}
             onEndReachedThreshold={0.5}
             onEndReached={() => {
@@ -216,7 +221,14 @@ export default function TransfersHomeScreen() {
               ) : null
             }
           />
-          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+          <View
+            style={[
+              styles.footer,
+              rep
+                ? { paddingBottom: Math.max(insets.bottom, spacing.md) }
+                : { bottom: barHeight, paddingBottom: spacing.md },
+            ]}
+          >
             <PillButton
               title={t('mobile.transfers.home.newRequest')}
               icon={<Plus size={20} strokeWidth={2.4} color={colors.primaryForeground} />}

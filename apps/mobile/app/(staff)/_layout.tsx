@@ -35,23 +35,21 @@ export default function StaffLayout() {
           <Stack.Protected guard={rep}>
             <Stack.Screen name="(tabs)" />
           </Stack.Protected>
+          {/* The work menu (picking, transfers, attendance, profile): first for everyone but a rep. */}
+          <Stack.Screen name="(work)" />
           {/* The picking (ADR-0132): first for a keeper, opened from «Нүүр» by a rep. */}
           <Stack.Protected guard={picker}>
-            <Stack.Screen name="picking/index" />
             <Stack.Screen name="picking/[id]" />
           </Stack.Protected>
           {/* The transfers (ADR-0116): first for a seller, opened from «Нүүр» by a rep. */}
           <Stack.Protected guard={rep || seller}>
-            <Stack.Screen name="transfers/index" />
             <Stack.Screen name="transfers/new" />
             <Stack.Screen name="transfers/[id]/index" />
             <Stack.Screen name="transfers/[id]/receive" />
           </Stack.Protected>
           {/* «Ирц» (ADR-0131): first for staff with neither right, a profile row for the rest. */}
-          <Stack.Screen name="attendance/index" />
           <Stack.Screen name="attendance/history" />
           {/* The profile without the rep's context: a seller's and any other staff member's. */}
-          <Stack.Screen name="store-profile" />
           <Stack.Protected guard={rep}>
             <Stack.Screen
               name="product/[id]"

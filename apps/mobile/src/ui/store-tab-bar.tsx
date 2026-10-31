@@ -21,6 +21,12 @@ export function useStoreTabBarInset(): number {
   return BAR_HEIGHT + insets.bottom + spacing.md;
 }
 
+/** The bar's own height: a footer pinned to the bottom of a tab sits right above it. */
+export function useStoreTabBarHeight(): number {
+  const insets = useSafeAreaInsets();
+  return BAR_HEIGHT + insets.bottom;
+}
+
 function useKeyboardShown(): boolean {
   const [shown, setShown] = useState(false);
   useEffect(() => {
@@ -34,12 +40,25 @@ function useKeyboardShown(): boolean {
   return shown;
 }
 
-export function StoreTabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
+/**
+ * `scan` raises the barcode camera in the middle (the shop's bar); the staff's work bar has none.
+ * A tab hidden with `href: null` (its item style `display: 'none'`) is left out.
+ */
+export function StoreTabBar({
+  state,
+  descriptors,
+  navigation,
+  insets,
+  scan = true,
+}: BottomTabBarProps & { scan?: boolean }) {
   const { t } = useTranslation();
   const router = useRouter();
   const keyboard = useKeyboardShown();
   if (keyboard) return null;
-  const middle = Math.ceil(state.routes.length / 2);
+  const hidden = (key: string) =>
+    StyleSheet.flatten(descriptors[key]?.options.tabBarItemStyle)?.display === 'none';
+  const shown = state.routes.filter((route) => !hidden(route.key));
+  const middle = scan ? Math.ceil(shown.length / 2) : -1;
   return (
     <View
       accessibilityRole="tablist"
@@ -47,7 +66,8 @@ export function StoreTabBar({ state, descriptors, navigation, insets }: BottomTa
     >
       {state.routes.map((route, index) => {
         const descriptor = descriptors[route.key];
-        if (!descriptor) return null;
+        if (!descriptor || hidden(route.key)) return null;
+        const place = shown.indexOf(route);
         const { options } = descriptor;
         const focused = state.index === index;
         const color = focused ? colors.primary : colors.placeholder;
@@ -62,7 +82,7 @@ export function StoreTabBar({ state, descriptors, navigation, insets }: BottomTa
         };
         return (
           <Fragment key={route.key}>
-            {index === middle ? (
+            {place === middle ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t('mobile.scan.title')}

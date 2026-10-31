@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   AppState,
   Linking,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -27,16 +26,16 @@ import {
   nextKind,
 } from '../../../src/attendance/status';
 import { ubDate, ubTime, weekdayOf } from '../../../src/dates/dates';
-import { initialsOf } from '../../../src/format/format';
-import { isRep, mayRequestTransfers } from '../../../src/state/phase';
+import { isRep } from '../../../src/state/phase';
 import { useSignedIn } from '../../../src/state/session';
-import { colors, fonts, radii, spacing, storeType, tabular, type } from '../../../src/theme/tokens';
+import { colors, radii, spacing, tabular, type } from '../../../src/theme/tokens';
 import { PillButton } from '../../../src/ui/controls';
 import { Group, ICON_INSET, IconTile, Row } from '../../../src/ui/grouped';
 import { ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
 import { StatRow } from '../../../src/ui/stat-row';
 import { StoreHeader } from '../../../src/ui/store-header';
+import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
 
@@ -58,7 +57,8 @@ export default function AttendanceScreen() {
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const { me } = useSignedIn();
-  const hasOwnHome = isRep(me) || mayRequestTransfers(me);
+  const rep = isRep(me);
+  const barInset = useStoreTabBarInset();
   const attendance = useMyAttendance();
   const punch = usePunch();
   const [problem, setProblem] = useState<AppProblem | null>(null);
@@ -71,6 +71,7 @@ export default function AttendanceScreen() {
   // the app only reads the permission, so a refused question never comes back by itself.
   const watch = useRef<Location.LocationSubscription | null>(null);
   const starting = useRef(false);
+  const declined = useRef(false);
   const alive = useRef(true);
   const asked = useRef(false);
 
@@ -85,6 +86,9 @@ export default function AttendanceScreen() {
 
   const startLocation = useCallback(async (ask: boolean) => {
     if (watch.current || starting.current) return;
+    // Declined once (the phone's location off and the system dialog refused): only «Байршил асаах»
+    // tries again — returning to the app would raise the dialog over and over.
+    if (!ask && declined.current) return;
     starting.current = true;
     try {
       const permission = ask
@@ -118,7 +122,8 @@ export default function AttendanceScreen() {
       watch.current = subscription;
       setWhere((current) => (current === 'on' ? current : 'asking'));
     } catch {
-      // The phone's location is switched off.
+      // The phone's location is switched off (or its dialog refused).
+      declined.current = true;
       if (alive.current) setWhere('off');
     } finally {
       starting.current = false;
@@ -154,6 +159,7 @@ export default function AttendanceScreen() {
     // A watch started while the location was off may stay silent: start a new one.
     watch.current?.remove();
     watch.current = null;
+    declined.current = false;
     setWhere('asking');
     void startLocation(false);
   };
@@ -440,25 +446,13 @@ export default function AttendanceScreen() {
     <Page edges={[]}>
       <StoreHeader
         title={t('mobile.attendance.title')}
-        {...(hasOwnHome ? { onBack: () => router.back() } : {})}
-        right={
-          hasOwnHome ? null : (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('mobile.tabs.profile')}
-              onPress={() => router.push('/store-profile')}
-              hitSlop={7}
-              style={({ pressed }) => [styles.avatar, pressed && styles.faded]}
-            >
-              <Text style={styles.avatarText}>{initialsOf(me.fullName)}</Text>
-            </Pressable>
-          )
-        }
+        {...(rep ? { onBack: () => router.back() } : {})}
+        right={null}
       />
       <ScrollView
         contentContainerStyle={[
           styles.body,
-          { paddingBottom: Math.max(insets.bottom, spacing.md) + 24 },
+          { paddingBottom: (rep ? Math.max(insets.bottom, spacing.md) : barInset) + 24 },
         ]}
         refreshControl={
           <RefreshControl
@@ -476,17 +470,6 @@ export default function AttendanceScreen() {
 const styles = StyleSheet.create({
   body: { paddingHorizontal: 14, paddingTop: spacing.md, gap: spacing.md },
   grow: { flex: 1, minWidth: 0, gap: 2 },
-  faded: { opacity: 0.7 },
-  avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    marginRight: spacing.sm,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { ...storeType.badge, fontFamily: fonts.bold, color: colors.primary },
   centered: { paddingTop: spacing.xl, gap: spacing.md },
   loading: { marginTop: spacing.xl },
   card: {

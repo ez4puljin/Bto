@@ -163,7 +163,13 @@ step(`Gradle ${task} (the first build downloads Gradle and its libraries: 15–3
 // The full path: cmd does not look in the working folder (NoDefaultCurrentDirectoryInExePath).
 run(
   path.join(mirrorApp, 'android', 'gradlew.bat'),
-  [task, `-PreactNativeArchitectures=${process.env.BTO_ABIS ?? 'arm64-v8a,armeabi-v7a'}`],
+  // No daemons left behind: Gradle's and Kotlin's would keep 3–4 GB of RAM after the build.
+  [
+    task,
+    '--no-daemon',
+    '-Pkotlin.compiler.execution.strategy=in-process',
+    `-PreactNativeArchitectures=${process.env.BTO_ABIS ?? 'arm64-v8a,armeabi-v7a'}`,
+  ],
   { cwd: path.join(mirrorApp, 'android'), env, shell: true },
 );
 

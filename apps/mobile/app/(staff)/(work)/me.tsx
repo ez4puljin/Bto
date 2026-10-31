@@ -1,18 +1,17 @@
 import Constants from 'expo-constants';
-import { useRouter } from 'expo-router';
-import { CalendarCheck, Server } from 'lucide-react-native';
+import { Server } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { initialsOf } from '../../src/format/format';
-import { useRoleName } from '../../src/state/role';
-import { useSignedIn } from '../../src/state/session';
-import { colors, fonts, radii, spacing, type } from '../../src/theme/tokens';
-import { Group, ICON_INSET, IconTile, Row } from '../../src/ui/grouped';
-import { Page } from '../../src/ui/layout';
-import { ActionSheet } from '../../src/ui/sheet';
-import { StoreHeader } from '../../src/ui/store-header';
-import { Text } from '../../src/ui/text';
+import { initialsOf } from '../../../src/format/format';
+import { useRoleName } from '../../../src/state/role';
+import { useSignedIn } from '../../../src/state/session';
+import { colors, fonts, radii, spacing, type } from '../../../src/theme/tokens';
+import { Group, ICON_INSET, IconTile, Row } from '../../../src/ui/grouped';
+import { Page } from '../../../src/ui/layout';
+import { ActionSheet } from '../../../src/ui/sheet';
+import { StoreHeader } from '../../../src/ui/store-header';
+import { Text } from '../../../src/ui/text';
 
 /**
  * «Профайл» of a store's seller (ADR-0116 #1) and of any staff member without the rep's context
@@ -21,7 +20,6 @@ import { Text } from '../../src/ui/text';
  */
 export default function StoreProfileScreen() {
   const { t } = useTranslation();
-  const router = useRouter();
   const { session, me, server } = useSignedIn();
   const roleName = useRoleName();
   const [leaving, setLeaving] = useState(false);
@@ -29,7 +27,7 @@ export default function StoreProfileScreen() {
 
   return (
     <Page edges={[]}>
-      <StoreHeader title={t('mobile.tabs.profile')} onBack={() => router.back()} right={null} />
+      <StoreHeader title={t('mobile.tabs.profile')} right={null} />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.user}>
           <View style={styles.avatar}>
@@ -44,19 +42,6 @@ export default function StoreProfileScreen() {
             </Text>
           </View>
         </View>
-
-        <Group inset={ICON_INSET} style={styles.group}>
-          <Row
-            minHeight={52}
-            icon={
-              <IconTile color={colors.tint.green}>
-                <CalendarCheck size={16} strokeWidth={2.2} color={colors.primaryForeground} />
-              </IconTile>
-            }
-            title={t('mobile.attendance.title')}
-            onPress={() => router.push('/attendance')}
-          />
-        </Group>
 
         <Group inset={ICON_INSET} style={styles.group}>
           <Row
