@@ -18421,7 +18421,7 @@
             "bearer": []
           }
         ],
-        "summary": "The staff app's «Бэлтгэл» (ADR-0131): the caller's parts, not done or done today.",
+        "summary": "The staff app's «Бэлтгэл» (ADR-0132): the caller's parts, not done or done today.",
         "tags": [
           "sales"
         ]

@@ -4508,7 +4508,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The staff app's «Бэлтгэл» (ADR-0131): the caller's parts, not done or done today. */
+        /** The staff app's «Бэлтгэл» (ADR-0132): the caller's parts, not done or done today. */
         get: operations["SalesPicks_work"];
         put?: never;
         post?: never;
