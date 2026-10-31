@@ -36,10 +36,7 @@ export function workGroups(rows: readonly PickWork[], meId: number): WorkGroup[]
 export type Counts = Readonly<Record<number, string>>;
 
 export type LineCountState =
-  | { kind: 'uncounted' }
-  | { kind: 'out' }
-  | { kind: 'short'; diffBase: string }
-  | { kind: 'full' };
+  { kind: 'uncounted' } | { kind: 'out' } | { kind: 'short'; diffBase: string } | { kind: 'full' };
 
 /**
  * A line's state from its count: the one typed on the phone, else the one confirmed on the
@@ -72,7 +69,13 @@ export function keypadUnitsOfPickLine(
   scanned: { id: number; uomName: string; factorToBase: string; isBase: boolean } | null,
 ): KeypadUnit[] {
   const units: KeypadUnit[] = [
-    { id: BASE_UNIT_ID, uomName: line.baseUnitName, factorToBase: '1', isBase: true, wholesale: null },
+    {
+      id: BASE_UNIT_ID,
+      uomName: line.baseUnitName,
+      factorToBase: '1',
+      isBase: true,
+      wholesale: null,
+    },
   ];
   if (!new Decimal(line.factorSnapshot).eq(1)) {
     units.push({
