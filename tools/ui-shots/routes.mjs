@@ -46,7 +46,6 @@ export const ROUTES = [
   { area: 'sales', name: 'sales-order-panel', path: '/sales/boards?order={order}', dialog: true },
   { area: 'sales', name: 'sales-order-new', path: '/sales/boards?new=1', dialog: true },
   { area: 'sales', name: 'sales-settings', path: '/sales/boards/settings' },
-  { area: 'sales', name: 'sales-picking', path: '/sales/picking' },
 
   { area: 'inventory', name: 'stock', path: '/inventory/stock' },
   { area: 'inventory', name: 'stock-record', path: '/inventory/stock/{stockProduct}' },

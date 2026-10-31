@@ -14730,6 +14730,16 @@
             }
           },
           {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "description": "Only the orders with a line in this warehouse (ADR-0126 #2)",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
             "name": "mine",
             "required": false,
             "in": "query",
@@ -16115,6 +16125,16 @@
             "name": "customerId",
             "required": false,
             "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "description": "Only the orders with a line in this warehouse (ADR-0126 #2)",
             "schema": {
               "minimum": 1,
               "type": "number"
@@ -17585,57 +17605,6 @@
         ],
         "tags": [
           "sales-rep"
-        ]
-      }
-    },
-    "/api/v1/sales-picks": {
-      "get": {
-        "operationId": "SalesPicks_work",
-        "parameters": [
-          {
-            "name": "warehouseId",
-            "required": false,
-            "in": "query",
-            "description": "One warehouse only",
-            "schema": {
-              "minimum": 1,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SalesPickWork"
-                  }
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "RFC 9457 problem details",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "The parts in the caller's warehouses (a lead: all), not done or done today.",
-        "tags": [
-          "sales"
         ]
       }
     },
@@ -43865,6 +43834,35 @@
           "stages"
         ]
       },
+      "SalesOrderCardPick": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "OPEN",
+              "PICKING",
+              "DONE"
+            ],
+            "type": "string"
+          },
+          "pickerName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "warehouseId",
+          "warehouseName",
+          "status",
+          "pickerName"
+        ]
+      },
       "SalesOrderCard": {
         "type": "object",
         "properties": {
@@ -43954,6 +43952,13 @@
           "stageEnteredAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "picks": {
+            "description": "The warehouses' parts the caller sees (ADR-0126 #2, #3)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderCardPick"
+            }
           }
         },
         "required": [
@@ -43971,7 +43976,8 @@
           "total",
           "lineCount",
           "createdByName",
-          "stageEnteredAt"
+          "stageEnteredAt",
+          "picks"
         ]
       },
       "SalesStageCards": {
@@ -45776,93 +45782,6 @@
           "addresses",
           "contacts",
           "overdue"
-        ]
-      },
-      "SalesPickWork": {
-        "type": "object",
-        "properties": {
-          "orderId": {
-            "type": "number"
-          },
-          "warehouseId": {
-            "type": "number"
-          },
-          "warehouseName": {
-            "type": "string"
-          },
-          "status": {
-            "enum": [
-              "OPEN",
-              "PICKING",
-              "DONE"
-            ],
-            "type": "string"
-          },
-          "pickerId": {
-            "type": "number",
-            "nullable": true
-          },
-          "pickerName": {
-            "type": "string",
-            "nullable": true
-          },
-          "startedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "doneAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "orderNumber": {
-            "type": "string",
-            "nullable": true
-          },
-          "orderStatus": {
-            "enum": [
-              "DRAFT",
-              "SUBMITTED",
-              "APPROVAL_PENDING",
-              "CONFIRMED",
-              "PICKING",
-              "PACKED",
-              "DISPATCHED",
-              "DELIVERED",
-              "DELIVERY_FAILED",
-              "INVOICED",
-              "CLOSED",
-              "CANCELLED"
-            ],
-            "type": "string"
-          },
-          "customerName": {
-            "type": "string"
-          },
-          "deliveryDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "lines": {
-            "type": "number",
-            "description": "The order's lines in this warehouse"
-          }
-        },
-        "required": [
-          "orderId",
-          "warehouseId",
-          "warehouseName",
-          "status",
-          "pickerId",
-          "pickerName",
-          "startedAt",
-          "doneAt",
-          "orderNumber",
-          "orderStatus",
-          "customerName",
-          "deliveryDate",
-          "lines"
         ]
       },
       "SalesPicker": {

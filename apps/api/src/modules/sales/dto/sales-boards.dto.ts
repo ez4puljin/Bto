@@ -11,6 +11,8 @@ import {
   type OrderStatus,
   PAYMENT_METHODS,
   type PaymentMethod,
+  PICK_STATUSES,
+  type PickStatus,
   PIPELINE_VISIBILITIES,
   type PipelineVisibility,
   PIPELINE_KINDS,
@@ -253,6 +255,14 @@ export class SalesOrderFiltersQueryDto {
   @MaxLength(60)
   q?: string;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) customerId?: number;
+  @ApiPropertyOptional({
+    description: 'Only the orders with a line in this warehouse (ADR-0126 #2)',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  warehouseId?: number;
   @ApiPropertyOptional({ description: 'Only the orders the caller entered' })
   @IsOptional()
   @Transform(flag)
@@ -281,6 +291,15 @@ export class SalesCustomerOverdueDto {
   @ApiProperty({ type: String, format: 'date', nullable: true }) oldestDueDate: string | null;
 }
 
+/** A warehouse's part of the picking as the card shows it (ADR-0126 #2). */
+@ApiSchema({ name: 'SalesOrderCardPick' })
+export class SalesOrderCardPickDto {
+  @ApiProperty() warehouseId: number;
+  @ApiProperty() warehouseName: string;
+  @ApiProperty({ enum: PICK_STATUSES }) status: PickStatus;
+  @ApiProperty({ type: String, nullable: true }) pickerName: string | null;
+}
+
 @ApiSchema({ name: 'SalesOrderCard' })
 export class SalesOrderCardDto {
   @ApiProperty() id: number;
@@ -304,6 +323,11 @@ export class SalesOrderCardDto {
   @ApiProperty() lineCount: number;
   @ApiProperty({ type: String, nullable: true }) createdByName: string | null;
   @ApiProperty({ type: String, format: 'date-time' }) stageEnteredAt: string;
+  @ApiProperty({
+    type: [SalesOrderCardPickDto],
+    description: "The warehouses' parts the caller sees (ADR-0126 #2, #3)",
+  })
+  picks: SalesOrderCardPickDto[];
 }
 
 @ApiSchema({ name: 'SalesStageCards' })

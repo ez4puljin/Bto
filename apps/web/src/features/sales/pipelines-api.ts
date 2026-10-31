@@ -26,12 +26,12 @@ export type MoveResult = Schemas['SalesOrderMoveResult'];
 export type ChannelDefault = Schemas['SalesChannelDefault'];
 export type Numbering = Schemas['SalesNumbering'];
 export type PickPart = Schemas['SalesOrderPickPart'];
-export type PickWork = Schemas['SalesPickWork'];
 
 /** The cards and list filters as the API takes them (`orderFilterQuery`). */
 export interface FilterQuery {
   q?: string;
   customerId?: number;
+  warehouseId?: number;
   mine?: boolean;
   channel?: OrderChannel;
   fulfilment?: 'PICKUP' | 'DELIVERY';
@@ -58,7 +58,6 @@ export const SALES_KEYS = {
   numbering: ['sales', 'settings', 'numbering'] as const,
   orders: ['sales', 'orders'] as const,
   pickInfo: (orderId: number) => ['sales', 'orders', orderId, 'pick-info'] as const,
-  pickWork: ['sales', 'picks'] as const,
   pickers: (warehouseId: number) => ['sales', 'picks', 'pickers', warehouseId] as const,
 };
 
@@ -176,16 +175,6 @@ export function usePickInfo(orderId: number | null) {
           signal,
         }),
       ),
-  });
-}
-
-/** The picking page (ADR-0126 #2): the parts of the caller's warehouses (a lead: all). */
-export function usePickWork() {
-  const api = useApiClient();
-  return useQuery({
-    queryKey: SALES_KEYS.pickWork,
-    queryFn: async ({ signal }) => unwrap(await api.GET('/api/v1/sales-picks', { signal })),
-    refetchInterval: 30_000,
   });
 }
 

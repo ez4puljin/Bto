@@ -50,7 +50,7 @@ The owner's orders ship from several Mörön warehouses at once. Each warehouse'
 - **Ledger keys.** The stock ledger keys a movement per document line, movement and leg (`stock_ledger_idem`). So:
   - the way back from STAGING posts BIN_MOVE_OUT and BIN_MOVE_IN;
   - a reopened warehouse's lines are written again under new ids before they are picked again.
-- **The «Бэлтгэл» page** (`/sales/picking`) lists the parts in the caller's warehouses; a lead sees every warehouse. Its views are: to take, mine, all, and done today. A row opens the order on its «Бэлтгэх» tab, which shows one card per warehouse.
+- **On the board.** The card of a confirmed, picking or packed order shows each warehouse's part the caller sees as a small label in the part's colour (waiting grey, being picked blue, picked green) with the picker's name. The board's filter «Агуулах» keeps the orders with a line in one warehouse, so a keeper narrows the board to their own goods. The order opens on its «Бэлтгэх» tab, one card per warehouse. (The first build added a separate «Бэлтгэл» page; the owner had not asked for a menu and refused it the same day, so it was removed.)
 
 ### 3. Keepers see their own lines
 

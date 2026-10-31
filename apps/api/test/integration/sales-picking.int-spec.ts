@@ -279,21 +279,26 @@ describe('sales picking by warehouse', () => {
     const refused = (await move(admin, draft.id, 'Борлуулалт').expect(409)).body as ProblemJson;
     expect(refused.code).toBe('PICK_INCOMPLETE');
     expect(refused.params?.warehouses).toBe(whB.name);
-    // The picking page: keeper B sees warehouse B's open part; the lead sees both with pickers.
-    const work = async (token: string) =>
-      (
-        (await http().get('/api/v1/sales-picks').set(bearer(token)).expect(200))
-          .body as (PartJson & {
-          orderId: number;
-        })[]
-      ).filter((entry) => entry.orderId === draft.id);
-    expect((await work(keeperB)).map((entry) => [entry.warehouseId, entry.status])).toEqual([
-      [whB.id, 'OPEN'],
-    ]);
-    expect((await work(lead)).map((entry) => [entry.warehouseId, entry.status])).toEqual([
+    // The board's cards carry the parts: keeper B sees warehouse B's open part only, the lead
+    // sees both with their pickers; the warehouse filter keeps the orders with a line there.
+    const cardPicks = async (token: string, warehouseId?: number) => {
+      const stages = (
+        await http()
+          .get(`/api/v1/sales-pipelines/${pipeline.id}/cards`)
+          .query(warehouseId ? { warehouseId } : {})
+          .set(bearer(token))
+          .expect(200)
+      ).body as { cards: { id: number; picks: PartJson[] }[] }[];
+      const card = stages.flatMap((entry) => entry.cards).find((entry) => entry.id === draft.id);
+      return card ? card.picks.map((entry) => [entry.warehouseId, entry.status]) : null;
+    };
+    expect(await cardPicks(keeperB)).toEqual([[whB.id, 'OPEN']]);
+    expect(await cardPicks(lead)).toEqual([
       [whA.id, 'DONE'],
       [whB.id, 'OPEN'],
     ]);
+    expect(await cardPicks(lead, whB.id)).not.toBeNull();
+    expect(await cardPicks(lead, 999_999)).toBeNull();
     // The lead hands B's part to keeper B; keeper A may not; then keeper B picks it.
     await part(keeperA, draft.id, whB.id, 'assign', { userId: keeperBId }).expect(403);
     const pickers = (

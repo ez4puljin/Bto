@@ -289,25 +289,6 @@ export class SalesOrderPickPartDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) doneAt: string | null;
 }
 
-@ApiSchema({ name: 'SalesPickWork' })
-export class SalesPickWorkDto extends SalesOrderPickPartDto {
-  @ApiProperty({ type: String, nullable: true }) orderNumber: string | null;
-  @ApiProperty({ enum: ORDER_STATUSES }) orderStatus: OrderStatus;
-  @ApiProperty() customerName: string;
-  @ApiProperty({ type: String, format: 'date' }) deliveryDate: string;
-  @ApiProperty({ description: "The order's lines in this warehouse" }) lines: number;
-}
-
-@ApiSchema({ name: 'SalesPickWorkQuery' })
-export class SalesPickWorkQueryDto {
-  @ApiPropertyOptional({ description: 'One warehouse only' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  warehouseId?: number;
-}
-
 @ApiSchema({ name: 'SalesPickAssignRequest' })
 export class SalesPickAssignRequestDto {
   @ApiProperty({ description: 'The picker the part goes to' }) @IsInt() @Min(1) userId: number;

@@ -3,6 +3,7 @@ import {
   BOARD_LIMITS,
   CARD_SORTS,
   type CardSort,
+  type PickStatus,
   PRINT_KINDS,
   type PrintKind,
 } from '@tugeel/shared/sales';
@@ -20,6 +21,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SegmentedControl } from '@/components/list';
 import { PrintFormatToggle } from '@/components/print-format-toggle';
 import { ProblemAlert } from '@/components/problem-alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -65,6 +67,14 @@ const DRAG_TYPE = 'application/x-tugeel-order';
 /** Space kept under the board: the page's bottom padding (`pb-10`). */
 const BELOW_BOARD = 40;
 const INTERACTIVE = 'a, button, input, select, textarea, label, [role="menuitem"]';
+/** The warehouses' parts on a card (ADR-0126 #2): waiting grey, being picked blue, picked green. */
+const PICK_VARIANTS = {
+  OPEN: 'secondary',
+  PICKING: 'default',
+  DONE: 'success',
+} as const satisfies Record<PickStatus, string>;
+/** The orders whose parts are still worked on; afterwards the card drops them. */
+const PICKING_STATUSES: readonly OrderCard['status'][] = ['CONFIRMED', 'PICKING', 'PACKED'];
 
 /**
  * «Самбараар» (ADR-0056 #8, ADR-0057 #7): the pipeline's visible stages as columns in their own
@@ -458,6 +468,23 @@ function Card({
         </span>
         <OrderStatusBadge status={card.status} />
       </div>
+      {PICKING_STATUSES.includes(card.status) && card.picks.length > 0 ? (
+        <div className="mt-1.5 flex flex-wrap gap-1" aria-label={t('sales.pick.cardParts')}>
+          {card.picks.map((part) => (
+            <Badge
+              key={part.warehouseId}
+              variant={PICK_VARIANTS[part.status]}
+              className="max-w-full rounded-md"
+              title={t(`sales.pick.status.${part.status}`, { name: part.pickerName ?? '' })}
+            >
+              <span className="truncate">
+                {part.warehouseName}
+                {part.pickerName ? ` · ${part.pickerName}` : ''}
+              </span>
+            </Badge>
+          ))}
+        </div>
+      ) : null}
       <div className="mt-1 flex items-center gap-x-3 text-xs whitespace-nowrap text-muted-foreground">
         {card.total !== null ? (
           <span className="font-mono text-foreground">{formatTugrik(card.total)}</span>

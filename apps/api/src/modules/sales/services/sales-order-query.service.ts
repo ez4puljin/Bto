@@ -138,6 +138,8 @@ export interface OrderFilters {
   /** Part of the number, or of a customer's name, code or phone. */
   q?: string;
   customerId?: number;
+  /** Only the orders with a line in this warehouse (ADR-0126 #2: a keeper's own goods). */
+  warehouseId?: number;
   /** Only the orders the caller entered. */
   mine?: boolean;
   channel?: OrderChannel;
@@ -200,7 +202,12 @@ export interface OrderCard {
   lineCount: number;
   createdByName: string | null;
   stageEnteredAt: Date;
+  /** The warehouses' parts the caller sees (ADR-0126 #2, #3). */
+  picks: CardPick[];
 }
+
+/** A part as the card shows it. */
+export type CardPick = Pick<PickPart, 'warehouseId' | 'warehouseName' | 'status' | 'pickerName'>;
 
 export interface StageCards {
   stageId: number;
@@ -399,6 +406,8 @@ export class SalesOrderQueryService {
     const names = await this.names.namesOf(
       rows.flatMap((row) => (row.created_by === null ? [] : [int(row.created_by)])),
     );
+    const parts = await this.picks.partsOfOrders(rows.map((row) => int(row.id)));
+    const visible = access.lineWarehouses;
     return stages.map((stage) => {
       const sums = totals.find((entry) => entry.stageId === stage.id);
       return {
@@ -424,6 +433,14 @@ export class SalesOrderQueryService {
               deliveryDate: row.delivery_date,
               total: row.total === null ? null : new Decimal(row.total),
               lineCount: int(row.line_count),
+              picks: (parts.get(int(row.id)) ?? [])
+                .filter((part) => visible === null || visible.has(part.warehouseId))
+                .map(({ warehouseId, warehouseName, status, pickerName }) => ({
+                  warehouseId,
+                  warehouseName,
+                  status,
+                  pickerName,
+                })),
               createdByName: createdBy === null ? null : (names.get(createdBy) ?? null),
               stageEnteredAt:
                 row.stage_entered_at instanceof Date
@@ -529,6 +546,12 @@ export class SalesOrderQueryService {
       );
     }
     if (filters.customerId) where.push(eq(salesOrders.customerId, filters.customerId));
+    if (filters.warehouseId) {
+      where.push(
+        sql`EXISTS (SELECT 1 FROM ${salesOrderLines} l
+                    WHERE l.order_id = ${salesOrders.id} AND l.warehouse_id = ${filters.warehouseId})`,
+      );
+    }
     if (filters.mine) where.push(eq(salesOrders.createdBy, ctx.userId));
     if (filters.channel) where.push(eq(salesOrders.channel, filters.channel));
     if (filters.fulfilment) where.push(eq(salesOrders.fulfilment, filters.fulfilment));

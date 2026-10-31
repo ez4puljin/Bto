@@ -100,6 +100,7 @@ const CARD: Schemas['SalesOrderCard'] = {
   lineCount: 1,
   createdByName: 'Оффис Сараа',
   stageEnteredAt: STAMP,
+  picks: [],
 };
 const CARDS: Schemas['SalesStageCards'][] = [
   { stageId: 1, count: 1, total: '0', cards: [CARD] },

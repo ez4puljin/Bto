@@ -14,6 +14,8 @@ import { isIsoDate } from '@tugeel/shared/time';
  */
 export interface OrderFilters {
   customer?: number;
+  /** Only the orders with a line in this warehouse (ADR-0126 #2: a keeper's own goods). */
+  warehouse?: number;
   deliveryFrom?: string;
   deliveryTo?: string;
   mine?: boolean;
@@ -24,6 +26,7 @@ export interface OrderFilters {
 
 export const ORDER_FILTER_FIELDS = [
   'customer',
+  'warehouse',
   'delivery',
   'mine',
   'channel',
@@ -34,6 +37,7 @@ export type OrderFilterField = (typeof ORDER_FILTER_FIELDS)[number];
 
 const KEYS = {
   customer: 'c',
+  warehouse: 'w',
   deliveryFrom: 'df',
   deliveryTo: 'dt',
   mine: 'm',
@@ -51,6 +55,8 @@ export function readOrderFilters(params: URLSearchParams): OrderFilters {
   const to = params.get(KEYS.deliveryTo);
   const filters: OrderFilters = {};
   if (customer > 0) filters.customer = customer;
+  const warehouse = Number.parseInt(params.get(KEYS.warehouse) ?? '', 10);
+  if (warehouse > 0) filters.warehouse = warehouse;
   if (from && isIsoDate(from)) filters.deliveryFrom = from;
   if (to && isIsoDate(to)) filters.deliveryTo = to;
   if (params.get(KEYS.mine) === '1') filters.mine = true;
@@ -68,6 +74,7 @@ export function writeOrderFilters(params: URLSearchParams, filters: OrderFilters
   const next = new URLSearchParams(params);
   for (const key of Object.values(KEYS)) next.delete(key);
   if (filters.customer) next.set(KEYS.customer, String(filters.customer));
+  if (filters.warehouse) next.set(KEYS.warehouse, String(filters.warehouse));
   if (filters.deliveryFrom) next.set(KEYS.deliveryFrom, filters.deliveryFrom);
   if (filters.deliveryTo) next.set(KEYS.deliveryTo, filters.deliveryTo);
   if (filters.mine) next.set(KEYS.mine, '1');
@@ -82,6 +89,8 @@ export function activeOrderFilters(filters: OrderFilters): OrderFilterField[] {
     switch (field) {
       case 'customer':
         return filters.customer !== undefined;
+      case 'warehouse':
+        return filters.warehouse !== undefined;
       case 'delivery':
         return filters.deliveryFrom !== undefined || filters.deliveryTo !== undefined;
       case 'mine':
@@ -101,6 +110,9 @@ export function withoutField(filters: OrderFilters, field: OrderFilterField): Or
   switch (field) {
     case 'customer':
       delete next.customer;
+      break;
+    case 'warehouse':
+      delete next.warehouse;
       break;
     case 'delivery':
       delete next.deliveryFrom;
@@ -127,6 +139,7 @@ export function orderFilterQuery(filters: OrderFilters, q: string) {
   return {
     ...(q.trim() ? { q: q.trim() } : {}),
     ...(filters.customer ? { customerId: filters.customer } : {}),
+    ...(filters.warehouse ? { warehouseId: filters.warehouse } : {}),
     ...(filters.mine ? { mine: true } : {}),
     ...(filters.channel ? { channel: filters.channel } : {}),
     ...(filters.fulfilment ? { fulfilment: filters.fulfilment } : {}),

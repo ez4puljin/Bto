@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useHasPermission } from '@/app/auth-context';
 import { FormField } from '@/components/form';
 import { FilterChip, SegmentedControl } from '@/components/list';
+import { NativeSelect } from '@/components/native-select';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -21,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { useWarehouseName, useWarehouseOptions } from '@/features/inventory/helpers';
 import { useCustomer } from '@/features/partners/api';
 import { CustomerPicker, type PickedCustomer } from '@/features/partners/customer-picker';
 import {
@@ -32,6 +34,8 @@ import {
 } from './order-filters';
 
 const CHANNELS = ORDER_CHANNELS.filter((channel) => channel !== 'POS');
+/** The warehouses an order's lines ship from: the filter «Агуулах» (ADR-0126 #2). */
+const SHELF_KINDS = ['WHOLESALE', 'STORE'] as const;
 
 /**
  * «Шүүлтүүр» of the warehouse sales page (ADR-0057 #7, the product list's pattern): the menu lists
@@ -114,8 +118,11 @@ export function OrderFilterMenu(props: {
 
 function FilterText({ field, filters }: { field: OrderFilterField; filters: OrderFilters }) {
   const { t } = useTranslation();
+  const warehouseName = useWarehouseName();
   const name = t(`sales.filters.fields.${field}`);
   switch (field) {
+    case 'warehouse':
+      return `${name}: ${filters.warehouse ? warehouseName(filters.warehouse) : ''}`;
     case 'customer':
       return (
         <>
@@ -157,6 +164,8 @@ function FilterDialog({
 }) {
   const { t } = useTranslation();
   const [customer, setCustomer] = useState<PickedCustomer | null>(null);
+  const warehouses = useWarehouseOptions(SHELF_KINDS);
+  const [warehouse, setWarehouse] = useState(filters.warehouse ? String(filters.warehouse) : '');
   const [from, setFrom] = useState(filters.deliveryFrom ?? '');
   const [to, setTo] = useState(filters.deliveryTo ?? '');
   const [channel, setChannel] = useState(filters.channel ?? CHANNELS[0] ?? 'ADMIN');
@@ -166,6 +175,13 @@ function FilterDialog({
     switch (field) {
       case 'customer':
         apply(customer ? { ...filters, customer: customer.id } : withoutField(filters, field));
+        return;
+      case 'warehouse':
+        apply(
+          warehouse
+            ? { ...filters, warehouse: Number.parseInt(warehouse, 10) }
+            : withoutField(filters, field),
+        );
         return;
       case 'delivery':
         apply({
@@ -202,6 +218,22 @@ function FilterDialog({
         {field === 'customer' ? (
           <FormField label={t('sales.order.customer')} htmlFor="filter-customer">
             <CustomerPicker id="filter-customer" value={customer} onChange={setCustomer} />
+          </FormField>
+        ) : null}
+        {field === 'warehouse' ? (
+          <FormField label={t('sales.filters.fields.warehouse')} htmlFor="filter-warehouse">
+            <NativeSelect
+              id="filter-warehouse"
+              value={warehouse}
+              onChange={(event) => setWarehouse(event.target.value)}
+            >
+              <option value="">{t('sales.filters.anyWarehouse')}</option>
+              {warehouses.options.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.name}
+                </option>
+              ))}
+            </NativeSelect>
           </FormField>
         ) : null}
         {field === 'delivery' ? (
