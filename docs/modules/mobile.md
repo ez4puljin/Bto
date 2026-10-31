@@ -215,7 +215,7 @@ The send (`src/cart/use-send.ts`): the same body keeps its Idempotency-Key (cano
 
 Do not run it while `pnpm check` runs: the load makes the integrity suite time out.
 
-`BTO_SERVER` sets the address the app starts with (default `http://<this PC's Wi-Fi address>:3300`). Cleartext HTTP is allowed outside `APP_ENV=production` (office Wi-Fi until go-live). Release builds are signed with the template's debug key until the owner chooses a release key.
+`BTO_SERVER` sets the address the app starts with (default `http://<this PC's Wi-Fi address>:3300`). **The Android emulator** (2026-10-31): the AVD `bto-test` (Pixel 7, `system-images;android-36;google_apis;x86_64` in `C:AndroidSdk`, WHPX) needs an x86_64 build pointed at the host: `BTO_ABIS=x86_64 BTO_SERVER=http://10.0.2.2:3300 pnpm mobile:apk` (`BTO_ABIS` defaults to `arm64-v8a,armeabi-v7a`; the phone APK crashes there with `libreactnative.so` not found). Start it with `C:AndroidSdkemulatoremulator.exe -avd bto-test`, install with `adb install`; turn off Gboard's stylus popup (`adb shell settings put secure stylus_handwriting_enabled 0`) before typing through adb. Cleartext HTTP is allowed outside `APP_ENV=production` (office Wi-Fi until go-live). Release builds are signed with the template's debug key until the owner chooses a release key.
 
 **Install:** copy the APK to the phone (USB, messenger) and allow «install unknown apps»; an update needs a higher versionCode and the same key. The phone and the PC must share the Wi-Fi (no client isolation); Windows Firewall must let Node.js answer on Private networks (as `start.bat` says).
 

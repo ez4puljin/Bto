@@ -7,7 +7,8 @@
 //   4. The APK is copied to apps/mobile/build/apk/ in the repository.
 // Options: --variant staff|customer (variants.json; the staff app unless named), --debug (a debug
 // APK instead of release). Environment: BTO_SERVER (the address the app
-// starts with, default http://<this PC's Wi-Fi address>:3300), BTO_JAVA_HOME, ANDROID_HOME.
+// starts with, default http://<this PC's Wi-Fi address>:3300), BTO_ABIS (the native ABIs, default
+// arm64-v8a,armeabi-v7a; x86_64 for the Android emulator), BTO_JAVA_HOME, ANDROID_HOME.
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import os from 'node:os';
@@ -162,7 +163,7 @@ step(`Gradle ${task} (the first build downloads Gradle and its libraries: 15–3
 // The full path: cmd does not look in the working folder (NoDefaultCurrentDirectoryInExePath).
 run(
   path.join(mirrorApp, 'android', 'gradlew.bat'),
-  [task, '-PreactNativeArchitectures=arm64-v8a,armeabi-v7a'],
+  [task, `-PreactNativeArchitectures=${process.env.BTO_ABIS ?? 'arm64-v8a,armeabi-v7a'}`],
   { cwd: path.join(mirrorApp, 'android'), env, shell: true },
 );
 
