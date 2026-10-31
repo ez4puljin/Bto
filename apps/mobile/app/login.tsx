@@ -16,8 +16,8 @@ import { ProblemText } from '../src/ui/kit';
 import { Page, SectionHeader } from '../src/ui/layout';
 import { Text, type TextInput } from '../src/ui/text';
 
-/** The label column of the two rows: «Нэвтрэх нэр» fits on one line. */
-const LABEL_WIDTH = 104;
+/** The label column of the two rows: «Утасны дугаар» fits on one line. */
+const LABEL_WIDTH = 120;
 
 /**
  * Signs in with the staff account (ADR-0061 #4, ADR-0068); the session stays until its shift ends.
@@ -29,19 +29,19 @@ export default function LoginScreen() {
   const { t } = useTranslation();
   const appName = useAppName();
   const { session, state, server, setServer } = useSession();
-  const [username, setUsername] = useState('');
+  const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [shown, setShown] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<AppProblem | null>(null);
   const passwordRef = useRef<TextInput>(null);
   const reason = state.status === 'anonymous' ? state.reason : undefined;
-  const ready = username.trim() !== '' && password !== '';
+  const ready = login.trim() !== '' && password !== '';
 
   const submit = async () => {
     if (!session || !ready || busy) return;
     setBusy(true);
-    setProblem(await session.login(username.trim(), password));
+    setProblem(await session.login(login.trim(), password));
     setBusy(false);
   };
 
@@ -90,12 +90,12 @@ export default function LoginScreen() {
           <SectionHeader style={styles.heading}>{t('auth.login.welcome')}</SectionHeader>
           <Group>
             <FieldRow
-              label={t('auth.login.username')}
+              label={t('auth.login.phone')}
               labelWidth={LABEL_WIDTH}
-              placeholder={t('auth.login.username')}
-              value={username}
+              placeholder={t('auth.login.phone')}
+              value={login}
               onChangeText={(value) => {
-                setUsername(value);
+                setLogin(value);
                 setProblem(null);
               }}
               autoCapitalize="none"

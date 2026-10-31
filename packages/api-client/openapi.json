@@ -756,7 +756,7 @@
             "name": "q",
             "required": false,
             "in": "query",
-            "description": "Part of the username or full name",
+            "description": "Part of the full name, phone or login name",
             "schema": {
               "maxLength": 100,
               "type": "string"
@@ -29870,11 +29870,19 @@
       "LoginRequest": {
         "type": "object",
         "properties": {
+          "login": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "example": "99112233",
+            "description": "The registered phone (local form allowed), or the login name while no phone is set"
+          },
           "username": {
             "type": "string",
             "minLength": 1,
             "maxLength": 64,
-            "example": "bat.erdene"
+            "deprecated": true,
+            "description": "Older name of login"
           },
           "password": {
             "type": "string",
@@ -29884,7 +29892,6 @@
           }
         },
         "required": [
-          "username",
           "password"
         ]
       },
@@ -29987,10 +29994,16 @@
             "type": "number"
           },
           "username": {
-            "type": "string"
+            "type": "string",
+            "description": "Internal login name (ADR-0128 #2); not shown to staff"
           },
           "fullName": {
             "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "description": "The sign-in phone, E.164"
           },
           "permissions": {
             "type": "array",
@@ -30026,6 +30039,7 @@
           "id",
           "username",
           "fullName",
+          "phone",
           "permissions",
           "roles",
           "writableWarehouseIds",
@@ -30101,11 +30115,19 @@
       "PasswordSetupRequest": {
         "type": "object",
         "properties": {
+          "login": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "example": "99112233",
+            "description": "The registered phone (local form allowed), or the login name while no phone is set"
+          },
           "username": {
             "type": "string",
             "minLength": 1,
             "maxLength": 64,
-            "example": "bat.erdene"
+            "deprecated": true,
+            "description": "Older name of login"
           },
           "code": {
             "type": "string",
@@ -30120,7 +30142,6 @@
           }
         },
         "required": [
-          "username",
           "code",
           "newPassword"
         ]
@@ -30328,10 +30349,16 @@
             "type": "number"
           },
           "username": {
-            "type": "string"
+            "type": "string",
+            "description": "Internal login name (ADR-0128 #2); not shown to staff"
           },
           "fullName": {
             "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "description": "The sign-in phone, E.164; null on a record registered before ADR-0128"
           },
           "status": {
             "enum": [
@@ -30361,6 +30388,7 @@
           "id",
           "username",
           "fullName",
+          "phone",
           "status",
           "roleIds",
           "lastLoginAt",
@@ -30420,10 +30448,16 @@
             "type": "number"
           },
           "username": {
-            "type": "string"
+            "type": "string",
+            "description": "Internal login name (ADR-0128 #2); not shown to staff"
           },
           "fullName": {
             "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "description": "The sign-in phone, E.164; null on a record registered before ADR-0128"
           },
           "status": {
             "enum": [
@@ -30448,10 +30482,6 @@
             "nullable": true,
             "format": "date-time"
           },
-          "phone": {
-            "type": "string",
-            "nullable": true
-          },
           "passwordSet": {
             "type": "boolean",
             "description": "False until the user redeems a one-time code"
@@ -30475,11 +30505,11 @@
           "id",
           "username",
           "fullName",
+          "phone",
           "status",
           "roleIds",
           "lastLoginAt",
           "lockedUntil",
-          "phone",
           "passwordSet",
           "failedLoginCount",
           "scopes",
@@ -30490,12 +30520,6 @@
       "UserCreateRequest": {
         "type": "object",
         "properties": {
-          "username": {
-            "type": "string",
-            "maxLength": 64,
-            "example": "bat.erdene",
-            "pattern": "^[a-z0-9][a-z0-9._-]{2,31}$"
-          },
           "fullName": {
             "type": "string",
             "maxLength": 100,
@@ -30503,9 +30527,9 @@
           },
           "phone": {
             "type": "string",
-            "nullable": true,
             "maxLength": 32,
-            "example": "99112233"
+            "example": "99112233",
+            "description": "The sign-in phone, 8 Mongolian digits in any local form; unique among staff"
           },
           "roleIds": {
             "maxItems": 20,
@@ -30520,8 +30544,8 @@
           }
         },
         "required": [
-          "username",
           "fullName",
+          "phone",
           "roleIds"
         ]
       },
@@ -30535,7 +30559,8 @@
           "phone": {
             "type": "string",
             "nullable": true,
-            "maxLength": 32
+            "maxLength": 32,
+            "description": "A new sign-in phone; null is refused once a phone is set (ADR-0128 #3)"
           },
           "status": {
             "enum": [
@@ -50083,7 +50108,12 @@
             "type": "number"
           },
           "username": {
-            "type": "string"
+            "type": "string",
+            "description": "Internal login name (ADR-0128 #2)"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
           },
           "fullName": {
             "type": "string"
@@ -50126,6 +50156,7 @@
         "required": [
           "userId",
           "username",
+          "phone",
           "fullName",
           "userStatus",
           "status",

@@ -1,15 +1,40 @@
-import { ApiProperty, ApiSchema } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
 import { PASSWORD_MAX_LENGTH, PERMISSIONS } from '@tugeel/shared/auth';
-import { IsString, MaxLength, MinLength } from 'class-validator';
+import { IsString, MaxLength, MinLength, ValidateIf } from 'class-validator';
 
-@ApiSchema({ name: 'LoginRequest' })
-export class LoginDto {
-  @ApiProperty({ example: 'bat.erdene', maxLength: 64 })
+/**
+ * Who is signing in (ADR-0128 #1): `login` is the registered phone in any local form, or the
+ * login name of a staff record that has no phone yet. `username` is the same field under its
+ * pre-ADR-0128 name, kept so an installed staff app keeps working; one of the two is required.
+ */
+export class StaffLoginFieldsDto {
+  @ApiPropertyOptional({
+    example: '99112233',
+    maxLength: 64,
+    description:
+      'The registered phone (local form allowed), or the login name while no phone is set',
+  })
+  @ValidateIf((o: StaffLoginFieldsDto) => o.username === undefined)
   @IsString()
   @MinLength(1)
   @MaxLength(64)
-  username: string;
+  login?: string;
 
+  @ApiPropertyOptional({ maxLength: 64, deprecated: true, description: 'Older name of login' })
+  @ValidateIf((o: StaffLoginFieldsDto) => o.login === undefined)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  username?: string;
+}
+
+/** The typed identifier, whichever field carried it. */
+export function loginOf(dto: StaffLoginFieldsDto): string {
+  return dto.login ?? dto.username ?? '';
+}
+
+@ApiSchema({ name: 'LoginRequest' })
+export class LoginDto extends StaffLoginFieldsDto {
   @ApiProperty({ format: 'password', maxLength: 256 })
   @IsString()
   @MinLength(1)
@@ -18,13 +43,7 @@ export class LoginDto {
 }
 
 @ApiSchema({ name: 'PasswordSetupRequest' })
-export class PasswordSetupDto {
-  @ApiProperty({ example: 'bat.erdene', maxLength: 64 })
-  @IsString()
-  @MinLength(1)
-  @MaxLength(64)
-  username: string;
-
+export class PasswordSetupDto extends StaffLoginFieldsDto {
   @ApiProperty({ description: 'One-time code issued by an admin, e.g. 7KQ2M-X9D4F', maxLength: 32 })
   @IsString()
   @MinLength(1)
@@ -63,8 +82,11 @@ export class RoleRefDto {
 @ApiSchema({ name: 'Me' })
 export class MeDto {
   @ApiProperty() id: number;
-  @ApiProperty() username: string;
+  @ApiProperty({ description: 'Internal login name (ADR-0128 #2); not shown to staff' })
+  username: string;
   @ApiProperty() fullName: string;
+  @ApiProperty({ type: String, nullable: true, description: 'The sign-in phone, E.164' })
+  phone: string | null;
   @ApiProperty({ enum: PERMISSIONS, enumName: 'Permission', isArray: true })
   permissions: string[];
   @ApiProperty({ type: [RoleRefDto] }) roles: RoleRefDto[];

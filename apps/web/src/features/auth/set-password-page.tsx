@@ -16,7 +16,7 @@ import { passwordMessage } from '@/lib/forms';
 
 const schema = z
   .object({
-    username: z.string().trim().min(1, 'validation.required'),
+    login: z.string().trim().min(1, 'validation.required'),
     code: z
       .string()
       .trim()
@@ -25,7 +25,8 @@ const schema = z
     confirmPassword: z.string().min(1, 'validation.required'),
   })
   .superRefine((values, context) => {
-    const message = passwordMessage(values.newPassword, values.username);
+    // The record is not known yet: what was typed stands in for both the login name and the phone.
+    const message = passwordMessage(values.newPassword, values.login, values.login);
     if (message) context.addIssue({ code: 'custom', path: ['newPassword'], message });
     if (values.confirmPassword !== values.newPassword) {
       context.addIssue({
@@ -45,11 +46,11 @@ export function SetPasswordPage() {
   const [problem, setProblem] = useState<ProblemDetails | null>(null);
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { username: '', code: '', newPassword: '', confirmPassword: '' },
+    defaultValues: { login: '', code: '', newPassword: '', confirmPassword: '' },
   });
   const submit = form.handleSubmit(async (values) => {
     setProblem(null);
-    const result = await session.setupPassword(values.username, values.code, values.newPassword);
+    const result = await session.setupPassword(values.login, values.code, values.newPassword);
     if (result.ok) await navigate('/', { replace: true });
     else setProblem(result.problem);
   });
@@ -60,15 +61,15 @@ export function SetPasswordPage() {
       <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
         <ProblemAlert problem={problem} />
         <div className="flex flex-col gap-2">
-          <Label htmlFor="username">{t('auth.login.username')}</Label>
+          <Label htmlFor="login">{t('auth.login.phone')}</Label>
           <Input
-            id="username"
+            id="login"
             className="h-10"
             autoComplete="username"
             autoCapitalize="none"
-            {...form.register('username')}
+            {...form.register('login')}
           />
-          <FieldError message={errors.username?.message} />
+          <FieldError message={errors.login?.message} />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="code">{t('auth.setPassword.code')}</Label>

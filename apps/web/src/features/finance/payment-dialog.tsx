@@ -77,7 +77,7 @@ function PaymentForm({
   const { t } = useTranslation();
   const moneyAccounts = useMoneyAccounts();
   const glAccounts = useGlAccounts();
-  const users = useUsers('');
+  const users = useUsers({});
   const mutations = useFinanceMutations();
   const action = useAction();
   const [key] = useState(randomUuid);

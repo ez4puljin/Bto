@@ -2,7 +2,7 @@ import { Body, Controller, Header, HttpCode, Post, Req } from '@nestjs/common';
 import { ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { Public } from '../../../common/auth/public.decorator';
-import { LoginDto } from '../dto/auth.dto';
+import { LoginDto, loginOf } from '../dto/auth.dto';
 import {
   MobileLoginResponseDto,
   MobileTokenRequestDto,
@@ -34,7 +34,10 @@ export class MobileAuthController {
   @ApiOkResponse({ type: MobileLoginResponseDto })
   async login(@Body() body: LoginDto, @Req() request: Request): Promise<MobileLoginResponseDto> {
     assertNativeClient(request);
-    const issued = await this.auth.login(body, clientOf(request));
+    const issued = await this.auth.login(
+      { login: loginOf(body), password: body.password },
+      clientOf(request),
+    );
     if (!issued.refreshCookie) throw new Error('a login issued no refresh token');
     return {
       ...(await loginResponseOf(this.access, issued, requestIdOf(request))),

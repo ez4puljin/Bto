@@ -323,9 +323,10 @@ export class StaffSession extends MobileSession<Me> {
   readonly kind = 'staff';
   protected readonly ownRoutes = /\/api\/v1\/auth\/mobile\/(login|refresh|logout)$/;
 
-  login(username: string, password: string): Promise<AppProblem | null> {
+  /** `login`: the registered phone, or the login name of a record without one (ADR-0128 #1). */
+  login(login: string, password: string): Promise<AppProblem | null> {
     return this.signIn(
-      () => this.client.POST('/api/v1/auth/mobile/login', { body: { username, password } }),
+      () => this.client.POST('/api/v1/auth/mobile/login', { body: { login, password } }),
       (data) => ({ userId: data.me.id, me: data.me }),
     );
   }

@@ -7352,8 +7352,16 @@ export interface components {
             tin: string | null;
         };
         LoginRequest: {
-            /** @example bat.erdene */
-            username: string;
+            /**
+             * @description The registered phone (local form allowed), or the login name while no phone is set
+             * @example 99112233
+             */
+            login?: string;
+            /**
+             * @deprecated
+             * @description Older name of login
+             */
+            username?: string;
             /** Format: password */
             password: string;
         };
@@ -7369,8 +7377,11 @@ export interface components {
         };
         Me: {
             id: number;
+            /** @description Internal login name (ADR-0128 #2); not shown to staff */
             username: string;
             fullName: string;
+            /** @description The sign-in phone, E.164 */
+            phone: string | null;
             permissions: components["schemas"]["Permission"][];
             roles: components["schemas"]["RoleRef"][];
             /** @description Warehouses this user may write documents for; null = every warehouse */
@@ -7405,8 +7416,16 @@ export interface components {
             newPassword: string;
         };
         PasswordSetupRequest: {
-            /** @example bat.erdene */
-            username: string;
+            /**
+             * @description The registered phone (local form allowed), or the login name while no phone is set
+             * @example 99112233
+             */
+            login?: string;
+            /**
+             * @deprecated
+             * @description Older name of login
+             */
+            username?: string;
             /** @description One-time code issued by an admin, e.g. 7KQ2M-X9D4F */
             code: string;
             /** Format: password */
@@ -7481,8 +7500,11 @@ export interface components {
         };
         UserSummary: {
             id: number;
+            /** @description Internal login name (ADR-0128 #2); not shown to staff */
             username: string;
             fullName: string;
+            /** @description The sign-in phone, E.164; null on a record registered before ADR-0128 */
+            phone: string | null;
             /** @enum {string} */
             status: "ACTIVE" | "DISABLED";
             roleIds: number[];
@@ -7503,8 +7525,11 @@ export interface components {
         };
         UserDetail: {
             id: number;
+            /** @description Internal login name (ADR-0128 #2); not shown to staff */
             username: string;
             fullName: string;
+            /** @description The sign-in phone, E.164; null on a record registered before ADR-0128 */
+            phone: string | null;
             /** @enum {string} */
             status: "ACTIVE" | "DISABLED";
             roleIds: number[];
@@ -7512,7 +7537,6 @@ export interface components {
             lastLoginAt: string | null;
             /** Format: date-time */
             lockedUntil: string | null;
-            phone: string | null;
             /** @description False until the user redeems a one-time code */
             passwordSet: boolean;
             failedLoginCount: number;
@@ -7523,17 +7547,19 @@ export interface components {
             updatedAt: string;
         };
         UserCreateRequest: {
-            /** @example bat.erdene */
-            username: string;
             /** @example Батын Эрдэнэ */
             fullName: string;
-            /** @example 99112233 */
-            phone?: string | null;
+            /**
+             * @description The sign-in phone, 8 Mongolian digits in any local form; unique among staff
+             * @example 99112233
+             */
+            phone: string;
             roleIds: number[];
             scopes?: components["schemas"]["UserScopes"];
         };
         UserUpdateRequest: {
             fullName?: string;
+            /** @description A new sign-in phone; null is refused once a phone is set (ADR-0128 #3) */
             phone?: string | null;
             /** @enum {string} */
             status?: "ACTIVE" | "DISABLED";
@@ -13333,7 +13359,9 @@ export interface components {
         };
         PosCashier: {
             userId: number;
+            /** @description Internal login name (ADR-0128 #2) */
             username: string;
+            phone: string | null;
             fullName: string;
             /** @enum {string} */
             userStatus: "ACTIVE" | "DISABLED";
@@ -16868,7 +16896,7 @@ export interface operations {
                 /** @description nextCursor of the previous page */
                 cursor?: string;
                 limit?: number;
-                /** @description Part of the username or full name */
+                /** @description Part of the full name, phone or login name */
                 q?: string;
                 status?: "ACTIVE" | "DISABLED";
             };

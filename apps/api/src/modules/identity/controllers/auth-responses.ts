@@ -29,6 +29,7 @@ export async function toMe(access: AccessService, ctx: ResolvedAccess): Promise<
     id: ctx.userId,
     username: ctx.username,
     fullName: ctx.fullName,
+    phone: ctx.phone,
     permissions: [...ctx.permissions].sort(),
     roles: await access.roleRefs(ctx.roleIds),
     writableWarehouseIds:

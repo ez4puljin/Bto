@@ -13,6 +13,7 @@ const ctx = (permissions: Permission[], roleIds: number[] = [REP_ROLE]): AuthCon
   sessionId: 's',
   username: 'rep',
   fullName: 'Rep',
+  phone: null,
   permissions: new Set(permissions),
   roleIds,
   writableWarehouseIds: null,

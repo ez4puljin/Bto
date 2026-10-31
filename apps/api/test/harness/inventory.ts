@@ -222,6 +222,7 @@ export function staffContext(
     sessionId: 'test',
     username: `user${userId}`,
     fullName: 'Тест хэрэглэгч',
+    phone: null,
     permissions: new Set(SYSTEM_ROLE_PERMISSIONS[role]),
     roleIds: [],
     writableWarehouseIds: writableWarehouseIds === null ? null : new Set(writableWarehouseIds),

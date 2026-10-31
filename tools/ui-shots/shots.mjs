@@ -98,8 +98,9 @@ async function post(url, body) {
 }
 
 async function signIn() {
+  // ADR-0128: `login` is the phone, or the login name of a dev user without one.
   const response = await post(`${api}/api/v1/auth/login`, {
-    username: user,
+    login: user,
     password: readSecret(),
   });
   if (!response.ok) throw new Error(`sign-in failed: HTTP ${response.status}`);
@@ -432,7 +433,9 @@ function gallery(report) {
     const parts = [
       m.pageOverflowX > 0 ? `<b class="bad">page +${m.pageOverflowX}px →</b>` : '',
       m.frame && m.contentWidth !== null
-        ? (m.contentWidth < m.frame.width * 0.75 ? `<b class="bad">uses ${m.contentWidth}/${m.frame.width}px</b>` : `uses ${m.contentWidth}/${m.frame.width}px`)
+        ? m.contentWidth < m.frame.width * 0.75
+          ? `<b class="bad">uses ${m.contentWidth}/${m.frame.width}px</b>`
+          : `uses ${m.contentWidth}/${m.frame.width}px`
         : '',
       m.firstRowTop !== null ? `row 1 at ${m.firstRowTop}px` : '',
       m.rows ? `${m.visibleRows}/${m.rows} rows seen` : '',
@@ -470,7 +473,9 @@ async function main() {
   const session = await signIn();
   const ids = await discover(session.accessToken);
   // --ids product=10885,supplier=5: the records to open instead of the first ones found.
-  for (const pair of String(args.ids ?? '').split(',').filter(Boolean)) {
+  for (const pair of String(args.ids ?? '')
+    .split(',')
+    .filter(Boolean)) {
     const [name, id] = pair.split('=');
     if (name && id) ids[name] = id;
   }

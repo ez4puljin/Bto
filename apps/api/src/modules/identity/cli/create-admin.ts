@@ -1,7 +1,8 @@
 import 'reflect-metadata';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { normalizeUsername, USERNAME_PATTERN } from '@tugeel/shared/auth';
+import { normalizeUsername, USERNAME_PATTERN, usernameFromPhone } from '@tugeel/shared/auth';
+import { normalizeMnPhone } from '@tugeel/shared/phone';
 import { businessDateTime } from '@tugeel/shared/time';
 import { eq, sql } from 'drizzle-orm';
 import { Pool } from 'pg';
@@ -29,9 +30,13 @@ export interface CreateAdminResult extends IssuedCode {
  */
 export async function createAdmin(
   db: Db,
-  input: { username: string; fullName: string; pepper: string },
+  input: { username?: string; phone?: string; fullName: string; pepper: string },
 ): Promise<CreateAdminResult> {
-  const username = normalizeUsername(input.username);
+  // ADR-0128: the admin is named by phone (the login name is generated from it); an older admin
+  // without a phone is recovered by login name.
+  const phone = input.phone === undefined ? null : normalizeMnPhone(input.phone);
+  if (input.phone !== undefined && !phone) throw new Error(`invalid phone "${input.phone}"`);
+  const username = phone ? usernameFromPhone(phone) : normalizeUsername(input.username ?? '');
   if (!USERNAME_PATTERN.test(username)) throw new Error(`invalid username "${input.username}"`);
   const actor = systemActor('cli:create-admin');
   const audit = new AuditService();
@@ -39,14 +44,20 @@ export async function createAdmin(
     await syncAccessCatalog(tx);
     const [admin] = await tx.select({ id: roles.id }).from(roles).where(eq(roles.code, 'ADMIN'));
     if (!admin) throw new Error('the ADMIN role is missing after the catalog sync');
-    const [existing] = await tx.select().from(users).where(eq(users.username, username));
+    const [existing] = await tx
+      .select()
+      .from(users)
+      .where(phone ? eq(users.phone, phone) : eq(users.username, username));
     const [user] = existing
       ? await tx
           .update(users)
           .set({ status: 'ACTIVE', failedLoginCount: 0, lockedUntil: null, updatedAt: sql`now()` })
           .where(eq(users.id, existing.id))
           .returning()
-      : await tx.insert(users).values({ username, fullName: input.fullName.trim() }).returning();
+      : await tx
+          .insert(users)
+          .values({ username, fullName: input.fullName.trim(), phone })
+          .returning();
     if (!user) throw new Error('admin user was not written');
     await tx.insert(userRoles).values({ userId: user.id, roleId: admin.id }).onConflictDoNothing();
     await mirrorCompanyRoles(tx, user.id);
@@ -78,12 +89,18 @@ async function main(): Promise<void> {
   while (args[0] === '--') args.shift();
   const { values } = parseArgs({
     args,
-    options: { username: { type: 'string' }, 'full-name': { type: 'string' } },
+    options: {
+      phone: { type: 'string' },
+      username: { type: 'string' },
+      'full-name': { type: 'string' },
+    },
   });
-  const username = values.username;
+  const { phone, username } = values;
   const fullName = values['full-name'] ?? username;
-  if (!username || !fullName) {
-    throw new Error('usage: pnpm user:create-admin --username <name> --full-name "<full name>"');
+  if ((!phone && !username) || !fullName) {
+    throw new Error(
+      'usage: pnpm user:create-admin --phone <8 digits> --full-name "<full name>" (--username <name> recovers an older admin)',
+    );
   }
   const env = parseEnv(process.env, 'api');
   configurePgTypeParsers();
@@ -94,15 +111,16 @@ async function main(): Promise<void> {
   });
   try {
     const result = await createAdmin(createDb(pool), {
-      username,
+      ...(phone ? { phone } : { username }),
       fullName,
       pepper: env.AUTH_PEPPER ?? '',
     });
+    const signIn = phone ? normalizeMnPhone(phone) : normalizeUsername(username ?? '');
     console.log(
       [
-        `${result.created ? 'Created' : 'Recovered'} admin "${normalizeUsername(username)}" (id ${result.userId}).`,
+        `${result.created ? 'Created' : 'Recovered'} admin "${signIn}" (id ${result.userId}).`,
         `One-time code: ${result.code}  (valid until ${businessDateTime(result.expiresAt)} Ulaanbaatar time)`,
-        'Open the admin, choose "set password with a code" and enter the username, this code and a new password.',
+        `Open /set-password and enter ${phone ? 'the phone' : 'the login name'}, this code and a new password.`,
       ].join('\n'),
     );
   } finally {

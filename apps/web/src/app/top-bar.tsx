@@ -18,6 +18,7 @@ import {
 import { InboxBell } from '@/features/notifications/inbox';
 import { useFavoritePages } from '@/lib/favorite-pages';
 import { cn } from '@/lib/utils';
+import { localPhone } from '@/features/partners/phone';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -297,7 +298,7 @@ function AccountMenu() {
       <DropdownMenuContent align="end" className="min-w-56">
         <DropdownMenuLabel className="flex flex-col gap-0.5">
           <span className="text-sm font-medium text-foreground">{me.fullName}</span>
-          <span className="font-normal">{me.username}</span>
+          {me.phone ? <span className="font-normal">{localPhone(me.phone)}</span> : null}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => void navigate('/account')}>

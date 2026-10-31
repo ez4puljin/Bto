@@ -1,6 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { checkPassword, normalizeUsername, PASSWORD_MIN_LENGTH } from '@tugeel/shared/auth';
+import {
+  checkPassword,
+  parseStaffLogin,
+  PASSWORD_MIN_LENGTH,
+  type StaffLogin,
+} from '@tugeel/shared/auth';
 import { and, eq, isNull, ne, sql, type SQL } from 'drizzle-orm';
 import { AppConfig } from '../../../common/config/app-config';
 import { DB } from '../../../common/db/db.tokens';
@@ -57,6 +62,16 @@ const staffActor = (userId: number, client: ClientInfo): Actor => ({
   ...(client.requestId ? { requestId: client.requestId } : {}),
 });
 
+/**
+ * The row a typed identifier names (ADR-0128 #1): a phone matches the registered phone; a login
+ * name matches only a record that has no phone yet, so a registered phone is the only way in.
+ */
+export function matchesLogin(typed: StaffLogin): SQL {
+  return typed.kind === 'PHONE'
+    ? eq(users.phone, typed.value)
+    : (and(eq(users.username, typed.value), isNull(users.phone)) as SQL);
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Splits the refresh cookie `<sessionId>.<token>`; null when it is not ours. */
@@ -88,12 +103,17 @@ export class AuthService {
     private readonly config: AppConfig,
   ) {}
 
+  /**
+   * Signs a staff member in by the registered phone, or by the login name while the record has no
+   * phone yet (ADR-0128 #1). The limiter keys on what was typed, normalised.
+   */
   async login(
-    input: { username: string; password: string },
+    input: { login: string; password: string },
     client: ClientInfo,
   ): Promise<IssuedSession> {
-    const username = normalizeUsername(input.username);
-    this.limiter.assertAllowed(client.ip, username);
+    const typed = parseStaffLogin(input.login);
+    const key = typed.value;
+    this.limiter.assertAllowed(client.ip, key);
     const [user] = await this.db
       .select({
         id: users.id,
@@ -102,7 +122,7 @@ export class AuthService {
         lockedUntil: users.lockedUntil,
       })
       .from(users)
-      .where(eq(users.username, username));
+      .where(matchesLogin(typed));
     if (user?.lockedUntil && user.lockedUntil > new Date()) {
       throw new AppError('ACCOUNT_LOCKED', `user ${user.id} is locked`, {
         lockedUntil: user.lockedUntil.toISOString(),
@@ -110,14 +130,14 @@ export class AuthService {
     }
     const valid = await this.hasher.verify(user?.passwordHash ?? null, input.password);
     if (!user || !valid) {
-      this.limiter.recordFailure(client.ip, username);
+      this.limiter.recordFailure(client.ip, key);
       if (user) await this.recordFailedPassword(user.id, client);
-      throw new AppError('INVALID_CREDENTIALS', 'invalid username or password');
+      throw new AppError('INVALID_CREDENTIALS', 'invalid login or password');
     }
     // Only a caller who knows the password learns that the account is disabled.
     if (user.status !== 'ACTIVE')
       throw new AppError('ACCOUNT_DISABLED', `user ${user.id} is disabled`);
-    this.limiter.recordSuccess(client.ip, username);
+    this.limiter.recordSuccess(client.ip, key);
     const created = await inTransaction(this.db, async (tx) => {
       await tx
         .update(users)
@@ -248,14 +268,14 @@ export class AuthService {
     client: ClientInfo,
   ): Promise<void> {
     const [user] = await this.db
-      .select({ passwordHash: users.passwordHash })
+      .select({ passwordHash: users.passwordHash, phone: users.phone })
       .from(users)
       .where(eq(users.id, ctx.userId));
     if (!(await this.hasher.verify(user?.passwordHash ?? null, input.currentPassword))) {
       await this.recordFailedPassword(ctx.userId, client);
       throw new AppError('CURRENT_PASSWORD_INCORRECT', 'current password does not match');
     }
-    this.assertStrong(input.newPassword, ctx.username);
+    this.assertStrong(input.newPassword, ctx.username, user?.phone ?? null);
     const passwordHash = await this.hasher.hash(input.newPassword);
     await inTransaction(this.db, async (tx) => {
       await tx
@@ -277,21 +297,29 @@ export class AuthService {
 
   /** Redeems an admin-issued one-time code: sets the password, ends other sessions, logs in. */
   async setupPassword(
-    input: { username: string; code: string; newPassword: string },
+    input: { login: string; code: string; newPassword: string },
     client: ClientInfo,
   ): Promise<IssuedSession> {
-    const username = normalizeUsername(input.username);
-    this.limiter.assertAllowed(client.ip, username);
-    this.assertStrong(input.newPassword, username);
+    const typed = parseStaffLogin(input.login);
+    const key = typed.value;
+    this.limiter.assertAllowed(client.ip, key);
+    // The record is not known yet: the typed identifier stands in for both name and phone.
+    this.assertStrong(input.newPassword, key, typed.kind === 'PHONE' ? key : null);
     const passwordHash = await this.hasher.hash(input.newPassword);
     const pepper = this.config.require('AUTH_PEPPER');
     const outcome = await inTransaction(this.db, async (tx) => {
       const [user] = await tx
-        .select({ id: users.id, status: users.status })
+        .select({
+          id: users.id,
+          status: users.status,
+          username: users.username,
+          phone: users.phone,
+        })
         .from(users)
-        .where(eq(users.username, username))
+        .where(matchesLogin(typed))
         .for('update');
       if (user?.status !== 'ACTIVE') return null;
+      this.assertStrong(input.newPassword, user.username, user.phone);
       const [code] = await tx
         .select()
         .from(passwordResets)
@@ -343,10 +371,10 @@ export class AuthService {
       return { userId: user.id, created: await this.createSession(tx, user.id, client) };
     });
     if (!outcome) {
-      this.limiter.recordFailure(client.ip, username);
+      this.limiter.recordFailure(client.ip, key);
       throw new AppError('PASSWORD_CODE_INVALID', 'one-time code rejected');
     }
-    this.limiter.recordSuccess(client.ip, username);
+    this.limiter.recordSuccess(client.ip, key);
     return this.issue(outcome.userId, outcome.created);
   }
 
@@ -360,8 +388,8 @@ export class AuthService {
     return rows.length;
   }
 
-  private assertStrong(password: string, username: string): void {
-    const problem = checkPassword(password, username);
+  private assertStrong(password: string, username: string, phone: string | null): void {
+    const problem = checkPassword(password, username, phone);
     if (problem) {
       throw new AppError('PASSWORD_TOO_WEAK', `password rejected: ${problem}`, {
         problem,

@@ -10,6 +10,7 @@ import { Authenticated, CurrentUser } from '../decorators/access.decorators';
 import {
   AccessTokenDto,
   LoginDto,
+  loginOf,
   LoginResponseDto,
   MeDto,
   PasswordChangeDto,
@@ -64,7 +65,10 @@ export class AuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<LoginResponseDto> {
-    const issued = await this.auth.login(body, clientOf(request));
+    const issued = await this.auth.login(
+      { login: loginOf(body), password: body.password },
+      clientOf(request),
+    );
     this.setRefreshCookie(response, issued);
     return loginResponseOf(this.access, issued, requestIdOf(request));
   }
@@ -152,7 +156,10 @@ export class AuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<LoginResponseDto> {
-    const issued = await this.auth.setupPassword(body, clientOf(request));
+    const issued = await this.auth.setupPassword(
+      { login: loginOf(body), code: body.code, newPassword: body.newPassword },
+      clientOf(request),
+    );
     this.setRefreshCookie(response, issued);
     return loginResponseOf(this.access, issued, requestIdOf(request));
   }

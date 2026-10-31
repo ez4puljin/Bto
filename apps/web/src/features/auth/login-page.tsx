@@ -15,8 +15,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { safeNext } from '@/lib/auth/next';
 
+/** The sign-in identifier (ADR-0128 #1): the registered phone, or a login name while no phone is set. */
 const schema = z.object({
-  username: z.string().trim().min(1, 'validation.required'),
+  login: z.string().trim().min(1, 'validation.required'),
   password: z.string().min(1, 'validation.required'),
 });
 type Values = z.infer<typeof schema>;
@@ -32,14 +33,14 @@ export function LoginPage() {
   const [problem, setProblem] = useState<ProblemDetails | null>(null);
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { username: '', password: '' },
+    defaultValues: { login: '', password: '' },
   });
 
   if (state.status === 'authenticated') return <Navigate to={next} replace />;
 
   const submit = form.handleSubmit(async (values) => {
     setProblem(null);
-    const result = await session.login(values.username, values.password);
+    const result = await session.login(values.login, values.password);
     if (result.ok) await navigate(next, { replace: true });
     else setProblem(result.problem);
   });
@@ -60,17 +61,21 @@ export function LoginPage() {
         ) : null}
         <ProblemAlert problem={problem} />
         <div className="flex flex-col gap-2">
-          <Label htmlFor="username">{t('auth.login.username')}</Label>
+          <Label htmlFor="login">{t('auth.login.phone')}</Label>
           <Input
-            id="username"
+            id="login"
             className="h-10"
             autoComplete="username"
             autoCapitalize="none"
             autoFocus
-            aria-invalid={Boolean(errors.username)}
-            {...form.register('username')}
+            aria-invalid={Boolean(errors.login)}
+            aria-describedby="login-hint"
+            {...form.register('login')}
           />
-          <FieldError message={errors.username?.message} />
+          <FieldError message={errors.login?.message} />
+          <p id="login-hint" className="text-xs text-muted-foreground">
+            {t('auth.login.phoneHint')}
+          </p>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="password">{t('auth.login.password')}</Label>
