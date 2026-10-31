@@ -3,7 +3,6 @@ import {
   BOARD_LIMITS,
   CARD_SORTS,
   type CardSort,
-  type PickStatus,
   PRINT_KINDS,
   type PrintKind,
 } from '@tugeel/shared/sales';
@@ -54,6 +53,7 @@ import { useAction } from '@/lib/use-action';
 import { cn } from '@/lib/utils';
 import { MoveDialogs } from './move-dialogs';
 import { OrderStatusBadge, PaymentLabel } from './order-badges';
+import { PICK_TONES } from './pick-tones';
 import {
   batchPrintPath,
   type FilterQuery,
@@ -74,15 +74,6 @@ const DRAG_TYPE = 'application/x-tugeel-order';
 /** Space kept under the board: the page's bottom padding (`pb-10`). */
 const BELOW_BOARD = 40;
 const INTERACTIVE = 'a, button, input, select, textarea, label, [role="menuitem"]';
-/**
- * The warehouses' parts on a card (ADR-0126 #2), one tone per state so the keeper reads the board
- * at a glance: not started grey, being picked orange, picked green.
- */
-const PICK_TONES = {
-  OPEN: { dot: 'bg-muted-foreground/40', text: 'text-muted-foreground', row: '' },
-  PICKING: { dot: 'bg-warning', text: 'text-warning', row: 'bg-warning-soft/60' },
-  DONE: { dot: 'bg-success', text: 'text-success', row: 'bg-success-soft/60' },
-} as const satisfies Record<PickStatus, { dot: string; text: string; row: string }>;
 /** The stages that sell or transfer the goods: drawn apart from the plain ones (ADR-0129 #3). */
 const FINAL_ACTIONS: readonly SalesStage['action'][] = ['SALE', 'TRANSFER'];
 /** The orders whose parts are still worked on; afterwards the card drops them. */

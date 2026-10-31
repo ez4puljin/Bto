@@ -56,6 +56,7 @@ const money = (value: Decimal | null): string | null => (value ? value.toFixed(0
 
 const inputOf = (body: SalesOrderRequestDto): OrderInput => ({
   customerId: body.customerId,
+  expectedUpdatedAt: body.expectedUpdatedAt ?? null,
   pipelineId: body.pipelineId ?? null,
   stageId: body.stageId ?? null,
   fulfilment: body.fulfilment,

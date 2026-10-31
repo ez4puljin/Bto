@@ -86,6 +86,8 @@ export interface OrderLineInput {
 
 export interface OrderInput {
   customerId: number;
+  /** The updatedAt the client read (ADR-0130); a save over a newer change is refused. */
+  expectedUpdatedAt?: string | null;
   /** The pipeline a new order goes in (ADR-0057 #4); null = the channel's default. */
   pipelineId?: number | null;
   /** A stage without an action of that pipeline («+»); null = the pipeline's landing stage. */
@@ -287,6 +289,16 @@ export class SalesOrdersService implements OnModuleInit {
   async update(ctx: AuthContext, id: number, input: OrderInput): Promise<OrderDetail> {
     await inTransaction(this.db, async (tx) => {
       const { order, access } = await this.lockSeen(ctx, tx, id);
+      // The whole order is saved at once, so a save from a stale view would undo what a keeper or
+      // another office user changed meanwhile: it is refused and the client reads again (ADR-0130).
+      if (
+        input.expectedUpdatedAt &&
+        order.updatedAt.toISOString() !== new Date(input.expectedUpdatedAt).toISOString()
+      ) {
+        throw new AppError('ORDER_CHANGED', 'the order changed since it was read', {
+          updatedAt: order.updatedAt.toISOString(),
+        });
+      }
       // Only an admin (who configures the boards) changes a picking or packed order (ADR-0126 #4).
       const manager = ctx.permissions.has('sales.boards.manage');
       if (

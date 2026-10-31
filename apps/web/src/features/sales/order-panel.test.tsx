@@ -374,18 +374,43 @@ describe('order panel (ADR-0059)', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '20261015_0005' })).toBeNull());
   });
 
-  it('gives a picker the pick section of a confirmed order', async () => {
+  it("heads the products with each warehouse's part and lets a picker take theirs", async () => {
     const picker: Me = {
       ...OFFICE_ME,
       permissions: [...SYSTEM_ROLE_PERMISSIONS.OFFICE, 'sales.orders.pick'],
     };
+    const part = (warehouseId: number, warehouseName: string) => ({
+      orderId: 5,
+      warehouseId,
+      warehouseName,
+      status: 'OPEN' as const,
+      pickerId: null,
+      pickerName: null,
+      startedAt: null,
+      doneAt: null,
+    });
+    const withParts: Schemas['SalesOrderDetail'] = {
+      ...ORDER,
+      picks: [part(2, 'Бөөний агуулах'), part(1, 'Заал')],
+    };
     renderApp(
-      '/sales/boards?order=5',
-      signedIn(picker, routes({ 'GET /api/v1/sales-orders/5/pick-info': () => json([]) })),
+      '/sales/boards?order=5&tab=pick',
+      signedIn(
+        picker,
+        routes({
+          'GET /api/v1/sales-orders/5': () => json(withParts),
+          'GET /api/v1/sales-orders/5/pick-info': () => json([]),
+        }),
+      ),
     );
     const panel = await screen.findByRole('dialog', { name: '20261015_0005' });
+    // The old pick address lands in the products tab, which is now the only one.
+    expect(within(panel).queryByRole('tab', { name: 'Бэлтгэх' })).not.toBeInTheDocument();
+    const products = within(panel).getByRole('tabpanel', { name: mn.sales.panel.tabs.products });
     expect(
-      await within(panel).findByRole('tab', { name: mn.sales.panel.tabs.pick }),
-    ).toBeInTheDocument();
+      await within(products).findAllByRole('button', { name: mn.sales.pick.take }),
+    ).toHaveLength(2);
+    expect(within(products).getByRole('heading', { name: 'Бөөний агуулах' })).toBeInTheDocument();
+    expect(within(products).getByRole('heading', { name: 'Заал' })).toBeInTheDocument();
   });
 });

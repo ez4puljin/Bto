@@ -11,6 +11,8 @@ export function orderRequestOf(
 ): SalesOrderRequest {
   return {
     customerId: order.customerId,
+    // A save over a change made meanwhile is refused (ORDER_CHANGED) instead of undoing it.
+    expectedUpdatedAt: order.updatedAt,
     pipelineId: null,
     stageId: null,
     fulfilment: order.fulfilment,

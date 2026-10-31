@@ -43263,6 +43263,11 @@
             "type": "number",
             "minimum": 1
           },
+          "expectedUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The order's updatedAt as the client read it (ADR-0130): a save over a newer change answers 409 ORDER_CHANGED"
+          },
           "pipelineId": {
             "type": "number",
             "nullable": true,
@@ -44572,6 +44577,11 @@
           "customerId": {
             "type": "number",
             "minimum": 1
+          },
+          "expectedUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The order's updatedAt as the client read it (ADR-0130): a save over a newer change answers 409 ORDER_CHANGED"
           },
           "fulfilment": {
             "enum": [
@@ -60750,6 +60760,7 @@
           "CREDIT_NEEDS_APPROVAL",
           "ORDER_STATE_INVALID",
           "STAGE_SKIP",
+          "ORDER_CHANGED",
           "PICK_INCOMPLETE",
           "PICK_TAKEN",
           "PICK_STATE_INVALID",

@@ -1,6 +1,28 @@
-import type { OrderStatus, PaymentMethod } from '@tugeel/shared/sales';
+import type { OrderStatus, PaymentMethod, PickStatus } from '@tugeel/shared/sales';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
+
+const PICK_VARIANTS = {
+  OPEN: 'outline',
+  PICKING: 'warning',
+  DONE: 'success',
+} as const satisfies Record<PickStatus, string>;
+
+/** A part's status as a badge in its tone: not started, being picked (by whom), picked (by whom). */
+export function PickStatusBadge({
+  part,
+}: {
+  part: { status: PickStatus; pickerName: string | null };
+}) {
+  const { t } = useTranslation();
+  return (
+    <Badge variant={PICK_VARIANTS[part.status]}>
+      {part.status === 'OPEN'
+        ? t('sales.pick.status.OPEN')
+        : t(`sales.pick.status.${part.status}`, { name: part.pickerName ?? '' })}
+    </Badge>
+  );
+}
 
 /**
  * docs/ui.md status colours: a draft grey, the order on its way blue, a pending approval orange

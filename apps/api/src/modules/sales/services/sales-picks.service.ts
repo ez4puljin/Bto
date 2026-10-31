@@ -353,6 +353,7 @@ export class SalesPicksService {
         short: input.filter((entry) => entry.qty.lt(byLine.get(entry.lineId)?.qtyBase ?? 0)).length,
       },
     });
+    await this.touchOrder(tx, order.id);
     const packed = (await this.missingInTx(tx, order.id)).length === 0;
     const status: OrderStatus = packed ? 'PACKED' : 'PICKING';
     if (status !== order.status) {
@@ -434,6 +435,7 @@ export class SalesPicksService {
           inArray(salesOrderPicks.warehouseId, [...wanted]),
         ),
       );
+    await this.touchOrder(tx, order.id);
     if (order.status === 'PACKED') {
       await tx
         .update(salesOrders)
@@ -535,6 +537,7 @@ export class SalesPicksService {
       await this.event(tx, ctx, order.id, 'CONFIRMED', 'PICKING');
       order.status = 'PICKING';
     }
+    await this.touchOrder(tx, order.id);
     await this.audit.record(tx, ctx, {
       action: pickerId === ctx.userId ? 'PICK_TAKE' : 'PICK_ASSIGN',
       entity: 'sales_orders',
@@ -542,6 +545,17 @@ export class SalesPicksService {
       before: { warehouseId: part.warehouseId, pickerId: part.pickerId },
       after: { warehouseId: part.warehouseId, pickerId },
     });
+  }
+
+  /**
+   * Every change of a part moves the order's updatedAt, so an office save from before it is
+   * refused as stale (ADR-0130): nobody's change is overwritten by another's.
+   */
+  private async touchOrder(tx: Tx, orderId: number): Promise<void> {
+    await tx
+      .update(salesOrders)
+      .set({ updatedAt: sql`now()` })
+      .where(eq(salesOrders.id, orderId));
   }
 
   private assertPicking(order: OrderRow): void {
