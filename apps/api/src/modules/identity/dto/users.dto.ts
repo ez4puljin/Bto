@@ -1,5 +1,4 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
-import { USERNAME_PATTERN } from '@tugeel/shared/auth';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -34,24 +33,24 @@ export class UserScopesDto {
   branchIds: number[];
 }
 
+/** A staff registration (ADR-0128): name and phone; the internal login name is generated. */
 @ApiSchema({ name: 'UserCreateRequest' })
 export class CreateUserDto {
-  @ApiProperty({ example: 'bat.erdene', pattern: USERNAME_PATTERN.source })
-  @IsString()
-  @MaxLength(64)
-  username: string;
-
   @ApiProperty({ example: 'Батын Эрдэнэ', maxLength: 100 })
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
   fullName: string;
 
-  @ApiPropertyOptional({ type: String, nullable: true, example: '99112233' })
-  @IsOptional()
+  @ApiProperty({
+    example: '99112233',
+    maxLength: 32,
+    description: 'The sign-in phone, 8 Mongolian digits in any local form; unique among staff',
+  })
   @IsString()
+  @IsNotEmpty()
   @MaxLength(32)
-  phone?: string | null;
+  phone: string;
 
   @ApiProperty({ type: [Number] })
   @IsArray()
@@ -76,7 +75,11 @@ export class UpdateUserDto {
   @MaxLength(100)
   fullName?: string;
 
-  @ApiPropertyOptional({ type: String, nullable: true })
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'A new sign-in phone; null is refused once a phone is set (ADR-0128 #3)',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(32)
@@ -103,7 +106,7 @@ export class UpdateUserDto {
 }
 
 export class UserListQueryDto extends PageQueryDto {
-  @ApiPropertyOptional({ description: 'Part of the username or full name' })
+  @ApiPropertyOptional({ description: 'Part of the full name, phone or login name' })
   @IsOptional()
   @IsString()
   @MaxLength(100)
@@ -118,8 +121,15 @@ export class UserListQueryDto extends PageQueryDto {
 @ApiSchema({ name: 'UserSummary' })
 export class UserSummaryDto {
   @ApiProperty() id: number;
-  @ApiProperty() username: string;
+  @ApiProperty({ description: 'Internal login name (ADR-0128 #2); not shown to staff' })
+  username: string;
   @ApiProperty() fullName: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'The sign-in phone, E.164; null on a record registered before ADR-0128',
+  })
+  phone: string | null;
   @ApiProperty({ enum: USER_STATUSES }) status: (typeof USER_STATUSES)[number];
   @ApiProperty({ type: [Number] }) roleIds: number[];
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) lastLoginAt: string | null;
@@ -128,7 +138,6 @@ export class UserSummaryDto {
 
 @ApiSchema({ name: 'UserDetail' })
 export class UserDetailDto extends UserSummaryDto {
-  @ApiProperty({ type: String, nullable: true }) phone: string | null;
   @ApiProperty({ description: 'False until the user redeems a one-time code' })
   passwordSet: boolean;
   @ApiProperty() failedLoginCount: number;

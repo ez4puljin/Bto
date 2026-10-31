@@ -44,7 +44,9 @@ const when = (iso: string) => formatUbDateTime(Date.parse(iso));
 type Asking = 'code' | 'disable' | 'revokeAll' | { sessionId: string } | null;
 
 /**
- * One staff account (SPEC §5.1), read first (ADR-0042 #7): username and state under the name; the
+ * One staff account (SPEC §5.1), read first (ADR-0042 #7): the phone and state under the name (no
+ * login name is shown, ADR-0128 #2; a record without a phone is flagged, since it still signs in by
+ * its old login name); the
  * password code, unlock and disable at the top, each asked first where it changes access; the
  * account with its roles and write scopes in one card, «Засах» for those who manage users; the
  * signed-in devices.
@@ -85,7 +87,7 @@ export function UserDetailPage() {
         id,
         body: {
           fullName: values.fullName,
-          phone: values.phone ? normalizeMnPhone(values.phone) : null,
+          phone: normalizeMnPhone(values.phone) ?? values.phone,
           ...(isSelf
             ? {}
             : {
@@ -133,7 +135,11 @@ export function UserDetailPage() {
         title={detail.fullName}
         meta={
           <>
-            <span className="font-mono">{detail.username}</span>
+            {detail.phone ? (
+              <span className="font-mono">{localPhone(detail.phone)}</span>
+            ) : (
+              <Badge variant="warning">{t('users.noPhone')}</Badge>
+            )}
             <Badge variant={detail.status === 'ACTIVE' ? 'success' : 'secondary'}>
               {t(`users.status.${detail.status}`)}
             </Badge>
@@ -173,6 +179,11 @@ export function UserDetailPage() {
         }
       />
       <ProblemAlert problem={asking ? null : mutationProblem} />
+      {detail.phone === null && canManage ? (
+        <Alert>
+          <AlertDescription>{t('users.noPhoneHint')}</AlertDescription>
+        </Alert>
+      ) : null}
 
       <div className="grid items-start gap-4 xl:grid-cols-2">
         <DetailCard
@@ -187,7 +198,6 @@ export function UserDetailPage() {
                 </Alert>
               ) : null}
               <UserForm
-                lockUsername
                 lockAccess={isSelf}
                 submitLabel={t('common.save')}
                 onCancel={close}
@@ -195,7 +205,6 @@ export function UserDetailPage() {
                   if (await save(values)) close();
                 }}
                 defaultValues={{
-                  username: detail.username,
                   fullName: detail.fullName,
                   phone: detail.phone?.replace(/^\+976/, '') ?? '',
                   roleIds: detail.roleIds,
@@ -331,10 +340,13 @@ function UserFacts({ detail }: { detail: UserDetail }) {
         items={[
           { label: t('users.form.fullName'), value: detail.fullName },
           {
-            label: t('users.form.username'),
-            value: <span className="font-mono">{detail.username}</span>,
+            label: t('users.form.phone'),
+            value: detail.phone ? (
+              <span className="font-mono">{localPhone(detail.phone)}</span>
+            ) : (
+              <Badge variant="warning">{t('users.noPhone')}</Badge>
+            ),
           },
-          { label: t('users.form.phone'), value: detail.phone ? localPhone(detail.phone) : null },
         ]}
       />
       <FieldList

@@ -28,6 +28,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useUsers } from '@/features/identity/api';
+import { localPhone } from '@/features/partners/phone';
 import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { problemFromError } from '@/lib/problem';
@@ -111,7 +112,7 @@ export function PosCashiersPage() {
                 <TableRow key={cashier.userId}>
                   <TableCell className="font-medium">{cashier.fullName}</TableCell>
                   <TableCell className="font-mono text-muted-foreground">
-                    {cashier.username}
+                    {cashier.phone ? localPhone(cashier.phone) : t('common.none')}
                   </TableCell>
                   <TableCell>
                     <span className="flex flex-wrap gap-1">
@@ -204,7 +205,7 @@ function PinDialog({
 function PinForm({ cashier, onClose }: { cashier: Cashier | null; onClose: () => void }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
-  const users = useUsers(search);
+  const users = useUsers({ q: search });
   const mutations = usePosMutations();
   const action = useAction();
   const [userId, setUserId] = useState<number | null>(cashier?.userId ?? null);
@@ -262,7 +263,8 @@ function PinForm({ cashier, onClose }: { cashier: Cashier | null; onClose: () =>
                 <option value="">{t('pos.cashiers.chooseUser')}</option>
                 {(users.data?.pages.flatMap((page) => page.data) ?? []).map((user) => (
                   <option key={user.id} value={user.id}>
-                    {user.fullName} · {user.username}
+                    {user.fullName}
+                    {user.phone ? ` · ${localPhone(user.phone)}` : ''}
                   </option>
                 ))}
               </NativeSelect>

@@ -39,7 +39,7 @@ export default function StoreProfileScreen() {
               {me.fullName}
             </Text>
             <Text style={[type.body, styles.muted]} numberOfLines={2}>
-              {roleName ? `${me.username} · ${roleName}` : me.username}
+              {[me.phone?.replace(/^\+976/, ''), roleName].filter(Boolean).join(' · ')}
             </Text>
           </View>
         </View>

@@ -18,9 +18,10 @@ import { Input } from '@/components/ui/input';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { passwordMessage } from '@/lib/forms';
 import { problemOf } from '@/lib/problem';
+import { localPhone } from '@/features/partners/phone';
 import { toast } from '@/lib/toast';
 
-function passwordSchema(username: string) {
+function passwordSchema(username: string, phone: string | null) {
   return z
     .object({
       currentPassword: z.string().min(1, 'validation.required'),
@@ -28,7 +29,7 @@ function passwordSchema(username: string) {
       confirmPassword: z.string().min(1, 'validation.required'),
     })
     .superRefine((values, context) => {
-      const message = passwordMessage(values.newPassword, username);
+      const message = passwordMessage(values.newPassword, username, phone);
       if (message) context.addIssue({ code: 'custom', path: ['newPassword'], message });
       if (values.confirmPassword !== values.newPassword) {
         context.addIssue({
@@ -54,8 +55,9 @@ export function AccountPage() {
   const [problem, setProblem] = useState<ProblemDetails | null>(null);
   const [leaving, setLeaving] = useState(false);
   const username = state.status === 'authenticated' ? state.me.username : '';
+  const phone = state.status === 'authenticated' ? state.me.phone : null;
   const form = useForm<PasswordValues>({
-    resolver: zodResolver(passwordSchema(username)),
+    resolver: zodResolver(passwordSchema(username, phone)),
     defaultValues: { currentPassword: '', newPassword: '', confirmPassword: '' },
   });
   if (state.status !== 'authenticated') return null;
@@ -90,8 +92,8 @@ export function AccountPage() {
           items={[
             { label: t('auth.account.fullName'), value: me.fullName },
             {
-              label: t('auth.account.username'),
-              value: <span className="font-mono">{me.username}</span>,
+              label: t('auth.account.phone'),
+              value: me.phone ? <span className="font-mono">{localPhone(me.phone)}</span> : null,
             },
             {
               label: t('auth.account.roles'),

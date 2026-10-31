@@ -3,7 +3,7 @@ import { isAssignablePermission, PERMISSIONS } from '@tugeel/shared/auth';
 import type { Client } from 'pg';
 import request from 'supertest';
 import { connectAs, createHttpApp } from '../harness/apps';
-import { bearer, login, seedUser, testIp, uniqueUsername } from '../harness/identity';
+import { bearer, login, seedUser, testIp, uniquePhone } from '../harness/identity';
 
 interface RoleBody {
   id: number;
@@ -51,7 +51,7 @@ describe('users and roles API (SPEC §5.1, ADR-0027)', () => {
       const createAttempt = await http()
         .post('/api/v1/users')
         .set(bearer(workerToken))
-        .send({ username: uniqueUsername(), fullName: 'Х', roleIds: [] })
+        .send({ phone: uniquePhone(), fullName: 'Х', roleIds: [] })
         .expect(403);
       expect(createAttempt.body).toMatchObject({ code: 'FORBIDDEN' });
       const accountant = await seedUser(app, { roles: ['ACCOUNTANT'] });
@@ -66,13 +66,11 @@ describe('users and roles API (SPEC §5.1, ADR-0027)', () => {
   });
 
   describe('users', () => {
-    it('creates a user without a password; a one-time code lets them in', async () => {
-      const username = uniqueUsername('new');
+    it('creates a user by name and phone without a password; a one-time code lets them in', async () => {
       const created = await http()
         .post('/api/v1/users')
         .set(asAdmin())
         .send({
-          username: ` ${username.toUpperCase()} `,
           fullName: '  Шинэ ажилтан ',
           phone: '9911 2233',
           roleIds: [roleId('WAREHOUSE')],
@@ -87,7 +85,7 @@ describe('users and roles API (SPEC §5.1, ADR-0027)', () => {
         roleIds: number[];
       };
       expect(body).toMatchObject({
-        username,
+        username: 'p99112233',
         fullName: 'Шинэ ажилтан',
         phone: '+97699112233',
         passwordSet: false,
@@ -102,7 +100,7 @@ describe('users and roles API (SPEC §5.1, ADR-0027)', () => {
       await http()
         .post('/api/v1/auth/password/setup')
         .set('X-Forwarded-For', testIp())
-        .send({ username, code, newPassword: 'worker-password-1' })
+        .send({ login: '99112233', code, newPassword: 'worker-password-1' })
         .expect(200);
       const detail = await http().get(`/api/v1/users/${body.id}`).set(asAdmin()).expect(200);
       expect((detail.body as { passwordSet: boolean }).passwordSet).toBe(true);
@@ -117,30 +115,71 @@ describe('users and roles API (SPEC §5.1, ADR-0027)', () => {
       ]);
     });
 
-    it('validates usernames, phones, role ids and uniqueness', async () => {
-      const username = uniqueUsername('dup');
-      await http()
+    it('requires a phone, keeps it unique and never lets it go (ADR-0128 #3)', async () => {
+      const phone = uniquePhone();
+      const first = await http()
         .post('/api/v1/users')
         .set(asAdmin())
-        .send({ username, fullName: 'А', roleIds: [] })
+        .send({ phone, fullName: 'А', roleIds: [] })
         .expect(201);
+      const firstId = (first.body as { id: number }).id;
       const duplicate = await http()
         .post('/api/v1/users')
         .set(asAdmin())
-        .send({ username, fullName: 'Б', roleIds: [] })
-        .expect(409);
+        .send({ phone: ` ${phone.slice(-8)} `, fullName: 'Б', roleIds: [] })
+        .expect(422);
       expect(duplicate.body).toMatchObject({
-        code: 'DUPLICATE_VALUE',
-        params: { constraint: 'users_username_key' },
+        code: 'VALIDATION_FAILED',
+        errors: [{ path: 'phone', constraint: 'unique' }],
       });
-      for (const [body, path] of [
-        [{ username: 'бат', fullName: 'А', roleIds: [] }, 'username'],
-        [{ username: uniqueUsername(), fullName: 'А', phone: '123', roleIds: [] }, 'phone'],
-        [{ username: uniqueUsername(), fullName: 'А', roleIds: [999_999] }, 'roleIds'],
+      for (const [body, path, constraint] of [
+        [{ fullName: 'А', roleIds: [] }, 'phone', 'isNotEmpty'],
+        [{ fullName: 'А', phone: '   ', roleIds: [] }, 'phone', 'required'],
+        [{ fullName: 'А', phone: '123', roleIds: [] }, 'phone', 'isMnPhone'],
+        [{ fullName: 'А', phone: uniquePhone(), roleIds: [999_999] }, 'roleIds', undefined],
       ] as const) {
         const response = await http().post('/api/v1/users').set(asAdmin()).send(body).expect(422);
-        expect(response.body).toMatchObject({ code: 'VALIDATION_FAILED', errors: [{ path }] });
+        expect(response.body).toMatchObject({
+          code: 'VALIDATION_FAILED',
+          errors: expect.arrayContaining([
+            expect.objectContaining(constraint ? { path, constraint } : { path }),
+          ]) as unknown,
+        });
       }
+      // An older typed login name equal to the generated one: the new record takes a suffix.
+      const legacyPhone = uniquePhone();
+      await seedUser(app, { username: `p${legacyPhone.slice(-8)}`, phone: null });
+      const suffixed = await http()
+        .post('/api/v1/users')
+        .set(asAdmin())
+        .send({ phone: legacyPhone, fullName: 'В', roleIds: [] })
+        .expect(201);
+      expect((suffixed.body as { username: string }).username).toBe(`p${legacyPhone.slice(-8)}-1`);
+      // The phone changes but never goes away; another staff member's phone is refused.
+      const other = await seedUser(app);
+      const cleared = await http()
+        .patch(`/api/v1/users/${firstId}`)
+        .set(asAdmin())
+        .send({ phone: null })
+        .expect(422);
+      expect(cleared.body).toMatchObject({ errors: [{ path: 'phone', constraint: 'required' }] });
+      const taken = await http()
+        .patch(`/api/v1/users/${firstId}`)
+        .set(asAdmin())
+        .send({ phone: other.phone })
+        .expect(422);
+      expect(taken.body).toMatchObject({ errors: [{ path: 'phone', constraint: 'unique' }] });
+      const moved = await http()
+        .patch(`/api/v1/users/${firstId}`)
+        .set(asAdmin())
+        .send({ phone: uniquePhone().slice(-8) })
+        .expect(200);
+      expect((moved.body as { phone: string }).phone).toMatch(/^\+976\d{8}$/);
+      await http()
+        .patch(`/api/v1/users/${firstId}`)
+        .set(asAdmin())
+        .send({ phone: (moved.body as { phone: string }).phone })
+        .expect(200);
     });
 
     it('lists users with keyset pagination and search', async () => {
@@ -154,11 +193,17 @@ describe('users and roles API (SPEC §5.1, ADR-0027)', () => {
         .expect(200);
       const second = page2.body as { data: { id: number }[] };
       expect(second.data[0]?.id).toBeGreaterThan(first.data[1]?.id ?? 0);
-      const found = await http().get('/api/v1/users?q=new').set(asAdmin()).expect(200);
+      const found = await http().get('/api/v1/users?q=Шинэ').set(asAdmin()).expect(200);
+      const foundRows = (found.body as { data: { fullName: string; phone: string | null }[] }).data;
+      expect(foundRows.length).toBeGreaterThan(0);
+      expect(foundRows.every((u) => u.fullName.includes('Шинэ'))).toBe(true);
+      const byPhone = await http().get('/api/v1/users?q=99112233').set(asAdmin()).expect(200);
+      expect((byPhone.body as { data: { phone: string | null }[] }).data).toEqual([
+        expect.objectContaining({ phone: '+97699112233' }),
+      ]);
+      const active = await http().get('/api/v1/users?status=DISABLED').set(asAdmin()).expect(200);
       expect(
-        (found.body as { data: { username: string }[] }).data.every((u) =>
-          u.username.includes('new'),
-        ),
+        (active.body as { data: { status: string }[] }).data.every((u) => u.status === 'DISABLED'),
       ).toBe(true);
       await http().get('/api/v1/users?cursor=***').set(asAdmin()).expect(422);
     });

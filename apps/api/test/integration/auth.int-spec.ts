@@ -70,9 +70,14 @@ describe('authentication (ADR-0027)', () => {
       const user = await seedUser(app);
       const noPassword = await seedUser(app, { password: null });
       const attempts = [
-        { username: user.username, password: 'wrong-password-1' },
-        { username: 'nobody.here', password: 'whatever-123' },
-        { username: noPassword.username, password: 'whatever-123' },
+        { login: user.phone, password: 'wrong-password-1' },
+        { login: '99000000', password: 'whatever-123' },
+        { login: 'nobody.here', password: 'whatever-123' },
+        { login: noPassword.phone, password: 'whatever-123' },
+        // A record that has a phone is never found by its login name (ADR-0128 #1).
+        { login: user.username, password: DEFAULT_PASSWORD },
+        // The older field name still carries the identifier (an installed app).
+        { username: user.phone, password: 'wrong-password-1' },
       ];
       for (const body of attempts) {
         const response = await http()
@@ -85,17 +90,46 @@ describe('authentication (ADR-0027)', () => {
       }
     });
 
+    it('signs a record without a phone in by its login name, until the phone is set', async () => {
+      const legacy = await seedUser(app, { phone: null });
+      const { response } = await login(app, legacy);
+      expect((response.body as { me: { phone: string | null } }).me.phone).toBeNull();
+      const byAlias = await http()
+        .post('/api/v1/auth/login')
+        .set('X-Forwarded-For', testIp())
+        .send({ username: legacy.username.toUpperCase(), password: DEFAULT_PASSWORD })
+        .expect(200);
+      expect((byAlias.body as { me: { id: number } }).me.id).toBe(legacy.id);
+      await sql.query("UPDATE users SET phone = '+97699000001' WHERE id = $1", [legacy.id]);
+      await http()
+        .post('/api/v1/auth/login')
+        .set('X-Forwarded-For', testIp())
+        .send({ login: legacy.username, password: DEFAULT_PASSWORD })
+        .expect(401);
+      const byPhone = await http()
+        .post('/api/v1/auth/login')
+        .set('X-Forwarded-For', testIp())
+        .send({ login: '+976 9900-0001', password: DEFAULT_PASSWORD })
+        .expect(200);
+      expect((byPhone.body as { me: { phone: string } }).me.phone).toBe('+97699000001');
+      await http()
+        .post('/api/v1/auth/login')
+        .set('X-Forwarded-For', testIp())
+        .send({ password: DEFAULT_PASSWORD })
+        .expect(422);
+    });
+
     it('reveals a disabled account only to a caller with the right password', async () => {
       const user = await seedUser(app, { status: 'DISABLED' });
       await http()
         .post('/api/v1/auth/login')
         .set('X-Forwarded-For', testIp())
-        .send({ username: user.username, password: 'wrong-password-1' })
+        .send({ login: user.phone, password: 'wrong-password-1' })
         .expect(401);
       const response = await http()
         .post('/api/v1/auth/login')
         .set('X-Forwarded-For', testIp())
-        .send({ username: user.username, password: DEFAULT_PASSWORD })
+        .send({ login: user.phone, password: DEFAULT_PASSWORD })
         .expect(403);
       expect(response.body).toMatchObject({ code: 'ACCOUNT_DISABLED' });
     });
@@ -107,13 +141,13 @@ describe('authentication (ADR-0027)', () => {
         await http()
           .post('/api/v1/auth/login')
           .set('X-Forwarded-For', ip)
-          .send({ username: user.username, password: 'wrong-password-1' })
+          .send({ login: user.phone, password: 'wrong-password-1' })
           .expect(401);
       }
       const blocked = await http()
         .post('/api/v1/auth/login')
         .set('X-Forwarded-For', ip)
-        .send({ username: user.username, password: DEFAULT_PASSWORD })
+        .send({ login: user.phone, password: DEFAULT_PASSWORD })
         .expect(429);
       expect(blocked.body).toMatchObject({ code: 'TOO_MANY_REQUESTS' });
       expect(
@@ -128,12 +162,12 @@ describe('authentication (ADR-0027)', () => {
       await http()
         .post('/api/v1/auth/login')
         .set('X-Forwarded-For', testIp())
-        .send({ username: user.username, password: 'wrong-password-1' })
+        .send({ login: user.phone, password: 'wrong-password-1' })
         .expect(401);
       const locked = await http()
         .post('/api/v1/auth/login')
         .set('X-Forwarded-For', testIp())
-        .send({ username: user.username, password: DEFAULT_PASSWORD })
+        .send({ login: user.phone, password: DEFAULT_PASSWORD })
         .expect(423);
       expect(locked.body).toMatchObject({ code: 'ACCOUNT_LOCKED' });
       await sql.query(`UPDATE users SET locked_until = now() - interval '1 second' WHERE id = $1`, [
@@ -153,7 +187,7 @@ describe('authentication (ADR-0027)', () => {
         .post('/api/v1/auth/login')
         .set('X-Forwarded-For', testIp())
         .type('form')
-        .send({ username: user.username, password: DEFAULT_PASSWORD })
+        .send({ login: user.phone, password: DEFAULT_PASSWORD })
         .expect(422);
     });
   });
@@ -366,7 +400,7 @@ describe('authentication (ADR-0027)', () => {
         .expect(204);
       await http().get('/api/v1/auth/me').set(bearer(desk.accessToken)).expect(200);
       await http().get('/api/v1/auth/me').set(bearer(phone.accessToken)).expect(401);
-      await login(app, { username: user.username, password: 'brand-new-pass-1' });
+      await login(app, { ...user, password: 'brand-new-pass-1' });
     });
 
     it('lets a user set a password with a one-time code, once', async () => {
@@ -375,13 +409,16 @@ describe('authentication (ADR-0027)', () => {
       const setup = (body: Record<string, string>) =>
         http().post('/api/v1/auth/password/setup').set('X-Forwarded-For', testIp()).send(body);
       const weak = await setup({
-        username: user.username,
+        login: user.phone ?? '',
         code,
-        newPassword: user.username,
+        newPassword: (user.phone ?? '').slice(-8),
       }).expect(422);
-      expect(weak.body).toMatchObject({ code: 'PASSWORD_TOO_WEAK' });
+      expect(weak.body).toMatchObject({
+        code: 'PASSWORD_TOO_WEAK',
+        params: { problem: 'SAME_AS_PHONE' },
+      });
       const done = await setup({
-        username: user.username,
+        login: (user.phone ?? '').slice(-8),
         code: code.toLowerCase(),
         newPassword: 'my-own-password-1',
       }).expect(200);
@@ -393,12 +430,12 @@ describe('authentication (ADR-0027)', () => {
       );
       expect(rows[0]?.signed_in).toBe(true);
       const again = await setup({
-        username: user.username,
+        login: user.phone ?? '',
         code,
         newPassword: 'another-pass-2',
       }).expect(400);
       expect(again.body).toMatchObject({ code: 'PASSWORD_CODE_INVALID' });
-      await login(app, { username: user.username, password: 'my-own-password-1' });
+      await login(app, { ...user, password: 'my-own-password-1' });
     });
 
     it('burns a code after 5 wrong attempts, expires it, and replaces it on re-issue', async () => {
@@ -408,20 +445,20 @@ describe('authentication (ADR-0027)', () => {
         await http()
           .post('/api/v1/auth/password/setup')
           .set('X-Forwarded-For', testIp())
-          .send({ username: user.username, code: 'AAAAA-AAAAA', newPassword: 'my-own-password-1' })
+          .send({ login: user.phone, code: 'AAAAA-AAAAA', newPassword: 'my-own-password-1' })
           .expect(400);
       }
       await http()
         .post('/api/v1/auth/password/setup')
         .set('X-Forwarded-For', testIp())
-        .send({ username: user.username, code, newPassword: 'my-own-password-1' })
+        .send({ login: user.phone, code, newPassword: 'my-own-password-1' })
         .expect(400);
       const replaced = await issueCode(app, user.id);
       const fresh = await issueCode(app, user.id);
       await http()
         .post('/api/v1/auth/password/setup')
         .set('X-Forwarded-For', testIp())
-        .send({ username: user.username, code: replaced, newPassword: 'my-own-password-1' })
+        .send({ login: user.phone, code: replaced, newPassword: 'my-own-password-1' })
         .expect(400);
       await sql.query(
         `UPDATE password_resets SET created_at = now() - interval '2 hours', expires_at = now() - interval '1 hour'
@@ -431,7 +468,7 @@ describe('authentication (ADR-0027)', () => {
       await http()
         .post('/api/v1/auth/password/setup')
         .set('X-Forwarded-For', testIp())
-        .send({ username: user.username, code: fresh, newPassword: 'my-own-password-1' })
+        .send({ login: user.phone, code: fresh, newPassword: 'my-own-password-1' })
         .expect(400);
     });
   });

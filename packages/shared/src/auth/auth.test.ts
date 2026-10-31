@@ -6,17 +6,19 @@ import {
   isPermission,
   isSystemRole,
   normalizeUsername,
+  parseStaffLogin,
   PASSWORD_MIN_LENGTH,
   PERMISSIONS,
   SYSTEM_ROLE_PERMISSIONS,
   SYSTEM_ROLES,
+  usernameFromPhone,
   USERNAME_PATTERN,
 } from './index';
 
 describe('permission catalog', () => {
   it('uses lowercase dot paths without duplicates', () => {
     expect(new Set(PERMISSIONS).size).toBe(PERMISSIONS.length);
-    for (const code of PERMISSIONS) expect(code).toMatch(/^[a-z]+(\.[a-z][a-z_]*)+$/);
+    for (const code of PERMISSIONS) expect(code).toMatch(/^[a-z]+(\.[a-z][a-zA-Z_]*)+$/);
   });
 
   it('never lets one code be a segment prefix of another (i18n key paths would collide)', () => {
@@ -76,9 +78,32 @@ describe('password policy', () => {
     expect(checkPassword('bat.erdene1', 'bat.erdene')).toBeNull();
   });
 
+  it('rejects the staff phone as the password in any written form', () => {
+    expect(checkPassword('99112233', 'p99112233', '+97699112233')).toBe('SAME_AS_PHONE');
+    expect(checkPassword('+976 9911 2233', 'p99112233', '+97699112233')).toBe('SAME_AS_PHONE');
+    expect(checkPassword('99112233x', 'p99112233', '+97699112233')).toBeNull();
+    expect(checkPassword('99112233', 'bat', null)).toBeNull();
+    // A login name standing in for the phone (the set-password form) is not a phone.
+    expect(checkPassword('my-own-password-1', 'worker', 'worker')).toBeNull();
+  });
+
   it('compares in NFC so composed and decomposed input match', () => {
     const decomposed = 'Ё'.normalize('NFD').repeat(8);
     expect(checkPassword(decomposed, 'bat')).toBeNull();
     expect([...decomposed].length).toBe(16);
+  });
+});
+describe('staff login (ADR-0128)', () => {
+  it('derives the internal login name from the phone', () => {
+    expect(usernameFromPhone('+97699112233')).toBe('p99112233');
+    expect(usernameFromPhone('+97699112233', 2)).toBe('p99112233-2');
+    expect(USERNAME_PATTERN.test(usernameFromPhone('+97699112233', 2))).toBe(true);
+  });
+
+  it('reads a phone in any local form, anything else as a login name', () => {
+    expect(parseStaffLogin(' 9911 2233 ')).toEqual({ kind: 'PHONE', value: '+97699112233' });
+    expect(parseStaffLogin('+976-99112233')).toEqual({ kind: 'PHONE', value: '+97699112233' });
+    expect(parseStaffLogin(' Menejer ')).toEqual({ kind: 'USERNAME', value: 'menejer' });
+    expect(parseStaffLogin('9911223')).toEqual({ kind: 'USERNAME', value: '9911223' });
   });
 });

@@ -7,6 +7,7 @@ const randomUUID = () => `00000000-0000-4000-8000-${String((uuids += 1)).padStar
 const ME = {
   id: 7,
   username: 'rep',
+  phone: '+97699110007',
   fullName: 'Төлөөлөгч',
   permissions: ['sales.orders.rep'],
   roles: [],

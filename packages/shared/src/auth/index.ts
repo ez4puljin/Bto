@@ -5,6 +5,8 @@
  * appends its own codes here and extends SYSTEM_ROLE_PERMISSIONS. The API syncs this catalog into
  * the `permissions`, `roles` and `role_permissions` tables at boot.
  */
+import { normalizeMnPhone } from '../phone';
+
 export const PERMISSIONS = [
   'identity.users.read',
   'identity.users.manage',
@@ -222,22 +224,56 @@ export function normalizeUsername(value: string): string {
   return value.trim().toLowerCase();
 }
 
+/**
+ * The internal login name a staff record gets from its phone (ADR-0128 #2): `p` + the 8 local
+ * digits, never typed and never shown; `suffix` resolves a clash with an older, typed name.
+ */
+export function usernameFromPhone(phoneE164: string, suffix = 0): string {
+  const base = `p${phoneE164.slice(-8)}`;
+  return suffix > 0 ? `${base}-${suffix}` : base;
+}
+
+/** What a staff member typed to sign in (ADR-0128 #1): a phone in any local form, or a login name. */
+export type StaffLogin =
+  | { readonly kind: 'PHONE'; readonly value: string }
+  | { readonly kind: 'USERNAME'; readonly value: string };
+
+/**
+ * A value that normalises to a Mongolian phone is a PHONE (E.164); anything else is a USERNAME
+ * (trimmed, lower-cased). The api looks a USERNAME up only on records without a phone yet.
+ */
+export function parseStaffLogin(value: string): StaffLogin {
+  const phone = normalizeMnPhone(value);
+  if (phone) return { kind: 'PHONE', value: phone };
+  return { kind: 'USERNAME', value: normalizeUsername(value) };
+}
+
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 128;
 
-export type PasswordProblem = 'TOO_SHORT' | 'TOO_LONG' | 'SAME_AS_USERNAME';
+export type PasswordProblem = 'TOO_SHORT' | 'TOO_LONG' | 'SAME_AS_USERNAME' | 'SAME_AS_PHONE';
 
 /** Passwords are compared and hashed in Unicode NFC so the same text typed on any device matches. */
 export function normalizePassword(value: string): string {
   return value.normalize('NFC');
 }
 
-/** The password policy shared by the API (authoritative) and the web forms (instant feedback). */
-export function checkPassword(password: string, username: string): PasswordProblem | null {
+/**
+ * The password policy shared by the API (authoritative) and the web forms (instant feedback):
+ * never the login name, and never the staff member's own phone (ADR-0128 #5), with or without
+ * the country code.
+ */
+export function checkPassword(
+  password: string,
+  username: string,
+  phone?: string | null,
+): PasswordProblem | null {
   const normalized = normalizePassword(password);
   const length = [...normalized].length;
   if (length < PASSWORD_MIN_LENGTH) return 'TOO_SHORT';
   if (length > PASSWORD_MAX_LENGTH) return 'TOO_LONG';
   if (normalized.toLowerCase() === normalizeUsername(username)) return 'SAME_AS_USERNAME';
+  const ownPhone = phone ? normalizeMnPhone(phone) : null;
+  if (ownPhone && normalizeMnPhone(normalized) === ownPhone) return 'SAME_AS_PHONE';
   return null;
 }

@@ -36,6 +36,7 @@ export const problem = (code: string, status: number, params?: Record<string, un
 export const ADMIN_ME: Me = {
   id: 1,
   username: 'admin',
+  phone: '+97699110001',
   fullName: 'Админ Бат',
   permissions: [...PERMISSIONS],
   roles: [{ id: 1, code: 'ADMIN', name: null, isSystem: true }],
@@ -48,6 +49,7 @@ export const WORKER_ME: Me = {
   ...ADMIN_ME,
   id: 2,
   username: 'worker',
+  phone: null,
   fullName: 'Агуулахын Дорж',
   permissions: [],
   roles: [{ id: 4, code: 'WAREHOUSE', name: null, isSystem: true }],

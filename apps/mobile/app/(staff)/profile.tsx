@@ -57,7 +57,7 @@ export default function ProfileScreen() {
               {me.fullName}
             </Text>
             <Text style={[type.body, styles.muted]} numberOfLines={2}>
-              {roleName ? `${me.username} · ${roleName}` : me.username}
+              {[me.phone?.replace(/^\+976/, ''), roleName].filter(Boolean).join(' · ')}
             </Text>
           </View>
           <ChevronRight size={16} strokeWidth={2.6} color={colors.input} />

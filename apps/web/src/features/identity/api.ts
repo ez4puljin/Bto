@@ -37,15 +37,19 @@ const KEYS = {
   audit: ['identity', 'audit'] as const,
 };
 
-export function useUsers(search: string) {
+export type UserStatusFilter = 'ACTIVE' | 'DISABLED';
+
+/** Staff, 100 a page (the list groups them by role in the browser, so a page holds most installations). */
+export function useUsers(filter: { q?: string; status?: UserStatusFilter }) {
   const api = useApiClient();
+  const q = filter.q?.trim() || undefined;
   return useInfiniteQuery({
-    queryKey: [...KEYS.users, 'list', search],
+    queryKey: [...KEYS.users, 'list', q ?? '', filter.status ?? ''],
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam, signal }) =>
       unwrap(
         await api.GET('/api/v1/users', {
-          params: { query: { q: search || undefined, cursor: pageParam, limit: 50 } },
+          params: { query: { q, status: filter.status, cursor: pageParam, limit: 100 } },
           signal,
         }),
       ),

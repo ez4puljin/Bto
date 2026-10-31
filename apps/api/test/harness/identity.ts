@@ -22,6 +22,14 @@ export function uniqueUsername(prefix = 'user'): string {
   return `${prefix}.${process.env.JEST_WORKER_ID ?? '1'}.${usernames}`.slice(0, 32);
 }
 
+let phones = 0;
+/** A staff phone that is unique within this Jest worker: +9769 + worker digit + 6 digits. */
+export function uniquePhone(): string {
+  phones += 1;
+  const worker = (Number.parseInt(process.env.JEST_WORKER_ID ?? '1', 10) % 10).toString();
+  return `+9769${worker}${phones.toString().padStart(6, '0')}`;
+}
+
 let addresses = 0;
 /** A fresh documentation-range client address (RFC 5737), so limiter buckets never collide. */
 export function testIp(): string {
@@ -34,8 +42,14 @@ export function testIp(): string {
 export interface SeededUser {
   id: number;
   username: string;
+  /** The sign-in phone (E.164), or null for a record "registered before ADR-0128". */
+  phone: string | null;
   password: string;
 }
+
+/** What a seeded user types to sign in (ADR-0128 #1): the phone, or the login name without one. */
+export const loginOf = (user: { username: string; phone?: string | null }): string =>
+  user.phone ?? user.username;
 
 /** Inserts a staff user directly (with roles by system code and optional write scopes). */
 export async function seedUser(
@@ -47,16 +61,20 @@ export async function seedUser(
     warehouseIds?: number[];
     branchIds?: number[];
     username?: string;
+    /** `null`: a record without a phone (signs in by login name); default a unique phone. */
+    phone?: string | null;
   } = {},
 ): Promise<SeededUser> {
   const db = app.get<Db>(DB);
   const hasher = app.get(PasswordHasher);
   const username = options.username ?? uniqueUsername();
+  const phone = options.phone === undefined ? uniquePhone() : options.phone;
   const password = options.password === undefined ? DEFAULT_PASSWORD : options.password;
   const [user] = await db
     .insert(users)
     .values({
       username,
+      phone,
       fullName: 'Тест хэрэглэгч',
       passwordHash: password ? await hasher.hash(password) : null,
       status: options.status ?? 'ACTIVE',
@@ -77,7 +95,7 @@ export async function seedUser(
   for (const branchId of options.branchIds ?? []) {
     await db.insert(userScopes).values({ userId: user.id, branchId });
   }
-  return { id: user.id, username, password: password ?? '' };
+  return { id: user.id, username, phone, password: password ?? '' };
 }
 
 /** A one-time password code as an admin would issue it. */
@@ -105,13 +123,13 @@ export interface LoggedIn {
 
 export async function login(
   app: NestExpressApplication,
-  user: { username: string; password: string },
+  user: { username: string; phone?: string | null; password: string },
   ip = testIp(),
 ): Promise<LoggedIn> {
   const response = await request(app.getHttpServer())
     .post('/api/v1/auth/login')
     .set('X-Forwarded-For', ip)
-    .send({ username: user.username, password: user.password })
+    .send({ login: loginOf(user), password: user.password })
     .expect(200);
   const body = response.body as { accessToken: string };
   return { accessToken: body.accessToken, cookie: refreshCookieOf(response), ip, response };
