@@ -79,6 +79,9 @@ export const ErrorCode = {
   ORDER_NUMBER_TAKEN: 'ORDER_NUMBER_TAKEN',
   // the customer app (docs/modules/customer.md, ADR-0079 #5): no stage takes app orders
   CUSTOMER_APP_CLOSED: 'CUSTOMER_APP_CLOSED',
+  // the apps sell only the assortment segment's products (ADR-0127 #1) and above the minimum (#4)
+  PRODUCT_NOT_IN_APP: 'PRODUCT_NOT_IN_APP',
+  ORDER_BELOW_MINIMUM: 'ORDER_BELOW_MINIMUM',
   COSTING_CLOSED: 'COSTING_CLOSED',
   // the receipt window (ADR-0099)
   RECEIPT_DISCOUNT_TOO_LARGE: 'RECEIPT_DISCOUNT_TOO_LARGE',

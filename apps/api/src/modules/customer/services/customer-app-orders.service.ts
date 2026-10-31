@@ -5,16 +5,18 @@ import { businessDate } from '@tugeel/shared/time';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
-import { invalid } from '../../../common/errors/app-error';
+import { AppError, invalid } from '../../../common/errors/app-error';
 import { InvoiceQueryService } from '../../finance';
 import type { CustomerContext } from '../../identity';
 import {
+  AppSettingsService,
   type CustomerOrderDetail,
   type CustomerOrderFilters,
   type CustomerOrderPage,
   CustomerOrdersService,
   SalesOrdersService,
   SalesPipelinesService,
+  SalesRepShopService,
 } from '../../sales';
 import { CustomerShopService, wordOf } from './customer-shop.service';
 
@@ -50,6 +52,8 @@ export class CustomerAppOrdersService {
     private readonly history: CustomerOrdersService,
     private readonly invoices: InvoiceQueryService,
     private readonly shop: CustomerShopService,
+    private readonly repShop: SalesRepShopService,
+    private readonly settings: AppSettingsService,
   ) {}
 
   /**
@@ -60,6 +64,20 @@ export class CustomerAppOrdersService {
   async send(ctx: CustomerContext, input: CustomerOrderInput): Promise<CustomerOrderDetail> {
     if (!isCustomerDeliveryDate(input.deliveryDate, businessDate())) {
       throw invalid('deliveryDate', 'customerDay', 'today or within 60 days');
+    }
+    // The apps' rules (ADR-0127 #1, #4): only the assortment's products, and the order quoted
+    // today — as the office will price it — at least the minimum amount; both before the transaction.
+    await this.repShop.assertUnitsListed(input.lines.map((line) => line.productUnitId));
+    const minimum = (await this.settings.current()).minOrderAmount;
+    if (minimum !== null && minimum.gt(0)) {
+      const { quote } = await this.shop.quote(input.lines);
+      if (quote.orderAmount.lt(minimum)) {
+        throw new AppError(
+          'ORDER_BELOW_MINIMUM',
+          `the order of ${quote.orderAmount.toFixed(0)} is below the minimum ${minimum.toFixed(0)}`,
+          { min: minimum.toFixed(0), total: quote.orderAmount.toFixed(0) },
+        );
+      }
     }
     const id = await inTransaction(this.db, async (tx) => {
       const placement = await this.pipelines.customerAppPlacement(tx);

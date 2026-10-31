@@ -49,7 +49,8 @@ describe('the credit refusal', () => {
   });
 
   it('has a Mongolian message for every reason', () => {
-    const errors: Record<string, string> = mn.errors;
+    // `errors.fields` nests the refused fields' texts (2026-10-31); the codes themselves are strings.
+    const errors: Record<string, unknown> = mn.errors;
     for (const reason of ['HOLD', 'OVERDUE', 'LIMIT']) {
       const message = creditMessage({ code: 'CREDIT_BLOCKED', status: 409, params: { reason } });
       expect(message && errors[message.key.slice('errors.'.length)]).toEqual(expect.any(String));

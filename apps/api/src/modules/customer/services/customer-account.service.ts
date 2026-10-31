@@ -18,6 +18,7 @@ import {
 import { type CustomerContext, OrgService } from '../../identity';
 import { CustomersService } from '../../partners';
 import {
+  AppSettingsService,
   type CustomerOrderOrigin,
   CustomerOrdersService,
   SalesPipelinesService,
@@ -142,6 +143,7 @@ export class CustomerAccountService {
     private readonly orders: CustomerOrdersService,
     private readonly pipelines: SalesPipelinesService,
     private readonly org: OrgService,
+    private readonly settings: AppSettingsService,
   ) {}
 
   async account(ctx: CustomerContext): Promise<CustomerAccount> {
@@ -283,6 +285,7 @@ export class CustomerAccountService {
       settlementGroup: terms.settlementGroup,
       ordersOpen: await this.pipelines.customerAppOpen(),
       today: businessDate(),
+      ...(await this.appRules()),
     };
   }
 
@@ -304,6 +307,21 @@ export class CustomerAccountService {
       addresses,
       pickup: await this.centre(),
       ordersOpen: await this.pipelines.customerAppOpen(),
+      ...(await this.appRules()),
+    };
+  }
+
+  /** The office's app settings the store's app shows (ADR-0127 #4): the minimum, the name, the colour. */
+  private async appRules(): Promise<{
+    minOrderAmount: string | null;
+    appName: string | null;
+    appColor: string | null;
+  }> {
+    const settings = await this.settings.current();
+    return {
+      minOrderAmount: settings.minOrderAmount?.toFixed(0) ?? null,
+      appName: settings.appName,
+      appColor: settings.appColor,
     };
   }
 

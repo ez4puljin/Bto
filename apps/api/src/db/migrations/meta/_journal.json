@@ -428,6 +428,13 @@
       "when": 1793413322263,
       "tag": "0061_sales_picks",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1793423685588,
+      "tag": "0062_app_settings",
+      "breakpoints": true
     }
   ]
 }

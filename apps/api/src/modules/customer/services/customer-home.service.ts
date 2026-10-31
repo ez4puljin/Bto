@@ -2,10 +2,12 @@ import { Injectable } from '@nestjs/common';
 import type { Decimal } from '@tugeel/shared/money';
 import {
   HOME_SECTION_SIZE,
+  HOME_TOGGLE_KINDS,
   type HomeSectionKey,
   type HomeSectionKind,
   homeSectionKey,
   type HomeSectionSort,
+  type HomeToggleKind,
   RECENT_ORDER_DAYS,
 } from '@tugeel/shared/sales';
 import { addDays, businessDate, isIsoDate } from '@tugeel/shared/time';
@@ -26,7 +28,7 @@ import {
 import type { CustomerContext } from '../../identity';
 import { StockQueryService } from '../../inventory';
 import { type DealBook, ProductDealsService, ProductPricesService } from '../../pricing';
-import { CustomerOrdersService, type RepShopProduct } from '../../sales';
+import { AppSettingsService, CustomerOrdersService, type RepShopProduct } from '../../sales';
 import { AppBannersService, type RunningBanner } from './app-banners.service';
 import { type CustomerProduct, CustomerShopService, newSince } from './customer-shop.service';
 
@@ -141,6 +143,9 @@ type StoreSectionKind = 'RECENT' | 'FAVOURITES';
 const isStoreSection = (key: HomeSectionKey): key is { kind: StoreSectionKind } =>
   key.kind === 'RECENT' || key.kind === 'FAVOURITES';
 const noSection = (key: string) => new AppError('NOT_FOUND', 'no such section', { key });
+/** A fixed section the office may switch off (ADR-0127 #3). */
+const isToggled = (key: HomeSectionKey): key is { kind: HomeToggleKind } =>
+  (HOME_TOGGLE_KINDS as readonly string[]).includes(key.kind);
 
 /**
  * «Bto300»'s home as a shop window (ADR-0092, ADR-0093), built only from other modules' public
@@ -160,6 +165,7 @@ export class CustomerHomeService {
     private readonly orders: CustomerOrdersService,
     private readonly deals: ProductDealsService,
     private readonly prices: ProductPricesService,
+    private readonly settings: AppSettingsService,
   ) {}
 
   /** «Нүүр» (ADR-0092 #1): banners, the category grid and the sections in their fixed order. */
@@ -230,9 +236,11 @@ export class CustomerHomeService {
     const listed = new Set(shop.rank.keys());
     const tree = await this.categories.list();
     const shown = await this.productQuery.productSegments({ shownInApp: true });
+    // The office switches the fixed sections on and off from «Апп → Нүүр» (ADR-0127 #3).
+    const on = (await this.settings.current()).homeSections;
     const sections: SectionIds[] = [];
     if (viewer.store) sections.push(await this.sectionIds(viewer, shop, { kind: 'RECENT' }));
-    sections.push(await this.sectionIds(viewer, shop, { kind: 'PROMOTIONS' }));
+    if (on.PROMOTIONS) sections.push(await this.sectionIds(viewer, shop, { kind: 'PROMOTIONS' }));
     for (const segment of shown) {
       try {
         sections.push(await this.segmentIds(shop, segment));
@@ -242,7 +250,7 @@ export class CustomerHomeService {
       }
     }
     for (const kind of ['DISCOUNTS', 'NEW'] as const) {
-      sections.push(await this.sectionIds(viewer, shop, { kind }));
+      if (on[kind]) sections.push(await this.sectionIds(viewer, shop, { kind }));
     }
     if (viewer.store) sections.push(await this.sectionIds(viewer, shop, { kind: 'FAVOURITES' }));
     return {
@@ -260,6 +268,9 @@ export class CustomerHomeService {
   ): Promise<SectionPage<P>> {
     const keyText = homeSectionKey(key);
     if (!viewer.store && isStoreSection(key)) throw noSection(keyText);
+    if (isToggled(key) && !(await this.settings.current()).homeSections[key.kind]) {
+      throw noSection(keyText);
+    }
     const sort = query.sort ?? 'DEFAULT';
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const after = cursorOf(query.cursor, keyText, sort);

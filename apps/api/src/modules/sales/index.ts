@@ -76,6 +76,13 @@ export {
   type StageInput,
 } from './services/sales-pipelines.service';
 export {
+  APP_SETTINGS_MANAGE,
+  type AppSettings,
+  type AppSettingsInput,
+  AppSettingsService,
+  type Assortment,
+} from './services/app-settings.service';
+export {
   type ChannelDefault,
   type NumberFormat,
   ORDER_NUMBER_SCOPE,

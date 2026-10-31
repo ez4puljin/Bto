@@ -87,7 +87,7 @@ const LIVE_COLUMNS: readonly ColumnSpec[] = [
 ];
 
 /**
- * «Систем» → «Харилцагчийн апп» → «Баннер» (ADR-0092 #5, customer.home.manage): the banners
+ * «Апп» → «Аппын нүүр» → «Баннер» (ADR-0092 #5, ADR-0127, customer.home.manage): the banners
  * of «Bto300»'s home in the order the app shows them, with their link, period and state; moved
  * up or down, archived (asked first), or added in a dialog (`?new=1`). A banner is never edited.
  */

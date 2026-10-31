@@ -33,6 +33,8 @@ import {
 } from './sales-order-query.service';
 import { type OrderInput, SalesOrdersService } from './sales-orders.service';
 import { SalesPipelinesService } from './sales-pipelines.service';
+import { AppSettingsService } from './app-settings.service';
+import { SalesRepShopService } from './sales-rep-shop.service';
 
 /** A store history page's rows when the app asks for no other number. */
 export const REP_STORE_ORDER_PAGE_LIMIT = 20;
@@ -61,6 +63,9 @@ export interface RepContext {
   warehouses: { id: number; name: string; branchId: number; branchName: string }[];
   /** The branches the rep may write for, by name; empty when the rep is not scoped. */
   branchNames: string[];
+  /** The name and colour the office set for the apps (ADR-0127 #4); null = the built-in ones. */
+  appName: string | null;
+  appColor: string | null;
 }
 
 export interface RepOrderSummary {
@@ -202,10 +207,13 @@ export class SalesRepOrdersService {
     private readonly org: OrgService,
     private readonly quotes: PriceQuoteService,
     private readonly names: UserNamesService,
+    private readonly settings: AppSettingsService,
+    private readonly shop: SalesRepShopService,
   ) {}
 
   async context(ctx: AuthContext): Promise<RepContext> {
     const access = await this.access.load(ctx);
+    const settings = await this.settings.current();
     const boards = await this.db
       .select({ id: salesBoards.id, name: salesBoards.name, branchId: salesBoards.branchId })
       .from(salesBoards)
@@ -269,6 +277,8 @@ export class SalesRepOrdersService {
         .map((id) => branchNameOf.get(id) ?? '')
         .filter((name) => name !== '')
         .sort((a, b) => a.localeCompare(b)),
+      appName: settings.appName,
+      appColor: settings.appColor,
     };
   }
 
@@ -279,6 +289,8 @@ export class SalesRepOrdersService {
    * the rest backordered), the number drawn last. A refusal leaves nothing behind.
    */
   async create(ctx: AuthContext, input: RepOrderInput): Promise<RepOrderDetail> {
+    // The app sells only the assortment (ADR-0127 #1); checked before the stage is locked.
+    await this.shop.assertUnitsListed(input.lines.map((line) => line.productUnitId));
     const id = await inTransaction(this.db, async (tx) => {
       const pipelineId = await this.pipelines.lockStage(tx, input.stageId);
       const access = await this.access.load(ctx, tx);

@@ -99,6 +99,14 @@ export class SalesRepContextDto {
     description: "The branches of the rep's write scope; empty when the rep is not scoped",
   })
   branchNames: string[];
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'The name the office set for the app (ADR-0127 #4)',
+  })
+  appName: string | null;
+  @ApiProperty({ type: String, nullable: true, description: '#RRGGBB the office set for the app' })
+  appColor: string | null;
 }
 
 @ApiSchema({ name: 'SalesRepSupplier' })

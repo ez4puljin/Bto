@@ -9,6 +9,7 @@ import { bodyOf, calls } from '@/test/inventory-fixtures';
 import {
   ADMIN_ME,
   findSidebar,
+  getSidebar,
   json,
   type Me,
   renderApp,
@@ -83,11 +84,24 @@ const KEEPER: Me = {
   roles: [],
 };
 
+const SETTINGS: Schemas['AppSettings'] = {
+  assortmentSegmentId: null,
+  assortment: { segmentId: null, segmentName: null, broken: false },
+  shopProductCount: 120,
+  homeSections: { PROMOTIONS: true, DISCOUNTS: true, NEW: true },
+  minOrderAmount: null,
+  appName: null,
+  appColor: null,
+  updatedAt: null,
+};
+
 const routes = (
   extra: Record<string, (request: Request) => Response | Promise<Response>> = {},
 ) => ({
   'GET /api/v1/customer/banners': () => json({ data: [DRINKS, LATER, GONE], nextCursor: null }),
   'GET /api/v1/categories': () => json({ data: CATEGORIES, nextCursor: null }),
+  'GET /api/v1/app-settings': () => json(SETTINGS),
+  'GET /api/v1/segments': () => json({ data: [], nextCursor: null }),
   ...extra,
 });
 
@@ -98,7 +112,7 @@ beforeEach(() => {
 
 describe('banners (ADR-0092 #5)', () => {
   it('lists the banners in order with their link, period and state', async () => {
-    renderApp('/system/customer-app/banners', signedIn(ADMIN_ME, routes()));
+    renderApp('/app/home/banners', signedIn(ADMIN_ME, routes()));
     await screen.findByText('Ундааны долоо хоног');
     const rows = screen.getAllByRole('row');
     expect(rows.map((row) => row.textContent)).toEqual([
@@ -138,7 +152,7 @@ describe('banners (ADR-0092 #5)', () => {
         'POST /api/v1/customer/banners/3/archive': () => new Response(null, { status: 204 }),
       }),
     );
-    renderApp('/system/customer-app/banners', fetchMock);
+    renderApp('/app/home/banners', fetchMock);
     const user = userEvent.setup();
     await user.click(
       await screen.findByRole('button', { name: `${mn.customerApp.banners.up}: Шинэ амт` }),
@@ -172,7 +186,7 @@ describe('banners (ADR-0092 #5)', () => {
         'POST /api/v1/customer/banners': () => json(banner({ id: 7, title: 'Ус' }), 201),
       }),
     );
-    renderApp('/system/customer-app/banners?new=1', fetchMock);
+    renderApp('/app/home/banners?new=1', fetchMock);
     const user = userEvent.setup();
     const dialog = within(await screen.findByRole('dialog'));
     // Nothing is sent without a picture and a title.
@@ -212,28 +226,40 @@ describe('banners (ADR-0092 #5)', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(mn.customerApp.banners.created);
   }, 15_000);
 
-  it('opens «Харилцагчийн апп» and its banners to the home’s keeper alone', async () => {
+  it('opens «Аппын нүүр» and its banners to the home’s keeper alone (ADR-0127)', async () => {
     const fetchMock = signedIn(KEEPER, routes());
-    renderApp('/system/customer-app', fetchMock);
-    expect(
-      within(await findSidebar()).getByRole('link', { name: mn.nav.customerApp }),
-    ).toHaveAttribute('href', '/system/customer-app');
+    renderApp('/app/home', fetchMock);
+    expect(within(await findSidebar()).getByRole('link', { name: mn.nav.appHome })).toHaveAttribute(
+      'href',
+      '/app/home',
+    );
     const card = within(await screen.findByRole('region', { name: mn.customerApp.banners.title }));
     expect(
       await card.findByText(mn.customerApp.banners.runningCount.replace('{{n}}', '2')),
     ).toBeInTheDocument();
     expect(card.getByRole('link', { name: mn.customerApp.banners.manage })).toHaveAttribute(
       'href',
-      '/system/customer-app/banners',
+      '/app/home/banners',
     );
-    // The contact list is identity.settings.read's.
+    // The contact list is identity.settings.read's, on its own page.
     expect(screen.queryByRole('region', { name: mn.customerApp.contacts.title })).toBeNull();
     expect(calls(fetchMock, 'GET', '/api/v1/customer/contacts')).toHaveLength(0);
+    expect(within(getSidebar()).queryByRole('link', { name: mn.nav.appContacts })).toBeNull();
+  });
+
+  it('sends the old «Систем» addresses to the «Апп» pages', async () => {
+    const { router } = renderApp('/system/customer-app', signedIn(ADMIN_ME, routes()));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/app/home'));
+  });
+
+  it('sends the old banners address to the new one', async () => {
+    const { router } = renderApp('/system/customer-app/banners', signedIn(ADMIN_ME, routes()));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/app/home/banners'));
   });
 
   it('keeps the banners from a user without the right', async () => {
     const fetchMock = signedIn(WORKER_ME);
-    renderApp('/system/customer-app/banners', fetchMock);
+    renderApp('/app/home/banners', fetchMock);
     expect(await screen.findByText(mn.errors.FORBIDDEN)).toBeInTheDocument();
     expect(calls(fetchMock, 'GET', '/api/v1/customer/banners')).toHaveLength(0);
   });
