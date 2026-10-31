@@ -43,6 +43,7 @@ function toSummaryDto(user: UserSummary): UserSummaryDto {
     id: user.id,
     username: user.username,
     fullName: user.fullName,
+    phone: user.phone,
     status: user.status,
     roleIds: user.roleIds,
     lastLoginAt: iso(user.lastLoginAt),
@@ -53,7 +54,6 @@ function toSummaryDto(user: UserSummary): UserSummaryDto {
 function toDetailDto(user: UserDetail): UserDetailDto {
   return {
     ...toSummaryDto(user),
-    phone: user.phone,
     passwordSet: user.passwordSet,
     failedLoginCount: user.failedLoginCount,
     scopes: user.scopes,

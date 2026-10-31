@@ -52,7 +52,7 @@ describe('integrity: authentication under concurrency', () => {
         request(server)
           .post('/api/v1/auth/login')
           .set('X-Forwarded-For', testIp())
-          .send({ username: user.username, password: 'wrong-password-1' }),
+          .send({ login: user.phone, password: 'wrong-password-1' }),
       ),
     );
     expect(responses.map((response) => response.status)).toEqual(Array(10).fill(401));

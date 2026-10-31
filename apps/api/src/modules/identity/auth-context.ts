@@ -9,8 +9,11 @@ export interface AuthContext {
   readonly kind: 'STAFF';
   readonly userId: number;
   readonly sessionId: string;
+  /** Internal, generated from the phone for new staff (ADR-0128 #2); never shown. */
   readonly username: string;
   readonly fullName: string;
+  /** The sign-in phone (E.164), null on a record registered before ADR-0128. */
+  readonly phone: string | null;
   readonly permissions: ReadonlySet<Permission>;
   readonly roleIds: readonly number[];
   /**

@@ -176,7 +176,7 @@ describe('customer app sign-in (ADR-0079)', () => {
     const staffLogin = await http()
       .post('/api/v1/auth/mobile/login')
       .set('X-Forwarded-For', testIp())
-      .send({ username: user.username, password: user.password })
+      .send({ login: user.phone, password: user.password })
       .expect(200);
     await auth()
       .refresh((staffLogin.body as { refreshToken: string }).refreshToken)

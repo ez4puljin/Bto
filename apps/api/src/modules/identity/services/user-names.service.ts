@@ -9,6 +9,7 @@ import { rolePermissions, userRoles, users } from '../schema';
 export interface UserSummary {
   id: number;
   username: string;
+  phone: string | null;
   fullName: string;
   status: 'ACTIVE' | 'DISABLED';
 }
@@ -63,6 +64,7 @@ export class UserNamesService {
       .select({
         id: users.id,
         username: users.username,
+        phone: users.phone,
         fullName: users.fullName,
         status: users.status,
       })

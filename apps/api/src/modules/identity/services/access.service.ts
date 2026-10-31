@@ -21,6 +21,7 @@ export interface RoleRef {
 
 interface AccessRow extends Record<string, unknown> {
   username: string;
+  phone: string | null;
   full_name: string;
   created_at: string | Date;
   expires_at: string | Date;
@@ -49,7 +50,7 @@ export class AccessService {
     requestId?: string,
   ): Promise<ResolvedAccess | null> {
     const result = await this.db.execute<AccessRow>(sql`
-      SELECT u.username, u.full_name, s.created_at, s.expires_at,
+      SELECT u.username, u.full_name, u.phone, s.created_at, s.expires_at,
         ARRAY(SELECT DISTINCT rp.permission_code FROM user_roles ur
                 JOIN role_permissions rp ON rp.role_id = ur.role_id
                WHERE ur.user_id = u.id) AS permissions,
@@ -82,6 +83,7 @@ export class AccessService {
       sessionId,
       username: row.username,
       fullName: row.full_name,
+      phone: row.phone,
       permissions,
       roleIds: row.role_ids.map(toId),
       writableWarehouseIds: row.scoped ? new Set(row.writable.map(toId)) : null,

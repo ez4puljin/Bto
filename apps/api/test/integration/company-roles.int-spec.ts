@@ -89,7 +89,7 @@ describe('company code and per-company roles', () => {
       .post('/api/v1/users')
       .set(asAdmin())
       .send({
-        username: 'nyagtlan1',
+        phone: '99000011',
         fullName: 'Нягтлан',
         roleIds: [roleIds.get('ACCOUNTANT'), roleIds.get('OFFICE')],
       })
@@ -112,7 +112,7 @@ describe('company code and per-company roles', () => {
     expect(await mirrored(seeded.id)).toEqual(await direct(seeded.id));
 
     const admin = await createAdmin(app.get<Db>(DB), {
-      username: 'owner2',
+      phone: '99000012',
       fullName: 'Эзэн',
       pepper: TEST_PEPPER,
     });

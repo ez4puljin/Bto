@@ -8,6 +8,7 @@ const context = (writable: number[] | null): AuthContext => ({
   sessionId: 's',
   username: 'bat',
   fullName: 'Бат',
+  phone: null,
   permissions: new Set(),
   roleIds: [],
   writableWarehouseIds: writable === null ? null : new Set(writable),

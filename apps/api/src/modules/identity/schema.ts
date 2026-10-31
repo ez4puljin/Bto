@@ -47,6 +47,10 @@ export const users = pgTable(
   },
   (t) => [
     uniqueIndex('users_username_key').on(t.username),
+    // ADR-0128 #3: the registered phone is the sign-in identifier, one account per phone.
+    uniqueIndex('users_phone_key')
+      .on(t.phone)
+      .where(sql`${t.phone} IS NOT NULL`),
     check('users_username_format', sql`${t.username} ~ '^[a-z0-9][a-z0-9._-]{2,31}$'`),
     check('users_full_name_present', sql`length(btrim(${t.fullName})) > 0`),
     check('users_phone_e164', sql`${t.phone} IS NULL OR ${t.phone} ~ '^[+]976[0-9]{8}$'`),

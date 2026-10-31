@@ -67,17 +67,18 @@ export class AuthSession {
     return this.restoring;
   }
 
-  async login(username: string, password: string): Promise<AuthResult> {
-    const result = await this.client.POST('/api/v1/auth/login', { body: { username, password } });
+  /** `login`: the registered phone, or the login name of a record without a phone (ADR-0128). */
+  async login(login: string, password: string): Promise<AuthResult> {
+    const result = await this.client.POST('/api/v1/auth/login', { body: { login, password } });
     if (!result.data) return { ok: false, problem: problemOf(result.error) };
     this.token = result.data.accessToken;
     this.update({ status: 'authenticated', me: result.data.me });
     return { ok: true };
   }
 
-  async setupPassword(username: string, code: string, newPassword: string): Promise<AuthResult> {
+  async setupPassword(login: string, code: string, newPassword: string): Promise<AuthResult> {
     const result = await this.client.POST('/api/v1/auth/password/setup', {
-      body: { username, code, newPassword },
+      body: { login, code, newPassword },
     });
     if (!result.data) return { ok: false, problem: problemOf(result.error) };
     this.token = result.data.accessToken;

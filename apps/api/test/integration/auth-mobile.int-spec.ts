@@ -126,7 +126,7 @@ describe('native-client authentication (ADR-0061)', () => {
         http()
           .post('/api/v1/auth/mobile/login')
           .set('X-Forwarded-For', testIp())
-          .send({ username: user.username, password: DEFAULT_PASSWORD }),
+          .send({ login: user.phone, password: DEFAULT_PASSWORD }),
       () => http().post('/api/v1/auth/mobile/refresh').send({ refreshToken }),
       () => http().post('/api/v1/auth/mobile/logout').send({ refreshToken }),
     ];
@@ -152,7 +152,7 @@ describe('native-client authentication (ADR-0061)', () => {
     await http()
       .post('/api/v1/auth/mobile/login')
       .set('X-Forwarded-For', testIp())
-      .send({ username: user.username, password: DEFAULT_PASSWORD, device: 'phone' })
+      .send({ login: user.phone, password: DEFAULT_PASSWORD, device: 'phone' })
       .expect(422);
     await refresh('not-a-token').expect(401);
   });
@@ -164,13 +164,13 @@ describe('native-client authentication (ADR-0061)', () => {
       await http()
         .post('/api/v1/auth/mobile/login')
         .set('X-Forwarded-For', ip)
-        .send({ username: user.username, password: 'wrong-password-1' })
+        .send({ login: user.phone, password: 'wrong-password-1' })
         .expect(401);
     }
     const blocked = await http()
       .post('/api/v1/auth/mobile/login')
       .set('X-Forwarded-For', ip)
-      .send({ username: user.username, password: DEFAULT_PASSWORD })
+      .send({ login: user.phone, password: DEFAULT_PASSWORD })
       .expect(429);
     expect(blocked.body).toMatchObject({ code: 'TOO_MANY_REQUESTS' });
   });

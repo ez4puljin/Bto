@@ -24,7 +24,7 @@ describe('create-admin CLI', () => {
   it('creates an ADMIN whose password is set with the printed one-time code', async () => {
     const db = app.get<Db>(DB);
     const first = await createAdmin(db, {
-      username: ' Owner ',
+      phone: '9900 0099',
       fullName: 'Эзэн',
       pepper: TEST_PEPPER,
     });
@@ -33,7 +33,7 @@ describe('create-admin CLI', () => {
     const done = await request(app.getHttpServer())
       .post('/api/v1/auth/password/setup')
       .set('X-Forwarded-For', testIp())
-      .send({ username: 'owner', code: first.code, newPassword: 'owner-password-1' })
+      .send({ login: '99000099', code: first.code, newPassword: 'owner-password-1' })
       .expect(200);
     expect((done.body as { me: { roles: { code: string }[] } }).me.roles).toEqual([
       expect.objectContaining({ code: 'ADMIN' }),
@@ -43,16 +43,16 @@ describe('create-admin CLI', () => {
   it('recovers an existing admin: active, unlocked, a fresh code', async () => {
     const db = app.get<Db>(DB);
     await sql.query(
-      `UPDATE users SET status = 'DISABLED', locked_until = now() + interval '1 hour' WHERE username = 'owner'`,
+      `UPDATE users SET status = 'DISABLED', locked_until = now() + interval '1 hour' WHERE phone = '+97699000099'`,
     );
     const again = await createAdmin(db, {
-      username: 'owner',
+      phone: '99000099',
       fullName: 'Эзэн',
       pepper: TEST_PEPPER,
     });
     expect(again.created).toBe(false);
     const { rows } = await sql.query<{ status: string; locked_until: Date | null }>(
-      `SELECT status, locked_until FROM users WHERE username = 'owner'`,
+      `SELECT status, locked_until FROM users WHERE username = 'p99000099'`,
     );
     expect(rows).toEqual([{ status: 'ACTIVE', locked_until: null }]);
     const audit = await sql.query<{ action: string; actor_label: string }>(
@@ -65,5 +65,18 @@ describe('create-admin CLI', () => {
     await expect(
       createAdmin(db, { username: 'Нэр', fullName: 'x', pepper: TEST_PEPPER }),
     ).rejects.toThrow('invalid username');
+    await expect(
+      createAdmin(db, { phone: '12', fullName: 'x', pepper: TEST_PEPPER }),
+    ).rejects.toThrow('invalid phone');
+    // An admin registered before ADR-0128 is still recovered by login name.
+    const legacy = await createAdmin(db, {
+      username: 'owner',
+      fullName: 'Эзэн',
+      pepper: TEST_PEPPER,
+    });
+    expect(legacy.created).toBe(true);
+    expect(
+      (await createAdmin(db, { username: 'Owner', fullName: 'Эзэн', pepper: TEST_PEPPER })).created,
+    ).toBe(false);
   });
 });

@@ -10,7 +10,6 @@ import {
   findSidebar,
   getSidebar,
   json,
-  problem,
   renderApp,
   signedIn,
   WORKER_ME,
@@ -160,17 +159,18 @@ describe('users', () => {
     await user.click(await screen.findByRole('button', { name: mn.users.create }));
     const dialog = within(await screen.findByRole('dialog'));
     const fullName = dialog.getByLabelText(mn.users.form.fullName);
-    const username = dialog.getByLabelText(mn.users.form.username);
+    const phone = dialog.getByLabelText(mn.users.form.phone);
     const keeperRole = await dialog.findByRole('checkbox', { name: mn.roles.system.WAREHOUSE });
     const warehouse = dialog.getByRole('checkbox', { name: 'WH1 · Бөөний агуулах' });
-    const branch = dialog.getByRole('checkbox', { name: 'MAIN · Төв салбар' });
-    // A staff registration reads top-down: the name, the username, the role, then the warehouse.
+    // No login name is typed (ADR-0128 #2), and with one branch «Салбараар» is not offered (#7).
+    expect(dialog.queryByLabelText(/Нэвтрэх нэр/)).toBeNull();
+    expect(dialog.queryByRole('checkbox', { name: 'MAIN · Төв салбар' })).toBeNull();
+    // A staff registration reads top-down: the name, the phone, the role, then the warehouse.
     const follows = (first: HTMLElement, second: HTMLElement) =>
       Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(follows(fullName, username)).toBe(true);
-    expect(follows(username, keeperRole)).toBe(true);
+    expect(follows(fullName, phone)).toBe(true);
+    expect(follows(phone, keeperRole)).toBe(true);
     expect(follows(keeperRole, warehouse)).toBe(true);
-    expect(follows(warehouse, branch)).toBe(true);
     // The hint names the seeded roles of a rep, a store seller and a keeper.
     expect(
       dialog.getByText(
@@ -181,8 +181,7 @@ describe('users', () => {
       ),
     ).toBeInTheDocument();
     await user.type(fullName, 'Дорж Нямаа');
-    await user.type(username, 'Dorj.N');
-    await user.type(dialog.getByLabelText(mn.users.form.phone), '9911 2233');
+    await user.type(phone, '9911 2233');
     await user.click(keeperRole);
     await user.click(warehouse);
     expect(dialog.queryByRole('checkbox', { name: /TRANSIT/ })).toBeNull();
@@ -192,7 +191,6 @@ describe('users', () => {
     // With the code, the words to hand over: the web's set-password page, then the app.
     expect(screen.getByText(mn.users.code.handOver)).toBeInTheDocument();
     expect(created).toEqual({
-      username: 'dorj.n',
       fullName: 'Дорж Нямаа',
       phone: '+97699112233',
       roleIds: [4],
@@ -210,16 +208,25 @@ describe('users', () => {
         ...ORG_ROUTES,
         'GET /api/v1/users': () => list([]),
         'POST /api/v1/users': () =>
-          problem('DUPLICATE_VALUE', 409, { constraint: 'users_username_key' }),
+          json(
+            {
+              type: 'https://tugeel.local/errors/VALIDATION_FAILED',
+              title: 'VALIDATION_FAILED',
+              status: 422,
+              code: 'VALIDATION_FAILED',
+              errors: [{ path: 'phone', constraint: 'unique', message: 'taken' }],
+            },
+            422,
+          ),
       }),
     );
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: mn.users.create }));
     const dialog = within(await screen.findByRole('dialog'));
-    await user.type(dialog.getByLabelText(mn.users.form.username), 'dorj.n');
+    await user.type(dialog.getByLabelText(mn.users.form.phone), '99112233');
     await user.type(dialog.getByLabelText(mn.users.form.fullName), 'Дорж');
     await user.click(dialog.getByRole('button', { name: mn.common.save }));
-    expect(await dialog.findByText(mn.errors.DUPLICATE_VALUE)).toBeInTheDocument();
+    expect(await dialog.findByText(mn.errors.fields.phone.unique)).toBeInTheDocument();
   });
 
   it('unlocks a locked user and signs one device out', async () => {

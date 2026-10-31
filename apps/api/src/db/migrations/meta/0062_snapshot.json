@@ -1,6 +1,6 @@
 {
-  "id": "f6620dc7-79a4-4aea-8e3c-fb5446e8f979",
-  "prevId": "c8a183b8-f5e8-41cd-a70d-30dcafac608d",
+  "id": "7d0bf3a8-8068-44cc-9673-d084c08db405",
+  "prevId": "b8364884-54b6-494a-a1db-f35b8ff9ad1e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -27418,6 +27418,22 @@
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "users_phone_key": {
+          "name": "users_phone_key",
+          "columns": [
+            {
+              "expression": "phone",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"users\".\"phone\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}

@@ -41,13 +41,13 @@ describe('login', () => {
     });
     const { router } = renderApp('/login?next=%2Fsystem%2Fstatus', fetchMock);
     const user = userEvent.setup();
-    await user.type(await screen.findByLabelText(mn.auth.login.username), 'admin');
+    await user.type(await screen.findByLabelText(mn.auth.login.phone), 'admin');
     await user.type(screen.getByLabelText(mn.auth.login.password), 'correct-horse-9');
     await user.click(screen.getByRole('button', { name: mn.auth.login.submit }));
     expect(await screen.findByText(ADMIN_ME.fullName)).toBeInTheDocument();
     await waitFor(() => expect(router.state.location.pathname).toBe('/system/status'));
     const login = fetchMock.mock.calls.find(([request]) => request.url.endsWith('/auth/login'));
-    expect(await login?.[0].json()).toEqual({ username: 'admin', password: 'correct-horse-9' });
+    expect(await login?.[0].json()).toEqual({ login: 'admin', password: 'correct-horse-9' });
   });
 
   it('shows the Mongolian message of the error code', async () => {
@@ -56,7 +56,7 @@ describe('login', () => {
       signedOut({ 'POST /api/v1/auth/login': () => problem('INVALID_CREDENTIALS', 401) }),
     );
     const user = userEvent.setup();
-    await user.type(await screen.findByLabelText(mn.auth.login.username), 'admin');
+    await user.type(await screen.findByLabelText(mn.auth.login.phone), 'admin');
     await user.type(screen.getByLabelText(mn.auth.login.password), 'wrong');
     await user.click(screen.getByRole('button', { name: mn.auth.login.submit }));
     expect(await screen.findByText(mn.errors.INVALID_CREDENTIALS)).toBeInTheDocument();
@@ -79,7 +79,7 @@ describe('login', () => {
       signedOut({ 'POST /api/v1/auth/login': () => json({ ...TOKENS, me: ADMIN_ME }) }),
     );
     const user = userEvent.setup();
-    await user.type(await screen.findByLabelText(mn.auth.login.username), 'admin');
+    await user.type(await screen.findByLabelText(mn.auth.login.phone), 'admin');
     await user.type(screen.getByLabelText(mn.auth.login.password), 'correct-horse-9');
     await user.click(screen.getByRole('button', { name: mn.auth.login.submit }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
@@ -93,7 +93,7 @@ describe('password setup with a one-time code', () => {
     });
     const { router } = renderApp('/set-password', fetchMock);
     const user = userEvent.setup();
-    await user.type(await screen.findByLabelText(mn.auth.login.username), 'worker');
+    await user.type(await screen.findByLabelText(mn.auth.login.phone), 'worker');
     await user.type(screen.getByLabelText(mn.auth.setPassword.code), '7kq2m-x9d4f');
     await user.type(screen.getByLabelText(mn.auth.setPassword.newPassword), 'short');
     await user.type(screen.getByLabelText(mn.auth.setPassword.confirmPassword), 'other');

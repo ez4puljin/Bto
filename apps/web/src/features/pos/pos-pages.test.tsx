@@ -146,7 +146,7 @@ describe('supermarket pages (ADR-0063 #8)', () => {
     });
     renderApp('/pos/cashiers', fetchMock);
     const row = await screen.findByRole('row', { name: /Кассчин Болор/ });
-    expect(within(row).getByText('bolor')).toBeInTheDocument();
+    expect(within(row).getByText('9911 0007')).toBeInTheDocument();
     await user.click(
       within(row).getByRole('button', { name: `${mn.pos.actions.setPin}: Кассчин Болор` }),
     );

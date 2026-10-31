@@ -11,6 +11,7 @@ const adminContext = (userId: number): AuthContext => ({
   sessionId: '00000000-0000-7000-8000-000000000000',
   username: `admin${userId}`,
   fullName: 'Админ',
+  phone: null,
   permissions: new Set(['identity.users.manage']),
   roleIds: [],
   writableWarehouseIds: null,

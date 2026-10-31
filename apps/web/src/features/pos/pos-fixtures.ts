@@ -53,7 +53,8 @@ export const TILL: Schemas['PosTill'] = {
 export const CASHIER: Schemas['PosCashier'] = {
   userId: 7,
   supervisor: false,
-  username: 'bolor',
+  username: 'p99110007',
+  phone: '+97699110007',
   fullName: 'Кассчин Болор',
   userStatus: 'ACTIVE',
   status: 'ACTIVE',

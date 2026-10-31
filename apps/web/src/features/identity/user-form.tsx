@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { isSystemRole, USERNAME_PATTERN } from '@tugeel/shared/auth';
+import { isSystemRole } from '@tugeel/shared/auth';
 import { normalizeMnPhone } from '@tugeel/shared/phone';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -12,12 +12,13 @@ import { Input } from '@/components/ui/input';
 import { useBranches, useRoles, useWarehouses } from './api';
 
 const userFormSchema = z.object({
-  username: z.string().trim().toLowerCase().regex(USERNAME_PATTERN, 'validation.username'),
   fullName: z.string().trim().min(1, 'validation.required').max(100),
+  // The sign-in identifier (ADR-0128 #1): required, 8 Mongolian digits in any local form.
   phone: z
     .string()
     .trim()
-    .refine((value) => value === '' || normalizeMnPhone(value) !== null, 'validation.phone'),
+    .min(1, 'validation.required')
+    .refine((value) => normalizeMnPhone(value) !== null, 'validation.phone'),
   roleIds: z.array(z.number()),
   branchIds: z.array(z.number()),
   warehouseIds: z.array(z.number()),
@@ -37,17 +38,17 @@ const SCOPE_OFFSET = '@md:pt-2.5';
 const HINTED_ROLES = { rep: 'SALES_REP', seller: 'POS_CASHIER', keeper: 'WAREHOUSE' } as const;
 
 /**
- * Name, username, phone, roles and write scopes, settings-style (ADR-0043), in the order a staff
- * registration is filled: who, how they sign in, what they do, where they write (the warehouses
- * first). Under the roles a hint names the seeded role of a rep, a store seller and a keeper —
- * only the roles this installation holds. `lockUsername` for existing users, `lockAccess` when an
- * admin edits themselves (the API refuses own role and scope changes). `inDialog` ends the form with
- * the dialog's footer, which stays in view while the sections scroll (ADR-0066); on a page it ends
- * with the page form's footer.
+ * Name, phone, roles and write scopes, settings-style (ADR-0043), in the order a staff
+ * registration is filled: who, the phone they sign in with (ADR-0128: no login name is typed, the
+ * internal one is generated), what they do, where they write (the warehouses first; «Салбараар»
+ * only when the installation has two or more branches, ADR-0128 #7). Under the roles a hint names
+ * the seeded role of a rep, a store seller and a keeper — only the roles this installation holds.
+ * `lockAccess` when an admin edits themselves (the API refuses own role and scope changes).
+ * `inDialog` ends the form with the dialog's footer, which stays in view while the sections scroll
+ * (ADR-0066); on a page it ends with the page form's footer.
  */
 export function UserForm(props: {
   defaultValues: UserFormValues;
-  lockUsername?: boolean;
   lockAccess?: boolean;
   submitLabel: string;
   onSubmit: (values: UserFormValues) => Promise<void>;
@@ -64,6 +65,13 @@ export function UserForm(props: {
   });
   const { errors, isSubmitting } = form.formState;
   const submit = form.handleSubmit(props.onSubmit);
+  // One installation is one legal entity, usually one branch: the branch scope then says nothing
+  // that «every warehouse» does not, so it appears only when a second branch exists.
+  const branchOptions = (branches.data ?? []).map((branch) => ({
+    value: branch.id,
+    label: `${branch.code} · ${branch.name}`,
+  }));
+  const showBranches = branchOptions.length > 1;
   // The hint names the seeded roles as the list shows them; a job whose role is missing is left out.
   const seeded = new Set(
     (roles.data ?? []).flatMap((role) => (role.code && isSystemRole(role.code) ? [role.code] : [])),
@@ -87,20 +95,18 @@ export function UserForm(props: {
           <Input id="user-fullName" {...form.register('fullName')} />
         </FormRow>
         <FormRow
-          label={t('users.form.username')}
-          htmlFor="user-username"
-          error={errors.username?.message}
+          label={t('users.form.phone')}
+          htmlFor="user-phone"
+          hint={t('users.form.phoneHint')}
+          error={errors.phone?.message}
         >
           <Input
-            id="user-username"
-            autoCapitalize="none"
-            className="font-mono sm:w-56"
-            disabled={props.lockUsername}
-            {...form.register('username')}
+            id="user-phone"
+            inputMode="tel"
+            autoComplete="off"
+            className="sm:w-56"
+            {...form.register('phone')}
           />
-        </FormRow>
-        <FormRow label={t('users.form.phone')} htmlFor="user-phone" error={errors.phone?.message}>
-          <Input id="user-phone" inputMode="tel" className="sm:w-56" {...form.register('phone')} />
         </FormRow>
       </FormSection>
       <fieldset disabled={props.lockAccess} className="flex min-w-0 flex-col gap-5">
@@ -149,26 +155,25 @@ export function UserForm(props: {
               />
             </div>
           </FormRow>
-          <FormRow label={t('users.form.scopeBranches')}>
-            <div className={SCOPE_OFFSET}>
-              <Controller
-                control={form.control}
-                name="branchIds"
-                render={({ field }) => (
-                  <CheckboxGroup
-                    name="scope-branch"
-                    value={field.value}
-                    onChange={field.onChange}
-                    disabled={props.lockAccess}
-                    options={(branches.data ?? []).map((branch) => ({
-                      value: branch.id,
-                      label: `${branch.code} · ${branch.name}`,
-                    }))}
-                  />
-                )}
-              />
-            </div>
-          </FormRow>
+          {showBranches ? (
+            <FormRow label={t('users.form.scopeBranches')} hint={t('users.form.scopeBranchesHint')}>
+              <div className={SCOPE_OFFSET}>
+                <Controller
+                  control={form.control}
+                  name="branchIds"
+                  render={({ field }) => (
+                    <CheckboxGroup
+                      name="scope-branch"
+                      value={field.value}
+                      onChange={field.onChange}
+                      disabled={props.lockAccess}
+                      options={branchOptions}
+                    />
+                  )}
+                />
+              </div>
+            </FormRow>
+          ) : null}
         </FormSection>
       </fieldset>
       {props.inDialog ? (

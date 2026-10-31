@@ -58,7 +58,11 @@ export default function ProfileInfoScreen() {
         <SectionHeader>{t('mobile.profileInfo.account')}</SectionHeader>
         <Group>
           <Row title={t('mobile.profileInfo.name')} value={me.fullName} minHeight={50} />
-          <Row title={t('mobile.profileInfo.username')} value={me.username} minHeight={50} />
+          <Row
+            title={t('mobile.profileInfo.phone')}
+            value={me.phone?.replace(/^\+976/, '') || t('common.none')}
+            minHeight={50}
+          />
           <Row
             title={t('mobile.profileInfo.role')}
             value={roleName || t('common.none')}

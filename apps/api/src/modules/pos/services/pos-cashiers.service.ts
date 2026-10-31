@@ -12,6 +12,7 @@ import { posCashiers } from '../schema';
 export interface Cashier {
   userId: number;
   username: string;
+  phone: string | null;
   fullName: string;
   userStatus: 'ACTIVE' | 'DISABLED';
   status: PosStatus;
@@ -57,6 +58,7 @@ export class PosCashiersService {
       cashiers.push({
         userId: row.userId,
         username: user.username,
+        phone: user.phone,
         fullName: user.fullName,
         userStatus: user.status,
         status: row.status,

@@ -355,7 +355,8 @@ export class PairingCodeDto {
 @ApiSchema({ name: 'PosCashier' })
 export class CashierDto {
   @ApiProperty() userId: number;
-  @ApiProperty() username: string;
+  @ApiProperty({ description: 'Internal login name (ADR-0128 #2)' }) username: string;
+  @ApiProperty({ type: String, nullable: true }) phone: string | null;
   @ApiProperty() fullName: string;
   @ApiProperty({ enum: ['ACTIVE', 'DISABLED'] }) userStatus: 'ACTIVE' | 'DISABLED';
   @ApiProperty({ enum: POS_STATUSES }) status: PosStatus;

@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { normalizeUsername, USERNAME_PATTERN } from '@tugeel/shared/auth';
+import { usernameFromPhone } from '@tugeel/shared/auth';
 import { normalizeMnPhone } from '@tugeel/shared/phone';
-import { and, asc, eq, gt, ilike, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, eq, gt, ilike, inArray, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
 import { AppConfig } from '../../../common/config/app-config';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -25,8 +25,11 @@ export interface UserScopes {
 
 export interface UserSummary {
   id: number;
+  /** Internal, generated from the phone (ADR-0128 #2); never shown to staff. */
   username: string;
   fullName: string;
+  /** The sign-in phone (E.164); null on a record registered before ADR-0128. */
+  phone: string | null;
   status: UserStatus;
   roleIds: number[];
   lastLoginAt: Date | null;
@@ -34,7 +37,6 @@ export interface UserSummary {
 }
 
 export interface UserDetail extends UserSummary {
-  phone: string | null;
   passwordSet: boolean;
   failedLoginCount: number;
   scopes: UserScopes;
@@ -43,9 +45,9 @@ export interface UserDetail extends UserSummary {
 }
 
 export interface UserInput {
-  username: string;
   fullName: string;
-  phone?: string | null;
+  /** Required: the sign-in identifier (ADR-0128 #1), 8 Mongolian digits in any local form. */
+  phone: string;
   roleIds: number[];
   scopes?: UserScopes;
 }
@@ -79,6 +81,13 @@ function normalizedPhone(phone: string | null | undefined): string | null | unde
   return value;
 }
 
+/** The phone a registration or an edit must carry (ADR-0128 #3): never empty, never cleared. */
+function requiredPhone(phone: string | null | undefined): string {
+  const value = normalizedPhone(phone);
+  if (!value) throw invalid('phone', 'required', 'the sign-in phone is required');
+  return value;
+}
+
 /**
  * Staff accounts (SPEC §5.1, ADR-0027). Only ADMIN holds `identity.users.manage`, so callers are
  * admins; nobody edits their own roles, scopes or status, and the last active ADMIN stays.
@@ -102,7 +111,11 @@ export class UsersService {
     const term = query.q?.trim();
     if (term) {
       const pattern = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-      const match = or(ilike(users.username, pattern), ilike(users.fullName, pattern));
+      const match = or(
+        ilike(users.username, pattern),
+        ilike(users.fullName, pattern),
+        ilike(users.phone, pattern),
+      );
       if (match) conditions.push(match);
     }
     const rows = await this.db
@@ -129,7 +142,6 @@ export class UsersService {
       .where(eq(userScopes.userId, id));
     return {
       ...toSummary(row, roleIds),
-      phone: row.phone,
       passwordSet: row.passwordHash !== null,
       failedLoginCount: row.failedLoginCount,
       scopes: {
@@ -143,18 +155,20 @@ export class UsersService {
     };
   }
 
+  /**
+   * Registers a staff member by name and phone (ADR-0128): the phone is the sign-in identifier
+   * and unique among staff; the internal login name is generated from it.
+   */
   async create(actor: AuthContext, input: UserInput): Promise<UserDetail> {
-    const username = normalizeUsername(input.username);
-    if (!USERNAME_PATTERN.test(username)) {
-      throw invalid('username', 'isUsername', 'username: 3-32 of a-z 0-9 . _ -');
-    }
-    const phone = normalizedPhone(input.phone);
+    const phone = requiredPhone(input.phone);
     return inTransaction(this.db, async (tx) => {
       await this.assertRoles(tx, input.roleIds);
       if (input.scopes) await this.assertScopeTargets(tx, input.scopes);
+      await this.assertPhoneFree(tx, phone, null);
+      const username = await this.freeUsername(tx, phone);
       const [row] = await tx
         .insert(users)
-        .values({ username, fullName: input.fullName.trim(), phone: phone ?? null })
+        .values({ username, fullName: input.fullName.trim(), phone })
         .returning({ id: users.id });
       if (!row) throw new Error('user insert returned no row');
       await this.replaceRoles(tx, row.id, input.roleIds);
@@ -176,7 +190,8 @@ export class UsersService {
     if (touchesAccess && id === actor.userId) {
       throw new AppError('SELF_EDIT_FORBIDDEN', 'users cannot change their own access', { id });
     }
-    const phone = normalizedPhone(patch.phone);
+    // A phone may change, never go away: it is how this person signs in (ADR-0128 #3).
+    const phone = patch.phone === undefined ? undefined : requiredPhone(patch.phone);
     return inTransaction(this.db, async (tx) => {
       // Lock order: the ADMIN role row first (serialises every access change), then the user.
       const adminRoleId = await this.lockAdminRole(tx);
@@ -187,6 +202,7 @@ export class UsersService {
         .for('update');
       if (!locked) throw new AppError('NOT_FOUND', `user ${id} not found`, { id });
       const before = await this.get(id, tx);
+      if (phone !== undefined && phone !== before.phone) await this.assertPhoneFree(tx, phone, id);
       if (patch.roleIds) await this.assertRoles(tx, patch.roleIds);
       if (patch.scopes) await this.assertScopeTargets(tx, patch.scopes);
       if (patch.status !== undefined || patch.roleIds !== undefined) {
@@ -246,6 +262,7 @@ export class UsersService {
         .set({ failedLoginCount: 0, lockedUntil: null, updatedAt: sql`now()` })
         .where(eq(users.id, id));
       this.limiter.clearUser(user.username);
+      if (user.phone) this.limiter.clearUser(user.phone);
       await this.audit.record(tx, actor, { action: 'UNLOCK', entity: 'users', entityId: id });
     });
   }
@@ -372,6 +389,32 @@ export class UsersService {
     if (rows.length) await tx.insert(userScopes).values(rows);
   }
 
+  /** One phone, one account (ADR-0128 #3): a readable refusal before the unique index's 409. */
+  private async assertPhoneFree(tx: Tx, phone: string, exceptUserId: number | null): Promise<void> {
+    const [taken] = await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(
+        exceptUserId === null
+          ? eq(users.phone, phone)
+          : and(eq(users.phone, phone), ne(users.id, exceptUserId)),
+      );
+    if (taken) throw invalid('phone', 'unique', 'this phone belongs to another staff member');
+  }
+
+  /** The generated login name (ADR-0128 #2); a clash with an older typed name takes a suffix. */
+  private async freeUsername(tx: Tx, phone: string): Promise<string> {
+    for (let suffix = 0; suffix < 100; suffix += 1) {
+      const candidate = usernameFromPhone(phone, suffix);
+      const [taken] = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.username, candidate));
+      if (!taken) return candidate;
+    }
+    throw new Error(`no free login name for ${phone}`);
+  }
+
   private async roleIdsOf(
     userIds: number[],
     executor: Db | Tx = this.db,
@@ -395,6 +438,7 @@ function toSummary(row: typeof users.$inferSelect, roleIds: number[]): UserSumma
     id: row.id,
     username: row.username,
     fullName: row.fullName,
+    phone: row.phone,
     status: row.status,
     roleIds,
     lastLoginAt: row.lastLoginAt,

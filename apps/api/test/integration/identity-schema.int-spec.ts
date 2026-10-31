@@ -32,6 +32,10 @@ describe('identity schema constraints', () => {
     expect(await sqlStateOf(insertUser('бат.эрдэнэ'))).toBe(CHECK);
     await insertUser('schema.phone', '+97699112233');
     expect(await sqlStateOf(insertUser('schema.phone2', '99112233'))).toBe(CHECK);
+    // One phone, one account (ADR-0128 #3); records without a phone do not collide.
+    expect(await sqlStateOf(insertUser('schema.phone3', '+97699112233'))).toBe(UNIQUE);
+    await insertUser('schema.nophone1');
+    await insertUser('schema.nophone2');
     expect(
       await sqlStateOf(
         app.query(`UPDATE users SET status = 'GONE' WHERE username = 'schema.user'`),
