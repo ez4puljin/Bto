@@ -2,7 +2,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ThumbKeeper } from '../../src/images/thumb-keeper';
 import { NoticePopupGate } from '../../src/notifications/popup-gate';
-import { isRep } from '../../src/state/phase';
+import { isRep, mayPick, mayRequestTransfers } from '../../src/state/phase';
 import { useSignedIn } from '../../src/state/session';
 import { ShopProvider } from '../../src/state/shop';
 import { colors } from '../../src/theme/tokens';
@@ -12,11 +12,14 @@ import { ToastProvider } from '../../src/ui/toast';
  * The sales-rep app (ADR-0061, ADR-0068, in «Bto300»'s look since ADR-0100): the tabs, and the
  * screens opened from them, for a rep. A store's seller with only the transfer right (ADR-0116 #1)
  * sees none of them: the stack's first screen is then «Шилжүүлэг» (expo-router drops the guarded
- * screens, and the navigator opens on the first one left), with the store profile beside it.
+ * screens, and the navigator opens on the first one left), with the store profile beside it. A
+ * warehouse keeper with the picking right (ADR-0132) opens on «Бэлтгэл» the same way.
  */
 export default function StaffLayout() {
   const { me, server } = useSignedIn();
   const rep = isRep(me);
+  const picker = mayPick(me);
+  const seller = mayRequestTransfers(me);
   return (
     <ShopProvider server={server} userId={me.id}>
       <ToastProvider>
@@ -30,11 +33,18 @@ export default function StaffLayout() {
           <Stack.Protected guard={rep}>
             <Stack.Screen name="(tabs)" />
           </Stack.Protected>
+          {/* The picking (ADR-0132): first for a keeper, opened from «Нүүр» by a rep. */}
+          <Stack.Protected guard={picker}>
+            <Stack.Screen name="picking/index" />
+            <Stack.Screen name="picking/[id]" />
+          </Stack.Protected>
           {/* The transfers (ADR-0116): first for a seller, opened from «Нүүр» by a rep. */}
-          <Stack.Screen name="transfers/index" />
-          <Stack.Screen name="transfers/new" />
-          <Stack.Screen name="transfers/[id]/index" />
-          <Stack.Screen name="transfers/[id]/receive" />
+          <Stack.Protected guard={rep || seller}>
+            <Stack.Screen name="transfers/index" />
+            <Stack.Screen name="transfers/new" />
+            <Stack.Screen name="transfers/[id]/index" />
+            <Stack.Screen name="transfers/[id]/receive" />
+          </Stack.Protected>
           <Stack.Screen name="store-profile" />
           <Stack.Protected guard={rep}>
             <Stack.Screen

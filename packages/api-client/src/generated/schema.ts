@@ -4293,6 +4293,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales-picks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The staff app's «Бэлтгэл» (ADR-0131): the caller's parts, not done or done today. */
+        get: operations["SalesPicks_work"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sales-picks/pickers": {
         parameters: {
             query?: never;
@@ -12061,6 +12078,27 @@ export interface components {
             contacts: components["schemas"]["SalesRepCustomerContact"][];
             /** @description The overdue receivable: a red reminder, never a block (ADR-0101); null when none */
             overdue: components["schemas"]["SalesCustomerOverdue"] | null;
+        };
+        SalesPickWork: {
+            orderId: number;
+            warehouseId: number;
+            warehouseName: string;
+            /** @enum {string} */
+            status: "OPEN" | "PICKING" | "DONE";
+            pickerId: number | null;
+            pickerName: string | null;
+            /** Format: date-time */
+            startedAt: string | null;
+            /** Format: date-time */
+            doneAt: string | null;
+            orderNumber: string | null;
+            /** @enum {string} */
+            orderStatus: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
+            customerName: string;
+            /** Format: date */
+            deliveryDate: string;
+            /** @description The order's lines in this warehouse */
+            lines: number;
         };
         SalesPicker: {
             id: number;
@@ -27017,6 +27055,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesRepCustomerDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesPicks_work: {
+        parameters: {
+            query?: {
+                /** @description One warehouse only */
+                warehouseId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesPickWork"][];
                 };
             };
             /** @description RFC 9457 problem details */

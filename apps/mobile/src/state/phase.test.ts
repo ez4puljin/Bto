@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CustomerPrincipal, Me } from '../api/session';
-import { isRep, mayRequestTransfers, phaseOf } from './phase';
+import { isRep, mayPick, mayRequestTransfers, phaseOf } from './phase';
 
 const rep = { id: 7, permissions: ['sales.orders.rep'] } as unknown as Me;
 const office = { id: 8, permissions: ['sales.orders.read'] } as unknown as Me;
@@ -9,6 +9,7 @@ const both = {
   id: 10,
   permissions: ['sales.orders.rep', 'inventory.transfers.manage'],
 } as unknown as Me;
+const keeper = { id: 11, permissions: ['sales.orders.read', 'sales.orders.pick'] } as unknown as Me;
 const store = { accountId: 12, store: { customerId: 40 } } as unknown as CustomerPrincipal;
 
 describe('the phases of the two apps', () => {
@@ -32,6 +33,14 @@ describe('the phases of the two apps', () => {
     expect(mayRequestTransfers(seller)).toBe(true);
     expect(isRep(office)).toBe(false);
     expect(mayRequestTransfers(office)).toBe(false);
+  });
+
+  it('lets a warehouse keeper with the picking right in (ADR-0132)', () => {
+    expect(phaseOf('http://pc:3300', { status: 'signedIn', me: keeper, userId: 11 })).toBe('app');
+    expect(mayPick(keeper)).toBe(true);
+    expect(isRep(keeper)).toBe(false);
+    expect(mayRequestTransfers(keeper)).toBe(false);
+    expect(mayPick(office)).toBe(false);
   });
 
   it('tells a rep who also requests transfers from one who does not', () => {

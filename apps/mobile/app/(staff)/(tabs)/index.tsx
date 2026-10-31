@@ -35,7 +35,7 @@ import { formatMillions, formatMnt, initialsOf } from '../../../src/format/forma
 import { allOrdered, countsOf } from '../../../src/map/stores';
 import { shortMoney } from '../../../src/orders/amounts';
 import { useAddOne } from '../../../src/shop/use-add';
-import { mayRequestTransfers } from '../../../src/state/phase';
+import { mayPick, mayRequestTransfers } from '../../../src/state/phase';
 import { effectiveStage, placeOf } from '../../../src/state/placement';
 import { useSignedIn } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
@@ -131,6 +131,16 @@ export default function HomeScreen() {
             key: 'transfers',
             label: t('mobile.transfers.title'),
             onPress: () => router.push('/transfers'),
+          },
+        ]
+      : []),
+    // A rep who also picks in a warehouse (ADR-0132).
+    ...(mayPick(me)
+      ? [
+          {
+            key: 'picking',
+            label: t('mobile.picking.title'),
+            onPress: () => router.push('/picking'),
           },
         ]
       : []),

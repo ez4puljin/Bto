@@ -17608,6 +17608,57 @@
         ]
       }
     },
+    "/api/v1/sales-picks": {
+      "get": {
+        "operationId": "SalesPicks_work",
+        "parameters": [
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "description": "One warehouse only",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesPickWork"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The staff app's «Бэлтгэл» (ADR-0131): the caller's parts, not done or done today.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales-picks/pickers": {
       "get": {
         "operationId": "SalesPicks_pickers",
@@ -45805,6 +45856,93 @@
           "addresses",
           "contacts",
           "overdue"
+        ]
+      },
+      "SalesPickWork": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "number"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "OPEN",
+              "PICKING",
+              "DONE"
+            ],
+            "type": "string"
+          },
+          "pickerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "pickerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "doneAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "orderNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "orderStatus": {
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVAL_PENDING",
+              "CONFIRMED",
+              "PICKING",
+              "PACKED",
+              "DISPATCHED",
+              "DELIVERED",
+              "DELIVERY_FAILED",
+              "INVOICED",
+              "CLOSED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "deliveryDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "lines": {
+            "type": "number",
+            "description": "The order's lines in this warehouse"
+          }
+        },
+        "required": [
+          "orderId",
+          "warehouseId",
+          "warehouseName",
+          "status",
+          "pickerId",
+          "pickerName",
+          "startedAt",
+          "doneAt",
+          "orderNumber",
+          "orderStatus",
+          "customerName",
+          "deliveryDate",
+          "lines"
         ]
       },
       "SalesPicker": {
