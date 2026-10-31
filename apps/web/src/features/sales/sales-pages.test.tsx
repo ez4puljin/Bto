@@ -347,6 +347,7 @@ describe('new order (ADR-0059)', () => {
     await waitFor(() => expect(calls(fetchMock, 'PUT', '/api/v1/sales-orders/5')).toHaveLength(1));
     expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/sales-orders/5')[0])).toEqual({
       customerId: 9,
+      expectedUpdatedAt: STAMP,
       pipelineId: null,
       stageId: null,
       fulfilment: 'PICKUP',
@@ -432,6 +433,7 @@ describe('confirmed order in the panel (ADR-0059)', () => {
     await waitFor(() => expect(calls(fetchMock, 'PUT', '/api/v1/sales-orders/5')).toHaveLength(1));
     expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/sales-orders/5')[0])).toEqual({
       customerId: 9,
+      expectedUpdatedAt: STAMP,
       pipelineId: null,
       stageId: null,
       fulfilment: 'DELIVERY',

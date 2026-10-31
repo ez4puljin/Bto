@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-query';
 import { type components, idempotencyKey } from '@tugeel/api-client';
 import { useApiClient } from '@/app/api-client-context';
-import { unwrap } from '@/lib/problem';
+import { problemFromError, unwrap } from '@/lib/problem';
 
 type Schemas = components['schemas'];
 export type SalesOrder = Schemas['SalesOrderDetail'];
@@ -56,6 +56,9 @@ export function useSalesOrder(id: number, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: [...KEYS.orders, id],
     enabled: options.enabled ?? true,
+    // The open panel follows the other warehouses' picking and the office's edits.
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/v1/sales-orders/{id}', { params: { path: { id } }, signal })),
   });
@@ -95,6 +98,11 @@ export function useSalesOrderMutations() {
       mutationFn: async ({ id, body }: { id: number; body: SalesOrderRequest }) =>
         unwrap(await api.PUT('/api/v1/sales-orders/{id}', { params: { path: { id } }, body })),
       onSuccess: () => changed(),
+      // A save over a newer change (ORDER_CHANGED, ADR-0130): the order is read again under the
+      // edits still typed, so the next save carries the fresh updatedAt.
+      onError: (error) => {
+        if (problemFromError(error)?.code === 'ORDER_CHANGED') void changed();
+      },
     }),
     submit: useMutation({
       mutationFn: async ({ id, key }: { id: number; key: string }) =>

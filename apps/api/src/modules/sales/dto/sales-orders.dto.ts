@@ -45,6 +45,15 @@ export class SalesOrderLineRequestDto {
 export class SalesOrderRequestDto {
   @ApiProperty() @IsInt() @Min(1) customerId: number;
   @ApiPropertyOptional({
+    type: String,
+    format: 'date-time',
+    description:
+      "The order's updatedAt as the client read it (ADR-0130): a save over a newer change answers 409 ORDER_CHANGED",
+  })
+  @IsOptional()
+  @IsString()
+  expectedUpdatedAt?: string;
+  @ApiPropertyOptional({
     type: Number,
     nullable: true,
     description: "A new order's pipeline; null = the channel's default (ADR-0057)",

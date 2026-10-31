@@ -396,6 +396,70 @@ describe('sales picking by warehouse', () => {
     expect(await onHand(beer.id)).toEqual([{ wh: 'PKB', bin: 'B-01-01', on_hand: '48.000' }]);
   });
 
+  it("keeps every keeper's change when they pick at once and refuses a save over a newer change", async () => {
+    const orders = salesApi(app, admin);
+    const body = orderBody(
+      shop.id,
+      [
+        { productUnitId: pcs(cola), qty: '2' },
+        { productUnitId: pcs(beer), qty: '2' },
+      ],
+      { pipelineId: pipeline.id },
+    );
+    const draft = await orders.draft(body);
+    await move(admin, draft.id, 'Нөөцлөх').expect(200);
+    const stale = (await detail(admin, draft.id)) as DetailJson & { updatedAt: string };
+    const lineOf = (order: DetailJson, productId: number) =>
+      order.lines.find((entry) => entry.productId === productId)?.id;
+    // Both keepers take and confirm their own warehouse at the same moment: neither is lost, and
+    // warehouse B's short count (1 of 2) stands beside A's full one.
+    await Promise.all([
+      part(keeperA, draft.id, whA.id, 'take').expect(200),
+      part(keeperB, draft.id, whB.id, 'take').expect(200),
+    ]);
+    const [a, b] = await Promise.all([
+      part(keeperA, draft.id, whA.id, 'pick', {
+        lines: [{ lineId: lineOf(stale, cola.id), qty: '2', binId: shelfA }],
+      }),
+      part(keeperB, draft.id, whB.id, 'pick', {
+        lines: [{ lineId: lineOf(stale, beer.id), qty: '1', binId: shelfB }],
+      }),
+    ]);
+    expect([a.status, b.status]).toEqual([200, 200]);
+    let order = await detail(admin, draft.id);
+    expect(order.status).toBe('PACKED');
+    expect(order.lines.map((line) => [line.productId, line.qtyPicked])).toEqual(
+      expect.arrayContaining([
+        [cola.id, '2'],
+        [beer.id, '1'],
+      ]),
+    );
+    // The office saves the order as it read it before the picks: refused; read again, it goes.
+    const refused = (
+      await orders.update(draft.id, { ...body, expectedUpdatedAt: stale.updatedAt }).expect(409)
+    ).body as ProblemJson;
+    expect(refused.code).toBe('ORDER_CHANGED');
+    const fresh = (await detail(admin, draft.id)) as DetailJson & { updatedAt: string };
+    await orders.update(draft.id, { ...body, expectedUpdatedAt: fresh.updatedAt }).expect(200);
+    // The same part confirmed twice at once (two devices): one wins, the other is told so.
+    await part(lead, draft.id, whB.id, 'reopen').expect(200);
+    await part(keeperB, draft.id, whB.id, 'take').expect(200);
+    order = await detail(admin, draft.id);
+    const twice = await Promise.all(
+      [1, 2].map(() =>
+        part(keeperB, draft.id, whB.id, 'pick', {
+          lines: [{ lineId: lineOf(order, beer.id), qty: '2', binId: shelfB }],
+        }),
+      ),
+    );
+    expect(twice.map((res) => res.status).sort()).toEqual([200, 409]);
+    expect((twice.find((res) => res.status === 409)?.body as ProblemJson).code).toBe(
+      'PICK_STATE_INVALID',
+    );
+    expect(statusOf(await detail(admin, draft.id), whB.id)).toBe('DONE');
+    await expectReconciled(app);
+  });
+
   async function detailBoard(): Promise<number | null> {
     const tree = (await http().get('/api/v1/sales-boards').set(bearer(admin)).expect(200)).body as {
       id: number;
