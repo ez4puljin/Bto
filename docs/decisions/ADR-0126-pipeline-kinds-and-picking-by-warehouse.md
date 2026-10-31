@@ -4,7 +4,7 @@
 |---|---|
 | Status | Accepted |
 | Date | 2026-10-31 |
-| Deciders | Owner (the request of 2026-10-31 and one question round: «Захиалгын борлуулалт» only reserves; a person moves the card and a missing warehouse refuses the move; keepers take their own part, the lead sees and hands over; the seller's app request becomes a transfer pipeline's card — part B), Claude (the direct-mode session) |
+| Deciders | Owner (the request of 2026-10-31 and one question round: «Захиалгын борлуулалт» only reserves; a person moves the card and a missing warehouse refuses the move; keepers take their own part, the lead sees and hands over; then «B хийхгүй»: the store's seller sends their orders from the rep app into the transfer pipeline's first stage), Claude (the direct-mode session) |
 | Amends | ADR-0056 #3 and #5 (picking is per warehouse; the sale needs every warehouse), ADR-0057 #1 (a pipeline has a kind), ADR-0125 #1 (a TRANSFER stage lives in a TRANSFER pipeline), ADR-0027 #7 (reads are filtered for one thing: a keeper sees only their warehouses' order lines), ADR-0055 / ADR-0056 #4 (an admin changes the lines of a picking or packed order) |
 
 ## Context
@@ -20,9 +20,10 @@ The owner's orders ship from several Mörön warehouses at once. Each warehouse'
   - a SALES pipeline offers NONE, CONFIRM, PICK, SALE and CANCEL;
   - a TRANSFER pipeline offers NONE, CONFIRM, PICK, TRANSFER and CANCEL.
   - Any other action is refused with `PIPELINE_KIND_STAGE`.
-- The customer app and the reps land only in SALES pipelines:
-  - the channel settings refuse a TRANSFER pipeline for them;
-  - a pipeline they land in cannot become TRANSFER (`PIPELINE_KIND_CHANNEL`).
+- The customer app lands only in SALES pipelines:
+  - the channel settings refuse a TRANSFER pipeline for it;
+  - a pipeline it lands in cannot become TRANSFER (`PIPELINE_KIND_CHANNEL`).
+- **The store's seller orders from the rep app** (owner, 2026-10-31): a seller holding `sales.orders.rep` places their orders on a transfer pipeline's first stage, as any rep places on a stage whose MOVE right their role holds (ADR-0061 #6). The store is the order's customer. Nothing new is built for it: the app's «Шилжүүлэг» request (ADR-0116) stays for the keepers' own transfers.
 - On screen the actions read:
   - «Захиалгын борлуулалт (нөөцлөх)», which is CONFIRM: only a reservation, as the owner answered;
   - «Бэлтгэх»;
@@ -83,7 +84,7 @@ The products tab shows each line's list price, its discount and its amount. The 
 
 ## Consequences
 
-- Part B (the next session): the store seller's orders without a customer in a TRANSFER pipeline, from the web and the app, replacing the app's «Шилжүүлэг» request (ADR-0116); a picking screen in the staff app; a new APK.
+- No part B: the seller uses the rep app (above). A picking screen in the staff app is not planned.
 - The integration suite `sales-picking` covers:
   - the two parts;
   - a keeper's own part and lines;

@@ -154,7 +154,8 @@ export class SalesSettingsService {
         if (!stage || stage.archivedAt) {
           throw invalid('stageId', 'ofPipeline', 'a live stage of the pipeline');
         }
-        if ((channel === 'CUSTOMER_APP' || channel === 'SALES_REP') && pipeline.kind !== 'SALES') {
+        // The store's seller sends from the staff app into a transfer pipeline (ADR-0126 #1).
+        if (channel === 'CUSTOMER_APP' && pipeline.kind !== 'SALES') {
           throw invalid('pipelineId', 'salesPipeline', 'a sales pipeline (ADR-0126 #1)');
         }
         // App orders wait for the office (ADR-0079 #5): a stage without an action, in a pipeline

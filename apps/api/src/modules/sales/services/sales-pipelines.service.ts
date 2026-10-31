@@ -14,7 +14,7 @@ import {
   STAGE_RIGHTS,
   type StageRight,
 } from '@tugeel/shared/sales';
-import { and, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm';
+import { and, eq, isNull, notInArray, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -321,7 +321,11 @@ export class SalesPipelinesService {
     }
   }
 
-  /** The customer app and the reps land only in SALES pipelines (ADR-0126 #1). */
+  /**
+   * The customer app lands only in SALES pipelines (ADR-0126 #1). A rep — the store's seller in the
+   * staff app — may place on a transfer pipeline's stage: that is how the floor orders its goods
+   * (owner, 2026-10-31).
+   */
   private async assertNoAppChannel(tx: Tx, pipelineId: number): Promise<void> {
     const [landing] = await tx
       .select({ channel: salesChannelDefaults.channel })
@@ -329,7 +333,7 @@ export class SalesPipelinesService {
       .where(
         and(
           eq(salesChannelDefaults.pipelineId, pipelineId),
-          inArray(salesChannelDefaults.channel, ['CUSTOMER_APP', 'SALES_REP']),
+          eq(salesChannelDefaults.channel, 'CUSTOMER_APP'),
         ),
       );
     if (landing) {

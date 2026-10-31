@@ -45,7 +45,7 @@ Finance answers two hooks of `sales/hooks.ts` (`CREDIT_CHECKER`, `SALE_SINK`; AD
 - Boards → pipelines → stages, as in erxes.
 - The menu «Борлуулалт» → «Агуулахын борлуулалт» (the POS page joins in delivery 9).
 - A stage's «⋯» menu: sort, print the documents of its cards, archive the finished cards, archive the stage. No favourites.
-- A pipeline has a name, a board, a visibility, manage roles and stages, plus «own orders only»; since ADR-0126 a kind, «Борлуулалтын» (SALES: NONE, CONFIRM, PICK, SALE, CANCEL) or «Шилжүүлгийн» (TRANSFER: NONE, CONFIRM, PICK, TRANSFER, CANCEL; the customer app and the reps never land there); since ADR-0125 a transfer pipeline's «Шилжүүлэх дэлгүүр», the active STORE warehouse its «Дэлгүүрт шилжүүлэх» (TRANSFER) stage fills — a TRANSFER stage without it is refused (`PIPELINE_TRANSFER_STAGE_NEEDS_STORE`), as is any other warehouse (`PIPELINE_TRANSFER_WAREHOUSE_INVALID`).
+- A pipeline has a name, a board, a visibility, manage roles and stages, plus «own orders only»; since ADR-0126 a kind, «Борлуулалтын» (SALES: NONE, CONFIRM, PICK, SALE, CANCEL) or «Шилжүүлгийн» (TRANSFER: NONE, CONFIRM, PICK, TRANSFER, CANCEL; the customer app never lands there, the store's seller sends from the rep app into its first stage); since ADR-0125 a transfer pipeline's «Шилжүүлэх дэлгүүр», the active STORE warehouse its «Дэлгүүрт шилжүүлэх» (TRANSFER) stage fills — a TRANSFER stage without it is refused (`PIPELINE_TRANSFER_STAGE_NEEDS_STORE`), as is any other warehouse (`PIPELINE_TRANSFER_WAREHOUSE_INVALID`).
 - Order numbers look like `20261005_0001`: one numbering whatever the board, given when the order is created.
 - «+» appears only on stages without an action.
 
