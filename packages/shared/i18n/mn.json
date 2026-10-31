@@ -3959,6 +3959,12 @@
       "moveElsewhereTitle": "«{{name}}» дамжлагын шат сонгох",
       "moveElsewhereDescription": "Карт сонгосон шат руу шилжиж, тэр шатны үйлдэл хийгдэнэ.",
       "moveElsewhereNone": "Зөөх боломжтой шат алга.",
+      "card": {
+        "subtotal": "Дүн",
+        "discount": "Хөнгөлөлт",
+        "total": "Нийт",
+        "lines": "{{count}} бараа"
+      },
       "printTitle": "Баримт хэвлэх",
       "printDescription": "Энэ шатанд ирэхэд хэвлэдэг баримтууд. Товч дарахад шинэ цонхонд нээгдэж хэвлэх цонх гарна.",
       "openOrder": "Захиалгыг нээх",
@@ -4001,6 +4007,12 @@
       "pickedOf": "{{picked}} / {{qty}} {{unit}}",
       "take": "Бэлдэж эхлэх",
       "cardParts": "Агуулахын бэлтгэл",
+      "cardProgress": "{{done}}/{{count}} бэлэн",
+      "card": {
+        "OPEN": "Эхлээгүй",
+        "PICKING": "Бэлдэж буй",
+        "DONE": "Бэлэн"
+      },
       "taken": "Бэлтгэлийг авлаа",
       "assign": "Хуваарилах",
       "assignTo": "Бэлтгэгч",

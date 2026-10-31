@@ -97,6 +97,8 @@ const CARD: Schemas['SalesOrderCard'] = {
   paymentMethod: 'CREDIT',
   deliveryDate: '2026-10-16',
   total: null,
+  subtotal: null,
+  discountTotal: null,
   lineCount: 1,
   createdByName: 'Оффис Сараа',
   stageEnteredAt: STAMP,

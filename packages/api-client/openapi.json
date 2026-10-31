@@ -43943,6 +43943,16 @@
             "type": "string",
             "nullable": true
           },
+          "subtotal": {
+            "type": "string",
+            "nullable": true,
+            "description": "Before the discount, whole MNT"
+          },
+          "discountTotal": {
+            "type": "string",
+            "nullable": true,
+            "description": "The discount taken, whole MNT"
+          },
           "lineCount": {
             "type": "number"
           },
@@ -43975,6 +43985,8 @@
           "paymentMethod",
           "deliveryDate",
           "total",
+          "subtotal",
+          "discountTotal",
           "lineCount",
           "createdByName",
           "stageEnteredAt",

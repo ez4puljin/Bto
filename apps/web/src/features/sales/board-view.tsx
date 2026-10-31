@@ -7,7 +7,7 @@ import {
   PRINT_KINDS,
   type PrintKind,
 } from '@tugeel/shared/sales';
-import { AlertTriangle, ArrowRightLeft, Ellipsis, Plus, Printer } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, CalendarDays, Ellipsis, Plus, Printer } from 'lucide-react';
 import {
   type DragEvent,
   type MouseEvent,
@@ -22,7 +22,6 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SegmentedControl } from '@/components/list';
 import { PrintFormatToggle } from '@/components/print-format-toggle';
 import { ProblemAlert } from '@/components/problem-alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -75,12 +74,15 @@ const DRAG_TYPE = 'application/x-tugeel-order';
 /** Space kept under the board: the page's bottom padding (`pb-10`). */
 const BELOW_BOARD = 40;
 const INTERACTIVE = 'a, button, input, select, textarea, label, [role="menuitem"]';
-/** The warehouses' parts on a card (ADR-0126 #2): waiting grey, being picked blue, picked green. */
-const PICK_VARIANTS = {
-  OPEN: 'secondary',
-  PICKING: 'default',
-  DONE: 'success',
-} as const satisfies Record<PickStatus, string>;
+/**
+ * The warehouses' parts on a card (ADR-0126 #2), one tone per state so the keeper reads the board
+ * at a glance: not started grey, being picked orange, picked green.
+ */
+const PICK_TONES = {
+  OPEN: { dot: 'bg-muted-foreground/40', text: 'text-muted-foreground', row: '' },
+  PICKING: { dot: 'bg-warning', text: 'text-warning', row: 'bg-warning-soft/60' },
+  DONE: { dot: 'bg-success', text: 'text-success', row: 'bg-success-soft/60' },
+} as const satisfies Record<PickStatus, { dot: string; text: string; row: string }>;
 /** The stages that sell or transfer the goods: drawn apart from the plain ones (ADR-0129 #3). */
 const FINAL_ACTIONS: readonly SalesStage['action'][] = ['SALE', 'TRANSFER'];
 /** The orders whose parts are still worked on; afterwards the card drops them. */
@@ -482,6 +484,7 @@ function Card({
             {title}
           </button>
           <PaymentLabel method={card.paymentMethod} />
+          <OrderStatusBadge status={card.status} />
         </div>
         {targets.length > 0 || elsewhere.length > 0 ? (
           <DropdownMenu>
@@ -523,52 +526,39 @@ function Card({
           </DropdownMenu>
         ) : null}
       </div>
-      {/* The status beside the customer: the money line never wraps, so cards keep one height. */}
-      <div className="mt-1 flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-1">
-          <span className="min-w-0 truncate" title={card.customerName}>
-            {card.customerName}
+      {/* The customer's whole name: it wraps rather than being cut. */}
+      <div className="mt-1.5 flex items-start gap-1">
+        <span className="min-w-0 font-medium leading-snug break-words">{card.customerName}</span>
+        {card.customerOverdue ? (
+          // ADR-0101: the customer's overdue debt, a red reminder that never blocks.
+          <span
+            role="img"
+            className="mt-0.5 shrink-0 text-destructive"
+            aria-label={t('sales.overdue.amount', {
+              amount: formatTugrik(card.customerOverdue.amount),
+            })}
+            title={t('sales.overdue.amount', {
+              amount: formatTugrik(card.customerOverdue.amount),
+            })}
+          >
+            <AlertTriangle className="size-3.5" aria-hidden />
           </span>
-          {card.customerOverdue ? (
-            // ADR-0101: the customer's overdue debt, a red reminder that never blocks.
-            <span
-              role="img"
-              className="shrink-0 text-destructive"
-              aria-label={t('sales.overdue.amount', {
-                amount: formatTugrik(card.customerOverdue.amount),
-              })}
-              title={t('sales.overdue.amount', {
-                amount: formatTugrik(card.customerOverdue.amount),
-              })}
-            >
-              <AlertTriangle className="size-3.5" aria-hidden />
-            </span>
-          ) : null}
-        </span>
-        <OrderStatusBadge status={card.status} />
+        ) : null}
       </div>
       {PICKING_STATUSES.includes(card.status) && card.picks.length > 0 ? (
-        <div className="mt-1.5 flex flex-wrap gap-1" aria-label={t('sales.pick.cardParts')}>
-          {card.picks.map((part) => (
-            <Badge
-              key={part.warehouseId}
-              variant={PICK_VARIANTS[part.status]}
-              className="max-w-full rounded-md"
-              title={t(`sales.pick.status.${part.status}`, { name: part.pickerName ?? '' })}
-            >
-              <span className="truncate">
-                {part.warehouseName}
-                {part.pickerName ? ` · ${part.pickerName}` : ''}
-              </span>
-            </Badge>
-          ))}
-        </div>
+        <PickParts picks={card.picks} />
       ) : null}
-      <div className="mt-1 flex items-center gap-x-3 text-xs whitespace-nowrap text-muted-foreground">
-        {card.total !== null ? (
-          <span className="font-mono text-foreground">{formatTugrik(card.total)}</span>
-        ) : null}
-        <span className="font-mono">{card.deliveryDate}</span>
+      <CardMoney card={card} />
+      <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span
+          className="inline-flex items-center gap-1 font-mono"
+          title={t('sales.order.deliveryDate')}
+        >
+          <CalendarDays className="size-3.5" aria-hidden />
+          <span className="sr-only">{t('sales.order.deliveryDate')}</span>
+          {card.deliveryDate}
+        </span>
+        <span>{t('sales.boards.card.lines', { count: card.lineCount })}</span>
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
         {card.createdByName ? (
@@ -582,6 +572,86 @@ function Card({
         </span>
       </div>
     </article>
+  );
+}
+
+/**
+ * The warehouses' parts of the picking (ADR-0126 #2): one row per warehouse with its tone, the
+ * picker under the name, and how many of them are picked.
+ */
+function PickParts({ picks }: { picks: OrderCard['picks'] }) {
+  const { t } = useTranslation();
+  const done = picks.filter((part) => part.status === 'DONE').length;
+  return (
+    <section
+      className="mt-2 overflow-hidden rounded-md border border-border/70"
+      aria-label={t('sales.pick.cardParts')}
+    >
+      <div className="flex items-center justify-between gap-2 px-2 pt-1 text-xs text-muted-foreground">
+        <span>{t('sales.pick.cardParts')}</span>
+        <span className={cn('font-medium', done === picks.length && 'text-success')}>
+          {t('sales.pick.cardProgress', { done, count: picks.length })}
+        </span>
+      </div>
+      <div className="mx-2 mt-1 mb-1 h-1 overflow-hidden rounded-full bg-fill" aria-hidden>
+        <div
+          className="h-full rounded-full bg-success transition-[width]"
+          style={{ width: `${picks.length === 0 ? 0 : Math.round((done / picks.length) * 100)}%` }}
+        />
+      </div>
+      <ul className="divide-y divide-border/60">
+        {picks.map((part) => {
+          const tone = PICK_TONES[part.status];
+          return (
+            <li
+              key={part.warehouseId}
+              className={cn('flex items-center gap-1.5 px-2 py-1 text-xs', tone.row)}
+              title={t(`sales.pick.status.${part.status}`, { name: part.pickerName ?? '' })}
+            >
+              <span className={cn('size-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{part.warehouseName}</span>
+                {part.pickerName ? (
+                  <span className="block truncate text-muted-foreground">{part.pickerName}</span>
+                ) : null}
+              </span>
+              <span className={cn('shrink-0 font-medium', tone.text)}>
+                {t(`sales.pick.card.${part.status}`)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * The money of a card: the total in bold; when a discount was taken, the sum before it and the
+ * discount above the total. A draft without prices shows nothing.
+ */
+function CardMoney({ card }: { card: OrderCard }) {
+  const { t } = useTranslation();
+  if (card.total === null) return null;
+  const discount = card.discountTotal === null ? null : new Decimal(card.discountTotal);
+  const discounted = discount !== null && discount.gt(0);
+  return (
+    <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+      {discounted && card.subtotal !== null ? (
+        <>
+          <dt className="text-muted-foreground">{t('sales.boards.card.subtotal')}</dt>
+          <dd className="text-right font-mono text-muted-foreground">
+            {formatTugrik(card.subtotal)}
+          </dd>
+          <dt className="text-muted-foreground">{t('sales.boards.card.discount')}</dt>
+          <dd className="text-right font-mono text-destructive">{`−${formatTugrik(card.discountTotal ?? '0')}`}</dd>
+        </>
+      ) : null}
+      <dt className="self-end text-muted-foreground">{t('sales.boards.card.total')}</dt>
+      <dd className="text-right font-mono text-sm font-semibold text-foreground">
+        {formatTugrik(card.total)}
+      </dd>
+    </dl>
   );
 }
 

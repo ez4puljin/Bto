@@ -199,6 +199,9 @@ export interface OrderCard {
   paymentMethod: PaymentMethod;
   deliveryDate: string;
   total: Decimal | null;
+  /** The frozen sums behind the total (null on a draft): the card shows the discount taken. */
+  subtotal: Decimal | null;
+  discountTotal: Decimal | null;
   lineCount: number;
   createdByName: string | null;
   stageEnteredAt: Date;
@@ -364,6 +367,8 @@ export class SalesOrderQueryService {
       fulfilment: Fulfilment;
       payment_method: PaymentMethod;
       delivery_date: string;
+      subtotal: string | null;
+      discount_total: string | null;
       total: string | null;
       stage_id: string | number;
       stage_entered_at: string | Date | null;
@@ -378,6 +383,7 @@ export class SalesOrderQueryService {
                  ${salesOrders.customerId} AS customer_id, ${salesOrders.fulfilment} AS fulfilment,
                  ${salesOrders.paymentMethod} AS payment_method,
                  ${salesOrders.deliveryDate}::text AS delivery_date, ${salesOrders.total}::text AS total,
+                 ${salesOrders.subtotal}::text AS subtotal, ${salesOrders.discountTotal}::text AS discount_total,
                  ${salesOrders.stageId} AS stage_id, ${salesOrders.stageEnteredAt} AS stage_entered_at,
                  ${salesOrders.createdBy} AS created_by,
                  (SELECT count(*) FROM ${salesOrderLines} l WHERE l.order_id = ${salesOrders.id}) AS line_count
@@ -432,6 +438,8 @@ export class SalesOrderQueryService {
               paymentMethod: row.payment_method,
               deliveryDate: row.delivery_date,
               total: row.total === null ? null : new Decimal(row.total),
+              subtotal: row.subtotal === null ? null : new Decimal(row.subtotal),
+              discountTotal: row.discount_total === null ? null : new Decimal(row.discount_total),
               lineCount: int(row.line_count),
               picks: (parts.get(int(row.id)) ?? [])
                 .filter((part) => visible === null || visible.has(part.warehouseId))

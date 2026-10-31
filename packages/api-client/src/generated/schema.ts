@@ -11530,6 +11530,10 @@ export interface components {
             /** Format: date */
             deliveryDate: string;
             total: string | null;
+            /** @description Before the discount, whole MNT */
+            subtotal: string | null;
+            /** @description The discount taken, whole MNT */
+            discountTotal: string | null;
             lineCount: number;
             createdByName: string | null;
             /** Format: date-time */

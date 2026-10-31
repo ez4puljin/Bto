@@ -122,6 +122,8 @@ export class SalesPipelinesController {
       cards: stage.cards.map((card) => ({
         ...card,
         total: card.total?.toFixed(0) ?? null,
+        subtotal: card.subtotal?.toFixed(0) ?? null,
+        discountTotal: card.discountTotal?.toFixed(0) ?? null,
         customerOverdue: overdueDto(card.customerOverdue),
         stageEnteredAt: card.stageEnteredAt.toISOString(),
       })),

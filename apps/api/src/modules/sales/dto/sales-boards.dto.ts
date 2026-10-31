@@ -320,6 +320,10 @@ export class SalesOrderCardDto {
   paymentMethod: PaymentMethod;
   @ApiProperty({ format: 'date' }) deliveryDate: string;
   @ApiProperty({ type: String, nullable: true }) total: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Before the discount, whole MNT' })
+  subtotal: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'The discount taken, whole MNT' })
+  discountTotal: string | null;
   @ApiProperty() lineCount: number;
   @ApiProperty({ type: String, nullable: true }) createdByName: string | null;
   @ApiProperty({ type: String, format: 'date-time' }) stageEnteredAt: string;
