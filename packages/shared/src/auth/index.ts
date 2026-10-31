@@ -64,6 +64,8 @@ export const PERMISSIONS = [
   // The warehouse lead (ADR-0126 #2): sees every warehouse's part of the orders with its picker,
   // hands a part to another picker and opens a picked part again.
   'sales.orders.pickLead',
+  // ADR-0129: moves a card over stages and into another pipeline's stage (the admin always).
+  'sales.orders.moveAny',
   // The sales-rep app (ADR-0061 #5): the rep's own orders only, through /sales-rep/*.
   'sales.orders.rep',
   // Finance (ADR-0060): reading invoices, balances and books; recording money; voiding invoices

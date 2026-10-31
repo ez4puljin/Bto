@@ -460,10 +460,14 @@ describe('sales boards', () => {
       .update(draft.id, orderBody(shop.id, [{ productUnitId: pcs(cola), qty: '1' }]))
       .expect(403);
 
-    // A sale before picking is refused, naming the warehouse not picked (ADR-0126); «Бэлдэх» starts
-    // picking (the picker's stage).
+    // The office may not jump over «Бэлдэх» (ADR-0129); the admin may, and is then refused for the
+    // warehouse not picked (ADR-0126); «Бэлдэх» starts picking (the picker's stage).
+    const skipped = (await api(office).move(draft.id, stage('Борлуулалт').id).expect(403))
+      .body as ProblemJson;
+    expect(skipped.code).toBe('STAGE_SKIP');
+    expect(skipped.params).toEqual({ from: 'Нярав Хяналт', to: 'Борлуулалт' });
     expect(
-      ((await api(office).move(draft.id, stage('Борлуулалт').id).expect(409)).body as ProblemJson)
+      ((await api(admin).move(draft.id, stage('Борлуулалт').id).expect(409)).body as ProblemJson)
         .code,
     ).toBe('PICK_INCOMPLETE');
     await api(office).move(draft.id, stage('Бэлдэх').id).expect(403);
@@ -765,10 +769,11 @@ describe('sales boards', () => {
           roles: { VIEW: [], MANAGE: [roleIds.accountant], ALL_ORDERS: [roleIds.warehouse] },
           stages: [
             stageBody('Ирсэн', 'NONE'),
-            stageBody('Нөөцөлсөн', 'CONFIRM'),
+            // Next to «Ирсэн»: a card moves one stage at a time (ADR-0129).
             stageBody('Нууц', 'NONE', {
               roles: { VIEW: [roleIds.accountant], EDIT: [], MOVE: [] },
             }),
+            stageBody('Нөөцөлсөн', 'CONFIRM'),
           ],
         })
         .expect(201)
@@ -863,7 +868,7 @@ describe('sales boards', () => {
     // Not before every warehouse has picked (ADR-0126).
     expect(
       (
-        (await api(office).move(draft.id, stage('Зааланд орсон', moving).id).expect(409))
+        (await api(admin).move(draft.id, stage('Зааланд орсон', moving).id).expect(409))
           .body as ProblemJson
       ).code,
     ).toBe('PICK_INCOMPLETE');

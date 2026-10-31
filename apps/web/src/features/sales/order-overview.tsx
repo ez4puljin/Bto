@@ -3,6 +3,7 @@ import { AlertTriangle, Check } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
+import { useHasPermission } from '@/app/auth-context';
 import { NativeSelect } from '@/components/native-select';
 import { FactChips } from '@/components/record-sheet';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import { OrderActivity } from './order-activity';
 import { PaymentLabel } from './order-badges';
 import type { PanelTab } from './order-panel-tabs';
 import { placeName, type SalesPipeline, type SalesStage, useBoardTree } from './pipelines-api';
+import { canMoveTo } from './stage-moves';
 import type { Mover } from './use-mover';
 
 /**
@@ -181,6 +183,11 @@ function StageProgress({
   const { t } = useTranslation();
   const stages = pipeline.stages.filter((stage) => stage.archivedAt === null && stage.canView);
   const current = stages.findIndex((stage) => stage.id === order.stageId);
+  // ADR-0129: the neighbours only, unless the user holds the right to jump stages.
+  const moveAny = useHasPermission('sales.orders.moveAny');
+  const live = pipeline.stages.filter((stage) => stage.archivedAt === null);
+  const at = live.find((stage) => stage.id === order.stageId);
+  const may = (stage: SalesStage) => (at ? canMoveTo(live, at, stage, moveAny) : stage.canMove);
   const move = (stage: SalesStage) => {
     if (stage.id !== order.stageId) mover.start(order.id, stage);
   };
@@ -205,7 +212,7 @@ function StageProgress({
             <option
               key={stage.id}
               value={stage.id}
-              disabled={stage.id !== order.stageId && !stage.canMove}
+              disabled={stage.id !== order.stageId && !may(stage)}
             >
               {stage.name}
             </option>
@@ -222,7 +229,7 @@ function StageProgress({
                   title={stage.name}
                   aria-label={here ? stage.name : t('sales.panel.moveTo', { name: stage.name })}
                   aria-current={here ? 'step' : undefined}
-                  disabled={here || !stage.canMove || busy}
+                  disabled={here || !may(stage) || busy}
                   onClick={() => move(stage)}
                   className={cn(
                     'flex size-8 shrink-0 items-center justify-center rounded-full border-2 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-default',

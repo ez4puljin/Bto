@@ -17,6 +17,7 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SegmentedControl } from '@/components/list';
 import { PrintFormatToggle } from '@/components/print-format-toggle';
@@ -40,6 +41,9 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
@@ -48,6 +52,7 @@ import { usePrintFormat } from '@/lib/print-format';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
+import { cn } from '@/lib/utils';
 import { MoveDialogs } from './move-dialogs';
 import { OrderStatusBadge, PaymentLabel } from './order-badges';
 import {
@@ -58,9 +63,12 @@ import {
   type SalesPipeline,
   type SalesStage,
   type StageCards,
+  useBoardTree,
+  usePipeline,
   useSalesMutations,
   useStageCards,
 } from './pipelines-api';
+import { canMoveTo } from './stage-moves';
 import { useMover } from './use-mover';
 
 const DRAG_TYPE = 'application/x-tugeel-order';
@@ -73,6 +81,8 @@ const PICK_VARIANTS = {
   PICKING: 'default',
   DONE: 'success',
 } as const satisfies Record<PickStatus, string>;
+/** The stages that sell or transfer the goods: drawn apart from the plain ones (ADR-0129 #3). */
+const FINAL_ACTIONS: readonly SalesStage['action'][] = ['SALE', 'TRANSFER'];
 /** The orders whose parts are still worked on; afterwards the card drops them. */
 const PICKING_STATUSES: readonly OrderCard['status'][] = ['CONFIRMED', 'PICKING', 'PACKED'];
 
@@ -104,6 +114,26 @@ export function BoardView({
   const cards = useStageCards(pipeline.id, filters);
   const mover = useMover();
   const stages = pipeline.stages.filter((stage) => stage.archivedAt === null && stage.canView);
+  // ADR-0129: neighbours only, unless the user holds the right to jump stages and boards.
+  const moveAny = useHasPermission('sales.orders.moveAny');
+  const live = pipeline.stages.filter((stage) => stage.archivedAt === null);
+  const tree = useBoardTree();
+  const elsewhere = moveAny
+    ? (tree.data ?? []).flatMap((board) =>
+        board.pipelines
+          .filter((entry) => entry.id !== pipeline.id && entry.archivedAt === null)
+          .map((entry) => ({ id: entry.id, name: `${board.name} · ${entry.name}` })),
+      )
+    : [];
+  const allows = (fromStageId: number, to: SalesStage) => {
+    const from = live.find((entry) => entry.id === fromStageId);
+    return from ? canMoveTo(live, from, to, moveAny) : false;
+  };
+  const [dragging, setDragging] = useState<{ orderId: number; stageId: number } | null>(null);
+  const [elsewhereTarget, setElsewhereTarget] = useState<{
+    orderId: number;
+    pipelineId: number;
+  } | null>(null);
   const [over, setOver] = useState<number | null>(null);
   const [printing, setPrinting] = useState<{ stage: SalesStage; column: StageCards } | null>(null);
   const [archiving, setArchiving] = useState<{ stage: SalesStage; what: 'cards' | 'stage' } | null>(
@@ -118,7 +148,10 @@ export function BoardView({
     event.preventDefault();
     setOver(null);
     const orderId = Number.parseInt(event.dataTransfer.getData(DRAG_TYPE), 10);
-    if (orderId) mover.start(orderId, stage);
+    if (orderId && dragging?.orderId === orderId && allows(dragging.stageId, stage)) {
+      mover.start(orderId, stage);
+    }
+    setDragging(null);
   };
   const sort = (stage: SalesStage, value: CardSort) =>
     void action.run(async () => {
@@ -154,14 +187,19 @@ export function BoardView({
         {stages.map((stage) => {
           const column = cards.data?.find((entry) => entry.stageId === stage.id);
           const more = column ? column.count - column.cards.length : 0;
+          const final = FINAL_ACTIONS.includes(stage.action);
           return (
             <section
               key={stage.id}
               aria-label={stage.name}
               data-over={over === stage.id ? 'true' : undefined}
-              className="flex min-h-0 w-72 shrink-0 flex-col rounded-xl bg-fill/60 p-2 data-[over=true]:ring-2 data-[over=true]:ring-ring/40"
+              data-final={final ? 'true' : undefined}
+              className={cn(
+                'flex min-h-0 w-72 shrink-0 flex-col rounded-xl p-2 data-[over=true]:ring-2 data-[over=true]:ring-ring/40',
+                final ? 'border border-success/40 bg-success-soft/70' : 'bg-fill/60',
+              )}
               onDragOver={(event) => {
-                if (!stage.canMove) return;
+                if (!stage.canMove || !dragging || !allows(dragging.stageId, stage)) return;
                 event.preventDefault();
                 if (over !== stage.id) setOver(stage.id);
               }}
@@ -169,7 +207,10 @@ export function BoardView({
               onDrop={stage.canMove ? dropOn(stage) : undefined}
             >
               <header className="flex h-9 shrink-0 items-center justify-between gap-1 pr-0.5 pl-2">
-                <h2 className="min-w-0 truncate text-sm font-semibold" title={stage.name}>
+                <h2
+                  className={cn('min-w-0 truncate text-sm font-semibold', final && 'text-success')}
+                  title={stage.name}
+                >
                   {stage.name}
                   <span className="ml-2 font-normal text-muted-foreground">
                     {column?.count ?? 0}
@@ -213,15 +254,21 @@ export function BoardView({
                   />
                 </div>
               </header>
-              <div className="-mx-1 flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain px-1 py-0.5 [scrollbar-width:thin]">
+              {/* overscroll-y only: shift + wheel chains sideways to the board (ADR-0129 #4). */}
+              <div className="-mx-1 flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto overscroll-y-contain px-1 py-0.5 [scrollbar-width:thin]">
                 {(column?.cards ?? []).map((card) => (
                   <Card
                     key={card.id}
                     card={card}
-                    stage={stage}
-                    stages={stages}
+                    targets={stages.filter((target) => canMoveTo(live, stage, target, moveAny))}
+                    elsewhere={elsewhere}
                     onOpen={() => onOpen(card.id)}
                     onMove={(target) => mover.start(card.id, target)}
+                    onMoveElsewhere={(pipelineId) =>
+                      setElsewhereTarget({ orderId: card.id, pipelineId })
+                    }
+                    onDragStart={() => setDragging({ orderId: card.id, stageId: stage.id })}
+                    onDragEnd={() => setDragging(null)}
                   />
                 ))}
                 {more > 0 ? (
@@ -240,6 +287,11 @@ export function BoardView({
         })}
       </div>
       <MoveDialogs mover={mover} />
+      <ElsewhereDialog
+        target={elsewhereTarget}
+        onClose={() => setElsewhereTarget(null)}
+        onMove={(orderId, stage) => mover.start(orderId, stage)}
+      />
       <StagePrintDialog printing={printing} onClose={() => setPrinting(null)} />
       <ConfirmDialog
         open={archiving !== null}
@@ -379,23 +431,31 @@ function opensCard(event: MouseEvent<HTMLElement>): boolean {
 
 /**
  * A card: a click anywhere opens the order (its number stays the keyboard's button), the «Зөөх»
- * menu moves it without dragging.
+ * menu moves it without dragging — to its neighbours, or anywhere for the holder of
+ * sales.orders.moveAny, whose menu also lists the other pipelines (ADR-0129).
  */
 function Card({
   card,
-  stage,
-  stages,
+  targets,
+  elsewhere,
   onOpen,
   onMove,
+  onMoveElsewhere,
+  onDragStart,
+  onDragEnd,
 }: {
   card: OrderCard;
-  stage: SalesStage;
-  stages: SalesStage[];
+  /** The stages this card may move into. */
+  targets: SalesStage[];
+  /** The other pipelines, for the holder of the right; empty otherwise. */
+  elsewhere: { id: number; name: string }[];
   onOpen: () => void;
   onMove: (stage: SalesStage) => void;
+  onMoveElsewhere: (pipelineId: number) => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
 }) {
   const { t } = useTranslation();
-  const targets = stages.filter((entry) => entry.id !== stage.id && entry.canMove);
   const title = card.number ?? t('sales.order.draftNo', { id: card.id });
   return (
     <article
@@ -408,7 +468,9 @@ function Card({
       onDragStart={(event) => {
         event.dataTransfer.setData(DRAG_TYPE, String(card.id));
         event.dataTransfer.effectAllowed = 'move';
+        onDragStart();
       }}
+      onDragEnd={onDragEnd}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -421,7 +483,7 @@ function Card({
           </button>
           <PaymentLabel method={card.paymentMethod} />
         </div>
-        {targets.length > 0 ? (
+        {targets.length > 0 || elsewhere.length > 0 ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -440,6 +502,23 @@ function Card({
                   {target.name}
                 </DropdownMenuItem>
               ))}
+              {elsewhere.length > 0 ? (
+                <>
+                  {targets.length > 0 ? <DropdownMenuSeparator /> : null}
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      {t('sales.boards.moveElsewhere')}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
+                      {elsewhere.map((entry) => (
+                        <DropdownMenuItem key={entry.id} onSelect={() => onMoveElsewhere(entry.id)}>
+                          {entry.name}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                </>
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}
@@ -503,6 +582,56 @@ function Card({
         </span>
       </div>
     </article>
+  );
+}
+
+/**
+ * «Өөр дамжлага руу…» (ADR-0129 #2): the chosen pipeline's live stages the role may move into;
+ * one click moves the card there (the stage's action runs as on any move).
+ */
+function ElsewhereDialog({
+  target,
+  onClose,
+  onMove,
+}: {
+  target: { orderId: number; pipelineId: number } | null;
+  onClose: () => void;
+  onMove: (orderId: number, stage: SalesStage) => void;
+}) {
+  const { t } = useTranslation();
+  const pipeline = usePipeline(target?.pipelineId ?? null);
+  const stages = (pipeline.data?.stages ?? []).filter(
+    (stage) => stage.archivedAt === null && stage.canMove,
+  );
+  return (
+    <Dialog open={target !== null} onOpenChange={(open) => (open ? undefined : onClose())}>
+      <DialogContent closeLabel={t('common.close')}>
+        <DialogHeader>
+          <DialogTitle>
+            {t('sales.boards.moveElsewhereTitle', { name: pipeline.data?.name ?? '…' })}
+          </DialogTitle>
+          <DialogDescription>{t('sales.boards.moveElsewhereDescription')}</DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-1">
+          {stages.map((stage) => (
+            <Button
+              key={stage.id}
+              variant="outline"
+              className="justify-start"
+              onClick={() => {
+                if (target) onMove(target.orderId, stage);
+                onClose();
+              }}
+            >
+              {stage.name}
+            </Button>
+          ))}
+          {pipeline.isSuccess && stages.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('sales.boards.moveElsewhereNone')}</p>
+          ) : null}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

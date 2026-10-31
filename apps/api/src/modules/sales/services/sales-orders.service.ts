@@ -386,8 +386,24 @@ export class SalesOrdersService implements OnModuleInit {
         });
       }
       const { pipeline, stage, rights } = await this.pipelines.stageFor(ctx, tx, input.stageId);
+      // ADR-0129: a card moves one stage at a time (a CANCEL stage from anywhere); only the holder
+      // of sales.orders.moveAny jumps stages or takes the card into another pipeline.
+      const moveAny = ctx.permissions.has('sales.orders.moveAny');
       if (stage.pipelineId !== order.pipelineId) {
-        throw invalid('stageId', 'ofPipeline', "a stage of the order's pipeline");
+        if (!moveAny) throw invalid('stageId', 'ofPipeline', "a stage of the order's pipeline");
+        if (order.channel === 'CUSTOMER_APP' && pipeline.kind !== 'SALES') {
+          throw invalid('stageId', 'salesPipeline', 'a sales pipeline for a customer-app order');
+        }
+      } else if (!moveAny && stage.action !== 'CANCEL') {
+        const live = pipeline.stages.filter((entry) => entry.archivedAt === null);
+        const from = live.findIndex((entry) => entry.id === order.stageId);
+        const to = live.findIndex((entry) => entry.id === stage.id);
+        if (from >= 0 && to >= 0 && Math.abs(to - from) > 1) {
+          throw new AppError('STAGE_SKIP', 'a card moves one stage at a time', {
+            from: live[from]?.name ?? '',
+            to: stage.name,
+          });
+        }
       }
       if (!rights.move) {
         throw new AppError('FORBIDDEN', 'the stage does not let this role move cards into it', {
@@ -431,7 +447,12 @@ export class SalesOrdersService implements OnModuleInit {
       }
       await tx
         .update(salesOrders)
-        .set({ stageId: stage.id, stageEnteredAt: sql`now()`, updatedAt: sql`now()` })
+        .set({
+          pipelineId: pipeline.id,
+          stageId: stage.id,
+          stageEnteredAt: sql`now()`,
+          updatedAt: sql`now()`,
+        })
         .where(eq(salesOrders.id, id));
       await tx.insert(salesStageMoves).values({
         orderId: id,
@@ -443,8 +464,8 @@ export class SalesOrdersService implements OnModuleInit {
         action: 'MOVE',
         entity: 'sales_orders',
         entityId: id,
-        before: { stageId: order.stageId },
-        after: { stageId: stage.id, action: stage.action },
+        before: { pipelineId: order.pipelineId, stageId: order.stageId },
+        after: { pipelineId: pipeline.id, stageId: stage.id, action: stage.action },
       });
       return this.pipelines.printsOf(stage);
     });
