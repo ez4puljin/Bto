@@ -56,20 +56,20 @@ const saving = async (put: Request) => {
 const contactsCard = async () =>
   within(await screen.findByRole('region', { name: mn.customerApp.contacts.title }));
 
-describe('customer app settings menu (ADR-0079 #14)', () => {
-  it('shows «Харилцагчийн апп» under «Систем» to whoever reads the settings', async () => {
+describe('app contacts menu (ADR-0079 #14, ADR-0127)', () => {
+  it('shows «Холбоо барих» under «Апп» to whoever reads the settings', async () => {
     renderApp('/system/status', signedIn(READER));
     expect(
-      within(await findSidebar()).getByRole('link', { name: mn.nav.customerApp }),
-    ).toHaveAttribute('href', '/system/customer-app');
+      within(await findSidebar()).getByRole('link', { name: mn.nav.appContacts }),
+    ).toHaveAttribute('href', '/app/contacts');
   });
 
   it('keeps the page from a user without identity.settings.read', async () => {
     const fetchMock = signedIn(WORKER_ME);
-    renderApp('/system/customer-app', fetchMock);
+    renderApp('/app/contacts', fetchMock);
     expect(await screen.findByText(mn.errors.FORBIDDEN)).toBeInTheDocument();
     expect(
-      within(await findSidebar()).queryByRole('link', { name: mn.nav.customerApp }),
+      within(await findSidebar()).queryByRole('link', { name: mn.nav.appContacts }),
     ).toBeNull();
     expect(calls(fetchMock, 'GET', '/api/v1/customer/contacts')).toHaveLength(0);
   });
@@ -80,7 +80,7 @@ describe('company contacts', () => {
     const fetchMock = signedIn(READER, {
       'GET /api/v1/customer/contacts': () => json([ORDERS, ACCOUNTANT]),
     });
-    renderApp('/system/customer-app', fetchMock);
+    renderApp('/app/contacts', fetchMock);
     const card = await contactsCard();
     const rows = await card.findAllByRole('row');
     // The header row, then the contacts in their order.
@@ -100,9 +100,6 @@ describe('company contacts', () => {
       within(rows[2] as HTMLElement).getByText(mn.customerApp.contacts.hiddenBadge),
     ).toBeInTheDocument();
     expect(card.queryByRole('button')).toBeNull();
-    // Without sales.boards.manage the orders card stays out, and so does its read.
-    expect(screen.queryByRole('region', { name: mn.customerApp.orders.title })).toBeNull();
-    expect(calls(fetchMock, 'GET', '/api/v1/customer/attention')).toHaveLength(0);
   });
 
   it('adds a contact, checking the fields, and saves the whole list', async () => {
@@ -110,7 +107,7 @@ describe('company contacts', () => {
       'GET /api/v1/customer/contacts': () => json([ORDERS]),
       'PUT /api/v1/customer/contacts': saving,
     });
-    renderApp('/system/customer-app', fetchMock);
+    renderApp('/app/contacts', fetchMock);
     const user = userEvent.setup();
     const card = await contactsCard();
     await card.findByText('Сараа');
@@ -159,7 +156,7 @@ describe('company contacts', () => {
         return json(list);
       },
     });
-    renderApp('/system/customer-app', fetchMock);
+    renderApp('/app/contacts', fetchMock);
     const user = userEvent.setup();
     const card = await contactsCard();
     await card.findByText('Сараа');
@@ -210,7 +207,7 @@ describe('company contacts', () => {
 
   it('shows a refusal inside the dialog and keeps it open', async () => {
     renderApp(
-      '/system/customer-app',
+      '/app/contacts',
       signedIn(ADMIN_ME, {
         'GET /api/v1/customer/contacts': () => json([]),
         'PUT /api/v1/customer/contacts': () => problem('VALIDATION_FAILED', 422),
@@ -227,39 +224,5 @@ describe('company contacts', () => {
     await user.click(dialog.getByRole('button', { name: mn.common.save }));
     expect(await dialog.findByText(mn.errors.VALIDATION_FAILED)).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-  });
-});
-
-describe('app orders card (ADR-0079 #5)', () => {
-  it('says when app orders have no stage to land on and links to the boards settings', async () => {
-    renderApp(
-      '/system/customer-app',
-      signedIn(ADMIN_ME, {
-        'GET /api/v1/customer/contacts': () => json([]),
-        'GET /api/v1/customer/attention': () => json({ activeAccounts: 3, ordersOpen: false }),
-      }),
-    );
-    const card = within(await screen.findByRole('region', { name: mn.customerApp.orders.title }));
-    expect(await card.findByText(mn.customerApp.orders.closed)).toBeInTheDocument();
-    expect(
-      card.getByText(mn.customerApp.orders.accounts.replace('{{n}}', '3')),
-    ).toBeInTheDocument();
-    expect(card.getByRole('link', { name: mn.customerApp.orders.settings })).toHaveAttribute(
-      'href',
-      '/sales/boards/settings',
-    );
-  });
-
-  it('says so when app orders are taken', async () => {
-    renderApp(
-      '/system/customer-app',
-      signedIn(ADMIN_ME, {
-        'GET /api/v1/customer/contacts': () => json([]),
-        'GET /api/v1/customer/attention': () => json({ activeAccounts: 0, ordersOpen: true }),
-      }),
-    );
-    const card = within(await screen.findByRole('region', { name: mn.customerApp.orders.title }));
-    expect(await card.findByText(mn.customerApp.orders.open)).toBeInTheDocument();
-    expect(card.queryByText(mn.customerApp.orders.closed)).toBeNull();
   });
 });

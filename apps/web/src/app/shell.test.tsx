@@ -113,7 +113,11 @@ describe('home page (ADR-0114)', () => {
   it('gives an admin every module and the tools', async () => {
     renderApp('/', signedIn(ADMIN_ME));
     const modules = within(await screen.findByRole('region', { name: mn.home.modules }));
-    expect(modules.getAllByRole('link')).toHaveLength(6);
+    expect(modules.getAllByRole('link')).toHaveLength(7);
+    expect(modules.getByRole('link', { name: mn.nav.modules.app })).toHaveAttribute(
+      'href',
+      '/m/app',
+    );
     const tools = within(screen.getByRole('region', { name: mn.home.tools }));
     expect(tools.getByRole('link', { name: mn.nav.modules.system })).toHaveAttribute(
       'href',

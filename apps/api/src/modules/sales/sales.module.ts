@@ -23,6 +23,8 @@ import { SalesRepOrdersService } from './services/sales-rep-orders.service';
 import { SalesRepShopService } from './services/sales-rep-shop.service';
 import { CustomerOrdersService } from './services/customer-orders.service';
 import { SalesSettingsService } from './services/sales-settings.service';
+import { AppSettingsService } from './services/app-settings.service';
+import { AppSettingsController } from './controllers/app-settings.controller';
 
 /**
  * Sales (docs/modules/sales.md, ADR-0055, ADR-0056, ADR-0057): customer orders on boards,
@@ -36,6 +38,7 @@ import { SalesSettingsService } from './services/sales-settings.service';
     SalesBoardsService,
     SalesPipelinesService,
     SalesSettingsService,
+    AppSettingsService,
     SalesOrderQueryService,
     SalesOrdersService,
     SalesPicksService,
@@ -48,6 +51,7 @@ import { SalesSettingsService } from './services/sales-settings.service';
     SalesBoardsService,
     SalesPipelinesService,
     SalesSettingsService,
+    AppSettingsService,
     SalesOrderQueryService,
     SalesOrdersService,
     SalesPicksService,
@@ -67,6 +71,7 @@ export class SalesModule {}
     SalesPipelinesController,
     SalesStagesController,
     SalesSettingsController,
+    AppSettingsController,
     SalesRepController,
     SalesPicksController,
   ],

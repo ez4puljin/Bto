@@ -3,7 +3,7 @@ import request from 'supertest';
 import { createHttpApp } from '../harness/apps';
 import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { type AppStore, appStore } from '../harness/customer-app';
-import { bearer, login, seedUser } from '../harness/identity';
+import { bearer, customRoleUser, login, seedUser } from '../harness/identity';
 import { inventoryApi } from '../harness/inventory';
 import { pricingApi } from '../harness/pricing';
 
@@ -209,5 +209,96 @@ describe('customer app shop (ADR-0079)', () => {
     expect((await store.api.get('/thumbs').expect(200)).body).toEqual({ urls: expect.any(Array) });
     await http().get('/api/v1/customer-app/products').set(bearer(admin)).expect(403);
     await http().get('/api/v1/customer-app/products').expect(401);
+  });
+
+  it('sells only the assortment segment’s products once the office picks one (ADR-0127 #1)', async () => {
+    const settingsOf = async (token = admin) =>
+      (await http().get('/api/v1/app-settings').set(bearer(token)).expect(200)).body as {
+        assortmentSegmentId: number | null;
+        assortment: { segmentId: number | null; segmentName: string | null; broken: boolean };
+        shopProductCount: number;
+        homeSections: Record<string, boolean>;
+        minOrderAmount: string | null;
+        appName: string | null;
+        appColor: string | null;
+      };
+    const save = (body: Record<string, unknown>, token = admin) =>
+      http()
+        .put('/api/v1/app-settings')
+        .set(bearer(token))
+        .send({
+          assortmentSegmentId: null,
+          homeSections: { PROMOTIONS: true, DISCOUNTS: true, NEW: true },
+          minOrderAmount: null,
+          appName: null,
+          appColor: null,
+          ...body,
+        });
+    const before = await settingsOf();
+    expect(before).toMatchObject({
+      assortmentSegmentId: null,
+      assortment: { segmentId: null, broken: false },
+      minOrderAmount: null,
+      appName: null,
+    });
+    expect(before.shopProductCount).toBeGreaterThanOrEqual(5);
+    // Only the home's keepers (customer.home.manage) read and change the apps' settings.
+    const clerk = await customRoleUser(app, admin, ['identity.settings.read']);
+    await http().get('/api/v1/app-settings').set(bearer(clerk)).expect(403);
+    await save({ appName: 'Бто' }, clerk).expect(403);
+    await save({ appColor: 'blue' }).expect(422);
+    await save({ assortmentSegmentId: 999_999 }).expect(422);
+    const segment = (
+      await http()
+        .post('/api/v1/segments/lists')
+        .set(bearer(admin))
+        .set(idempotency())
+        .send({ name: 'Аппын нэр төрөл', productIds: [plenty.id, boxed.id, homeless.id] })
+        .expect(201)
+    ).body as { id: number };
+    const saved = (
+      await save({
+        assortmentSegmentId: segment.id,
+        appName: 'Bto дэлгүүр',
+        appColor: '#0A84FF',
+      }).expect(200)
+    ).body as Awaited<ReturnType<typeof settingsOf>>;
+    expect(saved).toMatchObject({
+      assortmentSegmentId: segment.id,
+      assortment: { segmentId: segment.id, segmentName: 'Аппын нэр төрөл', broken: false },
+      // The homeless product is in the segment but not in the shop.
+      shopProductCount: 2,
+      appName: 'Bto дэлгүүр',
+      appColor: '#0A84FF',
+    });
+    const listed = await page('?limit=50');
+    expect(listed.data.map((row) => row.id).sort()).toEqual([plenty.id, boxed.id].sort());
+    const batch = (
+      await store.api
+        .get(`/products/batch?productIds=${plenty.id},${fewLoose.id},${boxed.id}`)
+        .expect(200)
+    ).body as ShopProductJson[];
+    expect(batch.map((row) => row.id).sort()).toEqual([plenty.id, boxed.id].sort());
+    await store.api.get('/barcodes/BX-92030').expect(200);
+    await store.api.put(`/favourites/${fewLoose.id}`).expect(404);
+    await store.api.put(`/favourites/${boxed.id}`).expect(204);
+    // Before a token: the apps' sign-in screens read the name and colour.
+    expect((await http().get('/api/v1/app-settings/branding').expect(200)).body).toEqual({
+      appName: 'Bto дэлгүүр',
+      appColor: '#0A84FF',
+    });
+    expect((await store.api.get('/me').expect(200)).body).toMatchObject({
+      appName: 'Bto дэлгүүр',
+      appColor: '#0A84FF',
+      minOrderAmount: null,
+    });
+    // The segment archived: nothing narrows the shop until the office picks another.
+    await http().delete(`/api/v1/segments/${segment.id}`).set(bearer(admin)).expect(204);
+    const broken = await settingsOf();
+    expect(broken.assortment).toEqual({ segmentId: null, segmentName: null, broken: true });
+    expect(broken.assortmentSegmentId).toBe(segment.id);
+    expect((await page('?limit=50')).data.some((row) => row.id === fewLoose.id)).toBe(true);
+    await save({}).expect(200);
+    expect((await settingsOf()).assortment.broken).toBe(false);
   });
 });

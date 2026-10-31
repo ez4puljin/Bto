@@ -103,6 +103,16 @@ export class CustomerAppMeDto {
   @ApiProperty({ description: 'False while no stage takes app orders: the app does not send' })
   ordersOpen: boolean;
   @ApiProperty({ format: 'date', description: "The server's business date" }) today: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Whole MNT the order must reach (ADR-0127 #4); null = no minimum',
+  })
+  minOrderAmount: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'The name the office set for the app' })
+  appName: string | null;
+  @ApiProperty({ type: String, nullable: true, description: '#RRGGBB the office set for the app' })
+  appColor: string | null;
 }
 
 // ------------------------------------------------------------------------------------- the shop
@@ -399,6 +409,16 @@ export class CustomerAppCheckoutDto {
   addresses: CustomerAppCheckoutAddressDto[];
   @ApiProperty({ type: CustomerAppCentreDto, nullable: true }) pickup: CustomerAppCentreDto | null;
   @ApiProperty() ordersOpen: boolean;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Whole MNT the order must reach (ADR-0127 #4); null = no minimum',
+  })
+  minOrderAmount: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'The name the office set for the app' })
+  appName: string | null;
+  @ApiProperty({ type: String, nullable: true, description: '#RRGGBB the office set for the app' })
+  appColor: string | null;
 }
 
 @ApiSchema({ name: 'CustomerAppCreditCheckQuery' })

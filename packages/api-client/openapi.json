@@ -16715,6 +16715,117 @@
         ]
       }
     },
+    "/api/v1/app-settings": {
+      "get": {
+        "operationId": "AppSettings_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      },
+      "put": {
+        "operationId": "AppSettings_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppSettingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/app-settings/branding": {
+      "get": {
+        "operationId": "AppSettings_branding",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppBranding"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales-rep/context": {
       "get": {
         "operationId": "SalesRep_context",
@@ -44134,6 +44245,152 @@
           "channel"
         ]
       },
+      "AppAssortment": {
+        "type": "object",
+        "properties": {
+          "segmentId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The live segment the apps sell from"
+          },
+          "segmentName": {
+            "type": "string",
+            "nullable": true
+          },
+          "broken": {
+            "type": "boolean",
+            "description": "The setting names a segment that is archived or gone: every product shows"
+          }
+        },
+        "required": [
+          "segmentId",
+          "segmentName",
+          "broken"
+        ]
+      },
+      "AppHomeSections": {
+        "type": "object",
+        "properties": {
+          "PROMOTIONS": {
+            "type": "boolean",
+            "description": "«Урамшуулал»"
+          },
+          "DISCOUNTS": {
+            "type": "boolean",
+            "description": "«Хямдралтай бараа»"
+          },
+          "NEW": {
+            "type": "boolean",
+            "description": "«Шинээр нэмэгдсэн бараа»"
+          }
+        },
+        "required": [
+          "PROMOTIONS",
+          "DISCOUNTS",
+          "NEW"
+        ]
+      },
+      "AppSettings": {
+        "type": "object",
+        "properties": {
+          "assortmentSegmentId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The PRODUCT segment both apps show; null = every sale-ready product"
+          },
+          "assortment": {
+            "$ref": "#/components/schemas/AppAssortment"
+          },
+          "shopProductCount": {
+            "type": "number",
+            "description": "How many products the customer app lists now"
+          },
+          "homeSections": {
+            "$ref": "#/components/schemas/AppHomeSections"
+          },
+          "minOrderAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Whole MNT; null = no minimum"
+          },
+          "appName": {
+            "type": "string",
+            "nullable": true
+          },
+          "appColor": {
+            "type": "string",
+            "nullable": true,
+            "description": "#RRGGBB"
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "assortmentSegmentId",
+          "assortment",
+          "shopProductCount",
+          "homeSections",
+          "minOrderAmount",
+          "appName",
+          "appColor",
+          "updatedAt"
+        ]
+      },
+      "AppSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "assortmentSegmentId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "homeSections": {
+            "$ref": "#/components/schemas/AppHomeSections"
+          },
+          "minOrderAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Whole MNT; null = no minimum"
+          },
+          "appName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
+          },
+          "appColor": {
+            "type": "string",
+            "nullable": true,
+            "description": "#RRGGBB"
+          }
+        },
+        "required": [
+          "assortmentSegmentId",
+          "homeSections",
+          "minOrderAmount",
+          "appName",
+          "appColor"
+        ]
+      },
+      "AppBranding": {
+        "type": "object",
+        "properties": {
+          "appName": {
+            "type": "string",
+            "nullable": true
+          },
+          "appColor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "appName",
+          "appColor"
+        ]
+      },
       "SalesRepStage": {
         "type": "object",
         "properties": {
@@ -44268,6 +44525,16 @@
             "items": {
               "type": "string"
             }
+          },
+          "appName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The name the office set for the app (ADR-0127 #4)"
+          },
+          "appColor": {
+            "type": "string",
+            "nullable": true,
+            "description": "#RRGGBB the office set for the app"
           }
         },
         "required": [
@@ -44275,7 +44542,9 @@
           "boards",
           "defaultStageId",
           "warehouses",
-          "branchNames"
+          "branchNames",
+          "appName",
+          "appColor"
         ]
       },
       "SalesRepOrderRequest": {
@@ -54542,6 +54811,21 @@
             "type": "string",
             "format": "date",
             "description": "The server's business date"
+          },
+          "minOrderAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Whole MNT the order must reach (ADR-0127 #4); null = no minimum"
+          },
+          "appName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The name the office set for the app"
+          },
+          "appColor": {
+            "type": "string",
+            "nullable": true,
+            "description": "#RRGGBB the office set for the app"
           }
         },
         "required": [
@@ -54553,7 +54837,10 @@
           "defaultAddress",
           "settlementGroup",
           "ordersOpen",
-          "today"
+          "today",
+          "minOrderAmount",
+          "appName",
+          "appColor"
         ]
       },
       "CustomerAppCheckoutAddress": {
@@ -54611,6 +54898,21 @@
           },
           "ordersOpen": {
             "type": "boolean"
+          },
+          "minOrderAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Whole MNT the order must reach (ADR-0127 #4); null = no minimum"
+          },
+          "appName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The name the office set for the app"
+          },
+          "appColor": {
+            "type": "string",
+            "nullable": true,
+            "description": "#RRGGBB the office set for the app"
           }
         },
         "required": [
@@ -54618,7 +54920,10 @@
           "lastDay",
           "addresses",
           "pickup",
-          "ordersOpen"
+          "ordersOpen",
+          "minOrderAmount",
+          "appName",
+          "appColor"
         ]
       },
       "CustomerAppCreditCheck": {
@@ -60464,6 +60769,8 @@
           "PIPELINE_IN_USE",
           "ORDER_NUMBER_TAKEN",
           "CUSTOMER_APP_CLOSED",
+          "PRODUCT_NOT_IN_APP",
+          "ORDER_BELOW_MINIMUM",
           "COSTING_CLOSED",
           "RECEIPT_DISCOUNT_TOO_LARGE",
           "RECEIPT_FROM_ORDER",

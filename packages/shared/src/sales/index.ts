@@ -401,6 +401,21 @@ export const HOME_SECTION_KINDS = [
 ] as const;
 export type HomeSectionKind = (typeof HOME_SECTION_KINDS)[number];
 
+/**
+ * The fixed home sections the office may switch off on «Апп → Нүүр» (ADR-0127 #3); RECENT and
+ * FAVOURITES are a store's own and always shown, the segments are chosen one by one.
+ */
+export const HOME_TOGGLE_KINDS = ['PROMOTIONS', 'DISCOUNTS', 'NEW'] as const;
+export type HomeToggleKind = (typeof HOME_TOGGLE_KINDS)[number];
+
+/** The apps' settings (ADR-0127): the name and the colour the apps may show, the minimum order. */
+export const APP_SETTINGS_LIMITS = {
+  /** The app's display name. */
+  maxAppName: 40,
+  /** A CSS hex colour, #RRGGBB. */
+  colorPattern: /^#[0-9a-fA-F]{6}$/,
+} as const;
+
 /** A section's key in the routes: `recent`, …, or `segment-<id>`. */
 export type HomeSectionKey =
   | { kind: Exclude<HomeSectionKind, 'SEGMENT'> }

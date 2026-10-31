@@ -18,6 +18,7 @@ import {
   type ProductListQuery,
   ProductFiltersService,
   ProductQueryService,
+  UnitConversionService,
 } from '../../catalog';
 import type { AuthContext } from '../../identity';
 import { ProductLocationsService, StockQueryService } from '../../inventory';
@@ -29,6 +30,7 @@ import {
   ProductPricesService,
 } from '../../pricing';
 import { overdueDto } from '../overdue';
+import { AppSettingsService } from './app-settings.service';
 import { SalesOrdersService } from './sales-orders.service';
 
 /** A product as the rep's shop shows it: units with their wholesale price, and the stock. */
@@ -205,6 +207,8 @@ export class SalesRepShopService {
     private readonly productSuppliers: ProductSuppliersService,
     private readonly locations: ProductLocationsService,
     private readonly deals: ProductDealsService,
+    private readonly settings: AppSettingsService,
+    private readonly units: UnitConversionService,
   ) {}
 
   /** The WHOLESALE programs in force on `today` and the products they mark (one read per request). */
@@ -247,12 +251,14 @@ export class SalesRepShopService {
       query.onlyIds && inStock
         ? query.onlyIds.filter((id) => new Set(inStock).has(id))
         : (query.onlyIds ?? inStock);
+    const segmentId = await this.settings.assortmentSegmentId();
     const base: ProductListQuery = {
       ...(query.q ? { q: query.q } : {}),
       status: 'ACTIVE',
       saleReady: true,
       ...(where ? { where } : {}),
       ...(onlyIds ? { onlyIds } : {}),
+      ...(segmentId === null ? {} : { segmentId }),
     };
     const sort = query.sort ?? 'NEW';
     if (sort === 'NEW') {
@@ -307,7 +313,7 @@ export class SalesRepShopService {
     if (priceBefore !== undefined && !isIsoDate(priceBefore)) {
       throw invalid('priceBefore', 'isDate', 'priceBefore must be a date');
     }
-    const rows = await this.products.listItemsOf(ids);
+    const rows = await this.products.listItemsOf(await this.inAssortment(ids));
     return this.enrich(
       rows.filter((row) => row.status === 'ACTIVE' && row.saleReadyAt !== null),
       businessDate(),
@@ -319,16 +325,47 @@ export class SalesRepShopService {
    * «Bto300»'s shop index (ADR-0093): every product the customer app lists — active, sale-ready,
    * with a home warehouse — in the NEW order, with its category and sale-ready moment.
    */
-  index(): Promise<ProductIndexRow[]> {
+  async index(): Promise<ProductIndexRow[]> {
+    const segmentId = await this.settings.assortmentSegmentId();
     return this.products.index(
       {
         status: 'ACTIVE',
         saleReady: true,
         sort: 'NEW',
         where: { match: 'ALL', groups: [{ match: 'ALL', conditions: [HOME_ANY] }] },
+        ...(segmentId === null ? {} : { segmentId }),
       },
       REP_PRICE_SORT_MAX,
     );
+  }
+
+  /**
+   * An app order carries only products the apps sell (ADR-0127 #1): every id must be in the
+   * assortment segment while one is set; 409 PRODUCT_NOT_IN_APP names the others.
+   */
+  async assertListed(ids: readonly number[]): Promise<void> {
+    const kept = new Set(await this.inAssortment(ids));
+    const outside = [...new Set(ids)].filter((id) => !kept.has(id));
+    if (outside.length > 0) {
+      throw new AppError(
+        'PRODUCT_NOT_IN_APP',
+        `products ${outside.join(', ')} are outside the apps' assortment`,
+        { productIds: outside.join(', ') },
+      );
+    }
+  }
+
+  /** The same for order lines: the units' products must be in the assortment. */
+  async assertUnitsListed(unitIds: readonly number[]): Promise<void> {
+    const units = await this.units.describe(unitIds);
+    await this.assertListed([...units.values()].map((unit) => unit.productId));
+  }
+
+  /** `ids` narrowed to the assortment segment when one is set (ADR-0127 #1), else as given. */
+  private async inAssortment(ids: readonly number[]): Promise<number[]> {
+    const segmentId = await this.settings.assortmentSegmentId();
+    if (segmentId === null) return [...ids];
+    return (await this.products.within({ segmentId, onlyIds: ids })) ?? [...ids];
   }
 
   /** The main suppliers of the shop's products, with how many each has, the most first. */
@@ -390,9 +427,14 @@ export class SalesRepShopService {
     };
   }
 
-  /** Every product the shop can list: active and sale-ready (the ACTIVE stage). */
-  private shopIds() {
-    return this.productFilters.idsWhere({ field: 'stage', op: 'IN', values: ['ACTIVE'] });
+  /**
+   * Every product the shop can list: active and sale-ready (the ACTIVE stage), within the
+   * assortment segment when one is set (ADR-0127 #1).
+   */
+  private async shopIds(): Promise<number[]> {
+    return this.inAssortment(
+      await this.productFilters.idsWhere({ field: 'stage', op: 'IN', values: ['ACTIVE'] }),
+    );
   }
 
   private async enrich(

@@ -415,6 +415,35 @@ export const salesSettings = pgTable(
   ],
 );
 
+/**
+ * The apps' settings, one row (ADR-0127): the product segment both apps sell from
+ * (`assortment_segment_id`, no foreign key — segments is a leaf nobody imports; re-checked on every
+ * read, null = every sale-ready product), the fixed home sections switched on or off, the customer
+ * app's minimum order amount (null = none), the name and colour the apps may show (null = their
+ * built-in ones). No row means the defaults.
+ */
+export const appSettings = pgTable(
+  'app_settings',
+  {
+    id: smallint('id').primaryKey(),
+    assortmentSegmentId: ref('assortment_segment_id'),
+    homePromotions: boolean('home_promotions').notNull().default(true),
+    homeDiscounts: boolean('home_discounts').notNull().default(true),
+    homeNew: boolean('home_new').notNull().default(true),
+    minOrderAmount: money('min_order_amount'),
+    appName: text('app_name'),
+    appColor: text('app_color'),
+    updatedBy: userRef('updated_by'),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check('app_settings_single', sql`${t.id} = 1`),
+    check('app_settings_min_order', sql`${t.minOrderAmount} IS NULL OR ${t.minOrderAmount} >= 0`),
+    check('app_settings_name', sql`${t.appName} IS NULL OR length(${t.appName}) BETWEEN 1 AND 40`),
+    check('app_settings_color', sql`${t.appColor} IS NULL OR ${t.appColor} ~ '^#[0-9a-fA-F]{6}$'`),
+  ],
+);
+
 /** A stage of a pipeline: a column of cards, with what arriving there does (ADR-0056 #1, #3). */
 export const salesStages = pgTable(
   'sales_stages',

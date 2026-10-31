@@ -369,4 +369,59 @@ describe('customer app orders (ADR-0079)', () => {
     expect(again.lines).toEqual([{ productId: cola.id, productUnitId: flow.pcs(cola), qty: '2' }]);
     expect(again.skipped).toEqual([{ productId: water.id, name: 'Ус', reason: 'OUT_OF_STOCK' }]);
   });
+
+  it('refuses an order under the minimum amount or with a product outside the assortment (ADR-0127)', async () => {
+    const save = (body: Record<string, unknown>, token = admin) =>
+      http()
+        .put('/api/v1/app-settings')
+        .set(bearer(token))
+        .send({
+          assortmentSegmentId: null,
+          homeSections: { PROMOTIONS: true, DISCOUNTS: true, NEW: true },
+          minOrderAmount: null,
+          appName: null,
+          appColor: null,
+          ...body,
+        });
+    await save({ minOrderAmount: '50000' }).expect(200);
+    expect((await store.api.get('/checkout').expect(200)).body).toMatchObject({
+      minOrderAmount: '50000',
+    });
+    // Two colas at 1000₮: far under 50,000₮.
+    const small = await store.api
+      .send(storeOrderBody(today, [{ productUnitId: flow.pcs(cola), qty: '2' }]))
+      .expect(422);
+    expect(small.body).toMatchObject({
+      code: 'ORDER_BELOW_MINIMUM',
+      params: { min: '50000', total: '2000' },
+    });
+    await store.api
+      .send(storeOrderBody(today, [{ productUnitId: flow.pcs(cola), qty: '60' }]))
+      .expect(201);
+    const onlyCola = (
+      await http()
+        .post('/api/v1/segments/lists')
+        .set(bearer(admin))
+        .set(idempotency())
+        .send({ name: 'Зөвхөн кола', productIds: [cola.id] })
+        .expect(201)
+    ).body as { id: number };
+    await save({ assortmentSegmentId: onlyCola.id }).expect(200);
+    const outside = await store.api
+      .send(
+        storeOrderBody(today, [
+          { productUnitId: flow.pcs(cola), qty: '1' },
+          { productUnitId: flow.pcs(water), qty: '1' },
+        ]),
+      )
+      .expect(409);
+    expect(outside.body).toMatchObject({
+      code: 'PRODUCT_NOT_IN_APP',
+      params: { productIds: String(water.id) },
+    });
+    await store.api
+      .send(storeOrderBody(today, [{ productUnitId: flow.pcs(cola), qty: '1' }]))
+      .expect(201);
+    await save({}).expect(200);
+  });
 });

@@ -66,16 +66,16 @@ const rowOf = (title: string) => {
 };
 
 describe('app notices menu', () => {
-  it('shows «Апп мэдэгдэл» under «Систем» to whoever may send notices', async () => {
+  it('shows «Апп мэдэгдэл» under «Апп» to whoever may send notices (ADR-0127)', async () => {
     renderApp('/system/status', signedIn(ADMIN_ME));
     expect(
       within(await findSidebar()).getByRole('link', { name: mn.nav.appNotices }),
-    ).toHaveAttribute('href', '/system/app-notices');
+    ).toHaveAttribute('href', '/app/notices');
   });
 
   it('keeps the page from a user without notifications.send', async () => {
     const fetchMock = signedIn(WORKER_ME);
-    renderApp('/system/app-notices', fetchMock);
+    renderApp('/app/notices', fetchMock);
     expect(await screen.findByText(mn.errors.FORBIDDEN)).toBeInTheDocument();
     expect(within(await findSidebar()).queryByRole('link', { name: mn.nav.appNotices })).toBeNull();
     expect(calls(fetchMock, 'GET', '/api/v1/app-notices')).toHaveLength(0);
@@ -101,7 +101,7 @@ describe('app notices list', () => {
         return json({ ...RUNNING, state: 'WITHDRAWN', withdrawnAt: STAMP });
       },
     });
-    renderApp('/system/app-notices', fetchMock);
+    renderApp('/app/notices', fetchMock);
     const user = userEvent.setup();
 
     expect(await screen.findByText(RUNNING.title)).toBeInTheDocument();
@@ -146,7 +146,7 @@ describe('app notices list', () => {
       'POST /api/v1/app-notices': async (request) =>
         json({ ...notice(), ...((await request.clone().json()) as object), id: 9 }, 201),
     });
-    const { router } = renderApp('/system/app-notices?new=1', fetchMock);
+    const { router } = renderApp('/app/notices?new=1', fetchMock);
     const user = userEvent.setup();
 
     const dialog = await screen.findByRole('dialog');
@@ -211,7 +211,7 @@ describe('app notices list', () => {
 
   it('checks the form before sending', async () => {
     const fetchMock = signedIn(ADMIN_ME, { 'GET /api/v1/app-notices': () => list([]) });
-    renderApp('/system/app-notices?new=1', fetchMock);
+    renderApp('/app/notices?new=1', fetchMock);
     const user = userEvent.setup();
     const dialog = await screen.findByRole('dialog');
 

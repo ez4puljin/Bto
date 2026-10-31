@@ -84,7 +84,7 @@ None: `VALIDATION_FAILED` (`notPast`, `afterStart`, `isNotEmpty`, `maxLength`, t
 
 ## 8. Screens
 
-- **Web** «Систем» → «Апп мэдэгдэл» (`/system/app-notices`, `apps/web/src/features/notifications/`): «Хэнд» (the sales reps, the default, or the customers of «Bto300»; ADR-0079 #8) in the form and as a badge in the list; the list (kind, title and text, popup / picture / products badges, the period with the last day, the state, «read / recipients», who sent it and when), withdrawing a running or scheduled notice through a confirmation; «Шинэ мэдэгдэл» (`?new=1`) with the phone's popup drawn beside the form, the picture resized in the browser (1,280 px) and uploaded as `notifications.notice_image`, products searched among sale-ready ones.
+- **Web** «Апп» → «Мэдэгдэл» (`/app/notices`, moved from «Систем» → «Апп мэдэгдэл» `/system/app-notices`, which redirects; ADR-0127 #2; `apps/web/src/features/notifications/`): «Хэнд» (the sales reps, the default, or the customers of «Bto300»; ADR-0079 #8) in the form and as a badge in the list; the list (kind, title and text, popup / picture / products badges, the period with the last day, the state, «read / recipients», who sent it and when), withdrawing a running or scheduled notice through a confirmation; «Шинэ мэдэгдэл» (`?new=1`) with the phone's popup drawn beside the form, the picture resized in the browser (1,280 px) and uploaded as `notifications.notice_image`, products searched among sale-ready ones.
 - **App** (`docs/modules/mobile.md`): the popup route, «Мэдэгдэл», a notice's products, the bell on «Профайл» and the Profile tab's count.
 
 ## 9. Tests

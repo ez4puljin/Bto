@@ -94,8 +94,13 @@ import { ProfitPage, ProfitPrintPage } from '@/features/reports/profit-page';
 import { StockPrintPage, StockReportPage } from '@/features/reports/stock-page';
 import { SuppliersPrintPage, SuppliersReportPage } from '@/features/reports/suppliers-page';
 import { AiReportsPage } from '@/features/ai/reports-page';
+import { AppContactsPage } from '@/features/app-settings/contacts-page';
+import { AppGeneralPage } from '@/features/app-settings/general-page';
+import { AppHomePage } from '@/features/app-settings/home-page';
+import { AppOrdersPage } from '@/features/app-settings/orders-page';
+import { AppProductsPage } from '@/features/app-settings/products-page';
+import { AppStoresPage } from '@/features/app-settings/stores-page';
 import { BannersPage } from '@/features/customer-app/banners-page';
-import { CustomerAppPage } from '@/features/customer-app/customer-app-page';
 import { PosCashiersPage } from '@/features/pos/cashiers-page';
 import { PosLoyaltyMembersPage } from '@/features/pos/loyalty-members-page';
 import { PosQuickButtonsPage } from '@/features/pos/quick-buttons-page';
@@ -262,34 +267,8 @@ export const routes: RouteObject[] = [
           ...financeRoutes(),
           ...reportRoutes(),
           ...posRoutes(),
+          ...appRoutes(),
           { path: 'system/status', handle: { width: 'reading' }, element: <SystemStatusPage /> },
-          {
-            path: 'system/app-notices',
-            handle: { width: 'wide' },
-            element: (
-              <RequirePermission permission="notifications.send">
-                <AppNoticesPage />
-              </RequirePermission>
-            ),
-          },
-          {
-            path: 'system/customer-app',
-            handle: { width: 'reading' },
-            element: (
-              <RequirePermission permission={['identity.settings.read', 'customer.home.manage']}>
-                <CustomerAppPage />
-              </RequirePermission>
-            ),
-          },
-          {
-            path: 'system/customer-app/banners',
-            handle: { width: 'wide' },
-            element: (
-              <RequirePermission permission="customer.home.manage">
-                <BannersPage />
-              </RequirePermission>
-            ),
-          },
           { path: 'account', handle: { width: 'reading' }, element: <AccountPage /> },
           { path: 'catalog/products', handle: { width: 'wide' }, element: <ProductsPage /> },
           {
@@ -724,6 +703,75 @@ function posRoutes(): RouteObject[] {
     ...(import.meta.env.DEV
       ? [{ path: 'pos/test-till', handle: { width: 'wide' }, element: manage(<PosTestTillPage />) }]
       : []),
+  ];
+}
+
+/**
+ * The «Апп» pages (ADR-0127): the two mobile apps' settings. The home, the assortment and the
+ * general settings behind customer.home.manage; the orders page to the boards' keepers too; the
+ * contacts to the settings' readers; the notices to their senders; the stores to the customers'
+ * readers. The old «Систем» addresses redirect (bookmarks, the recent pages).
+ */
+function appRoutes(): RouteObject[] {
+  const home = (element: ReactNode) => (
+    <RequirePermission permission="customer.home.manage">{element}</RequirePermission>
+  );
+  return [
+    { path: 'app/home', handle: { width: 'wide' }, element: home(<AppHomePage />) },
+    { path: 'app/home/banners', handle: { width: 'wide' }, element: home(<BannersPage />) },
+    { path: 'app/products', handle: { width: 'reading' }, element: home(<AppProductsPage />) },
+    {
+      path: 'app/orders',
+      handle: { width: 'reading' },
+      element: (
+        <RequirePermission permission={['sales.boards.manage', 'customer.home.manage']}>
+          <AppOrdersPage />
+        </RequirePermission>
+      ),
+    },
+    {
+      path: 'app/contacts',
+      handle: { width: 'reading' },
+      element: (
+        <RequirePermission permission="identity.settings.read">
+          <AppContactsPage />
+        </RequirePermission>
+      ),
+    },
+    {
+      path: 'app/notices',
+      handle: { width: 'wide' },
+      element: (
+        <RequirePermission permission="notifications.send">
+          <AppNoticesPage />
+        </RequirePermission>
+      ),
+    },
+    {
+      path: 'app/stores',
+      handle: { width: 'reading' },
+      element: (
+        <RequirePermission permission="partners.customers.read">
+          <AppStoresPage />
+        </RequirePermission>
+      ),
+    },
+    { path: 'app/general', handle: { width: 'reading' }, element: home(<AppGeneralPage />) },
+    {
+      path: 'system/customer-app',
+      handle: { width: 'wide' },
+      element: <Navigate to="/app/home" replace />,
+    },
+    {
+      path: 'system/customer-app/banners',
+      handle: { width: 'wide' },
+      element: <Navigate to="/app/home/banners" replace />,
+    },
+    {
+      path: 'system/app-notices',
+      handle: { width: 'wide' },
+      element: <Navigate to="/app/notices" replace />,
+    },
   ];
 }
 

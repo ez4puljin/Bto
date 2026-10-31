@@ -1,26 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { normalizeMnPhone } from '@tugeel/shared/phone';
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronRight,
-  Pencil,
-  Plus,
-  Trash2,
-  TriangleAlert,
-} from 'lucide-react';
+import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router';
 import { z } from 'zod';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DialogFormFooter, FormField } from '@/components/form';
 import { RowAction, RowActions } from '@/components/list';
-import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,21 +32,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatCount } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useDeleteConfirm } from '@/lib/use-delete-confirm';
-import { localPhone, phoneInput } from '@/features/partners/phone';
 import {
   type CompanyContact,
   type CompanyContactRequest,
   CONTACT_LIMITS,
-  useBanners,
   useCompanyContacts,
-  useCustomerAppAttention,
   useSaveCompanyContacts,
-} from './api';
+} from '@/features/customer-app/api';
+import { localPhone, phoneInput } from '@/features/partners/phone';
 
 const requestOf = (contact: CompanyContact): CompanyContactRequest => ({
   role: contact.role,
@@ -67,63 +53,11 @@ const requestOf = (contact: CompanyContact): CompanyContactRequest => ({
 });
 
 /**
- * «Систем» → «Харилцагчийн апп» (ADR-0079 #14, identity.settings.read or customer.home.manage):
- * the company's contact people every store sees on the app's «Профайл» (ADR-0092 #8) — role, name,
- * phone, shown or hidden, in order; each change saves the whole list (identity.settings.manage).
- * Beside it, for the home's keepers, the banners (ADR-0092 #5), and for people who set up the
- * boards, whether app orders have a stage to land on (ADR-0079 #5).
+ * «Холбоо барих» (ADR-0079 #14, identity.settings.read): the company's contact people every store
+ * sees on the app's «Профайл» (ADR-0092 #8) — role, name, phone, shown or hidden, in order; each
+ * change saves the whole list (identity.settings.manage).
  */
-export function CustomerAppPage() {
-  const { t } = useTranslation();
-  const canBoards = useHasPermission('sales.boards.manage');
-  const canContacts = useHasPermission('identity.settings.read');
-  const canHome = useHasPermission('customer.home.manage');
-  return (
-    <div className="space-y-4">
-      <PageHeader title={t('customerApp.title')} description={t('customerApp.description')} />
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        {canContacts ? <ContactsCard /> : null}
-        {canHome || canBoards ? (
-          <div className="flex flex-col gap-4">
-            {canHome ? <BannersCard /> : null}
-            {canBoards ? <OrdersCard /> : null}
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-/** «Баннер» (ADR-0092 #5): how many banners the app shows now, and their page. */
-function BannersCard() {
-  const { t } = useTranslation();
-  const banners = useBanners();
-  const running = (banners.data ?? []).filter((banner) => banner.state === 'RUNNING').length;
-  return (
-    <Card role="region" aria-label={t('customerApp.banners.title')}>
-      <CardHeader>
-        <CardTitle>{t('customerApp.banners.title')}</CardTitle>
-        <CardDescription>{t('customerApp.banners.cardDescription')}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <ProblemAlert problem={problemFromError(banners.error)} onRetry={banners.refetch} />
-        {banners.isSuccess ? (
-          <p className="text-sm">
-            {t('customerApp.banners.runningCount', { n: formatCount(running) })}
-          </p>
-        ) : null}
-        <Button asChild variant="link" size="sm" className="self-start px-0">
-          <Link to="/system/customer-app/banners">
-            {t('customerApp.banners.manage')}
-            <ChevronRight />
-          </Link>
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ContactsCard() {
+export function ContactsCard() {
   const { t } = useTranslation();
   const canManage = useHasPermission('identity.settings.manage');
   const contacts = useCompanyContacts();
@@ -384,56 +318,5 @@ function ContactDialog(props: {
         </form>
       </DialogContent>
     </Dialog>
-  );
-}
-
-/**
- * «Аппын захиалга»: whether a stage without an action takes the CUSTOMER_APP channel (ADR-0079 #5,
- * set in the boards' «Сувгийн тохиргоо») and how many stores have the app open. Read-only.
- */
-function OrdersCard() {
-  const { t } = useTranslation();
-  const attention = useCustomerAppAttention(true);
-  const data = attention.data;
-  return (
-    <Card role="region" aria-label={t('customerApp.orders.title')}>
-      <CardHeader>
-        <CardTitle>{t('customerApp.orders.title')}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <ProblemAlert problem={problemFromError(attention.error)} onRetry={attention.refetch} />
-        {attention.isPending ? (
-          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
-        ) : null}
-        {data ? (
-          <>
-            {data.ordersOpen ? (
-              <div className="flex flex-col gap-1.5">
-                <Badge variant="success" className="self-start">
-                  {t('customerApp.orders.open')}
-                </Badge>
-                <p className="text-[0.8125rem] text-muted-foreground">
-                  {t('customerApp.orders.openHint')}
-                </p>
-              </div>
-            ) : (
-              <Alert className="border-transparent bg-warning-soft shadow-none!">
-                <TriangleAlert aria-hidden className="text-warning" />
-                <AlertTitle className="text-warning">{t('customerApp.orders.closed')}</AlertTitle>
-                <AlertDescription className="text-warning">
-                  {t('customerApp.orders.closedHint')}
-                </AlertDescription>
-              </Alert>
-            )}
-            <p className="text-sm">
-              {t('customerApp.orders.accounts', { n: formatCount(data.activeAccounts) })}
-            </p>
-            <Button asChild variant="link" size="sm" className="self-start px-0">
-              <Link to="/sales/boards/settings">{t('customerApp.orders.settings')}</Link>
-            </Button>
-          </>
-        ) : null}
-      </CardContent>
-    </Card>
   );
 }

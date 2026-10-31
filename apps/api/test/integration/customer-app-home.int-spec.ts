@@ -577,4 +577,33 @@ describe('customer app home (ADR-0092)', () => {
     expect(staff.body).toMatchObject({ params: { reason: 'STAFF_TOKEN' } });
     await http().get('/api/v1/customer/banners').set(bearer(store.token)).expect(403);
   });
+
+  it('leaves out the fixed sections the office switched off (ADR-0127 #3)', async () => {
+    const save = (body: Record<string, unknown>, token = admin) =>
+      http()
+        .put('/api/v1/app-settings')
+        .set(bearer(token))
+        .send({
+          assortmentSegmentId: null,
+          homeSections: { PROMOTIONS: true, DISCOUNTS: true, NEW: true },
+          minOrderAmount: null,
+          appName: null,
+          appColor: null,
+          ...body,
+        });
+    const all = kinds(await homeOf(store));
+    expect(all).toContain('new');
+    await save({ homeSections: { PROMOTIONS: false, DISCOUNTS: false, NEW: false } }).expect(200);
+    const trimmed = kinds(await homeOf(store));
+    expect(trimmed).not.toContain('new');
+    expect(trimmed).not.toContain('promotions');
+    expect(trimmed).not.toContain('discounts');
+    await store.api.get('/sections/new/products').expect(404);
+    await store.api.get('/sections/promotions/products').expect(404);
+    // A category page keeps its own «Шинэ» and «Хямдралтай» rows; only the home is switched.
+    await store.api.get(`/categories/${drinks}/page`).expect(200);
+    await save({}).expect(200);
+    expect(kinds(await homeOf(store))).toEqual(all);
+    await store.api.get('/sections/new/products').expect(200);
+  });
 });

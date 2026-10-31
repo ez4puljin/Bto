@@ -180,4 +180,54 @@ describe('sales rep shop', () => {
     await http().get('/api/v1/sales-rep/products').set(bearer(office)).expect(403);
     await http().get('/api/v1/sales-rep/customers').set(bearer(office)).expect(403);
   });
+
+  it('follows the assortment segment and carries the office’s name and colour (ADR-0127)', async () => {
+    const save = (body: Record<string, unknown>, token = admin) =>
+      http()
+        .put('/api/v1/app-settings')
+        .set(bearer(token))
+        .send({
+          assortmentSegmentId: null,
+          homeSections: { PROMOTIONS: true, DISCOUNTS: true, NEW: true },
+          minOrderAmount: null,
+          appName: null,
+          appColor: null,
+          ...body,
+        });
+    const ids = async () =>
+      (
+        (await http().get('/api/v1/sales-rep/products').set(bearer(rep)).expect(200)).body as {
+          data: { id: number }[];
+        }
+      ).data.map((product) => product.id);
+    expect((await ids()).sort()).toEqual([cola.id, water.id].sort());
+    const onlyWater = (
+      await http()
+        .post('/api/v1/segments/lists')
+        .set(bearer(admin))
+        .set(idempotency())
+        .send({ name: 'Зөвхөн ус', productIds: [water.id] })
+        .expect(201)
+    ).body as { id: number };
+    await save({
+      assortmentSegmentId: onlyWater.id,
+      appName: 'Bto ХТ',
+      appColor: '#FF3B30',
+    }).expect(200);
+    expect(await ids()).toEqual([water.id]);
+    const batch = await http()
+      .get('/api/v1/sales-rep/products/batch')
+      .query({ productIds: `${cola.id},${water.id}` })
+      .set(bearer(rep))
+      .expect(200);
+    expect((batch.body as { id: number }[]).map((product) => product.id)).toEqual([water.id]);
+    const suppliers = (await http().get('/api/v1/sales-rep/suppliers').set(bearer(rep)).expect(200))
+      .body as { productCount: number }[];
+    expect(suppliers.every((row) => row.productCount <= 1)).toBe(true);
+    expect(
+      (await http().get('/api/v1/sales-rep/context').set(bearer(rep)).expect(200)).body,
+    ).toMatchObject({ appName: 'Bto ХТ', appColor: '#FF3B30' });
+    await save({}).expect(200);
+    expect((await ids()).sort()).toEqual([cola.id, water.id].sort());
+  });
 });

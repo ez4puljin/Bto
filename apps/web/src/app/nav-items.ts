@@ -28,6 +28,7 @@ import {
   HandCoins,
   IdCard,
   History,
+  House,
   Hourglass,
   KeyRound,
   LayoutGrid,
@@ -35,6 +36,8 @@ import {
   Megaphone,
   Monitor,
   Network,
+  Palette,
+  Phone,
   Move,
   Package,
   PackageCheck,
@@ -50,6 +53,7 @@ import {
   Shapes,
   SquareKanban,
   ShieldCheck,
+  ShoppingBag,
   ShoppingBasket,
   ShoppingCart,
   SlidersHorizontal,
@@ -95,7 +99,7 @@ export interface NavGroup {
 /**
  * Sidebar menu, one group per area (ADR-0042: every entry has an icon), in the order of a wholesale
  * office's day (ADR-0066): sales, the warehouse, the catalogue, prices, segments, partners, finance,
- * the supermarket, the assistant, the system. An entry with a permission
+ * the supermarket, the apps, the assistant, the system. An entry with a permission
  * is shown only to users who hold it (ADR-0027); a group without visible entries is hidden. Catalog
  * pages and suppliers are readable by every user; customers only by the office, accountants and
  * admins. The staff registry («Ажилтан», the users) sits among the partners (owner 2026-10-29): a
@@ -389,6 +393,57 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     ],
   },
   {
+    // «Апп» (ADR-0127): every setting of the two mobile apps — the customer app «Bto300» and the
+    // staff app — in one place; the old «Систем» addresses redirect here.
+    label: 'nav.groups.app',
+    items: [
+      {
+        to: '/app/home',
+        label: 'nav.appHome',
+        icon: House,
+        permission: 'customer.home.manage',
+        also: ['/system/customer-app'],
+      },
+      {
+        to: '/app/products',
+        label: 'nav.appProducts',
+        icon: Package,
+        permission: 'customer.home.manage',
+      },
+      {
+        to: '/app/orders',
+        label: 'nav.appOrders',
+        icon: ShoppingBag,
+        permission: ['sales.boards.manage', 'customer.home.manage'],
+      },
+      {
+        to: '/app/contacts',
+        label: 'nav.appContacts',
+        icon: Phone,
+        permission: 'identity.settings.read',
+      },
+      {
+        to: '/app/notices',
+        label: 'nav.appNotices',
+        icon: Megaphone,
+        permission: 'notifications.send',
+        also: ['/system/app-notices'],
+      },
+      {
+        to: '/app/stores',
+        label: 'nav.appStores',
+        icon: Store,
+        permission: 'partners.customers.read',
+      },
+      {
+        to: '/app/general',
+        label: 'nav.appGeneral',
+        icon: Palette,
+        permission: 'customer.home.manage',
+      },
+    ],
+  },
+  {
     label: 'nav.groups.ai',
     items: [
       { to: '/ai', label: 'nav.aiAssistant', icon: Sparkles, permission: 'ai.ask' },
@@ -438,19 +493,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'imports.manage',
       },
       { to: '/system/status', label: 'nav.systemStatus', icon: Activity },
-      {
-        to: '/system/app-notices',
-        label: 'nav.appNotices',
-        icon: Megaphone,
-        permission: 'notifications.send',
-      },
-      {
-        to: '/system/customer-app',
-        label: 'nav.customerApp',
-        icon: Smartphone,
-        // The contact list's readers and the home's keepers (ADR-0092 #9: banners).
-        permission: ['identity.settings.read', 'customer.home.manage'],
-      },
     ],
   },
 ];
@@ -469,7 +511,7 @@ export function visibleNav(permissions: readonly Permission[]): NavGroup[] {
 }
 
 export type ModuleKey =
-  'sales' | 'inventory' | 'catalog' | 'partners' | 'finance' | 'pos' | 'system' | 'ai';
+  'sales' | 'inventory' | 'catalog' | 'partners' | 'finance' | 'pos' | 'app' | 'system' | 'ai';
 
 export interface NavModule {
   key: ModuleKey;
@@ -482,9 +524,10 @@ export interface NavModule {
 }
 
 /**
- * The top bar's modules (ADR-0114): the menu groups gathered into seven areas so they fit one line
+ * The top bar's modules (ADR-0114): the menu groups gathered into eight areas so they fit one line
  * at 1366 px — «Бараа» holds the catalogue, prices and segments, «Санхүү» the books and the
- * reports. «Систем» and the assistant are tools at the bar's right. Every group belongs to exactly
+ * reports, «Апп» the two mobile apps' settings (ADR-0127). «Систем» and the assistant are tools at
+ * the bar's right. Every group belongs to exactly
  * one module (a test proves it).
  */
 export const NAV_MODULES: readonly NavModule[] = [
@@ -509,6 +552,7 @@ export const NAV_MODULES: readonly NavModule[] = [
     groups: ['nav.groups.finance', 'nav.groups.reports'],
   },
   { key: 'pos', label: 'nav.modules.pos', icon: Store, groups: ['nav.groups.pos'] },
+  { key: 'app', label: 'nav.modules.app', icon: Smartphone, groups: ['nav.groups.app'] },
   {
     key: 'system',
     label: 'nav.modules.system',
