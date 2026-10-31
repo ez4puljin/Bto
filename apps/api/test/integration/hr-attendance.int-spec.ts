@@ -29,7 +29,12 @@ describe('attendance', () => {
   let mainSiteId: number;
   let farSiteId: number;
 
-  const punch = (token: string, kind: 'IN' | 'OUT', where: { lat: string; lng: string }, accuracyM?: number) =>
+  const punch = (
+    token: string,
+    kind: 'IN' | 'OUT',
+    where: { lat: string; lng: string },
+    accuracyM?: number,
+  ) =>
     http()
       .post('/api/v1/hr/attendance/punch')
       .set(bearer(token))
@@ -67,7 +72,12 @@ describe('attendance', () => {
       .set(bearer(hr))
       .send({ name: '  Оргил бөөний төв ', ...MAIN, radiusM: 150, branchId: null })
       .expect(201);
-    expect(created.body).toMatchObject({ name: 'Оргил бөөний төв', radiusM: 150, lat: '49.6345', archivedAt: null });
+    expect(created.body).toMatchObject({
+      name: 'Оргил бөөний төв',
+      radiusM: 150,
+      lat: '49.6345',
+      archivedAt: null,
+    });
     mainSiteId = (created.body as { id: number }).id;
     const far = await http()
       .post('/api/v1/hr/work-sites')
@@ -101,13 +111,20 @@ describe('attendance', () => {
       code: 'ATTENDANCE_OUT_OF_RANGE',
       params: { site: 'Оргил бөөний төв', radiusM: 150 },
     });
-    expect((outside.body as { params: { distanceM: number } }).params.distanceM).toBeGreaterThan(1000);
+    expect((outside.body as { params: { distanceM: number } }).params.distanceM).toBeGreaterThan(
+      1000,
+    );
     const loose = await punch(keeperToken, 'IN', MAIN, 450).expect(422);
     expect(loose.body).toMatchObject({ code: 'ATTENDANCE_LOCATION_IMPRECISE' });
     const notIn = await punch(keeperToken, 'OUT', MAIN).expect(409);
     expect(notIn.body).toMatchObject({ code: 'ATTENDANCE_NOT_IN' });
 
-    const inside = await punch(keeperToken, 'IN', { lat: '49.634900', lng: '100.162300' }, 12).expect(201);
+    const inside = await punch(
+      keeperToken,
+      'IN',
+      { lat: '49.634900', lng: '100.162300' },
+      12,
+    ).expect(201);
     expect(inside.body).toMatchObject({
       kind: 'IN',
       source: 'APP',
@@ -123,7 +140,13 @@ describe('attendance', () => {
     expect((again.body as { params: { at: string } }).params.at).toMatch(/^\d{2}:\d{2}$/);
 
     const me = (await http().get('/api/v1/hr/attendance/me').set(bearer(keeperToken)).expect(200))
-      .body as { state: string; today: string; day: { firstIn: string | null; openIn: boolean }; sites: { id: number }[]; tracked: boolean };
+      .body as {
+      state: string;
+      today: string;
+      day: { firstIn: string | null; openIn: boolean };
+      sites: { id: number }[];
+      tracked: boolean;
+    };
     expect(me.state).toBe('IN');
     expect(me.today).toBe(today);
     expect(me.day.openIn).toBe(true);
@@ -132,8 +155,9 @@ describe('attendance', () => {
     expect(me.tracked).toBe(true);
 
     await punch(keeperToken, 'OUT', MAIN).expect(201);
-    const after = (await http().get('/api/v1/hr/attendance/me').set(bearer(keeperToken)).expect(200))
-      .body as { state: string; todayEvents: unknown[]; month: { presentDays: number } };
+    const after = (
+      await http().get('/api/v1/hr/attendance/me').set(bearer(keeperToken)).expect(200)
+    ).body as { state: string; todayEvents: unknown[]; month: { presentDays: number } };
     expect(after.state).toBe('OUT');
     expect(after.todayEvents).toHaveLength(2);
     expect(after.month.presentDays).toBe(1);
@@ -143,12 +167,26 @@ describe('attendance', () => {
     await http()
       .put(`/api/v1/hr/employees/${rep.id}`)
       .set(bearer(keeperToken))
-      .send({ tracked: true, workStart: null, workEnd: null, graceMinutes: null, workdays: null, siteIds: [farSiteId] })
+      .send({
+        tracked: true,
+        workStart: null,
+        workEnd: null,
+        graceMinutes: null,
+        workdays: null,
+        siteIds: [farSiteId],
+      })
       .expect(403);
     const terms = await http()
       .put(`/api/v1/hr/employees/${rep.id}`)
       .set(bearer(hr))
-      .send({ tracked: true, workStart: '10:00', workEnd: '19:00', graceMinutes: null, workdays: null, siteIds: [farSiteId] })
+      .send({
+        tracked: true,
+        workStart: '10:00',
+        workEnd: '19:00',
+        graceMinutes: null,
+        workdays: null,
+        siteIds: [farSiteId],
+      })
       .expect(200);
     expect(terms.body).toMatchObject({
       userId: rep.id,
@@ -156,7 +194,10 @@ describe('attendance', () => {
       schedule: { workStart: '10:00', workEnd: '19:00', graceMinutes: 10 },
     });
     const refused = await punch(repToken, 'IN', MAIN).expect(409);
-    expect(refused.body).toMatchObject({ code: 'ATTENDANCE_OUT_OF_RANGE', params: { site: 'Хойд агуулах' } });
+    expect(refused.body).toMatchObject({
+      code: 'ATTENDANCE_OUT_OF_RANGE',
+      params: { site: 'Хойд агуулах' },
+    });
     await punch(repToken, 'IN', FAR).expect(201);
     const me = (await http().get('/api/v1/hr/attendance/me').set(bearer(repToken)).expect(200))
       .body as { sites: { id: number }[]; schedule: { workStart: string } };
@@ -166,12 +207,26 @@ describe('attendance', () => {
     await http()
       .put(`/api/v1/hr/employees/${rep.id}`)
       .set(bearer(hr))
-      .send({ tracked: true, workStart: '10:00', workEnd: '09:00', graceMinutes: null, workdays: null, siteIds: [] })
+      .send({
+        tracked: true,
+        workStart: '10:00',
+        workEnd: '09:00',
+        graceMinutes: null,
+        workdays: null,
+        siteIds: [],
+      })
       .expect(422);
     await http()
       .put(`/api/v1/hr/employees/${rep.id}`)
       .set(bearer(hr))
-      .send({ tracked: true, workStart: null, workEnd: null, graceMinutes: 500, workdays: null, siteIds: [] })
+      .send({
+        tracked: true,
+        workStart: null,
+        workEnd: null,
+        graceMinutes: 500,
+        workdays: null,
+        siteIds: [],
+      })
       .expect(422);
   });
 
@@ -200,7 +255,8 @@ describe('attendance', () => {
     expect(saved.body).toMatchObject({ workStart: '08:30', graceMinutes: 15, workdays: '1111100' });
     expect((saved.body as { updatedAt: string | null }).updatedAt).not.toBeNull();
     // The keeper follows the company; the rep keeps their own hours.
-    const employees = (await http().get('/api/v1/hr/employees').set(bearer(hr)).expect(200)).body as {
+    const employees = (await http().get('/api/v1/hr/employees').set(bearer(hr)).expect(200))
+      .body as {
       userId: number;
       schedule: { workStart: string; graceMinutes: number };
     }[];
@@ -221,7 +277,14 @@ describe('attendance', () => {
     ).body as {
       date: string;
       counts: { present: number; inNow: number; expected: number };
-      rows: { userId: number; status: string; state: string | null; firstIn: string | null; siteName: string | null; fullName: string }[];
+      rows: {
+        userId: number;
+        status: string;
+        state: string | null;
+        firstIn: string | null;
+        siteName: string | null;
+        fullName: string;
+      }[];
       trend: { date: string }[];
       month: { userId: number; presentDays: number; avgArrivalMinutes: number | null }[];
     };
@@ -239,8 +302,12 @@ describe('attendance', () => {
     expect(repRow?.state).toBe('IN');
     expect(dashboard.counts.present).toBeGreaterThanOrEqual(2);
     expect(dashboard.counts.inNow).toBeGreaterThanOrEqual(1);
-    expect(dashboard.month.find((row) => row.userId === keeper.id)).toMatchObject({ presentDays: 1 });
-    expect(dashboard.month.find((row) => row.userId === keeper.id)?.avgArrivalMinutes).not.toBeNull();
+    expect(dashboard.month.find((row) => row.userId === keeper.id)).toMatchObject({
+      presentDays: 1,
+    });
+    expect(
+      dashboard.month.find((row) => row.userId === keeper.id)?.avgArrivalMinutes,
+    ).not.toBeNull();
 
     const days = (
       await http()
@@ -304,7 +371,12 @@ describe('attendance', () => {
       .set(bearer(hr))
       .send({ userId: keeper.id, kind: 'IN', at: new Date().toISOString(), note: 'Утас унтарсан' })
       .expect(201);
-    expect(added.body).toMatchObject({ kind: 'IN', source: 'OFFICE', note: 'Утас унтарсан', siteId: null });
+    expect(added.body).toMatchObject({
+      kind: 'IN',
+      source: 'OFFICE',
+      note: 'Утас унтарсан',
+      siteId: null,
+    });
     const addedId = (added.body as { id: number }).id;
 
     const struck = await http()
@@ -338,12 +410,18 @@ describe('attendance', () => {
     const asApp = await connectAs('app');
     try {
       expect(
-        await sqlStateOf(asApp.query(`UPDATE hr_attendance_events SET kind = 'OUT' WHERE id = $1`, [firstIn.id])),
+        await sqlStateOf(
+          asApp.query(`UPDATE hr_attendance_events SET kind = 'OUT' WHERE id = $1`, [firstIn.id]),
+        ),
       ).toBe('42501');
-      expect(await sqlStateOf(asApp.query(`DELETE FROM hr_attendance_events WHERE id = $1`, [firstIn.id]))).toBe(
-        '42501',
-      );
-      expect(await sqlStateOf(asApp.query(`DELETE FROM hr_work_sites WHERE id = $1`, [farSiteId]))).toBe('42501');
+      expect(
+        await sqlStateOf(
+          asApp.query(`DELETE FROM hr_attendance_events WHERE id = $1`, [firstIn.id]),
+        ),
+      ).toBe('42501');
+      expect(
+        await sqlStateOf(asApp.query(`DELETE FROM hr_work_sites WHERE id = $1`, [farSiteId])),
+      ).toBe('42501');
     } finally {
       await asApp.end();
     }
@@ -356,10 +434,16 @@ describe('attendance', () => {
       .send({ archived: true })
       .expect(200);
     expect((archived.body as { archivedAt: string | null }).archivedAt).not.toBeNull();
-    const live = (await http().get('/api/v1/hr/work-sites').set(bearer(hr)).expect(200)).body as { id: number }[];
+    const live = (await http().get('/api/v1/hr/work-sites').set(bearer(hr)).expect(200)).body as {
+      id: number;
+    }[];
     expect(live.map((site) => site.id)).toEqual([mainSiteId]);
     const withArchived = (
-      await http().get('/api/v1/hr/work-sites').query({ includeArchived: 'true' }).set(bearer(hr)).expect(200)
+      await http()
+        .get('/api/v1/hr/work-sites')
+        .query({ includeArchived: 'true' })
+        .set(bearer(hr))
+        .expect(200)
     ).body as { id: number }[];
     expect(withArchived).toHaveLength(2);
     // The rep's only site is archived: no site to punch at until HR assigns another.
