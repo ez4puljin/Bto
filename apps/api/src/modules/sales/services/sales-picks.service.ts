@@ -1,7 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from '@tugeel/shared/money';
 import type { OrderStatus, PickStatus } from '@tugeel/shared/sales';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { businessDate } from '@tugeel/shared/time';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import { idIn } from '../../../common/db/days';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -51,6 +52,19 @@ export interface PickPart {
   pickerName: string | null;
   startedAt: Date | null;
   doneAt: Date | null;
+}
+
+/** The orders whose parts are worked on. */
+const OPEN_ORDERS: readonly OrderStatus[] = ['CONFIRMED', 'PICKING', 'PACKED'];
+
+/** A part on the keeper's work list (the staff app, ADR-0132): with its order's facts. */
+export interface PickWork extends PickPart {
+  orderNumber: string | null;
+  orderStatus: OrderStatus;
+  customerName: string;
+  deliveryDate: string;
+  /** The order's lines in this warehouse. */
+  lines: number;
 }
 
 /** One line of a part's pick: the quantity picked (base units) and the shelf it left. */
@@ -161,6 +175,77 @@ export class SalesPicksService {
   }
 
   /** Who may pick in a warehouse: active users with the pick right and it in their write scope. */
+  /**
+   * The keeper's work (the staff app, ADR-0132): the parts of the open orders in the caller's
+   * warehouses (a lead: every warehouse), not done or done today; soonest delivery first.
+   */
+  async work(ctx: AuthContext, query: { warehouseId?: number | null }): Promise<PickWork[]> {
+    const access = await this.access.load(ctx);
+    const lead = ctx.permissions.has(LEAD);
+    const writable = ctx.writableWarehouseIds;
+    const today = businessDate();
+    const rows = await this.db
+      .select({ part: salesOrderPicks, order: salesOrders })
+      .from(salesOrderPicks)
+      .innerJoin(salesOrders, eq(salesOrders.id, salesOrderPicks.orderId))
+      .where(
+        and(
+          inArray(salesOrders.status, [...OPEN_ORDERS]),
+          isNull(salesOrders.archivedAt),
+          access.visibleSql(),
+          query.warehouseId ? eq(salesOrderPicks.warehouseId, query.warehouseId) : undefined,
+          !lead && writable !== null
+            ? inArray(salesOrderPicks.warehouseId, writable.size === 0 ? [0] : [...writable])
+            : undefined,
+          sql`(${salesOrderPicks.status} <> 'DONE'
+               OR (${salesOrderPicks.doneAt} AT TIME ZONE 'Asia/Ulaanbaatar')::date = ${today}::date)`,
+        ),
+      )
+      .orderBy(
+        asc(salesOrders.deliveryDate),
+        desc(salesOrders.id),
+        asc(salesOrderPicks.warehouseId),
+      )
+      .limit(500);
+    if (rows.length === 0) return [];
+    const views = await this.views(
+      rows.map((row) => row.part),
+      this.db,
+    );
+    const customers = new Map(
+      (await this.customers.getMany(rows.map((row) => row.order.customerId))).map((c) => [c.id, c]),
+    );
+    const counts = await this.db
+      .select({
+        orderId: salesOrderLines.orderId,
+        warehouseId: salesOrderLines.warehouseId,
+        count: sql<string>`count(*)`,
+      })
+      .from(salesOrderLines)
+      .where(
+        idIn(
+          salesOrderLines.orderId,
+          rows.map((row) => row.order.id),
+        ),
+      )
+      .groupBy(salesOrderLines.orderId, salesOrderLines.warehouseId);
+    const countOf = new Map(
+      counts.map((row) => [`${row.orderId}:${row.warehouseId}`, Number.parseInt(row.count, 10)]),
+    );
+    return rows.map((row, index) => {
+      const view = views[index];
+      if (!view) throw new Error('pick view missing');
+      return {
+        ...view,
+        orderNumber: row.order.number,
+        orderStatus: row.order.status,
+        customerName: customers.get(row.order.customerId)?.name ?? '',
+        deliveryDate: row.order.deliveryDate,
+        lines: countOf.get(`${row.order.id}:${row.part.warehouseId}`) ?? 0,
+      };
+    });
+  }
+
   pickersOf(warehouseId: number): Promise<{ id: number; fullName: string }[]> {
     return this.names.holdersInWarehouse(PICK, warehouseId);
   }

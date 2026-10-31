@@ -262,6 +262,19 @@ describe('sales picking by warehouse', () => {
     const seenByA = await detail(keeperA, draft.id);
     expect(seenByA.lines.map((line) => line.productId)).toEqual([cola.id]);
     expect(seenByA.picks.map((entry) => entry.warehouseId)).toEqual([whA.id]);
+    // The phone's work list (ADR-0132): each keeper's own warehouse's part with the order's facts.
+    const work = async (token: string) =>
+      (await http().get('/api/v1/sales-picks').set(bearer(token)).expect(200)).body as {
+        orderId: number;
+        warehouseId: number;
+        status: string;
+        customerName: string;
+        lines: number;
+      }[];
+    expect(
+      (await work(keeperA)).filter((row) => row.orderId === draft.id).map((row) => [row.warehouseId, row.status, row.lines]),
+    ).toEqual([[whA.id, 'OPEN', 1]]);
+    expect((await work(keeperB)).filter((row) => row.orderId === draft.id).map((row) => row.warehouseId)).toEqual([whB.id]);
     // A keeper takes only their own warehouse; the order starts picking.
     await part(keeperA, draft.id, whB.id, 'take').expect(403);
     await part(keeperA, draft.id, whA.id, 'take').expect(200);

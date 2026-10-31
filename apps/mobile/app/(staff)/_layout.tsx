@@ -2,7 +2,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ThumbKeeper } from '../../src/images/thumb-keeper';
 import { NoticePopupGate } from '../../src/notifications/popup-gate';
-import { isRep, mayRequestTransfers } from '../../src/state/phase';
+import { isRep, mayPick, mayRequestTransfers } from '../../src/state/phase';
 import { useSignedIn } from '../../src/state/session';
 import { ShopProvider } from '../../src/state/shop';
 import { colors } from '../../src/theme/tokens';
@@ -11,14 +11,16 @@ import { ToastProvider } from '../../src/ui/toast';
 /**
  * The staff app (ADR-0061, ADR-0068, in «Bto300»'s look since ADR-0100): the tabs, and the screens
  * opened from them, for a rep. expo-router drops the guarded screens and opens the navigator on the
- * first one left, so the order below decides where each person lands: a store's seller with only
- * the transfer right (ADR-0116 #1) on «Шилжүүлэг» (with the store profile beside it), and every
- * other staff member on «Ирц» (ADR-0131: the attendance is for all staff), which is never guarded
- * and carries the profile row and «Гарах» for them.
+ * first one left, so the order below decides where each person lands: a warehouse keeper with the
+ * picking right (ADR-0132) on «Бэлтгэл», a store's seller with only the transfer right (ADR-0116 #1)
+ * on «Шилжүүлэг» (with the store profile beside it), and every other staff member on «Ирц»
+ * (ADR-0131: the attendance is for all staff), which is never guarded and carries the profile row
+ * and «Гарах» for them.
  */
 export default function StaffLayout() {
   const { me, server } = useSignedIn();
   const rep = isRep(me);
+  const picker = mayPick(me);
   const seller = mayRequestTransfers(me);
   return (
     <ShopProvider server={server} userId={me.id}>
@@ -33,8 +35,13 @@ export default function StaffLayout() {
           <Stack.Protected guard={rep}>
             <Stack.Screen name="(tabs)" />
           </Stack.Protected>
+          {/* The picking (ADR-0132): first for a keeper, opened from «Нүүр» by a rep. */}
+          <Stack.Protected guard={picker}>
+            <Stack.Screen name="picking/index" />
+            <Stack.Screen name="picking/[id]" />
+          </Stack.Protected>
           {/* The transfers (ADR-0116): first for a seller, opened from «Нүүр» by a rep. */}
-          <Stack.Protected guard={seller}>
+          <Stack.Protected guard={rep || seller}>
             <Stack.Screen name="transfers/index" />
             <Stack.Screen name="transfers/new" />
             <Stack.Screen name="transfers/[id]/index" />
