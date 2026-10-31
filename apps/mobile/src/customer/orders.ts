@@ -1,19 +1,21 @@
 import { Decimal } from '@tugeel/shared/money';
 import type { CustomerOrderState, OrderChannel } from '@tugeel/shared/sales';
+import { brandSheet } from '../theme/brand';
 import { colors } from '../theme/tokens';
 
 // The store's orders in its own words (ADR-0079 #6, the Orders and Order boards): the progress, who
 // took an order, its notes and its amount; mn.json's `sales.customerStates.*` names the states.
 
 /** The pill of each state, as the Orders board colours them. */
-export const STATE_TONES: Record<CustomerOrderState, { background: string; text: string }> = {
-  PENDING: { background: colors.warningSoft, text: colors.warningText },
-  CONFIRMED: { background: colors.secondary, text: colors.secondaryForeground },
-  PREPARING: { background: colors.violetSoft, text: colors.violet },
-  READY: { background: colors.infoSoft, text: colors.link },
-  DELIVERED: { background: colors.successSoft, text: colors.success },
-  CANCELLED: { background: colors.destructiveSoft, text: colors.cancelled },
-};
+export const STATE_TONES: Record<CustomerOrderState, { background: string; text: string }> =
+  brandSheet(() => ({
+    PENDING: { background: colors.warningSoft, text: colors.warningText },
+    CONFIRMED: { background: colors.secondary, text: colors.secondaryForeground },
+    PREPARING: { background: colors.violetSoft, text: colors.violet },
+    READY: { background: colors.infoSoft, text: colors.link },
+    DELIVERED: { background: colors.successSoft, text: colors.success },
+    CANCELLED: { background: colors.destructiveSoft, text: colors.cancelled },
+  }));
 
 /** «Илгээсэн → Батлагдсан → Бэлтгэж буй → Бэлэн → Хүргэгдсэн»: the order page's steps. */
 export const PROGRESS_STEPS = ['SENT', 'CONFIRMED', 'PREPARING', 'READY', 'DELIVERED'] as const;

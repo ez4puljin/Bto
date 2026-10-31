@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
+import { brandSheet } from '../theme/brand';
 import { colors, fonts, type } from '../theme/tokens';
 import { Text } from '../ui/text';
 import type { LineState } from './counts';
@@ -21,14 +22,16 @@ export function DraftPill() {
   return <TransferStatusPill status="DRAFT" />;
 }
 
-const LINE_TONES: Record<LineState['kind'], { background: string; text: string }> = {
-  unchecked: { background: colors.canvas, text: colors.muted },
-  notArrived: { background: colors.destructiveSoft, text: colors.destructive },
-  short: { background: colors.warningSoft, text: colors.warning },
-  over: { background: colors.warningSoft, text: colors.warning },
-  exact: { background: colors.successSoft, text: colors.success },
-  extra: { background: colors.secondary, text: colors.secondaryForeground },
-};
+const LINE_TONES: Record<LineState['kind'], { background: string; text: string }> = brandSheet(
+  () => ({
+    unchecked: { background: colors.canvas, text: colors.muted },
+    notArrived: { background: colors.destructiveSoft, text: colors.destructive },
+    short: { background: colors.warningSoft, text: colors.warning },
+    over: { background: colors.warningSoft, text: colors.warning },
+    exact: { background: colors.successSoft, text: colors.success },
+    extra: { background: colors.secondary, text: colors.secondaryForeground },
+  }),
+);
 
 /**
  * A shipped line's state as a small badge (ADR-0116 #4): «Тоолоогүй» grey, «Ирээгүй» red, «Дутуу»

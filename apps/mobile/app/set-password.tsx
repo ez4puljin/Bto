@@ -13,6 +13,7 @@ import {
 } from '../src/customer/sign-in';
 import { FieldRow, SignInProblem } from '../src/customer/sign-in-rows';
 import { useSession } from '../src/state/session';
+import { brandSheet } from '../src/theme/brand';
 import { colors, radii, spacing, type } from '../src/theme/tokens';
 import { PillButton } from '../src/ui/controls';
 import { PasswordToggle } from '../src/ui/field';
@@ -185,23 +186,25 @@ export default function SetPasswordScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  grow: { flex: 1 },
-  body: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  title: { marginTop: 2, marginHorizontal: spacing.xs },
-  lead: { marginTop: 6, marginHorizontal: spacing.xs, color: colors.label2 },
-  info: {
-    marginTop: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: spacing.md,
-    paddingHorizontal: 14,
-    borderRadius: radii.field,
-    backgroundColor: colors.infoSoft,
-  },
-  infoText: { flex: 1, color: colors.secondaryForeground },
-  issue: { marginTop: spacing.sm, marginHorizontal: spacing.xs, color: colors.destructive },
-  problem: { marginTop: spacing.lg },
-  button: { marginTop: spacing.xl },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    grow: { flex: 1 },
+    body: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
+    title: { marginTop: 2, marginHorizontal: spacing.xs },
+    lead: { marginTop: 6, marginHorizontal: spacing.xs, color: colors.label2 },
+    info: {
+      marginTop: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: spacing.md,
+      paddingHorizontal: 14,
+      borderRadius: radii.field,
+      backgroundColor: colors.infoSoft,
+    },
+    infoText: { flex: 1, color: colors.secondaryForeground },
+    issue: { marginTop: spacing.sm, marginHorizontal: spacing.xs, color: colors.destructive },
+    problem: { marginTop: spacing.lg },
+    button: { marginTop: spacing.xl },
+  }),
+);

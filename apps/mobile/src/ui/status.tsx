@@ -2,10 +2,11 @@ import type { OrderStatus, PaymentMethod } from '@tugeel/shared/sales';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { Text } from './text';
+import { brandSheet } from '../theme/brand';
 import { colors, fonts, type } from '../theme/tokens';
 
 /** Each order status's pill as the MyOrders board colours it; the stages after them alike. */
-const STATUS_COLORS: Record<OrderStatus, { background: string; text: string }> = {
+const STATUS_COLORS: Record<OrderStatus, { background: string; text: string }> = brandSheet(() => ({
   DRAFT: { background: colors.canvas, text: colors.muted },
   SUBMITTED: { background: colors.secondary, text: colors.secondaryForeground },
   APPROVAL_PENDING: { background: colors.warningSoft, text: colors.warning },
@@ -18,7 +19,7 @@ const STATUS_COLORS: Record<OrderStatus, { background: string; text: string }> =
   INVOICED: { background: colors.successSoft, text: colors.success },
   CLOSED: { background: colors.successSoft, text: colors.success },
   CANCELLED: { background: colors.destructiveSoft, text: colors.cancelled },
-};
+}));
 
 export function StatusPill({ status }: { status: OrderStatus }) {
   const { t } = useTranslation();

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Text } from './text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { brandSheet } from '../theme/brand';
 import { colors, fonts, radii, spacing, type } from '../theme/tokens';
 
 /**
@@ -232,60 +233,62 @@ export function ActionSheet({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: { backgroundColor: colors.backdrop },
-  sheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: colors.canvas,
-    borderTopLeftRadius: radii.sheet,
-    borderTopRightRadius: radii.sheet,
-    overflow: 'hidden',
-  },
-  grabberRow: { alignItems: 'center', paddingTop: 7 },
-  grabber: { width: 36, height: 5, borderRadius: 3, backgroundColor: colors.input },
-  header: {
-    height: 50,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  side: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  right: { justifyContent: 'flex-end' },
-  close: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.closeFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  grow: { flex: 1 },
-  footer: {
-    paddingTop: spacing.md,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.sheetBarFill,
-  },
-  actions: { position: 'absolute', left: 10, right: 10, gap: spacing.sm },
-  actionGroup: {
-    borderRadius: radii.card,
-    backgroundColor: colors.floatingFill,
-    overflow: 'hidden',
-  },
-  question: { paddingTop: spacing.lg, paddingBottom: 14, paddingHorizontal: 20, gap: spacing.xs },
-  center: { textAlign: 'center' },
-  actionLine: { height: StyleSheet.hairlineWidth, backgroundColor: colors.hairlineStrong },
-  action: { height: 58, alignItems: 'center', justifyContent: 'center' },
-  actionText: { ...type.sectionTitle, fontFamily: fonts.regular, letterSpacing: 0 },
-  cancel: {
-    height: 58,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelText: { fontFamily: fonts.semibold, color: colors.primary },
-  pressed: { backgroundColor: colors.accent },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    backdrop: { backgroundColor: colors.backdrop },
+    sheet: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: colors.canvas,
+      borderTopLeftRadius: radii.sheet,
+      borderTopRightRadius: radii.sheet,
+      overflow: 'hidden',
+    },
+    grabberRow: { alignItems: 'center', paddingTop: 7 },
+    grabber: { width: 36, height: 5, borderRadius: 3, backgroundColor: colors.input },
+    header: {
+      height: 50,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.lg,
+    },
+    side: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+    right: { justifyContent: 'flex-end' },
+    close: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.closeFill,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    grow: { flex: 1 },
+    footer: {
+      paddingTop: spacing.md,
+      paddingHorizontal: spacing.lg,
+      backgroundColor: colors.sheetBarFill,
+    },
+    actions: { position: 'absolute', left: 10, right: 10, gap: spacing.sm },
+    actionGroup: {
+      borderRadius: radii.card,
+      backgroundColor: colors.floatingFill,
+      overflow: 'hidden',
+    },
+    question: { paddingTop: spacing.lg, paddingBottom: 14, paddingHorizontal: 20, gap: spacing.xs },
+    center: { textAlign: 'center' },
+    actionLine: { height: StyleSheet.hairlineWidth, backgroundColor: colors.hairlineStrong },
+    action: { height: 58, alignItems: 'center', justifyContent: 'center' },
+    actionText: { ...type.sectionTitle, fontFamily: fonts.regular, letterSpacing: 0 },
+    cancel: {
+      height: 58,
+      borderRadius: radii.card,
+      backgroundColor: colors.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cancelText: { fontFamily: fonts.semibold, color: colors.primary },
+    pressed: { backgroundColor: colors.accent },
+  }),
+);

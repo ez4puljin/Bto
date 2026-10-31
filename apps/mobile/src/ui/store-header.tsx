@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShop } from '../state/shop';
+import { brandSheet } from '../theme/brand';
 import { colors, spacing, storeType, TOUCH } from '../theme/tokens';
 import { CountBadge } from './controls';
 import { Text } from './text';
@@ -129,22 +130,24 @@ export function StoreHeader({
   );
 }
 
-const styles = StyleSheet.create({
-  band: { backgroundColor: colors.primary },
-  row: {
-    height: HEADER_ROW,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: 2,
-    paddingRight: 6,
-    gap: spacing.xs,
-  },
-  rowNoBack: { paddingLeft: spacing.lg },
-  title: { flex: 1, minWidth: 0 },
-  right: { flexDirection: 'row', alignItems: 'center' },
-  icon: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
-  pressed: { opacity: 0.6 },
-  badge: { position: 'absolute', top: 5, right: 3 },
-  textButton: { height: TOUCH, justifyContent: 'center', paddingHorizontal: spacing.sm },
-  faded: { opacity: 0.5 },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    band: { backgroundColor: colors.primary },
+    row: {
+      height: HEADER_ROW,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingLeft: 2,
+      paddingRight: 6,
+      gap: spacing.xs,
+    },
+    rowNoBack: { paddingLeft: spacing.lg },
+    title: { flex: 1, minWidth: 0 },
+    right: { flexDirection: 'row', alignItems: 'center' },
+    icon: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
+    pressed: { opacity: 0.6 },
+    badge: { position: 'absolute', top: 5, right: 3 },
+    textButton: { height: TOUCH, justifyContent: 'center', paddingHorizontal: spacing.sm },
+    faded: { opacity: 0.5 },
+  }),
+);

@@ -18,6 +18,7 @@ import { ubTime } from '../../src/dates/dates';
 import { formatMnt } from '../../src/format/format';
 import { dayName, type FeedItem, feedOf, unreadIds } from '../../src/notifications/feed';
 import { FeedBadge, useNoticeEyebrow } from '../../src/notifications/kinds';
+import { brandSheet } from '../../src/theme/brand';
 import { colors, fonts, spacing, type } from '../../src/theme/tokens';
 import { Separator } from '../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../src/ui/kit';
@@ -181,36 +182,38 @@ function FeedRow({ item, onPress }: { item: Item; onPress: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
-  list: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  day: { marginTop: 18, marginBottom: spacing.sm, marginHorizontal: spacing.xs },
-  cell: {
-    backgroundColor: colors.card,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: colors.border,
-  },
-  firstCell: { borderTopWidth: 1, borderTopLeftRadius: 10, borderTopRightRadius: 10 },
-  lastCell: { borderBottomWidth: 1, borderBottomLeftRadius: 10, borderBottomRightRadius: 10 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingLeft: spacing.lg,
-    paddingRight: 14,
-  },
-  pressed: { backgroundColor: colors.accent },
-  text: { flex: 1, gap: 2 },
-  head: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  rowTitle: { ...type.rowStrong, flex: 1 },
-  unreadTitle: { fontFamily: fonts.bold },
-  body: { ...type.body, color: colors.label2 },
-  unread: { width: 9, height: 9, borderRadius: 5, marginTop: 6, backgroundColor: colors.primary },
-  loading: { marginTop: spacing.xxl },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    list: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
+    day: { marginTop: 18, marginBottom: spacing.sm, marginHorizontal: spacing.xs },
+    cell: {
+      backgroundColor: colors.card,
+      borderLeftWidth: 1,
+      borderRightWidth: 1,
+      borderColor: colors.border,
+    },
+    firstCell: { borderTopWidth: 1, borderTopLeftRadius: 10, borderTopRightRadius: 10 },
+    lastCell: { borderBottomWidth: 1, borderBottomLeftRadius: 10, borderBottomRightRadius: 10 },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.md,
+      paddingVertical: spacing.md,
+      paddingLeft: spacing.lg,
+      paddingRight: 14,
+    },
+    pressed: { backgroundColor: colors.accent },
+    text: { flex: 1, gap: 2 },
+    head: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+    },
+    rowTitle: { ...type.rowStrong, flex: 1 },
+    unreadTitle: { fontFamily: fonts.bold },
+    body: { ...type.body, color: colors.label2 },
+    unread: { width: 9, height: 9, borderRadius: 5, marginTop: 6, backgroundColor: colors.primary },
+    loading: { marginTop: spacing.xxl },
+  }),
+);

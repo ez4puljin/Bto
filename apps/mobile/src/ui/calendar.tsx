@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './text';
 import { type DateRange, monthGrid } from '../dates/calendar';
 import { monthOf, shiftMonth } from '../dates/dates';
+import { brandSheet } from '../theme/brand';
 import { colors, fonts, radii, spacing, tabular, type } from '../theme/tokens';
 
 /** Monday first, as the design draws the week. */
@@ -120,46 +121,54 @@ export function MonthCalendar({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: radii.card,
-    paddingTop: 10,
-    paddingHorizontal: 10,
-    paddingBottom: spacing.md,
-  },
-  head: {
-    height: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 6,
-  },
-  month: type.heading,
-  arrows: { flexDirection: 'row', gap: spacing.xs },
-  arrow: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  week: { flexDirection: 'row', paddingTop: spacing.xs, paddingBottom: 2 },
-  weekday: {
-    flex: 1,
-    ...type.sectionHeader,
-    textAlign: 'center',
-  },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingTop: spacing.xs, rowGap: spacing.xs },
-  cell: { width: `${100 / 7}%`, alignItems: 'center' },
-  day: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  inside: { backgroundColor: colors.rangeFill },
-  edge: { backgroundColor: colors.primary },
-  dayText: {
-    ...type.row,
-    ...tabular,
-  },
-  offText: { color: colors.input },
-  todayText: { color: colors.primary, fontFamily: fonts.bold },
-  edgeText: { color: colors.primaryForeground, fontFamily: fonts.semibold },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: radii.card,
+      paddingTop: 10,
+      paddingHorizontal: 10,
+      paddingBottom: spacing.md,
+    },
+    head: {
+      height: 40,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 6,
+    },
+    month: type.heading,
+    arrows: { flexDirection: 'row', gap: spacing.xs },
+    arrow: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    week: { flexDirection: 'row', paddingTop: spacing.xs, paddingBottom: 2 },
+    weekday: {
+      flex: 1,
+      ...type.sectionHeader,
+      textAlign: 'center',
+    },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', paddingTop: spacing.xs, rowGap: spacing.xs },
+    cell: { width: `${100 / 7}%`, alignItems: 'center' },
+    day: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    inside: { backgroundColor: colors.rangeFill },
+    edge: { backgroundColor: colors.primary },
+    dayText: {
+      ...type.row,
+      ...tabular,
+    },
+    offText: { color: colors.input },
+    todayText: { color: colors.primary, fontFamily: fonts.bold },
+    edgeText: { color: colors.primaryForeground, fontFamily: fonts.semibold },
+  }),
+);

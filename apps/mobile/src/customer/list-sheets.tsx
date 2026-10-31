@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStoreCategories } from '../api/customer';
 import { formatCount } from '../format/format';
 import { toggleId } from '../shop/filters';
+import { brandSheet } from '../theme/brand';
 import { colors, radii, shadows, spacing, storeType } from '../theme/tokens';
 import { ChoiceChip, CountBadge, PillButton, Toggle } from '../ui/controls';
 import { Group, Row } from '../ui/grouped';
@@ -249,48 +250,50 @@ export function CategoryFilterSheet({
   );
 }
 
-const styles = StyleSheet.create({
-  pillRow: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  pill: {
-    height: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    borderRadius: 22,
-    backgroundColor: colors.primary,
-    boxShadow: shadows.bluePill,
-  },
-  pillButton: {
-    height: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-  },
-  pressed: { opacity: 0.7 },
-  top: {
-    position: 'absolute',
-    right: 14,
-    top: 3,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.primary,
-    boxShadow: shadows.bluePill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sortBody: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xl },
-  body: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.xl },
-  first: { marginTop: spacing.sm },
-  section: { marginTop: 22 },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    padding: 14,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
-  },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    pillRow: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+    pill: {
+      height: 44,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 6,
+      borderRadius: 22,
+      backgroundColor: colors.primary,
+      boxShadow: shadows.bluePill,
+    },
+    pillButton: {
+      height: 40,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 14,
+      borderRadius: 20,
+    },
+    pressed: { opacity: 0.7 },
+    top: {
+      position: 'absolute',
+      right: 14,
+      top: 3,
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: colors.primary,
+      boxShadow: shadows.bluePill,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sortBody: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xl },
+    body: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.xl },
+    first: { marginTop: spacing.sm },
+    section: { marginTop: 22 },
+    chips: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+      padding: 14,
+      borderRadius: radii.card,
+      backgroundColor: colors.card,
+    },
+  }),
+);

@@ -34,6 +34,7 @@ import { formatMnt } from '../../src/format/format';
 import { feedOf, unreadIds } from '../../src/notifications/feed';
 import { KIND_STYLES, KindIcon, useNoticeEyebrow } from '../../src/notifications/kinds';
 import { useCustomer } from '../../src/state/session';
+import { brandSheet } from '../../src/theme/brand';
 import { colors, fonts, spacing, storeType, type } from '../../src/theme/tokens';
 import { Separator } from '../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../src/ui/kit';
@@ -370,68 +371,70 @@ function PromoCard({ notice, onPress }: { notice: StoreNotice; onPress: () => vo
   );
 }
 
-const styles = StyleSheet.create({
-  list: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  tabs: { flexDirection: 'row', gap: spacing.md, marginTop: 14, marginBottom: spacing.xs },
-  tabButton: {
-    flex: 1,
-    height: 38,
-    borderRadius: 5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabOn: { backgroundColor: colors.primary },
-  tabOff: { backgroundColor: colors.placeholder },
-  day: { marginTop: 18, marginBottom: spacing.sm, marginHorizontal: spacing.xs },
-  cell: {
-    backgroundColor: colors.card,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: colors.border,
-  },
-  firstCell: { borderTopWidth: 1, borderTopLeftRadius: 10, borderTopRightRadius: 10 },
-  lastCell: { borderBottomWidth: 1, borderBottomLeftRadius: 10, borderBottomRightRadius: 10 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingLeft: spacing.lg,
-    paddingRight: 14,
-  },
-  pressed: { backgroundColor: colors.accent },
-  tile: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  text: { flex: 1, gap: 2 },
-  head: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  rowTitle: { ...type.rowStrong, flex: 1 },
-  unreadTitle: { fontFamily: fonts.bold },
-  body: { ...type.body, color: colors.label2 },
-  unread: { width: 9, height: 9, borderRadius: 5, marginTop: 6, backgroundColor: colors.primary },
-  loading: { marginTop: spacing.xxl },
-  more: { marginTop: spacing.lg },
-  card: {
-    marginTop: spacing.md,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-    overflow: 'hidden',
-  },
-  cardPressed: { opacity: 0.85 },
-  hero: { height: 150, alignItems: 'center', justifyContent: 'center' },
-  heroImage: { width: '100%', height: '100%' },
-  cardBody: { padding: 14, gap: spacing.xs },
-  eyebrow: { ...type.secondary, fontFamily: fonts.semibold, flex: 1 },
-  cardTitle: { ...type.heading },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    list: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
+    tabs: { flexDirection: 'row', gap: spacing.md, marginTop: 14, marginBottom: spacing.xs },
+    tabButton: {
+      flex: 1,
+      height: 38,
+      borderRadius: 5,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    tabOn: { backgroundColor: colors.primary },
+    tabOff: { backgroundColor: colors.placeholder },
+    day: { marginTop: 18, marginBottom: spacing.sm, marginHorizontal: spacing.xs },
+    cell: {
+      backgroundColor: colors.card,
+      borderLeftWidth: 1,
+      borderRightWidth: 1,
+      borderColor: colors.border,
+    },
+    firstCell: { borderTopWidth: 1, borderTopLeftRadius: 10, borderTopRightRadius: 10 },
+    lastCell: { borderBottomWidth: 1, borderBottomLeftRadius: 10, borderBottomRightRadius: 10 },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.md,
+      paddingVertical: spacing.md,
+      paddingLeft: spacing.lg,
+      paddingRight: 14,
+    },
+    pressed: { backgroundColor: colors.accent },
+    tile: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    text: { flex: 1, gap: 2 },
+    head: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+    },
+    rowTitle: { ...type.rowStrong, flex: 1 },
+    unreadTitle: { fontFamily: fonts.bold },
+    body: { ...type.body, color: colors.label2 },
+    unread: { width: 9, height: 9, borderRadius: 5, marginTop: 6, backgroundColor: colors.primary },
+    loading: { marginTop: spacing.xxl },
+    more: { marginTop: spacing.lg },
+    card: {
+      marginTop: spacing.md,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+      overflow: 'hidden',
+    },
+    cardPressed: { opacity: 0.85 },
+    hero: { height: 150, alignItems: 'center', justifyContent: 'center' },
+    heroImage: { width: '100%', height: '100%' },
+    cardBody: { padding: 14, gap: spacing.xs },
+    eyebrow: { ...type.secondary, fontFamily: fonts.semibold, flex: 1 },
+    cardTitle: { ...type.heading },
+  }),
+);

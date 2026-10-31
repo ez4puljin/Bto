@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { dealToneOf } from '../customer/deals';
+import { brandSheet } from '../theme/brand';
 import { colors, spacing, storeType, tabular } from '../theme/tokens';
 import { CardPictures } from './card-pictures';
 import { Text } from './text';
@@ -193,62 +194,64 @@ export function CardAdd({ name, onPress }: { name: string; onPress: () => void }
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    backgroundColor: colors.card,
-    overflow: 'hidden',
-  },
-  fill: { flex: 1 },
-  picture: {
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  corner: { position: 'absolute', top: 2, right: 2 },
-  body: { paddingTop: 6, paddingHorizontal: 10, paddingBottom: 6, gap: 1 },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, minHeight: 20 },
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 },
-  struck: { textDecorationLine: 'line-through', flexShrink: 1 },
-  bottom: {
-    minHeight: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 6,
-  },
-  stock: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexShrink: 1 },
-  stockDot: { width: 6, height: 6, borderRadius: 3 },
-  newBadge: {
-    height: 20,
-    paddingHorizontal: spacing.sm,
-    borderRadius: 10,
-    justifyContent: 'center',
-    flexShrink: 1,
-    backgroundColor: colors.newBadge,
-  },
-  newText: { textTransform: 'uppercase' },
-  dealBadge: {
-    height: 20,
-    paddingHorizontal: spacing.sm,
-    borderRadius: 10,
-    justifyContent: 'center',
-    flexShrink: 1,
-  },
-  promotion: { backgroundColor: colors.dealPromotion },
-  promotionText: { color: colors.foreground },
-  discount: { backgroundColor: colors.dealDiscount },
-  discountText: { color: colors.primaryForeground },
-  add: { width: 36, height: 36, marginRight: -7, alignItems: 'center', justifyContent: 'center' },
-  qty: {
-    height: 24,
-    maxWidth: 76,
-    paddingHorizontal: spacing.sm,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-  },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    card: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      backgroundColor: colors.card,
+      overflow: 'hidden',
+    },
+    fill: { flex: 1 },
+    picture: {
+      backgroundColor: colors.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    corner: { position: 'absolute', top: 2, right: 2 },
+    body: { paddingTop: 6, paddingHorizontal: 10, paddingBottom: 6, gap: 1 },
+    badges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, minHeight: 20 },
+    priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 },
+    struck: { textDecorationLine: 'line-through', flexShrink: 1 },
+    bottom: {
+      minHeight: 32,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 6,
+    },
+    stock: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexShrink: 1 },
+    stockDot: { width: 6, height: 6, borderRadius: 3 },
+    newBadge: {
+      height: 20,
+      paddingHorizontal: spacing.sm,
+      borderRadius: 10,
+      justifyContent: 'center',
+      flexShrink: 1,
+      backgroundColor: colors.newBadge,
+    },
+    newText: { textTransform: 'uppercase' },
+    dealBadge: {
+      height: 20,
+      paddingHorizontal: spacing.sm,
+      borderRadius: 10,
+      justifyContent: 'center',
+      flexShrink: 1,
+    },
+    promotion: { backgroundColor: colors.dealPromotion },
+    promotionText: { color: colors.foreground },
+    discount: { backgroundColor: colors.dealDiscount },
+    discountText: { color: colors.primaryForeground },
+    add: { width: 36, height: 36, marginRight: -7, alignItems: 'center', justifyContent: 'center' },
+    qty: {
+      height: 24,
+      maxWidth: 76,
+      paddingHorizontal: spacing.sm,
+      borderRadius: 12,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+    },
+  }),
+);

@@ -27,7 +27,9 @@ import { HeaderIconButton, StoreHeaderBand } from '../../../src/ui/store-header'
 import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 import { initialsOf } from '../../../src/format/format';
 import { useCustomer } from '../../../src/state/session';
+import { brandSheet } from '../../../src/theme/brand';
 import { colors, fonts, spacing, storeType, TOUCH } from '../../../src/theme/tokens';
+import { useAppName } from '../../../src/ui/brand';
 import { PillButton } from '../../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
@@ -41,6 +43,7 @@ import { Text } from '../../../src/ui/text';
  */
 export default function CustomerHomeScreen() {
   const { t } = useTranslation();
+  const appName = useAppName();
   const router = useRouter();
   const inset = useStoreTabBarInset();
   const { me, server } = useCustomer();
@@ -83,7 +86,7 @@ export default function CustomerHomeScreen() {
       <StoreHeaderBand>
         <View style={styles.bar}>
           <Text accessibilityRole="header" style={storeType.wordmark}>
-            {t('mobile.customer.appName')}
+            {appName}
           </Text>
           <View style={styles.search}>
             <Pressable
@@ -224,46 +227,48 @@ export default function CustomerHomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  grow: { flex: 1 },
-  upper: { textTransform: 'uppercase' },
-  pressed: { opacity: 0.7 },
-  bar: {
-    height: 46,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingLeft: 14,
-    paddingRight: spacing.sm,
-  },
-  search: {
-    flex: 1,
-    minWidth: 0,
-    height: 34,
-    marginLeft: spacing.xs,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 17,
-    backgroundColor: colors.card,
-  },
-  searchText: { flex: 1, height: TOUCH, justifyContent: 'center', paddingLeft: 14 },
-  searchScan: { width: 36, height: 34, alignItems: 'center', justifyContent: 'center' },
-  avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { ...storeType.badge, fontFamily: fonts.bold, color: colors.primary },
-  links: { gap: 20, paddingTop: 2, paddingBottom: 10, paddingHorizontal: 14 },
-  noLinks: { height: spacing.sm },
-  categoriesHead: { paddingTop: 12 },
-  grid: { gap: 12, paddingHorizontal: 6 },
-  gridRow: { flexDirection: 'row', gap: spacing.xs },
-  divider: { height: 2, marginTop: 16, marginHorizontal: 10, backgroundColor: colors.border },
-  loading: { marginTop: spacing.xxl },
-  problem: { marginTop: spacing.lg, marginHorizontal: spacing.lg },
-  empty: { alignItems: 'center', gap: spacing.md, marginTop: spacing.xl },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    grow: { flex: 1 },
+    upper: { textTransform: 'uppercase' },
+    pressed: { opacity: 0.7 },
+    bar: {
+      height: 46,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingLeft: 14,
+      paddingRight: spacing.sm,
+    },
+    search: {
+      flex: 1,
+      minWidth: 0,
+      height: 34,
+      marginLeft: spacing.xs,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 17,
+      backgroundColor: colors.card,
+    },
+    searchText: { flex: 1, height: TOUCH, justifyContent: 'center', paddingLeft: 14 },
+    searchScan: { width: 36, height: 34, alignItems: 'center', justifyContent: 'center' },
+    avatar: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: colors.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarText: { ...storeType.badge, fontFamily: fonts.bold, color: colors.primary },
+    links: { gap: 20, paddingTop: 2, paddingBottom: 10, paddingHorizontal: 14 },
+    noLinks: { height: spacing.sm },
+    categoriesHead: { paddingTop: 12 },
+    grid: { gap: 12, paddingHorizontal: 6 },
+    gridRow: { flexDirection: 'row', gap: spacing.xs },
+    divider: { height: 2, marginTop: 16, marginHorizontal: 10, backgroundColor: colors.border },
+    loading: { marginTop: spacing.xxl },
+    problem: { marginTop: spacing.lg, marginHorizontal: spacing.lg },
+    empty: { alignItems: 'center', gap: spacing.md, marginTop: spacing.xl },
+  }),
+);

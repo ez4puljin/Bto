@@ -2,6 +2,7 @@ import { Delete } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { brandSheet } from '../theme/brand';
 import { colors, fonts, shadows, spacing, type } from '../theme/tokens';
 
 const DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
@@ -71,49 +72,51 @@ export function Keypad({
   );
 }
 
-const styles = StyleSheet.create({
-  bar: {
-    height: 46,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.keypadBar,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairlineStrong,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  barButton: { height: 44, justifyContent: 'center', paddingHorizontal: spacing.sm },
-  barText: { ...type.row, color: colors.primary },
-  done: { fontFamily: fonts.semibold },
-  tray: {
-    backgroundColor: colors.keypadTray,
-    paddingTop: 7,
-    paddingHorizontal: 6,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    rowGap: 7,
-    columnGap: 6,
-  },
-  key: {
-    width: '31.8%',
-    flexGrow: 1,
-    height: 50,
-    borderRadius: 8,
-    backgroundColor: colors.card,
-    boxShadow: shadows.key,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  keyPressed: { backgroundColor: colors.fill },
-  digit: { ...type.title, fontFamily: fonts.regular, letterSpacing: 0 },
-  blank: { width: '31.8%', flexGrow: 1, height: 50 },
-  delete: {
-    width: '31.8%',
-    flexGrow: 1,
-    height: 50,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deletePressed: { backgroundColor: colors.fieldFill },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    bar: {
+      height: 46,
+      paddingHorizontal: spacing.md,
+      backgroundColor: colors.keypadBar,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.hairlineStrong,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    barButton: { height: 44, justifyContent: 'center', paddingHorizontal: spacing.sm },
+    barText: { ...type.row, color: colors.primary },
+    done: { fontFamily: fonts.semibold },
+    tray: {
+      backgroundColor: colors.keypadTray,
+      paddingTop: 7,
+      paddingHorizontal: 6,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      rowGap: 7,
+      columnGap: 6,
+    },
+    key: {
+      width: '31.8%',
+      flexGrow: 1,
+      height: 50,
+      borderRadius: 8,
+      backgroundColor: colors.card,
+      boxShadow: shadows.key,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    keyPressed: { backgroundColor: colors.fill },
+    digit: { ...type.title, fontFamily: fonts.regular, letterSpacing: 0 },
+    blank: { width: '31.8%', flexGrow: 1, height: 50 },
+    delete: {
+      width: '31.8%',
+      flexGrow: 1,
+      height: 50,
+      borderRadius: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    deletePressed: { backgroundColor: colors.fieldFill },
+  }),
+);

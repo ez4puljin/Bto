@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import type { MyNotice } from '../api/notifications';
 import { monthDay } from '../dates/calendar';
+import { brandSheet } from '../theme/brand';
 import { colors } from '../theme/tokens';
 
 type Kind = MyNotice['kind'];
@@ -27,12 +28,14 @@ export function useNoticeEyebrow() {
  * Each notice kind's colours and icon (ADR-0062 #1) as the Notifications and Launch boards draw
  * them: the list's round badge in `tint`, the popup's picture on `soft` with the eyebrow `strong`.
  */
-export const KIND_STYLES: Record<Kind, { tint: string; soft: string; strong: string }> = {
-  PROMOTION: { tint: colors.tint.orange, soft: colors.warningSoft, strong: colors.promoText },
-  PRICE_DROP: { tint: colors.tint.pink, soft: colors.secondary, strong: colors.link },
-  NEW_PRODUCT: { tint: colors.tint.indigo, soft: colors.successSoft, strong: colors.success },
-  NEWS: { tint: colors.tint.blue, soft: colors.secondary, strong: colors.link },
-};
+export const KIND_STYLES: Record<Kind, { tint: string; soft: string; strong: string }> = brandSheet(
+  () => ({
+    PROMOTION: { tint: colors.tint.orange, soft: colors.warningSoft, strong: colors.promoText },
+    PRICE_DROP: { tint: colors.tint.pink, soft: colors.secondary, strong: colors.link },
+    NEW_PRODUCT: { tint: colors.tint.indigo, soft: colors.successSoft, strong: colors.success },
+    NEWS: { tint: colors.tint.blue, soft: colors.secondary, strong: colors.link },
+  }),
+);
 
 export function KindIcon({
   kind,

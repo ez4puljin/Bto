@@ -15,12 +15,13 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   type StoreProduct,
+  useCheckoutOptions,
   useCreditCheck,
   useStoreProductsOf,
   useStoreQuote,
 } from '../../../src/api/customer';
 import { problemFrom } from '../../../src/api/problem';
-import { type CartLine, linesOf } from '../../../src/cart/cart';
+import { type CartLine, linesOf, minAmountShort } from '../../../src/cart/cart';
 import { useCustomerSendOrder } from '../../../src/cart/use-customer-send';
 import { creditWarningOf } from '../../../src/customer/account';
 import { orderDealHintsOf } from '../../../src/customer/deals';
@@ -37,6 +38,7 @@ import { formatMnt } from '../../../src/format/format';
 import { useUnitWords } from '../../../src/shop/unit-words';
 import { useCustomer } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
+import { brandSheet } from '../../../src/theme/brand';
 import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme/tokens';
 import { PillButton } from '../../../src/ui/controls';
 import { Separator } from '../../../src/ui/grouped';
@@ -69,6 +71,9 @@ export default function StoreCartScreen() {
   const answered = quoteFor(quote.data, lines);
   const credit = useCreditCheck(answered ? answered.quote.total : null);
   const warning = credit.data ? creditWarningOf(credit.data) : null;
+  // The office's minimum order (ADR-0127 #4): the same hint the checkout shows.
+  const options = useCheckoutOptions();
+  const minShort = minAmountShort(answered?.quote.total ?? null, options.data?.minOrderAmount);
   const ids = useMemo(() => [...new Set(cart.lines.map((line) => line.productId))], [cart.lines]);
   const products = useStoreProductsOf(ids);
   const productOf = (id: number) => products.data?.find((product) => product.id === id);
@@ -217,6 +222,11 @@ export default function StoreCartScreen() {
         {unpriced ? (
           <Text style={[type.secondary, styles.warning]}>{t('mobile.customer.cart.unpriced')}</Text>
         ) : null}
+        {minShort !== null ? (
+          <Text style={[type.secondary, styles.warning]}>
+            {t('mobile.cart.issues.minAmount', { min: formatMnt(minShort) })}
+          </Text>
+        ) : null}
         {locked ? null : (
           <PillButton
             title={t('mobile.customer.cart.next')}
@@ -355,94 +365,96 @@ function CartRow({
   );
 }
 
-const styles = StyleSheet.create({
-  body: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
-  subtitle: { marginHorizontal: spacing.xs, color: colors.muted },
-  credit: { marginTop: 14 },
-  orderDeals: {
-    marginTop: 14,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    paddingVertical: spacing.md,
-    paddingHorizontal: 14,
-    borderRadius: radii.card,
-    backgroundColor: colors.secondary,
-  },
-  orderDealText: { color: colors.link },
-  grow: { flex: 1, gap: 2 },
-  section: { marginTop: 22 },
-  group: { backgroundColor: colors.card, borderRadius: radii.card, overflow: 'hidden' },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: 10,
-    paddingLeft: spacing.lg,
-    paddingRight: 14,
-  },
-  thumb: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: colors.imageFill,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  image: { width: '100%', height: '100%' },
-  text: { flex: 1 },
-  stockNote: { ...type.caption, fontFamily: fonts.semibold, color: colors.warningText },
-  stockOut: { color: colors.cancelled },
-  right: { alignItems: 'flex-end', gap: 6 },
-  lineTotal: { ...type.heading, ...tabular },
-  red: { ...type.chip, fontFamily: fonts.semibold, color: colors.destructive },
-  qtyPill: {
-    height: 28,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingLeft: 10,
-    paddingRight: spacing.sm,
-    borderRadius: 14,
-    backgroundColor: colors.fieldFill,
-  },
-  qtyText: { ...type.chip, fontFamily: fonts.semibold },
-  addRow: {
-    minHeight: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: spacing.lg,
-  },
-  pressed: { backgroundColor: colors.accent },
-  accent: { color: colors.primary },
-  totalRow: {
-    minHeight: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-  },
-  total: { ...type.title2, ...tabular },
-  stale: { color: colors.muted },
-  discountRow: {
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-  },
-  green: { color: colors.success },
-  note: { paddingVertical: 11, paddingHorizontal: spacing.lg },
-  warning: { marginTop: spacing.md, marginHorizontal: spacing.xs, color: colors.destructive },
-  next: { marginTop: 20, borderRadius: 10 },
-  empty: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.lg,
-    gap: spacing.lg,
-  },
-  browse: { alignSelf: 'stretch' },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    body: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
+    subtitle: { marginHorizontal: spacing.xs, color: colors.muted },
+    credit: { marginTop: 14 },
+    orderDeals: {
+      marginTop: 14,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+      paddingVertical: spacing.md,
+      paddingHorizontal: 14,
+      borderRadius: radii.card,
+      backgroundColor: colors.secondary,
+    },
+    orderDealText: { color: colors.link },
+    grow: { flex: 1, gap: 2 },
+    section: { marginTop: 22 },
+    group: { backgroundColor: colors.card, borderRadius: radii.card, overflow: 'hidden' },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingVertical: 10,
+      paddingLeft: spacing.lg,
+      paddingRight: 14,
+    },
+    thumb: {
+      width: 52,
+      height: 52,
+      borderRadius: 14,
+      backgroundColor: colors.imageFill,
+      overflow: 'hidden',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    image: { width: '100%', height: '100%' },
+    text: { flex: 1 },
+    stockNote: { ...type.caption, fontFamily: fonts.semibold, color: colors.warningText },
+    stockOut: { color: colors.cancelled },
+    right: { alignItems: 'flex-end', gap: 6 },
+    lineTotal: { ...type.heading, ...tabular },
+    red: { ...type.chip, fontFamily: fonts.semibold, color: colors.destructive },
+    qtyPill: {
+      height: 28,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      paddingLeft: 10,
+      paddingRight: spacing.sm,
+      borderRadius: 14,
+      backgroundColor: colors.fieldFill,
+    },
+    qtyText: { ...type.chip, fontFamily: fonts.semibold },
+    addRow: {
+      minHeight: 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: spacing.lg,
+    },
+    pressed: { backgroundColor: colors.accent },
+    accent: { color: colors.primary },
+    totalRow: {
+      minHeight: 56,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.lg,
+    },
+    total: { ...type.title2, ...tabular },
+    stale: { color: colors.muted },
+    discountRow: {
+      minHeight: 44,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.lg,
+    },
+    green: { color: colors.success },
+    note: { paddingVertical: 11, paddingHorizontal: spacing.lg },
+    warning: { marginTop: spacing.md, marginHorizontal: spacing.xs, color: colors.destructive },
+    next: { marginTop: 20, borderRadius: 10 },
+    empty: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing.lg,
+      gap: spacing.lg,
+    },
+    browse: { alignSelf: 'stretch' },
+  }),
+);

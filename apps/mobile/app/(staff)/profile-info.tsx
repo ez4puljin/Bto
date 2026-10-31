@@ -8,6 +8,7 @@ import { ubDate, ubTime } from '../../src/dates/dates';
 import { initialsOf } from '../../src/format/format';
 import { useRoleName } from '../../src/state/role';
 import { useSignedIn } from '../../src/state/session';
+import { brandSheet } from '../../src/theme/brand';
 import { colors, fonts, spacing, type } from '../../src/theme/tokens';
 import { Group, Row } from '../../src/ui/grouped';
 import { FootNote, Page, SectionHeader } from '../../src/ui/layout';
@@ -108,26 +109,28 @@ export default function ProfileInfoScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  body: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  head: { alignItems: 'center', gap: spacing.sm, paddingTop: 20 },
-  avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initials: { ...type.title, fontFamily: fonts.bold, color: colors.primaryForeground },
-  center: { textAlign: 'center', marginTop: spacing.xs },
-  rolePill: {
-    height: 26,
-    paddingHorizontal: 10,
-    borderRadius: 13,
-    backgroundColor: colors.secondary,
-    justifyContent: 'center',
-  },
-  roleText: { ...type.chip, fontFamily: fonts.semibold, color: colors.link },
-  password: { marginTop: spacing.xl },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    body: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
+    head: { alignItems: 'center', gap: spacing.sm, paddingTop: 20 },
+    avatar: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    initials: { ...type.title, fontFamily: fonts.bold, color: colors.primaryForeground },
+    center: { textAlign: 'center', marginTop: spacing.xs },
+    rolePill: {
+      height: 26,
+      paddingHorizontal: 10,
+      borderRadius: 13,
+      backgroundColor: colors.secondary,
+      justifyContent: 'center',
+    },
+    roleText: { ...type.chip, fontFamily: fonts.semibold, color: colors.link },
+    password: { marginTop: spacing.xl },
+  }),
+);

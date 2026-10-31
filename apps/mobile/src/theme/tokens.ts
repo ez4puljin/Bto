@@ -1,6 +1,11 @@
+import { currentPaletteOf } from './brand';
+
 // Bto's design tokens for the phone: the web's values from apps/web/src/index.css (ADR-0042,
 // docs/ui.md §1) and the rep app's design boards (ADR-0068), light theme only. Screens use these
-// names, never colour literals.
+// names, never colour literals. The primary colour and what it decides (the pressed shade, links,
+// the tint, the glows) are read from the brand in use (ADR-0127 #4, `src/theme/brand.ts`): the
+// office's colour when it set one, else Bto's blue; a module-level sheet reading them goes through
+// `brandSheet`.
 export const colors = {
   canvas: '#F2F2F7',
   card: '#FFFFFF',
@@ -8,12 +13,24 @@ export const colors = {
   muted: '#6E6E73',
   /** Secondary text on a grey chip. */
   label2: '#3A3A3C',
-  primary: '#0071E3',
-  primaryPressed: '#0066CC',
+  /** The office's colour (ADR-0127 #4), else '#0071E3'. */
+  get primary(): string {
+    return currentPaletteOf().primary;
+  },
+  get primaryPressed(): string {
+    return currentPaletteOf().primaryPressed;
+  },
   primaryForeground: '#FFFFFF',
-  link: '#0066CC',
-  secondary: '#E8F0FB',
-  secondaryForeground: '#0066CC',
+  get link(): string {
+    return currentPaletteOf().link;
+  },
+  /** The soft tint behind a chip in the primary colour. */
+  get secondary(): string {
+    return currentPaletteOf().secondary;
+  },
+  get secondaryForeground(): string {
+    return currentPaletteOf().link;
+  },
   accent: '#F0F0F5',
   fill: '#E8E8ED',
   border: '#E5E5EA',
@@ -53,7 +70,9 @@ export const colors = {
   /** A dot of a pager that is not the current page. */
   dotIdle: '#D1D1D6',
   /** The tinted range of a calendar. */
-  rangeFill: 'rgba(0,113,227,0.12)',
+  get rangeFill(): string {
+    return currentPaletteOf().rangeFill;
+  },
   /** The quantity keypad: its bar and the tray under the keys. */
   keypadBar: '#F6F6F8',
   keypadTray: '#D1D4DA',
@@ -229,8 +248,10 @@ export const storeType = {
   tableHead: face(fonts.semibold, 11, 14, 0.2, colors.muted),
   tableCell: face(fonts.regular, 13, 18),
   tableCellStrong: face(fonts.semibold, 13, 18),
-  /** «Эцсийн үлдэгдэл» at the table's foot. */
-  tableTotal: face(fonts.bold, 14, 18, 0, colors.primary),
+  /** «Эцсийн үлдэгдэл» at the table's foot, in the primary colour (read when used). */
+  get tableTotal() {
+    return face(fonts.bold, 14, 18, 0, colors.primary);
+  },
 } as const;
 
 /** Numbers that line up in columns (money, counts). */
@@ -240,10 +261,14 @@ export const tabular = { fontVariant: ['tabular-nums' as const] };
 export const shadows = {
   floating: '0 1px 2px rgba(0,0,0,0.05), 0 6px 18px rgba(0,0,0,0.08)',
   tabBar: '0 1px 2px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.10)',
-  /** The logo tile. */
-  brand: '0 6px 16px rgba(0,113,227,0.28)',
-  /** The blue month card on the home. */
-  accentCard: '0 6px 18px rgba(0,113,227,0.22)',
+  /** The logo tile, glowing in the primary colour. */
+  get brand(): string {
+    return currentPaletteOf().shadows.brand;
+  },
+  /** The month card on the home, in the primary colour. */
+  get accentCard(): string {
+    return currentPaletteOf().shadows.accentCard;
+  },
   /** A pager capsule over a picture. */
   capsule: '0 1px 3px rgba(0,0,0,0.18)',
   addButton: '0 2px 10px rgba(0,0,0,0.14)',
@@ -254,9 +279,13 @@ export const shadows = {
   popup: '0 20px 60px rgba(0,0,0,0.25)',
   toast: '0 10px 30px rgba(0,0,0,0.14)',
   key: '0 1px 0 rgba(0,0,0,0.3)',
-  /** «Bto300»'s raised barcode button and floating pill (ADR-0095). */
-  scanButton: '0 4px 12px rgba(0,113,227,0.35)',
-  bluePill: '0 8px 24px rgba(0,113,227,0.3)',
+  /** «Bto300»'s raised barcode button and floating pill (ADR-0095), in the primary colour. */
+  get scanButton(): string {
+    return currentPaletteOf().shadows.scanButton;
+  },
+  get bluePill(): string {
+    return currentPaletteOf().shadows.bluePill;
+  },
 } as const;
 
 export const TOUCH = 44;

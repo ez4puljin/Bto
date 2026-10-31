@@ -11,6 +11,7 @@ import {
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { brandSheet } from '../theme/brand';
 import { colors, radii, shadows, spacing, type } from '../theme/tokens';
 
 export interface ToastInput {
@@ -99,35 +100,37 @@ export function useToast(): ToastValue {
   return value;
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  toast: {
-    position: 'absolute',
-    left: spacing.lg,
-    right: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingLeft: spacing.lg,
-    paddingRight: spacing.md,
-    borderRadius: radii.tile,
-    backgroundColor: colors.floatingFill,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
-    boxShadow: shadows.toast,
-  },
-  message: {
-    ...type.body,
-    flex: 1,
-    color: colors.label2,
-  },
-  action: {
-    height: 36,
-    paddingHorizontal: 14,
-    borderRadius: 18,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-  },
-  actionText: { ...type.bodyStrong, color: colors.primaryForeground },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    root: { flex: 1 },
+    toast: {
+      position: 'absolute',
+      left: spacing.lg,
+      right: spacing.lg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingVertical: spacing.md,
+      paddingLeft: spacing.lg,
+      paddingRight: spacing.md,
+      borderRadius: radii.tile,
+      backgroundColor: colors.floatingFill,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.hairline,
+      boxShadow: shadows.toast,
+    },
+    message: {
+      ...type.body,
+      flex: 1,
+      color: colors.label2,
+    },
+    action: {
+      height: 36,
+      paddingHorizontal: 14,
+      borderRadius: 18,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+    },
+    actionText: { ...type.bodyStrong, color: colors.primaryForeground },
+  }),
+);

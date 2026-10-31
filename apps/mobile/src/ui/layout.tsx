@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Text } from './text';
 import { type Edge, SafeAreaView } from 'react-native-safe-area-context';
+import { brandSheet } from '../theme/brand';
 import { colors, spacing, type } from '../theme/tokens';
 
 /**
@@ -181,36 +182,38 @@ export function FootNote({ children, center = false }: { children: ReactNode; ce
   return <Text style={[type.secondary, styles.footNote, center && styles.center]}>{children}</Text>;
 }
 
-const styles = StyleSheet.create({
-  page: { flex: 1 },
-  bar: {
-    height: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  barSide: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  barRight: { justifyContent: 'flex-end', gap: spacing.md },
-  back: { height: 44, flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: -8 },
-  backText: { color: colors.primary },
-  barButton: { height: 44, justifyContent: 'center' },
-  strong: { fontFamily: type.heading.fontFamily },
-  section: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.xl,
-    marginBottom: spacing.sm,
-    marginHorizontal: spacing.xs,
-  },
-  sectionTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.xl,
-    marginBottom: 10,
-    marginHorizontal: spacing.xs,
-  },
-  action: { color: colors.primary },
-  grow: { flex: 1 },
-  footNote: { marginTop: 10, marginHorizontal: spacing.xs },
-  center: { textAlign: 'center' },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    page: { flex: 1 },
+    bar: {
+      height: 44,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.lg,
+    },
+    barSide: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+    barRight: { justifyContent: 'flex-end', gap: spacing.md },
+    back: { height: 44, flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: -8 },
+    backText: { color: colors.primary },
+    barButton: { height: 44, justifyContent: 'center' },
+    strong: { fontFamily: type.heading.fontFamily },
+    section: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: spacing.xl,
+      marginBottom: spacing.sm,
+      marginHorizontal: spacing.xs,
+    },
+    sectionTitle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: spacing.xl,
+      marginBottom: 10,
+      marginHorizontal: spacing.xs,
+    },
+    action: { color: colors.primary },
+    grow: { flex: 1 },
+    footNote: { marginTop: 10, marginHorizontal: spacing.xs },
+    center: { textAlign: 'center' },
+  }),
+);
