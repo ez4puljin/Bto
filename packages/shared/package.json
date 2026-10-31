@@ -127,6 +127,11 @@
       "types": "./dist/notifications/index.d.ts",
       "default": "./dist/notifications/index.js"
     },
+    "./hr": {
+      "@tugeel/source": "./src/hr/index.ts",
+      "types": "./dist/hr/index.d.ts",
+      "default": "./dist/hr/index.js"
+    },
     "./mn": {
       "@tugeel/source": "./src/mn/index.ts",
       "types": "./dist/mn/index.d.ts",

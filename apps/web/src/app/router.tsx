@@ -99,6 +99,9 @@ import { AppHomePage } from '@/features/app-settings/home-page';
 import { AppOrdersPage } from '@/features/app-settings/orders-page';
 import { AppProductsPage } from '@/features/app-settings/products-page';
 import { AppStoresPage } from '@/features/app-settings/stores-page';
+import { AttendanceDashboardPage } from '@/features/hr/dashboard-page';
+import { AttendanceDaysPage } from '@/features/hr/days-page';
+import { AttendanceSetupPage } from '@/features/hr/setup-page';
 import { BannersPage } from '@/features/customer-app/banners-page';
 import { PosCashiersPage } from '@/features/pos/cashiers-page';
 import { PosLoyaltyMembersPage } from '@/features/pos/loyalty-members-page';
@@ -267,6 +270,7 @@ export const routes: RouteObject[] = [
           ...reportRoutes(),
           ...posRoutes(),
           ...appRoutes(),
+          ...hrRoutes(),
           { path: 'system/status', handle: { width: 'reading' }, element: <SystemStatusPage /> },
           { path: 'account', handle: { width: 'reading' }, element: <AccountPage /> },
           { path: 'catalog/products', handle: { width: 'wide' }, element: <ProductsPage /> },
@@ -762,6 +766,30 @@ function appRoutes(): RouteObject[] {
       handle: { width: 'wide' },
       element: <Navigate to="/app/notices" replace />,
     },
+  ];
+}
+
+/**
+ * The attendance pages (ADR-0131), every one behind hr.attendance.view: the setup (sites, the
+ * schedule, the employees) reads to a viewer and is changed by hr.attendance.manage, which the menu
+ * entry needs.
+ */
+function hrRoutes(): RouteObject[] {
+  const view = (element: ReactNode) => (
+    <RequirePermission permission="hr.attendance.view">{element}</RequirePermission>
+  );
+  return [
+    {
+      path: 'hr/attendance',
+      handle: { width: 'wide' },
+      element: view(<AttendanceDashboardPage />),
+    },
+    {
+      path: 'hr/attendance/days',
+      handle: { width: 'wide' },
+      element: view(<AttendanceDaysPage />),
+    },
+    { path: 'hr/setup', handle: { width: 'reading' }, element: view(<AttendanceSetupPage />) },
   ];
 }
 

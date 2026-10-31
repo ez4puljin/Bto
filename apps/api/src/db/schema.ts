@@ -151,6 +151,13 @@ export {
 } from '../modules/notifications/schema';
 export { appBanners, companyContacts, customerFavourites } from '../modules/customer/schema';
 export {
+  hrAttendanceEvents,
+  hrEmployees,
+  hrEmployeeSites,
+  hrSettings,
+  hrWorkSites,
+} from '../modules/hr/schema';
+export {
   finAccountGroups,
   finAccounts,
   finAllocations,

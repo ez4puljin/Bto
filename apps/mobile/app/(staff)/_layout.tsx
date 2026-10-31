@@ -2,21 +2,24 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ThumbKeeper } from '../../src/images/thumb-keeper';
 import { NoticePopupGate } from '../../src/notifications/popup-gate';
-import { isRep } from '../../src/state/phase';
+import { isRep, mayRequestTransfers } from '../../src/state/phase';
 import { useSignedIn } from '../../src/state/session';
 import { ShopProvider } from '../../src/state/shop';
 import { colors } from '../../src/theme/tokens';
 import { ToastProvider } from '../../src/ui/toast';
 
 /**
- * The sales-rep app (ADR-0061, ADR-0068, in «Bto300»'s look since ADR-0100): the tabs, and the
- * screens opened from them, for a rep. A store's seller with only the transfer right (ADR-0116 #1)
- * sees none of them: the stack's first screen is then «Шилжүүлэг» (expo-router drops the guarded
- * screens, and the navigator opens on the first one left), with the store profile beside it.
+ * The staff app (ADR-0061, ADR-0068, in «Bto300»'s look since ADR-0100): the tabs, and the screens
+ * opened from them, for a rep. expo-router drops the guarded screens and opens the navigator on the
+ * first one left, so the order below decides where each person lands: a store's seller with only
+ * the transfer right (ADR-0116 #1) on «Шилжүүлэг» (with the store profile beside it), and every
+ * other staff member on «Ирц» (ADR-0131: the attendance is for all staff), which is never guarded
+ * and carries the profile row and «Гарах» for them.
  */
 export default function StaffLayout() {
   const { me, server } = useSignedIn();
   const rep = isRep(me);
+  const seller = mayRequestTransfers(me);
   return (
     <ShopProvider server={server} userId={me.id}>
       <ToastProvider>
@@ -31,10 +34,16 @@ export default function StaffLayout() {
             <Stack.Screen name="(tabs)" />
           </Stack.Protected>
           {/* The transfers (ADR-0116): first for a seller, opened from «Нүүр» by a rep. */}
-          <Stack.Screen name="transfers/index" />
-          <Stack.Screen name="transfers/new" />
-          <Stack.Screen name="transfers/[id]/index" />
-          <Stack.Screen name="transfers/[id]/receive" />
+          <Stack.Protected guard={seller}>
+            <Stack.Screen name="transfers/index" />
+            <Stack.Screen name="transfers/new" />
+            <Stack.Screen name="transfers/[id]/index" />
+            <Stack.Screen name="transfers/[id]/receive" />
+          </Stack.Protected>
+          {/* «Ирц» (ADR-0131): first for staff with neither right, a profile row for the rest. */}
+          <Stack.Screen name="attendance/index" />
+          <Stack.Screen name="attendance/history" />
+          {/* The profile without the rep's context: a seller's and any other staff member's. */}
           <Stack.Screen name="store-profile" />
           <Stack.Protected guard={rep}>
             <Stack.Screen

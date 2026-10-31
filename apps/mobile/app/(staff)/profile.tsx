@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { Bell, ChevronRight, Send, Server, User } from 'lucide-react-native';
+import { Bell, CalendarCheck, ChevronRight, Send, Server, User } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -64,6 +64,16 @@ export default function ProfileScreen() {
         </Pressable>
 
         <Group inset={ICON_INSET} style={styles.group}>
+          <Row
+            minHeight={52}
+            icon={
+              <IconTile color={colors.tint.green}>
+                <CalendarCheck size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+              </IconTile>
+            }
+            title={t('mobile.attendance.title')}
+            onPress={() => router.push('/attendance')}
+          />
           <Row
             minHeight={52}
             icon={

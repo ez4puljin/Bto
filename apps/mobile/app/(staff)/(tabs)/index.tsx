@@ -1,6 +1,13 @@
 import { Decimal } from '@tugeel/shared/money';
 import { useRouter } from 'expo-router';
-import { Bell, ScanLine, Send, ShoppingCart, TriangleAlert } from 'lucide-react-native';
+import {
+  Bell,
+  CalendarCheck,
+  ScanLine,
+  Send,
+  ShoppingCart,
+  TriangleAlert,
+} from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -12,6 +19,7 @@ import {
   View,
 } from 'react-native';
 import { Text } from '../../../src/ui/text';
+import { useMyAttendance } from '../../../src/api/attendance';
 import { useNotificationSummary } from '../../../src/api/notifications';
 import { problemFrom } from '../../../src/api/problem';
 import {
@@ -31,6 +39,7 @@ import {
 } from '../../../src/customer/home-parts';
 import { homeCategoriesOf, sectionRouteOf } from '../../../src/customer/home-sections';
 import { presetRange } from '../../../src/dates/calendar';
+import { ubTime } from '../../../src/dates/dates';
 import { formatMillions, formatMnt, initialsOf } from '../../../src/format/format';
 import { allOrdered, countsOf } from '../../../src/map/stores';
 import { shortMoney } from '../../../src/orders/amounts';
@@ -69,6 +78,7 @@ export default function HomeScreen() {
   const { me, server } = useSignedIn();
   const { cart, pending, stageId, setStageId, ready } = useShop();
   const notifications = useNotificationSummary();
+  const attendance = useMyAttendance();
   const unread = notifications.data?.unread ?? 0;
   const context = useRepContext();
   const today = context.data?.today ?? null;
@@ -187,6 +197,7 @@ export default function HomeScreen() {
         orders.refetch(),
         storeMap.refetch(),
         notifications.refetch(),
+        attendance.refetch(),
       ]);
     } finally {
       setRefreshing(false);
@@ -448,6 +459,37 @@ export default function HomeScreen() {
 
         <View style={styles.section}>
           {heading(t('mobile.map.title'), () => router.push('/map'), mapLine)}
+        </View>
+
+        {/* «Ирц» (ADR-0131): today's state in one row; the page punches. */}
+        <View style={styles.section}>
+          <Group style={styles.panel}>
+            <Row
+              minHeight={56}
+              icon={
+                <IconTile
+                  color={attendance.data?.state === 'IN' ? colors.tint.green : colors.tint.gray}
+                >
+                  <CalendarCheck size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+                </IconTile>
+              }
+              title={t('mobile.attendance.title')}
+              value={
+                attendance.data
+                  ? attendance.data.state === 'IN'
+                    ? t('mobile.attendance.homeIn', {
+                        time: ubTime(attendance.data.day.firstIn ?? attendance.data.now),
+                      })
+                    : attendance.data.state === 'OUT'
+                      ? t('mobile.attendance.outAt', {
+                          time: ubTime(attendance.data.day.lastOut ?? attendance.data.now),
+                        })
+                      : t('mobile.attendance.homeNotIn')
+                  : null
+              }
+              onPress={() => router.push('/attendance')}
+            />
+          </Group>
         </View>
 
         <View style={styles.section}>

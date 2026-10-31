@@ -11,6 +11,7 @@ import { CatalogHttpModule } from './modules/catalog';
 import { CustomerHttpModule } from './modules/customer';
 import { FinBridgeHttpModule } from './modules/fin-bridge';
 import { FinanceHttpModule } from './modules/finance';
+import { HrHttpModule } from './modules/hr';
 import { IdentityHttpModule } from './modules/identity';
 import { ImportsHttpModule } from './modules/imports';
 import { InventoryHttpModule } from './modules/inventory';
@@ -41,6 +42,7 @@ import { SegmentsHttpModule } from './modules/segments';
     ImportsHttpModule,
     PricingHttpModule,
     AiHttpModule,
+    HrHttpModule,
     SegmentsHttpModule,
     SalesHttpModule,
     FinanceHttpModule,

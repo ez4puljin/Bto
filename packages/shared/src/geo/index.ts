@@ -76,3 +76,19 @@ export function parseCoordinates(
 export function mapsUrl(point: Coordinates): string {
   return `https://www.google.com/maps/search/?api=1&query=${point.lat},${point.lng}`;
 }
+
+const EARTH_RADIUS_M = 6_371_000;
+
+/**
+ * The great-circle distance between two points in whole metres (haversine). Geometry for the
+ * attendance geofence (ADR-0131), never money: plain floating point is fine here.
+ */
+export function distanceMeters(a: Coordinates, b: Coordinates): number {
+  const toRad = (value: string) => (Number.parseFloat(value) * Math.PI) / 180;
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const dLat = lat2 - lat1;
+  const dLng = toRad(b.lng) - toRad(a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return Math.round(2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h))));
+}
