@@ -56,6 +56,34 @@ export class UserNamesService {
       .limit(limit);
   }
 
+  /**
+   * Every staff record with the system role codes or custom role names it holds, for a module that
+   * lists the whole staff (attendance, ADR-0131). Disabled users included: the caller says.
+   */
+  async allStaff(): Promise<(UserSummary & { roles: string[] })[]> {
+    const { rows } = await this.db.execute<{
+      id: string;
+      username: string;
+      phone: string | null;
+      full_name: string;
+      status: 'ACTIVE' | 'DISABLED';
+      roles: string[];
+    }>(sql`
+      SELECT u.id::text, u.username, u.phone, u.full_name, u.status,
+             ARRAY(SELECT coalesce(r.code, r.name) FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+                    WHERE ur.user_id = u.id ORDER BY r.is_system DESC, r.code, r.name) AS roles
+        FROM users u
+       ORDER BY u.full_name, u.id`);
+    return rows.map((row) => ({
+      id: Number.parseInt(row.id, 10),
+      username: row.username,
+      phone: row.phone,
+      fullName: row.full_name,
+      status: row.status,
+      roles: row.roles,
+    }));
+  }
+
   /** Name, login and status by id, for modules that keep a list of staff (the POS cashiers). */
   async summariesOf(userIds: readonly number[]): Promise<Map<number, UserSummary>> {
     const ids = [...new Set(userIds)];

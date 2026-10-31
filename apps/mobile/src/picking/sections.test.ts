@@ -36,7 +36,9 @@ describe('the work list (ADR-0132)', () => {
       work({ orderId: 4, status: 'DONE', pickerId: 7 }),
       work({ orderId: 5 }),
     ];
-    expect(workGroups(rows, 7).map((group) => [group.key, group.data.map((r) => r.orderId)])).toEqual([
+    expect(
+      workGroups(rows, 7).map((group) => [group.key, group.data.map((r) => r.orderId)]),
+    ).toEqual([
       ['take', [1, 5]],
       ['mine', [2]],
       ['others', [3]],
@@ -58,7 +60,12 @@ describe("a line's count", () => {
   });
 
   it('offers the base unit, the ordered pack and the scanned unit, and counts in base units', () => {
-    const pack = { productUnitId: 30, unitName: 'хайрцаг', factorSnapshot: '24', baseUnitName: 'ш' };
+    const pack = {
+      productUnitId: 30,
+      unitName: 'хайрцаг',
+      factorSnapshot: '24',
+      baseUnitName: 'ш',
+    };
     const units = keypadUnitsOfPickLine(pack, null);
     expect(units.map((unit) => [unit.id, unit.uomName, unit.factorToBase, unit.isBase])).toEqual([
       [BASE_UNIT_ID, 'ш', '1', true],

@@ -351,11 +351,7 @@ export default function PickingPartScreen() {
           }}
           server={server}
           unitId={opened.unitId}
-          qty={
-            opened.qty && opened.unitId !== BASE_UNIT_ID
-              ? ''
-              : opened.qty
-          }
+          qty={opened.qty && opened.unitId !== BASE_UNIT_ID ? '' : opened.qty}
           subtitle={(unit) =>
             unit.isBase
               ? t('mobile.picking.part.ordered', {

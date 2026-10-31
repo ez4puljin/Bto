@@ -31,11 +31,12 @@ export function isPickLead(me: Me): boolean {
 }
 
 /**
- * A staff member may use the staff app with the rep's right, the transfer right (ADR-0116) or the
- * picking right (ADR-0132); every signed-in store may use «Bto300».
+ * Every signed-in staff member may use the staff app since «Ирц» (ADR-0131: the attendance is for
+ * all staff; a rep, a seller or a picker gets their screens besides it, ADR-0116, ADR-0132); every signed-in store may
+ * use «Bto300».
  */
-export function mayUseApp(me: Me | CustomerPrincipal): boolean {
-  return 'permissions' in me ? isRep(me) || mayRequestTransfers(me) || mayPick(me) : true;
+export function mayUseApp(_me: Me | CustomerPrincipal): boolean {
+  return true;
 }
 
 /** The server, the sign-in, the offline page, «not a rep» (staff only) or the app itself. */

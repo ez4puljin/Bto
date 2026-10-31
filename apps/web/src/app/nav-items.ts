@@ -33,6 +33,7 @@ import {
   KeyRound,
   LayoutGrid,
   type LucideIcon,
+  MapPinned,
   Megaphone,
   Monitor,
   Network,
@@ -68,6 +69,7 @@ import {
   Truck,
   TicketPercent,
   Undo2,
+  UserCheck,
   Users,
   Warehouse,
   Percent,
@@ -240,6 +242,30 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       },
       { to: '/partners/suppliers', label: 'nav.suppliers', icon: Factory },
       { to: '/users', label: 'nav.staff', icon: Contact, permission: 'identity.users.read' },
+    ],
+  },
+  {
+    // Attendance (ADR-0131): the day's board and the log for HR and the owner, the setup for HR.
+    label: 'nav.groups.hr',
+    items: [
+      {
+        to: '/hr/attendance',
+        label: 'nav.hrDashboard',
+        icon: UserCheck,
+        permission: 'hr.attendance.view',
+      },
+      {
+        to: '/hr/attendance/days',
+        label: 'nav.hrDays',
+        icon: CalendarCheck,
+        permission: 'hr.attendance.view',
+      },
+      {
+        to: '/hr/setup',
+        label: 'nav.hrSetup',
+        icon: MapPinned,
+        permission: 'hr.attendance.manage',
+      },
     ],
   },
   {
@@ -538,7 +564,12 @@ export const NAV_MODULES: readonly NavModule[] = [
     icon: Package,
     groups: ['nav.groups.catalog', 'nav.groups.pricing', 'nav.groups.segments'],
   },
-  { key: 'partners', label: 'nav.modules.partners', icon: Users, groups: ['nav.groups.partners'] },
+  {
+    key: 'partners',
+    label: 'nav.modules.partners',
+    icon: Users,
+    groups: ['nav.groups.partners', 'nav.groups.hr'],
+  },
   {
     key: 'finance',
     label: 'nav.modules.finance',

@@ -113,7 +113,10 @@ export default function PickingHomeScreen() {
         sections={sections}
         keyExtractor={(row) => `${row.orderId}:${row.warehouseId}`}
         stickySectionHeadersEnabled={false}
-        contentContainerStyle={[styles.list, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}
+        contentContainerStyle={[
+          styles.list,
+          { paddingBottom: Math.max(insets.bottom, spacing.md) },
+        ]}
         renderSectionHeader={({ section }) => (
           <Text accessibilityRole="header" style={[type.sectionHeader, styles.sectionHeader]}>
             {t(`mobile.picking.sections.${section.key}`, { n: section.data.length })}

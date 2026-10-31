@@ -26,7 +26,9 @@ export function usePickOrder(id: number | null) {
     queryKey: ['picking', 'order', id],
     queryFn: async () =>
       unwrap(
-        await session.client.GET('/api/v1/sales-orders/{id}', { params: { path: { id: id ?? 0 } } }),
+        await session.client.GET('/api/v1/sales-orders/{id}', {
+          params: { path: { id: id ?? 0 } },
+        }),
       ),
     enabled: id !== null,
     refetchInterval: POLL_MS,

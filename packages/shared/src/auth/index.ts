@@ -90,6 +90,10 @@ export const PERMISSIONS = [
   'notifications.send',
   // The customer app's home (ADR-0092 #9): banners, the segments it shows and category pictures.
   'customer.home.manage',
+  // Attendance (ADR-0131): the dashboard and the day log; the work sites, the schedule and the
+  // office's corrections only with the second code.
+  'hr.attendance.view',
+  'hr.attendance.manage',
   // Management reports (ADR-0108): the dashboard and the reports; costs, profit, margins and stock
   // values in them only with the second code.
   'reports.view',
@@ -203,7 +207,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'reports.view',
     'reports.margins.view',
   ],
-  HR: [],
+  // Attendance (ADR-0131): the dashboard, the work sites, the schedule and the corrections.
+  HR: ['hr.attendance.view', 'hr.attendance.manage'],
   // Store staff request and receive transfers within the supermarket's write scope (ADR-0035).
   POS_CASHIER: ['inventory.transfers.manage', 'pos.till.operate'],
   // The senior cashier approves returns and drawer opens at the till (owner 2026-10-16).

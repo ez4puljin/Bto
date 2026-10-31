@@ -272,9 +272,13 @@ describe('sales picking by warehouse', () => {
         lines: number;
       }[];
     expect(
-      (await work(keeperA)).filter((row) => row.orderId === draft.id).map((row) => [row.warehouseId, row.status, row.lines]),
+      (await work(keeperA))
+        .filter((row) => row.orderId === draft.id)
+        .map((row) => [row.warehouseId, row.status, row.lines]),
     ).toEqual([[whA.id, 'OPEN', 1]]);
-    expect((await work(keeperB)).filter((row) => row.orderId === draft.id).map((row) => row.warehouseId)).toEqual([whB.id]);
+    expect(
+      (await work(keeperB)).filter((row) => row.orderId === draft.id).map((row) => row.warehouseId),
+    ).toEqual([whB.id]);
     // A keeper takes only their own warehouse; the order starts picking.
     await part(keeperA, draft.id, whB.id, 'take').expect(403);
     await part(keeperA, draft.id, whA.id, 'take').expect(200);

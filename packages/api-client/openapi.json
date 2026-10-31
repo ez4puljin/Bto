@@ -13980,6 +13980,774 @@
         ]
       }
     },
+    "/api/v1/hr/work-sites": {
+      "get": {
+        "operationId": "HrSetup_listSites",
+        "parameters": [
+          {
+            "name": "includeArchived",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WorkSite"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      },
+      "post": {
+        "operationId": "HrSetup_createSite",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkSiteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkSite"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/v1/hr/work-sites/{id}": {
+      "put": {
+        "operationId": "HrSetup_updateSite",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkSiteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkSite"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/v1/hr/work-sites/{id}/archived": {
+      "put": {
+        "operationId": "HrSetup_archiveSite",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkSiteArchiveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkSite"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/v1/hr/schedule": {
+      "get": {
+        "operationId": "HrSetup_schedule",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrSchedule"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      },
+      "put": {
+        "operationId": "HrSetup_updateSchedule",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HrScheduleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrSchedule"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/v1/hr/employees": {
+      "get": {
+        "operationId": "HrSetup_employees",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HrEmployee"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/v1/hr/employees/{userId}": {
+      "put": {
+        "operationId": "HrSetup_updateEmployee",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HrEmployeeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrEmployee"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/v1/hr/attendance/me": {
+      "get": {
+        "operationId": "Attendance_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyAttendance"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/v1/hr/attendance/me/days": {
+      "get": {
+        "operationId": "Attendance_myDays",
+        "parameters": [
+          {
+            "name": "month",
+            "required": true,
+            "in": "query",
+            "description": "YYYY-MM",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceDayList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/v1/hr/attendance/punch": {
+      "post": {
+        "operationId": "Attendance_punch",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendancePunchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceEvent"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/v1/hr/attendance/dashboard": {
+      "get": {
+        "operationId": "Attendance_dashboard",
+        "parameters": [
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "YYYY-MM-DD; today when left out",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceDashboard"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/v1/hr/attendance/days": {
+      "get": {
+        "operationId": "Attendance_days",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "YYYY-MM-DD",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "YYYY-MM-DD, at most 62 days after from",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceDayList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/v1/hr/attendance/events": {
+      "get": {
+        "operationId": "Attendance_events",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "description": "YYYY-MM-DD",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceEventList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      },
+      "post": {
+        "operationId": "Attendance_addEvent",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendanceEventRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceEvent"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/v1/hr/attendance/events/{id}": {
+      "delete": {
+        "operationId": "Attendance_strike",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendanceStrikeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceEvent"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
     "/api/v1/segments": {
       "get": {
         "operationId": "Segments_list",
@@ -17653,7 +18421,7 @@
             "bearer": []
           }
         ],
-        "summary": "The staff app's «Бэлтгэл» (ADR-0131): the caller's parts, not done or done today.",
+        "summary": "The staff app's «Бэлтгэл» (ADR-0132): the caller's parts, not done or done today.",
         "tags": [
           "sales"
         ]
@@ -30088,6 +30856,8 @@
           "pos.loyalty.manage",
           "notifications.send",
           "customer.home.manage",
+          "hr.attendance.view",
+          "hr.attendance.manage",
           "reports.view",
           "reports.margins.view"
         ]
@@ -42074,6 +42844,876 @@
         },
         "required": [
           "name"
+        ]
+      },
+      "WorkSite": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "lat": {
+            "type": "string",
+            "description": "Six decimals"
+          },
+          "lng": {
+            "type": "string"
+          },
+          "radiusM": {
+            "type": "number",
+            "description": "A punch counts within this many metres"
+          },
+          "branchId": {
+            "type": "number",
+            "nullable": true
+          },
+          "branchName": {
+            "type": "string",
+            "nullable": true
+          },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "lat",
+          "lng",
+          "radiusM",
+          "branchId",
+          "branchName",
+          "archivedAt",
+          "updatedAt"
+        ]
+      },
+      "WorkSiteRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "lat": {
+            "type": "string",
+            "description": "«47.918412»"
+          },
+          "lng": {
+            "type": "string"
+          },
+          "radiusM": {
+            "type": "number",
+            "minimum": 30,
+            "maximum": 2000
+          },
+          "branchId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          }
+        },
+        "required": [
+          "name",
+          "lat",
+          "lng",
+          "radiusM",
+          "branchId"
+        ]
+      },
+      "WorkSiteArchiveRequest": {
+        "type": "object",
+        "properties": {
+          "archived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "archived"
+        ]
+      },
+      "HrSchedule": {
+        "type": "object",
+        "properties": {
+          "workStart": {
+            "type": "string",
+            "description": "HH:mm"
+          },
+          "workEnd": {
+            "type": "string",
+            "description": "HH:mm"
+          },
+          "graceMinutes": {
+            "type": "number"
+          },
+          "workdays": {
+            "type": "string",
+            "description": "Seven 0/1 flags, Monday first"
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "workStart",
+          "workEnd",
+          "graceMinutes",
+          "workdays",
+          "updatedAt"
+        ]
+      },
+      "HrScheduleRequest": {
+        "type": "object",
+        "properties": {
+          "workStart": {
+            "type": "string",
+            "description": "HH:mm"
+          },
+          "workEnd": {
+            "type": "string",
+            "description": "HH:mm"
+          },
+          "graceMinutes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 120
+          },
+          "workdays": {
+            "type": "string",
+            "description": "Seven 0/1 flags, Monday first"
+          }
+        },
+        "required": [
+          "workStart",
+          "workEnd",
+          "graceMinutes",
+          "workdays"
+        ]
+      },
+      "HrEmployee": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "number"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "DISABLED"
+            ],
+            "type": "string"
+          },
+          "roles": {
+            "description": "System role codes or custom role names",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tracked": {
+            "type": "boolean",
+            "description": "Counted on the dashboard"
+          },
+          "workStart": {
+            "type": "string",
+            "nullable": true
+          },
+          "workEnd": {
+            "type": "string",
+            "nullable": true
+          },
+          "graceMinutes": {
+            "type": "number",
+            "nullable": true
+          },
+          "workdays": {
+            "type": "string",
+            "nullable": true
+          },
+          "siteIds": {
+            "description": "Empty = every active site",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "schedule": {
+            "description": "The schedule that applies",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HrSchedule"
+              }
+            ]
+          }
+        },
+        "required": [
+          "userId",
+          "fullName",
+          "phone",
+          "status",
+          "roles",
+          "tracked",
+          "workStart",
+          "workEnd",
+          "graceMinutes",
+          "workdays",
+          "siteIds",
+          "schedule"
+        ]
+      },
+      "HrEmployeeRequest": {
+        "type": "object",
+        "properties": {
+          "tracked": {
+            "type": "boolean"
+          },
+          "workStart": {
+            "type": "string",
+            "nullable": true
+          },
+          "workEnd": {
+            "type": "string",
+            "nullable": true
+          },
+          "graceMinutes": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 120
+          },
+          "workdays": {
+            "type": "string",
+            "nullable": true
+          },
+          "siteIds": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "required": [
+          "tracked",
+          "workStart",
+          "workEnd",
+          "graceMinutes",
+          "workdays",
+          "siteIds"
+        ]
+      },
+      "AttendanceSite": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "lat": {
+            "type": "string"
+          },
+          "lng": {
+            "type": "string"
+          },
+          "radiusM": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "lat",
+          "lng",
+          "radiusM"
+        ]
+      },
+      "AttendanceEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "userId": {
+            "type": "number"
+          },
+          "kind": {
+            "enum": [
+              "IN",
+              "OUT"
+            ],
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "businessDate": {
+            "type": "string",
+            "description": "The Ulaanbaatar date"
+          },
+          "source": {
+            "enum": [
+              "APP",
+              "OFFICE"
+            ],
+            "type": "string"
+          },
+          "siteId": {
+            "type": "number",
+            "nullable": true
+          },
+          "siteName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lat": {
+            "type": "string",
+            "nullable": true
+          },
+          "lng": {
+            "type": "string",
+            "nullable": true
+          },
+          "accuracyM": {
+            "type": "number",
+            "nullable": true
+          },
+          "distanceM": {
+            "type": "number",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "deletedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "deleteReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "kind",
+          "at",
+          "businessDate",
+          "source",
+          "siteId",
+          "siteName",
+          "lat",
+          "lng",
+          "accuracyM",
+          "distanceM",
+          "note",
+          "deletedAt",
+          "deleteReason"
+        ]
+      },
+      "AttendanceDay": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "number"
+          },
+          "date": {
+            "type": "string"
+          },
+          "firstIn": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "lastOut": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "workedMinutes": {
+            "type": "number"
+          },
+          "lateMinutes": {
+            "type": "number"
+          },
+          "openIn": {
+            "type": "boolean",
+            "description": "The day ended on an IN («явсан дараагүй»)"
+          },
+          "status": {
+            "enum": [
+              "PRESENT",
+              "LATE",
+              "ABSENT",
+              "OFF"
+            ],
+            "type": "string"
+          },
+          "siteName": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "nullable": true,
+            "enum": [
+              "IN",
+              "OUT"
+            ],
+            "type": "string",
+            "description": "IN = still there"
+          }
+        },
+        "required": [
+          "userId",
+          "date",
+          "firstIn",
+          "lastOut",
+          "workedMinutes",
+          "lateMinutes",
+          "openIn",
+          "status",
+          "siteName",
+          "state"
+        ]
+      },
+      "AttendanceMonth": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "workdays": {
+            "type": "number"
+          },
+          "presentDays": {
+            "type": "number"
+          },
+          "lateDays": {
+            "type": "number"
+          },
+          "lateMinutes": {
+            "type": "number"
+          },
+          "workedMinutes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "workdays",
+          "presentDays",
+          "lateDays",
+          "lateMinutes",
+          "workedMinutes"
+        ]
+      },
+      "MyAttendance": {
+        "type": "object",
+        "properties": {
+          "today": {
+            "type": "string"
+          },
+          "now": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "nullable": true,
+            "enum": [
+              "IN",
+              "OUT"
+            ],
+            "type": "string"
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/HrSchedule"
+          },
+          "tracked": {
+            "type": "boolean"
+          },
+          "sites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttendanceSite"
+            }
+          },
+          "todayEvents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttendanceEvent"
+            }
+          },
+          "day": {
+            "$ref": "#/components/schemas/AttendanceDay"
+          },
+          "month": {
+            "$ref": "#/components/schemas/AttendanceMonth"
+          }
+        },
+        "required": [
+          "today",
+          "now",
+          "state",
+          "schedule",
+          "tracked",
+          "sites",
+          "todayEvents",
+          "day",
+          "month"
+        ]
+      },
+      "AttendanceDayList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttendanceDay"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "AttendancePunchRequest": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "IN",
+              "OUT"
+            ],
+            "type": "string"
+          },
+          "lat": {
+            "type": "string"
+          },
+          "lng": {
+            "type": "string"
+          },
+          "accuracyM": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "description": "The fix’s radius in metres"
+          }
+        },
+        "required": [
+          "kind",
+          "lat",
+          "lng"
+        ]
+      },
+      "AttendanceCounts": {
+        "type": "object",
+        "properties": {
+          "expected": {
+            "type": "number"
+          },
+          "present": {
+            "type": "number"
+          },
+          "inNow": {
+            "type": "number"
+          },
+          "late": {
+            "type": "number"
+          },
+          "absent": {
+            "type": "number"
+          },
+          "openIn": {
+            "type": "number"
+          },
+          "off": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "expected",
+          "present",
+          "inNow",
+          "late",
+          "absent",
+          "openIn",
+          "off"
+        ]
+      },
+      "AttendanceDashboardRow": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "number"
+          },
+          "date": {
+            "type": "string"
+          },
+          "firstIn": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "lastOut": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "workedMinutes": {
+            "type": "number"
+          },
+          "lateMinutes": {
+            "type": "number"
+          },
+          "openIn": {
+            "type": "boolean",
+            "description": "The day ended on an IN («явсан дараагүй»)"
+          },
+          "status": {
+            "enum": [
+              "PRESENT",
+              "LATE",
+              "ABSENT",
+              "OFF"
+            ],
+            "type": "string"
+          },
+          "siteName": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "nullable": true,
+            "enum": [
+              "IN",
+              "OUT"
+            ],
+            "type": "string",
+            "description": "IN = still there"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/HrSchedule"
+          }
+        },
+        "required": [
+          "userId",
+          "date",
+          "firstIn",
+          "lastOut",
+          "workedMinutes",
+          "lateMinutes",
+          "openIn",
+          "status",
+          "siteName",
+          "state",
+          "fullName",
+          "roles",
+          "schedule"
+        ]
+      },
+      "AttendanceTrendPoint": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "expected": {
+            "type": "number"
+          },
+          "present": {
+            "type": "number"
+          },
+          "late": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "date",
+          "expected",
+          "present",
+          "late"
+        ]
+      },
+      "AttendanceMonthRow": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "workdays": {
+            "type": "number"
+          },
+          "presentDays": {
+            "type": "number"
+          },
+          "lateDays": {
+            "type": "number"
+          },
+          "lateMinutes": {
+            "type": "number"
+          },
+          "workedMinutes": {
+            "type": "number"
+          },
+          "userId": {
+            "type": "number"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "avgArrivalMinutes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Minutes since midnight"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "workdays",
+          "presentDays",
+          "lateDays",
+          "lateMinutes",
+          "workedMinutes",
+          "userId",
+          "fullName",
+          "avgArrivalMinutes"
+        ]
+      },
+      "AttendanceDashboard": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "now": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/AttendanceCounts"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttendanceDashboardRow"
+            }
+          },
+          "trend": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttendanceTrendPoint"
+            }
+          },
+          "month": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttendanceMonthRow"
+            }
+          }
+        },
+        "required": [
+          "date",
+          "now",
+          "counts",
+          "rows",
+          "trend",
+          "month"
+        ]
+      },
+      "AttendanceEventList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttendanceEvent"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "AttendanceEventRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "kind": {
+            "enum": [
+              "IN",
+              "OUT"
+            ],
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "userId",
+          "kind",
+          "at",
+          "note"
+        ]
+      },
+      "AttendanceStrikeRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "reason"
         ]
       },
       "Segment": {
@@ -60851,6 +62491,12 @@
           "CUSTOMER_APP_CLOSED",
           "PRODUCT_NOT_IN_APP",
           "ORDER_BELOW_MINIMUM",
+          "ATTENDANCE_NO_SITE",
+          "ATTENDANCE_OUT_OF_RANGE",
+          "ATTENDANCE_LOCATION_IMPRECISE",
+          "ATTENDANCE_ALREADY_IN",
+          "ATTENDANCE_NOT_IN",
+          "ATTENDANCE_EVENT_ORDER",
           "COSTING_CLOSED",
           "RECEIPT_DISCOUNT_TOO_LARGE",
           "RECEIPT_FROM_ORDER",

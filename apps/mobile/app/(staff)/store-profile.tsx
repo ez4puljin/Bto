@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { Server } from 'lucide-react-native';
+import { CalendarCheck, Server } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -15,8 +15,9 @@ import { StoreHeader } from '../../src/ui/store-header';
 import { Text } from '../../src/ui/text';
 
 /**
- * «Профайл» of a store's seller (ADR-0116 #1): who is signed in and their role, the server,
- * «Гарах» with its question, and the app's version — none of the rep's context (stages, notices).
+ * «Профайл» of a store's seller (ADR-0116 #1) and of any staff member without the rep's context
+ * (ADR-0131): who is signed in and their role, «Ирц», the server, «Гарах» with its question, and
+ * the app's version — none of the rep's stages or notices.
  */
 export default function StoreProfileScreen() {
   const { t } = useTranslation();
@@ -43,6 +44,19 @@ export default function StoreProfileScreen() {
             </Text>
           </View>
         </View>
+
+        <Group inset={ICON_INSET} style={styles.group}>
+          <Row
+            minHeight={52}
+            icon={
+              <IconTile color={colors.tint.green}>
+                <CalendarCheck size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+              </IconTile>
+            }
+            title={t('mobile.attendance.title')}
+            onPress={() => router.push('/attendance')}
+          />
+        </Group>
 
         <Group inset={ICON_INSET} style={styles.group}>
           <Row

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CustomerPrincipal, Me } from '../api/session';
-import { isRep, mayPick, mayRequestTransfers, phaseOf } from './phase';
+import { isRep, mayPick, mayRequestTransfers, mayUseApp, phaseOf } from './phase';
 
 const rep = { id: 7, permissions: ['sales.orders.rep'] } as unknown as Me;
 const office = { id: 8, permissions: ['sales.orders.read'] } as unknown as Me;
@@ -21,13 +21,14 @@ describe('the phases of the two apps', () => {
     expect(phaseOf('http://pc:3300', { status: 'offline' })).toBe('offline');
   });
 
-  it('lets a rep into the staff app, other staff to «not a rep», every store into «Bto300»', () => {
+  it('lets every staff member into the staff app (ADR-0131: «Ирц» is for all), every store into «Bto300»', () => {
     expect(phaseOf('http://pc:3300', { status: 'signedIn', me: rep, userId: 7 })).toBe('app');
-    expect(phaseOf('http://pc:3300', { status: 'signedIn', me: office, userId: 8 })).toBe('notRep');
+    expect(phaseOf('http://pc:3300', { status: 'signedIn', me: office, userId: 8 })).toBe('app');
     expect(phaseOf('http://pc:3300', { status: 'signedIn', me: store, userId: 12 })).toBe('app');
+    expect(mayUseApp(office)).toBe(true);
   });
 
-  it('lets a store seller with only the transfer right in (ADR-0116), but not an office user', () => {
+  it('tells a store seller with only the transfer right (ADR-0116) from an office user', () => {
     expect(phaseOf('http://pc:3300', { status: 'signedIn', me: seller, userId: 9 })).toBe('app');
     expect(isRep(seller)).toBe(false);
     expect(mayRequestTransfers(seller)).toBe(true);
