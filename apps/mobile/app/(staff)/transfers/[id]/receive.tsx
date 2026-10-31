@@ -15,6 +15,7 @@ import {
 } from '../../../../src/api/transfers';
 import { formatQty } from '../../../../src/format/format';
 import { useSignedIn } from '../../../../src/state/session';
+import { brandSheet } from '../../../../src/theme/brand';
 import { colors, fonts, radii, spacing, TOUCH, type } from '../../../../src/theme/tokens';
 import {
   findLineByProduct,
@@ -478,56 +479,58 @@ export default function TransferReceiveScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  grow: { flex: 1, minWidth: 0, gap: 3 },
-  center: { textAlign: 'center' },
-  pressed: { backgroundColor: colors.accent },
-  highlighted: { backgroundColor: colors.secondary },
-  failed: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginHorizontal: 14,
-    marginTop: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingLeft: 14,
-    paddingRight: spacing.sm,
-    borderRadius: radii.field,
-    backgroundColor: colors.destructiveSoft,
-  },
-  failedText: { flex: 1, color: colors.destructive, fontFamily: fonts.medium },
-  problem: { marginHorizontal: 14 },
-  list: { paddingHorizontal: 14 },
-  sectionHeader: { paddingTop: spacing.lg, paddingBottom: spacing.sm, paddingHorizontal: 2 },
-  cell: { backgroundColor: colors.card },
-  firstCell: {
-    borderTopLeftRadius: radii.card,
-    borderTopRightRadius: radii.card,
-    overflow: 'hidden',
-  },
-  lastCell: {
-    borderBottomLeftRadius: radii.card,
-    borderBottomRightRadius: radii.card,
-    overflow: 'hidden',
-  },
-  line: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    minHeight: 64,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  trash: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
-  sectionFooter: { gap: spacing.xs, paddingTop: spacing.sm },
-  loading: { marginTop: spacing.xl },
-  footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 14,
-    paddingTop: spacing.md,
-    backgroundColor: colors.sheetBarFill,
-  },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    grow: { flex: 1, minWidth: 0, gap: 3 },
+    center: { textAlign: 'center' },
+    pressed: { backgroundColor: colors.accent },
+    highlighted: { backgroundColor: colors.secondary },
+    failed: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginHorizontal: 14,
+      marginTop: spacing.md,
+      paddingVertical: spacing.sm,
+      paddingLeft: 14,
+      paddingRight: spacing.sm,
+      borderRadius: radii.field,
+      backgroundColor: colors.destructiveSoft,
+    },
+    failedText: { flex: 1, color: colors.destructive, fontFamily: fonts.medium },
+    problem: { marginHorizontal: 14 },
+    list: { paddingHorizontal: 14 },
+    sectionHeader: { paddingTop: spacing.lg, paddingBottom: spacing.sm, paddingHorizontal: 2 },
+    cell: { backgroundColor: colors.card },
+    firstCell: {
+      borderTopLeftRadius: radii.card,
+      borderTopRightRadius: radii.card,
+      overflow: 'hidden',
+    },
+    lastCell: {
+      borderBottomLeftRadius: radii.card,
+      borderBottomRightRadius: radii.card,
+      overflow: 'hidden',
+    },
+    line: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      minHeight: 64,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+    },
+    trash: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
+    sectionFooter: { gap: spacing.xs, paddingTop: spacing.sm },
+    loading: { marginTop: spacing.xl },
+    footer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      paddingHorizontal: 14,
+      paddingTop: spacing.md,
+      backgroundColor: colors.sheetBarFill,
+    },
+  }),
+);

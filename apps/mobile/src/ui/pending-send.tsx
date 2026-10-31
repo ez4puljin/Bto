@@ -7,6 +7,7 @@ import type { AppProblem } from '../api/problem';
 import type { RepOrder } from '../api/rep';
 import type { Sender } from '../cart/use-idempotent-send';
 import { useSendOrder } from '../cart/use-send';
+import { brandSheet } from '../theme/brand';
 import { colors, fonts, radii, spacing, type } from '../theme/tokens';
 import { PillButton } from './controls';
 import { ProblemText } from './kit';
@@ -108,17 +109,19 @@ export function PendingSendView<O extends { id: number }>({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    marginTop: spacing.lg,
-    padding: spacing.lg,
-    gap: 10,
-    borderRadius: radii.card,
-    backgroundColor: colors.warningSoft,
-  },
-  title: { ...type.rowStrong, color: colors.warningText },
-  body: { ...type.secondary, color: colors.warningText },
-  links: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 2 },
-  link: { ...type.row, fontFamily: fonts.medium, color: colors.primary },
-  danger: { color: colors.destructive },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    card: {
+      marginTop: spacing.lg,
+      padding: spacing.lg,
+      gap: 10,
+      borderRadius: radii.card,
+      backgroundColor: colors.warningSoft,
+    },
+    title: { ...type.rowStrong, color: colors.warningText },
+    body: { ...type.secondary, color: colors.warningText },
+    links: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 2 },
+    link: { ...type.row, fontFamily: fonts.medium, color: colors.primary },
+    danger: { color: colors.destructive },
+  }),
+);

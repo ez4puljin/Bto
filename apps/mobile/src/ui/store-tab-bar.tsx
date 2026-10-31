@@ -5,6 +5,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { brandSheet } from '../theme/brand';
 import { colors, shadows, spacing, storeType } from '../theme/tokens';
 import { Text } from './text';
 
@@ -101,52 +102,54 @@ export function StoreTabBar({ state, descriptors, navigation, insets }: BottomTa
   );
 }
 
-const styles = StyleSheet.create({
-  bar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: colors.card,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.input,
-  },
-  item: {
-    flex: 1,
-    height: BAR_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-  },
-  pressed: { opacity: 0.6 },
-  // The label on the others' line: a 22 px icon, 3 px and a 13 px line, centred in 56.
-  scanItem: { justifyContent: 'flex-end', paddingBottom: 9 },
-  scan: {
-    position: 'absolute',
-    top: -24,
-    width: SCAN,
-    height: SCAN,
-    borderRadius: SCAN / 2,
-    borderWidth: 3,
-    borderColor: colors.card,
-    backgroundColor: colors.primary,
-    boxShadow: shadows.scanButton,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badge: {
-    position: 'absolute',
-    top: 4,
-    left: '50%',
-    marginLeft: 3,
-    minWidth: 17,
-    height: 17,
-    paddingHorizontal: 4,
-    borderRadius: 9,
-    backgroundColor: colors.destructive,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    bar: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      backgroundColor: colors.card,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.input,
+    },
+    item: {
+      flex: 1,
+      height: BAR_HEIGHT,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 3,
+    },
+    pressed: { opacity: 0.6 },
+    // The label on the others' line: a 22 px icon, 3 px and a 13 px line, centred in 56.
+    scanItem: { justifyContent: 'flex-end', paddingBottom: 9 },
+    scan: {
+      position: 'absolute',
+      top: -24,
+      width: SCAN,
+      height: SCAN,
+      borderRadius: SCAN / 2,
+      borderWidth: 3,
+      borderColor: colors.card,
+      backgroundColor: colors.primary,
+      boxShadow: shadows.scanButton,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    badge: {
+      position: 'absolute',
+      top: 4,
+      left: '50%',
+      marginLeft: 3,
+      minWidth: 17,
+      height: 17,
+      paddingHorizontal: 4,
+      borderRadius: 9,
+      backgroundColor: colors.destructive,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+  }),
+);

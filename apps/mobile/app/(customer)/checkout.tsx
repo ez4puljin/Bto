@@ -31,6 +31,7 @@ import { monthOf, weekdayOf } from '../../src/dates/dates';
 import { formatMnt } from '../../src/format/format';
 import { useCustomer } from '../../src/state/session';
 import { useShop } from '../../src/state/shop';
+import { brandSheet } from '../../src/theme/brand';
 import { colors, fonts, radii, shadows, spacing, tabular, type } from '../../src/theme/tokens';
 import { MonthCalendar } from '../../src/ui/calendar';
 import { PillButton, Segmented } from '../../src/ui/controls';
@@ -109,7 +110,12 @@ export default function StoreCheckoutScreen() {
 
   const today = data?.today ?? null;
   const lastDay = data?.lastDay ?? null;
-  const issues = today && lastDay ? customerCartIssues(cart, today, lastDay) : ['lines' as const];
+  // The office's minimum order (ADR-0127 #4): a total under it waits; the server refuses it too.
+  const minOrderAmount = data?.minOrderAmount ?? null;
+  const issues =
+    today && lastDay
+      ? customerCartIssues(cart, today, lastDay, { total, minOrderAmount })
+      : ['lines' as const];
   const closed = data?.ordersOpen === false || closedAnswer;
   const addresses = data?.addresses ?? [];
   const address = addresses.find((entry) => entry.id === cart.addressId);
@@ -343,7 +349,9 @@ export default function StoreCheckoutScreen() {
           <Text style={[type.secondary, styles.issue]}>
             {issues[0] === 'deliveryDate' && cart.fulfilment === 'PICKUP'
               ? t('mobile.customer.checkout.pickupDateIssue')
-              : t(`mobile.cart.issues.${issues[0] ?? 'lines'}`)}
+              : t(`mobile.cart.issues.${issues[0] ?? 'lines'}`, {
+                  min: formatMnt(minOrderAmount ?? '0'),
+                })}
           </Text>
         ) : null}
       </ScrollView>
@@ -650,139 +658,141 @@ function DateSheet({
   );
 }
 
-const styles = StyleSheet.create({
-  body: { paddingHorizontal: spacing.lg },
-  title: { marginTop: 2, marginHorizontal: spacing.xs },
-  subtitle: { marginTop: spacing.xs, marginHorizontal: spacing.xs, color: colors.muted },
-  section: { marginTop: 22 },
-  grow: { flex: 1 },
-  options: { flexDirection: 'row', gap: 10 },
-  option: {
-    flex: 1,
-    minHeight: 104,
-    padding: spacing.md,
-    gap: 10,
-    borderRadius: radii.card,
-    borderWidth: 2,
-    borderColor: colors.card,
-    backgroundColor: colors.card,
-  },
-  optionPressed: { borderColor: colors.accent, backgroundColor: colors.accent },
-  optionSelected: { borderColor: colors.primary },
-  dimmed: { opacity: 0.5 },
-  optionTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  optionIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: radii.control,
-    backgroundColor: colors.fieldFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  optionIconSelected: { backgroundColor: colors.primary },
-  radio: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    borderColor: colors.input,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioSelected: { borderWidth: 0, backgroundColor: colors.primary },
-  optionText: { gap: 2 },
-  optionLine: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  shrink: { flexShrink: 1 },
-  days: { flexDirection: 'row', gap: spacing.sm },
-  day: {
-    flex: 1,
-    height: 56,
-    paddingHorizontal: spacing.xs,
-    gap: 2,
-    borderRadius: radii.field,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dayPressed: { backgroundColor: colors.accent },
-  daySelected: { backgroundColor: colors.primary },
-  dayTitle: { ...type.chip, fontFamily: fonts.semibold },
-  dayLine: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  onPrimary: { color: colors.primaryForeground },
-  payNote: { marginTop: spacing.sm, marginHorizontal: spacing.sm },
-  counter: { ...type.secondary, color: colors.tint.gray },
-  noteInput: {
-    minHeight: 92,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
-    textAlignVertical: 'top',
-  },
-  credit: { marginTop: spacing.lg },
-  note: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.card,
-  },
-  noteIcon: { marginTop: 1 },
-  info: { marginTop: spacing.md, backgroundColor: colors.card },
-  infoText: { color: colors.label2 },
-  closed: { marginTop: spacing.lg, backgroundColor: colors.destructiveSoft },
-  closedText: { color: colors.cancelled },
-  issue: { marginTop: spacing.md, marginHorizontal: spacing.xs, color: colors.destructive },
-  bottom: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingTop: 14,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.sheetBarFill,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  total: { ...type.title2, ...tabular },
-  stale: { color: colors.muted },
-  sheetBody: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.xxl,
-    gap: 14,
-  },
-  sentBackdrop: {
-    flex: 1,
-    backgroundColor: colors.dimFill,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  sentCard: {
-    paddingTop: 28,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderRadius: radii.hero,
-    backgroundColor: colors.floatingFill,
-    boxShadow: shadows.popup,
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  sentIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.tint.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sentTitle: { ...type.title3 },
-  sentLine: { color: colors.label2, textAlign: 'center', ...tabular },
-  sentHint: { color: colors.muted, textAlign: 'center' },
-  sentActions: { flexDirection: 'row', gap: 10, alignSelf: 'stretch', marginTop: spacing.md },
-  sentButton: { flex: 1, paddingHorizontal: spacing.sm },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    body: { paddingHorizontal: spacing.lg },
+    title: { marginTop: 2, marginHorizontal: spacing.xs },
+    subtitle: { marginTop: spacing.xs, marginHorizontal: spacing.xs, color: colors.muted },
+    section: { marginTop: 22 },
+    grow: { flex: 1 },
+    options: { flexDirection: 'row', gap: 10 },
+    option: {
+      flex: 1,
+      minHeight: 104,
+      padding: spacing.md,
+      gap: 10,
+      borderRadius: radii.card,
+      borderWidth: 2,
+      borderColor: colors.card,
+      backgroundColor: colors.card,
+    },
+    optionPressed: { borderColor: colors.accent, backgroundColor: colors.accent },
+    optionSelected: { borderColor: colors.primary },
+    dimmed: { opacity: 0.5 },
+    optionTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+    optionIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: radii.control,
+      backgroundColor: colors.fieldFill,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    optionIconSelected: { backgroundColor: colors.primary },
+    radio: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 1.5,
+      borderColor: colors.input,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    radioSelected: { borderWidth: 0, backgroundColor: colors.primary },
+    optionText: { gap: 2 },
+    optionLine: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+    shrink: { flexShrink: 1 },
+    days: { flexDirection: 'row', gap: spacing.sm },
+    day: {
+      flex: 1,
+      height: 56,
+      paddingHorizontal: spacing.xs,
+      gap: 2,
+      borderRadius: radii.field,
+      backgroundColor: colors.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dayPressed: { backgroundColor: colors.accent },
+    daySelected: { backgroundColor: colors.primary },
+    dayTitle: { ...type.chip, fontFamily: fonts.semibold },
+    dayLine: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+    onPrimary: { color: colors.primaryForeground },
+    payNote: { marginTop: spacing.sm, marginHorizontal: spacing.sm },
+    counter: { ...type.secondary, color: colors.tint.gray },
+    noteInput: {
+      minHeight: 92,
+      paddingVertical: 14,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radii.card,
+      backgroundColor: colors.card,
+      textAlignVertical: 'top',
+    },
+    credit: { marginTop: spacing.lg },
+    note: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radii.card,
+    },
+    noteIcon: { marginTop: 1 },
+    info: { marginTop: spacing.md, backgroundColor: colors.card },
+    infoText: { color: colors.label2 },
+    closed: { marginTop: spacing.lg, backgroundColor: colors.destructiveSoft },
+    closedText: { color: colors.cancelled },
+    issue: { marginTop: spacing.md, marginHorizontal: spacing.xs, color: colors.destructive },
+    bottom: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      paddingTop: 14,
+      paddingHorizontal: spacing.lg,
+      backgroundColor: colors.sheetBarFill,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.hairline,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    total: { ...type.title2, ...tabular },
+    stale: { color: colors.muted },
+    sheetBody: {
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.xs,
+      paddingBottom: spacing.xxl,
+      gap: 14,
+    },
+    sentBackdrop: {
+      flex: 1,
+      backgroundColor: colors.dimFill,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.lg,
+    },
+    sentCard: {
+      paddingTop: 28,
+      paddingHorizontal: 20,
+      paddingBottom: 20,
+      borderRadius: radii.hero,
+      backgroundColor: colors.floatingFill,
+      boxShadow: shadows.popup,
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    sentIcon: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: colors.tint.green,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sentTitle: { ...type.title3 },
+    sentLine: { color: colors.label2, textAlign: 'center', ...tabular },
+    sentHint: { color: colors.muted, textAlign: 'center' },
+    sentActions: { flexDirection: 'row', gap: 10, alignSelf: 'stretch', marginTop: spacing.md },
+    sentButton: { flex: 1, paddingHorizontal: spacing.sm },
+  }),
+);

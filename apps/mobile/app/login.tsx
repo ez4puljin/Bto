@@ -7,6 +7,7 @@ import splashIcon from '../assets/splash-icon.png';
 import type { AppProblem } from '../src/api/problem';
 import { FieldRow } from '../src/customer/sign-in-rows';
 import { useSession } from '../src/state/session';
+import { brandSheet } from '../src/theme/brand';
 import { colors, radii, shadows, spacing, type } from '../src/theme/tokens';
 import { ServerChip, useAppName } from '../src/ui/brand';
 import { PillButton } from '../src/ui/controls';
@@ -148,30 +149,32 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  grow: { flex: 1 },
-  body: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 56, paddingBottom: spacing.lg },
-  mark: { alignItems: 'center', gap: 10 },
-  logo: { width: 84, height: 84, borderRadius: 24, boxShadow: shadows.brand },
-  logoImage: { width: 84, height: 84, borderRadius: 24 },
-  company: { color: colors.muted, textAlign: 'center' },
-  notice: {
-    marginTop: spacing.xl,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    paddingVertical: spacing.md,
-    paddingHorizontal: 14,
-    borderRadius: radii.field,
-  },
-  noticeExpired: { backgroundColor: colors.warningSoft },
-  noticeLogout: { backgroundColor: colors.infoSoft },
-  noticeIcon: { marginTop: 0.5 },
-  noticeText: { flex: 1 },
-  expiredText: { color: colors.warningText },
-  logoutText: { color: colors.secondaryForeground },
-  heading: { marginTop: 36 },
-  problem: { marginTop: spacing.lg },
-  button: { marginTop: 20 },
-  spacer: { flex: 1, minHeight: spacing.xl },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    grow: { flex: 1 },
+    body: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 56, paddingBottom: spacing.lg },
+    mark: { alignItems: 'center', gap: 10 },
+    logo: { width: 84, height: 84, borderRadius: 24, boxShadow: shadows.brand },
+    logoImage: { width: 84, height: 84, borderRadius: 24 },
+    company: { color: colors.muted, textAlign: 'center' },
+    notice: {
+      marginTop: spacing.xl,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+      paddingVertical: spacing.md,
+      paddingHorizontal: 14,
+      borderRadius: radii.field,
+    },
+    noticeExpired: { backgroundColor: colors.warningSoft },
+    noticeLogout: { backgroundColor: colors.infoSoft },
+    noticeIcon: { marginTop: 0.5 },
+    noticeText: { flex: 1 },
+    expiredText: { color: colors.warningText },
+    logoutText: { color: colors.secondaryForeground },
+    heading: { marginTop: 36 },
+    problem: { marginTop: spacing.lg },
+    button: { marginTop: 20 },
+    spacer: { flex: 1, minHeight: spacing.xl },
+  }),
+);

@@ -18,6 +18,7 @@ import { ubDate, ubTime } from '../../../src/dates/dates';
 import { initialsOf } from '../../../src/format/format';
 import { isRep } from '../../../src/state/phase';
 import { useSignedIn } from '../../../src/state/session';
+import { brandSheet } from '../../../src/theme/brand';
 import { colors, fonts, radii, spacing, storeType, type } from '../../../src/theme/tokens';
 import { numbersLabel } from '../../../src/transfers/grouping';
 import { DraftPill, TransferStatusPill } from '../../../src/transfers/pills';
@@ -232,47 +233,49 @@ export default function TransfersHomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  grow: { flex: 1, minWidth: 0, gap: 2 },
-  faded: { opacity: 0.7 },
-  avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    marginRight: spacing.sm,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { ...storeType.badge, fontFamily: fonts.bold, color: colors.primary },
-  stores: { paddingHorizontal: 14, paddingBottom: spacing.md },
-  keeper: { flex: 1, justifyContent: 'center', padding: spacing.lg, gap: spacing.md },
-  chipRow: { flexGrow: 0 },
-  chips: { gap: spacing.sm, paddingHorizontal: 14, paddingVertical: spacing.md },
-  list: { paddingHorizontal: 14 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    minHeight: 64,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
-  },
-  rowTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  rowTitle: { flex: 1, minWidth: 0 },
-  pressed: { backgroundColor: colors.accent },
-  separator: { height: spacing.sm },
-  loading: { marginTop: spacing.xl },
-  problem: { marginTop: spacing.md },
-  footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 14,
-    paddingTop: spacing.md,
-    backgroundColor: colors.sheetBarFill,
-  },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    grow: { flex: 1, minWidth: 0, gap: 2 },
+    faded: { opacity: 0.7 },
+    avatar: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      marginRight: spacing.sm,
+      backgroundColor: colors.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarText: { ...storeType.badge, fontFamily: fonts.bold, color: colors.primary },
+    stores: { paddingHorizontal: 14, paddingBottom: spacing.md },
+    keeper: { flex: 1, justifyContent: 'center', padding: spacing.lg, gap: spacing.md },
+    chipRow: { flexGrow: 0 },
+    chips: { gap: spacing.sm, paddingHorizontal: 14, paddingVertical: spacing.md },
+    list: { paddingHorizontal: 14 },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      minHeight: 64,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radii.card,
+      backgroundColor: colors.card,
+    },
+    rowTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    rowTitle: { flex: 1, minWidth: 0 },
+    pressed: { backgroundColor: colors.accent },
+    separator: { height: spacing.sm },
+    loading: { marginTop: spacing.xl },
+    problem: { marginTop: spacing.md },
+    footer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      paddingHorizontal: 14,
+      paddingTop: spacing.md,
+      backgroundColor: colors.sheetBarFill,
+    },
+  }),
+);

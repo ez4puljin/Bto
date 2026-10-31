@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { StoreContact } from '../api/customer';
 import { callNow } from '../phone/call';
+import { brandSheet } from '../theme/brand';
 import { AVATAR_TINTS, colors, fonts, spacing, tabular, TOUCH, type } from '../theme/tokens';
 import { Group } from '../ui/grouped';
 import { Text } from '../ui/text';
@@ -86,41 +87,43 @@ export function Contacts({ contacts }: { contacts: StoreContact[] | undefined })
   );
 }
 
-const styles = StyleSheet.create({
-  grow: { flex: 1 },
-  title: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: spacing.sm,
-    marginTop: spacing.xl,
-    marginBottom: spacing.sm,
-    marginHorizontal: spacing.xs,
-  },
-  empty: { paddingHorizontal: spacing.xs },
-  contact: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: 10,
-    paddingLeft: spacing.lg,
-    paddingRight: 14,
-  },
-  pressed: { backgroundColor: colors.accent },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initials: { ...type.bodyStrong, fontFamily: fonts.bold, color: colors.primaryForeground },
-  phone: { ...tabular, color: colors.link },
-  callButton: {
-    width: TOUCH,
-    height: TOUCH,
-    borderRadius: TOUCH / 2,
-    backgroundColor: colors.tint.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    grow: { flex: 1 },
+    title: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: spacing.sm,
+      marginTop: spacing.xl,
+      marginBottom: spacing.sm,
+      marginHorizontal: spacing.xs,
+    },
+    empty: { paddingHorizontal: spacing.xs },
+    contact: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingVertical: 10,
+      paddingLeft: spacing.lg,
+      paddingRight: 14,
+    },
+    pressed: { backgroundColor: colors.accent },
+    avatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    initials: { ...type.bodyStrong, fontFamily: fonts.bold, color: colors.primaryForeground },
+    phone: { ...tabular, color: colors.link },
+    callButton: {
+      width: TOUCH,
+      height: TOUCH,
+      borderRadius: TOUCH / 2,
+      backgroundColor: colors.tint.green,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+  }),
+);

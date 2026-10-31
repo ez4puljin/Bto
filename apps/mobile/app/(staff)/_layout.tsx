@@ -1,10 +1,13 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import { useRepContext } from '../../src/api/rep';
 import { ThumbKeeper } from '../../src/images/thumb-keeper';
 import { NoticePopupGate } from '../../src/notifications/popup-gate';
 import { isRep } from '../../src/state/phase';
 import { useSignedIn } from '../../src/state/session';
 import { ShopProvider } from '../../src/state/shop';
+import { learnBrand } from '../../src/theme/brand-provider';
 import { colors } from '../../src/theme/tokens';
 import { ToastProvider } from '../../src/ui/toast';
 
@@ -14,6 +17,15 @@ import { ToastProvider } from '../../src/ui/toast';
  * sees none of them: the stack's first screen is then «Шилжүүлэг» (expo-router drops the guarded
  * screens, and the navigator opens on the first one left), with the store profile beside it.
  */
+/** The office's name and colour (ADR-0127 #4) as the rep's `/sales-rep/context` says them. */
+function BrandLearner({ server }: { server: string }) {
+  const context = useRepContext();
+  useEffect(() => {
+    if (context.data) void learnBrand(server, context.data);
+  }, [server, context.data]);
+  return null;
+}
+
 export default function StaffLayout() {
   const { me, server } = useSignedIn();
   const rep = isRep(me);
@@ -22,6 +34,7 @@ export default function StaffLayout() {
       <ToastProvider>
         {/* White on the blue header (ADR-0100 on ADR-0095); the sign-in screens keep the dark one. */}
         <StatusBar style="light" />
+        {rep ? <BrandLearner server={server} /> : null}
         {rep ? <NoticePopupGate /> : null}
         {rep ? <ThumbKeeper /> : null}
         <Stack

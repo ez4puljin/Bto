@@ -30,6 +30,7 @@ import { lineOf } from '../cart/cart';
 import { pageAt } from '../images/pictures';
 import { useCustomer } from '../state/session';
 import { useShop } from '../state/shop';
+import { brandSheet } from '../theme/brand';
 import { colors, spacing, storeType, TOUCH, type } from '../theme/tokens';
 import { Text } from '../ui/text';
 import {
@@ -119,12 +120,12 @@ export function useSectionText() {
   };
 }
 
-const ICON_TONES: Record<SectionIcon['tone'], string> = {
+const ICON_TONES: Record<SectionIcon['tone'], string> = brandSheet(() => ({
   muted: colors.muted,
   promotion: colors.dealPromotion,
   discount: colors.dealDiscount,
   new: colors.primary,
-};
+}));
 
 function SectionGlyph({ icon }: { icon: SectionIcon }) {
   const color = ICON_TONES[icon.tone];
@@ -439,38 +440,40 @@ export function SubcategoryTile({
   );
 }
 
-const styles = StyleSheet.create({
-  grow: { flex: 1, minWidth: 0, gap: 1 },
-  center: { textAlign: 'center' },
-  upper: { textTransform: 'uppercase' },
-  pressed: { opacity: 0.6 },
-  heading: {
-    minHeight: TOUCH,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingLeft: 14,
-    paddingRight: spacing.sm,
-    paddingBottom: 10,
-  },
-  glyph: { alignSelf: 'flex-start', width: 20, height: 21, justifyContent: 'center' },
-  section: { paddingTop: 18 },
-  cards: { gap: 10, paddingHorizontal: 14, paddingBottom: spacing.xs },
-  banners: { backgroundColor: colors.imageFill },
-  bannerImage: { width: '100%', height: '100%' },
-  bannerFallback: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 22,
-    backgroundColor: colors.primaryPressed,
-  },
-  bannerTitle: { ...type.title2, color: colors.primaryForeground },
-  dots: { flexDirection: 'row', justifyContent: 'center', paddingTop: spacing.xs },
-  dotButton: { width: 22, height: 20, alignItems: 'center', justifyContent: 'center' },
-  dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.input },
-  dotOn: { backgroundColor: colors.label2 },
-  tile: { flex: 1, alignItems: 'center', gap: 6 },
-  tilePicture: { width: 64, height: 50, alignItems: 'center', justifyContent: 'center' },
-  sub: { width: 88, alignItems: 'center', gap: 6 },
-  subPicture: { width: 88, height: 76, alignItems: 'center', justifyContent: 'center' },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    grow: { flex: 1, minWidth: 0, gap: 1 },
+    center: { textAlign: 'center' },
+    upper: { textTransform: 'uppercase' },
+    pressed: { opacity: 0.6 },
+    heading: {
+      minHeight: TOUCH,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingLeft: 14,
+      paddingRight: spacing.sm,
+      paddingBottom: 10,
+    },
+    glyph: { alignSelf: 'flex-start', width: 20, height: 21, justifyContent: 'center' },
+    section: { paddingTop: 18 },
+    cards: { gap: 10, paddingHorizontal: 14, paddingBottom: spacing.xs },
+    banners: { backgroundColor: colors.imageFill },
+    bannerImage: { width: '100%', height: '100%' },
+    bannerFallback: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 22,
+      backgroundColor: colors.primaryPressed,
+    },
+    bannerTitle: { ...type.title2, color: colors.primaryForeground },
+    dots: { flexDirection: 'row', justifyContent: 'center', paddingTop: spacing.xs },
+    dotButton: { width: 22, height: 20, alignItems: 'center', justifyContent: 'center' },
+    dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.input },
+    dotOn: { backgroundColor: colors.label2 },
+    tile: { flex: 1, alignItems: 'center', gap: 6 },
+    tilePicture: { width: 64, height: 50, alignItems: 'center', justifyContent: 'center' },
+    sub: { width: 88, alignItems: 'center', gap: 6 },
+    subPicture: { width: 88, height: 76, alignItems: 'center', justifyContent: 'center' },
+  }),
+);

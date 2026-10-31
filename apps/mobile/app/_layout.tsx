@@ -10,7 +10,9 @@ import { APP } from '../src/config/app';
 import { i18n } from '../src/i18n/i18n';
 import { phaseOf } from '../src/state/phase';
 import { SessionProvider, useSession } from '../src/state/session';
+import { BrandProvider, useBrandReady } from '../src/theme/brand-provider';
 import { colors } from '../src/theme/tokens';
+import { useBrand } from '../src/theme/use-brand';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -31,7 +33,9 @@ function DataProvider({ children }: { children: ReactNode }) {
 
 function Navigator() {
   const { server, state } = useSession();
-  const phase = phaseOf(server, state);
+  const brandReady = useBrandReady();
+  const brand = useBrand();
+  const phase = brandReady ? phaseOf(server, state) : 'boot';
   const userId = state.status === 'signedIn' ? state.userId : 0;
 
   useEffect(() => {
@@ -41,7 +45,9 @@ function Navigator() {
   if (phase === 'boot') return <View style={styles.boot} />;
   return (
     <DataProvider key={`${server ?? ''}:${userId}`}>
+      {/* A new primary colour (ADR-0127 #4) mounts the screens again: their sheets read it then. */}
       <Stack
+        key={brand.primary ?? 'built-in'}
         screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}
       >
         <Stack.Protected guard={phase === 'server'}>
@@ -80,7 +86,9 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <StatusBar style="dark" />
         <SessionProvider>
-          <Navigator />
+          <BrandProvider>
+            <Navigator />
+          </BrandProvider>
         </SessionProvider>
       </SafeAreaProvider>
     </I18nextProvider>

@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import { useStoreMe } from '../../src/api/customer';
 import { unwrap } from '../../src/api/problem';
 import {
   STORE_SUMMARY_KEY,
@@ -9,6 +11,7 @@ import { ThumbKeeperFor } from '../../src/images/thumb-keeper';
 import { PopupGate } from '../../src/notifications/popup-gate';
 import { useCustomer } from '../../src/state/session';
 import { ShopProvider, useShop } from '../../src/state/shop';
+import { learnBrand } from '../../src/theme/brand-provider';
 import { colors } from '../../src/theme/tokens';
 import { ToastProvider } from '../../src/ui/toast';
 
@@ -30,6 +33,15 @@ function StorePopupGate() {
   );
 }
 
+/** The office's name and colour (ADR-0127 #4) as `/customer-app/me` says them, whenever it is read again. */
+function BrandLearner({ server }: { server: string }) {
+  const me = useStoreMe();
+  useEffect(() => {
+    if (me.data) void learnBrand(server, me.data);
+  }, [server, me.data]);
+  return null;
+}
+
 /**
  * «Bto300», the stores' app (ADR-0079, the boards «Bto300 дэлгэц»): the tabs and the screens opened
  * from them. The cart and the pending send are kept on the phone per server and app account.
@@ -41,6 +53,7 @@ export default function CustomerLayout() {
       <ToastProvider>
         {/* White on «Bto300»'s blue header (ADR-0095); the sign-in screens keep the dark one. */}
         <StatusBar style="light" />
+        <BrandLearner server={server} />
         <StorePopupGate />
         <ThumbKeeperFor
           server={server}

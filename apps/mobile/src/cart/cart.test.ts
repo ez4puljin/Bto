@@ -9,6 +9,7 @@ import {
   EMPTY_CART,
   lineOf,
   MAX_LINES,
+  minAmountShort,
   orderRequestOf,
   qtyOf,
 } from './cart';
@@ -218,6 +219,22 @@ describe('the pending send (ADR-0061 #8)', () => {
     cart = cartReducer(cart, { type: 'deliveryDate', date: '2026-10-20' });
     cart = cartReducer(cart, { type: 'note', note: '  10 цагаас өмнө  ' });
     expect(customerCartIssues(cart, '2026-10-19', '2026-12-18')).toEqual([]);
+    // The office's minimum order (ADR-0127 #4): under it the cart waits; reached, none or unknown passes.
+    const minimum = (total: string | null, minOrderAmount: string | null) =>
+      customerCartIssues(cart, '2026-10-19', '2026-12-18', { total, minOrderAmount });
+    expect(minimum('99999.00', '100000')).toEqual(['minAmount']);
+    expect(minimum('100000.00', '100000')).toEqual([]);
+    expect(minimum('5000.00', null)).toEqual([]);
+    expect(minimum(null, '100000')).toEqual([]);
+    expect(
+      customerCartIssues(EMPTY_CART, '2026-10-19', '2026-12-18', {
+        total: '0.00',
+        minOrderAmount: '100000',
+      }),
+    ).toEqual(['lines', 'address', 'deliveryDate', 'payment']);
+    expect(minAmountShort('99999.00', '100000')).toBe('100000');
+    expect(minAmountShort('100000.00', '100000')).toBeNull();
+    expect(minAmountShort('1.00', undefined)).toBeNull();
     expect(customerOrderRequestOf(cart)).toEqual({
       fulfilment: 'DELIVERY',
       deliveryDate: '2026-10-20',

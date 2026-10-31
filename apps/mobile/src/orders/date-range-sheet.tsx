@@ -13,6 +13,7 @@ import {
   type RangeEnd,
 } from '../dates/calendar';
 import { monthOf } from '../dates/dates';
+import { brandSheet } from '../theme/brand';
 import { colors, fonts, spacing, tabular, type } from '../theme/tokens';
 import { MonthCalendar } from '../ui/calendar';
 import { ChoiceChip, PillButton } from '../ui/controls';
@@ -146,25 +147,27 @@ export function DateRangeSheet({
   );
 }
 
-const styles = StyleSheet.create({
-  body: { paddingBottom: spacing.xl },
-  presets: { gap: spacing.sm, paddingTop: 2, paddingHorizontal: spacing.lg },
-  group: { marginTop: 14, marginHorizontal: spacing.lg },
-  field: {
-    minHeight: 50,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-  },
-  value: {
-    height: 34,
-    paddingHorizontal: spacing.md,
-    borderRadius: 10,
-    backgroundColor: colors.fieldFill,
-    justifyContent: 'center',
-  },
-  valueOn: { backgroundColor: colors.rangeFill },
-  valueText: { ...type.row, ...tabular },
-  valueTextOn: { fontFamily: fonts.semibold, color: colors.primary },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    body: { paddingBottom: spacing.xl },
+    presets: { gap: spacing.sm, paddingTop: 2, paddingHorizontal: spacing.lg },
+    group: { marginTop: 14, marginHorizontal: spacing.lg },
+    field: {
+      minHeight: 50,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.lg,
+    },
+    value: {
+      height: 34,
+      paddingHorizontal: spacing.md,
+      borderRadius: 10,
+      backgroundColor: colors.fieldFill,
+      justifyContent: 'center',
+    },
+    valueOn: { backgroundColor: colors.rangeFill },
+    valueText: { ...type.row, ...tabular },
+    valueTextOn: { fontFamily: fonts.semibold, color: colors.primary },
+  }),
+);

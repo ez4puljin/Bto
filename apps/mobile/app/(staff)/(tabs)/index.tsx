@@ -39,7 +39,9 @@ import { mayRequestTransfers } from '../../../src/state/phase';
 import { effectiveStage, placeOf } from '../../../src/state/placement';
 import { useSignedIn } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
+import { brandSheet } from '../../../src/theme/brand';
 import { colors, fonts, spacing, storeType, tabular, TOUCH, type } from '../../../src/theme/tokens';
+import { useAppName } from '../../../src/ui/brand';
 import { PillButton } from '../../../src/ui/controls';
 import { Group, IconTile, Row } from '../../../src/ui/grouped';
 import { ProblemText } from '../../../src/ui/kit';
@@ -64,6 +66,7 @@ type HomeCategory = RepHome['categories'][number];
  */
 export default function HomeScreen() {
   const { t } = useTranslation();
+  const appName = useAppName();
   const router = useRouter();
   const inset = useStoreTabBarInset();
   const { me, server } = useSignedIn();
@@ -207,7 +210,7 @@ export default function HomeScreen() {
       <StoreHeaderBand>
         <View style={styles.bar}>
           <Text accessibilityRole="header" style={storeType.wordmark}>
-            {t('app.name')}
+            {appName}
           </Text>
           <View style={styles.search}>
             <Pressable
@@ -482,95 +485,97 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  grow: { flex: 1, minWidth: 0 },
-  shrink: { flexShrink: 1 },
-  center: { textAlign: 'center' },
-  mutedText: { color: colors.muted },
-  upper: { textTransform: 'uppercase' },
-  pressed: { opacity: 0.7 },
-  // «Bto300»'s header bar and search pill (ADR-0100 #9).
-  bar: {
-    height: 46,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingLeft: 14,
-    paddingRight: spacing.sm,
-  },
-  search: {
-    flex: 1,
-    minWidth: 0,
-    height: 34,
-    marginLeft: spacing.xs,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 17,
-    backgroundColor: colors.card,
-  },
-  searchText: { flex: 1, height: TOUCH, justifyContent: 'center', paddingLeft: 14 },
-  searchScan: { width: 36, height: 34, alignItems: 'center', justifyContent: 'center' },
-  avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { ...storeType.badge, fontFamily: fonts.bold, color: colors.primary },
-  links: { gap: 20, paddingTop: 2, paddingBottom: 10, paddingHorizontal: 14 },
-  categoriesHead: { paddingTop: 12 },
-  grid: { gap: 12, paddingHorizontal: 6 },
-  gridRow: { flexDirection: 'row', gap: spacing.xs },
-  divider: { height: 2, marginTop: 16, marginHorizontal: 10, backgroundColor: colors.border },
-  loading: { marginTop: spacing.xl },
-  homeProblem: { marginTop: spacing.lg, marginHorizontal: 14 },
-  section: { paddingTop: 18 },
-  // «Bto300»'s white panel with a hairline and 10 px corners (ADR-0095 #4).
-  panel: {
-    marginHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-  },
-  pressedPanel: { backgroundColor: colors.accent },
-  month: { paddingVertical: 14, paddingHorizontal: spacing.lg },
-  total: { ...type.title2, ...tabular },
-  totalSlot: { height: type.title2.lineHeight, justifyContent: 'center' },
-  block: { borderRadius: 6, backgroundColor: colors.fill },
-  blockTotal: { width: 140, height: 22 },
-  blockCounts: { width: 90, height: 16, marginVertical: 2.5 },
-  rule: { height: 1, marginVertical: spacing.md, backgroundColor: colors.border },
-  counts: { flexDirection: 'row', alignItems: 'center', gap: spacing.xl },
-  count: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  countValue: { ...type.heading, ...tabular },
-  draftDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    alignSelf: 'center',
-    backgroundColor: colors.tint.amber,
-  },
-  cart: {
-    marginTop: 18,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  cartIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.successSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cartButton: { paddingHorizontal: 14 },
-  stageWarning: { backgroundColor: colors.warningSoft },
-  empty: { padding: 20 },
-  problem: { marginTop: 0, marginHorizontal: 14 },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    grow: { flex: 1, minWidth: 0 },
+    shrink: { flexShrink: 1 },
+    center: { textAlign: 'center' },
+    mutedText: { color: colors.muted },
+    upper: { textTransform: 'uppercase' },
+    pressed: { opacity: 0.7 },
+    // «Bto300»'s header bar and search pill (ADR-0100 #9).
+    bar: {
+      height: 46,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingLeft: 14,
+      paddingRight: spacing.sm,
+    },
+    search: {
+      flex: 1,
+      minWidth: 0,
+      height: 34,
+      marginLeft: spacing.xs,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 17,
+      backgroundColor: colors.card,
+    },
+    searchText: { flex: 1, height: TOUCH, justifyContent: 'center', paddingLeft: 14 },
+    searchScan: { width: 36, height: 34, alignItems: 'center', justifyContent: 'center' },
+    avatar: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: colors.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarText: { ...storeType.badge, fontFamily: fonts.bold, color: colors.primary },
+    links: { gap: 20, paddingTop: 2, paddingBottom: 10, paddingHorizontal: 14 },
+    categoriesHead: { paddingTop: 12 },
+    grid: { gap: 12, paddingHorizontal: 6 },
+    gridRow: { flexDirection: 'row', gap: spacing.xs },
+    divider: { height: 2, marginTop: 16, marginHorizontal: 10, backgroundColor: colors.border },
+    loading: { marginTop: spacing.xl },
+    homeProblem: { marginTop: spacing.lg, marginHorizontal: 14 },
+    section: { paddingTop: 18 },
+    // «Bto300»'s white panel with a hairline and 10 px corners (ADR-0095 #4).
+    panel: {
+      marginHorizontal: 14,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+    },
+    pressedPanel: { backgroundColor: colors.accent },
+    month: { paddingVertical: 14, paddingHorizontal: spacing.lg },
+    total: { ...type.title2, ...tabular },
+    totalSlot: { height: type.title2.lineHeight, justifyContent: 'center' },
+    block: { borderRadius: 6, backgroundColor: colors.fill },
+    blockTotal: { width: 140, height: 22 },
+    blockCounts: { width: 90, height: 16, marginVertical: 2.5 },
+    rule: { height: 1, marginVertical: spacing.md, backgroundColor: colors.border },
+    counts: { flexDirection: 'row', alignItems: 'center', gap: spacing.xl },
+    count: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+    countValue: { ...type.heading, ...tabular },
+    draftDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      alignSelf: 'center',
+      backgroundColor: colors.tint.amber,
+    },
+    cart: {
+      marginTop: 18,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    cartIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.successSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cartButton: { paddingHorizontal: 14 },
+    stageWarning: { backgroundColor: colors.warningSoft },
+    empty: { padding: 20 },
+    problem: { marginTop: 0, marginHorizontal: 14 },
+  }),
+);

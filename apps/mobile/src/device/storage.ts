@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import type { StoredSession, TokenStore } from '../api/session';
 import { type RecentServer, recentServersFrom } from '../server/server-url';
+import { type Brand, NO_BRAND, sameBrand, storedBrandOf } from '../theme/brand';
 
 // What the phone keeps (ADR-0061 #8): the refresh token in secure storage; the server address,
 // the recent servers, the chosen stage and the unsent cart in app storage. A read that fails is
@@ -38,6 +39,20 @@ export async function readRecentServers(): Promise<RecentServer[]> {
 
 export async function writeRecentServers(list: readonly RecentServer[]): Promise<void> {
   await writeJson(RECENT_SERVERS_KEY, list.length > 0 ? list : null);
+}
+
+/**
+ * The office's name and colour for the apps (ADR-0127 #4), per server: `{name, primary}` as the
+ * server last said, so the app starts in them before it asks again.
+ */
+export const brandKey = (server: string) => `bto.brand.v1:${server}`;
+
+export async function readBrand(server: string): Promise<Brand> {
+  return storedBrandOf(await readJson(brandKey(server)));
+}
+
+export async function writeBrand(server: string, brand: Brand): Promise<void> {
+  await writeJson(brandKey(server), sameBrand(brand, NO_BRAND) ? null : brand);
 }
 
 const SESSION_KEY = 'bto.session.v1';

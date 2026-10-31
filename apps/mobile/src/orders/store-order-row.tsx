@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { RepStoreOrder } from '../api/rep';
 import { formatMnt } from '../format/format';
+import { brandSheet } from '../theme/brand';
 import { colors, spacing, tabular, type } from '../theme/tokens';
 import { StatusPill } from '../ui/status';
 import { Text } from '../ui/text';
@@ -82,24 +83,26 @@ export function StoreOrderRow({
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingLeft: spacing.lg,
-    paddingRight: 14,
-  },
-  pressed: { backgroundColor: colors.accent },
-  text: { flex: 1, gap: 2 },
-  taker: { ...type.heading },
-  me: { color: colors.primary },
-  right: { flexShrink: 0, alignItems: 'flex-end', gap: 6 },
-  // Bto300's order rows (ADR-0100).
-  total: { ...type.sectionTitle, ...tabular, textAlign: 'right' },
-  // Not final yet: a softer figure than a confirmed total.
-  estimate: { color: colors.muted },
-  later: { ...type.body, color: colors.muted, textAlign: 'right' },
-  struck: { color: colors.muted, textDecorationLine: 'line-through' },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingVertical: spacing.md,
+      paddingLeft: spacing.lg,
+      paddingRight: 14,
+    },
+    pressed: { backgroundColor: colors.accent },
+    text: { flex: 1, gap: 2 },
+    taker: { ...type.heading },
+    me: { color: colors.primary },
+    right: { flexShrink: 0, alignItems: 'flex-end', gap: 6 },
+    // Bto300's order rows (ADR-0100).
+    total: { ...type.sectionTitle, ...tabular, textAlign: 'right' },
+    // Not final yet: a softer figure than a confirmed total.
+    estimate: { color: colors.muted },
+    later: { ...type.body, color: colors.muted, textAlign: 'right' },
+    struck: { color: colors.muted, textDecorationLine: 'line-through' },
+  }),
+);

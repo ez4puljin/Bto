@@ -7,6 +7,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { initialsOf } from '../../src/format/format';
 import { useRoleName } from '../../src/state/role';
 import { useSignedIn } from '../../src/state/session';
+import { brandSheet } from '../../src/theme/brand';
 import { colors, fonts, radii, spacing, type } from '../../src/theme/tokens';
 import { Group, ICON_INSET, IconTile, Row } from '../../src/ui/grouped';
 import { Page } from '../../src/ui/layout';
@@ -95,39 +96,41 @@ export default function StoreProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  body: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  grow: { flex: 1, gap: 2 },
-  muted: { color: colors.muted },
-  pressed: { backgroundColor: colors.accent },
-  user: {
-    marginTop: spacing.md,
-    padding: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderRadius: radii.tile,
-    backgroundColor: colors.card,
-  },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initials: { ...type.title2, fontFamily: fonts.bold, color: colors.primaryForeground },
-  name: type.title3,
-  group: { marginTop: 22 },
-  logout: {
-    marginTop: 22,
-    minHeight: 52,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoutText: { color: colors.destructive },
-  footer: { marginTop: spacing.lg, alignItems: 'center', gap: 3 },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    body: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
+    grow: { flex: 1, gap: 2 },
+    muted: { color: colors.muted },
+    pressed: { backgroundColor: colors.accent },
+    user: {
+      marginTop: spacing.md,
+      padding: spacing.lg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      borderRadius: radii.tile,
+      backgroundColor: colors.card,
+    },
+    avatar: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    initials: { ...type.title2, fontFamily: fonts.bold, color: colors.primaryForeground },
+    name: type.title3,
+    group: { marginTop: 22 },
+    logout: {
+      marginTop: 22,
+      minHeight: 52,
+      borderRadius: radii.card,
+      backgroundColor: colors.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    logoutText: { color: colors.destructive },
+    footer: { marginTop: spacing.lg, alignItems: 'center', gap: 3 },
+  }),
+);

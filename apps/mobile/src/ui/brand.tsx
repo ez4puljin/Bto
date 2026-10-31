@@ -7,7 +7,9 @@ import customerIcon from '../../assets/customer/splash-icon.png';
 import splashIcon from '../../assets/splash-icon.png';
 import { APP } from '../config/app';
 import { serverHost } from '../server/server-url';
+import { brandSheet } from '../theme/brand';
 import { colors, fonts, radii, shadows, type } from '../theme/tokens';
+import { useBrand } from '../theme/use-brand';
 
 /**
  * The splash's tile, the same picture the phone starts with: a white «B» on rounded blue, or
@@ -15,10 +17,14 @@ import { colors, fonts, radii, shadows, type } from '../theme/tokens';
  */
 const LOGO = APP.variant === 'customer' ? customerIcon : splashIcon;
 
-/** This build's name: «Bto», or «Bto300» for the stores (ADR-0079). */
+/**
+ * The app's name: the one the office set on «Апп → Ерөнхий» (ADR-0127 #4, read from the server and
+ * kept per server), else this build's own — «Bto», or «Bto300» for the stores (ADR-0079).
+ */
 export function useAppName(): string {
   const { t } = useTranslation();
-  return APP.variant === 'customer' ? t('mobile.customer.appName') : t('app.name');
+  const brand = useBrand();
+  return brand.name ?? (APP.variant === 'customer' ? t('mobile.customer.appName') : t('app.name'));
 }
 
 /** The logo with the app's name and the company: the top of the server, sign-in and offline screens. */
@@ -100,23 +106,25 @@ export function ServerChip({
   );
 }
 
-const styles = StyleSheet.create({
-  lockup: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  logo: { width: 48, height: 48, borderRadius: radii.control, boxShadow: shadows.brand },
-  image: { width: 48, height: 48, borderRadius: radii.control },
-  names: { flexShrink: 1 },
-  mark: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  markLogo: { width: 34, height: 34, borderRadius: radii.control },
-  markImage: { width: 34, height: 34, borderRadius: radii.control },
-  chip: {
-    alignSelf: 'center',
-    height: 36,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    borderRadius: radii.pill,
-  },
-  host: { maxWidth: 180, color: colors.label2, fontVariant: ['tabular-nums'] },
-  change: { fontFamily: fonts.semibold, color: colors.link },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    lockup: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    logo: { width: 48, height: 48, borderRadius: radii.control, boxShadow: shadows.brand },
+    image: { width: 48, height: 48, borderRadius: radii.control },
+    names: { flexShrink: 1 },
+    mark: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    markLogo: { width: 34, height: 34, borderRadius: radii.control },
+    markImage: { width: 34, height: 34, borderRadius: radii.control },
+    chip: {
+      alignSelf: 'center',
+      height: 36,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 14,
+      borderRadius: radii.pill,
+    },
+    host: { maxWidth: 180, color: colors.label2, fontVariant: ['tabular-nums'] },
+    change: { fontFamily: fonts.semibold, color: colors.link },
+  }),
+);

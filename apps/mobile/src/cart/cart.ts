@@ -217,18 +217,42 @@ export function orderRequestOf(cart: Cart, stageId: number): OrderRequest {
 }
 
 /**
- * What keeps «Bto300»'s cart from being sent (ADR-0079 #5): no customer and no stage to choose (the
- * store is the token's own, the stage the CUSTOMER_APP channel's), a day from today to `lastDay`.
+ * The minimum an app order must reach (ADR-0127 #4, `/customer-app/checkout` → `minOrderAmount`,
+ * whole MNT) when the quoted total is under it; null when it is reached, when the office set none,
+ * or while the total is not known yet. The server's 422 `ORDER_BELOW_MINIMUM` has the last word.
  */
-export type CustomerCartIssue = 'lines' | 'address' | 'deliveryDate' | 'payment';
+export function minAmountShort(
+  total: string | null,
+  minOrderAmount: string | null | undefined,
+): string | null {
+  if (total === null || !minOrderAmount) return null;
+  return new Decimal(total).lt(minOrderAmount) ? minOrderAmount : null;
+}
+
+/** The quoted total and the office's minimum, as the checkout knows them. */
+export interface CartMinimum {
+  total: string | null;
+  minOrderAmount: string | null | undefined;
+}
+
+/**
+ * What keeps «Bto300»'s cart from being sent (ADR-0079 #5): no customer and no stage to choose (the
+ * store is the token's own, the stage the CUSTOMER_APP channel's), a day from today to `lastDay`;
+ * a total under the office's minimum (ADR-0127 #4) when the screen knows both.
+ */
+export type CustomerCartIssue = 'lines' | 'minAmount' | 'address' | 'deliveryDate' | 'payment';
 
 export function customerCartIssues(
   cart: Cart,
   today: string,
   lastDay: string,
+  minimum?: CartMinimum,
 ): CustomerCartIssue[] {
   const issues: CustomerCartIssue[] = [];
   if (cart.lines.length === 0) issues.push('lines');
+  else if (minimum && minAmountShort(minimum.total, minimum.minOrderAmount) !== null) {
+    issues.push('minAmount');
+  }
   if (cart.fulfilment === 'DELIVERY' && cart.addressId === null) issues.push('address');
   if (!cart.deliveryDate || cart.deliveryDate < today || cart.deliveryDate > lastDay) {
     issues.push('deliveryDate');

@@ -10,6 +10,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Text, TextInput } from './text';
+import { brandSheet } from '../theme/brand';
 import { colors, fonts, radii, TOUCH, type } from '../theme/tokens';
 
 /**
@@ -110,28 +111,30 @@ export function PasswordToggle({ shown, onToggle }: { shown: boolean; onToggle: 
   );
 }
 
-const styles = StyleSheet.create({
-  label: { marginBottom: 6 },
-  box: {
-    height: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingLeft: 14,
-    paddingRight: 6,
-    borderRadius: radii.field,
-    borderWidth: 1.5,
-    borderColor: colors.field,
-    backgroundColor: colors.field,
-  },
-  boxActive: { backgroundColor: colors.card },
-  boxFocused: { borderColor: colors.primary },
-  boxFailed: { borderColor: colors.destructive },
-  input: { flex: 1, alignSelf: 'stretch', paddingVertical: 0, paddingHorizontal: 0 },
-  trailing: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
-  button: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
-  message: { marginTop: 6, flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
-  errorIcon: { marginTop: 1 },
-  error: { flexShrink: 1, color: colors.destructive },
-  hint: { marginTop: 6 },
-});
+const styles = brandSheet(() =>
+  StyleSheet.create({
+    label: { marginBottom: 6 },
+    box: {
+      height: 52,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingLeft: 14,
+      paddingRight: 6,
+      borderRadius: radii.field,
+      borderWidth: 1.5,
+      borderColor: colors.field,
+      backgroundColor: colors.field,
+    },
+    boxActive: { backgroundColor: colors.card },
+    boxFocused: { borderColor: colors.primary },
+    boxFailed: { borderColor: colors.destructive },
+    input: { flex: 1, alignSelf: 'stretch', paddingVertical: 0, paddingHorizontal: 0 },
+    trailing: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
+    button: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
+    message: { marginTop: 6, flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+    errorIcon: { marginTop: 1 },
+    error: { flexShrink: 1, color: colors.destructive },
+    hint: { marginTop: 6 },
+  }),
+);
