@@ -1,9 +1,10 @@
 import { Decimal } from '@tugeel/shared/money';
-import { isEditable } from '@tugeel/shared/sales';
+import { isEditable, MANAGER_EDITABLE_STATUSES } from '@tugeel/shared/sales';
 import { matchesQuery, queryTerms, searchKeys } from '@tugeel/shared/text';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useHasPermission } from '@/app/auth-context';
 import {
   FilterBar,
   ListCard,
@@ -52,7 +53,8 @@ type PickedFilter = (typeof PICKED_FILTERS)[number];
 /** What a price column shows: the parts (a pack and loose pieces may differ) and the total. */
 interface Price {
   priced: boolean;
-  parts: { qty: string; uomName: string; unitPrice: string }[];
+  parts: { qty: string; uomName: string; unitPrice: string; listPrice: string }[];
+  discountAmount: string | null;
   total: string | null;
 }
 
@@ -86,7 +88,8 @@ function lineColumns(flags: {
     { key: 'warehouse', kind: 'text', weight: 1 },
     { key: 'unit', kind: 'text', weight: 1, min: 9 },
     { key: 'qty', kind: 'qty', width: 8 },
-    { key: 'unitPrice', kind: 'money', width: 11 },
+    { key: 'listPrice', kind: 'money', width: 11 },
+    { key: 'discount', kind: 'money', width: 10 },
     { key: 'amount', kind: 'money' },
     ...(flags.confirmed ? [{ key: 'reserved', kind: 'qty', width: 9 } as const] : []),
     ...(flags.backordered ? [{ key: 'backordered', kind: 'qty', width: 9 } as const] : []),
@@ -112,7 +115,12 @@ export function OrderProducts({
   const warehouseName = useWarehouseName();
   const mutations = useSalesOrderMutations();
   const action = useAction();
-  const editable = order.canEdit && isEditable(order.status);
+  // An admin changes the lines until the sale (ADR-0126 #4); others while the order is open.
+  const admin = useHasPermission('sales.boards.manage');
+  const editable =
+    order.canEdit &&
+    (isEditable(order.status) || (admin && MANAGER_EDITABLE_STATUSES.includes(order.status)));
+  const picking = order.status === 'PICKING' || order.status === 'PACKED';
   const saved = useMemo(() => linesOf(order), [order]);
   const savedById = useMemo(
     () => new Map(order.lines.map((line) => [String(line.id), line])),
@@ -159,7 +167,9 @@ export function OrderProducts({
           qty: part.qty,
           uomName: part.uomName,
           unitPrice: part.unitPrice,
+          listPrice: part.listPrice,
         })),
+        discountAmount: stored.discountAmount,
         total: stored.total,
       };
     }
@@ -172,11 +182,15 @@ export function OrderProducts({
         qty: part.qty,
         uomName: part.uomName,
         unitPrice: part.unitPrice,
+        listPrice: part.listPrice,
       })),
+      discountAmount: quoted.discountAmount,
       total: quoted.total,
     };
   };
   const total = frozen ? order.total : (quote.data?.total ?? null);
+  const subtotal = frozen ? order.subtotal : (quote.data?.subtotal ?? null);
+  const discountTotal = frozen ? order.discountTotal : (quote.data?.discountTotal ?? null);
 
   const rows = lines.map((line) => {
     const stored = savedById.get(line.key);
@@ -307,7 +321,8 @@ export function OrderProducts({
               <TableHead>{t('sales.order.warehouse')}</TableHead>
               <TableHead>{t('sales.order.unit')}</TableHead>
               <TableHead className="text-right">{t('sales.order.qty')}</TableHead>
-              <TableHead className="text-right">{t('sales.panel.products.unitPrice')}</TableHead>
+              <TableHead className="text-right">{t('sales.panel.products.listPrice')}</TableHead>
+              <TableHead className="text-right">{t('sales.panel.products.discount')}</TableHead>
               <TableHead className="text-right">{t('sales.panel.products.amount')}</TableHead>
               {confirmed ? (
                 <TableHead className="text-right">{t('sales.order.reserved')}</TableHead>
@@ -369,18 +384,23 @@ export function OrderProducts({
                     {price && !price.priced ? (
                       <span className="text-destructive">{t('sales.panel.products.noPrice')}</span>
                     ) : price && price.parts.length === 1 && price.parts[0] ? (
-                      formatTugrik(price.parts[0].unitPrice)
+                      formatTugrik(price.parts[0].listPrice)
                     ) : (
                       (price?.parts ?? []).map((part, index) => (
                         <div key={index}>
                           {t('sales.print.partLine', {
                             qty: formatQty(part.qty),
                             unit: part.uomName,
-                            price: formatMnt(part.unitPrice),
+                            price: formatMnt(part.listPrice),
                           })}
                         </div>
                       ))
                     )}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-success">
+                    {price?.discountAmount && new Decimal(price.discountAmount).gt(0)
+                      ? `−${formatTugrik(price.discountAmount)}`
+                      : ''}
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {price?.total ? formatTugrik(price.total) : ''}
@@ -450,6 +470,14 @@ export function OrderProducts({
               count: lines.length,
               total: total === null ? '0' : formatMnt(total),
             })}
+            {subtotal !== null && discountTotal !== null && new Decimal(discountTotal).gt(0) ? (
+              <span className="ml-2 font-normal text-muted-foreground">
+                {t('sales.panel.products.discountSummary', {
+                  subtotal: formatMnt(subtotal),
+                  discount: formatMnt(discountTotal),
+                })}
+              </span>
+            ) : null}
           </p>
           {invalid ? (
             <p className="text-[0.8125rem] text-destructive">{t('sales.panel.products.badQty')}</p>
@@ -461,6 +489,9 @@ export function OrderProducts({
           ) : null}
           {dirty && order.status === 'CONFIRMED' ? (
             <p className="text-[0.8125rem] text-warning">{t('sales.panel.products.repriceHint')}</p>
+          ) : null}
+          {dirty && picking ? (
+            <p className="text-[0.8125rem] text-warning">{t('sales.panel.products.repickHint')}</p>
           ) : null}
         </div>
         {editable ? (

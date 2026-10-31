@@ -120,6 +120,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'sales.orders.read',
         also: ['/sales/orders'],
       },
+      {
+        to: '/sales/picking',
+        label: 'nav.salesPicking',
+        icon: PackageCheck,
+        permission: 'sales.orders.pick',
+      },
     ],
   },
   {

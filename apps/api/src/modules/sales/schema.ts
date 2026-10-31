@@ -8,6 +8,8 @@ import {
   ORDER_LIMITS,
   ORDER_STATUSES,
   PAYMENT_METHODS,
+  PICK_STATUSES,
+  PIPELINE_KINDS,
   PIPELINE_RIGHTS,
   PIPELINE_VISIBILITIES,
   STAGE_ACTIONS,
@@ -347,6 +349,8 @@ export const salesPipelines = pgTable(
     position: smallint('position').notNull(),
     visibility: text('visibility', { enum: PIPELINE_VISIBILITIES }).notNull().default('PUBLIC'),
     ownOrdersOnly: boolean('own_orders_only').notNull().default(false),
+    /** SALES or TRANSFER (ADR-0126 #1): which stage actions it offers. */
+    kind: text('kind', { enum: PIPELINE_KINDS }).notNull().default('SALES'),
     /** The STORE warehouse a TRANSFER stage moves the picked goods into (ADR-0125); null = none. */
     transferWarehouseId: ref('transfer_warehouse_id').references(() => warehouses.id),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
@@ -362,6 +366,11 @@ export const salesPipelines = pgTable(
     ),
     check('sales_pipelines_position', sql`${t.position} >= 0`),
     check('sales_pipelines_visibility', inList(t.visibility, PIPELINE_VISIBILITIES)),
+    check('sales_pipelines_kind', inList(t.kind, PIPELINE_KINDS)),
+    check(
+      'sales_pipelines_transfer_store',
+      sql`(${t.kind} = 'TRANSFER') = (${t.transferWarehouseId} IS NOT NULL)`,
+    ),
   ],
 );
 
@@ -478,6 +487,35 @@ export const salesChannelDefaults = pgTable(
 );
 
 /** Every move of a card: from which stage to which, by whom, when. */
+/**
+ * A warehouse's part of an order (ADR-0126 #2), one per warehouse its lines ship from: OPEN until a
+ * picker takes it, PICKING by that picker, DONE once its lines are in the warehouse's STAGING. The
+ * order is PACKED when every part is DONE.
+ */
+export const salesOrderPicks = pgTable(
+  'sales_order_picks',
+  {
+    orderId: ref('order_id')
+      .notNull()
+      .references(() => salesOrders.id),
+    warehouseId: ref('warehouse_id')
+      .notNull()
+      .references(() => warehouses.id),
+    status: text('status', { enum: PICK_STATUSES }).notNull().default('OPEN'),
+    pickerId: userRef('picker_id'),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    doneAt: timestamp('done_at', { withTimezone: true }),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.orderId, t.warehouseId] }),
+    index('sales_order_picks_warehouse_idx').on(t.warehouseId, t.status),
+    check('sales_order_picks_status', inList(t.status, PICK_STATUSES)),
+    check('sales_order_picks_picker', sql`(${t.status} = 'OPEN') = (${t.pickerId} IS NULL)`),
+    check('sales_order_picks_done', sql`(${t.status} = 'DONE') = (${t.doneAt} IS NOT NULL)`),
+  ],
+);
+
 export const salesStageMoves = pgTable(
   'sales_stage_moves',
   {

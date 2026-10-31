@@ -3,7 +3,9 @@ import {
   BOARD_LIMITS,
   type CardSort,
   FINISHED_STATUSES,
+  KIND_STAGE_ACTIONS,
   type OrderChannel,
+  type PipelineKind,
   PIPELINE_RIGHTS,
   type PipelineRight,
   type PipelineVisibility,
@@ -12,7 +14,7 @@ import {
   STAGE_RIGHTS,
   type StageRight,
 } from '@tugeel/shared/sales';
-import { and, eq, isNull, notInArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -62,6 +64,8 @@ export interface PipelineInput {
   name: string;
   visibility: PipelineVisibility;
   ownOrdersOnly: boolean;
+  /** SALES or TRANSFER (ADR-0126 #1); the stage actions follow it. */
+  kind: PipelineKind;
   /** The STORE warehouse a TRANSFER stage moves the picked goods into (ADR-0125). */
   transferWarehouseId: number | null;
   roles: Record<PipelineRight, readonly number[]>;
@@ -142,7 +146,8 @@ export class SalesPipelinesService {
           position: Number.parseInt(counted?.next ?? '0', 10),
           visibility: input.visibility,
           ownOrdersOnly: input.ownOrdersOnly,
-          transferWarehouseId: input.transferWarehouseId,
+          kind: input.kind,
+          transferWarehouseId: storeOf(input),
           createdBy: actorUserId(ctx),
         })
         .returning({ id: salesPipelines.id });
@@ -195,6 +200,7 @@ export class SalesPipelinesService {
       for (const stage of removed) await this.assertStageFree(tx, stage);
       await this.assertCustomerAppStage(tx, id, stages, input.ownOrdersOnly);
       await this.checkTransferTarget(tx, input, stages);
+      if (input.kind === 'TRANSFER') await this.assertNoAppChannel(tx, id);
 
       await tx
         .update(salesPipelines)
@@ -203,7 +209,8 @@ export class SalesPipelinesService {
           name,
           visibility: input.visibility,
           ownOrdersOnly: input.ownOrdersOnly,
-          transferWarehouseId: input.transferWarehouseId,
+          kind: input.kind,
+          transferWarehouseId: storeOf(input),
           updatedAt: sql`now()`,
         })
         .where(eq(salesPipelines.id, id));
@@ -265,6 +272,7 @@ export class SalesPipelinesService {
           name: pipeline.name,
           visibility: pipeline.visibility,
           ownOrdersOnly: pipeline.ownOrdersOnly,
+          kind: pipeline.kind,
           transferWarehouseId: pipeline.transferWarehouseId,
           roles: pipeline.roles,
         },
@@ -283,16 +291,25 @@ export class SalesPipelinesService {
     input: PipelineInput,
     stages: readonly StageInput[],
   ): Promise<void> {
+    // The stage actions follow the pipeline's kind (ADR-0126 #1).
+    const allowed = KIND_STAGE_ACTIONS[input.kind];
+    const index = stages.findIndex((stage) => !allowed.includes(stage.action));
+    const stray = stages[index];
+    if (stray) {
+      throw new AppError(
+        'PIPELINE_KIND_STAGE',
+        `stage ${stray.name} does ${stray.action}, not offered by a ${input.kind} pipeline`,
+        { stage: stray.name, action: stray.action, kind: input.kind },
+      );
+    }
     const transferStage = stages.find((stage) => stage.action === 'TRANSFER');
+    if (input.kind === 'SALES') return;
     if (input.transferWarehouseId === null) {
-      if (transferStage) {
-        throw new AppError(
-          'PIPELINE_TRANSFER_STAGE_NEEDS_STORE',
-          `stage ${transferStage.name} transfers, but the pipeline names no store`,
-          { stage: transferStage.name },
-        );
-      }
-      return;
+      throw new AppError(
+        'PIPELINE_TRANSFER_STAGE_NEEDS_STORE',
+        'a transfer pipeline names its store',
+        { stage: transferStage?.name ?? input.name },
+      );
     }
     const warehouse = await this.org.getWarehouse(input.transferWarehouseId, tx).catch(() => null);
     if (!warehouse || warehouse.kind !== 'STORE' || warehouse.status !== 'ACTIVE') {
@@ -301,6 +318,24 @@ export class SalesPipelinesService {
         `warehouse ${input.transferWarehouseId} is not an active store`,
         { warehouse: warehouse?.name ?? null },
       );
+    }
+  }
+
+  /** The customer app and the reps land only in SALES pipelines (ADR-0126 #1). */
+  private async assertNoAppChannel(tx: Tx, pipelineId: number): Promise<void> {
+    const [landing] = await tx
+      .select({ channel: salesChannelDefaults.channel })
+      .from(salesChannelDefaults)
+      .where(
+        and(
+          eq(salesChannelDefaults.pipelineId, pipelineId),
+          inArray(salesChannelDefaults.channel, ['CUSTOMER_APP', 'SALES_REP']),
+        ),
+      );
+    if (landing) {
+      throw new AppError('PIPELINE_KIND_CHANNEL', `the ${landing.channel} channel lands here`, {
+        channel: landing.channel,
+      });
     }
   }
 
@@ -365,6 +400,7 @@ export class SalesPipelinesService {
           name,
           visibility: source.visibility,
           ownOrdersOnly: source.ownOrdersOnly,
+          kind: source.kind,
           transferWarehouseId: source.transferWarehouseId,
           roles: source.roles,
           stages,
@@ -785,6 +821,11 @@ function rolesFor(input: PipelineInput): Record<PipelineRight, readonly number[]
   };
 }
 
+/** A SALES pipeline names no store (ADR-0126 #1). */
+function storeOf(input: PipelineInput): number | null {
+  return input.kind === 'TRANSFER' ? input.transferWarehouseId : null;
+}
+
 function checkedStages(stages: readonly StageInput[]): StageInput[] {
   if (stages.length === 0) throw invalid('stages', 'min', 'a pipeline needs a stage');
   if (stages.length > BOARD_LIMITS.maxStages) {
@@ -806,7 +847,8 @@ function summaryOf(input: PipelineInput, name: string) {
     name,
     visibility: input.visibility,
     ownOrdersOnly: input.ownOrdersOnly,
-    transferWarehouseId: input.transferWarehouseId,
+    kind: input.kind,
+    transferWarehouseId: storeOf(input),
     roles: rolesFor(input),
   };
 }

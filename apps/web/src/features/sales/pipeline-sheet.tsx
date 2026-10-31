@@ -1,4 +1,10 @@
-import type { PipelineRight, PipelineVisibility } from '@tugeel/shared/sales';
+import {
+  KIND_STAGE_ACTIONS,
+  PIPELINE_KINDS,
+  type PipelineKind,
+  type PipelineRight,
+  type PipelineVisibility,
+} from '@tugeel/shared/sales';
 import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -72,6 +78,7 @@ export function PipelineSheet({
     pipeline?.visibility ?? 'PUBLIC',
   );
   const [ownOrdersOnly, setOwnOrdersOnly] = useState(pipeline?.ownOrdersOnly ?? false);
+  const [kind, setKind] = useState<PipelineKind>(pipeline?.kind ?? 'SALES');
   const [transferWarehouseId, setTransferWarehouseId] = useState<number | null>(
     pipeline?.transferWarehouseId ?? null,
   );
@@ -103,6 +110,7 @@ export function PipelineSheet({
     board,
     visibility,
     ownOrdersOnly,
+    kind,
     transferWarehouseId,
     roles,
     stages: stages.map(({ key: _key, ...stage }) => stage),
@@ -131,7 +139,8 @@ export function PipelineSheet({
         name: name.trim(),
         visibility,
         ownOrdersOnly,
-        transferWarehouseId,
+        kind,
+        transferWarehouseId: kind === 'TRANSFER' ? transferWarehouseId : null,
         roles: {
           VIEW: visibility === 'PRIVATE' ? roles.VIEW : [],
           MANAGE: roles.MANAGE,
@@ -212,26 +221,39 @@ export function PipelineSheet({
                   onChange={(value) => setRight('VIEW', value)}
                 />
               ) : null}
-              <FormField
-                label={t('sales.pipelines.transferWarehouse')}
-                htmlFor="pipeline-transfer"
-                hint={t('sales.pipelines.transferWarehouseHint')}
-              >
-                <NativeSelect
-                  id="pipeline-transfer"
-                  value={transferWarehouseId ?? ''}
-                  onChange={(event) =>
-                    setTransferWarehouseId(Number.parseInt(event.target.value, 10) || null)
-                  }
+              <fieldset className="flex flex-col gap-2">
+                <legend className="text-sm font-medium">{t('sales.pipelines.kind')}</legend>
+                <SegmentedControl
+                  options={PIPELINE_KINDS}
+                  value={kind}
+                  label={(value) => t(`sales.pipelines.kinds.${value}`)}
+                  onChange={setKind}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t(`sales.pipelines.kindHints.${kind}`)}
+                </p>
+              </fieldset>
+              {kind === 'TRANSFER' ? (
+                <FormField
+                  label={t('sales.pipelines.transferWarehouse')}
+                  htmlFor="pipeline-transfer"
+                  hint={t('sales.pipelines.transferWarehouseHint')}
                 >
-                  <option value="">{t('sales.pipelines.transferWarehouseNone')}</option>
-                  {stores.map((entry) => (
-                    <option key={entry.id} value={entry.id}>
-                      {entry.name}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </FormField>
+                  <NativeSelect
+                    id="pipeline-transfer"
+                    value={transferWarehouseId ?? ''}
+                    onChange={(event) =>
+                      setTransferWarehouseId(Number.parseInt(event.target.value, 10) || null)
+                    }
+                  >
+                    {stores.map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.name}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </FormField>
+              ) : null}
               <RolesField
                 right="MANAGE"
                 hint={t('sales.pipelines.manageHint')}
@@ -336,6 +358,7 @@ export function PipelineSheet({
           >
             {editing !== null ? (
               <StageDialog
+                actions={KIND_STAGE_ACTIONS[kind]}
                 stage={editing === 'new' ? null : editing}
                 onSave={(saved) => {
                   setStages((current) =>

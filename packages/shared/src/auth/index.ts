@@ -59,6 +59,9 @@ export const PERMISSIONS = [
   // Boards and stages (ADR-0056): configuring them; confirming picked counts.
   'sales.boards.manage',
   'sales.orders.pick',
+  // The warehouse lead (ADR-0126 #2): sees every warehouse's part of the orders with its picker,
+  // hands a part to another picker and opens a picked part again.
+  'sales.orders.pickLead',
   // The sales-rep app (ADR-0061 #5): the rep's own orders only, through /sales-rep/*.
   'sales.orders.rep',
   // Finance (ADR-0060): reading invoices, balances and books; recording money; voiding invoices

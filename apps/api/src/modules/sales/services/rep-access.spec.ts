@@ -38,6 +38,7 @@ const pipeline = (fields: Partial<PipelineView> = {}): PipelineView => ({
   boardId: 1,
   name: 'Мөрөн Борлуулалт',
   position: 0,
+  kind: 'SALES',
   transferWarehouseId: null,
   visibility: 'PUBLIC',
   ownOrdersOnly: false,

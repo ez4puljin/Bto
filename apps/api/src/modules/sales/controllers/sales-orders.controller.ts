@@ -26,14 +26,23 @@ import {
   SalesOrderProductInfoDto,
   SalesOrderProductInfoQueryDto,
   SalesOrderRequestDto,
+  SalesPickAssignRequestDto,
 } from '../dto/sales-orders.dto';
 import { overdueDto } from '../overdue';
 import { type OrderDetail, SalesOrderQueryService } from '../services/sales-order-query.service';
 import { type OrderInput, SalesOrdersService } from '../services/sales-orders.service';
+import { type PickPart, SalesPicksService } from '../services/sales-picks.service';
 
 const READ = 'sales.orders.read';
 const MANAGE = 'sales.orders.manage';
 const PICK = 'sales.orders.pick';
+const LEAD = 'sales.orders.pickLead';
+
+const partDto = (part: PickPart) => ({
+  ...part,
+  startedAt: iso(part.startedAt),
+  doneAt: iso(part.doneAt),
+});
 
 @ApiSchema({ name: 'SalesOrderMoveResult' })
 class SalesOrderMoveResultDto {
@@ -104,6 +113,7 @@ function toDetail(order: OrderDetail): SalesOrderDetailDto {
     canEdit: order.canEdit,
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
+    picks: order.picks.map(partDto),
     lines: order.lines.map((line) => ({
       id: line.id,
       lineNo: line.lineNo,
@@ -173,6 +183,7 @@ export class SalesOrdersController {
   constructor(
     private readonly orders: SalesOrdersService,
     private readonly queries: SalesOrderQueryService,
+    private readonly picks: SalesPicksService,
   ) {}
 
   @Get()
@@ -320,6 +331,75 @@ export class SalesOrdersController {
         })),
       ),
     );
+  }
+
+  /** A keeper takes their warehouse's part of the order (ADR-0126 #2). */
+  @Post(':id/picks/:warehouseId/take')
+  @HttpCode(200)
+  @RequirePermission(PICK)
+  @ApiOkResponse({ type: SalesOrderDetailDto })
+  async takePart(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('warehouseId', ParseIntPipe) warehouseId: number,
+  ): Promise<SalesOrderDetailDto> {
+    await this.picks.claim(ctx, id, warehouseId);
+    return toDetail(await this.queries.detail(ctx, id));
+  }
+
+  /** One warehouse's picked counts: its lines to STAGING; the last part packs the order. */
+  @Post(':id/picks/:warehouseId/pick')
+  @HttpCode(200)
+  @RequirePermission(PICK)
+  @Idempotent()
+  @ApiOkResponse({ type: SalesOrderDetailDto })
+  async pickPart(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('warehouseId', ParseIntPipe) warehouseId: number,
+    @Body() body: SalesOrderPickRequestDto,
+  ): Promise<SalesOrderDetailDto> {
+    return toDetail(
+      await this.orders.pickPart(
+        ctx,
+        id,
+        warehouseId,
+        body.lines.map((line) => ({
+          lineId: line.lineId,
+          qty: new Decimal(line.qty),
+          binId: line.binId,
+        })),
+      ),
+    );
+  }
+
+  /** A lead hands a part to another picker. */
+  @Post(':id/picks/:warehouseId/assign')
+  @HttpCode(200)
+  @RequirePermission(LEAD)
+  @ApiOkResponse({ type: SalesOrderDetailDto })
+  async assignPart(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('warehouseId', ParseIntPipe) warehouseId: number,
+    @Body() body: SalesPickAssignRequestDto,
+  ): Promise<SalesOrderDetailDto> {
+    await this.picks.assign(ctx, id, warehouseId, body.userId);
+    return toDetail(await this.queries.detail(ctx, id));
+  }
+
+  /** A lead opens a picked part again: its goods back on their shelves, reserved again. */
+  @Post(':id/picks/:warehouseId/reopen')
+  @HttpCode(200)
+  @RequirePermission(LEAD)
+  @ApiOkResponse({ type: SalesOrderDetailDto })
+  async reopenPart(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('warehouseId', ParseIntPipe) warehouseId: number,
+  ): Promise<SalesOrderDetailDto> {
+    await this.picks.reopen(ctx, id, warehouseId);
+    return toDetail(await this.queries.detail(ctx, id));
   }
 
   /** DRAFT → CONFIRMED: prices frozen, stock reserved (the rest backordered). */

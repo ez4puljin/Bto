@@ -25,6 +25,8 @@ export type PickLineInfo = Schemas['SalesOrderPickLineInfo'];
 export type MoveResult = Schemas['SalesOrderMoveResult'];
 export type ChannelDefault = Schemas['SalesChannelDefault'];
 export type Numbering = Schemas['SalesNumbering'];
+export type PickPart = Schemas['SalesOrderPickPart'];
+export type PickWork = Schemas['SalesPickWork'];
 
 /** The cards and list filters as the API takes them (`orderFilterQuery`). */
 export interface FilterQuery {
@@ -56,6 +58,8 @@ export const SALES_KEYS = {
   numbering: ['sales', 'settings', 'numbering'] as const,
   orders: ['sales', 'orders'] as const,
   pickInfo: (orderId: number) => ['sales', 'orders', orderId, 'pick-info'] as const,
+  pickWork: ['sales', 'picks'] as const,
+  pickers: (warehouseId: number) => ['sales', 'picks', 'pickers', warehouseId] as const,
 };
 
 /** The boards with the pipelines the caller sees (managers: also empty and, asked, archived). */
@@ -169,6 +173,32 @@ export function usePickInfo(orderId: number | null) {
       unwrap(
         await api.GET('/api/v1/sales-orders/{id}/pick-info', {
           params: { path: { id: orderId ?? 0 } },
+          signal,
+        }),
+      ),
+  });
+}
+
+/** The picking page (ADR-0126 #2): the parts of the caller's warehouses (a lead: all). */
+export function usePickWork() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: SALES_KEYS.pickWork,
+    queryFn: async ({ signal }) => unwrap(await api.GET('/api/v1/sales-picks', { signal })),
+    refetchInterval: 30_000,
+  });
+}
+
+/** Who may pick in a warehouse, for the lead's «Хуваарилах». */
+export function usePickers(warehouseId: number | null) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: SALES_KEYS.pickers(warehouseId ?? 0),
+    enabled: warehouseId !== null,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/sales-picks/pickers', {
+          params: { query: { warehouseId: warehouseId ?? 0 } },
           signal,
         }),
       ),
@@ -303,6 +333,62 @@ export function useSalesMutations() {
           await api.POST('/api/v1/sales-orders/{id}/pick', {
             params: { path: { id: orderId }, header: idempotencyKey(key) },
             body: { lines },
+          }),
+        ),
+      ...done,
+    }),
+    takePart: useMutation({
+      mutationFn: async ({ orderId, warehouseId }: { orderId: number; warehouseId: number }) =>
+        unwrap(
+          await api.POST('/api/v1/sales-orders/{id}/picks/{warehouseId}/take', {
+            params: { path: { id: orderId, warehouseId } },
+          }),
+        ),
+      ...done,
+    }),
+    pickPart: useMutation({
+      mutationFn: async ({
+        orderId,
+        warehouseId,
+        key,
+        lines,
+      }: {
+        orderId: number;
+        warehouseId: number;
+        key: string;
+        lines: { lineId: number; qty: string; binId: number }[];
+      }) =>
+        unwrap(
+          await api.POST('/api/v1/sales-orders/{id}/picks/{warehouseId}/pick', {
+            params: { path: { id: orderId, warehouseId }, header: idempotencyKey(key) },
+            body: { lines },
+          }),
+        ),
+      ...done,
+    }),
+    assignPart: useMutation({
+      mutationFn: async ({
+        orderId,
+        warehouseId,
+        userId,
+      }: {
+        orderId: number;
+        warehouseId: number;
+        userId: number;
+      }) =>
+        unwrap(
+          await api.POST('/api/v1/sales-orders/{id}/picks/{warehouseId}/assign', {
+            params: { path: { id: orderId, warehouseId } },
+            body: { userId },
+          }),
+        ),
+      ...done,
+    }),
+    reopenPart: useMutation({
+      mutationFn: async ({ orderId, warehouseId }: { orderId: number; warehouseId: number }) =>
+        unwrap(
+          await api.POST('/api/v1/sales-orders/{id}/picks/{warehouseId}/reopen', {
+            params: { path: { id: orderId, warehouseId } },
           }),
         ),
       ...done,

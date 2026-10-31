@@ -33,7 +33,7 @@ import { OrderActivity } from './order-activity';
 import { OrderStatusBadge, PaymentLabel } from './order-badges';
 import { OrderOverview } from './order-overview';
 import { PANEL_TABS, type PanelTab } from './order-panel-tabs';
-import { PickForm } from './order-pick';
+import { PickParts } from './order-pick';
 import { OrderProducts } from './order-products';
 import { OrderProperties } from './order-properties';
 import {
@@ -150,7 +150,7 @@ function PanelBody({
   const pickable =
     canPick &&
     detail !== undefined &&
-    (detail.status === 'CONFIRMED' || detail.status === 'PICKING');
+    (detail.status === 'CONFIRMED' || detail.status === 'PICKING' || detail.status === 'PACKED');
   const tabs = PANEL_TABS.filter((entry) => entry !== 'pick' || pickable);
   const current = tabs.includes(tab) ? tab : 'overview';
   const title = detail ? (detail.number ?? t('sales.order.draftNo', { id: detail.id })) : '';
@@ -224,7 +224,7 @@ function PanelBody({
             </TabsContent>
             {pickable ? (
               <TabsContent value="pick">
-                <PickForm order={detail} />
+                <PickParts order={detail} />
               </TabsContent>
             ) : null}
             <TabsContent value="activity">

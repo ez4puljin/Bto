@@ -15319,6 +15319,251 @@
         ]
       }
     },
+    "/api/v1/sales-orders/{id}/picks/{warehouseId}/take": {
+      "post": {
+        "operationId": "SalesOrders_takePart",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A keeper takes their warehouse's part of the order (ADR-0126 #2).",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-orders/{id}/picks/{warehouseId}/pick": {
+      "post": {
+        "operationId": "SalesOrders_pickPart",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesOrderPickRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One warehouse's picked counts: its lines to STAGING; the last part packs the order.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-orders/{id}/picks/{warehouseId}/assign": {
+      "post": {
+        "operationId": "SalesOrders_assignPart",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesPickAssignRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A lead hands a part to another picker.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-orders/{id}/picks/{warehouseId}/reopen": {
+      "post": {
+        "operationId": "SalesOrders_reopenPart",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A lead opens a picked part again: its goods back on their shelves, reserved again.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales-orders/{id}/submit": {
       "post": {
         "operationId": "SalesOrders_submit",
@@ -17229,6 +17474,106 @@
         ],
         "tags": [
           "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-picks": {
+      "get": {
+        "operationId": "SalesPicks_work",
+        "parameters": [
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "description": "One warehouse only",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesPickWork"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The parts in the caller's warehouses (a lead: all), not done or done today.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-picks/pickers": {
+      "get": {
+        "operationId": "SalesPicks_pickers",
+        "parameters": [
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesPicker"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Who may pick in a warehouse: the lead's choice when handing a part over.",
+        "tags": [
+          "sales"
         ]
       }
     },
@@ -29588,6 +29933,7 @@
           "sales.orders.manage",
           "sales.boards.manage",
           "sales.orders.pick",
+          "sales.orders.pickLead",
           "sales.orders.rep",
           "finance.read",
           "finance.payments.record",
@@ -42331,6 +42677,56 @@
           "parts"
         ]
       },
+      "SalesOrderPickPart": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "number"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "OPEN",
+              "PICKING",
+              "DONE"
+            ],
+            "type": "string"
+          },
+          "pickerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "pickerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "doneAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "orderId",
+          "warehouseId",
+          "warehouseName",
+          "status",
+          "pickerId",
+          "pickerName",
+          "startedAt",
+          "doneAt"
+        ]
+      },
       "SalesOrderEvent": {
         "type": "object",
         "properties": {
@@ -42643,6 +43039,13 @@
               "$ref": "#/components/schemas/SalesOrderLine"
             }
           },
+          "picks": {
+            "description": "Each warehouse's part (ADR-0126)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderPickPart"
+            }
+          },
           "events": {
             "type": "array",
             "items": {
@@ -42698,6 +43101,7 @@
           "createdAt",
           "updatedAt",
           "lines",
+          "picks",
           "events",
           "moves"
         ]
@@ -42949,6 +43353,19 @@
         },
         "required": [
           "lines"
+        ]
+      },
+      "SalesPickAssignRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The picker the part goes to"
+          }
+        },
+        "required": [
+          "userId"
         ]
       },
       "SalesOrderCancelRequest": {
@@ -43255,6 +43672,13 @@
           "ownOrdersOnly": {
             "type": "boolean"
           },
+          "kind": {
+            "enum": [
+              "SALES",
+              "TRANSFER"
+            ],
+            "type": "string"
+          },
           "transferWarehouseId": {
             "type": "number",
             "nullable": true,
@@ -43295,6 +43719,7 @@
           "position",
           "visibility",
           "ownOrdersOnly",
+          "kind",
           "transferWarehouseId",
           "archivedAt",
           "createdAt",
@@ -43504,6 +43929,14 @@
           },
           "ownOrdersOnly": {
             "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "SALES",
+              "TRANSFER"
+            ],
+            "type": "string",
+            "description": "SALES (default) or TRANSFER (ADR-0126)"
           },
           "transferWarehouseId": {
             "type": "number",
@@ -45049,6 +45482,108 @@
           "addresses",
           "contacts",
           "overdue"
+        ]
+      },
+      "SalesPickWork": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "number"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "OPEN",
+              "PICKING",
+              "DONE"
+            ],
+            "type": "string"
+          },
+          "pickerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "pickerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "doneAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "orderNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "orderStatus": {
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVAL_PENDING",
+              "CONFIRMED",
+              "PICKING",
+              "PACKED",
+              "DISPATCHED",
+              "DELIVERED",
+              "DELIVERY_FAILED",
+              "INVOICED",
+              "CLOSED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "deliveryDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "lines": {
+            "type": "number",
+            "description": "The order's lines in this warehouse"
+          }
+        },
+        "required": [
+          "orderId",
+          "warehouseId",
+          "warehouseName",
+          "status",
+          "pickerId",
+          "pickerName",
+          "startedAt",
+          "doneAt",
+          "orderNumber",
+          "orderStatus",
+          "customerName",
+          "deliveryDate",
+          "lines"
+        ]
+      },
+      "SalesPicker": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "fullName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "fullName"
         ]
       },
       "Invoice": {
@@ -59944,6 +60479,12 @@
           "CREDIT_BLOCKED",
           "CREDIT_NEEDS_APPROVAL",
           "ORDER_STATE_INVALID",
+          "PICK_INCOMPLETE",
+          "PICK_TAKEN",
+          "PICK_STATE_INVALID",
+          "PICKER_INVALID",
+          "PIPELINE_KIND_STAGE",
+          "PIPELINE_KIND_CHANNEL",
           "PIPELINE_NO_TRANSFER_WAREHOUSE",
           "PIPELINE_TRANSFER_STAGE_NEEDS_STORE",
           "PIPELINE_TRANSFER_WAREHOUSE_INVALID",

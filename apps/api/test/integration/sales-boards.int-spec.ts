@@ -460,11 +460,12 @@ describe('sales boards', () => {
       .update(draft.id, orderBody(shop.id, [{ productUnitId: pcs(cola), qty: '1' }]))
       .expect(403);
 
-    // A sale before picking is refused; «Бэлдэх» starts picking (the picker's stage).
+    // A sale before picking is refused, naming the warehouse not picked (ADR-0126); «Бэлдэх» starts
+    // picking (the picker's stage).
     expect(
       ((await api(office).move(draft.id, stage('Борлуулалт').id).expect(409)).body as ProblemJson)
         .code,
-    ).toBe('ORDER_STATE_INVALID');
+    ).toBe('PICK_INCOMPLETE');
     await api(office).move(draft.id, stage('Бэлдэх').id).expect(403);
     const picking = (await api(picker).move(draft.id, stage('Бэлдэх').id).expect(200)).body as {
       order: OrderJson;
@@ -820,6 +821,7 @@ describe('sales boards', () => {
       name: 'Заал хөдөлгөөн',
       visibility: 'PUBLIC',
       ownOrdersOnly: false,
+      kind: 'TRANSFER',
       transferWarehouseId,
       roles: NO_ROLES,
       stages,
@@ -858,13 +860,13 @@ describe('sales boards', () => {
       orderBody(shop.id, [{ productUnitId: pcs(cola), qty: '4' }], { pipelineId: moving.id }),
     );
     await api(office).move(draft.id, stage('Нөөцлөх', moving).id).expect(200);
-    // Not before the goods are picked.
+    // Not before every warehouse has picked (ADR-0126).
     expect(
       (
         (await api(office).move(draft.id, stage('Зааланд орсон', moving).id).expect(409))
           .body as ProblemJson
       ).code,
-    ).toBe('ORDER_STATE_INVALID');
+    ).toBe('PICK_INCOMPLETE');
     await api(picker).move(draft.id, stage('Бэлдэх', moving).id).expect(200);
     const lineId = (await orders.get(draft.id)).lines[0]?.id;
     await http()

@@ -46,6 +46,7 @@ import { SalesOrderNewPage, SalesOrderPage } from '@/features/sales/orders-pages
 import { SalesBatchPrintPage, SalesOrderPrintPage } from '@/features/sales/print-page';
 import { SalesSettingsPage } from '@/features/sales/settings-page';
 import { SalesWorkPage } from '@/features/sales/work-page';
+import { SalesPickingPage } from '@/features/sales/picking-page';
 import { SegmentEditorPage, SegmentPage, SegmentsPage } from '@/features/segments/segment-pages';
 import { TransferPage, TransfersPage } from '@/features/inventory/transfers-pages';
 import { CustomerCreatePage } from '@/features/partners/customer-create-page';
@@ -493,6 +494,15 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission="sales.orders.read">
                 <SalesWorkPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: 'sales/picking',
+            handle: { width: 'full' },
+            element: (
+              <RequirePermission permission="sales.orders.pick">
+                <SalesPickingPage />
               </RequirePermission>
             ),
           },

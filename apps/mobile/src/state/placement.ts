@@ -1,3 +1,5 @@
+import type { StageAction } from '@tugeel/shared/sales';
+
 /** The boards, pipelines and stages a rep may place on, as GET /sales-rep/context gives them. */
 export interface PlaceableBoards {
   boards: {
@@ -9,7 +11,7 @@ export interface PlaceableBoards {
       stages: {
         id: number;
         name: string;
-        action: 'NONE' | 'CONFIRM' | 'PICK' | 'SALE' | 'CANCEL';
+        action: StageAction;
       }[];
     }[];
   }[];

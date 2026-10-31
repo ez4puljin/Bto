@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type {
+  PipelineKind,
   CardSort,
   PipelineRight,
   PipelineVisibility,
@@ -46,6 +47,8 @@ export interface PipelineView {
   position: number;
   visibility: PipelineVisibility;
   ownOrdersOnly: boolean;
+  /** SALES or TRANSFER (ADR-0126 #1). */
+  kind: PipelineKind;
   /** The STORE warehouse a TRANSFER stage fills (ADR-0125); null = none. */
   transferWarehouseId: number | null;
   archivedAt: Date | null;
@@ -118,6 +121,17 @@ export class Access {
 
   get unrestricted(): boolean {
     return this.ctx === null || this.ctx.permissions.has(MANAGE);
+  }
+
+  /**
+   * The warehouses whose order lines the caller sees (ADR-0126 #3): every one (null), unless a
+   * keeper without `sales.orders.manage` writes only some warehouses — then only those.
+   */
+  get lineWarehouses(): ReadonlySet<number> | null {
+    const ctx = this.ctx;
+    if (ctx === null || this.unrestricted || ctx.permissions.has('sales.orders.manage'))
+      return null;
+    return ctx.writableWarehouseIds;
   }
 
   pipeline(id: number): PipelineView | undefined {
@@ -254,6 +268,7 @@ export class SalesAccessService {
         position: row.position,
         visibility: row.visibility,
         ownOrdersOnly: row.ownOrdersOnly,
+        kind: row.kind,
         transferWarehouseId: row.transferWarehouseId,
         archivedAt: row.archivedAt,
         createdBy: row.createdBy,

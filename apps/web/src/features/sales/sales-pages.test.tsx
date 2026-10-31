@@ -188,6 +188,7 @@ const ORDER: Schemas['SalesOrderDetail'] = {
   canEdit: true,
   createdAt: STAMP,
   updatedAt: STAMP,
+  picks: [],
   moves: [],
   lines: [LINE],
   events: [

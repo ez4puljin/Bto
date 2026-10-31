@@ -6,6 +6,7 @@ import { PartnersModule } from '../partners';
 import { PricingModule } from '../pricing';
 import { SalesBoardsController } from './controllers/sales-boards.controller';
 import { SalesOrdersController } from './controllers/sales-orders.controller';
+import { SalesPicksController } from './controllers/sales-picks.controller';
 import {
   SalesPipelinesController,
   SalesStagesController,
@@ -16,6 +17,7 @@ import { SalesAccessService } from './services/sales-access.service';
 import { SalesBoardsService } from './services/sales-boards.service';
 import { SalesOrderQueryService } from './services/sales-order-query.service';
 import { SalesOrdersService } from './services/sales-orders.service';
+import { SalesPicksService } from './services/sales-picks.service';
 import { SalesPipelinesService } from './services/sales-pipelines.service';
 import { SalesRepOrdersService } from './services/sales-rep-orders.service';
 import { SalesRepShopService } from './services/sales-rep-shop.service';
@@ -36,6 +38,7 @@ import { SalesSettingsService } from './services/sales-settings.service';
     SalesSettingsService,
     SalesOrderQueryService,
     SalesOrdersService,
+    SalesPicksService,
     SalesRepOrdersService,
     SalesRepShopService,
     CustomerOrdersService,
@@ -47,6 +50,7 @@ import { SalesSettingsService } from './services/sales-settings.service';
     SalesSettingsService,
     SalesOrderQueryService,
     SalesOrdersService,
+    SalesPicksService,
     SalesRepOrdersService,
     SalesRepShopService,
     CustomerOrdersService,
@@ -64,6 +68,7 @@ export class SalesModule {}
     SalesStagesController,
     SalesSettingsController,
     SalesRepController,
+    SalesPicksController,
   ],
 })
 export class SalesHttpModule {}

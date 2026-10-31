@@ -42,6 +42,7 @@ const PIPELINE: Schemas['SalesPipeline'] = {
   visibility: 'PUBLIC',
   ownOrdersOnly: false,
   transferWarehouseId: null,
+  kind: 'SALES',
   archivedAt: null,
   createdAt: STAMP,
   roles: { VIEW: [], MANAGE: [], ALL_ORDERS: [] },
@@ -132,6 +133,7 @@ describe('boards and pipelines settings', () => {
       name: 'Орон нутаг',
       visibility: 'PRIVATE',
       ownOrdersOnly: true,
+      kind: 'SALES',
       transferWarehouseId: null,
       roles: { VIEW: [2], MANAGE: [], ALL_ORDERS: [4] },
       stages: [

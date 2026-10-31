@@ -71,6 +71,7 @@ const PIPELINE: Schemas['SalesPipeline'] = {
   visibility: 'PUBLIC',
   ownOrdersOnly: false,
   transferWarehouseId: null,
+  kind: 'SALES',
   archivedAt: null,
   createdAt: STAMP,
   roles: { VIEW: [], MANAGE: [], ALL_ORDERS: [] },
@@ -168,6 +169,7 @@ const ORDER: Schemas['SalesOrderDetail'] = {
   updatedAt: STAMP,
   lines: [],
   events: [],
+  picks: [],
   moves: [],
 };
 const ROW: Schemas['SalesOrderSummary'] = {

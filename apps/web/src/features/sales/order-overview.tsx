@@ -116,6 +116,12 @@ export function OrderOverview({
           },
         ]
       : []),
+    ...(order.subtotal !== null && order.discountTotal !== null && order.discountTotal !== '0'
+      ? [
+          { label: t('sales.order.subtotal'), value: formatTugrik(order.subtotal) },
+          { label: t('sales.order.discount'), value: `−${formatTugrik(order.discountTotal)}` },
+        ]
+      : []),
     {
       label: t('sales.order.total'),
       value: order.total === null ? t('sales.panel.totalLater') : formatTugrik(order.total),

@@ -8,6 +8,7 @@ import {
   isCancellable,
   isEditable,
   isFinished,
+  MANAGER_EDITABLE_STATUSES,
   ORDER_LIMITS,
   type OrderChannel,
   orderHeaderIssues,
@@ -70,6 +71,7 @@ import {
 } from '../schema';
 import { type Access, isContext, SalesAccessService } from './sales-access.service';
 import { type OrderDetail, SalesOrderQueryService } from './sales-order-query.service';
+import { SalesPicksService } from './sales-picks.service';
 import { type Placement, SalesPipelinesService } from './sales-pipelines.service';
 import { SalesSettingsService } from './sales-settings.service';
 
@@ -174,6 +176,7 @@ export class SalesOrdersService implements OnModuleInit {
     private readonly scope: ScopeService,
     private readonly org: OrgService,
     private readonly transfers: TransfersService,
+    private readonly picks: SalesPicksService,
     private readonly moduleRef: ModuleRef,
   ) {}
 
@@ -284,12 +287,31 @@ export class SalesOrdersService implements OnModuleInit {
   async update(ctx: AuthContext, id: number, input: OrderInput): Promise<OrderDetail> {
     await inTransaction(this.db, async (tx) => {
       const { order, access } = await this.lockSeen(ctx, tx, id);
-      if (!isEditable(order.status)) throw stateError(order, 'EDITABLE');
+      // Only an admin (who configures the boards) changes a picking or packed order (ADR-0126 #4).
+      const manager = ctx.permissions.has('sales.boards.manage');
+      if (
+        !isEditable(order.status) &&
+        !(manager && MANAGER_EDITABLE_STATUSES.includes(order.status))
+      ) {
+        throw stateError(order, 'EDITABLE');
+      }
       if (input.customerId !== order.customerId) {
         throw invalid('customerId', 'fixed', 'the customer of an order does not change');
       }
-      assertCanEdit(access, order);
+      // An admin changes an order in any stage (ADR-0126 #4); others need the stage's EDIT right.
+      if (!ctx.permissions.has('sales.boards.manage')) assertCanEdit(access, order);
       const header = await this.checkedHeader(tx, input);
+      // A picking or packed order: the warehouses whose lines change are opened again (their goods
+      // back on the shelves); the other warehouses keep their picked counts (ADR-0126 #4).
+      const picking = order.status === 'PICKING' || order.status === 'PACKED';
+      const kept: LineRow[] = [];
+      if (picking) {
+        const before = await this.linesOf(tx, id);
+        const after = await this.placedLines(tx, input.lines);
+        const changed = changedWarehouses(before, after);
+        await this.picks.unpickInTx(tx, ctx, order, [...changed]);
+        kept.push(...before.filter((line) => !changed.has(line.warehouseId)));
+      }
       await tx
         .update(salesOrders)
         .set({ ...header, updatedAt: sql`now()` })
@@ -307,9 +329,11 @@ export class SalesOrdersService implements OnModuleInit {
       );
       await tx.delete(salesOrderLines).where(eq(salesOrderLines.orderId, id));
       await this.writeLines(tx, id, input.lines);
+      if (kept.length > 0) await this.keepPicked(tx, id, kept);
       let repriced: { total: string; backordered: number } | null = null;
-      if (order.status === 'CONFIRMED') {
-        const { quote, reserved } = await this.priceAndReserve(tx, ctx, order, true);
+      if (order.status === 'CONFIRMED' || picking) {
+        const done = picking ? await this.picks.doneWarehousesInTx(tx, id) : new Set<number>();
+        const { quote, reserved } = await this.priceAndReserve(tx, ctx, order, true, done);
         await tx
           .update(salesOrders)
           .set({
@@ -324,6 +348,7 @@ export class SalesOrdersService implements OnModuleInit {
           total: quote.total.toFixed(0),
           backordered: reserved.filter((entry) => entry.backordered.gt(0)).length,
         };
+        await this.picks.syncInTx(tx, id);
       }
       await this.audit.record(tx, ctx, {
         action: 'UPDATE',
@@ -384,11 +409,11 @@ export class SalesOrdersService implements OnModuleInit {
           }
           break;
         case 'SALE':
-          if (order.status !== 'PACKED') throw stateError(order, 'PACKED');
+          await this.assertPacked(tx, order);
           await this.saleInTx(tx, ctx, order);
           break;
         case 'TRANSFER':
-          if (order.status !== 'PACKED') throw stateError(order, 'PACKED');
+          await this.assertPacked(tx, order);
           if (pipeline.transferWarehouseId === null) {
             throw new AppError(
               'PIPELINE_NO_TRANSFER_WAREHOUSE',
@@ -476,108 +501,46 @@ export class SalesOrdersService implements OnModuleInit {
       const byLine = new Map(lines.map((line) => [line.id, line]));
       const seen = new Set<number>();
       for (const [index, entry] of input.entries()) {
-        const line = byLine.get(entry.lineId);
-        if (!line) throw invalid(`lines.${index}.lineId`, 'ofOrder', 'a line of the order');
+        if (!byLine.has(entry.lineId)) {
+          throw invalid(`lines.${index}.lineId`, 'ofOrder', 'a line of the order');
+        }
         if (seen.has(entry.lineId)) throw invalid(`lines.${index}.lineId`, 'unique', 'once');
         seen.add(entry.lineId);
-        if (entry.qty.isNegative() || entry.qty.gt(line.qtyBase)) {
-          throw invalid(`lines.${index}.qty`, 'range', 'between 0 and the ordered quantity');
-        }
       }
-      if (seen.size !== lines.length) throw invalid('lines', 'complete', 'every line once');
-      for (const warehouseId of new Set(lines.map((line) => line.warehouseId))) {
-        this.scope.assertCanWriteWarehouse(ctx, warehouseId);
+      const done = await this.picks.doneWarehousesInTx(tx, id);
+      const open = lines.filter((line) => !done.has(line.warehouseId));
+      if (open.some((line) => !seen.has(line.id))) {
+        throw invalid('lines', 'complete', 'every line of the warehouses not picked yet');
       }
-      const bins = new Map(
-        (await this.bins.getMany([...new Set(input.map((entry) => entry.binId))], tx)).map(
-          (bin) => [bin.id, bin],
-        ),
-      );
-      const products = new Map(
-        (
-          await this.catalog.getMany(
-            lines.map((line) => line.productId),
-            tx,
-          )
-        ).map((p) => [p.id, p]),
-      );
-      const staging = new Map<number, number>();
-      for (const warehouseId of new Set(lines.map((line) => line.warehouseId))) {
-        staging.set(warehouseId, (await this.bins.systemBin(warehouseId, 'STAGING', tx)).id);
-      }
-      const movements: Movement[] = [];
-      for (const [index, entry] of input.entries()) {
-        const line = byLine.get(entry.lineId);
-        if (!line) continue;
-        const bin = bins.get(entry.binId);
-        if (!bin || bin.warehouseId !== line.warehouseId) {
-          throw invalid(`lines.${index}.binId`, 'ofWarehouse', "a shelf of the line's warehouse");
-        }
-        if (entry.qty.isZero()) continue;
-        const base = products.get(line.productId)?.baseUnit;
-        if (!base) throw notFound('product', line.productId);
-        const common = {
-          docType: 'SO' as const,
-          docId: id,
-          docLineId: line.id,
-          warehouseId: line.warehouseId,
-          productId: line.productId,
-          enteredQty: entry.qty,
-          productUnitId: base.id,
-          factorSnapshot: new Decimal(1),
-        };
-        movements.push(
-          {
-            ...common,
-            movementType: 'PICK_OUT',
-            leg: 1,
-            binId: bin.id,
-            qtyBase: entry.qty.negated(),
-          },
-          {
-            ...common,
-            movementType: 'PICK_IN',
-            leg: 2,
-            binId: staging.get(line.warehouseId) ?? 0,
-            qtyBase: entry.qty,
-          },
+      const warehouses = [...new Set(open.map((line) => line.warehouseId))].sort((a, b) => a - b);
+      for (const warehouseId of warehouses) this.scope.assertCanWriteWarehouse(ctx, warehouseId);
+      for (const warehouseId of warehouses) {
+        await this.picks.pickInTx(
+          tx,
+          ctx,
+          order,
+          warehouseId,
+          input.filter((entry) => byLine.get(entry.lineId)?.warehouseId === warehouseId),
+          { implicit: true },
         );
       }
-      await this.posting.post(tx, ctx, {
-        docs: [{ docType: 'SO', docId: id, external: true }],
-        movements,
-        reservationConsume: { docType: 'SO', docLineIds: lines.map((line) => line.id) },
-      });
-      for (const entry of input) {
-        await tx
-          .update(salesOrderLines)
-          .set({ qtyPicked: entry.qty, pickBinId: entry.binId })
-          .where(eq(salesOrderLines.id, entry.lineId));
-      }
-      await tx
-        .update(salesOrders)
-        .set({
-          status: 'PACKED',
-          pickedAt: sql`now()`,
-          pickedBy: actorUserId(ctx),
-          updatedAt: sql`now()`,
-        })
-        .where(eq(salesOrders.id, id));
-      await this.event(tx, ctx, id, order.status, 'PACKED', null);
-      await this.audit.record(tx, ctx, {
-        action: 'PICK',
-        entity: 'sales_orders',
-        entityId: id,
-        after: {
-          lines: input.map((entry) => ({
-            lineId: entry.lineId,
-            qty: entry.qty.toFixed(),
-            binId: entry.binId,
-          })),
-          short: input.filter((entry) => entry.qty.lt(byLine.get(entry.lineId)?.qtyBase ?? 0))
-            .length,
-        },
-      });
+    });
+    return this.queries.detail(ctx, id);
+  }
+
+  /**
+   * One warehouse's part of the order picked (ADR-0126 #2): the part's picker (or a lead) names
+   * every line of that warehouse once; the order is PACKED when it was the last part.
+   */
+  async pickPart(
+    ctx: AuthContext,
+    id: number,
+    warehouseId: number,
+    input: readonly PickLineInput[],
+  ): Promise<OrderDetail> {
+    await inTransaction(this.db, async (tx) => {
+      const { order } = await this.lockSeen(ctx, tx, id);
+      await this.picks.pickInTx(tx, ctx, order, warehouseId, input);
     });
     return this.queries.detail(ctx, id);
   }
@@ -608,7 +571,13 @@ export class SalesOrdersService implements OnModuleInit {
   }
 
   /** Prices the order's lines today and reserves them (replacing earlier reservations when asked). */
-  private async priceAndReserve(tx: Tx, actor: Actor, order: OrderRow, replace: boolean) {
+  private async priceAndReserve(
+    tx: Tx,
+    actor: Actor,
+    order: OrderRow,
+    replace: boolean,
+    picked: ReadonlySet<number> = new Set(),
+  ) {
     const today = businessDate();
     const id = order.id;
     {
@@ -717,12 +686,15 @@ export class SalesOrdersService implements OnModuleInit {
       const request = {
         docType: 'SO' as const,
         docId: id,
-        lines: lines.map((line) => ({
-          lineId: line.id,
-          warehouseId: line.warehouseId,
-          productId: line.productId,
-          qtyBase: line.qtyBase,
-        })),
+        // A picked warehouse's goods are in its STAGING already (ADR-0126 #4).
+        lines: lines
+          .filter((line) => !picked.has(line.warehouseId))
+          .map((line) => ({
+            lineId: line.id,
+            warehouseId: line.warehouseId,
+            productId: line.productId,
+            qtyBase: line.qtyBase,
+          })),
       };
       const reserved = replace
         ? await this.reservations.replaceInTx(tx, request)
@@ -790,6 +762,7 @@ export class SalesOrdersService implements OnModuleInit {
         .where(eq(salesOrders.id, id));
       await this.event(tx, actor, id, 'DRAFT', 'SUBMITTED', null);
       await this.event(tx, actor, id, 'SUBMITTED', 'CONFIRMED', null);
+      await this.picks.syncInTx(tx, id);
       const waiting = reserved.filter((entry) => entry.backordered.gt(0));
       await this.audit.record(tx, actor, {
         action: 'CONFIRM',
@@ -1345,6 +1318,62 @@ export class SalesOrdersService implements OnModuleInit {
     };
   }
 
+  /** A sale or a transfer needs a packed order; while picking, the missing warehouses are named. */
+  private async assertPacked(tx: Tx, order: OrderRow): Promise<void> {
+    if (order.status === 'PACKED') return;
+    if (order.status === 'CONFIRMED' || order.status === 'PICKING') {
+      await this.picks.assertCompleteInTx(tx, order.id);
+    }
+    throw stateError(order, 'PACKED');
+  }
+
+  /** The lines an edit asks for, each with its product's home warehouse (where it would ship). */
+  private async placedLines(
+    tx: Tx,
+    lines: readonly OrderLineInput[],
+  ): Promise<{ warehouseId: number; productUnitId: number; qty: Decimal }[]> {
+    const converted = [];
+    for (const [index, line] of lines.entries()) {
+      if (!line.qty.gt(0)) throw invalid(`lines.${index}.qty`, 'min', 'a positive quantity');
+      converted.push(await this.units.toBase(line.productUnitId, line.qty, tx));
+    }
+    const homes = await this.assertOrderable(
+      tx,
+      converted.map((line) => line.productId),
+    );
+    return converted.map((line, index) => ({
+      warehouseId: homes.get(line.productId) ?? 0,
+      productUnitId: line.unitId,
+      qty: lines[index]?.qty ?? line.qtyBase,
+    }));
+  }
+
+  /** The picked counts of unchanged warehouses carried onto the rewritten lines, line by line. */
+  private async keepPicked(tx: Tx, orderId: number, kept: readonly LineRow[]): Promise<void> {
+    const fresh = await this.linesOf(tx, orderId);
+    const pool = [...kept];
+    for (const line of fresh) {
+      const index = pool.findIndex(
+        (old) =>
+          old.warehouseId === line.warehouseId &&
+          old.productUnitId === line.productUnitId &&
+          old.qty.equals(line.qty),
+      );
+      if (index < 0) continue;
+      const [old] = pool.splice(index, 1);
+      if (!old) continue;
+      await tx
+        .update(salesOrderLines)
+        .set({
+          qtyPicked: old.qtyPicked,
+          pickBinId: old.pickBinId,
+          qtyApproved: old.qtyApproved,
+          qtyBackordered: old.qtyBackordered,
+        })
+        .where(eq(salesOrderLines.id, line.id));
+    }
+  }
+
   /** Lines in base units, each in its product's home warehouse. */
   private async writeLines(
     tx: Tx,
@@ -1445,6 +1474,30 @@ function assertCanEdit(access: Access, order: OrderRow): void {
     'the stage does not let this role edit orders',
     order.stageId === null ? { permission: 'sales.orders.manage' } : { stageId: order.stageId },
   );
+}
+
+/** The warehouses whose lines an edit changes: their products, units or quantities differ. */
+function changedWarehouses(
+  before: readonly LineRow[],
+  after: readonly { warehouseId: number; productUnitId: number; qty: Decimal }[],
+): Set<number> {
+  const keys = (rows: readonly { warehouseId: number; productUnitId: number; qty: Decimal }[]) => {
+    const byWarehouse = new Map<number, string[]>();
+    for (const row of rows) {
+      byWarehouse.set(row.warehouseId, [
+        ...(byWarehouse.get(row.warehouseId) ?? []),
+        `${row.productUnitId}:${row.qty.toFixed()}`,
+      ]);
+    }
+    return new Map([...byWarehouse].map(([id, list]) => [id, list.sort().join('|')]));
+  };
+  const was = keys(before);
+  const will = keys(after);
+  const changed = new Set<number>();
+  for (const id of new Set([...was.keys(), ...will.keys()])) {
+    if (was.get(id) !== will.get(id)) changed.add(id);
+  }
+  return changed;
 }
 
 function stateError(order: OrderRow, expected: string): AppError {

@@ -32,6 +32,7 @@ import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagina
 import { CatalogService, type ProductSummary, UnitConversionService } from '../../catalog';
 import { type Actor, type AuthContext, UserNamesService } from '../../identity';
 import { BinsService } from '../../inventory';
+import { type PickPart, SalesPicksService } from './sales-picks.service';
 import { type CustomerOverdue, CustomersService } from '../../partners';
 import {
   orderStatusEvents,
@@ -122,9 +123,12 @@ export interface OrderDetail extends Omit<
   pipelineName: string | null;
   stageName: string | null;
   createdByName: string | null;
-  /** The caller may edit (and archive) the order: the stage's EDIT right. */
+  /** The caller may edit (and archive) the order: the stage's EDIT right (an admin always). */
   canEdit: boolean;
+  /** Only the warehouses the caller sees (ADR-0126 #3). */
   lines: OrderLine[];
+  /** Each warehouse's part of the picking (ADR-0126 #2), the caller's warehouses only. */
+  picks: PickPart[];
   events: OrderEvent[];
   moves: StageMove[];
 }
@@ -235,6 +239,7 @@ export class SalesOrderQueryService {
     private readonly customers: CustomersService,
     private readonly bins: BinsService,
     private readonly names: UserNamesService,
+    private readonly picks: SalesPicksService,
   ) {}
 
   /**
@@ -637,6 +642,9 @@ export class SalesOrderQueryService {
     ]);
     const nameOf = (id: number | null) => (id === null ? null : (names.get(id) ?? null));
     const overdue = await this.customers.overdueOf(orders.map((order) => order.customerId));
+    const picks = await this.picks.partsOfOrders(ids, executor);
+    const visible = access.lineWarehouses;
+    const seesWarehouse = (warehouseId: number) => visible === null || visible.has(warehouseId);
     return orders.map((order) => {
       const {
         createdBy,
@@ -660,10 +668,12 @@ export class SalesOrderQueryService {
         stageName:
           order.stageId === null ? null : (access.stage(order.stageId)?.stage.name ?? null),
         createdByName: nameOf(createdBy),
-        canEdit: access.canEdit(order),
+        canEdit:
+          access.canEdit(order) || (access.ctx?.permissions.has('sales.boards.manage') ?? false),
         lines: lines
-          .filter((line) => line.orderId === order.id)
+          .filter((line) => line.orderId === order.id && seesWarehouse(line.warehouseId))
           .map((line) => lineView(line, products, units, parts, pickBins)),
+        picks: (picks.get(order.id) ?? []).filter((part) => seesWarehouse(part.warehouseId)),
         moves: moves
           .filter((move) => move.orderId === order.id)
           .map((move) => ({

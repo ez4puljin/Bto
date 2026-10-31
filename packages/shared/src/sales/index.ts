@@ -45,6 +45,26 @@ export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 export const STAGE_ACTIONS = ['NONE', 'CONFIRM', 'PICK', 'SALE', 'TRANSFER', 'CANCEL'] as const;
 export type StageAction = (typeof STAGE_ACTIONS)[number];
 
+/**
+ * A pipeline sells to customers or moves goods into its store (ADR-0126 #1): a SALES pipeline
+ * ends in the main sale, a TRANSFER pipeline in the transfer to its store.
+ */
+export const PIPELINE_KINDS = ['SALES', 'TRANSFER'] as const;
+export type PipelineKind = (typeof PIPELINE_KINDS)[number];
+
+/** The stage actions each kind of pipeline offers (ADR-0126 #1). */
+export const KIND_STAGE_ACTIONS: Readonly<Record<PipelineKind, readonly StageAction[]>> = {
+  SALES: ['NONE', 'CONFIRM', 'PICK', 'SALE', 'CANCEL'],
+  TRANSFER: ['NONE', 'CONFIRM', 'PICK', 'TRANSFER', 'CANCEL'],
+};
+
+/**
+ * A warehouse's part of an order (ADR-0126 #2): waiting for a picker, being picked by one, done
+ * (its goods in that warehouse's STAGING).
+ */
+export const PICK_STATUSES = ['OPEN', 'PICKING', 'DONE'] as const;
+export type PickStatus = (typeof PICK_STATUSES)[number];
+
 /** The documents a stage may print when a card arrives. */
 export const PRINT_KINDS = ['PICK_LIST', 'DELIVERY_NOTE'] as const;
 export type PrintKind = (typeof PRINT_KINDS)[number];
@@ -85,6 +105,17 @@ export const BOARD_LIMITS = {
 
 /** The states an order may be edited in (ADR-0056 #4): until picking starts. */
 export const EDITABLE_STATUSES: readonly OrderStatus[] = ['DRAFT', 'CONFIRMED'];
+
+/**
+ * Where an admin (`sales.boards.manage`) may still change the lines (ADR-0126 #4): until the main
+ * sale or the transfer; a changed warehouse's picked goods go back to their shelves.
+ */
+export const MANAGER_EDITABLE_STATUSES: readonly OrderStatus[] = [
+  'DRAFT',
+  'CONFIRMED',
+  'PICKING',
+  'PACKED',
+];
 
 export function isEditable(status: OrderStatus): boolean {
   return EDITABLE_STATUSES.includes(status);

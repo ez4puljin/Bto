@@ -6,6 +6,8 @@ import {
   ORDER_CHANNELS,
   ORDER_LIMITS,
   ORDER_STATUSES,
+  PICK_STATUSES,
+  type PickStatus,
   type OrderChannel,
   type OrderStatus,
   PAYMENT_METHODS,
@@ -275,6 +277,48 @@ export class SalesOrderPickLineInfoDto {
   @ApiProperty({ type: [SalesOrderPickBinDto] }) bins: SalesOrderPickBinDto[];
 }
 
+@ApiSchema({ name: 'SalesOrderPickPart' })
+export class SalesOrderPickPartDto {
+  @ApiProperty() orderId: number;
+  @ApiProperty() warehouseId: number;
+  @ApiProperty() warehouseName: string;
+  @ApiProperty({ enum: PICK_STATUSES }) status: PickStatus;
+  @ApiProperty({ type: Number, nullable: true }) pickerId: number | null;
+  @ApiProperty({ type: String, nullable: true }) pickerName: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) startedAt: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) doneAt: string | null;
+}
+
+@ApiSchema({ name: 'SalesPickWork' })
+export class SalesPickWorkDto extends SalesOrderPickPartDto {
+  @ApiProperty({ type: String, nullable: true }) orderNumber: string | null;
+  @ApiProperty({ enum: ORDER_STATUSES }) orderStatus: OrderStatus;
+  @ApiProperty() customerName: string;
+  @ApiProperty({ type: String, format: 'date' }) deliveryDate: string;
+  @ApiProperty({ description: "The order's lines in this warehouse" }) lines: number;
+}
+
+@ApiSchema({ name: 'SalesPickWorkQuery' })
+export class SalesPickWorkQueryDto {
+  @ApiPropertyOptional({ description: 'One warehouse only' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  warehouseId?: number;
+}
+
+@ApiSchema({ name: 'SalesPickAssignRequest' })
+export class SalesPickAssignRequestDto {
+  @ApiProperty({ description: 'The picker the part goes to' }) @IsInt() @Min(1) userId: number;
+}
+
+@ApiSchema({ name: 'SalesPicker' })
+export class SalesPickerDto {
+  @ApiProperty() id: number;
+  @ApiProperty() fullName: string;
+}
+
 @ApiSchema({ name: 'SalesOrderDetail' })
 export class SalesOrderDetailDto {
   @ApiProperty() id: number;
@@ -324,6 +368,8 @@ export class SalesOrderDetailDto {
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt: string;
   @ApiProperty({ type: [SalesOrderLineDto] }) lines: SalesOrderLineDto[];
+  @ApiProperty({ type: [SalesOrderPickPartDto], description: "Each warehouse's part (ADR-0126)" })
+  picks: SalesOrderPickPartDto[];
   @ApiProperty({ type: [SalesOrderEventDto] }) events: SalesOrderEventDto[];
   @ApiProperty({ type: [SalesOrderMoveDto] }) moves: SalesOrderMoveDto[];
 }

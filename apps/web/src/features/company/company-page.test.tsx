@@ -58,7 +58,9 @@ describe('«Компани» (ADR-0084)', () => {
       .getAllByRole('link')
       .map((link) => link.textContent);
     expect(links.indexOf(mn.nav.company)).toBeGreaterThan(-1);
-    expect(links.indexOf(mn.nav.company)).toBe(links.indexOf(mn.nav.branches) - 1);
+    // «Байгууллагын бүтэц» sits between them since 2026-10-31.
+    expect(links.indexOf(mn.nav.company)).toBe(links.indexOf(mn.nav.structure) - 1);
+    expect(links.indexOf(mn.nav.structure)).toBe(links.indexOf(mn.nav.branches) - 1);
   });
 
   it('checks the register number and the TIN, then saves them', async () => {

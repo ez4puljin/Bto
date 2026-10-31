@@ -1,4 +1,4 @@
-import { STAGE_ACTIONS, STAGE_RIGHTS } from '@tugeel/shared/sales';
+import { STAGE_ACTIONS, STAGE_RIGHTS, type StageAction } from '@tugeel/shared/sales';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CheckboxGroup } from '@/components/checkbox-group';
@@ -26,9 +26,12 @@ const EMPTY_STAGE: StageInput = {
  */
 export function StageDialog({
   stage,
+  actions = STAGE_ACTIONS,
   onSave,
 }: {
   stage: StageInput | null;
+  /** The actions the pipeline's kind offers (ADR-0126 #1). */
+  actions?: readonly StageAction[];
   onSave: (stage: StageInput) => void;
 }) {
   const { t } = useTranslation();
@@ -67,11 +70,11 @@ export function StageDialog({
             id="stage-action"
             value={form.action}
             onChange={(event) => {
-              const value = STAGE_ACTIONS.find((entry) => entry === event.target.value);
+              const value = actions.find((entry) => entry === event.target.value);
               if (value) patch({ action: value });
             }}
           >
-            {STAGE_ACTIONS.map((value) => (
+            {actions.map((value) => (
               <option key={value} value={value}>
                 {t(`sales.stageActions.${value}`)}
               </option>

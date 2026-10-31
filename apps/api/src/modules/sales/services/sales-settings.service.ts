@@ -136,6 +136,7 @@ export class SalesSettingsService {
           .select({
             archivedAt: salesPipelines.archivedAt,
             ownOrdersOnly: salesPipelines.ownOrdersOnly,
+            kind: salesPipelines.kind,
           })
           .from(salesPipelines)
           .where(eq(salesPipelines.id, target.pipelineId))
@@ -152,6 +153,9 @@ export class SalesSettingsService {
           .for('share');
         if (!stage || stage.archivedAt) {
           throw invalid('stageId', 'ofPipeline', 'a live stage of the pipeline');
+        }
+        if ((channel === 'CUSTOMER_APP' || channel === 'SALES_REP') && pipeline.kind !== 'SALES') {
+          throw invalid('pipelineId', 'salesPipeline', 'a sales pipeline (ADR-0126 #1)');
         }
         // App orders wait for the office (ADR-0079 #5): a stage without an action, in a pipeline
         // where the office sees them (they have no author an own-orders-only pipeline could show).

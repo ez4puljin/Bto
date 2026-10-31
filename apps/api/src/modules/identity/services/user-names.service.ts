@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Permission } from '@tugeel/shared/auth';
-import { and, asc, eq, ilike, inArray, or } from 'drizzle-orm';
+import { and, asc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { escapeLike } from '../../../common/db/like';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -69,6 +69,29 @@ export class UserNamesService {
       .from(users)
       .where(inArray(users.id, ids));
     return new Map(rows.map((row) => [row.id, row]));
+  }
+
+  /**
+   * Active users who hold a permission and may write a warehouse (no scope, the warehouse itself or
+   * its branch in their scope): the pickers a warehouse lead hands an order's part to (ADR-0126 #2).
+   */
+  async holdersInWarehouse(
+    permission: Permission,
+    warehouseId: number,
+  ): Promise<{ id: number; fullName: string }[]> {
+    const { rows } = await this.db.execute<{ id: string; full_name: string }>(sql`
+      SELECT DISTINCT u.id::text, u.full_name FROM users u
+        JOIN user_roles ur ON ur.user_id = u.id
+        JOIN role_permissions rp ON rp.role_id = ur.role_id AND rp.permission_code = ${permission}
+       WHERE u.status = 'ACTIVE'
+         AND (NOT EXISTS (SELECT 1 FROM user_scopes us WHERE us.user_id = u.id)
+              OR EXISTS (SELECT 1 FROM user_scopes us
+                          WHERE us.user_id = u.id
+                            AND (us.warehouse_id = ${warehouseId}
+                                 OR us.branch_id = (SELECT branch_id FROM warehouses
+                                                     WHERE id = ${warehouseId}))))
+       ORDER BY u.full_name`);
+    return rows.map((row) => ({ id: Number.parseInt(row.id, 10), fullName: row.full_name }));
   }
 
   /** Of these users, those who hold a permission through one of their roles (the POS supervisors). */

@@ -95,6 +95,7 @@ export {
   salesChannelDefaults,
   salesOrderLineParts,
   salesOrderLines,
+  salesOrderPicks,
   salesOrders,
   salesPipelineRoles,
   salesPipelines,

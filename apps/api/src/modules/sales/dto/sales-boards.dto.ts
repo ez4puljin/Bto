@@ -13,6 +13,8 @@ import {
   type PaymentMethod,
   PIPELINE_VISIBILITIES,
   type PipelineVisibility,
+  PIPELINE_KINDS,
+  type PipelineKind,
   STAGE_ACTIONS,
   type StageAction,
 } from '@tugeel/shared/sales';
@@ -159,6 +161,13 @@ export class SalesPipelineRequestDto {
   visibility: PipelineVisibility;
   @ApiProperty() @IsBoolean() ownOrdersOnly: boolean;
   @ApiPropertyOptional({
+    enum: PIPELINE_KINDS,
+    description: 'SALES (default) or TRANSFER (ADR-0126)',
+  })
+  @IsOptional()
+  @IsIn(PIPELINE_KINDS)
+  kind?: PipelineKind;
+  @ApiPropertyOptional({
     type: Number,
     nullable: true,
     description: 'The STORE warehouse a TRANSFER stage moves the picked goods into (ADR-0125)',
@@ -216,6 +225,7 @@ export class SalesPipelineDto {
   @ApiProperty() position: number;
   @ApiProperty({ enum: PIPELINE_VISIBILITIES }) visibility: PipelineVisibility;
   @ApiProperty() ownOrdersOnly: boolean;
+  @ApiProperty({ enum: PIPELINE_KINDS }) kind: PipelineKind;
   @ApiProperty({
     type: Number,
     nullable: true,
