@@ -20167,6 +20167,527 @@
         ]
       }
     },
+    "/api/v1/finance/reports/ledger/accounts": {
+      "get": {
+        "operationId": "LedgerReports_accounts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerAccountOptions"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/reports/ledger": {
+      "get": {
+        "operationId": "LedgerReports_report",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PARTY",
+                "MONEY"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxItems": 200,
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "groupCodes",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxItems": 50,
+              "maxLength": 32,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "customerIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxItems": 200,
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "supplierIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxItems": 200,
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "customerCategoryId",
+            "required": false,
+            "in": "query",
+            "description": "Customers of this group",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "description",
+            "required": false,
+            "in": "query",
+            "description": "Lines whose description holds this text",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "counterAccount",
+            "required": false,
+            "in": "query",
+            "description": "Lines with this account (prefix) on the other side",
+            "schema": {
+              "pattern": "^[0-9A-Za-z.-]{1,32}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "withEmpty",
+            "required": false,
+            "in": "query",
+            "description": "Also rows without an opening or a turnover",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerReport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/reports/ledger/lines": {
+      "get": {
+        "operationId": "LedgerReports_lines",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PARTY",
+                "MONEY"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxItems": 200,
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "groupCodes",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxItems": 50,
+              "maxLength": 32,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "customerIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxItems": 200,
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "supplierIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxItems": 200,
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "customerCategoryId",
+            "required": false,
+            "in": "query",
+            "description": "Customers of this group",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "description",
+            "required": false,
+            "in": "query",
+            "description": "Lines whose description holds this text",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "counterAccount",
+            "required": false,
+            "in": "query",
+            "description": "Lines with this account (prefix) on the other side",
+            "schema": {
+              "pattern": "^[0-9A-Za-z.-]{1,32}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "withEmpty",
+            "required": false,
+            "in": "query",
+            "description": "Also rows without an opening or a turnover",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "partyId",
+            "required": false,
+            "in": "query",
+            "description": "The core's party id, or `none` for lines without one",
+            "schema": {
+              "pattern": "^([1-9]\\d{0,17}|none)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerLines"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/reports/ledger/xlsx": {
+      "get": {
+        "operationId": "LedgerReports_xlsx",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PARTY",
+                "MONEY"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxItems": 200,
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "groupCodes",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxItems": 50,
+              "maxLength": 32,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "customerIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxItems": 200,
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "supplierIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxItems": 200,
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "customerCategoryId",
+            "required": false,
+            "in": "query",
+            "description": "Customers of this group",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "description",
+            "required": false,
+            "in": "query",
+            "description": "Lines whose description holds this text",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "counterAccount",
+            "required": false,
+            "in": "query",
+            "description": "Lines with this account (prefix) on the other side",
+            "schema": {
+              "pattern": "^[0-9A-Za-z.-]{1,32}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "withEmpty",
+            "required": false,
+            "in": "query",
+            "description": "Also rows without an opening or a turnover",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
     "/api/v1/customer-balances": {
       "get": {
         "operationId": "CustomerBalances_list",
@@ -28454,6 +28975,1017 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SupplierEntries"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/book-options": {
+      "get": {
+        "operationId": "BookReports_bookOptions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookReportOptions"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/stock-balance": {
+      "get": {
+        "operationId": "BookReports_stockBalance",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "by",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "product",
+              "type": "string",
+              "enum": [
+                "product",
+                "warehouse"
+              ]
+            }
+          },
+          {
+            "name": "warehouseIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockBalanceReport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/stock-balance.xlsx": {
+      "get": {
+        "operationId": "BookReports_stockBalanceXlsx",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "by",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "product",
+              "type": "string",
+              "enum": [
+                "product",
+                "warehouse"
+              ]
+            }
+          },
+          {
+            "name": "warehouseIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/stock-balance/lines": {
+      "get": {
+        "operationId": "BookReports_stockBalanceLines",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockBalanceLines"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/product-sales": {
+      "get": {
+        "operationId": "BookReports_productSales",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "ALL",
+              "type": "string",
+              "enum": [
+                "ALL",
+                "WHOLESALE",
+                "POS"
+              ]
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "ALL",
+              "type": "string",
+              "enum": [
+                "ALL",
+                "SALES",
+                "RETURNS"
+              ]
+            }
+          },
+          {
+            "name": "repUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "customerCategoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductSalesReport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/product-sales.xlsx": {
+      "get": {
+        "operationId": "BookReports_productSalesXlsx",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "ALL",
+              "type": "string",
+              "enum": [
+                "ALL",
+                "WHOLESALE",
+                "POS"
+              ]
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "ALL",
+              "type": "string",
+              "enum": [
+                "ALL",
+                "SALES",
+                "RETURNS"
+              ]
+            }
+          },
+          {
+            "name": "repUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "customerCategoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/product-sales/documents": {
+      "get": {
+        "operationId": "BookReports_productSalesDocuments",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "ALL",
+              "type": "string",
+              "enum": [
+                "ALL",
+                "WHOLESALE",
+                "POS"
+              ]
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "ALL",
+              "type": "string",
+              "enum": [
+                "ALL",
+                "SALES",
+                "RETURNS"
+              ]
+            }
+          },
+          {
+            "name": "repUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "customerCategoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductSalesDocuments"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The documents behind one product (`productId` required).",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/stock-documents": {
+      "get": {
+        "operationId": "BookReports_stockDocuments",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "docTypes",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "GR",
+                  "GI",
+                  "TR",
+                  "ADJ",
+                  "ST",
+                  "SO",
+                  "POS",
+                  "CN"
+                ]
+              }
+            }
+          },
+          {
+            "name": "warehouseIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockDocumentsReport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/stock-documents.xlsx": {
+      "get": {
+        "operationId": "BookReports_stockDocumentsXlsx",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "docTypes",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "GR",
+                  "GI",
+                  "TR",
+                  "ADJ",
+                  "ST",
+                  "SO",
+                  "POS",
+                  "CN"
+                ]
+              }
+            }
+          },
+          {
+            "name": "warehouseIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/stock-documents/lines": {
+      "get": {
+        "operationId": "BookReports_stockDocumentLines",
+        "parameters": [
+          {
+            "name": "docType",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "GR",
+                "GI",
+                "TR",
+                "ADJ",
+                "ST",
+                "SO",
+                "POS",
+                "CN"
+              ]
+            }
+          },
+          {
+            "name": "docId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockDocumentLines"
                 }
               }
             }
@@ -50189,6 +51721,330 @@
           "description"
         ]
       },
+      "LedgerAccountOption": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "example": "120101"
+          },
+          "name": {
+            "type": "string"
+          },
+          "control": {
+            "enum": [
+              "NONE",
+              "RECEIVABLE",
+              "PAYABLE",
+              "ADVANCE_RECEIVED",
+              "ADVANCE_PAID",
+              "MONEY"
+            ],
+            "type": "string"
+          },
+          "groupCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "groupName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "accountId",
+          "code",
+          "name",
+          "control",
+          "groupCode",
+          "groupName"
+        ]
+      },
+      "LedgerAccountOptions": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerAccountOption"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "LedgerParty": {
+        "type": "object",
+        "properties": {
+          "partyId": {
+            "type": "string",
+            "description": "The core's party id"
+          },
+          "kind": {
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "OTHER"
+            ],
+            "type": "string"
+          },
+          "refId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The customer or supplier id"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "partyId",
+          "kind",
+          "refId",
+          "code",
+          "name"
+        ]
+      },
+      "LedgerReportRow": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "control": {
+            "enum": [
+              "NONE",
+              "RECEIVABLE",
+              "PAYABLE",
+              "ADVANCE_RECEIVED",
+              "ADVANCE_PAID",
+              "MONEY"
+            ],
+            "type": "string"
+          },
+          "groupCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "groupName": {
+            "type": "string",
+            "nullable": true
+          },
+          "party": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LedgerParty"
+              }
+            ]
+          },
+          "opening": {
+            "type": "string",
+            "example": "150000.00",
+            "description": "debit − credit before `from`"
+          },
+          "debit": {
+            "type": "string",
+            "example": "10000.00"
+          },
+          "credit": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "closing": {
+            "type": "string",
+            "example": "160000.00",
+            "description": "debit − credit at `to`"
+          }
+        },
+        "required": [
+          "accountId",
+          "code",
+          "name",
+          "control",
+          "groupCode",
+          "groupName",
+          "party",
+          "opening",
+          "debit",
+          "credit",
+          "closing"
+        ]
+      },
+      "LedgerReport": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "PARTY",
+              "MONEY"
+            ],
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerReportRow"
+            }
+          },
+          "opening": {
+            "type": "string"
+          },
+          "debit": {
+            "type": "string"
+          },
+          "credit": {
+            "type": "string"
+          },
+          "closing": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "from",
+          "to",
+          "data",
+          "opening",
+          "debit",
+          "credit",
+          "closing"
+        ]
+      },
+      "LedgerLine": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number"
+          },
+          "entryId": {
+            "type": "number"
+          },
+          "entryNumber": {
+            "type": "string"
+          },
+          "entryDate": {
+            "type": "string"
+          },
+          "entryDescription": {
+            "type": "string"
+          },
+          "lineDescription": {
+            "type": "string",
+            "nullable": true
+          },
+          "system": {
+            "type": "string",
+            "example": "BTO"
+          },
+          "sourceDocType": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceDocId": {
+            "type": "string",
+            "nullable": true
+          },
+          "documentId": {
+            "type": "number",
+            "nullable": true
+          },
+          "documentNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "party": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LedgerParty"
+              }
+            ]
+          },
+          "debit": {
+            "type": "string"
+          },
+          "credit": {
+            "type": "string"
+          },
+          "counters": {
+            "example": [
+              "C:510101"
+            ],
+            "description": "D:<code> or C:<code>",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "balanceAfter": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "lineId",
+          "entryId",
+          "entryNumber",
+          "entryDate",
+          "entryDescription",
+          "lineDescription",
+          "system",
+          "sourceDocType",
+          "sourceDocId",
+          "documentId",
+          "documentNumber",
+          "party",
+          "debit",
+          "credit",
+          "counters",
+          "balanceAfter"
+        ]
+      },
+      "LedgerLines": {
+        "type": "object",
+        "properties": {
+          "opening": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerLine"
+            }
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "More lines than listed (the oldest are shown)"
+          }
+        },
+        "required": [
+          "opening",
+          "data",
+          "truncated"
+        ]
+      },
       "Aging": {
         "type": "object",
         "properties": {
@@ -60433,6 +62289,730 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SupplierEntry"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "BookReportOption": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The parent category"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "parentId"
+        ]
+      },
+      "BookReportOptions": {
+        "type": "object",
+        "properties": {
+          "warehouses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookReportOption"
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookReportOption"
+            }
+          },
+          "customerCategories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookReportOption"
+            }
+          },
+          "users": {
+            "description": "Active staff members",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookReportOption"
+            }
+          }
+        },
+        "required": [
+          "warehouses",
+          "categories",
+          "customerCategories",
+          "users"
+        ]
+      },
+      "StockBalanceRow": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryId": {
+            "type": "number",
+            "nullable": true
+          },
+          "categoryName": {
+            "type": "string",
+            "nullable": true
+          },
+          "warehouseId": {
+            "type": "number",
+            "nullable": true
+          },
+          "warehouseName": {
+            "type": "string",
+            "nullable": true
+          },
+          "openingQty": {
+            "type": "string"
+          },
+          "openingValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "inQty": {
+            "type": "string"
+          },
+          "inValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "outQty": {
+            "type": "string"
+          },
+          "outValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "closingQty": {
+            "type": "string"
+          },
+          "closingValue": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "productId",
+          "sku",
+          "name",
+          "unit",
+          "categoryId",
+          "categoryName",
+          "warehouseId",
+          "warehouseName",
+          "openingQty",
+          "openingValue",
+          "inQty",
+          "inValue",
+          "outQty",
+          "outValue",
+          "closingQty",
+          "closingValue"
+        ]
+      },
+      "StockBalanceTotals": {
+        "type": "object",
+        "properties": {
+          "openingValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "inValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "outValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "closingValue": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "openingValue",
+          "inValue",
+          "outValue",
+          "closingValue"
+        ]
+      },
+      "StockBalanceReport": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "by": {
+            "enum": [
+              "product",
+              "warehouse"
+            ],
+            "type": "string"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockBalanceRow"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/StockBalanceTotals"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "by",
+          "rows",
+          "totals",
+          "truncated"
+        ]
+      },
+      "StockBalanceLine": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "docType": {
+            "type": "string",
+            "example": "GR"
+          },
+          "docId": {
+            "type": "number"
+          },
+          "docNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "inQty": {
+            "type": "string"
+          },
+          "outQty": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string",
+            "nullable": true
+          },
+          "balanceQty": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "docType",
+          "docId",
+          "docNumber",
+          "warehouseId",
+          "warehouseName",
+          "inQty",
+          "outQty",
+          "value",
+          "balanceQty"
+        ]
+      },
+      "StockBalanceLines": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "openingQty": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockBalanceLine"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "openingQty",
+          "rows",
+          "truncated"
+        ]
+      },
+      "ProductSalesRow": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryId": {
+            "type": "number",
+            "nullable": true
+          },
+          "categoryName": {
+            "type": "string",
+            "nullable": true
+          },
+          "qty": {
+            "type": "string"
+          },
+          "sales": {
+            "type": "string",
+            "description": "Net of VAT and city tax, returns subtracted"
+          },
+          "returns": {
+            "type": "string"
+          },
+          "avgPrice": {
+            "type": "string",
+            "nullable": true
+          },
+          "cost": {
+            "type": "string",
+            "nullable": true
+          },
+          "profit": {
+            "type": "string",
+            "nullable": true
+          },
+          "margin": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "productId",
+          "sku",
+          "name",
+          "unit",
+          "categoryId",
+          "categoryName",
+          "qty",
+          "sales",
+          "returns",
+          "avgPrice",
+          "cost",
+          "profit",
+          "margin"
+        ]
+      },
+      "ProductSalesTotals": {
+        "type": "object",
+        "properties": {
+          "sales": {
+            "type": "string"
+          },
+          "returns": {
+            "type": "string"
+          },
+          "cost": {
+            "type": "string",
+            "nullable": true
+          },
+          "profit": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "sales",
+          "returns",
+          "cost",
+          "profit"
+        ]
+      },
+      "ProductSalesReport": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductSalesRow"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/ProductSalesTotals"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "rows",
+          "totals",
+          "truncated"
+        ]
+      },
+      "ProductSalesDocument": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "INVOICE",
+              "CREDIT_NOTE",
+              "POS_SALE",
+              "POS_RETURN",
+              "COST_ADJ"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "date": {
+            "type": "string"
+          },
+          "invoiceId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "qty": {
+            "type": "string"
+          },
+          "sales": {
+            "type": "string"
+          },
+          "cost": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "number",
+          "date",
+          "invoiceId",
+          "customerId",
+          "customerName",
+          "qty",
+          "sales",
+          "cost"
+        ]
+      },
+      "ProductSalesDocuments": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductSalesDocument"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "rows",
+          "truncated"
+        ]
+      },
+      "StockDocumentRow": {
+        "type": "object",
+        "properties": {
+          "docType": {
+            "enum": [
+              "GR",
+              "GI",
+              "TR",
+              "ADJ",
+              "ST",
+              "SO",
+              "POS",
+              "CN"
+            ],
+            "type": "string"
+          },
+          "docId": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "date": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "description": "An adjustment's reason"
+          },
+          "sourceWarehouse": {
+            "type": "string",
+            "nullable": true
+          },
+          "destWarehouse": {
+            "type": "string",
+            "nullable": true
+          },
+          "authorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "partyKind": {
+            "nullable": true,
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "USER",
+              "NAME"
+            ],
+            "type": "string"
+          },
+          "partyId": {
+            "type": "number",
+            "nullable": true
+          },
+          "partyName": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoiceId": {
+            "type": "number",
+            "nullable": true
+          },
+          "inQty": {
+            "type": "string"
+          },
+          "outQty": {
+            "type": "string"
+          },
+          "inValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "outValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "string",
+            "nullable": true
+          },
+          "net": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "docType",
+          "docId",
+          "number",
+          "date",
+          "note",
+          "reason",
+          "sourceWarehouse",
+          "destWarehouse",
+          "authorName",
+          "partyKind",
+          "partyId",
+          "partyName",
+          "invoiceId",
+          "inQty",
+          "outQty",
+          "inValue",
+          "outValue",
+          "total",
+          "net"
+        ]
+      },
+      "StockDocumentsTotals": {
+        "type": "object",
+        "properties": {
+          "inValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "outValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "string"
+          },
+          "net": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "inValue",
+          "outValue",
+          "total",
+          "net"
+        ]
+      },
+      "StockDocumentsReport": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockDocumentRow"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/StockDocumentsTotals"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "rows",
+          "totals",
+          "truncated"
+        ]
+      },
+      "StockDocumentLine": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "string",
+            "description": "Signed: in positive, out negative"
+          },
+          "unitCost": {
+            "type": "string",
+            "nullable": true
+          },
+          "value": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "productId",
+          "sku",
+          "name",
+          "unit",
+          "warehouseId",
+          "warehouseName",
+          "qty",
+          "unitCost",
+          "value"
+        ]
+      },
+      "StockDocumentLines": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockDocumentLine"
             }
           }
         },

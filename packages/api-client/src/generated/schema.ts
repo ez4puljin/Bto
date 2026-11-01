@@ -4876,6 +4876,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/finance/reports/ledger/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LedgerReports_accounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/reports/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LedgerReports_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/reports/ledger/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LedgerReports_lines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/reports/ledger/xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LedgerReports_xlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customer-balances": {
         parameters: {
             query?: never;
@@ -7038,6 +7102,167 @@ export interface paths {
             cookie?: never;
         };
         get: operations["Reports_supplierEntries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/book-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BookReports_bookOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/stock-balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BookReports_stockBalance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/stock-balance.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BookReports_stockBalanceXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/stock-balance/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BookReports_stockBalanceLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/product-sales": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BookReports_productSales"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/product-sales.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BookReports_productSalesXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/product-sales/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The documents behind one product (`productId` required). */
+        get: operations["BookReports_productSalesDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/stock-documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BookReports_stockDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/stock-documents.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BookReports_stockDocumentsXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/stock-documents/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BookReports_stockDocumentLines"];
         put?: never;
         post?: never;
         delete?: never;
@@ -13297,6 +13522,95 @@ export interface components {
         JournalReverseRequest: {
             description: string;
         };
+        LedgerAccountOption: {
+            accountId: number;
+            /** @example 120101 */
+            code: string;
+            name: string;
+            /** @enum {string} */
+            control: "NONE" | "RECEIVABLE" | "PAYABLE" | "ADVANCE_RECEIVED" | "ADVANCE_PAID" | "MONEY";
+            groupCode: string | null;
+            groupName: string | null;
+        };
+        LedgerAccountOptions: {
+            data: components["schemas"]["LedgerAccountOption"][];
+        };
+        LedgerParty: {
+            /** @description The core's party id */
+            partyId: string;
+            /** @enum {string} */
+            kind: "CUSTOMER" | "SUPPLIER" | "OTHER";
+            /** @description The customer or supplier id */
+            refId: number | null;
+            code: string | null;
+            name: string;
+        };
+        LedgerReportRow: {
+            accountId: number;
+            code: string;
+            name: string;
+            /** @enum {string} */
+            control: "NONE" | "RECEIVABLE" | "PAYABLE" | "ADVANCE_RECEIVED" | "ADVANCE_PAID" | "MONEY";
+            groupCode: string | null;
+            groupName: string | null;
+            party: components["schemas"]["LedgerParty"] | null;
+            /**
+             * @description debit − credit before `from`
+             * @example 150000.00
+             */
+            opening: string;
+            /** @example 10000.00 */
+            debit: string;
+            /** @example 0.00 */
+            credit: string;
+            /**
+             * @description debit − credit at `to`
+             * @example 160000.00
+             */
+            closing: string;
+        };
+        LedgerReport: {
+            /** @enum {string} */
+            kind: "PARTY" | "MONEY";
+            from: string;
+            to: string;
+            data: components["schemas"]["LedgerReportRow"][];
+            opening: string;
+            debit: string;
+            credit: string;
+            closing: string;
+        };
+        LedgerLine: {
+            lineId: number;
+            entryId: number;
+            entryNumber: string;
+            entryDate: string;
+            entryDescription: string;
+            lineDescription: string | null;
+            /** @example BTO */
+            system: string;
+            sourceDocType: string | null;
+            sourceDocId: string | null;
+            documentId: number | null;
+            documentNumber: string | null;
+            party: components["schemas"]["LedgerParty"] | null;
+            debit: string;
+            credit: string;
+            /**
+             * @description D:<code> or C:<code>
+             * @example [
+             *       "C:510101"
+             *     ]
+             */
+            counters: string[];
+            balanceAfter: string;
+        };
+        LedgerLines: {
+            opening: string;
+            data: components["schemas"]["LedgerLine"][];
+            /** @description More lines than listed (the oldest are shown) */
+            truncated: boolean;
+        };
         Aging: {
             /** @example 150000.00 */
             NOT_DUE: string;
@@ -16300,6 +16614,173 @@ export interface components {
         };
         SupplierEntries: {
             data: components["schemas"]["SupplierEntry"][];
+        };
+        BookReportOption: {
+            id: number;
+            code: string | null;
+            name: string;
+            /** @description The parent category */
+            parentId: number | null;
+        };
+        BookReportOptions: {
+            warehouses: components["schemas"]["BookReportOption"][];
+            categories: components["schemas"]["BookReportOption"][];
+            customerCategories: components["schemas"]["BookReportOption"][];
+            /** @description Active staff members */
+            users: components["schemas"]["BookReportOption"][];
+        };
+        StockBalanceRow: {
+            productId: number;
+            sku: string;
+            name: string;
+            unit: string | null;
+            categoryId: number | null;
+            categoryName: string | null;
+            warehouseId: number | null;
+            warehouseName: string | null;
+            openingQty: string;
+            openingValue: string | null;
+            inQty: string;
+            inValue: string | null;
+            outQty: string;
+            outValue: string | null;
+            closingQty: string;
+            closingValue: string | null;
+        };
+        StockBalanceTotals: {
+            openingValue: string | null;
+            inValue: string | null;
+            outValue: string | null;
+            closingValue: string | null;
+        };
+        StockBalanceReport: {
+            from: string;
+            to: string;
+            /** @enum {string} */
+            by: "product" | "warehouse";
+            rows: components["schemas"]["StockBalanceRow"][];
+            totals: components["schemas"]["StockBalanceTotals"];
+            truncated: boolean;
+        };
+        StockBalanceLine: {
+            date: string;
+            /** @example GR */
+            docType: string;
+            docId: number;
+            docNumber: string | null;
+            warehouseId: number;
+            warehouseName: string;
+            inQty: string;
+            outQty: string;
+            value: string | null;
+            balanceQty: string;
+        };
+        StockBalanceLines: {
+            from: string;
+            to: string;
+            openingQty: string;
+            rows: components["schemas"]["StockBalanceLine"][];
+            truncated: boolean;
+        };
+        ProductSalesRow: {
+            productId: number;
+            sku: string;
+            name: string;
+            unit: string | null;
+            categoryId: number | null;
+            categoryName: string | null;
+            qty: string;
+            /** @description Net of VAT and city tax, returns subtracted */
+            sales: string;
+            returns: string;
+            avgPrice: string | null;
+            cost: string | null;
+            profit: string | null;
+            margin: string | null;
+        };
+        ProductSalesTotals: {
+            sales: string;
+            returns: string;
+            cost: string | null;
+            profit: string | null;
+        };
+        ProductSalesReport: {
+            from: string;
+            to: string;
+            rows: components["schemas"]["ProductSalesRow"][];
+            totals: components["schemas"]["ProductSalesTotals"];
+            truncated: boolean;
+        };
+        ProductSalesDocument: {
+            /** @enum {string} */
+            kind: "INVOICE" | "CREDIT_NOTE" | "POS_SALE" | "POS_RETURN" | "COST_ADJ";
+            id: number;
+            number: string | null;
+            date: string;
+            invoiceId: number | null;
+            customerId: number | null;
+            customerName: string | null;
+            qty: string;
+            sales: string;
+            cost: string | null;
+        };
+        ProductSalesDocuments: {
+            from: string;
+            to: string;
+            rows: components["schemas"]["ProductSalesDocument"][];
+            truncated: boolean;
+        };
+        StockDocumentRow: {
+            /** @enum {string} */
+            docType: "GR" | "GI" | "TR" | "ADJ" | "ST" | "SO" | "POS" | "CN";
+            docId: number;
+            number: string | null;
+            date: string;
+            note: string | null;
+            /** @description An adjustment's reason */
+            reason: string | null;
+            sourceWarehouse: string | null;
+            destWarehouse: string | null;
+            authorName: string | null;
+            /** @enum {string|null} */
+            partyKind: "CUSTOMER" | "SUPPLIER" | "USER" | "NAME" | null;
+            partyId: number | null;
+            partyName: string | null;
+            invoiceId: number | null;
+            inQty: string;
+            outQty: string;
+            inValue: string | null;
+            outValue: string | null;
+            total: string | null;
+            net: string | null;
+        };
+        StockDocumentsTotals: {
+            inValue: string | null;
+            outValue: string | null;
+            total: string;
+            net: string;
+        };
+        StockDocumentsReport: {
+            from: string;
+            to: string;
+            rows: components["schemas"]["StockDocumentRow"][];
+            totals: components["schemas"]["StockDocumentsTotals"];
+            truncated: boolean;
+        };
+        StockDocumentLine: {
+            productId: number;
+            sku: string;
+            name: string;
+            unit: string | null;
+            warehouseId: number;
+            warehouseName: string;
+            /** @description Signed: in positive, out negative */
+            qty: string;
+            unitCost: string | null;
+            value: string | null;
+        };
+        StockDocumentLines: {
+            data: components["schemas"]["StockDocumentLine"][];
         };
         PurchaseOrderInvoiceCheckLine: {
             productId: number | null;
@@ -28956,6 +29437,169 @@ export interface operations {
             };
         };
     };
+    LedgerReports_accounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LedgerAccountOptions"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    LedgerReports_report: {
+        parameters: {
+            query: {
+                kind: "PARTY" | "MONEY";
+                from: string;
+                to: string;
+                accountIds?: number[];
+                groupCodes?: string[];
+                customerIds?: number[];
+                supplierIds?: number[];
+                /** @description Customers of this group */
+                customerCategoryId?: number;
+                /** @description Lines whose description holds this text */
+                description?: string;
+                /** @description Lines with this account (prefix) on the other side */
+                counterAccount?: string;
+                /** @description Also rows without an opening or a turnover */
+                withEmpty?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LedgerReport"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    LedgerReports_lines: {
+        parameters: {
+            query: {
+                kind: "PARTY" | "MONEY";
+                from: string;
+                to: string;
+                accountIds?: number[];
+                groupCodes?: string[];
+                customerIds?: number[];
+                supplierIds?: number[];
+                /** @description Customers of this group */
+                customerCategoryId?: number;
+                /** @description Lines whose description holds this text */
+                description?: string;
+                /** @description Lines with this account (prefix) on the other side */
+                counterAccount?: string;
+                /** @description Also rows without an opening or a turnover */
+                withEmpty?: boolean;
+                accountId: number;
+                /** @description The core's party id, or `none` for lines without one */
+                partyId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LedgerLines"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    LedgerReports_xlsx: {
+        parameters: {
+            query: {
+                kind: "PARTY" | "MONEY";
+                from: string;
+                to: string;
+                accountIds?: number[];
+                groupCodes?: string[];
+                customerIds?: number[];
+                supplierIds?: number[];
+                /** @description Customers of this group */
+                customerCategoryId?: number;
+                /** @description Lines whose description holds this text */
+                description?: string;
+                /** @description Lines with this account (prefix) on the other side */
+                counterAccount?: string;
+                /** @description Also rows without an opening or a turnover */
+                withEmpty?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     CustomerBalances_list: {
         parameters: {
             query?: {
@@ -33728,6 +34372,360 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SupplierEntries"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BookReports_bookOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookReportOptions"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BookReports_stockBalance: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                by?: "product" | "warehouse";
+                warehouseIds?: number[];
+                categoryId?: number;
+                productId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockBalanceReport"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BookReports_stockBalanceXlsx: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                by?: "product" | "warehouse";
+                warehouseIds?: number[];
+                categoryId?: number;
+                productId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BookReports_stockBalanceLines: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                productId: number;
+                warehouseIds?: number[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockBalanceLines"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BookReports_productSales: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                source?: "ALL" | "WHOLESALE" | "POS";
+                kind?: "ALL" | "SALES" | "RETURNS";
+                repUserId?: number;
+                customerCategoryId?: number;
+                customerId?: number;
+                productId?: number;
+                categoryId?: number;
+                warehouseId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductSalesReport"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BookReports_productSalesXlsx: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                source?: "ALL" | "WHOLESALE" | "POS";
+                kind?: "ALL" | "SALES" | "RETURNS";
+                repUserId?: number;
+                customerCategoryId?: number;
+                customerId?: number;
+                productId?: number;
+                categoryId?: number;
+                warehouseId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BookReports_productSalesDocuments: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                source?: "ALL" | "WHOLESALE" | "POS";
+                kind?: "ALL" | "SALES" | "RETURNS";
+                repUserId?: number;
+                customerCategoryId?: number;
+                customerId?: number;
+                productId?: number;
+                categoryId?: number;
+                warehouseId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductSalesDocuments"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BookReports_stockDocuments: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                docTypes?: ("GR" | "GI" | "TR" | "ADJ" | "ST" | "SO" | "POS" | "CN")[];
+                warehouseIds?: number[];
+                productId?: number;
+                customerId?: number;
+                supplierId?: number;
+                userId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockDocumentsReport"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BookReports_stockDocumentsXlsx: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                docTypes?: ("GR" | "GI" | "TR" | "ADJ" | "ST" | "SO" | "POS" | "CN")[];
+                warehouseIds?: number[];
+                productId?: number;
+                customerId?: number;
+                supplierId?: number;
+                userId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BookReports_stockDocumentLines: {
+        parameters: {
+            query: {
+                docType: "GR" | "GI" | "TR" | "ADJ" | "ST" | "SO" | "POS" | "CN";
+                docId: number;
+                warehouseIds?: number[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockDocumentLines"];
                 };
             };
             /** @description RFC 9457 problem details */

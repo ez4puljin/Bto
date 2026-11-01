@@ -298,7 +298,7 @@ async function evaluate(cdp, expression) {
   return result.result.value;
 }
 
-async function load(cdp, state, url, { dialog = false } = {}) {
+async function load(cdp, state, url, { dialog = false, then = null } = {}) {
   let off = () => {};
   const loaded = new Promise((resolveLoad) => {
     const timer = setTimeout(resolveLoad, 20_000);
@@ -324,6 +324,12 @@ async function load(cdp, state, url, { dialog = false } = {}) {
   }
   await sleep(450);
   await idle(state, { quiet: 300, timeout: 5_000 });
+  if (then) {
+    // A route's step after the load (a double click that opens a report row's detail).
+    await evaluate(cdp, `(() => { ${then}; return true; })()`);
+    await sleep(450);
+    await idle(state, { quiet: 300, timeout: 5_000 });
+  }
 }
 
 /** Runs in the page: the layout facts the review reads beside each picture. */
@@ -554,7 +560,7 @@ async function main() {
       }
       state.errors = [];
       state.failed = [];
-      await load(cdp, state, `${web}${path}`, { dialog: route.dialog });
+      await load(cdp, state, `${web}${path}`, { dialog: route.dialog, then: route.then });
       let metrics = await evaluate(cdp, MEASURE);
       if (signedIn && metrics.url.startsWith('/login')) {
         // The session was lost (a rotated cookie): sign in again once and retry.
@@ -570,7 +576,7 @@ async function main() {
         });
         state.errors = [];
         state.failed = [];
-        await load(cdp, state, `${web}${path}`, { dialog: route.dialog });
+        await load(cdp, state, `${web}${path}`, { dialog: route.dialog, then: route.then });
         metrics = await evaluate(cdp, MEASURE);
       }
       const file = `${route.area}--${route.name}@${size.label}.png`;

@@ -2,13 +2,18 @@ import { Injectable, Module, type OnApplicationBootstrap } from '@nestjs/common'
 import { JobsWorkerModule } from '../../common/jobs/worker/jobs-worker.module';
 import { JobWorkerService } from '../../common/jobs/worker/job-worker.service';
 import { IdentityModule } from '../identity';
+import { BookReportsController } from './controllers/book-reports.controller';
 import { ReportsController } from './controllers/reports.controller';
 import { ReportingRefreshJob } from './jobs/refresh.job';
 import { AgingService } from './services/aging.service';
+import { BookOptionsService } from './services/book-options.service';
 import { DashboardService } from './services/dashboard.service';
+import { ProductSalesService } from './services/product-sales.service';
 import { ProfitService } from './services/profit.service';
 import { RefreshService } from './services/refresh.service';
 import { ReportContext } from './services/report-context';
+import { StockBalanceService } from './services/stock-balance.service';
+import { StockDocumentsService } from './services/stock-documents.service';
 import { StockReportService } from './services/stock-report.service';
 import { SupplierReportService } from './services/supplier-report.service';
 
@@ -25,13 +30,17 @@ const SERVICES = [
   ProfitService,
   StockReportService,
   SupplierReportService,
+  BookOptionsService,
+  StockBalanceService,
+  ProductSalesService,
+  StockDocumentsService,
 ];
 
 @Module({ imports: [IdentityModule], providers: SERVICES, exports: SERVICES })
 export class ReportingModule {}
 
 /** The HTTP side of the reports. */
-@Module({ imports: [ReportingModule], controllers: [ReportsController] })
+@Module({ imports: [ReportingModule], controllers: [ReportsController, BookReportsController] })
 export class ReportingHttpModule {}
 
 /** Registers the refresh of the daily totals once the worker has started (worker only). */

@@ -34,6 +34,8 @@ import { ApLedgerService } from './services/ap-ledger.service';
 import { FinPosting } from './services/fin-posting';
 import { FinanceImportsService } from './services/finance-imports.service';
 import { PeriodsService } from './services/periods.service';
+import { LedgerReportsController } from './controllers/ledger-reports.controller';
+import { LedgerReportsService } from './services/ledger-reports.service';
 import { ReportsService } from './services/reports.service';
 import { ArLedgerService } from './services/ar-ledger.service';
 import { CreditControlService } from './services/credit-control.service';
@@ -80,6 +82,7 @@ const SERVICES = [
   PeriodsService,
   FinanceImportsService,
   ReportsService,
+  LedgerReportsService,
   IssueExpenseAccountsService,
 ];
 
@@ -136,6 +139,7 @@ export class FinanceModule {}
     IssueExpenseAccountsController,
     MoneyAccountsController,
     JournalController,
+    LedgerReportsController,
     CustomerBalancesController,
     FinanceAttentionController,
     FinanceSettingsController,

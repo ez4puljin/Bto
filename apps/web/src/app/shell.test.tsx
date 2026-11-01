@@ -113,7 +113,7 @@ describe('home page (ADR-0114)', () => {
   it('gives an admin every module and the tools', async () => {
     renderApp('/', signedIn(ADMIN_ME));
     const modules = within(await screen.findByRole('region', { name: mn.home.modules }));
-    expect(modules.getAllByRole('link')).toHaveLength(7);
+    expect(modules.getAllByRole('link')).toHaveLength(8);
     expect(modules.getByRole('link', { name: mn.nav.modules.app })).toHaveAttribute(
       'href',
       '/m/app',
@@ -140,7 +140,8 @@ describe('modules (ADR-0114)', () => {
       expect(NAV_MODULES.filter((module) => module.groups.includes(group.label))).toHaveLength(1);
     }
     expect(navTrail('/pricing/quote')?.module.key).toBe('catalog');
-    expect(navTrail('/reports/aging')?.module.key).toBe('finance');
+    expect(navTrail('/reports/aging')?.module.key).toBe('reports');
+    expect(navTrail('/reports/party-ledger')?.module.key).toBe('reports');
   });
 
   it('registers staff from «Харилцагч»: the tile, the menu entry, the trail (owner 2026-10-29)', async () => {

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from '@tugeel/shared/money';
-import { sql } from 'drizzle-orm';
+import { type SQL, sql } from 'drizzle-orm';
 import { type CompanyScope, type FinExecutor, resolveCompany } from '../context/authorize';
 import type { FinCallContext } from '../context/call-context';
 import { FIN_DB, type FinDb } from '../db/fin-db';
@@ -107,6 +107,91 @@ export interface FinAccountPartyBalance {
 }
 
 const MAX_VAT_DOCUMENTS = 2_000;
+
+/** The account controls a ledger report picks its accounts by (none: every account). */
+export type FinLedgerControl =
+  'NONE' | 'RECEIVABLE' | 'PAYABLE' | 'ADVANCE_RECEIVED' | 'ADVANCE_PAID' | 'MONEY';
+
+/** What narrows a ledger report (ADR-0133): accounts, parties and the lines themselves. */
+export interface FinLedgerFilter {
+  company: string;
+  from: string;
+  to: string;
+  /** These accounts only (none: by the controls and groups). */
+  accountIds?: readonly number[];
+  /** Accounts of these controls. */
+  controls?: readonly FinLedgerControl[];
+  /** Accounts of these groups (by code). */
+  groupCodes?: readonly string[];
+  /** Lines of these parties only. */
+  partyIds?: readonly string[];
+  /** Lines whose entry or line description holds this text. */
+  description?: string;
+  /** Lines whose entry has a line on the other side on an account starting with this code. */
+  counterAccount?: string;
+}
+
+/** One account (× party) of a ledger report: the opening, the period's turnover, the closing. */
+export interface FinLedgerReportRow {
+  accountId: number;
+  code: string;
+  name: string;
+  control: FinLedgerControl;
+  groupCode: string | null;
+  groupName: string | null;
+  /** The party's id and name in the core; null when not by party or for lines without one. */
+  partyId: string | null;
+  partyName: string | null;
+  /** Debit − credit before `from`. */
+  opening: Decimal;
+  debit: Decimal;
+  credit: Decimal;
+  /** Debit − credit at `to`. */
+  closing: Decimal;
+}
+
+/** The selectable accounts of a ledger report with their groups. */
+export interface FinLedgerAccountOption {
+  accountId: number;
+  code: string;
+  name: string;
+  control: FinLedgerControl;
+  groupCode: string | null;
+  groupName: string | null;
+}
+
+/** One journal line of a ledger report's detail, with the source it came from. */
+export interface FinLedgerLine {
+  lineId: number;
+  entryId: number;
+  entryNumber: string;
+  entryDate: string;
+  entryDescription: string;
+  lineDescription: string | null;
+  system: string;
+  sourceDocType: string | null;
+  sourceDocId: string | null;
+  /** The core's document behind the entry (a voucher, an opening), its number. */
+  documentId: number | null;
+  documentNumber: string | null;
+  partyId: string | null;
+  partyName: string | null;
+  debit: Decimal;
+  credit: Decimal;
+  /** The other side's accounts of the entry: `D:110103` (debit) or `C:510101` (credit). */
+  counters: string[];
+  /** Debit − credit after this line, from the opening. */
+  balanceAfter: Decimal;
+}
+
+export interface FinLedgerLines {
+  opening: Decimal;
+  rows: FinLedgerLine[];
+  /** More lines than the list holds: the oldest are shown. */
+  truncated: boolean;
+}
+
+const MAX_LEDGER_LINES = 2_000;
 
 /**
  * The core's reports over the journal (F6, ADR-0105): the trial balance of any dates, the month's
@@ -326,6 +411,164 @@ export class FinReports {
     }));
   }
 
+  /** The accounts a ledger report can pick (ADR-0133): every account with its control and group. */
+  async ledgerAccounts(
+    ctx: FinCallContext,
+    query: { company: string },
+    executor: FinExecutor = this.db,
+  ): Promise<FinLedgerAccountOption[]> {
+    const scope = await this.scope(executor, ctx, query.company);
+    const result = await executor.execute<Row>(sql`
+      SELECT a.id, a.code, a.name, a.control, g.code AS group_code, g.name AS group_name
+        FROM fin.accounts a
+        LEFT JOIN fin.account_groups g ON g.company_id = a.company_id AND g.id = a.group_id
+       WHERE a.company_id = ${scope.companyId}
+       ORDER BY a.code`);
+    return result.rows.map((row) => ({
+      accountId: int(row.id),
+      code: str(row.code),
+      name: str(row.name),
+      control: str(row.control) as FinLedgerControl,
+      groupCode: row.group_code === null ? null : str(row.group_code),
+      groupName: row.group_name === null ? null : str(row.group_name),
+    }));
+  }
+
+  /**
+   * The ledger report of accounts × parties (ADR-0133, Erkhet's «Авлага өглөгийн тайлан» and
+   * «Мөнгөн хөрөнгийн тайлан»): per account — and per party with `byParty` — the balance before
+   * `from`, the period's debit and credit and the balance at `to`, of the lines the filter keeps.
+   * Rows without an opening or a turnover are left out unless `withEmpty`, which also lists the
+   * filter's active accounts without lines.
+   */
+  async ledgerReport(
+    ctx: FinCallContext,
+    query: FinLedgerFilter & { byParty: boolean; withEmpty?: boolean },
+    executor: FinExecutor = this.db,
+  ): Promise<FinLedgerReportRow[]> {
+    checkRange(query.from, query.to);
+    const scope = await this.scope(executor, ctx, query.company);
+    const party = query.byParty ? sql`l.party_id` : sql`NULL::bigint`;
+    const joined = query.withEmpty ? sql`LEFT JOIN` : sql`JOIN`;
+    const result = await executor.execute<Row>(sql`
+      SELECT a.id, a.code, a.name, a.control, g.code AS group_code, g.name AS group_name,
+             x.party_id, p.name AS party_name,
+             coalesce(x.opening, 0)::text AS opening, coalesce(x.debit, 0)::text AS debit,
+             coalesce(x.credit, 0)::text AS credit
+        FROM fin.accounts a
+        LEFT JOIN fin.account_groups g ON g.company_id = a.company_id AND g.id = a.group_id
+        ${joined} (
+          SELECT l.account_id, ${party} AS party_id,
+                 sum(l.debit - l.credit) FILTER (WHERE e.entry_date < ${query.from}::date) AS opening,
+                 sum(l.debit) FILTER (WHERE e.entry_date >= ${query.from}::date) AS debit,
+                 sum(l.credit) FILTER (WHERE e.entry_date >= ${query.from}::date) AS credit
+            FROM fin.journal_lines l
+            JOIN fin.journal_entries e ON e.company_id = l.company_id AND e.id = l.entry_id
+           WHERE l.company_id = ${scope.companyId} AND e.entry_date <= ${query.to}::date
+             AND ${lineConditions(query)}
+           GROUP BY 1, 2) x ON x.account_id = a.id
+        LEFT JOIN fin.parties p ON p.id = x.party_id
+       WHERE a.company_id = ${scope.companyId} AND ${accountConditions(query)}
+         AND (x.account_id IS NOT NULL OR a.status = 'ACTIVE')
+       ORDER BY a.code, p.name NULLS FIRST, x.party_id`);
+    const rows: FinLedgerReportRow[] = [];
+    for (const row of result.rows) {
+      const opening = dec(row.opening);
+      const debit = dec(row.debit);
+      const credit = dec(row.credit);
+      if (!query.withEmpty && opening.isZero() && debit.isZero() && credit.isZero()) continue;
+      rows.push({
+        accountId: int(row.id),
+        code: str(row.code),
+        name: str(row.name),
+        control: str(row.control) as FinLedgerControl,
+        groupCode: row.group_code === null ? null : str(row.group_code),
+        groupName: row.group_name === null ? null : str(row.group_name),
+        partyId: row.party_id === null ? null : str(row.party_id),
+        partyName: row.party_name === null ? null : str(row.party_name),
+        opening,
+        debit,
+        credit,
+        closing: opening.plus(debit).minus(credit),
+      });
+    }
+    return rows;
+  }
+
+  /**
+   * The lines behind one row of the ledger report (ADR-0133): the account's lines in the period —
+   * of one party, of none (`partyId: null`) or of all (undefined) — oldest first with the entry, its
+   * source and the other side's accounts, the running balance from the opening; at most 2,000.
+   */
+  async ledgerLines(
+    ctx: FinCallContext,
+    query: FinLedgerFilter & { accountId: number; partyId?: string | null },
+    executor: FinExecutor = this.db,
+  ): Promise<FinLedgerLines> {
+    checkRange(query.from, query.to);
+    const scope = await this.scope(executor, ctx, query.company);
+    const party =
+      query.partyId === undefined
+        ? sql`TRUE`
+        : query.partyId === null
+          ? sql`l.party_id IS NULL`
+          : sql`l.party_id = ${partyKey(query.partyId)}::bigint`;
+    const where = sql`l.company_id = ${scope.companyId} AND l.account_id = ${query.accountId}
+      AND ${party} AND ${lineConditions(query)}`;
+    const before = await executor.execute<Row>(sql`
+      SELECT coalesce(sum(l.debit - l.credit), 0)::text AS opening
+        FROM fin.journal_lines l
+        JOIN fin.journal_entries e ON e.company_id = l.company_id AND e.id = l.entry_id
+       WHERE ${where} AND e.entry_date < ${query.from}::date`);
+    const opening = dec(before.rows[0]?.opening);
+    const result = await executor.execute<Row>(sql`
+      SELECT l.id, l.entry_id, e.number, e.entry_date::text AS entry_date,
+             e.description AS entry_description, l.description AS line_description,
+             s.code AS system, e.source_doc_type, e.source_doc_id, e.document_id,
+             d.number AS document_number, l.party_id, p.name AS party_name,
+             l.debit::text AS debit, l.credit::text AS credit, c.counters
+        FROM fin.journal_lines l
+        JOIN fin.journal_entries e ON e.company_id = l.company_id AND e.id = l.entry_id
+        JOIN fin.source_systems s ON s.id = e.source_system_id
+        LEFT JOIN fin.documents d ON d.company_id = e.company_id AND d.id = e.document_id
+        LEFT JOIN fin.parties p ON p.id = l.party_id
+        LEFT JOIN LATERAL (
+          SELECT array_agg(DISTINCT (CASE WHEN o.debit > 0 THEN 'D:' ELSE 'C:' END) || oa.code) AS counters
+            FROM fin.journal_lines o
+            JOIN fin.accounts oa ON oa.company_id = o.company_id AND oa.id = o.account_id
+           WHERE o.company_id = l.company_id AND o.entry_id = l.entry_id AND o.id <> l.id
+             AND (o.debit > 0) = (l.credit > 0)) c ON TRUE
+       WHERE ${where} AND e.entry_date BETWEEN ${query.from}::date AND ${query.to}::date
+       ORDER BY e.entry_date, e.id, l.line_no
+       LIMIT ${MAX_LEDGER_LINES + 1}`);
+    let balance = opening;
+    const rows = result.rows.slice(0, MAX_LEDGER_LINES).map((row): FinLedgerLine => {
+      const debit = dec(row.debit);
+      const credit = dec(row.credit);
+      balance = balance.plus(debit).minus(credit);
+      return {
+        lineId: int(row.id),
+        entryId: int(row.entry_id),
+        entryNumber: str(row.number),
+        entryDate: str(row.entry_date),
+        entryDescription: str(row.entry_description),
+        lineDescription: row.line_description === null ? null : str(row.line_description),
+        system: str(row.system),
+        sourceDocType: row.source_doc_type === null ? null : str(row.source_doc_type),
+        sourceDocId: row.source_doc_id === null ? null : str(row.source_doc_id),
+        documentId: row.document_id === null ? null : int(row.document_id),
+        documentNumber: row.document_number === null ? null : str(row.document_number),
+        partyId: row.party_id === null ? null : str(row.party_id),
+        partyName: row.party_name === null ? null : str(row.party_name),
+        debit,
+        credit,
+        counters: Array.isArray(row.counters) ? row.counters.map(str) : [],
+        balanceAfter: balance,
+      };
+    });
+    return { opening, rows, truncated: result.rows.length > MAX_LEDGER_LINES };
+  }
+
   private scope(
     executor: FinExecutor,
     ctx: FinCallContext,
@@ -337,4 +580,78 @@ export class FinReports {
 
 function invalid(path: string): FinError {
   return new FinError('FIN_PAYLOAD_INVALID', undefined, { path });
+}
+
+function checkRange(from: string, to: string): void {
+  if (!ISO_DATE.test(from)) throw invalid('from');
+  if (!ISO_DATE.test(to) || to < from) throw invalid('to');
+}
+
+/** A party id as the API carries it (a positive whole number in text). */
+function partyKey(value: string): string {
+  if (!/^[1-9]\d{0,17}$/.test(value)) throw invalid('partyId');
+  return value;
+}
+
+/** `%text%` for ILIKE with the pattern characters taken literally. */
+function containsPattern(text: string): string {
+  return `%${text.replace(/[\\%_]/g, (match) => `\\${match}`)}%`;
+}
+
+/** The ledger filter's conditions on the accounts (alias `a`). */
+function accountConditions(filter: FinLedgerFilter): SQL {
+  const parts: SQL[] = [];
+  if (filter.accountIds?.length) {
+    parts.push(
+      sql`a.id IN (${sql.join(
+        filter.accountIds.map((id) => sql`${id}`),
+        sql`, `,
+      )})`,
+    );
+  }
+  if (filter.controls?.length) {
+    parts.push(
+      sql`a.control IN (${sql.join(
+        filter.controls.map((control) => sql`${control}`),
+        sql`, `,
+      )})`,
+    );
+  }
+  if (filter.groupCodes?.length) {
+    parts.push(
+      sql`g.code IN (${sql.join(
+        filter.groupCodes.map((code) => sql`${code}`),
+        sql`, `,
+      )})`,
+    );
+  }
+  return parts.length ? sql.join(parts, sql` AND `) : sql`TRUE`;
+}
+
+/** The ledger filter's conditions on the lines (alias `l`, the entry `e`). */
+function lineConditions(filter: FinLedgerFilter): SQL {
+  const parts: SQL[] = [];
+  if (filter.partyIds?.length) {
+    parts.push(
+      sql`l.party_id IN (${sql.join(
+        filter.partyIds.map((id) => sql`${partyKey(id)}::bigint`),
+        sql`, `,
+      )})`,
+    );
+  }
+  const text = filter.description?.trim();
+  if (text) {
+    const pattern = containsPattern(text);
+    parts.push(sql`(e.description ILIKE ${pattern} OR l.description ILIKE ${pattern})`);
+  }
+  const counter = filter.counterAccount?.trim();
+  if (counter) {
+    if (!/^[0-9A-Za-z.-]{1,32}$/.test(counter)) throw invalid('counterAccount');
+    parts.push(sql`EXISTS (
+      SELECT 1 FROM fin.journal_lines o
+        JOIN fin.accounts oa ON oa.company_id = o.company_id AND oa.id = o.account_id
+       WHERE o.company_id = l.company_id AND o.entry_id = l.entry_id AND o.id <> l.id
+         AND (o.debit > 0) = (l.credit > 0) AND oa.code LIKE ${`${counter}%`})`);
+  }
+  return parts.length ? sql.join(parts, sql` AND `) : sql`TRUE`;
 }

@@ -155,13 +155,13 @@ function ModuleMenu({
           <button
             type="button"
             className={cn(
-              'flex h-8.5 items-center gap-1.5 rounded-full px-3 text-sm font-medium whitespace-nowrap text-foreground/80 transition-colors duration-200 hover:bg-black/[0.04] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none aria-expanded:bg-black/[0.05] aria-expanded:text-foreground',
+              'flex h-8.5 items-center gap-1 rounded-full px-2.5 text-sm 2xl:gap-1.5 2xl:px-3 font-medium whitespace-nowrap text-foreground/80 transition-colors duration-200 hover:bg-black/[0.04] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none aria-expanded:bg-black/[0.05] aria-expanded:text-foreground',
               active && 'bg-secondary text-secondary-foreground hover:bg-secondary',
             )}
           >
             <module.icon aria-hidden className="size-4 shrink-0" />
             {label}
-            <ChevronDown aria-hidden className="size-3.5 shrink-0 opacity-60" />
+            <ChevronDown aria-hidden className="hidden size-3.5 shrink-0 opacity-60 2xl:block" />
           </button>
         )}
       </DropdownMenuTrigger>

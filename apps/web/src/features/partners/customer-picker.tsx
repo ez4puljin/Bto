@@ -20,14 +20,17 @@ export function CustomerPicker(props: {
   onChange: (customer: PickedCustomer | null) => void;
   invalid?: boolean;
   describedBy?: string;
+  /** List matches only once something is typed (a report's prompt, ADR-0133). */
+  searchFirst?: boolean;
 }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [changing, setChanging] = useState(false);
   const searchBox = useRef<HTMLInputElement>(null);
   const q = useDeferredValue(search.trim());
-  const customers = useCustomers({ q, status: 'ACTIVE' }, { enabled: props.value === null });
-  const rows = (customers.data?.pages[0]?.data ?? []).slice(0, 8);
+  const listed = props.value === null && (!props.searchFirst || q !== '');
+  const customers = useCustomers({ q, status: 'ACTIVE' }, { enabled: listed });
+  const rows = listed ? (customers.data?.pages[0]?.data ?? []).slice(0, 8) : [];
 
   // «Солих» hands the focus to the search box it brings back.
   useEffect(() => {

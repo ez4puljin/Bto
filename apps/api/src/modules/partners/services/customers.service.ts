@@ -498,6 +498,15 @@ export class CustomersService implements OnModuleInit {
     return rows.map(toSummary);
   }
 
+  /** The ids of the customers in a group (a report filter, ADR-0133). */
+  async idsInCategory(categoryId: number, executor: Db | Tx = this.db): Promise<number[]> {
+    const rows = await executor
+      .select({ id: customers.id })
+      .from(customers)
+      .where(eq(customers.categoryId, categoryId));
+    return rows.map((row) => row.id);
+  }
+
   async list(
     ctx: AuthContext,
     query: CustomerQuery,

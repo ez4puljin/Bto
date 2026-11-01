@@ -70,6 +70,12 @@ export {
 export { type FinDocumentClass } from './posting/intake-command';
 export {
   type FinAccountPartyBalance,
+  type FinLedgerAccountOption,
+  type FinLedgerControl,
+  type FinLedgerFilter,
+  type FinLedgerLine,
+  type FinLedgerLines,
+  type FinLedgerReportRow,
   FinReports,
   type FinResultBalance,
   type FinTrialBalance,

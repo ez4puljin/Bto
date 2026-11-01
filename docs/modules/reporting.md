@@ -52,6 +52,10 @@ Job: `reporting.refresh`, cron `*/15 * * * *` (Ulaanbaatar time), the scheduled 
 | `GET sales-documents?…` (the same filters) | reports.view | Newest 500, `more`; costs null without margins |
 | `GET stock?slowDays&filter&warehouseId&categoryId&q&offset&limit` (+ `.xlsx`) | reports.view | `slowDays` 30 / 60 / 90 / 180; the Excel holds up to 30,000 products |
 | `GET suppliers?from&to&q` (+ `.xlsx`), `GET suppliers/:partyId/entries?from&to` | reports.margins.view | Purchases are costs |
+| `GET book-options` | reports.view | The prompts' lists: active warehouses, categories, customer groups, active staff (ADR-0133) |
+| `GET stock-balance?from&to&by=product|warehouse&warehouseIds&categoryId&productId` (+ `.xlsx`), `GET stock-balance/lines?from&to&productId&warehouseIds` | reports.view | «Бараа материалын үлдэгдлийн тайлан»: opening, in, out, closing in base units and at cost (values null without margins); 5,000 rows, 2,000 lines |
+| `GET product-sales?from&to&source&kind=ALL|SALES|RETURNS&repUserId&customerCategoryId&customerId&productId&categoryId&warehouseId` (+ `.xlsx`), `GET product-sales/documents?…&productId` | reports.view | «Борлуулалт /Бараагаар/», live from `sales_lines`; cost and profit null without margins |
+| `GET stock-documents?from&to&docTypes&warehouseIds&productId&customerId&supplierId&userId` (+ `.xlsx`), `GET stock-documents/lines?docType&docId&warehouseIds` | reports.view | «Бараа материалын тайлан /баримтаар/»: one row per stock document; 3,000 rows |
 
 Without `reports.margins.view` every cost, profit, margin and stock value comes back null.
 
@@ -66,6 +70,7 @@ Without `reports.margins.view` every cost, profit, margin and stock value comes 
 - Low stock follows `ai.low_stock`: a location with a minimum at or under it.
 - Supplier purchases = the PURCHASE entries (the goods receipt's bill, re-costing differences, supplier returns); an unpriced receipt is no purchase yet.
 - Margin = profit ÷ sales × 100, one decimal, HALF_UP; flagged under the threshold, or a loss without sales.
+- Erkhet's stock reports (ADR-0133) count the warehouse movements only (receipt, delivery, till sale, issue and its reversal, transfer legs, return, adjustment, count); bin moves inside a warehouse are left out. Stock value = Σ qty × the ledger's unit cost + `stock_valuation_adjustments.value_delta` (the re-costing of stock on hand; its `variance` goes to the cost of sales, not to stock).
 
 ## 6. Error codes introduced
 
@@ -73,7 +78,7 @@ None (validation is `VALIDATION_FAILED` 422).
 
 ## 7. Screens (`apps/web/src/features/reports/`)
 
-Menu «Тайлан»: «Захирлын самбар», «Авлагын насжилт», «Ашигт ажиллагаа», «Барааны эргэлт», «Нийлүүлэгчийн тайлан»; each with Excel, an A4 print page and drill sheets from rows to documents. Charts: Recharts 3.10.1.
+Top-bar module «Тайлан» (ADR-0133). «Удирдлагын тайлан»: «Захирлын самбар», «Авлагын насжилт», «Ашигт ажиллагаа», «Барааны эргэлт», «Нийлүүлэгчийн тайлан»; each with Excel, an A4 print page and drill sheets from rows to documents. Charts: Recharts 3. «Нягтлангийн тайлан» (`features/reports/books/`): «Авлага өглөгийн тайлан», «Мөнгөн хөрөнгийн тайлан» (the finance module's `/finance/reports/ledger`), «Бараа материалын үлдэгдэл», «Борлуулалт /Бараагаар/», «Бараа материал баримтаар» — each opens «Тайлан авах» (the conditions, kept in the address), draws Erkhet's paper, opens a row's lines on a double click and a line's document on a click; Excel and the browser's print.10.1.
 
 ## 8. Tests
 

@@ -88,6 +88,10 @@ import { JournalPage } from '@/features/finance/journal-page';
 import { PaymentsPage } from '@/features/finance/payments-page';
 import { InvoicePrintPage, PaymentPrintPage } from '@/features/finance/print-pages';
 import { AgingPage, AgingPrintPage } from '@/features/reports/aging-page';
+import { MoneyLedgerPage, PartyLedgerPage } from '@/features/reports/books/ledger-pages';
+import { ProductSalesPage } from '@/features/reports/books/product-sales-page';
+import { StockBalancePage } from '@/features/reports/books/stock-balance-page';
+import { StockDocumentsPage } from '@/features/reports/books/stock-documents-page';
 import { DashboardPage, DashboardPrintPage } from '@/features/reports/dashboard-page';
 import { ProfitPage, ProfitPrintPage } from '@/features/reports/profit-page';
 import { StockPrintPage, StockReportPage } from '@/features/reports/stock-page';
@@ -801,7 +805,36 @@ function reportRoutes(): RouteObject[] {
   const margins = (element: ReactNode) => (
     <RequirePermission permission="reports.margins.view">{element}</RequirePermission>
   );
+  const books = (element: ReactNode) => (
+    <RequirePermission permission="finance.read">{element}</RequirePermission>
+  );
   return [
+    // Erkhet's reports on Bto's books (ADR-0133): a prompt, the paper, the lines on a double click.
+    {
+      path: 'reports/party-ledger',
+      handle: { width: 'full' },
+      element: books(<PartyLedgerPage />),
+    },
+    {
+      path: 'reports/money-ledger',
+      handle: { width: 'full' },
+      element: books(<MoneyLedgerPage />),
+    },
+    {
+      path: 'reports/stock-balance',
+      handle: { width: 'full' },
+      element: view(<StockBalancePage />),
+    },
+    {
+      path: 'reports/product-sales',
+      handle: { width: 'full' },
+      element: view(<ProductSalesPage />),
+    },
+    {
+      path: 'reports/stock-documents',
+      handle: { width: 'full' },
+      element: view(<StockDocumentsPage />),
+    },
     { path: 'reports/dashboard', handle: { width: 'wide' }, element: view(<DashboardPage />) },
     { path: 'reports/aging', handle: { width: 'wide' }, element: view(<AgingPage />) },
     { path: 'reports/profit', handle: { width: 'wide' }, element: margins(<ProfitPage />) },

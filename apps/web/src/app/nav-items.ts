@@ -4,12 +4,15 @@ import {
   Activity,
   ArrowLeftRight,
   BookOpenText,
+  BookUser,
   CalendarCheck,
   CalendarClock,
   Coins,
+  FileStack,
   FileText,
   Landmark,
   ListTree,
+  Wallet,
   WalletCards,
   BadgePercent,
   Boxes,
@@ -336,6 +339,42 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     ],
   },
   {
+    // Erkhet's reports on Bto's books (ADR-0133): a prompt, the paper, the lines on a double click.
+    label: 'nav.groups.books',
+    items: [
+      {
+        to: '/reports/party-ledger',
+        label: 'nav.reportsPartyLedger',
+        icon: BookUser,
+        permission: 'finance.read',
+      },
+      {
+        to: '/reports/money-ledger',
+        label: 'nav.reportsMoneyLedger',
+        icon: Wallet,
+        permission: 'finance.read',
+      },
+      {
+        to: '/reports/stock-balance',
+        label: 'nav.reportsStockBalance',
+        icon: Boxes,
+        permission: 'reports.view',
+      },
+      {
+        to: '/reports/product-sales',
+        label: 'nav.reportsProductSales',
+        icon: ShoppingBasket,
+        permission: 'reports.view',
+      },
+      {
+        to: '/reports/stock-documents',
+        label: 'nav.reportsStockDocuments',
+        icon: FileStack,
+        permission: 'reports.view',
+      },
+    ],
+  },
+  {
     // The management reports (ADR-0108): margins only behind reports.margins.view.
     label: 'nav.groups.reports',
     items: [
@@ -531,7 +570,16 @@ export function visibleNav(permissions: readonly Permission[]): NavGroup[] {
 }
 
 export type ModuleKey =
-  'sales' | 'inventory' | 'catalog' | 'partners' | 'finance' | 'pos' | 'app' | 'system' | 'ai';
+  | 'sales'
+  | 'inventory'
+  | 'catalog'
+  | 'partners'
+  | 'finance'
+  | 'reports'
+  | 'pos'
+  | 'app'
+  | 'system'
+  | 'ai';
 
 export interface NavModule {
   key: ModuleKey;
@@ -544,11 +592,11 @@ export interface NavModule {
 }
 
 /**
- * The top bar's modules (ADR-0114): the menu groups gathered into eight areas so they fit one line
- * at 1366 px — «Бараа» holds the catalogue, prices and segments, «Санхүү» the books and the
- * reports, «Апп» the two mobile apps' settings (ADR-0127). «Систем» and the assistant are tools at
- * the bar's right. Every group belongs to exactly
- * one module (a test proves it).
+ * The top bar's modules (ADR-0114): the menu groups gathered into areas that fit one line at
+ * 1366 px (the pills drop their arrows below 2xl) — «Бараа» holds the catalogue, prices and
+ * segments, «Санхүү» the books, «Тайлан» Erkhet's reports and the management reports (ADR-0133),
+ * «Апп» the two mobile apps' settings (ADR-0127). «Систем» and the assistant are tools at the
+ * bar's right. Every group belongs to exactly one module (a test proves it).
  */
 export const NAV_MODULES: readonly NavModule[] = [
   { key: 'sales', label: 'nav.modules.sales', icon: ShoppingCart, groups: ['nav.groups.sales'] },
@@ -574,7 +622,13 @@ export const NAV_MODULES: readonly NavModule[] = [
     key: 'finance',
     label: 'nav.modules.finance',
     icon: Landmark,
-    groups: ['nav.groups.finance', 'nav.groups.reports'],
+    groups: ['nav.groups.finance'],
+  },
+  {
+    key: 'reports',
+    label: 'nav.modules.reports',
+    icon: FileChartColumn,
+    groups: ['nav.groups.books', 'nav.groups.reports'],
   },
   { key: 'pos', label: 'nav.modules.pos', icon: Store, groups: ['nav.groups.pos'] },
   { key: 'app', label: 'nav.modules.app', icon: Smartphone, groups: ['nav.groups.app'] },

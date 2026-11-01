@@ -37,7 +37,10 @@ export const PUBLIC_ROUTES = [
   { area: 'auth', name: 'set-password', path: '/set-password' },
 ];
 
-/** `dialog: true` waits for a dialog or a sheet to open before measuring. */
+/**
+ * `dialog: true` waits for a dialog or a sheet to open before measuring; `then` is a script run in
+ * the page once it has loaded (a double click that opens a report row's detail).
+ */
 export const ROUTES = [
   { area: 'home', name: 'home', path: '/' },
 
@@ -151,6 +154,38 @@ export const ROUTES = [
   { area: 'pos', name: 'pos-settings', path: '/pos/settings' },
   { area: 'pos', name: 'pos-test-till', path: '/pos/test-till' },
 
+  { area: 'reports', name: 'books-party-prompt', path: '/reports/party-ledger', dialog: true },
+  {
+    area: 'reports',
+    name: 'books-party',
+    path: '/reports/party-ledger?from=2026-10-01&to=2026-11-01',
+    then: "document.querySelectorAll('tr[aria-expanded]').forEach((row) => row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })))",
+  },
+  {
+    area: 'reports',
+    name: 'books-money',
+    path: '/reports/money-ledger?from=2026-10-01&to=2026-11-01&e=1',
+    then: "document.querySelectorAll('tr[aria-expanded]').forEach((row) => row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })))",
+  },
+  {
+    area: 'reports',
+    name: 'books-stock-balance',
+    path: '/reports/stock-balance?from=2026-10-01&to=2026-11-01&by=warehouse',
+    then: "document.querySelectorAll('tr[aria-expanded]').forEach((row) => row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })))",
+  },
+  {
+    area: 'reports',
+    name: 'books-product-sales',
+    path: '/reports/product-sales?from=2026-10-01&to=2026-11-01',
+    then: "document.querySelectorAll('tr[aria-expanded]').forEach((row) => row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })))",
+  },
+  {
+    area: 'reports',
+    name: 'books-stock-documents',
+    path: '/reports/stock-documents?from=2026-10-01&to=2026-11-01',
+    then: "document.querySelectorAll('tr[aria-expanded]').forEach((row) => row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })))",
+  },
+  { area: 'reports', name: 'books-sales-prompt', path: '/reports/product-sales', dialog: true },
   { area: 'reports', name: 'reports-dashboard', path: '/reports/dashboard' },
   { area: 'reports', name: 'reports-aging', path: '/reports/aging' },
   { area: 'reports', name: 'reports-profit', path: '/reports/profit' },
