@@ -24,7 +24,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useHasPermission } from '@/app/auth-context';
 import { useWarehouses } from '@/features/identity/api';
@@ -48,6 +47,7 @@ import {
   useReceiptPaymentAccounts,
 } from './api';
 import { columnName, fieldNames, issueText } from './helpers';
+import { MonthInput } from '@/components/date-input';
 
 const FILTERS: readonly RowFilter[] = ['ERRORS', 'WARNINGS', 'ALL'];
 /** Filled cells shown for each row before the ones with a problem. */
@@ -247,13 +247,12 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
             htmlFor="opening-month"
             hint={t('imports.openingOptions.startMonthHint', { date: openingDate })}
           >
-            <Input
+            <MonthInput
               id="opening-month"
-              type="month"
               max={thisMonth}
               className="sm:w-44"
               value={startMonth}
-              onChange={(event) => setStartMonth(event.target.value)}
+              onChange={(value) => setStartMonth(value)}
             />
           </FormField>
         ) : null}

@@ -6,7 +6,7 @@ import { REG_NO_MAX_LENGTH } from '@tugeel/shared/taxpayer';
 import { businessDate } from '@tugeel/shared/time';
 import { Ban, CircleCheck, Coins, IdCard, KeyRound, LockOpen, Plus } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import { z } from 'zod';
@@ -71,6 +71,7 @@ import {
   useLoyaltyMutations,
   useSaleLoyaltyToCheck,
 } from './loyalty-api';
+import { DateInput } from '@/components/date-input';
 
 const STATUSES = ['ACTIVE', 'BLOCKED'] as const satisfies readonly LoyaltyMemberStatus[];
 const isStatus = (value: string | null): value is LoyaltyMemberStatus =>
@@ -437,7 +438,19 @@ function RegisterForm({
             htmlFor="member-birth"
             error={errors.birthDate?.message}
           >
-            <Input id="member-birth" type="date" max={today} {...form.register('birthDate')} />
+            <Controller
+              control={form.control}
+              name="birthDate"
+              render={({ field }) => (
+                <DateInput
+                  id="member-birth"
+                  max={today}
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
+              )}
+            />
           </FormField>
         </div>
         <FormField label={t('posLoyalty.fields.gender')} htmlFor="member-gender">
@@ -714,12 +727,19 @@ function MemberEditForm({ member, onClose }: { member: LoyaltyMember; onClose: (
           htmlFor="member-edit-birth"
           error={errors.birthDate?.message}
         >
-          <Input
-            id="member-edit-birth"
-            type="date"
-            max={today}
-            className="sm:w-48"
-            {...form.register('birthDate')}
+          <Controller
+            control={form.control}
+            name="birthDate"
+            render={({ field }) => (
+              <DateInput
+                id="member-edit-birth"
+                max={today}
+                className="sm:w-48"
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+              />
+            )}
           />
         </FormRow>
         <FormRow label={t('posLoyalty.fields.gender')} htmlFor="member-edit-gender">

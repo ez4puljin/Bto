@@ -59,6 +59,7 @@ Radius (`--radius: 0.875rem`, since 2026-10-30): cards `rounded-xl` (14px), fiel
 | `components/sticky-actions.tsx` | `StickyActions({ summary?, children })`: a step's buttons at the foot of a long editor, sticking to the bottom of the window. Place it after the card, never inside (cards clip their content); toasts rise above it |
 | `components/leave-guard.tsx` | `LeaveGuard({ when, title, description, leaveLabel })`: asks before leaving a page with work not yet sent (a link or the back button inside the app opens the question; a reload or a closed tab gets the browser's own). Only a change of page asks. One per page |
 | `lib/use-delete-confirm.ts` | `useDeleteConfirm(remove)`: `ask(row)`, then a `ConfirmDialog` while `target` is set; refusals show in the dialog |
+| `components/date-input.tsx` | `DateInput`, `MonthInput`, `TimeInput({ id?, value, onChange(value), min?, max?, required?, variant?: 'filter' | 'bare', label? })` (owner 2026-11-01): every date, month and time field — the browser's own `type="date"`, `"month"` and `"time"` speak the browser's language (an English «mm/dd/yyyy», «AM/PM»). The value stays text (`YYYY-MM-DD`, `YYYY-MM`, `HH:mm`, 24 hours) that can be typed (`2026.11.01`, `20261101`, `0830` too; a value typed in full goes out at once, a short one on leaving the box); the button opens a Mongolian calendar («2026 оны 11-р сар», «Да … Ня», Monday first, ← → ↑ ↓ PgUp PgDn, «Өнөөдөр», «Цэвэрлэх»); days outside `min` / `max` are closed, the form still checks a typed one. A react-hook-form field goes through a `Controller`. `DateFilter` and `DateRangeFilter` are built on it |
 | `components/ui/switch.tsx` | `Switch` (Radix): on/off values, green when on; tie a `Label htmlFor` or a `FormRow` to its `id` |
 | `lib/toast.ts` | `toast.success(text)` / `toast.info(text)`; rendered by `Toaster` (mounted in `AppProviders`) |
 | `lib/use-create-param.ts` | `const [creating, setCreating] = useCreateParam()`: a create dialog's open state in the URL (`?new=1`) |
@@ -182,6 +183,7 @@ A page others edit at the same time polls a light version route and shows a yell
 | Blue text with `text-link` | `text-primary` for small text (3.9:1 on the canvas) |
 | `pending` on a button whose request runs; `onRetry` on a failed load | A button that only dims while it waits; an error with no way out |
 | Tokens and Tailwind classes | Colour literals; new UI dependencies without an ADR |
+| `DateInput` / `MonthInput` / `TimeInput` for a date, a month or a time | `<Input type="date">`, `"month"`, `"time"` (the browser's language, AM/PM) |
 | Icon-only buttons with `aria-label` and `title` (the same text) | An icon button without a name, or a row of text buttons |
 | `DialogContent size`, the footer last | A one-off dialog width; a page `FormFooter` inside a dialog |
 | `description` for what a page is for | Paragraphs in the header's meta row |

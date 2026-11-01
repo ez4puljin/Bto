@@ -32,6 +32,7 @@ import {
 } from './api';
 import { WHOLE_MNT } from './helpers';
 import { previewTable, useProfileSummary, useUnitLabel } from './price-views';
+import { DateInput } from '@/components/date-input';
 
 type Issue =
   | 'pricing.dialog.noChanges'
@@ -293,12 +294,11 @@ function PriceEntryForm(props: {
             </p>
           ) : (
             <FormField label={t('pricing.dialog.validFrom')} htmlFor="price-valid-from">
-              <Input
+              <DateInput
                 id="price-valid-from"
-                type="date"
                 min={view.today}
                 value={validFrom}
-                onChange={(event) => setValidFrom(event.target.value)}
+                onChange={(value) => setValidFrom(value)}
                 className="sm:w-44"
               />
             </FormField>

@@ -23,6 +23,7 @@ import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
 import { type PriceList, type Quote, useQuote } from './api';
 import { QuoteResult, UnitSelect } from './quote-table';
+import { DateInput } from '@/components/date-input';
 
 interface CartLine {
   key: string;
@@ -102,12 +103,11 @@ export function PriceQuotePage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="quote-date">{t('pricing.quote.date')}</Label>
-              <Input
+              <DateInput
                 id="quote-date"
-                type="date"
                 value={date}
-                onChange={(event) => {
-                  setDate(event.target.value);
+                onChange={(value) => {
+                  setDate(value);
                   setResult(null);
                 }}
               />

@@ -54,6 +54,7 @@ import {
   usePurchaseOrders,
 } from './api';
 import { StatusCountBadge, SupplierTicks } from './parts';
+import { DateInput } from '@/components/date-input';
 
 const idOf = (value: string | null | undefined) => {
   const parsed = Number.parseInt(value ?? '', 10);
@@ -256,12 +257,11 @@ function CreateOrderDialog({ onCancel }: { onCancel: () => void }) {
         <ProblemAlert problem={action.problem} />
         <div className="grid gap-4 sm:grid-cols-[12rem_1fr]">
           <FormField label={t('procurement.create.date')} htmlFor="po-date">
-            <Input
+            <DateInput
               id="po-date"
-              type="date"
               className="font-mono"
               value={orderDate}
-              onChange={(event) => setOrderDate(event.target.value)}
+              onChange={(value) => setOrderDate(value)}
             />
           </FormField>
           <FormField label={t('procurement.create.note')} htmlFor="po-note">

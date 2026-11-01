@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { DATE } from '../report-helpers';
 import { type Precision, PRECISIONS } from './book-format';
 import type { usePromptDates } from './book-state';
+import { DateInput } from '@/components/date-input';
 
 /** «Тайлан авах»: Erkhet's prompt window, two columns of conditions, the dates last. */
 export function PromptDialog(props: {
@@ -65,12 +66,11 @@ export function DateFields(props: ReturnType<typeof usePromptDates>) {
   return (
     <>
       <FormField label={t('reports.prompt.from')} htmlFor="book-from">
-        <Input
+        <DateInput
           id="book-from"
-          type="date"
           required
           value={props.start}
-          onChange={(event) => props.setStart(event.target.value)}
+          onChange={(value) => props.setStart(value)}
         />
       </FormField>
       <FormField
@@ -82,12 +82,11 @@ export function DateFields(props: ReturnType<typeof usePromptDates>) {
             : undefined
         }
       >
-        <Input
+        <DateInput
           id="book-to"
-          type="date"
           required
           value={props.end}
-          onChange={(event) => props.setEnd(event.target.value)}
+          onChange={(value) => props.setEnd(value)}
         />
       </FormField>
     </>

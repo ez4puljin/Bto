@@ -45,6 +45,7 @@ import {
 } from './api';
 import { useRoleLabel, useWorkdaysText } from './hr-helpers';
 import { Avatar, WeekdayChecks } from './hr-kit';
+import { TimeInput } from '@/components/date-input';
 
 const SITE_COLUMNS: readonly ColumnSpec[] = [
   { key: 'name', kind: 'text', weight: 3, min: 10 },
@@ -382,13 +383,12 @@ function ScheduleFields(props: {
         htmlFor={ids.start}
         error={props.errors.workStart ? 'validation.required' : undefined}
       >
-        <Input
+        <TimeInput
           id={ids.start}
-          type="time"
           className="font-mono sm:w-40"
           value={props.value.workStart}
           disabled={props.disabled}
-          onChange={(event) => set({ workStart: event.target.value })}
+          onChange={(value) => set({ workStart: value })}
         />
       </Field>
       <Field
@@ -396,13 +396,12 @@ function ScheduleFields(props: {
         htmlFor={ids.end}
         error={props.errors.workEnd ? 'validation.required' : undefined}
       >
-        <Input
+        <TimeInput
           id={ids.end}
-          type="time"
           className="font-mono sm:w-40"
           value={props.value.workEnd}
           disabled={props.disabled}
-          onChange={(event) => set({ workEnd: event.target.value })}
+          onChange={(value) => set({ workEnd: value })}
         />
       </Field>
       <Field

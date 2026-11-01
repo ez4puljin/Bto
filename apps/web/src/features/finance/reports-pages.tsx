@@ -42,6 +42,7 @@ import {
   type VatReport,
 } from './api';
 import { DATE, save, sides } from './report-helpers';
+import { DateInput, MonthInput } from '@/components/date-input';
 
 const PERIOD = /^\d{4}-(0[1-9]|1[0-2])$/;
 const monthStart = (): string => `${businessDate().slice(0, 7)}-01`;
@@ -240,23 +241,21 @@ export function TrialBalancePage() {
       />
       <FilterBar>
         <FormField label={t('finance.reports.trialBalance.from')} htmlFor="tb-from">
-          <Input
+          <DateInput
             id="tb-from"
-            type="date"
             className="sm:w-44"
             value={from}
             max={to}
-            onChange={(event) => set('from', event.target.value)}
+            onChange={(value) => set('from', value)}
           />
         </FormField>
         <FormField label={t('finance.reports.trialBalance.to')} htmlFor="tb-to">
-          <Input
+          <DateInput
             id="tb-to"
-            type="date"
             className="sm:w-44"
             value={to}
             min={from}
-            onChange={(event) => set('to', event.target.value)}
+            onChange={(value) => set('to', value)}
           />
         </FormField>
         <div className="flex items-center gap-2 self-end pb-1.5">
@@ -509,16 +508,15 @@ export function VatReportPage() {
       />
       <FilterBar>
         <FormField label={t('finance.reports.vat.period')} htmlFor="vat-period">
-          <Input
+          <MonthInput
             id="vat-period"
-            type="month"
             className="sm:w-44"
             value={period}
-            onChange={(event) =>
+            onChange={(value) =>
               setSearch(
                 (current) => {
                   const params = new URLSearchParams(current);
-                  params.set('period', event.target.value);
+                  params.set('period', value);
                   return params;
                 },
                 { replace: true },

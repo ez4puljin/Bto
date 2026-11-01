@@ -24,7 +24,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import { useWarehouses } from '@/features/identity/api';
 import { type PickedSupplier, SupplierPicker } from '@/features/partners/supplier-picker';
 import { usePriceProfileChoices } from '@/features/pricing/api';
@@ -35,6 +34,7 @@ import { randomUuid } from '@/lib/uuid';
 import { type ProductListItem, useCategories, useProductNames } from './api';
 import { useBulkEdits } from './bulk-api';
 import { categoryTree } from './category-tree';
+import { DateInput } from '@/components/date-input';
 
 type EditAction = 'category' | 'mainSupplier' | 'profile' | 'home';
 type StatusAction = 'deactivate' | 'activate';
@@ -374,13 +374,12 @@ function ProfileDialog({ ids, onClose, onDone }: DialogProps) {
         </NativeSelect>
       </FormField>
       <FormField label={t('catalog.products.bulk.validFrom')} htmlFor="bulk-valid-from">
-        <Input
+        <DateInput
           id="bulk-valid-from"
-          type="date"
           min={today}
           className="sm:w-44"
           value={validFrom}
-          onChange={(event) => setValidFrom(event.target.value)}
+          onChange={(value) => setValidFrom(value)}
         />
       </FormField>
     </BulkDialog>

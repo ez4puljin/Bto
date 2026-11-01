@@ -36,7 +36,6 @@ import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -58,6 +57,7 @@ import {
 } from './api';
 import { useRoleLabel, useWorded } from './hr-helpers';
 import { Avatar, StatusBadge, TimeCell } from './hr-kit';
+import { DateInput } from '@/components/date-input';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -569,13 +569,12 @@ export function AttendanceDashboardPage() {
             >
               <ChevronLeft />
             </Button>
-            <Input
-              type="date"
+            <DateInput
               aria-label={t('hr.dashboard.date')}
               className="w-40 font-mono"
               value={date}
               max={today}
-              onChange={(event) => setParam('date', event.target.value || today)}
+              onChange={(value) => setParam('date', value || today)}
             />
             <Button
               variant="outline"

@@ -1,3 +1,5 @@
+import { DateInput } from '@/components/date-input';
+
 /**
  * A date range in a filter bar (ADR-0066): one pill «Огноо [from] – [to]» instead of two, so a busy
  * bar keeps one line at 1366px. Tinted while it narrows the list; each date keeps its own name
@@ -23,24 +25,23 @@ export function DateRangeFilter(props: {
       <span className="mr-1 text-muted-foreground group-data-[active=true]:text-secondary-foreground">
         {props.label}
       </span>
-      <input
-        type="date"
+      <DateInput
+        variant="bare"
         aria-label={props.fromLabel}
-        className="h-full min-w-0 bg-transparent font-mono outline-none"
-        value={props.from ?? ''}
+        value={props.from}
         max={props.to}
-        onChange={(event) => props.onFrom(event.target.value || undefined)}
+        onChange={(value) => props.onFrom(value || undefined)}
       />
       <span aria-hidden className="text-muted-foreground">
         –
       </span>
-      <input
-        type="date"
+      <DateInput
+        variant="bare"
         aria-label={props.toLabel}
-        className="h-full min-w-0 rounded-r-full bg-transparent pr-3 font-mono outline-none"
-        value={props.to ?? ''}
+        className="pr-1"
+        value={props.to}
         min={props.from}
-        onChange={(event) => props.onTo(event.target.value || undefined)}
+        onChange={(value) => props.onTo(value || undefined)}
       />
     </div>
   );

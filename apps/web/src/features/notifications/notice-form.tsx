@@ -37,6 +37,7 @@ import { toast } from '@/lib/toast';
 import { uploadFile } from '@/lib/upload';
 import { randomUuid } from '@/lib/uuid';
 import { type NoticeKind, useNoticeMutations } from './api';
+import { DateInput } from '@/components/date-input';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ACCEPT = 'image/jpeg,image/png,image/webp';
@@ -329,7 +330,19 @@ export function NoticeDialog(props: { onClose: () => void }) {
                   htmlFor="notice-from"
                   error={errors.validFrom?.message}
                 >
-                  <Input id="notice-from" type="date" min={today} {...form.register('validFrom')} />
+                  <Controller
+                    control={form.control}
+                    name="validFrom"
+                    render={({ field }) => (
+                      <DateInput
+                        id="notice-from"
+                        min={today}
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                      />
+                    )}
+                  />
                 </FormField>
                 <FormField
                   label={t('notifications.form.lastDay')}
@@ -337,11 +350,18 @@ export function NoticeDialog(props: { onClose: () => void }) {
                   hint={t('notifications.form.lastDayHint')}
                   error={errors.lastDay?.message}
                 >
-                  <Input
-                    id="notice-last-day"
-                    type="date"
-                    min={watched.validFrom || today}
-                    {...form.register('lastDay')}
+                  <Controller
+                    control={form.control}
+                    name="lastDay"
+                    render={({ field }) => (
+                      <DateInput
+                        id="notice-last-day"
+                        min={watched.validFrom || today}
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                      />
+                    )}
                   />
                 </FormField>
               </div>

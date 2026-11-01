@@ -51,6 +51,7 @@ import {
 import { useDefaultWarehouse } from './last-warehouse';
 import { useScanQty } from './scan-qty';
 import { ProductSearch, QtyInput, ScanQtyControl, ScanToolbar, WarehouseSelect } from './shared';
+import { DateInput } from '@/components/date-input';
 
 /** Goods leave a wholesale warehouse or a store (ADR-0081). */
 const ISSUE_WAREHOUSES = ['WHOLESALE', 'STORE'] as const;
@@ -803,13 +804,12 @@ function DraftEditor(props: {
         />
         <div className={EDITOR_GRID}>
           <FormField label={t('inventory.date')} htmlFor="issue-date" error={dateError}>
-            <Input
+            <DateInput
               id="issue-date"
-              type="date"
               max={businessDate()}
               aria-invalid={dateError !== undefined || undefined}
               value={issuedOn}
-              onChange={(event) => setIssuedOn(event.target.value)}
+              onChange={(value) => setIssuedOn(value)}
               onBlur={() => {
                 if (detail !== null && issuedOn !== detail.issuedOn && !dateMessage(issuedOn)) {
                   const before = detail.issuedOn;

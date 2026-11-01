@@ -425,6 +425,33 @@
     "deleteTitle": "{{date}}-ний төлөвлөсөн утгыг устгах уу?"
   },
   "common": {
+    "calendar": {
+      "open": "Календарь нээх",
+      "chooseMonth": "Сар сонгох",
+      "previousMonth": "Өмнөх сар",
+      "nextMonth": "Дараагийн сар",
+      "previousYear": "Өмнөх жил",
+      "nextYear": "Дараагийн жил",
+      "title": "{{year}} оны {{month}}-р сар",
+      "year": "{{year}} он",
+      "month": "{{month}}-р сар",
+      "day": "{{year}} оны {{month}}-р сарын {{day}}",
+      "weekdays": {
+        "mon": "Да",
+        "tue": "Мя",
+        "wed": "Лх",
+        "thu": "Пү",
+        "fri": "Ба",
+        "sat": "Бя",
+        "sun": "Ня"
+      },
+      "today": "Өнөөдөр",
+      "thisMonth": "Энэ сар",
+      "clear": "Цэвэрлэх",
+      "datePlaceholder": "ОООО-СС-ӨӨ",
+      "monthPlaceholder": "ОООО-СС",
+      "timePlaceholder": "ЦЦ:ММ"
+    },
     "comingSoon": "Тун удахгүй",
     "binsSoonHint": "Тавиурын системийг одоогоор ашиглахгүй; дараагийн хөгжүүлэлтээр нээгдэнэ.",
     "binsSoonPage": "Тавиур, зөөлтийн дэлгэцийг дараагийн хөгжүүлэлтээр нээнэ. Одоогоор агуулахын үлдэгдэл тавиургүй хөтлөгдөнө.",

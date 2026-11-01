@@ -17,7 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
+import { useForm, useWatch, Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { useApiClient } from '@/app/api-client-context';
@@ -62,6 +62,7 @@ import { ProductSearch } from '@/features/inventory/shared';
 import { lastDayOf, validToOf } from '@/features/pricing/helpers';
 import { useSegments } from '@/features/segments/api';
 import { type Banner, useBannerMutations, useBanners } from './api';
+import { DateInput } from '@/components/date-input';
 
 const STATE_BADGES: Record<BannerState, 'success' | 'default' | 'secondary' | 'outline'> = {
   RUNNING: 'success',
@@ -567,7 +568,19 @@ export function BannerDialog(props: { onClose: () => void }) {
               htmlFor="banner-from"
               error={errors.validFrom?.message}
             >
-              <Input id="banner-from" type="date" min={today} {...form.register('validFrom')} />
+              <Controller
+                control={form.control}
+                name="validFrom"
+                render={({ field }) => (
+                  <DateInput
+                    id="banner-from"
+                    min={today}
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
+              />
             </FormField>
             <FormField
               label={t('customerApp.banners.form.lastDay')}
@@ -575,11 +588,18 @@ export function BannerDialog(props: { onClose: () => void }) {
               hint={t('customerApp.banners.form.lastDayHint')}
               error={errors.lastDay?.message}
             >
-              <Input
-                id="banner-last-day"
-                type="date"
-                min={watched.validFrom || today}
-                {...form.register('lastDay')}
+              <Controller
+                control={form.control}
+                name="lastDay"
+                render={({ field }) => (
+                  <DateInput
+                    id="banner-last-day"
+                    min={watched.validFrom || today}
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
             </FormField>
           </div>

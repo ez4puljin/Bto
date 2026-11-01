@@ -31,6 +31,7 @@ import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
 import { useFinanceMutations, useGlAccounts, useInvoices, useMoneyAccounts } from './api';
+import { DateInput } from '@/components/date-input';
 
 const MONEY = /^\d{1,12}(\.\d{1,2})?$/;
 const isKind = (value: string): value is PaymentKind =>
@@ -275,13 +276,12 @@ function PaymentForm({
             />
           </FormField>
           <FormField label={t('finance.payments.dialog.paidOn')} htmlFor="payment-date">
-            <Input
+            <DateInput
               id="payment-date"
-              type="date"
               className="font-mono"
               value={paidOn}
               max={businessDate()}
-              onChange={(event) => setPaidOn(event.target.value)}
+              onChange={(value) => setPaidOn(value)}
             />
           </FormField>
         </div>

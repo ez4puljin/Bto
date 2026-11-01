@@ -23,6 +23,7 @@ import { useAction } from '@/lib/use-action';
 import { type SalesOrder, useSalesOrderMutations } from './api';
 import { PaymentLabel } from './order-badges';
 import { orderRequestOf } from './order-request';
+import { DateInput } from '@/components/date-input';
 
 /**
  * «Мэдээлэл» (ADR-0059, erxes's Properties): the order's header read first, edited in place while
@@ -178,11 +179,10 @@ function PropertiesForm({
           htmlFor={`${id}-date`}
           error={issueOf('deliveryDate')}
         >
-          <Input
+          <DateInput
             id={`${id}-date`}
-            type="date"
             value={deliveryDate}
-            onChange={(event) => setDeliveryDate(event.target.value)}
+            onChange={(value) => setDeliveryDate(value)}
           />
         </FormField>
         {fulfilment === 'DELIVERY' ? (

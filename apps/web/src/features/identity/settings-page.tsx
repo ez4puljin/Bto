@@ -41,6 +41,7 @@ import { problemFromError, settle } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useDeleteConfirm } from '@/lib/use-delete-confirm';
 import { type SettingView, useIdentityMutations, useSettings } from './api';
+import { DateInput } from '@/components/date-input';
 
 type SettingEntry = SettingView['entries'][number];
 
@@ -279,13 +280,12 @@ function SettingDialog(props: { settingKey: SettingKey; first: boolean; onClose:
             </FormField>
           )}
           <FormField label={t('settings.effectiveFrom')} htmlFor="setting-date">
-            <Input
+            <DateInput
               id="setting-date"
-              type="date"
               className="sm:w-44"
               min={props.first ? undefined : today}
               value={effectiveFrom}
-              onChange={(event) => setEffectiveFrom(event.target.value)}
+              onChange={(value) => setEffectiveFrom(value)}
             />
           </FormField>
           <DialogFormFooter pending={mutations.createSetting.isPending} onCancel={props.onClose} />

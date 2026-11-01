@@ -28,6 +28,7 @@ import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
 import { useFinanceMutations, useOpenItems, useSupplierOpenItems } from './api';
+import { DateInput } from '@/components/date-input';
 
 /** Whose open items the dialog pairs: a customer's receivables or a supplier's payables (F3). */
 export type AllocationParty = { kind: 'customer' | 'supplier'; id: number };
@@ -342,13 +343,12 @@ function AllocationForm({ party, onClose }: { party: AllocationParty; onClose: (
         </section>
         <div className="grid gap-4 sm:grid-cols-[10rem_minmax(0,1fr)]">
           <FormField label={t('finance.allocations.date')} htmlFor="allocation-date">
-            <Input
+            <DateInput
               id="allocation-date"
-              type="date"
               className="font-mono"
               value={date}
               max={businessDate()}
-              onChange={(event) => setDate(event.target.value)}
+              onChange={(value) => setDate(value)}
             />
           </FormField>
           <FormField label={t('finance.allocations.description')} htmlFor="allocation-description">

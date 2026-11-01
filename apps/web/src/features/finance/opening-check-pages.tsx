@@ -10,7 +10,6 @@ import { PageHeader } from '@/components/page-header';
 import { PrintFrame } from '@/components/print-frame';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -31,6 +30,7 @@ import {
   useReportMutations,
 } from './api';
 import { DATE, save, sides } from './report-helpers';
+import { DateInput } from '@/components/date-input';
 
 /** The balances by account, each account with its parties and its subtotal (ADR-0106 #5). */
 function byAccount(rows: readonly OpeningCheckRow[]) {
@@ -173,17 +173,13 @@ export function OpeningCheckPage() {
       />
       <FilterBar>
         <FormField label={t('finance.reports.openingCheck.date')} htmlFor="oc-date">
-          <Input
+          <DateInput
             id="oc-date"
-            type="date"
             className="sm:w-44"
             value={date}
             max={businessDate()}
-            onChange={(event) =>
-              setSearch(
-                event.target.value ? new URLSearchParams({ date: event.target.value }) : {},
-                { replace: true },
-              )
+            onChange={(value) =>
+              setSearch(value ? new URLSearchParams({ date: value }) : {}, { replace: true })
             }
           />
         </FormField>

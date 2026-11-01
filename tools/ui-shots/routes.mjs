@@ -186,6 +186,13 @@ export const ROUTES = [
     then: "document.querySelectorAll('tr[aria-expanded]').forEach((row) => row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })))",
   },
   { area: 'reports', name: 'books-sales-prompt', path: '/reports/product-sales', dialog: true },
+  {
+    area: 'reports',
+    name: 'calendar-open',
+    path: '/reports/party-ledger',
+    dialog: true,
+    then: 'document.querySelector(\'[role=dialog] button[aria-label="Календарь нээх"]\')?.click()',
+  },
   { area: 'reports', name: 'reports-dashboard', path: '/reports/dashboard' },
   { area: 'reports', name: 'reports-aging', path: '/reports/aging' },
   { area: 'reports', name: 'reports-profit', path: '/reports/profit' },

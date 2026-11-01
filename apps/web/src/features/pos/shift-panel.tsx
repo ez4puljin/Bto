@@ -28,6 +28,7 @@ import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
 import { type Shift, useDayCounts, usePosMutations, useShift } from './api';
 import { ShiftStatusBadge } from './badges';
+import { DateInput } from '@/components/date-input';
 
 const MONEY = /^\d{1,12}(\.\d{1,2})?$/;
 
@@ -318,13 +319,12 @@ function HandoverDialog({
               />
             </FormField>
             <FormField label={t('pos.fields.paidOn')} htmlFor="handover-date">
-              <Input
+              <DateInput
                 id="handover-date"
-                type="date"
                 className="font-mono"
                 value={paidOn}
                 max={businessDate()}
-                onChange={(event) => setPaidOn(event.target.value)}
+                onChange={(value) => setPaidOn(value)}
               />
             </FormField>
           </div>

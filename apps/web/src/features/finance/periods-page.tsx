@@ -11,7 +11,6 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
@@ -28,6 +27,7 @@ import {
 } from './api';
 import { YearCloseCard } from './reports-pages';
 import { VoidDialog } from './void-dialog';
+import { MonthInput } from '@/components/date-input';
 
 /** The month before this one, `YYYY-MM`: the one usually closed next. */
 const previousMonth = (): string => addMonths(`${businessDate().slice(0, 7)}-01`, -1).slice(0, 7);
@@ -104,13 +104,12 @@ export function PeriodsPage() {
           <CardContent className="flex flex-col gap-3">
             <div className="flex flex-wrap items-end gap-2">
               <FormField label={t('finance.periods.month')} htmlFor="close-month">
-                <Input
+                <MonthInput
                   id="close-month"
-                  type="month"
                   className="sm:w-44"
                   value={month}
                   max={previousMonth()}
-                  onChange={(event) => setMonth(event.target.value)}
+                  onChange={(value) => setMonth(value)}
                 />
               </FormField>
               <Button

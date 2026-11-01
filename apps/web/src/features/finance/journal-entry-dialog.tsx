@@ -37,6 +37,7 @@ import {
   useGlAccounts,
   useMoneyAccounts,
 } from './api';
+import { DateInput } from '@/components/date-input';
 
 const MONEY = /^\d{1,12}(\.\d{1,2})?$/;
 
@@ -186,13 +187,12 @@ export function JournalEntryDialog({
         <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
           <div className="grid gap-4 sm:grid-cols-[10rem_minmax(0,1fr)]">
             <FormField label={t('finance.journal.dialog.date')} htmlFor="entry-date">
-              <Input
+              <DateInput
                 id="entry-date"
-                type="date"
                 className="font-mono"
                 value={entryDate}
                 max={businessDate()}
-                onChange={(event) => setEntryDate(event.target.value)}
+                onChange={(value) => setEntryDate(value)}
               />
             </FormField>
             <FormField

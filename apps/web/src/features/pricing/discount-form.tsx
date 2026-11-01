@@ -31,6 +31,7 @@ import {
   type ProgramDraft,
   programBody,
 } from './helpers';
+import { DateInput } from '@/components/date-input';
 
 const SCOPES: readonly DiscountScope[] = ['PRODUCT', 'CATEGORY', 'ORDER'];
 const MEASURES: readonly DiscountMeasure[] = ['QTY', 'AMOUNT'];
@@ -246,23 +247,21 @@ function ProgramForm(props: {
                 </NativeSelect>
               </FormRow>
               <FormRow label={t('pricing.programs.fields.validFrom')} htmlFor="program-valid-from">
-                <Input
+                <DateInput
                   id="program-valid-from"
-                  type="date"
                   className="sm:w-44"
                   min={today}
                   value={draft.validFrom}
-                  onChange={(event) => update({ validFrom: event.target.value })}
+                  onChange={(value) => update({ validFrom: value })}
                 />
               </FormRow>
               <FormRow label={t('pricing.programs.fields.validTo')} htmlFor="program-last-day">
-                <Input
+                <DateInput
                   id="program-last-day"
-                  type="date"
                   className="sm:w-44"
                   min={draft.validFrom}
                   value={draft.lastDay}
-                  onChange={(event) => update({ lastDay: event.target.value })}
+                  onChange={(value) => update({ lastDay: value })}
                 />
               </FormRow>
             </FormSection>

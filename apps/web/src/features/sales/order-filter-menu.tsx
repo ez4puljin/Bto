@@ -21,7 +21,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import { useWarehouseName, useWarehouseOptions } from '@/features/inventory/helpers';
 import { useCustomer } from '@/features/partners/api';
 import { CustomerPicker, type PickedCustomer } from '@/features/partners/customer-picker';
@@ -32,6 +31,7 @@ import {
   type OrderFilters,
   withoutField,
 } from './order-filters';
+import { DateInput } from '@/components/date-input';
 
 const CHANNELS = ORDER_CHANNELS.filter((channel) => channel !== 'POS');
 /** The warehouses an order's lines ship from: the filter «Агуулах» (ADR-0126 #2). */
@@ -239,20 +239,10 @@ function FilterDialog({
         {field === 'delivery' ? (
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField label={t('sales.filters.from')} htmlFor="filter-from">
-              <Input
-                id="filter-from"
-                type="date"
-                value={from}
-                onChange={(event) => setFrom(event.target.value)}
-              />
+              <DateInput id="filter-from" value={from} onChange={(value) => setFrom(value)} />
             </FormField>
             <FormField label={t('sales.filters.to')} htmlFor="filter-to">
-              <Input
-                id="filter-to"
-                type="date"
-                value={to}
-                onChange={(event) => setTo(event.target.value)}
-              />
+              <DateInput id="filter-to" value={to} onChange={(value) => setTo(value)} />
             </FormField>
           </div>
         ) : null}

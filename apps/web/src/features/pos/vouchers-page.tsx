@@ -10,7 +10,7 @@ import {
 import { addDays, businessDate } from '@tugeel/shared/time';
 import { Ban, CircleCheck, ListChecks, Plus, Printer, TicketPercent } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
+import { useForm, useWatch, Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import { z } from 'zod';
@@ -73,6 +73,7 @@ import {
   useVoucherMutations,
   voucherValueText,
 } from './vouchers-api';
+import { DateInput } from '@/components/date-input';
 
 const STATUSES = ['ACTIVE', 'STOPPED'] as const;
 const isKind = (value: string | null): value is VoucherBatchKind =>
@@ -492,18 +493,36 @@ function VoucherBatchForm({
             htmlFor="voucher-from"
             error={errors.validFrom?.message}
           >
-            <Input id="voucher-from" type="date" {...form.register('validFrom')} />
+            <Controller
+              control={form.control}
+              name="validFrom"
+              render={({ field }) => (
+                <DateInput
+                  id="voucher-from"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
+              )}
+            />
           </FormField>
           <FormField
             label={t('pos.vouchers.fields.validTo')}
             htmlFor="voucher-to"
             error={errors.validTo?.message}
           >
-            <Input
-              id="voucher-to"
-              type="date"
-              min={watched.validFrom || today}
-              {...form.register('validTo')}
+            <Controller
+              control={form.control}
+              name="validTo"
+              render={({ field }) => (
+                <DateInput
+                  id="voucher-to"
+                  min={watched.validFrom || today}
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
+              )}
             />
           </FormField>
         </div>

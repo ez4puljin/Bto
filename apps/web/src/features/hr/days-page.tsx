@@ -26,7 +26,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Table,
@@ -56,6 +55,7 @@ import {
 } from './api';
 import { useWorded } from './hr-helpers';
 import { StatusBadge, TimeCell } from './hr-kit';
+import { TimeInput } from '@/components/date-input';
 
 const STATUSES = ['PRESENT', 'LATE', 'ABSENT', 'OFF'] as const satisfies readonly DayStatus[];
 const MAX_DAYS = 62;
@@ -147,14 +147,13 @@ function AddEventDialog(props: {
             </NativeSelect>
           </FormField>
           <FormField label={t('hr.days.sheet.time')} htmlFor="event-time" error={errors.time}>
-            <Input
+            <TimeInput
               id="event-time"
-              type="time"
-              className="font-mono sm:w-40"
+              className="sm:w-40"
               value={time}
-              onChange={(event) => {
+              onChange={(value) => {
                 setErrors((prev) => ({ ...prev, time: undefined }));
-                setTime(event.target.value);
+                setTime(value);
               }}
             />
           </FormField>

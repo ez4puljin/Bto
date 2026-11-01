@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableCell, TableHead, TableRow } from '@/components/ui/table';
 import { columnLayout, type ColumnSpec } from '@/lib/column-layout';
 import { cn } from '@/lib/utils';
+import { DateInput } from '@/components/date-input';
 
 /*
  * The list kit (ADR-0042, docs/ui.md): a filter bar (search box, filter pills, the column chooser
@@ -81,20 +82,12 @@ export function DateFilter(props: {
   onChange: (value: string | undefined) => void;
 }) {
   return (
-    <label
-      data-active={props.value ? 'true' : undefined}
-      className="group inline-flex h-8.5 items-center gap-2 rounded-full border border-border bg-background pl-3 text-[0.8125rem] font-medium shadow-control focus-within:border-ring focus-within:ring-1 focus-within:ring-ring hover:bg-accent data-[active=true]:border-transparent data-[active=true]:bg-secondary data-[active=true]:text-secondary-foreground"
-    >
-      <span className="text-muted-foreground group-data-[active=true]:text-secondary-foreground">
-        {props.label}
-      </span>
-      <input
-        type="date"
-        className="h-full rounded-r-full bg-transparent pr-3 font-mono outline-none"
-        value={props.value ?? ''}
-        onChange={(event) => props.onChange(event.target.value || undefined)}
-      />
-    </label>
+    <DateInput
+      variant="filter"
+      label={props.label}
+      value={props.value}
+      onChange={(value) => props.onChange(value || undefined)}
+    />
   );
 }
 

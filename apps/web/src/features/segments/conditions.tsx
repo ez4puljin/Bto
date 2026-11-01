@@ -34,6 +34,7 @@ import { usePriceProfileChoices } from '@/features/pricing/api';
 import { formatMnt } from '@/lib/money';
 import { fieldLabel, NO_IDS, SELLING_KINDS, useIdNames, valueLabel } from './condition-labels';
 import { newCondition, withOperator } from './segment-definition';
+import { DateInput } from '@/components/date-input';
 
 /** One condition in words: «Ангилал аль нэг нь: Ундаа», «Үлдэгдэл: дууссан · Бөөний агуулах». */
 export function ConditionText(props: { entity: SegmentEntity; condition: SegmentCondition }) {
@@ -431,14 +432,13 @@ function ValueEditor(props: {
     return (
       <div className="grid gap-2 sm:grid-cols-2">
         {(['from', 'to'] as const).map((slot) => (
-          <Input
+          <DateInput
             key={slot}
-            type="date"
             aria-label={`${t(`catalog.products.filters.${slot}`)}: ${label}`}
             value={condition[slot] ?? ''}
-            onChange={(event) => {
+            onChange={(value) => {
               const { [slot]: _old, ...rest } = condition;
-              onChange(event.target.value ? { ...rest, [slot]: event.target.value } : rest);
+              onChange(value ? { ...rest, [slot]: value } : rest);
             }}
           />
         ))}

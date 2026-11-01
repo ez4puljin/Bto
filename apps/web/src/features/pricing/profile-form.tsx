@@ -41,6 +41,7 @@ import { problemFromError, settle } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { randomUuid } from '@/lib/uuid';
 import { type PriceProfile, type PriceProfileVersion, usePricingMutations } from './api';
+import { DateInput } from '@/components/date-input';
 
 /** The NUMERIC(5,2) markups and the NUMERIC(14,3) bulk quantity, as typed. */
 const MARKUP = /^\d{1,3}(\.\d{1,2})?$/;
@@ -326,11 +327,18 @@ export function ProfileValuesDialog(props: { profile: PriceProfile | null; onClo
                   htmlFor="profile-valid-from"
                   error={errors.validFrom?.message}
                 >
-                  <Input
-                    id="profile-valid-from"
-                    type="date"
-                    min={today}
-                    {...form.register('validFrom')}
+                  <Controller
+                    control={form.control}
+                    name="validFrom"
+                    render={({ field }) => (
+                      <DateInput
+                        id="profile-valid-from"
+                        min={today}
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                      />
+                    )}
                   />
                 </FormField>
               </div>

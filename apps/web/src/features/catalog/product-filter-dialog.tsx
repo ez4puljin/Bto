@@ -33,6 +33,7 @@ import {
   type StockKind,
   withFilter,
 } from './product-filters';
+import { DateInput } from '@/components/date-input';
 
 /** Warehouses that sell: the ones homes, stock and minimums are kept for (ADR-0049). */
 const SELLING_KINDS: readonly string[] = ['WHOLESALE', 'STORE'];
@@ -390,20 +391,14 @@ function DateEditor(props: EditorProps & { field: 'created' | 'updated' }) {
       {choice === 'range' ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label={t('catalog.products.filters.from')} htmlFor={`filter-${field}-from`}>
-            <Input
+            <DateInput
               id={`filter-${field}-from`}
-              type="date"
               value={from}
-              onChange={(event) => setFrom(event.target.value)}
+              onChange={(value) => setFrom(value)}
             />
           </FormField>
           <FormField label={t('catalog.products.filters.to')} htmlFor={`filter-${field}-to`}>
-            <Input
-              id={`filter-${field}-to`}
-              type="date"
-              value={to}
-              onChange={(event) => setTo(event.target.value)}
-            />
+            <DateInput id={`filter-${field}-to`} value={to} onChange={(value) => setTo(value)} />
           </FormField>
         </div>
       ) : null}

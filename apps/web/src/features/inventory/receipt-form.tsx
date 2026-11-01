@@ -57,6 +57,7 @@ import {
   focusNextPrice,
   usePostedCosts,
 } from './receipt-prices';
+import { DateInput } from '@/components/date-input';
 
 const PAYMENT_METHODS: readonly ReceiptPaymentMethod[] = ['CREDIT', 'CASH', 'BANK'];
 
@@ -867,11 +868,10 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
           htmlFor="receipt-date"
           error={fieldError(headerProblem, 'supplierDocDate')}
         >
-          <Input
+          <DateInput
             id="receipt-date"
-            type="date"
             value={docDate}
-            onChange={(event) => setDocDate(event.target.value)}
+            onChange={(value) => setDocDate(value)}
             onBlur={() => {
               if (detail !== null && docDate !== (detail.supplierDocDate ?? '')) {
                 patchHeader({ supplierDocDate: docDate || null });

@@ -9,7 +9,6 @@ import { PageHeader } from '@/components/page-header';
 import { PrintFrame } from '@/components/print-frame';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -29,6 +28,7 @@ import { type Dashboard, useDashboard, useReportDownloads } from './api';
 import { type BarItem, HorizontalBars, TrendChart } from './charts';
 import { MONTH, NONE, percentChange, pointChange, reportHref } from './report-helpers';
 import { ExcelButton, PrintHeading, PrintLink, RefreshControl } from './report-kit';
+import { MonthInput } from '@/components/date-input';
 
 /** How a rise reads: good (sales, profit), bad (receivables) or neither (stock). */
 type Sense = 'good' | 'bad' | 'neutral';
@@ -512,12 +512,11 @@ export function DashboardPage() {
         }
         actions={
           <>
-            <Input
-              type="month"
+            <MonthInput
               aria-label={t('reports.dashboard.month')}
               className="w-40"
               value={month}
-              onChange={(event) => setParam('month', event.target.value)}
+              onChange={(value) => setParam('month', value)}
             />
             <RefreshControl />
             <ExcelButton
