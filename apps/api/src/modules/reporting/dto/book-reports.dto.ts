@@ -1,9 +1,23 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { ArrayMaxSize, IsIn, IsInt, IsOptional, Matches, Min } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  Matches,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { queryIds } from '../../../common/pagination/page';
 import { BOOK_DOC_TYPES, type BookDocType } from '../services/book-sql';
-import { PRODUCT_SALES_KINDS, type ProductSalesKind } from '../services/product-sales.service';
+import {
+  PRODUCT_SALES_GROUPINGS,
+  PRODUCT_SALES_KINDS,
+  type ProductSalesGrouping,
+  type ProductSalesKind,
+} from '../services/product-sales.service';
 import {
   SALES_DOC_KINDS,
   SALES_SOURCES,
@@ -64,6 +78,10 @@ export class BookReportOptionsDto {
   @ApiProperty({ type: [BookReportOptionDto] }) customerCategories: BookReportOptionDto[];
   @ApiProperty({ type: [BookReportOptionDto], description: 'Active staff members' })
   users: BookReportOptionDto[];
+  @ApiProperty({ type: [BookReportOptionDto], description: 'The main suppliers of products' })
+  brands: BookReportOptionDto[];
+  @ApiProperty({ type: [BookReportOptionDto], description: 'Live hand-picked product segments' })
+  segments: BookReportOptionDto[];
 }
 
 // ------------------------------------------------------------- stock balance
@@ -167,6 +185,37 @@ export class ProductSalesQueryDto extends RangeQueryDto {
   @optionalId() productId?: number;
   @optionalId() categoryId?: number;
   @optionalId() warehouseId?: number;
+  @optionalIds() brandIds?: number[];
+  @optionalIds() segmentIds?: number[];
+
+  @ApiPropertyOptional({ enum: PRODUCT_SALES_GROUPINGS, default: 'none' })
+  @IsOptional()
+  @IsIn(PRODUCT_SALES_GROUPINGS)
+  by?: ProductSalesGrouping;
+
+  @ApiPropertyOptional({ description: 'Split the sales by payment' })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => value === true || value === 'true')
+  @IsBoolean()
+  payments?: boolean;
+
+  @ApiPropertyOptional({ description: "The documents' group key under `by` (documents only)" })
+  @IsOptional()
+  @MaxLength(24)
+  @Matches(/^(\d+|APP|NONE)$/)
+  group?: string;
+}
+
+@ApiSchema({ name: 'PaidAmount' })
+export class PaidAmountDto {
+  @ApiProperty({ example: 'AR' }) key: string;
+  @ApiProperty({ description: 'Net of VAT' }) amount: string;
+}
+
+@ApiSchema({ name: 'ProductSalesPayment' })
+export class ProductSalesPaymentDto {
+  @ApiProperty({ example: 'AR' }) key: string;
+  @ApiProperty() name: string;
 }
 
 @ApiSchema({ name: 'ProductSalesRow' })
@@ -177,6 +226,8 @@ export class ProductSalesRowDto {
   @ApiProperty({ type: String, nullable: true }) unit: string | null;
   @ApiProperty({ type: Number, nullable: true }) categoryId: number | null;
   @ApiProperty({ type: String, nullable: true }) categoryName: string | null;
+  @ApiProperty({ type: String, nullable: true }) group: string | null;
+  @ApiProperty({ type: String, nullable: true }) groupName: string | null;
   @ApiProperty() qty: string;
   @ApiProperty({ description: 'Net of VAT and city tax, returns subtracted' }) sales: string;
   @ApiProperty() returns: string;
@@ -184,6 +235,7 @@ export class ProductSalesRowDto {
   @ApiProperty({ type: String, nullable: true }) cost: string | null;
   @ApiProperty({ type: String, nullable: true }) profit: string | null;
   @ApiProperty({ type: String, nullable: true }) margin: string | null;
+  @ApiProperty({ type: [PaidAmountDto] }) paid: PaidAmountDto[];
 }
 
 @ApiSchema({ name: 'ProductSalesTotals' })
@@ -192,13 +244,16 @@ export class ProductSalesTotalsDto {
   @ApiProperty() returns: string;
   @ApiProperty({ type: String, nullable: true }) cost: string | null;
   @ApiProperty({ type: String, nullable: true }) profit: string | null;
+  @ApiProperty({ type: [PaidAmountDto] }) paid: PaidAmountDto[];
 }
 
 @ApiSchema({ name: 'ProductSalesReport' })
 export class ProductSalesReportDto {
   @ApiProperty() from: string;
   @ApiProperty() to: string;
+  @ApiProperty({ enum: PRODUCT_SALES_GROUPINGS }) by: ProductSalesGrouping;
   @ApiProperty({ type: [ProductSalesRowDto] }) rows: ProductSalesRowDto[];
+  @ApiProperty({ type: [ProductSalesPaymentDto] }) payments: ProductSalesPaymentDto[];
   @ApiProperty({ type: ProductSalesTotalsDto }) totals: ProductSalesTotalsDto;
   @ApiProperty() truncated: boolean;
 }
@@ -215,6 +270,7 @@ export class ProductSalesDocumentDto {
   @ApiProperty() qty: string;
   @ApiProperty() sales: string;
   @ApiProperty({ type: String, nullable: true }) cost: string | null;
+  @ApiProperty({ type: [PaidAmountDto] }) paid: PaidAmountDto[];
 }
 
 @ApiSchema({ name: 'ProductSalesDocuments' })

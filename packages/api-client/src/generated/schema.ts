@@ -16628,6 +16628,10 @@ export interface components {
             customerCategories: components["schemas"]["BookReportOption"][];
             /** @description Active staff members */
             users: components["schemas"]["BookReportOption"][];
+            /** @description The main suppliers of products */
+            brands: components["schemas"]["BookReportOption"][];
+            /** @description Live hand-picked product segments */
+            segments: components["schemas"]["BookReportOption"][];
         };
         StockBalanceRow: {
             productId: number;
@@ -16682,6 +16686,12 @@ export interface components {
             rows: components["schemas"]["StockBalanceLine"][];
             truncated: boolean;
         };
+        PaidAmount: {
+            /** @example AR */
+            key: string;
+            /** @description Net of VAT */
+            amount: string;
+        };
         ProductSalesRow: {
             productId: number;
             sku: string;
@@ -16689,6 +16699,8 @@ export interface components {
             unit: string | null;
             categoryId: number | null;
             categoryName: string | null;
+            group: string | null;
+            groupName: string | null;
             qty: string;
             /** @description Net of VAT and city tax, returns subtracted */
             sales: string;
@@ -16697,17 +16709,27 @@ export interface components {
             cost: string | null;
             profit: string | null;
             margin: string | null;
+            paid: components["schemas"]["PaidAmount"][];
+        };
+        ProductSalesPayment: {
+            /** @example AR */
+            key: string;
+            name: string;
         };
         ProductSalesTotals: {
             sales: string;
             returns: string;
             cost: string | null;
             profit: string | null;
+            paid: components["schemas"]["PaidAmount"][];
         };
         ProductSalesReport: {
             from: string;
             to: string;
+            /** @enum {string} */
+            by: "none" | "category" | "brand" | "segment" | "user";
             rows: components["schemas"]["ProductSalesRow"][];
+            payments: components["schemas"]["ProductSalesPayment"][];
             totals: components["schemas"]["ProductSalesTotals"];
             truncated: boolean;
         };
@@ -16723,6 +16745,7 @@ export interface components {
             qty: string;
             sales: string;
             cost: string | null;
+            paid: components["schemas"]["PaidAmount"][];
         };
         ProductSalesDocuments: {
             from: string;
@@ -34529,6 +34552,13 @@ export interface operations {
                 productId?: number;
                 categoryId?: number;
                 warehouseId?: number;
+                brandIds?: number[];
+                segmentIds?: number[];
+                by?: "none" | "category" | "brand" | "segment" | "user";
+                /** @description Split the sales by payment */
+                payments?: boolean;
+                /** @description The documents' group key under `by` (documents only) */
+                group?: string;
             };
             header?: never;
             path?: never;
@@ -34568,6 +34598,13 @@ export interface operations {
                 productId?: number;
                 categoryId?: number;
                 warehouseId?: number;
+                brandIds?: number[];
+                segmentIds?: number[];
+                by?: "none" | "category" | "brand" | "segment" | "user";
+                /** @description Split the sales by payment */
+                payments?: boolean;
+                /** @description The documents' group key under `by` (documents only) */
+                group?: string;
             };
             header?: never;
             path?: never;
@@ -34607,6 +34644,13 @@ export interface operations {
                 productId?: number;
                 categoryId?: number;
                 warehouseId?: number;
+                brandIds?: number[];
+                segmentIds?: number[];
+                by?: "none" | "category" | "brand" | "segment" | "user";
+                /** @description Split the sales by payment */
+                payments?: boolean;
+                /** @description The documents' group key under `by` (documents only) */
+                group?: string;
             };
             header?: never;
             path?: never;

@@ -190,7 +190,7 @@ export function MultiPick(props: {
         onChange={(value) => {
           if (value) props.onChange([...props.values, value]);
         }}
-        className="w-full justify-between"
+        className="h-10 w-full max-w-none justify-between rounded-lg px-3 text-sm font-normal"
       />
     </div>
   );

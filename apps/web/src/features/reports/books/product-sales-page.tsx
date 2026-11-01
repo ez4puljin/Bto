@@ -2,6 +2,8 @@ import { ShoppingBasket } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/list';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import {
@@ -19,6 +21,9 @@ import { problemFromError } from '@/lib/problem';
 import { useAction } from '@/lib/use-action';
 import {
   type BookOptions,
+  type PaidAmount,
+  type ProductSalesDocument,
+  type ProductSalesPayment,
   type ProductSalesQuery,
   type ProductSalesRow,
   useBookDownloads,
@@ -42,6 +47,7 @@ import {
   DetailRow,
   DrillMark,
   DrillRow,
+  MultiPick,
   NoteRow,
   PickedField,
   PrecisionField,
@@ -49,9 +55,10 @@ import {
   SelectField,
 } from './book-kit';
 import { salesDocHref } from './book-links';
-import { idParamOf, useBookParams, useDrill, usePromptDates } from './book-state';
+import { idParamOf, idsParam, useBookParams, useDrill, usePromptDates } from './book-state';
 
-type Grouping = 'none' | 'category';
+const GROUPINGS = ['none', 'category', 'brand', 'segment', 'user'] as const;
+type Grouping = (typeof GROUPINGS)[number];
 const SOURCES = ['ALL', 'WHOLESALE', 'POS'] as const;
 const KINDS = ['ALL', 'SALES', 'RETURNS'] as const;
 type Source = (typeof SOURCES)[number];
@@ -60,7 +67,8 @@ type Kind = (typeof KINDS)[number];
 function useProductSalesQuery() {
   const params = useBookParams();
   const { search } = params;
-  const grouping: Grouping = search.get('by') === 'category' ? 'category' : 'none';
+  const grouping: Grouping = GROUPINGS.find((value) => value === search.get('by')) ?? 'none';
+  const payments = search.get('pay') === '1';
   const query = useMemo<ProductSalesQuery | null>(() => {
     if (!params.ready) return null;
     const source = SOURCES.find((value) => value === search.get('src'));
@@ -73,15 +81,21 @@ function useProductSalesQuery() {
       categoryId: idParamOf(search, 'cat'),
       warehouseId: idParamOf(search, 'w'),
     };
+    const brandIds = idsParam(search, 'br');
+    const segmentIds = idsParam(search, 'sg');
     return {
       from: params.from,
       to: params.to,
       ...(source && source !== 'ALL' ? { source } : {}),
       ...(kind && kind !== 'ALL' ? { kind } : {}),
       ...Object.fromEntries(Object.entries(ids).filter(([, value]) => value !== undefined)),
+      ...(brandIds.length ? { brandIds } : {}),
+      ...(segmentIds.length ? { segmentIds } : {}),
+      ...(grouping === 'none' ? {} : { by: grouping }),
+      ...(payments ? { payments: true } : {}),
     };
-  }, [params.ready, params.from, params.to, search]);
-  return { ...params, query, grouping };
+  }, [params.ready, params.from, params.to, search, grouping, payments]);
+  return { ...params, query, grouping, payments };
 }
 
 /** «Тайлан → Борлуулалт /Бараагаар/» (ADR-0133). */
@@ -105,6 +119,12 @@ export function ProductSalesPage() {
     ...(idParamOf(search, 'w')
       ? [options.data?.warehouses.find((w) => w.id === idParamOf(search, 'w'))?.name ?? '']
       : []),
+    ...idsParam(search, 'br').map(
+      (id) => options.data?.brands.find((b) => b.id === id)?.name ?? String(id),
+    ),
+    ...idsParam(search, 'sg').map(
+      (id) => options.data?.segments.find((g) => g.id === id)?.name ?? String(id),
+    ),
     ...['cn', 'prn', 'catn'].flatMap((key) => (search.get(key) ? [search.get(key) ?? ''] : [])),
     ...(search.get('src')
       ? [t(`reports.books.prompt.sources.${search.get('src') as Source}`)]
@@ -149,8 +169,9 @@ export function ProductSalesPage() {
           <ProductSalesTable
             rows={report.data.rows}
             totals={report.data.totals}
+            payments={report.data.payments}
             truncated={report.data.truncated}
-            grouping={state.grouping}
+            grouping={report.data.by}
             query={state.query}
             precision={state.precision}
           />
@@ -182,6 +203,9 @@ function ProductSalesPrompt(props: {
   const [categoryId, setCategoryId] = useState(search.get('cat') ?? '');
   const [warehouse, setWarehouse] = useState(search.get('w') ?? '');
   const [kind, setKind] = useState(search.get('kind') ?? 'ALL');
+  const [brands, setBrands] = useState<string[]>(search.getAll('br'));
+  const [segments, setSegments] = useState<string[]>(search.getAll('sg'));
+  const [payments, setPayments] = useState(props.state.payments);
   const [precision, setPrecision] = useState<Precision>(props.state.precision);
   useEffect(() => {
     if (!props.open) return;
@@ -195,6 +219,10 @@ function ProductSalesPrompt(props: {
     setCategoryId(search.get('cat') ?? '');
     setWarehouse(search.get('w') ?? '');
     setKind(search.get('kind') ?? 'ALL');
+    setBrands(search.getAll('br'));
+    setSegments(search.getAll('sg'));
+    setGrouping(GROUPINGS.find((value) => value === search.get('by')) ?? 'none');
+    setPayments(search.get('pay') === '1');
   }, [props.open, search]);
   const categories = useMemo(
     () => categoryOptions(props.options?.categories ?? []),
@@ -218,6 +246,9 @@ function ProductSalesPrompt(props: {
       catn: categories.find((c) => c.value === categoryId)?.label,
       w: warehouse,
       kind: kind === 'ALL' ? null : kind,
+      br: brands,
+      sg: segments,
+      pay: payments ? '1' : null,
     });
     props.onOpenChange(false);
   };
@@ -277,11 +308,11 @@ function ProductSalesPrompt(props: {
           label={t('reports.books.prompt.grouping')}
           value={grouping}
           emptyLabel=""
-          options={(['none', 'category'] as const).map((value) => ({
+          options={GROUPINGS.map((value) => ({
             value,
             label: t(`reports.books.prompt.groupings.${value}`),
           }))}
-          onChange={(value) => setGrouping(value === 'category' ? 'category' : 'none')}
+          onChange={(value) => setGrouping(GROUPINGS.find((g) => g === value) ?? 'none')}
         />
         <PickedField
           label={t('reports.books.prompt.product')}
@@ -307,6 +338,25 @@ function ProductSalesPrompt(props: {
           options={categories}
           onChange={setCategoryId}
         />
+        <MultiPick
+          label={t('reports.books.prompt.brands')}
+          options={(props.options?.brands ?? []).map((b) => ({
+            value: String(b.id),
+            label: b.name,
+            keys: [b.code ?? ''],
+          }))}
+          values={brands}
+          onChange={setBrands}
+        />
+        <MultiPick
+          label={t('reports.books.prompt.segments')}
+          options={(props.options?.segments ?? []).map((g) => ({
+            value: String(g.id),
+            label: g.name,
+          }))}
+          values={segments}
+          onChange={setSegments}
+        />
         <SelectField
           id="book-warehouse"
           label={t('reports.books.prompt.warehouse')}
@@ -318,6 +368,14 @@ function ProductSalesPrompt(props: {
           onChange={setWarehouse}
         />
         <PrecisionField value={precision} onChange={setPrecision} />
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="book-payments"
+            checked={payments}
+            onCheckedChange={(value) => setPayments(value === true)}
+          />
+          <Label htmlFor="book-payments">{t('reports.books.prompt.payments')}</Label>
+        </div>
         <SelectField
           id="book-kind"
           label={t('reports.books.prompt.kind')}
@@ -340,11 +398,30 @@ interface SalesTotals {
   returns: string;
   cost: string | null;
   profit: string | null;
+  paid: readonly PaidAmount[];
+}
+
+/** A payment's amount in a row's split, null without one. */
+function paidOf(paid: readonly PaidAmount[], key: string): string | null {
+  return paid.find((p) => p.key === key)?.amount ?? null;
+}
+
+/** Adds two splits by payment. */
+function addPaid(a: readonly PaidAmount[], b: readonly PaidAmount[]): PaidAmount[] {
+  const sum = new Map(a.map((p) => [p.key, p.amount]));
+  for (const p of b) sum.set(p.key, addMoney(sum.get(p.key) ?? '0', p.amount) ?? '0');
+  return [...sum].map(([key, amount]) => ({ key, amount }));
+}
+
+/** The groups' order: by name, the customer app and «… -гүй» last. */
+function groupRank(key: string | null): number {
+  return key === 'NONE' ? 2 : key === 'APP' ? 1 : 0;
 }
 
 function ProductSalesTable(props: {
   rows: readonly ProductSalesRow[];
   totals: SalesTotals;
+  payments: readonly ProductSalesPayment[];
   truncated: boolean;
   grouping: Grouping;
   query: ProductSalesQuery;
@@ -353,16 +430,21 @@ function ProductSalesTable(props: {
   const { t } = useTranslation();
   const drill = useDrill();
   const costs = props.totals.cost !== null;
-  const span = costs ? 10 : 7;
+  const { payments } = props;
+  const span = (costs ? 10 : 7) + payments.length;
   const groups = useMemo(() => {
-    if (props.grouping === 'none') return [['', [...props.rows]] as const];
-    const map = new Map<string, ProductSalesRow[]>();
+    if (props.grouping === 'none') return [{ key: '', name: '', rows: [...props.rows] }];
+    const map = new Map<string, { key: string; name: string; rows: ProductSalesRow[] }>();
     for (const row of props.rows) {
-      const key = row.categoryName ?? t('reports.books.table.noCategory');
-      map.set(key, [...(map.get(key) ?? []), row]);
+      const key = row.group ?? 'NONE';
+      const group = map.get(key) ?? { key, name: row.groupName ?? '', rows: [] };
+      group.rows.push(row);
+      map.set(key, group);
     }
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b, 'mn'));
-  }, [props.rows, props.grouping, t]);
+    return [...map.values()].sort(
+      (a, b) => groupRank(a.key) - groupRank(b.key) || a.name.localeCompare(b.name, 'mn'),
+    );
+  }, [props.rows, props.grouping]);
   if (props.rows.length === 0) {
     return <EmptyState icon={ShoppingBasket} title={t('reports.prompt.empty')} />;
   }
@@ -374,9 +456,22 @@ function ProductSalesTable(props: {
         returns: addMoney(sum.returns, row.returns) ?? '0',
         cost: addMoney(sum.cost, row.cost),
         profit: addMoney(sum.profit, row.profit),
+        paid: addPaid(sum.paid, row.paid),
       }),
-      { sales: '0', returns: '0', cost: costs ? '0' : null, profit: costs ? '0' : null },
+      {
+        sales: '0',
+        returns: '0',
+        cost: costs ? '0' : null,
+        profit: costs ? '0' : null,
+        paid: [],
+      },
     );
+  const paidCells = (paid: readonly PaidAmount[]) =>
+    payments.map((payment) => (
+      <TableCell key={payment.key} className={NUM}>
+        {money(paidOf(paid, payment.key) ?? '0')}
+      </TableCell>
+    ));
   const totalCells = (totals: SalesTotals) => (
     <>
       <TableCell />
@@ -390,39 +485,60 @@ function ProductSalesTable(props: {
           <TableCell />
         </>
       ) : null}
+      {paidCells(totals.paid)}
     </>
+  );
+  const twoRows = payments.length > 0;
+  const head = (label: string, className: string) => (
+    <TableHead rowSpan={twoRows ? 2 : undefined} className={className}>
+      {label}
+    </TableHead>
   );
   return (
     <Table className={BOOK_TABLE}>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-28 text-center">{t('reports.books.columns.sku')}</TableHead>
-          <TableHead className="text-center">{t('reports.books.columns.name')}</TableHead>
-          <TableHead className="text-center">{t('reports.books.columns.unit')}</TableHead>
-          <TableHead className="text-right">{t('reports.books.columns.qty')}</TableHead>
-          <TableHead className="text-right">{t('reports.books.columns.avgPrice')}</TableHead>
-          <TableHead className="text-right">{t('reports.books.columns.sales')}</TableHead>
-          <TableHead className="text-right">{t('reports.books.columns.returns')}</TableHead>
+          {head(t('reports.books.columns.sku'), 'w-28 text-center')}
+          {head(t('reports.books.columns.name'), 'text-center')}
+          {head(t('reports.books.columns.unit'), 'text-center')}
+          {head(t('reports.books.columns.qty'), 'text-right')}
+          {head(t('reports.books.columns.avgPrice'), 'text-right')}
+          {head(t('reports.books.columns.sales'), 'text-right')}
+          {head(t('reports.books.columns.returns'), 'text-right')}
           {costs ? (
             <>
-              <TableHead className="text-right">{t('reports.books.columns.cost')}</TableHead>
-              <TableHead className="text-right">{t('reports.books.columns.profit')}</TableHead>
-              <TableHead className="text-right">{t('reports.books.columns.margin')}</TableHead>
+              {head(t('reports.books.columns.cost'), 'text-right')}
+              {head(t('reports.books.columns.profit'), 'text-right')}
+              {head(t('reports.books.columns.margin'), 'text-right')}
             </>
           ) : null}
+          {twoRows ? (
+            <TableHead colSpan={payments.length} className="text-center">
+              {t('reports.books.columns.payments')}
+            </TableHead>
+          ) : null}
         </TableRow>
+        {twoRows ? (
+          <TableRow>
+            {payments.map((payment) => (
+              <TableHead key={payment.key} className="text-right">
+                {payment.name}
+              </TableHead>
+            ))}
+          </TableRow>
+        ) : null}
       </TableHeader>
       <TableBody>
-        {groups.map(([groupName, rows]) => (
-          <Fragment key={groupName}>
-            {props.grouping === 'category' ? (
+        {groups.map((group) => (
+          <Fragment key={group.key}>
+            {props.grouping !== 'none' ? (
               <TableRow className="bg-muted/30 font-semibold">
-                <TableCell colSpan={3}>{groupName}</TableCell>
-                {totalCells(sumOf(rows))}
+                <TableCell colSpan={3}>{group.name}</TableCell>
+                {totalCells(sumOf(group.rows))}
               </TableRow>
             ) : null}
-            {rows.map((row) => {
-              const key = String(row.productId);
+            {group.rows.map((row) => {
+              const key = `${row.productId}|${row.group ?? ''}`;
               const expanded = drill.open.has(key);
               return (
                 <Fragment key={key}>
@@ -448,12 +564,15 @@ function ProductSalesTable(props: {
                         </TableCell>
                       </>
                     ) : null}
+                    {paidCells(row.paid)}
                   </DrillRow>
                   {expanded ? (
                     <SalesDetail
                       query={props.query}
                       productId={row.productId}
+                      group={row.group}
                       costs={costs}
+                      payments={payments}
                       precision={props.precision}
                       span={span}
                     />
@@ -479,12 +598,14 @@ function ProductSalesTable(props: {
 function SalesDetail(props: {
   query: ProductSalesQuery;
   productId: number;
+  group: string | null;
   costs: boolean;
+  payments: readonly ProductSalesPayment[];
   precision: Precision;
   span: number;
 }) {
   const { t } = useTranslation();
-  const documents = useProductSalesDocuments(props.query, props.productId);
+  const documents = useProductSalesDocuments(props.query, props.productId, props.group);
   if (documents.isPending) {
     return <NoteRow colSpan={props.span}>{t('reports.prompt.loadingLines')}</NoteRow>;
   }
@@ -498,34 +619,38 @@ function SalesDetail(props: {
   if (documents.data.rows.length === 0) {
     return <NoteRow colSpan={props.span}>{t('reports.prompt.noLines')}</NoteRow>;
   }
+  const label = (doc: ProductSalesDocument) =>
+    [
+      `#${doc.number ?? doc.id}`,
+      doc.date,
+      t(`reports.books.salesKinds.${doc.kind}`),
+      ...(doc.customerName ? [doc.customerName] : []),
+    ].join(' - ');
   return (
     <>
-      {documents.data.rows.map((doc) => {
-        const text = [
-          `#${doc.number ?? doc.id}`,
-          doc.date,
-          t(`reports.books.salesKinds.${doc.kind}`),
-          ...(doc.customerName ? [doc.customerName] : []),
-        ].join(' - ');
-        return (
-          <DetailRow key={`${doc.kind}:${doc.id}`} href={salesDocHref(doc)} label={text}>
-            <TableCell colSpan={3} className="text-right">
-              {text}
+      {documents.data.rows.map((doc) => (
+        <DetailRow key={`${doc.kind}:${doc.id}`} href={salesDocHref(doc)} label={label(doc)}>
+          <TableCell colSpan={3} className="text-right">
+            {label(doc)}
+          </TableCell>
+          <TableCell className={NUM}>{quantity(doc.qty) || '0'}</TableCell>
+          <TableCell />
+          <TableCell className={NUM}>{amount(doc.sales, props.precision, '0')}</TableCell>
+          <TableCell />
+          {props.costs ? (
+            <>
+              <TableCell className={NUM}>{amount(doc.cost, props.precision, '0')}</TableCell>
+              <TableCell />
+              <TableCell />
+            </>
+          ) : null}
+          {props.payments.map((payment) => (
+            <TableCell key={payment.key} className={NUM}>
+              {amount(paidOf(doc.paid, payment.key) ?? '0', props.precision)}
             </TableCell>
-            <TableCell className={NUM}>{quantity(doc.qty) || '0'}</TableCell>
-            <TableCell />
-            <TableCell className={NUM}>{amount(doc.sales, props.precision, '0')}</TableCell>
-            <TableCell />
-            {props.costs ? (
-              <>
-                <TableCell className={NUM}>{amount(doc.cost, props.precision, '0')}</TableCell>
-                <TableCell />
-                <TableCell />
-              </>
-            ) : null}
-          </DetailRow>
-        );
-      })}
+          ))}
+        </DetailRow>
+      ))}
       {documents.data.truncated ? (
         <NoteRow colSpan={props.span}>{t('reports.prompt.truncated')}</NoteRow>
       ) : null}

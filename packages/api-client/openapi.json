@@ -29399,6 +29399,64 @@
             "schema": {
               "type": "number"
             }
+          },
+          {
+            "name": "brandIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "segmentIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "by",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "none",
+              "type": "string",
+              "enum": [
+                "none",
+                "category",
+                "brand",
+                "segment",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "payments",
+            "required": false,
+            "in": "query",
+            "description": "Split the sales by payment",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "group",
+            "required": false,
+            "in": "query",
+            "description": "The documents' group key under `by` (documents only)",
+            "schema": {
+              "maxLength": 24,
+              "pattern": "^(\\d+|APP|NONE)$",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -29529,6 +29587,64 @@
             "in": "query",
             "schema": {
               "type": "number"
+            }
+          },
+          {
+            "name": "brandIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "segmentIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "by",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "none",
+              "type": "string",
+              "enum": [
+                "none",
+                "category",
+                "brand",
+                "segment",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "payments",
+            "required": false,
+            "in": "query",
+            "description": "Split the sales by payment",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "group",
+            "required": false,
+            "in": "query",
+            "description": "The documents' group key under `by` (documents only)",
+            "schema": {
+              "maxLength": 24,
+              "pattern": "^(\\d+|APP|NONE)$",
+              "type": "string"
             }
           }
         ],
@@ -29661,6 +29777,64 @@
             "in": "query",
             "schema": {
               "type": "number"
+            }
+          },
+          {
+            "name": "brandIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "segmentIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "name": "by",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "none",
+              "type": "string",
+              "enum": [
+                "none",
+                "category",
+                "brand",
+                "segment",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "payments",
+            "required": false,
+            "in": "query",
+            "description": "Split the sales by payment",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "group",
+            "required": false,
+            "in": "query",
+            "description": "The documents' group key under `by` (documents only)",
+            "schema": {
+              "maxLength": 24,
+              "pattern": "^(\\d+|APP|NONE)$",
+              "type": "string"
             }
           }
         ],
@@ -62349,13 +62523,29 @@
             "items": {
               "$ref": "#/components/schemas/BookReportOption"
             }
+          },
+          "brands": {
+            "description": "The main suppliers of products",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookReportOption"
+            }
+          },
+          "segments": {
+            "description": "Live hand-picked product segments",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookReportOption"
+            }
           }
         },
         "required": [
           "warehouses",
           "categories",
           "customerCategories",
-          "users"
+          "users",
+          "brands",
+          "segments"
         ]
       },
       "StockBalanceRow": {
@@ -62583,6 +62773,23 @@
           "truncated"
         ]
       },
+      "PaidAmount": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "AR"
+          },
+          "amount": {
+            "type": "string",
+            "description": "Net of VAT"
+          }
+        },
+        "required": [
+          "key",
+          "amount"
+        ]
+      },
       "ProductSalesRow": {
         "type": "object",
         "properties": {
@@ -62604,6 +62811,14 @@
             "nullable": true
           },
           "categoryName": {
+            "type": "string",
+            "nullable": true
+          },
+          "group": {
+            "type": "string",
+            "nullable": true
+          },
+          "groupName": {
             "type": "string",
             "nullable": true
           },
@@ -62632,6 +62847,12 @@
           "margin": {
             "type": "string",
             "nullable": true
+          },
+          "paid": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaidAmount"
+            }
           }
         },
         "required": [
@@ -62641,13 +62862,32 @@
           "unit",
           "categoryId",
           "categoryName",
+          "group",
+          "groupName",
           "qty",
           "sales",
           "returns",
           "avgPrice",
           "cost",
           "profit",
-          "margin"
+          "margin",
+          "paid"
+        ]
+      },
+      "ProductSalesPayment": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "AR"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name"
         ]
       },
       "ProductSalesTotals": {
@@ -62666,13 +62906,20 @@
           "profit": {
             "type": "string",
             "nullable": true
+          },
+          "paid": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaidAmount"
+            }
           }
         },
         "required": [
           "sales",
           "returns",
           "cost",
-          "profit"
+          "profit",
+          "paid"
         ]
       },
       "ProductSalesReport": {
@@ -62684,10 +62931,26 @@
           "to": {
             "type": "string"
           },
+          "by": {
+            "enum": [
+              "none",
+              "category",
+              "brand",
+              "segment",
+              "user"
+            ],
+            "type": "string"
+          },
           "rows": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ProductSalesRow"
+            }
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductSalesPayment"
             }
           },
           "totals": {
@@ -62700,7 +62963,9 @@
         "required": [
           "from",
           "to",
+          "by",
           "rows",
+          "payments",
           "totals",
           "truncated"
         ]
@@ -62749,6 +63014,12 @@
           "cost": {
             "type": "string",
             "nullable": true
+          },
+          "paid": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaidAmount"
+            }
           }
         },
         "required": [
@@ -62761,7 +63032,8 @@
           "customerName",
           "qty",
           "sales",
-          "cost"
+          "cost",
+          "paid"
         ]
       },
       "ProductSalesDocuments": {

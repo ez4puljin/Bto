@@ -58,7 +58,12 @@ export function stockBalanceWorkbook(report: StockBalanceReport): Promise<Buffer
 /** «Борлуулалт /Бараагаар/» as an Excel sheet. */
 export function productSalesWorkbook(report: ProductSalesReport): Promise<Buffer> {
   const costs = report.totals.cost !== null;
+  // A category is a column already; a brand, segment or author gets one in front.
+  const groupColumn = report.by === 'none' || report.by === 'category' ? null : report.by;
+  const amountOf = (paid: readonly { key: string; amount: string }[], key: string) =>
+    paid.find((p) => p.key === key)?.amount ?? null;
   const columns: ExcelColumn[] = [
+    ...(groupColumn ? [text(L[groupColumn])] : []),
     text(L.sku),
     text(L.name),
     text(L.unit),
@@ -68,8 +73,10 @@ export function productSalesWorkbook(report: ProductSalesReport): Promise<Buffer
     number(L.sales),
     number(L.returns),
     ...(costs ? [number(L.cost), number(L.profit), number(L.margin)] : []),
+    ...report.payments.map((payment) => number(payment.name)),
   ];
   const rows: ExcelRow[] = report.rows.map((row) => [
+    ...(groupColumn ? [row.groupName] : []),
     row.sku,
     row.name,
     row.unit,
@@ -79,6 +86,7 @@ export function productSalesWorkbook(report: ProductSalesReport): Promise<Buffer
     row.sales,
     row.returns,
     ...(costs ? [row.cost, row.profit, row.margin] : []),
+    ...report.payments.map((payment) => amountOf(row.paid, payment.key)),
   ]);
   return tableWorkbook(
     `${mn.reports.books.titles.productSales} ${report.from} – ${report.to}`,

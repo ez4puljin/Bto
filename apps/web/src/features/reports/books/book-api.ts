@@ -39,6 +39,8 @@ export type ProductSalesRow = ProductSales['rows'][number];
 export type ProductSalesQuery = Query<'/api/v1/reports/product-sales'>;
 export type ProductSalesDocuments = Body<'/api/v1/reports/product-sales/documents'>;
 export type ProductSalesDocument = ProductSalesDocuments['rows'][number];
+export type ProductSalesPayment = ProductSales['payments'][number];
+export type PaidAmount = ProductSalesRow['paid'][number];
 
 export type StockDocuments = Body<'/api/v1/reports/stock-documents'>;
 export type StockDocumentRow = StockDocuments['rows'][number];
@@ -173,15 +175,23 @@ export function useProductSales(query: ProductSalesQuery | null) {
 export function useProductSalesDocuments(
   query: ProductSalesQuery | null,
   productId: number | null,
+  /** The row's group under `query.by`. */
+  group: string | null = null,
 ) {
   const api = useApiClient();
   return useQuery({
-    queryKey: [...KEYS.productSalesDocuments, query, productId],
+    queryKey: [...KEYS.productSalesDocuments, query, productId, group],
     enabled: query !== null && productId !== null,
     queryFn: async ({ signal }) =>
       unwrap(
         await api.GET('/api/v1/reports/product-sales/documents', {
-          params: { query: { ...(query ?? ({} as ProductSalesQuery)), productId: productId ?? 0 } },
+          params: {
+            query: {
+              ...(query ?? ({} as ProductSalesQuery)),
+              productId: productId ?? 0,
+              ...(group === null ? {} : { group }),
+            },
+          },
           signal,
         }),
       ),

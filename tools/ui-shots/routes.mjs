@@ -185,6 +185,12 @@ export const ROUTES = [
     path: '/reports/stock-documents?from=2026-10-01&to=2026-11-01',
     then: "document.querySelectorAll('tr[aria-expanded]').forEach((row) => row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })))",
   },
+  {
+    area: 'reports',
+    name: 'books-sales-split',
+    path: '/reports/product-sales?from=2026-10-26&to=2026-10-27&by=user&pay=1',
+    then: "document.querySelectorAll('tr[aria-expanded]').forEach((row) => row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })))",
+  },
   { area: 'reports', name: 'books-sales-prompt', path: '/reports/product-sales', dialog: true },
   {
     area: 'reports',
