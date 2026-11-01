@@ -7,21 +7,13 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { FormField } from '@/components/form';
 import { CustomerPicker, type PickedCustomer } from '@/features/partners/customer-picker';
 import { SupplierPicker, type PickedSupplier } from '@/features/partners/supplier-picker';
 import { saveBlob } from '@/lib/download';
 import { problemFromError } from '@/lib/problem';
 import { useAction } from '@/lib/use-action';
-import { cn } from '@/lib/utils';
 import {
   type LedgerKind,
   type LedgerLine,
@@ -33,20 +25,36 @@ import {
   useLedgerLines,
   useLedgerReport,
 } from './book-api';
-import { addMoney, amount, BOOK_TABLE, NUM, type Precision, sidesOf } from './book-format';
+import {
+  addMoney,
+  amount,
+  type BookColumn,
+  COL,
+  NUM,
+  paperRem,
+  type Precision,
+  sidesOf,
+  textColumn,
+} from './book-format';
 import {
   BookActions,
+  BookPage,
   BookSheet,
+  BookTable,
   DateFields,
+  DetailLabel,
   DetailRow,
-  DrillMark,
+  DrillCell,
   DrillRow,
+  GroupRow,
   MultiPick,
   NoteRow,
   PickedField,
   PrecisionField,
   PromptDialog,
   SelectField,
+  TextCell,
+  TotalRow,
 } from './book-kit';
 import { ledgerLineHref } from './book-links';
 import { idParamOf, idsParam, useBookParams, useDrill, usePromptDates } from './book-state';
@@ -105,12 +113,12 @@ function LedgerPage({ kind }: { kind: LedgerKind }) {
   const options = useBookOptions();
   const title = t(`reports.ledger.titles.${kind}`);
   const filters = describe(state, accounts.data ?? [], options.data?.customerCategories ?? []);
+  const columns = kind === 'PARTY' ? PARTY_COLUMNS : MONEY_COLUMNS;
   return (
-    <div>
+    <BookPage width={paperRem(columns)}>
       <div className="print:hidden">
         <PageHeader
           title={title}
-          description={t(`reports.ledger.descriptions.${kind}`)}
           actions={
             <BookActions
               ready={state.query !== null}
@@ -139,7 +147,13 @@ function LedgerPage({ kind }: { kind: LedgerKind }) {
       />
       <ProblemAlert problem={action.problem ?? problemFromError(report.error)} />
       {state.query && report.data ? (
-        <BookSheet title={title} from={state.query.from} to={state.query.to} filters={filters}>
+        <BookSheet
+          title={title}
+          from={state.query.from}
+          to={state.query.to}
+          filters={filters}
+          orientation="portrait"
+        >
           {kind === 'PARTY' ? (
             <PartyTable
               rows={report.data.data}
@@ -163,9 +177,22 @@ function LedgerPage({ kind }: { kind: LedgerKind }) {
           title={t('reports.prompt.waiting')}
         />
       ) : null}
-    </div>
+    </BookPage>
   );
 }
+
+/** Code, name, then opening, turnover and closing as debit / credit (portrait A4). */
+const PARTY_COLUMNS: readonly BookColumn[] = [
+  COL.code,
+  textColumn(16),
+  ...Array<number>(6).fill(COL.money),
+];
+/** Code, name, opening, in, out, closing (portrait A4). */
+const MONEY_COLUMNS: readonly BookColumn[] = [
+  COL.code,
+  textColumn(19),
+  ...Array<number>(4).fill(COL.money),
+];
 
 /** The conditions above the table, as Erkhet prints them. */
 function describe(
@@ -404,7 +431,7 @@ function sumOf(rows: readonly LedgerRow[]): Totals {
   );
 }
 
-/** Opening D, opening C, debit, credit, closing D, closing C. */
+/** Opening D, opening C, debit, credit, closing D, closing C (zeros blank unless `zero`). */
 function SixCells(props: { totals: Totals; precision: Precision; zero?: string }) {
   const opening = sidesOf(props.totals.opening);
   const closing = sidesOf(props.totals.closing);
@@ -428,7 +455,7 @@ function SixHead() {
   return (
     <TableHeader>
       <TableRow>
-        <TableHead rowSpan={2} className="w-28 text-center">
+        <TableHead rowSpan={2} className="text-center">
           {t('reports.ledger.table.code')}
         </TableHead>
         <TableHead rowSpan={2} className="text-center">
@@ -481,7 +508,7 @@ function PartyTable(props: {
     return <EmptyState icon={Landmark} title={t('reports.prompt.empty')} />;
   }
   return (
-    <Table className={BOOK_TABLE}>
+    <BookTable columns={PARTY_COLUMNS}>
       <SixHead />
       <TableBody>
         {groups.map(([key, rows]) => {
@@ -495,14 +522,15 @@ function PartyTable(props: {
               };
           return (
             <Fragment key={key}>
-              <TableRow className="bg-muted/30 font-semibold">
-                <TableCell>{head.code}</TableCell>
-                <TableCell>{head.name}</TableCell>
+              <GroupRow>
+                <TextCell text={head.code} />
+                <TextCell text={head.name} />
                 <SixCells totals={sumOf(rows)} precision={props.precision} zero="0" />
-              </TableRow>
+              </GroupRow>
               {rows.map((row) => {
                 const rowKey = `${row.accountId}:${row.party?.partyId ?? 'none'}`;
                 const expanded = drill.open.has(rowKey);
+                const toggle = () => drill.toggle(rowKey);
                 const label = byAccount
                   ? {
                       code: row.party?.code ?? '',
@@ -511,12 +539,14 @@ function PartyTable(props: {
                   : { code: row.code, name: row.name };
                 return (
                   <Fragment key={rowKey}>
-                    <DrillRow expanded={expanded} onToggle={() => drill.toggle(rowKey)}>
-                      <TableCell className="text-center">
-                        <DrillMark expanded={expanded} />
-                        {label.code}
-                      </TableCell>
-                      <TableCell>{label.name}</TableCell>
+                    <DrillRow expanded={expanded} onToggle={toggle}>
+                      <DrillCell
+                        expanded={expanded}
+                        onToggle={toggle}
+                        text={label.code}
+                        name={label.code || label.name}
+                      />
+                      <TextCell text={label.name} />
                       <SixCells totals={row} precision={props.precision} />
                     </DrillRow>
                     {expanded ? (
@@ -534,13 +564,11 @@ function PartyTable(props: {
             </Fragment>
           );
         })}
-        <TableRow className="font-semibold">
-          <TableCell />
-          <TableCell className="text-right">{t('reports.prompt.total')}</TableCell>
+        <TotalRow labelSpan={2}>
           <SixCells totals={props.totals} precision={props.precision} zero="0" />
-        </TableRow>
+        </TotalRow>
       </TableBody>
-    </Table>
+    </BookTable>
   );
 }
 
@@ -563,10 +591,10 @@ function MoneyTable(props: {
       </TableCell>
     ));
   return (
-    <Table className={BOOK_TABLE}>
+    <BookTable columns={MONEY_COLUMNS}>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-28 text-center">{t('reports.ledger.table.code')}</TableHead>
+          <TableHead className="text-center">{t('reports.ledger.table.code')}</TableHead>
           <TableHead className="text-center">{t('reports.ledger.table.name')}</TableHead>
           <TableHead className="text-right">{t('reports.ledger.table.opening')}</TableHead>
           <TableHead className="text-right">{t('reports.ledger.table.in')}</TableHead>
@@ -578,15 +606,13 @@ function MoneyTable(props: {
         {props.rows.map((row) => {
           const key = String(row.accountId);
           const expanded = drill.open.has(key);
+          const toggle = () => drill.toggle(key);
           return (
             <Fragment key={key}>
-              <DrillRow expanded={expanded} onToggle={() => drill.toggle(key)}>
-                <TableCell className="text-center">
-                  <DrillMark expanded={expanded} />
-                  {row.code}
-                </TableCell>
-                <TableCell>{row.name}</TableCell>
-                {cells(row, '0')}
+              <DrillRow expanded={expanded} onToggle={toggle}>
+                <DrillCell expanded={expanded} onToggle={toggle} text={row.code} />
+                <TextCell text={row.name} />
+                {cells(row)}
               </DrillRow>
               {expanded ? (
                 <LedgerDetail
@@ -599,13 +625,9 @@ function MoneyTable(props: {
             </Fragment>
           );
         })}
-        <TableRow className="font-semibold">
-          <TableCell />
-          <TableCell className="text-right">{t('reports.prompt.total')}</TableCell>
-          {cells(props.totals, '0')}
-        </TableRow>
+        <TotalRow labelSpan={2}>{cells(props.totals, '0')}</TotalRow>
       </TableBody>
-    </Table>
+    </BookTable>
   );
 }
 
@@ -642,6 +664,7 @@ function LedgerDetail(props: {
           : t('reports.ledger.table.counterCredit', { code: counter.slice(2) }),
       )
       .join(', ');
+  const money = (value: string) => amount(value, props.precision);
   return (
     <>
       {lines.data.data.map((line) => {
@@ -654,23 +677,21 @@ function LedgerDetail(props: {
         const balance = sidesOf(line.balanceAfter);
         return (
           <DetailRow key={line.lineId} href={ledgerLineHref(line)} label={text}>
-            <TableCell colSpan={2} className="text-right">
-              {text}
-            </TableCell>
-            <TableCell colSpan={props.kind === 'PARTY' ? 2 : 1} className="text-right">
-              {counters(line)}
-            </TableCell>
-            <TableCell className={NUM}>{amount(line.debit, props.precision, '0')}</TableCell>
-            <TableCell className={NUM}>{amount(line.credit, props.precision, '0')}</TableCell>
+            <DetailLabel text={text} colSpan={2} />
+            <TextCell
+              text={counters(line)}
+              colSpan={props.kind === 'PARTY' ? 2 : 1}
+              className="text-right"
+            />
+            <TableCell className={NUM}>{money(line.debit)}</TableCell>
+            <TableCell className={NUM}>{money(line.credit)}</TableCell>
             {props.kind === 'PARTY' ? (
               <>
-                <TableCell className={NUM}>{amount(balance.debit, props.precision, '0')}</TableCell>
-                <TableCell className={NUM}>
-                  {amount(balance.credit, props.precision, '0')}
-                </TableCell>
+                <TableCell className={NUM}>{money(balance.debit)}</TableCell>
+                <TableCell className={NUM}>{money(balance.credit)}</TableCell>
               </>
             ) : (
-              <TableCell className={cn(NUM)}>
+              <TableCell className={NUM}>
                 {amount(line.balanceAfter, props.precision, '0')}
               </TableCell>
             )}

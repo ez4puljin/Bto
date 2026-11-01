@@ -4,14 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ProductSearch } from '@/features/inventory/shared';
 import { saveBlob } from '@/lib/download';
 import { problemFromError } from '@/lib/problem';
@@ -28,25 +21,34 @@ import {
 import {
   addMoney,
   amount,
-  BOOK_TABLE,
+  type BookColumn,
   categoryOptions,
+  COL,
   NUM,
+  paperRem,
   type Precision,
   quantity,
+  textColumn,
 } from './book-format';
 import {
   BookActions,
+  BookPage,
   BookSheet,
+  BookTable,
   DateFields,
+  DetailLabel,
   DetailRow,
-  DrillMark,
+  DrillCell,
   DrillRow,
+  GroupRow,
   MultiPick,
   NoteRow,
   PickedField,
   PrecisionField,
   PromptDialog,
   SelectField,
+  TextCell,
+  TotalRow,
 } from './book-kit';
 import { stockDocHref } from './book-links';
 import { idParamOf, idsParam, useBookParams, useDrill, usePromptDates } from './book-state';
@@ -97,12 +99,12 @@ export function StockBalancePage() {
     ...(state.search.get('catn') ? [state.search.get('catn') ?? ''] : []),
     ...(state.search.get('prn') ? [state.search.get('prn') ?? ''] : []),
   ];
+  const values = report.data ? report.data.totals.closingValue !== null : true;
   return (
-    <div>
+    <BookPage width={paperRem(stockBalanceColumns(values))}>
       <div className="print:hidden">
         <PageHeader
           title={title}
-          description={t('reports.books.descriptions.stockBalance')}
           actions={
             <BookActions
               ready={state.query !== null}
@@ -131,7 +133,13 @@ export function StockBalancePage() {
       />
       <ProblemAlert problem={action.problem ?? problemFromError(report.error)} />
       {state.query && report.data ? (
-        <BookSheet title={title} from={state.query.from} to={state.query.to} filters={filters}>
+        <BookSheet
+          title={title}
+          from={state.query.from}
+          to={state.query.to}
+          filters={filters}
+          orientation="landscape"
+        >
           <StockBalanceTable
             rows={report.data.rows}
             totals={report.data.totals}
@@ -144,8 +152,14 @@ export function StockBalancePage() {
       ) : !state.query ? (
         <EmptyState icon={Boxes} title={t('reports.prompt.waiting')} />
       ) : null}
-    </div>
+    </BookPage>
   );
+}
+
+/** Code, name, unit, then opening, in, out and closing as quantity (and cost) (landscape A4). */
+function stockBalanceColumns(values: boolean): BookColumn[] {
+  const pair = values ? [COL.qty, COL.money] : [COL.qty];
+  return [COL.code, textColumn(18.5, 10), COL.unit, ...pair, ...pair, ...pair, ...pair];
 }
 
 function StockBalancePrompt(props: {
@@ -313,10 +327,10 @@ function StockBalanceTable(props: {
       </Fragment>
     ));
   return (
-    <Table className={BOOK_TABLE}>
+    <BookTable columns={stockBalanceColumns(values)}>
       <TableHeader>
         <TableRow>
-          <TableHead rowSpan={2} className="w-28 text-center">
+          <TableHead rowSpan={2} className="text-center">
             {t('reports.books.columns.sku')}
           </TableHead>
           <TableHead rowSpan={2} className="text-center">
@@ -337,8 +351,8 @@ function StockBalanceTable(props: {
         {groups.map(([groupName, rows]) => (
           <Fragment key={groupName}>
             {props.grouping !== 'product' ? (
-              <TableRow className="bg-muted/30 font-semibold">
-                <TableCell colSpan={3}>{groupName}</TableCell>
+              <GroupRow>
+                <TextCell text={groupName} colSpan={3} />
                 {(() => {
                   const sum = valueSum(rows);
                   return (
@@ -350,20 +364,18 @@ function StockBalanceTable(props: {
                     </>
                   );
                 })()}
-              </TableRow>
+              </GroupRow>
             ) : null}
             {rows.map((row) => {
               const key = `${row.productId}:${row.warehouseId ?? ''}`;
               const expanded = drill.open.has(key);
+              const toggle = () => drill.toggle(key);
               return (
                 <Fragment key={key}>
-                  <DrillRow expanded={expanded} onToggle={() => drill.toggle(key)}>
-                    <TableCell>
-                      <DrillMark expanded={expanded} />
-                      {row.sku}
-                    </TableCell>
-                    <TableCell>{row.name}</TableCell>
-                    <TableCell className="text-center">{row.unit ?? ''}</TableCell>
+                  <DrillRow expanded={expanded} onToggle={toggle}>
+                    <DrillCell expanded={expanded} onToggle={toggle} text={row.sku} />
+                    <TextCell text={row.name} />
+                    <TextCell text={row.unit ?? ''} className="text-center" />
                     {pair(row.openingQty, row.openingValue)}
                     {pair(row.inQty, row.inValue)}
                     {pair(row.outQty, row.outValue)}
@@ -384,18 +396,15 @@ function StockBalanceTable(props: {
             })}
           </Fragment>
         ))}
-        <TableRow className="font-semibold">
-          <TableCell colSpan={3} className="text-right">
-            {t('reports.prompt.total')}
-          </TableCell>
+        <TotalRow labelSpan={3}>
           {pair(null, props.totals.openingValue, true)}
           {pair(null, props.totals.inValue, true)}
           {pair(null, props.totals.outValue, true)}
           {pair(null, props.totals.closingValue, true)}
-        </TableRow>
+        </TotalRow>
         {props.truncated ? <NoteRow colSpan={span}>{t('reports.prompt.truncated')}</NoteRow> : null}
       </TableBody>
-    </Table>
+    </BookTable>
   );
 }
 
@@ -441,9 +450,7 @@ function StockBalanceDetail(props: {
             href={stockDocHref(line.docType, line.docId)}
             label={text}
           >
-            <TableCell colSpan={3} className="text-right">
-              {text}
-            </TableCell>
+            <DetailLabel text={text} colSpan={3} />
             <TableCell colSpan={blank} />
             <TableCell className={NUM}>{quantity(line.inQty)}</TableCell>
             {props.values ? (

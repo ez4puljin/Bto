@@ -19,7 +19,13 @@ import { useAuthState } from '@/app/auth-context';
 import { useCompanyName } from '@/features/company/api';
 import { cn } from '@/lib/utils';
 import { DATE } from '../report-helpers';
-import { type Precision, PRECISIONS } from './book-format';
+import {
+  BOOK_TABLE,
+  type BookColumn,
+  type Precision,
+  PRECISIONS,
+  tableMinRem,
+} from './book-format';
 import type { usePromptDates } from './book-state';
 import { DateInput } from '@/components/date-input';
 
@@ -45,9 +51,7 @@ export function PromptDialog(props: {
           <DialogDescription>{props.title}</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="flex flex-col gap-4">
-          <div className="grid max-h-[65vh] gap-4 overflow-y-auto p-0.5 sm:grid-cols-2">
-            {props.children}
-          </div>
+          <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">{props.children}</div>
           <DialogFormFooter
             pending={false}
             disabled={!props.valid}
@@ -161,7 +165,9 @@ export function MultiPick(props: {
   );
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium">{props.label}</span>
+      <span className="text-[0.8125rem] leading-none font-medium text-foreground">
+        {props.label}
+      </span>
       {chosen.length > 0 ? (
         <ul className="flex flex-wrap gap-1.5">
           {chosen.map((option) => (
@@ -190,7 +196,7 @@ export function MultiPick(props: {
         onChange={(value) => {
           if (value) props.onChange([...props.values, value]);
         }}
-        className="h-10 w-full max-w-none justify-between rounded-lg px-3 text-sm font-normal"
+        className="h-10 w-full max-w-none justify-between rounded-lg border-input px-3 text-base font-normal md:text-sm"
       />
     </div>
   );
@@ -254,14 +260,32 @@ export function BookActions(props: {
 }
 
 /**
+ * A report's column (2026-11-01): the page header and the paper share one width, sized to the
+ * paper's table and centred, so the buttons line up with the paper's right edge; `null` runs the
+ * whole width. Paper pages are the exception to "pages sit at the left" (docs/ui.md §4).
+ */
+export function BookPage({ width, children }: { width: number | null; children: ReactNode }) {
+  return (
+    <div
+      className="mx-auto w-full print:max-w-none!"
+      style={width === null ? undefined : { maxWidth: `${width}rem` }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
  * The report's paper as Erkhet draws it: the title in the middle, the company on the left with
- * its note, the period on the right «(төгрөгөөр)», the conditions, the table, and the lines to sign.
+ * its note, the period on the right «(төгрөгөөр)», the conditions, the table in one scroll box
+ * with its head in view, the hint, and the lines to sign. `orientation` is the printed A4 sheet's.
  */
 export function BookSheet(props: {
   title: string;
   from: string;
   to: string;
   filters: readonly string[];
+  orientation: 'portrait' | 'landscape';
   children: ReactNode;
   footer?: ReactNode;
 }) {
@@ -269,31 +293,36 @@ export function BookSheet(props: {
   const company = useCompanyName();
   const auth = useAuthState();
   const me = auth.status === 'authenticated' ? auth.me.fullName : '';
+  const filters = props.filters.join(', ');
   return (
-    <section className="rounded-xl bg-card px-4 py-6 shadow-card ring-1 ring-black/[0.06] sm:px-8 print:p-0 print:shadow-none print:ring-0">
-      <h2 className="mb-5 text-center text-[1.375rem] font-semibold">{props.title}</h2>
-      <div className="mb-1 flex flex-wrap items-end justify-between gap-3 text-[0.8125rem]">
+    <section className="rounded-xl bg-card px-5 py-6 shadow-card ring-1 ring-black/[0.06] md:px-8 md:py-8 2xl:px-10 print:rounded-none print:p-0 print:shadow-none print:ring-0">
+      <style media="print">{`@page{size:A4 ${props.orientation};margin:10mm 8mm}`}</style>
+      <h2 className="mb-4 text-center text-[1.25rem] font-semibold tracking-tight">
+        {props.title}
+      </h2>
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3 text-[0.8125rem]">
         <div className="text-center">
-          <p className="min-w-56 border-b border-foreground px-4 font-semibold">{company}</p>
-          <p className="text-[0.75rem] text-muted-foreground">{t('reports.prompt.companyNote')}</p>
+          <p className="min-w-56 border-b border-foreground/70 px-4 font-semibold">{company}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('reports.prompt.companyNote')}</p>
         </div>
         <div className="text-right">
-          <p>{`${props.from.replaceAll('-', '/')} - ${props.to.replaceAll('-', '/')}`}</p>
-          <p className="text-[0.75rem] text-muted-foreground">{t('reports.prompt.currencyNote')}</p>
+          <p className="tabular-nums">{`${props.from.replaceAll('-', '/')} - ${props.to.replaceAll('-', '/')}`}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('reports.prompt.currencyNote')}</p>
         </div>
       </div>
-      {props.filters.length > 0 ? (
-        <p className="mb-2 text-[0.8125rem]">
-          <span className="text-muted-foreground">{t('reports.prompt.filters')}</span>{' '}
-          {props.filters.join(', ')}
+      {filters ? (
+        <p className="mb-3 truncate text-[0.8125rem] print:whitespace-normal" title={filters}>
+          <span className="text-muted-foreground">{t('reports.prompt.filters')}</span> {filters}
         </p>
       ) : null}
-      <p className="mb-2 text-[0.75rem] text-muted-foreground print:hidden">
+      <div className="max-h-[calc(100dvh-10rem)] overflow-auto print:max-h-none print:overflow-visible">
+        {props.children}
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground print:hidden">
         {t('reports.prompt.drillHint')}
       </p>
-      <div className="overflow-x-auto">{props.children}</div>
       {props.footer}
-      <div className="mt-8 flex flex-col gap-3 pl-[15%] text-[0.8125rem]">
+      <div className="mt-10 grid gap-3 pl-[15%] text-[0.8125rem] break-inside-avoid">
         <p>{t('reports.prompt.preparedBy', { name: me })}</p>
         <p>{t('reports.prompt.reviewedBy')}</p>
       </div>
@@ -301,7 +330,66 @@ export function BookSheet(props: {
   );
 }
 
-/** A row that opens its detail on a double click (or Enter), with ▸ / ▾ in front. */
+/**
+ * The paper's table without the shadcn wrapper's own scroll box (the sheet holds the one box, so
+ * the head sticks): fixed columns from `columns`, never narrower than their least widths.
+ */
+export function BookTable({
+  columns,
+  children,
+}: {
+  columns: readonly BookColumn[];
+  children: ReactNode;
+}) {
+  return (
+    <table
+      data-slot="table"
+      className={cn(BOOK_TABLE, 'print:min-w-0!')}
+      style={{ minWidth: `${tableMinRem(columns)}rem` }}
+    >
+      <colgroup>
+        {columns.map((column, index) => (
+          <col
+            key={index}
+            style={typeof column === 'number' ? { width: `${column}rem` } : undefined}
+          />
+        ))}
+      </colgroup>
+      {children}
+    </table>
+  );
+}
+
+/** A text cell on one line, cut with «…» and whole on hover; it wraps on paper. */
+export function TextCell(props: { text: string; colSpan?: number; className?: string }) {
+  return (
+    <TableCell
+      colSpan={props.colSpan}
+      title={props.text || undefined}
+      className={cn('truncate print:overflow-visible print:whitespace-normal', props.className)}
+    >
+      {props.text}
+    </TableCell>
+  );
+}
+
+/** A group's row (an account, a warehouse, a category): its sums with «0». */
+export function GroupRow({ children }: { children: ReactNode }) {
+  return <TableRow className="bg-muted/50 font-semibold hover:bg-muted/50">{children}</TableRow>;
+}
+
+/** «НИЙТ ДҮН»: a heavier rule above, its label on the left across `labelSpan` columns. */
+export function TotalRow({ labelSpan, children }: { labelSpan: number; children: ReactNode }) {
+  const { t } = useTranslation();
+  return (
+    <TableRow className="bg-muted/60 font-semibold hover:bg-muted/60 [&>td]:border-t-2 [&>td]:border-t-foreground/70!">
+      <TableCell colSpan={labelSpan}>{t('reports.prompt.total')}</TableCell>
+      {children}
+    </TableRow>
+  );
+}
+
+/** A row that opens its detail on a click of ▸, a double click or Enter. */
 export function DrillRow(props: {
   expanded: boolean;
   onToggle: () => void;
@@ -309,6 +397,7 @@ export function DrillRow(props: {
   children: ReactNode;
 }) {
   const onKeyDown = (event: KeyboardEvent<HTMLTableRowElement>) => {
+    if (event.target !== event.currentTarget) return;
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       props.onToggle();
@@ -320,20 +409,64 @@ export function DrillRow(props: {
       aria-expanded={props.expanded}
       onDoubleClick={props.onToggle}
       onKeyDown={onKeyDown}
-      className={cn('cursor-default select-none hover:bg-accent/60', props.className)}
+      className={cn(
+        'cursor-default select-none hover:bg-accent/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+        props.className,
+      )}
     >
       {props.children}
     </TableRow>
   );
 }
 
-/** ▸ / ▾ before a drillable row's first text. */
-export function DrillMark({ expanded }: { expanded: boolean }) {
-  const Icon = expanded ? ChevronDown : ChevronRight;
-  return <Icon aria-hidden className="mr-1 inline size-3.5 text-muted-foreground print:hidden" />;
+/** A drillable row's first cell: ▸ / ▾ then its code or number on one line («…» when cut). */
+export function DrillCell(props: {
+  expanded: boolean;
+  onToggle: () => void;
+  text: string;
+  /** What the button names when the text is empty (a row without a code). */
+  name?: string;
+}) {
+  return (
+    <TableCell title={props.text || undefined}>
+      <span className="flex min-w-0 items-center">
+        <DrillMark
+          expanded={props.expanded}
+          onToggle={props.onToggle}
+          name={props.name ?? props.text}
+        />
+        <span className="min-w-0 truncate print:whitespace-normal">{props.text}</span>
+      </span>
+    </TableCell>
+  );
 }
 
-/** A detail row: italic like Erkhet's; a click opens the document behind it. */
+/** ▸ / ▾ before a drillable row's first text: a button opening the row on one click. */
+function DrillMark(props: { expanded: boolean; onToggle: () => void; name: string }) {
+  const { t } = useTranslation();
+  const Icon = props.expanded ? ChevronDown : ChevronRight;
+  const label = t(props.expanded ? 'reports.prompt.closeLines' : 'reports.prompt.openLines', {
+    name: props.name,
+  });
+  return (
+    <button
+      type="button"
+      aria-expanded={props.expanded}
+      aria-label={label}
+      title={label}
+      onClick={(event) => {
+        event.stopPropagation();
+        props.onToggle();
+      }}
+      onDoubleClick={(event) => event.stopPropagation()}
+      className="-my-0.5 mr-1 grid size-5 shrink-0 place-items-center rounded text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring print:hidden"
+    >
+      <Icon aria-hidden className="size-3.5" />
+    </button>
+  );
+}
+
+/** A detail row: small, italic and lighter, like Erkhet's; a click opens the document behind it. */
 export function DetailRow(props: { href: string | null; label: string; children: ReactNode }) {
   const navigate = useNavigate();
   const open = () => {
@@ -349,8 +482,9 @@ export function DetailRow(props: { href: string | null; label: string; children:
         if (event.key === 'Enter') open();
       }}
       className={cn(
-        'text-muted-foreground italic',
-        props.href && 'cursor-pointer hover:bg-accent/60 hover:text-foreground',
+        'text-xs text-muted-foreground italic hover:bg-transparent [&>td]:border-border/60!',
+        props.href &&
+          'cursor-pointer hover:bg-accent/60 hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
       )}
     >
       {props.children}
@@ -358,11 +492,19 @@ export function DetailRow(props: { href: string | null; label: string; children:
   );
 }
 
+/** A detail row's label: left, indented under the row it opened, on one line. */
+export function DetailLabel(props: { text: string; colSpan: number }) {
+  return <TextCell text={props.text} colSpan={props.colSpan} className="pl-8!" />;
+}
+
 /** A full-width message row inside the table (loading, nothing, too many). */
 export function NoteRow({ colSpan, children }: { colSpan: number; children: ReactNode }) {
   return (
-    <TableRow>
-      <TableCell colSpan={colSpan} className="text-center text-muted-foreground italic">
+    <TableRow className="hover:bg-transparent">
+      <TableCell
+        colSpan={colSpan}
+        className="text-center whitespace-normal! text-muted-foreground italic"
+      >
         {children}
       </TableCell>
     </TableRow>

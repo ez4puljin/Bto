@@ -48,12 +48,62 @@ export function sidesOf(balance: string): { debit: string; credit: string } {
     : { debit: balance, credit: '0' };
 }
 
-/** The bordered table of the paper. */
-export const BOOK_TABLE =
-  'w-full border-collapse text-[0.8125rem] [&_td]:border [&_td]:whitespace-normal [&_td]:border-border [&_td]:px-1.5 [&_td]:py-1 [&_th]:border [&_th]:border-border [&_th]:bg-muted/60 [&_th]:px-1.5 [&_th]:py-1 [&_th]:font-semibold';
+/**
+ * The bordered table of the paper (2026-11-01): fixed columns from a `<colgroup>` in rem, hairlines
+ * drawn by the cells (separate borders, so the sticky head keeps its own), rows of about 1.75rem.
+ * The descendant selectors outweigh the shadcn cells' own height, padding and colours.
+ */
+export const BOOK_TABLE = [
+  'w-full table-fixed border-separate border-spacing-0 border-l border-border text-[0.8125rem] leading-tight',
+  '[&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10',
+  '[&_th]:h-auto [&_th]:border-r [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-2 [&_th]:py-1.5 [&_th]:align-bottom [&_th]:text-xs [&_th]:font-semibold [&_th]:whitespace-normal [&_th]:text-foreground [&_th]:first:pl-2 [&_th]:last:pr-2',
+  '[&_thead_tr:first-child_th]:border-t',
+  '[&_td]:h-auto [&_td]:border-r [&_td]:border-b [&_td]:border-border [&_td]:px-2 [&_td]:py-1 [&_td]:align-middle [&_td]:first:pl-2 [&_td]:last:pr-2',
+  'print:table-auto print:text-[0.6875rem] print:[&_col]:w-auto! print:[&_thead]:static print:[&_tr]:break-inside-avoid',
+].join(' ');
 
 /** Right-aligned figures. */
-export const NUM = 'text-right font-mono whitespace-nowrap! tabular-nums';
+export const NUM = 'text-right tabular-nums whitespace-nowrap';
+
+/** The fixed columns of the papers in rem (ADR-0119's idea); text columns take the rest. */
+export const COL = {
+  code: 6,
+  docNumber: 10.5,
+  date: 6.5,
+  unit: 4.5,
+  qty: 5,
+  money: 7.5,
+  percent: 5,
+} as const;
+
+/** A text column: the width it is given on the paper and the least it keeps before the table scrolls. */
+export interface TextColumn {
+  prefer: number;
+  min: number;
+}
+
+/** A column of a paper's table: a fixed width in rem, or a text column. */
+export type BookColumn = number | TextColumn;
+
+export function textColumn(prefer: number, min = 12): TextColumn {
+  return { prefer, min };
+}
+
+/** The paper's padding on both sides together, in rem (`2xl:px-10`; `md:px-8` below 1536px). */
+const PAPER_PADDING = 5;
+
+/** The least width of a table in rem: its fixed columns and each text column at its least. */
+export function tableMinRem(columns: readonly BookColumn[]): number {
+  return columns.reduce<number>((sum, c) => sum + (typeof c === 'number' ? c : c.min), 0);
+}
+
+/** How wide a report's column runs in rem: its table at the text columns' given widths, and the padding. */
+export function paperRem(columns: readonly BookColumn[]): number {
+  return columns.reduce<number>(
+    (sum, c) => sum + (typeof c === 'number' ? c : c.prefer),
+    PAPER_PADDING,
+  );
+}
 
 /** The sum of two amounts (two decimals) without floats; null when either is unknown. */
 export function addMoney(a: string | null, b: string | null): string | null {

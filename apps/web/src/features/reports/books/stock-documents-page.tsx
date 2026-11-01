@@ -4,14 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ProductSearch } from '@/features/inventory/shared';
 import { CustomerPicker, type PickedCustomer } from '@/features/partners/customer-picker';
 import { SupplierPicker, type PickedSupplier } from '@/features/partners/supplier-picker';
@@ -28,13 +21,24 @@ import {
   useStockDocumentLines,
   useStockDocuments,
 } from './book-api';
-import { amount, BOOK_TABLE, NUM, type Precision, quantity } from './book-format';
+import {
+  amount,
+  type BookColumn,
+  COL,
+  NUM,
+  type Precision,
+  quantity,
+  textColumn,
+} from './book-format';
 import {
   BookActions,
+  BookPage,
   BookSheet,
+  BookTable,
   DateFields,
+  DetailLabel,
   DetailRow,
-  DrillMark,
+  DrillCell,
   DrillRow,
   MultiPick,
   NoteRow,
@@ -42,6 +46,8 @@ import {
   PrecisionField,
   PromptDialog,
   SelectField,
+  TextCell,
+  TotalRow,
 } from './book-kit';
 import { stockDocHref } from './book-links';
 import { idParamOf, idsParam, useBookParams, useDrill, usePromptDates } from './book-state';
@@ -96,11 +102,10 @@ export function StockDocumentsPage() {
     ...['prn', 'cn', 'sn'].flatMap((key) => (search.get(key) ? [search.get(key) ?? ''] : [])),
   ].filter(Boolean);
   return (
-    <div>
+    <BookPage width={null}>
       <div className="print:hidden">
         <PageHeader
           title={title}
-          description={t('reports.books.descriptions.stockDocuments')}
           actions={
             <BookActions
               ready={state.query !== null}
@@ -129,7 +134,13 @@ export function StockDocumentsPage() {
       />
       <ProblemAlert problem={action.problem ?? problemFromError(report.error)} />
       {state.query && report.data ? (
-        <BookSheet title={title} from={state.query.from} to={state.query.to} filters={filters}>
+        <BookSheet
+          title={title}
+          from={state.query.from}
+          to={state.query.to}
+          filters={filters}
+          orientation="landscape"
+        >
           <StockDocumentsTable
             rows={report.data.rows}
             totals={report.data.totals}
@@ -141,8 +152,27 @@ export function StockDocumentsPage() {
       ) : !state.query ? (
         <EmptyState icon={FileStack} title={t('reports.prompt.waiting')} />
       ) : null}
-    </div>
+    </BookPage>
   );
+}
+
+/**
+ * Number, date, description, type, author, party, quantity, the cost for the margins right, total
+ * and net (the whole width, landscape A4).
+ */
+function stockDocumentColumns(values: boolean): BookColumn[] {
+  return [
+    COL.docNumber,
+    COL.date,
+    textColumn(20, 12),
+    8.5,
+    9,
+    textColumn(14, 10),
+    6,
+    ...(values ? [COL.money] : []),
+    COL.money,
+    COL.money,
+  ];
 }
 
 function StockDocumentsPrompt(props: {
@@ -311,7 +341,7 @@ function StockDocumentsTable(props: {
   }
   const money = (value: string | null, zero = '') => amount(value, props.precision, zero);
   return (
-    <Table className={BOOK_TABLE}>
+    <BookTable columns={stockDocumentColumns(values)}>
       <TableHeader>
         <TableRow>
           {(['number', 'date', 'description', 'docType', 'author', 'party', 'qty'] as const).map(
@@ -332,24 +362,21 @@ function StockDocumentsTable(props: {
         {props.rows.map((row) => {
           const key = `${row.docType}:${row.docId}`;
           const expanded = drill.open.has(key);
+          const toggle = () => drill.toggle(key);
+          const number = row.number ?? String(row.docId);
           return (
             <Fragment key={key}>
-              <DrillRow expanded={expanded} onToggle={() => drill.toggle(key)}>
-                <TableCell className="whitespace-nowrap!">
-                  <DrillMark expanded={expanded} />
-                  {row.number ?? row.docId}
-                </TableCell>
-                <TableCell className="whitespace-nowrap!">{row.date}</TableCell>
-                <TableCell>{describe(row)}</TableCell>
-                <TableCell>{t(`reports.books.docTypes.${row.docType}`)}</TableCell>
-                <TableCell>{row.authorName ?? ''}</TableCell>
-                <TableCell>{row.partyName ?? ''}</TableCell>
+              <DrillRow expanded={expanded} onToggle={toggle}>
+                <DrillCell expanded={expanded} onToggle={toggle} text={number} />
+                <TableCell>{row.date}</TableCell>
+                <TextCell text={describe(row)} />
+                <TextCell text={t(`reports.books.docTypes.${row.docType}`)} />
+                <TextCell text={row.authorName ?? ''} />
+                <TextCell text={row.partyName ?? ''} />
                 <TableCell className={NUM}>{movedQty(row)}</TableCell>
                 {values ? <TableCell className={NUM}>{money(movedValue(row))}</TableCell> : null}
-                <TableCell className={NUM}>
-                  {row.total === null ? '' : money(row.total, '0')}
-                </TableCell>
-                <TableCell className={NUM}>{row.net === null ? '' : money(row.net, '0')}</TableCell>
+                <TableCell className={NUM}>{row.total === null ? '' : money(row.total)}</TableCell>
+                <TableCell className={NUM}>{row.net === null ? '' : money(row.net)}</TableCell>
               </DrillRow>
               {expanded ? (
                 <DocumentDetail
@@ -363,16 +390,13 @@ function StockDocumentsTable(props: {
             </Fragment>
           );
         })}
-        <TableRow className="font-semibold">
-          <TableCell colSpan={values ? 8 : 7} className="text-right">
-            {t('reports.prompt.total')}
-          </TableCell>
+        <TotalRow labelSpan={values ? 8 : 7}>
           <TableCell className={NUM}>{money(props.totals.total, '0')}</TableCell>
           <TableCell className={NUM}>{money(props.totals.net, '0')}</TableCell>
-        </TableRow>
+        </TotalRow>
         {props.truncated ? <NoteRow colSpan={span}>{t('reports.prompt.truncated')}</NoteRow> : null}
       </TableBody>
-    </Table>
+    </BookTable>
   );
 }
 
@@ -421,10 +445,8 @@ function DocumentDetail(props: {
         const incoming = !line.qty.startsWith('-');
         return (
           <DetailRow key={`${line.productId}:${line.warehouseId}`} href={href} label={text}>
-            <TableCell colSpan={3} className="text-right">
-              {text}
-            </TableCell>
-            <TableCell colSpan={3}>{line.warehouseName}</TableCell>
+            <DetailLabel text={text} colSpan={3} />
+            <TextCell text={line.warehouseName} colSpan={3} />
             <TableCell className={NUM}>
               {incoming ? quantity(line.qty) : `-${quantity(line.qty.slice(1))}`}
             </TableCell>

@@ -5,7 +5,8 @@
  * single-card records) ran to 1400px until 2026-10-30, when the owner found it leaving the right of
  * a 1920 screen empty: every width now takes the whole frame; a form keeps its own column caps up
  * to `xl` (`max-w-3xl xl:max-w-none`). Every page sits at the left, so the title never jumps
- * between a list and its record; only the sign-in pages, outside the shell, are centred.
+ * between a list and its record; only the sign-in pages, outside the shell, are centred, and the
+ * reports' paper pages (`wide` routes) centre their own column sized to the paper (`BookPage`).
  */
 export const PAGE_WIDTHS = {
   wide: 'max-w-none',

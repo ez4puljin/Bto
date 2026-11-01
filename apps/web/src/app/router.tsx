@@ -809,30 +809,31 @@ function reportRoutes(): RouteObject[] {
     <RequirePermission permission="finance.read">{element}</RequirePermission>
   );
   return [
-    // Erkhet's reports on Bto's books (ADR-0133): a prompt, the paper, the lines on a double click.
+    // Erkhet's reports on Bto's books (ADR-0133): a prompt, the paper, the lines on a double click;
+    // each page centres its own column, sized to its paper (BookPage, docs/ui.md §4).
     {
       path: 'reports/party-ledger',
-      handle: { width: 'full' },
+      handle: { width: 'wide' },
       element: books(<PartyLedgerPage />),
     },
     {
       path: 'reports/money-ledger',
-      handle: { width: 'full' },
+      handle: { width: 'wide' },
       element: books(<MoneyLedgerPage />),
     },
     {
       path: 'reports/stock-balance',
-      handle: { width: 'full' },
+      handle: { width: 'wide' },
       element: view(<StockBalancePage />),
     },
     {
       path: 'reports/product-sales',
-      handle: { width: 'full' },
+      handle: { width: 'wide' },
       element: view(<ProductSalesPage />),
     },
     {
       path: 'reports/stock-documents',
-      handle: { width: 'full' },
+      handle: { width: 'wide' },
       element: view(<StockDocumentsPage />),
     },
     { path: 'reports/dashboard', handle: { width: 'wide' }, element: view(<DashboardPage />) },

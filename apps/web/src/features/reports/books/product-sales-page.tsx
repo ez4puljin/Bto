@@ -6,14 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ProductSearch } from '@/features/inventory/shared';
 import { CustomerPicker, type PickedCustomer } from '@/features/partners/customer-picker';
 import { saveBlob } from '@/lib/download';
@@ -34,25 +27,34 @@ import {
 import {
   addMoney,
   amount,
-  BOOK_TABLE,
+  type BookColumn,
   categoryOptions,
+  COL,
   NUM,
+  paperRem,
   type Precision,
   quantity,
+  textColumn,
 } from './book-format';
 import {
   BookActions,
+  BookPage,
   BookSheet,
+  BookTable,
   DateFields,
+  DetailLabel,
   DetailRow,
-  DrillMark,
+  DrillCell,
   DrillRow,
+  GroupRow,
   MultiPick,
   NoteRow,
   PickedField,
   PrecisionField,
   PromptDialog,
   SelectField,
+  TextCell,
+  TotalRow,
 } from './book-kit';
 import { salesDocHref } from './book-links';
 import { idParamOf, idsParam, useBookParams, useDrill, usePromptDates } from './book-state';
@@ -131,12 +133,13 @@ export function ProductSalesPage() {
       : []),
     ...(search.get('kind') ? [t(`reports.books.prompt.kinds.${search.get('kind') as Kind}`)] : []),
   ].filter(Boolean);
+  const costs = report.data ? report.data.totals.cost !== null : true;
+  const paymentCount = report.data?.payments.length ?? 0;
   return (
-    <div>
+    <BookPage width={paperRem(productSalesColumns(costs, paymentCount))}>
       <div className="print:hidden">
         <PageHeader
           title={title}
-          description={t('reports.books.descriptions.productSales')}
           actions={
             <BookActions
               ready={state.query !== null}
@@ -165,7 +168,13 @@ export function ProductSalesPage() {
       />
       <ProblemAlert problem={action.problem ?? problemFromError(report.error)} />
       {state.query && report.data ? (
-        <BookSheet title={title} from={state.query.from} to={state.query.to} filters={filters}>
+        <BookSheet
+          title={title}
+          from={state.query.from}
+          to={state.query.to}
+          filters={filters}
+          orientation="landscape"
+        >
           <ProductSalesTable
             rows={report.data.rows}
             totals={report.data.totals}
@@ -179,8 +188,26 @@ export function ProductSalesPage() {
       ) : !state.query ? (
         <EmptyState icon={ShoppingBasket} title={t('reports.prompt.waiting')} />
       ) : null}
-    </div>
+    </BookPage>
   );
+}
+
+/**
+ * Code, name, unit, quantity, average price, sales, returns, with the margins right cost, profit
+ * and margin, then one column per payment (landscape A4).
+ */
+function productSalesColumns(costs: boolean, payments: number): BookColumn[] {
+  return [
+    COL.code,
+    textColumn(21),
+    COL.unit,
+    COL.qty,
+    COL.money,
+    COL.money,
+    COL.money,
+    ...(costs ? [COL.money, COL.money, COL.percent] : []),
+    ...Array<number>(payments).fill(COL.money),
+  ];
 }
 
 function ProductSalesPrompt(props: {
@@ -466,10 +493,10 @@ function ProductSalesTable(props: {
         paid: [],
       },
     );
-  const paidCells = (paid: readonly PaidAmount[]) =>
+  const paidCells = (paid: readonly PaidAmount[], zero = '') =>
     payments.map((payment) => (
       <TableCell key={payment.key} className={NUM}>
-        {money(paidOf(paid, payment.key) ?? '0')}
+        {money(paidOf(paid, payment.key) ?? '0', zero)}
       </TableCell>
     ));
   const totalCells = (totals: SalesTotals) => (
@@ -485,7 +512,7 @@ function ProductSalesTable(props: {
           <TableCell />
         </>
       ) : null}
-      {paidCells(totals.paid)}
+      {paidCells(totals.paid, '0')}
     </>
   );
   const twoRows = payments.length > 0;
@@ -495,10 +522,10 @@ function ProductSalesTable(props: {
     </TableHead>
   );
   return (
-    <Table className={BOOK_TABLE}>
+    <BookTable columns={productSalesColumns(costs, payments.length)}>
       <TableHeader>
         <TableRow>
-          {head(t('reports.books.columns.sku'), 'w-28 text-center')}
+          {head(t('reports.books.columns.sku'), 'text-center')}
           {head(t('reports.books.columns.name'), 'text-center')}
           {head(t('reports.books.columns.unit'), 'text-center')}
           {head(t('reports.books.columns.qty'), 'text-right')}
@@ -532,33 +559,31 @@ function ProductSalesTable(props: {
         {groups.map((group) => (
           <Fragment key={group.key}>
             {props.grouping !== 'none' ? (
-              <TableRow className="bg-muted/30 font-semibold">
-                <TableCell colSpan={3}>{group.name}</TableCell>
+              <GroupRow>
+                <TextCell text={group.name} colSpan={3} />
                 {totalCells(sumOf(group.rows))}
-              </TableRow>
+              </GroupRow>
             ) : null}
             {group.rows.map((row) => {
               const key = `${row.productId}|${row.group ?? ''}`;
               const expanded = drill.open.has(key);
+              const toggle = () => drill.toggle(key);
               return (
                 <Fragment key={key}>
-                  <DrillRow expanded={expanded} onToggle={() => drill.toggle(key)}>
-                    <TableCell>
-                      <DrillMark expanded={expanded} />
-                      {row.sku}
-                    </TableCell>
-                    <TableCell>{row.name}</TableCell>
-                    <TableCell className="text-center">{row.unit ?? ''}</TableCell>
-                    <TableCell className={NUM}>{quantity(row.qty) || '0'}</TableCell>
+                  <DrillRow expanded={expanded} onToggle={toggle}>
+                    <DrillCell expanded={expanded} onToggle={toggle} text={row.sku} />
+                    <TextCell text={row.name} />
+                    <TextCell text={row.unit ?? ''} className="text-center" />
+                    <TableCell className={NUM}>{quantity(row.qty)}</TableCell>
                     <TableCell className={NUM}>
                       {row.avgPrice === null ? '' : money(row.avgPrice)}
                     </TableCell>
-                    <TableCell className={NUM}>{money(row.sales, '0')}</TableCell>
+                    <TableCell className={NUM}>{money(row.sales)}</TableCell>
                     <TableCell className={NUM}>{money(row.returns)}</TableCell>
                     {costs ? (
                       <>
-                        <TableCell className={NUM}>{money(row.cost, '0')}</TableCell>
-                        <TableCell className={NUM}>{money(row.profit, '0')}</TableCell>
+                        <TableCell className={NUM}>{money(row.cost)}</TableCell>
+                        <TableCell className={NUM}>{money(row.profit)}</TableCell>
                         <TableCell className={NUM}>
                           {row.margin === null ? '' : `${row.margin}%`}
                         </TableCell>
@@ -582,15 +607,10 @@ function ProductSalesTable(props: {
             })}
           </Fragment>
         ))}
-        <TableRow className="font-semibold">
-          <TableCell colSpan={3} className="text-right">
-            {t('reports.prompt.total')}
-          </TableCell>
-          {totalCells(props.totals)}
-        </TableRow>
+        <TotalRow labelSpan={3}>{totalCells(props.totals)}</TotalRow>
         {props.truncated ? <NoteRow colSpan={span}>{t('reports.prompt.truncated')}</NoteRow> : null}
       </TableBody>
-    </Table>
+    </BookTable>
   );
 }
 
@@ -630,16 +650,14 @@ function SalesDetail(props: {
     <>
       {documents.data.rows.map((doc) => (
         <DetailRow key={`${doc.kind}:${doc.id}`} href={salesDocHref(doc)} label={label(doc)}>
-          <TableCell colSpan={3} className="text-right">
-            {label(doc)}
-          </TableCell>
-          <TableCell className={NUM}>{quantity(doc.qty) || '0'}</TableCell>
+          <DetailLabel text={label(doc)} colSpan={3} />
+          <TableCell className={NUM}>{quantity(doc.qty)}</TableCell>
           <TableCell />
-          <TableCell className={NUM}>{amount(doc.sales, props.precision, '0')}</TableCell>
+          <TableCell className={NUM}>{amount(doc.sales, props.precision)}</TableCell>
           <TableCell />
           {props.costs ? (
             <>
-              <TableCell className={NUM}>{amount(doc.cost, props.precision, '0')}</TableCell>
+              <TableCell className={NUM}>{amount(doc.cost, props.precision)}</TableCell>
               <TableCell />
               <TableCell />
             </>
