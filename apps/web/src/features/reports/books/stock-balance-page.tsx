@@ -1,7 +1,6 @@
 import { Boxes } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,6 +8,7 @@ import { ProductSearch } from '@/features/inventory/shared';
 import { saveBlob } from '@/lib/download';
 import { problemFromError } from '@/lib/problem';
 import { useAction } from '@/lib/use-action';
+import { cn } from '@/lib/utils';
 import {
   type BookOption,
   type StockBalanceQuery,
@@ -24,22 +24,27 @@ import {
   type BookColumn,
   categoryOptions,
   COL,
+  detailParts,
+  detailText,
+  GROUP_END,
+  isZero,
   NUM,
-  paperRem,
   type Precision,
   quantity,
   textColumn,
 } from './book-format';
 import {
   BookActions,
+  BookBlank,
   BookPage,
   BookSheet,
   BookTable,
-  DateFields,
   DetailLabel,
   DetailRow,
+  DetailSkeleton,
   DrillCell,
   DrillRow,
+  EmptyRow,
   GroupRow,
   MultiPick,
   NoteRow,
@@ -47,6 +52,7 @@ import {
   PrecisionField,
   PromptDialog,
   SelectField,
+  SkeletonBody,
   TextCell,
   TotalRow,
 } from './book-kit';
@@ -55,6 +61,7 @@ import { idParamOf, idsParam, useBookParams, useDrill, usePromptDates } from './
 
 type Grouping = 'product' | 'warehouse' | 'category';
 const GROUPINGS: readonly Grouping[] = ['product', 'warehouse', 'category'];
+const GROUPS = ['opening', 'in', 'out', 'closing'] as const;
 
 function useStockBalanceQuery() {
   const params = useBookParams();
@@ -100,15 +107,18 @@ export function StockBalancePage() {
     ...(state.search.get('prn') ? [state.search.get('prn') ?? ''] : []),
   ];
   const values = report.data ? report.data.totals.closingValue !== null : true;
+  const openPrompt = () => setPrompting(true);
   return (
-    <BookPage width={paperRem(stockBalanceColumns(values))}>
+    <BookPage columns={stockBalanceColumns(values)}>
       <div className="print:hidden">
         <PageHeader
+          compact
           title={title}
           actions={
             <BookActions
-              ready={state.query !== null}
-              onPrompt={() => setPrompting(true)}
+              ready={state.query !== null && report.data !== undefined}
+              period={state.query}
+              onPrompt={openPrompt}
               excelPending={downloads.stockBalance.isPending}
               onExcel={() => {
                 const query = state.query;
@@ -132,26 +142,27 @@ export function StockBalancePage() {
         options={options.data}
       />
       <ProblemAlert problem={action.problem ?? problemFromError(report.error)} />
-      {state.query && report.data ? (
+      {state.query && (report.data || report.isPending) ? (
         <BookSheet
           title={title}
-          from={state.query.from}
-          to={state.query.to}
+          period={state.query}
           filters={filters}
           orientation="landscape"
+          loading={!report.data}
         >
           <StockBalanceTable
-            rows={report.data.rows}
-            totals={report.data.totals}
-            truncated={report.data.truncated}
+            rows={report.data?.rows ?? null}
+            totals={report.data?.totals ?? null}
+            truncated={report.data?.truncated ?? false}
             grouping={state.grouping}
             query={state.query}
             precision={state.precision}
+            onPrompt={openPrompt}
           />
         </BookSheet>
-      ) : !state.query ? (
-        <EmptyState icon={Boxes} title={t('reports.prompt.waiting')} />
-      ) : null}
+      ) : (
+        <BookBlank title={title} icon={Boxes} orientation="landscape" onPrompt={openPrompt} />
+      )}
     </BookPage>
   );
 }
@@ -209,59 +220,62 @@ function StockBalancePrompt(props: {
       title={props.title}
       valid={dates.valid}
       onSubmit={submit}
-    >
-      <div className="flex flex-col gap-4">
-        <MultiPick
-          label={t('reports.books.prompt.warehouses')}
-          options={(props.options?.warehouses ?? []).map((w) => ({
-            value: String(w.id),
-            label: `${w.code ?? ''} - ${w.name}`,
-            keys: [w.code ?? ''],
-          }))}
-          values={warehouses}
-          onChange={setWarehouses}
-        />
-        <SelectField
-          id="book-category"
-          label={t('reports.books.prompt.category')}
-          value={categoryId}
-          options={categories}
-          onChange={setCategoryId}
-        />
-        <PickedField
-          label={t('reports.books.prompt.product')}
-          htmlFor="book-product"
-          picked={product?.label ?? null}
-          onClear={() => setProduct(null)}
-        >
-          <ProductSearch
-            id="book-product"
-            className="max-w-none"
-            pickLabel={t('reports.prompt.choose')}
-            onPick={(picked) =>
-              setProduct({ id: picked.id, label: `${picked.sku} - ${picked.name}` })
+      dates={dates}
+      filters={
+        <>
+          <MultiPick
+            label={t('reports.books.prompt.warehouses')}
+            options={(props.options?.warehouses ?? []).map((w) => ({
+              value: String(w.id),
+              label: `${w.code ?? ''} - ${w.name}`,
+              keys: [w.code ?? ''],
+            }))}
+            values={warehouses}
+            onChange={setWarehouses}
+          />
+          <SelectField
+            id="book-category"
+            label={t('reports.books.prompt.category')}
+            value={categoryId}
+            options={categories}
+            onChange={setCategoryId}
+          />
+          <PickedField
+            label={t('reports.books.prompt.product')}
+            htmlFor="book-product"
+            picked={product?.label ?? null}
+            onClear={() => setProduct(null)}
+          >
+            <ProductSearch
+              id="book-product"
+              className="max-w-none"
+              pickLabel={t('reports.prompt.choose')}
+              onPick={(picked) =>
+                setProduct({ id: picked.id, label: `${picked.sku} - ${picked.name}` })
+              }
+            />
+          </PickedField>
+        </>
+      }
+      view={
+        <>
+          <PrecisionField value={precision} onChange={setPrecision} />
+          <SelectField
+            id="book-grouping"
+            label={t('reports.books.prompt.grouping')}
+            value={grouping}
+            emptyLabel=""
+            options={GROUPINGS.map((value) => ({
+              value,
+              label: t(`reports.books.prompt.groupings.${value}`),
+            }))}
+            onChange={(value) =>
+              setGrouping(value === 'warehouse' || value === 'category' ? value : 'product')
             }
           />
-        </PickedField>
-      </div>
-      <div className="flex flex-col gap-4">
-        <PrecisionField value={precision} onChange={setPrecision} />
-        <SelectField
-          id="book-grouping"
-          label={t('reports.books.prompt.grouping')}
-          value={grouping}
-          emptyLabel=""
-          options={GROUPINGS.map((value) => ({
-            value,
-            label: t(`reports.books.prompt.groupings.${value}`),
-          }))}
-          onChange={(value) =>
-            setGrouping(value === 'warehouse' || value === 'category' ? value : 'product')
-          }
-        />
-        <DateFields {...dates} />
-      </div>
-    </PromptDialog>
+        </>
+      }
+    />
   );
 }
 
@@ -284,22 +298,58 @@ function valueSum(rows: readonly StockBalanceRow[]): ValueTotals {
   );
 }
 
+function StockBalanceHead({ values }: { values: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <TableHeader>
+      <TableRow>
+        <TableHead rowSpan={2}>{t('reports.books.columns.sku')}</TableHead>
+        <TableHead rowSpan={2}>{t('reports.books.columns.name')}</TableHead>
+        <TableHead rowSpan={2} className={GROUP_END}>
+          {t('reports.books.head.unit')}
+        </TableHead>
+        {GROUPS.map((group) => (
+          <TableHead key={group} colSpan={values ? 2 : 1} className={cn('text-center', GROUP_END)}>
+            {t(`reports.books.table.${group}`)}
+          </TableHead>
+        ))}
+      </TableRow>
+      <TableRow>
+        {GROUPS.map((group) => (
+          <Fragment key={group}>
+            <TableHead className={cn('text-right', !values && GROUP_END)}>
+              {t('reports.books.table.qty')}
+            </TableHead>
+            {values ? (
+              <TableHead className={cn('text-right', GROUP_END)}>
+                {t('reports.books.table.value')}
+              </TableHead>
+            ) : null}
+          </Fragment>
+        ))}
+      </TableRow>
+    </TableHeader>
+  );
+}
+
 function StockBalanceTable(props: {
-  rows: readonly StockBalanceRow[];
-  totals: ValueTotals;
+  rows: readonly StockBalanceRow[] | null;
+  totals: ValueTotals | null;
   truncated: boolean;
   grouping: Grouping;
   query: StockBalanceQuery;
   precision: Precision;
+  onPrompt: () => void;
 }) {
   const { t } = useTranslation();
   const drill = useDrill();
-  const values = props.totals.closingValue !== null;
+  const values = props.totals ? props.totals.closingValue !== null : true;
   const span = values ? 11 : 7;
   const groups = useMemo(() => {
-    if (props.grouping === 'product') return [['', [...props.rows]] as const];
+    const rows = props.rows ?? [];
+    if (props.grouping === 'product') return [['', [...rows]] as const];
     const map = new Map<string, StockBalanceRow[]>();
-    for (const row of props.rows) {
+    for (const row of rows) {
       const key =
         props.grouping === 'warehouse'
           ? (row.warehouseName ?? '')
@@ -308,84 +358,93 @@ function StockBalanceTable(props: {
     }
     return [...map.entries()];
   }, [props.rows, props.grouping, t]);
-  if (props.rows.length === 0) return <EmptyState icon={Boxes} title={t('reports.prompt.empty')} />;
-  const pair = (qty: string | null, value: string | null, bold = false) => (
+  const columns = stockBalanceColumns(values);
+  if (props.rows === null || props.totals === null) {
+    return (
+      <BookTable columns={columns}>
+        <StockBalanceHead values={values} />
+        <SkeletonBody columns={span} />
+      </BookTable>
+    );
+  }
+  if (props.rows.length === 0) {
+    return (
+      <BookTable columns={columns}>
+        <StockBalanceHead values={values} />
+        <EmptyRow colSpan={span} onPrompt={props.onPrompt} />
+      </BookTable>
+    );
+  }
+  /**
+   * A group's quantity and value: a balance (opening, closing) writes «0», a movement is blank
+   * when nothing moved; `sum` (a group, the total) writes «0» everywhere and no quantity.
+   */
+  const pair = (
+    qty: string | null,
+    value: string | null,
+    options: { balance?: boolean; sum?: boolean } = {},
+  ) => {
+    const zero = options.balance || options.sum ? '0' : '';
+    return (
+      <>
+        <TableCell className={cn(NUM, !values && GROUP_END)}>
+          {qty === null ? '' : quantity(qty, zero)}
+        </TableCell>
+        {values ? (
+          <TableCell className={cn(NUM, GROUP_END)}>
+            {amount(value, props.precision, zero)}
+          </TableCell>
+        ) : null}
+      </>
+    );
+  };
+  const sums = (totals: ValueTotals) => (
     <>
-      {qty === null ? <TableCell /> : <TableCell className={NUM}>{quantity(qty)}</TableCell>}
-      {values ? (
-        <TableCell className={NUM}>{amount(value, props.precision, bold ? '0' : '')}</TableCell>
-      ) : null}
+      {pair(null, totals.openingValue, { sum: true })}
+      {pair(null, totals.inValue, { sum: true })}
+      {pair(null, totals.outValue, { sum: true })}
+      {pair(null, totals.closingValue, { sum: true })}
     </>
   );
-  const groupHead = (key: string) =>
-    ['opening', 'in', 'out', 'closing'].map((group) => (
-      <Fragment key={`${key}-${group}`}>
-        <TableHead className="text-right">{t('reports.books.table.qty')}</TableHead>
-        {values ? (
-          <TableHead className="text-right">{t('reports.books.table.value')}</TableHead>
-        ) : null}
-      </Fragment>
-    ));
   return (
-    <BookTable columns={stockBalanceColumns(values)}>
-      <TableHeader>
-        <TableRow>
-          <TableHead rowSpan={2} className="text-center">
-            {t('reports.books.columns.sku')}
-          </TableHead>
-          <TableHead rowSpan={2} className="text-center">
-            {t('reports.books.columns.name')}
-          </TableHead>
-          <TableHead rowSpan={2} className="text-center">
-            {t('reports.books.columns.unit')}
-          </TableHead>
-          {(['opening', 'in', 'out', 'closing'] as const).map((group) => (
-            <TableHead key={group} colSpan={values ? 2 : 1} className="text-center">
-              {t(`reports.books.table.${group}`)}
-            </TableHead>
-          ))}
-        </TableRow>
-        <TableRow>{groupHead('h')}</TableRow>
-      </TableHeader>
+    <BookTable columns={columns}>
+      <StockBalanceHead values={values} />
       <TableBody>
         {groups.map(([groupName, rows]) => (
           <Fragment key={groupName}>
             {props.grouping !== 'product' ? (
               <GroupRow>
-                <TextCell text={groupName} colSpan={3} />
-                {(() => {
-                  const sum = valueSum(rows);
-                  return (
-                    <>
-                      {pair(null, sum.openingValue, true)}
-                      {pair(null, sum.inValue, true)}
-                      {pair(null, sum.outValue, true)}
-                      {pair(null, sum.closingValue, true)}
-                    </>
-                  );
-                })()}
+                <TextCell text={groupName} colSpan={3} className={GROUP_END} />
+                {sums(valueSum(rows))}
               </GroupRow>
             ) : null}
             {rows.map((row) => {
               const key = `${row.productId}:${row.warehouseId ?? ''}`;
               const expanded = drill.open.has(key);
               const toggle = () => drill.toggle(key);
+              const drillable = !isZero(row.inQty) || !isZero(row.outQty);
               return (
                 <Fragment key={key}>
-                  <DrillRow expanded={expanded} onToggle={toggle}>
-                    <DrillCell expanded={expanded} onToggle={toggle} text={row.sku} />
+                  <DrillRow expanded={expanded} onToggle={toggle} drillable={drillable}>
+                    <DrillCell
+                      expanded={expanded}
+                      onToggle={toggle}
+                      drillable={drillable}
+                      text={row.sku}
+                    />
                     <TextCell text={row.name} />
-                    <TextCell text={row.unit ?? ''} className="text-center" />
-                    {pair(row.openingQty, row.openingValue)}
+                    <TextCell text={row.unit ?? ''} className={GROUP_END} />
+                    {pair(row.openingQty, row.openingValue, { balance: true })}
                     {pair(row.inQty, row.inValue)}
                     {pair(row.outQty, row.outValue)}
-                    {pair(row.closingQty, row.closingValue)}
+                    {pair(row.closingQty, row.closingValue, { balance: true })}
                   </DrillRow>
-                  {expanded ? (
+                  {expanded && drillable ? (
                     <StockBalanceDetail
                       query={props.query}
                       productId={row.productId}
                       warehouseIds={row.warehouseId ? [row.warehouseId] : undefined}
+                      omit={props.grouping === 'warehouse' ? [groupName] : []}
                       values={values}
                       precision={props.precision}
                       span={span}
@@ -396,12 +455,7 @@ function StockBalanceTable(props: {
             })}
           </Fragment>
         ))}
-        <TotalRow labelSpan={3}>
-          {pair(null, props.totals.openingValue, true)}
-          {pair(null, props.totals.inValue, true)}
-          {pair(null, props.totals.outValue, true)}
-          {pair(null, props.totals.closingValue, true)}
-        </TotalRow>
+        <TotalRow labelSpan={3}>{sums(props.totals)}</TotalRow>
         {props.truncated ? <NoteRow colSpan={span}>{t('reports.prompt.truncated')}</NoteRow> : null}
       </TableBody>
     </BookTable>
@@ -413,6 +467,7 @@ function StockBalanceDetail(props: {
   query: StockBalanceQuery;
   productId: number;
   warehouseIds?: number[];
+  omit: readonly string[];
   values: boolean;
   precision: Precision;
   span: number;
@@ -422,9 +477,7 @@ function StockBalanceDetail(props: {
     productId: props.productId,
     ...(props.warehouseIds ? { warehouseIds: props.warehouseIds } : {}),
   });
-  if (lines.isPending) {
-    return <NoteRow colSpan={props.span}>{t('reports.prompt.loadingLines')}</NoteRow>;
-  }
+  if (lines.isPending) return <DetailSkeleton colSpan={props.span} />;
   if (lines.error) {
     return (
       <NoteRow colSpan={props.span}>
@@ -436,35 +489,35 @@ function StockBalanceDetail(props: {
     return <NoteRow colSpan={props.span}>{t('reports.prompt.noLines')}</NoteRow>;
   }
   const blank = props.values ? 2 : 1;
+  const end = (last: boolean) => cn(NUM, last && GROUP_END);
   return (
     <>
       {lines.data.rows.map((line, index) => {
         const type = t(`reports.books.docTypes.${line.docType}`, { defaultValue: line.docType });
-        const text = [`#${line.docNumber ?? line.docId}`, line.date, type, line.warehouseName].join(
-          ' - ',
-        );
-        const incoming = line.inQty !== '0';
+        const number = line.docNumber ?? String(line.docId);
+        const parts = detailParts(number, [line.date, type, line.warehouseName], props.omit);
+        const incoming = !isZero(line.inQty);
         return (
           <DetailRow
             key={`${line.docType}:${line.docId}:${line.warehouseId}:${index}`}
             href={stockDocHref(line.docType, line.docId)}
-            label={text}
+            label={detailText(number, parts)}
           >
-            <DetailLabel text={text} colSpan={3} />
-            <TableCell colSpan={blank} />
-            <TableCell className={NUM}>{quantity(line.inQty)}</TableCell>
+            <DetailLabel number={number} parts={parts} colSpan={3} />
+            <TableCell colSpan={blank} className={GROUP_END} />
+            <TableCell className={end(!props.values)}>{quantity(line.inQty)}</TableCell>
             {props.values ? (
-              <TableCell className={NUM}>
+              <TableCell className={end(true)}>
                 {incoming ? amount(line.value, props.precision) : ''}
               </TableCell>
             ) : null}
-            <TableCell className={NUM}>{quantity(line.outQty)}</TableCell>
+            <TableCell className={end(!props.values)}>{quantity(line.outQty)}</TableCell>
             {props.values ? (
-              <TableCell className={NUM}>
+              <TableCell className={end(true)}>
                 {incoming ? '' : amount(line.value, props.precision)}
               </TableCell>
             ) : null}
-            <TableCell className={NUM}>{quantity(line.balanceQty) || '0'}</TableCell>
+            <TableCell className={NUM}>{quantity(line.balanceQty, '0')}</TableCell>
             {props.values ? <TableCell /> : null}
           </DetailRow>
         );

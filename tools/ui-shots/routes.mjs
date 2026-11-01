@@ -191,6 +191,11 @@ export const ROUTES = [
     path: '/reports/product-sales?from=2026-10-26&to=2026-10-27&by=user&pay=1',
     then: "document.querySelectorAll('tr[aria-expanded]').forEach((row) => row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })))",
   },
+  {
+    area: 'reports',
+    name: 'books-empty',
+    path: '/reports/stock-documents?from=2020-01-01&to=2020-01-31',
+  },
   { area: 'reports', name: 'books-sales-prompt', path: '/reports/product-sales', dialog: true },
   {
     area: 'reports',

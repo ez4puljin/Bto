@@ -1,9 +1,6 @@
 import { ShoppingBasket } from 'lucide-react';
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState } from '@/components/list';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -12,6 +9,7 @@ import { CustomerPicker, type PickedCustomer } from '@/features/partners/custome
 import { saveBlob } from '@/lib/download';
 import { problemFromError } from '@/lib/problem';
 import { useAction } from '@/lib/use-action';
+import { cn } from '@/lib/utils';
 import {
   type BookOptions,
   type PaidAmount,
@@ -30,29 +28,38 @@ import {
   type BookColumn,
   categoryOptions,
   COL,
+  detailParts,
+  detailText,
+  GROUP_END,
   NUM,
-  paperRem,
+  negate,
+  percentText,
   type Precision,
   quantity,
   textColumn,
 } from './book-format';
 import {
   BookActions,
+  BookBlank,
   BookPage,
   BookSheet,
   BookTable,
-  DateFields,
+  CheckField,
   DetailLabel,
   DetailRow,
+  DetailSkeleton,
   DrillCell,
   DrillRow,
+  EmptyRow,
   GroupRow,
+  HeadLabel,
   MultiPick,
   NoteRow,
   PickedField,
   PrecisionField,
   PromptDialog,
   SelectField,
+  SkeletonBody,
   TextCell,
   TotalRow,
 } from './book-kit';
@@ -65,6 +72,8 @@ const SOURCES = ['ALL', 'WHOLESALE', 'POS'] as const;
 const KINDS = ['ALL', 'SALES', 'RETURNS'] as const;
 type Source = (typeof SOURCES)[number];
 type Kind = (typeof KINDS)[number];
+/** The documents that take goods back: their amount is a return. */
+const RETURN_KINDS: readonly ProductSalesDocument['kind'][] = ['CREDIT_NOTE', 'POS_RETURN'];
 
 function useProductSalesQuery() {
   const params = useBookParams();
@@ -135,15 +144,18 @@ export function ProductSalesPage() {
   ].filter(Boolean);
   const costs = report.data ? report.data.totals.cost !== null : true;
   const paymentCount = report.data?.payments.length ?? 0;
+  const openPrompt = () => setPrompting(true);
   return (
-    <BookPage width={paperRem(productSalesColumns(costs, paymentCount))}>
+    <BookPage columns={productSalesColumns(costs, paymentCount)}>
       <div className="print:hidden">
         <PageHeader
+          compact
           title={title}
           actions={
             <BookActions
-              ready={state.query !== null}
-              onPrompt={() => setPrompting(true)}
+              ready={state.query !== null && report.data !== undefined}
+              period={state.query}
+              onPrompt={openPrompt}
               excelPending={downloads.productSales.isPending}
               onExcel={() => {
                 const query = state.query;
@@ -167,27 +179,30 @@ export function ProductSalesPage() {
         options={options.data}
       />
       <ProblemAlert problem={action.problem ?? problemFromError(report.error)} />
-      {state.query && report.data ? (
+      {state.query && (report.data || report.isPending) ? (
         <BookSheet
           title={title}
-          from={state.query.from}
-          to={state.query.to}
+          period={state.query}
           filters={filters}
           orientation="landscape"
+          loading={!report.data}
         >
           <ProductSalesTable
-            rows={report.data.rows}
-            totals={report.data.totals}
-            payments={report.data.payments}
-            truncated={report.data.truncated}
-            grouping={report.data.by}
+            report={report.data ?? null}
+            grouping={report.data?.by ?? state.grouping}
             query={state.query}
             precision={state.precision}
+            onPrompt={openPrompt}
           />
         </BookSheet>
-      ) : !state.query ? (
-        <EmptyState icon={ShoppingBasket} title={t('reports.prompt.waiting')} />
-      ) : null}
+      ) : (
+        <BookBlank
+          title={title}
+          icon={ShoppingBasket}
+          orientation="landscape"
+          onPrompt={openPrompt}
+        />
+      )}
     </BookPage>
   );
 }
@@ -206,7 +221,7 @@ function productSalesColumns(costs: boolean, payments: number): BookColumn[] {
     COL.money,
     COL.money,
     ...(costs ? [COL.money, COL.money, COL.percent] : []),
-    ...Array<number>(payments).fill(COL.money),
+    ...Array<BookColumn>(payments).fill(COL.money),
   ];
 }
 
@@ -286,137 +301,143 @@ function ProductSalesPrompt(props: {
       title={props.title}
       valid={dates.valid}
       onSubmit={submit}
-    >
-      <div className="flex flex-col gap-4">
-        <SelectField
-          id="book-rep"
-          label={t('reports.books.prompt.rep')}
-          value={rep}
-          options={(props.options?.users ?? []).map((u) => ({
-            value: String(u.id),
-            label: u.name,
-          }))}
-          onChange={setRep}
-        />
-        <SelectField
-          id="book-customer-category"
-          label={t('reports.books.prompt.customerCategory')}
-          value={categoryOfCustomers}
-          options={(props.options?.customerCategories ?? []).map((c) => ({
-            value: String(c.id),
-            label: c.name,
-          }))}
-          onChange={setCategoryOfCustomers}
-        />
-        <PickedField
-          label={t('reports.books.prompt.customer')}
-          htmlFor="book-customer"
-          picked={customer ? `${customer.name} · ${customer.code}` : customerLabel}
-          onClear={() => {
-            setCustomer(null);
-            setCustomerLabel(null);
-          }}
-        >
-          <CustomerPicker id="book-customer" value={customer} onChange={setCustomer} searchFirst />
-        </PickedField>
-        <SelectField
-          id="book-source"
-          label={t('reports.books.prompt.source')}
-          value={source}
-          emptyLabel=""
-          options={SOURCES.map((value) => ({
-            value,
-            label: t(`reports.books.prompt.sources.${value}`),
-          }))}
-          onChange={setSource}
-        />
-        <SelectField
-          id="book-grouping"
-          label={t('reports.books.prompt.grouping')}
-          value={grouping}
-          emptyLabel=""
-          options={GROUPINGS.map((value) => ({
-            value,
-            label: t(`reports.books.prompt.groupings.${value}`),
-          }))}
-          onChange={(value) => setGrouping(GROUPINGS.find((g) => g === value) ?? 'none')}
-        />
-        <PickedField
-          label={t('reports.books.prompt.product')}
-          htmlFor="book-product"
-          picked={product?.label ?? null}
-          onClear={() => setProduct(null)}
-        >
-          <ProductSearch
-            id="book-product"
-            className="max-w-none"
-            pickLabel={t('reports.prompt.choose')}
-            onPick={(picked) =>
-              setProduct({ id: picked.id, label: `${picked.sku} - ${picked.name}` })
-            }
+      dates={dates}
+      filters={
+        <>
+          <SelectField
+            id="book-rep"
+            label={t('reports.books.prompt.rep')}
+            value={rep}
+            options={(props.options?.users ?? []).map((u) => ({
+              value: String(u.id),
+              label: u.name,
+            }))}
+            onChange={setRep}
           />
-        </PickedField>
-      </div>
-      <div className="flex flex-col gap-4">
-        <SelectField
-          id="book-category"
-          label={t('reports.books.prompt.category')}
-          value={categoryId}
-          options={categories}
-          onChange={setCategoryId}
-        />
-        <MultiPick
-          label={t('reports.books.prompt.brands')}
-          options={(props.options?.brands ?? []).map((b) => ({
-            value: String(b.id),
-            label: b.name,
-            keys: [b.code ?? ''],
-          }))}
-          values={brands}
-          onChange={setBrands}
-        />
-        <MultiPick
-          label={t('reports.books.prompt.segments')}
-          options={(props.options?.segments ?? []).map((g) => ({
-            value: String(g.id),
-            label: g.name,
-          }))}
-          values={segments}
-          onChange={setSegments}
-        />
-        <SelectField
-          id="book-warehouse"
-          label={t('reports.books.prompt.warehouse')}
-          value={warehouse}
-          options={(props.options?.warehouses ?? []).map((w) => ({
-            value: String(w.id),
-            label: `${w.code ?? ''} - ${w.name}`,
-          }))}
-          onChange={setWarehouse}
-        />
-        <PrecisionField value={precision} onChange={setPrecision} />
-        <div className="flex items-center gap-2">
-          <Checkbox
+          <SelectField
+            id="book-customer-category"
+            label={t('reports.books.prompt.customerCategory')}
+            value={categoryOfCustomers}
+            options={(props.options?.customerCategories ?? []).map((c) => ({
+              value: String(c.id),
+              label: c.name,
+            }))}
+            onChange={setCategoryOfCustomers}
+          />
+          <PickedField
+            label={t('reports.books.prompt.customer')}
+            htmlFor="book-customer"
+            picked={customer ? `${customer.name} · ${customer.code}` : customerLabel}
+            onClear={() => {
+              setCustomer(null);
+              setCustomerLabel(null);
+            }}
+          >
+            <CustomerPicker
+              id="book-customer"
+              value={customer}
+              onChange={setCustomer}
+              searchFirst
+            />
+          </PickedField>
+          <SelectField
+            id="book-source"
+            label={t('reports.books.prompt.source')}
+            value={source}
+            emptyLabel=""
+            options={SOURCES.map((value) => ({
+              value,
+              label: t(`reports.books.prompt.sources.${value}`),
+            }))}
+            onChange={setSource}
+          />
+          <SelectField
+            id="book-kind"
+            label={t('reports.books.prompt.kind')}
+            value={kind}
+            emptyLabel=""
+            options={KINDS.map((value) => ({
+              value,
+              label: t(`reports.books.prompt.kinds.${value}`),
+            }))}
+            onChange={setKind}
+          />
+          <SelectField
+            id="book-warehouse"
+            label={t('reports.books.prompt.warehouse')}
+            value={warehouse}
+            options={(props.options?.warehouses ?? []).map((w) => ({
+              value: String(w.id),
+              label: `${w.code ?? ''} - ${w.name}`,
+            }))}
+            onChange={setWarehouse}
+          />
+          <SelectField
+            id="book-category"
+            label={t('reports.books.prompt.category')}
+            value={categoryId}
+            options={categories}
+            onChange={setCategoryId}
+          />
+          <PickedField
+            label={t('reports.books.prompt.product')}
+            htmlFor="book-product"
+            picked={product?.label ?? null}
+            onClear={() => setProduct(null)}
+          >
+            <ProductSearch
+              id="book-product"
+              className="max-w-none"
+              pickLabel={t('reports.prompt.choose')}
+              onPick={(picked) =>
+                setProduct({ id: picked.id, label: `${picked.sku} - ${picked.name}` })
+              }
+            />
+          </PickedField>
+          <MultiPick
+            label={t('reports.books.prompt.brands')}
+            options={(props.options?.brands ?? []).map((b) => ({
+              value: String(b.id),
+              label: b.name,
+              keys: [b.code ?? ''],
+            }))}
+            values={brands}
+            onChange={setBrands}
+          />
+          <MultiPick
+            label={t('reports.books.prompt.segments')}
+            options={(props.options?.segments ?? []).map((g) => ({
+              value: String(g.id),
+              label: g.name,
+            }))}
+            values={segments}
+            onChange={setSegments}
+          />
+        </>
+      }
+      view={
+        <>
+          <PrecisionField value={precision} onChange={setPrecision} />
+          <SelectField
+            id="book-grouping"
+            label={t('reports.books.prompt.grouping')}
+            value={grouping}
+            emptyLabel=""
+            options={GROUPINGS.map((value) => ({
+              value,
+              label: t(`reports.books.prompt.groupings.${value}`),
+            }))}
+            onChange={(value) => setGrouping(GROUPINGS.find((g) => g === value) ?? 'none')}
+          />
+          <CheckField
             id="book-payments"
+            label={t('reports.books.prompt.payments')}
             checked={payments}
-            onCheckedChange={(value) => setPayments(value === true)}
+            onChange={setPayments}
           />
-          <Label htmlFor="book-payments">{t('reports.books.prompt.payments')}</Label>
-        </div>
-        <SelectField
-          id="book-kind"
-          label={t('reports.books.prompt.kind')}
-          value={kind}
-          emptyLabel=""
-          options={KINDS.map((value) => ({
-            value,
-            label: t(`reports.books.prompt.kinds.${value}`),
-          }))}
-          onChange={setKind}
-        />
-        <DateFields {...dates} />
-      </div>
-    </PromptDialog>
+        </>
+      }
+    />
   );
 }
 
@@ -445,24 +466,73 @@ function groupRank(key: string | null): number {
   return key === 'NONE' ? 2 : key === 'APP' ? 1 : 0;
 }
 
+function ProductSalesHead(props: { costs: boolean; payments: readonly ProductSalesPayment[] }) {
+  const { t } = useTranslation();
+  const twoRows = props.payments.length > 0;
+  const head = (label: ReactNode, className?: string) => (
+    <TableHead rowSpan={twoRows ? 2 : undefined} className={className}>
+      {label}
+    </TableHead>
+  );
+  const exVat = t('reports.books.head.exVat');
+  return (
+    <TableHeader>
+      <TableRow>
+        {head(t('reports.books.columns.sku'))}
+        {head(t('reports.books.columns.name'))}
+        {head(t('reports.books.head.unit'), GROUP_END)}
+        {head(t('reports.books.columns.qty'), 'text-right')}
+        {head(t('reports.books.columns.avgPrice'), 'text-right')}
+        {head(<HeadLabel label={t('reports.books.head.sales')} note={exVat} />, 'text-right')}
+        {head(t('reports.books.columns.returns'), cn('text-right', GROUP_END))}
+        {props.costs ? (
+          <>
+            {head(t('reports.books.columns.cost'), 'text-right')}
+            {head(t('reports.books.columns.profit'), 'text-right')}
+            {head(t('reports.books.columns.margin'), cn('text-right', GROUP_END))}
+          </>
+        ) : null}
+        {twoRows ? (
+          <TableHead colSpan={props.payments.length} className={cn('text-center', GROUP_END)}>
+            <HeadLabel label={t('reports.books.head.payments')} note={exVat} />
+          </TableHead>
+        ) : null}
+      </TableRow>
+      {twoRows ? (
+        <TableRow>
+          {props.payments.map((payment) => (
+            <TableHead key={payment.key} className="text-right">
+              {payment.name}
+            </TableHead>
+          ))}
+        </TableRow>
+      ) : null}
+    </TableHeader>
+  );
+}
+
 function ProductSalesTable(props: {
-  rows: readonly ProductSalesRow[];
-  totals: SalesTotals;
-  payments: readonly ProductSalesPayment[];
-  truncated: boolean;
+  report: {
+    rows: readonly ProductSalesRow[];
+    totals: SalesTotals;
+    payments: readonly ProductSalesPayment[];
+    truncated: boolean;
+  } | null;
   grouping: Grouping;
   query: ProductSalesQuery;
   precision: Precision;
+  onPrompt: () => void;
 }) {
   const { t } = useTranslation();
   const drill = useDrill();
-  const costs = props.totals.cost !== null;
-  const { payments } = props;
+  const costs = props.report ? props.report.totals.cost !== null : true;
+  const payments = props.report?.payments ?? [];
   const span = (costs ? 10 : 7) + payments.length;
   const groups = useMemo(() => {
-    if (props.grouping === 'none') return [{ key: '', name: '', rows: [...props.rows] }];
+    const rows = props.report?.rows ?? [];
+    if (props.grouping === 'none') return [{ key: '', name: '', rows: [...rows] }];
     const map = new Map<string, { key: string; name: string; rows: ProductSalesRow[] }>();
-    for (const row of props.rows) {
+    for (const row of rows) {
       const key = row.group ?? 'NONE';
       const group = map.get(key) ?? { key, name: row.groupName ?? '', rows: [] };
       group.rows.push(row);
@@ -471,9 +541,24 @@ function ProductSalesTable(props: {
     return [...map.values()].sort(
       (a, b) => groupRank(a.key) - groupRank(b.key) || a.name.localeCompare(b.name, 'mn'),
     );
-  }, [props.rows, props.grouping]);
-  if (props.rows.length === 0) {
-    return <EmptyState icon={ShoppingBasket} title={t('reports.prompt.empty')} />;
+  }, [props.report?.rows, props.grouping]);
+  const columns = productSalesColumns(costs, payments.length);
+  const head = <ProductSalesHead costs={costs} payments={payments} />;
+  if (props.report === null) {
+    return (
+      <BookTable columns={columns}>
+        {head}
+        <SkeletonBody columns={span} />
+      </BookTable>
+    );
+  }
+  if (props.report.rows.length === 0) {
+    return (
+      <BookTable columns={columns}>
+        {head}
+        <EmptyRow colSpan={span} onPrompt={props.onPrompt} />
+      </BookTable>
+    );
   }
   const money = (value: string | null, zero = '') => amount(value, props.precision, zero);
   const sumOf = (rows: readonly ProductSalesRow[]): SalesTotals =>
@@ -494,8 +579,8 @@ function ProductSalesTable(props: {
       },
     );
   const paidCells = (paid: readonly PaidAmount[], zero = '') =>
-    payments.map((payment) => (
-      <TableCell key={payment.key} className={NUM}>
+    payments.map((payment, index) => (
+      <TableCell key={payment.key} className={cn(NUM, index === payments.length - 1 && GROUP_END)}>
         {money(paidOf(paid, payment.key) ?? '0', zero)}
       </TableCell>
     ));
@@ -504,63 +589,26 @@ function ProductSalesTable(props: {
       <TableCell />
       <TableCell />
       <TableCell className={NUM}>{money(totals.sales, '0')}</TableCell>
-      <TableCell className={NUM}>{money(totals.returns, '0')}</TableCell>
+      <TableCell className={cn(NUM, GROUP_END)}>{money(totals.returns, '0')}</TableCell>
       {costs ? (
         <>
           <TableCell className={NUM}>{money(totals.cost, '0')}</TableCell>
           <TableCell className={NUM}>{money(totals.profit, '0')}</TableCell>
-          <TableCell />
+          <TableCell className={GROUP_END} />
         </>
       ) : null}
       {paidCells(totals.paid, '0')}
     </>
   );
-  const twoRows = payments.length > 0;
-  const head = (label: string, className: string) => (
-    <TableHead rowSpan={twoRows ? 2 : undefined} className={className}>
-      {label}
-    </TableHead>
-  );
   return (
-    <BookTable columns={productSalesColumns(costs, payments.length)}>
-      <TableHeader>
-        <TableRow>
-          {head(t('reports.books.columns.sku'), 'text-center')}
-          {head(t('reports.books.columns.name'), 'text-center')}
-          {head(t('reports.books.columns.unit'), 'text-center')}
-          {head(t('reports.books.columns.qty'), 'text-right')}
-          {head(t('reports.books.columns.avgPrice'), 'text-right')}
-          {head(t('reports.books.columns.sales'), 'text-right')}
-          {head(t('reports.books.columns.returns'), 'text-right')}
-          {costs ? (
-            <>
-              {head(t('reports.books.columns.cost'), 'text-right')}
-              {head(t('reports.books.columns.profit'), 'text-right')}
-              {head(t('reports.books.columns.margin'), 'text-right')}
-            </>
-          ) : null}
-          {twoRows ? (
-            <TableHead colSpan={payments.length} className="text-center">
-              {t('reports.books.columns.payments')}
-            </TableHead>
-          ) : null}
-        </TableRow>
-        {twoRows ? (
-          <TableRow>
-            {payments.map((payment) => (
-              <TableHead key={payment.key} className="text-right">
-                {payment.name}
-              </TableHead>
-            ))}
-          </TableRow>
-        ) : null}
-      </TableHeader>
+    <BookTable columns={columns}>
+      {head}
       <TableBody>
         {groups.map((group) => (
           <Fragment key={group.key}>
             {props.grouping !== 'none' ? (
               <GroupRow>
-                <TextCell text={group.name} colSpan={3} />
+                <TextCell text={group.name} colSpan={3} className={GROUP_END} />
                 {totalCells(sumOf(group.rows))}
               </GroupRow>
             ) : null}
@@ -573,19 +621,19 @@ function ProductSalesTable(props: {
                   <DrillRow expanded={expanded} onToggle={toggle}>
                     <DrillCell expanded={expanded} onToggle={toggle} text={row.sku} />
                     <TextCell text={row.name} />
-                    <TextCell text={row.unit ?? ''} className="text-center" />
+                    <TextCell text={row.unit ?? ''} className={GROUP_END} />
                     <TableCell className={NUM}>{quantity(row.qty)}</TableCell>
                     <TableCell className={NUM}>
                       {row.avgPrice === null ? '' : money(row.avgPrice)}
                     </TableCell>
                     <TableCell className={NUM}>{money(row.sales)}</TableCell>
-                    <TableCell className={NUM}>{money(row.returns)}</TableCell>
+                    <TableCell className={cn(NUM, GROUP_END)}>{money(row.returns)}</TableCell>
                     {costs ? (
                       <>
                         <TableCell className={NUM}>{money(row.cost)}</TableCell>
                         <TableCell className={NUM}>{money(row.profit)}</TableCell>
-                        <TableCell className={NUM}>
-                          {row.margin === null ? '' : `${row.margin}%`}
+                        <TableCell className={cn(NUM, GROUP_END)}>
+                          {percentText(row.margin)}
                         </TableCell>
                       </>
                     ) : null}
@@ -596,6 +644,7 @@ function ProductSalesTable(props: {
                       query={props.query}
                       productId={row.productId}
                       group={row.group}
+                      omit={[group.name]}
                       costs={costs}
                       payments={payments}
                       precision={props.precision}
@@ -607,18 +656,24 @@ function ProductSalesTable(props: {
             })}
           </Fragment>
         ))}
-        <TotalRow labelSpan={3}>{totalCells(props.totals)}</TotalRow>
-        {props.truncated ? <NoteRow colSpan={span}>{t('reports.prompt.truncated')}</NoteRow> : null}
+        <TotalRow labelSpan={3}>{totalCells(props.report.totals)}</TotalRow>
+        {props.report.truncated ? (
+          <NoteRow colSpan={span}>{t('reports.prompt.truncated')}</NoteRow>
+        ) : null}
       </TableBody>
     </BookTable>
   );
 }
 
-/** The documents behind a product; a click opens the invoice or the till's sale. */
+/**
+ * The documents behind a product; a click opens the invoice or the till's sale. A return's amount
+ * shows under «Борлуулалт» (net sales take it off) and under «Буцаалт», as the product's row does.
+ */
 function SalesDetail(props: {
   query: ProductSalesQuery;
   productId: number;
   group: string | null;
+  omit: readonly string[];
   costs: boolean;
   payments: readonly ProductSalesPayment[];
   precision: Precision;
@@ -626,9 +681,7 @@ function SalesDetail(props: {
 }) {
   const { t } = useTranslation();
   const documents = useProductSalesDocuments(props.query, props.productId, props.group);
-  if (documents.isPending) {
-    return <NoteRow colSpan={props.span}>{t('reports.prompt.loadingLines')}</NoteRow>;
-  }
+  if (documents.isPending) return <DetailSkeleton colSpan={props.span} />;
   if (documents.error) {
     return (
       <NoteRow colSpan={props.span}>
@@ -639,36 +692,47 @@ function SalesDetail(props: {
   if (documents.data.rows.length === 0) {
     return <NoteRow colSpan={props.span}>{t('reports.prompt.noLines')}</NoteRow>;
   }
-  const label = (doc: ProductSalesDocument) =>
-    [
-      `#${doc.number ?? doc.id}`,
-      doc.date,
-      t(`reports.books.salesKinds.${doc.kind}`),
-      ...(doc.customerName ? [doc.customerName] : []),
-    ].join(' - ');
   return (
     <>
-      {documents.data.rows.map((doc) => (
-        <DetailRow key={`${doc.kind}:${doc.id}`} href={salesDocHref(doc)} label={label(doc)}>
-          <DetailLabel text={label(doc)} colSpan={3} />
-          <TableCell className={NUM}>{quantity(doc.qty)}</TableCell>
-          <TableCell />
-          <TableCell className={NUM}>{amount(doc.sales, props.precision)}</TableCell>
-          <TableCell />
-          {props.costs ? (
-            <>
-              <TableCell className={NUM}>{amount(doc.cost, props.precision)}</TableCell>
-              <TableCell />
-              <TableCell />
-            </>
-          ) : null}
-          {props.payments.map((payment) => (
-            <TableCell key={payment.key} className={NUM}>
-              {amount(paidOf(doc.paid, payment.key) ?? '0', props.precision)}
+      {documents.data.rows.map((doc) => {
+        const number = doc.number ?? String(doc.id);
+        const parts = detailParts(
+          number,
+          [doc.date, t(`reports.books.salesKinds.${doc.kind}`), doc.customerName],
+          props.omit,
+        );
+        const isReturn = RETURN_KINDS.includes(doc.kind);
+        return (
+          <DetailRow
+            key={`${doc.kind}:${doc.id}`}
+            href={salesDocHref(doc)}
+            label={detailText(number, parts)}
+          >
+            <DetailLabel number={number} parts={parts} colSpan={3} />
+            <TableCell className={NUM}>{quantity(doc.qty)}</TableCell>
+            <TableCell />
+            <TableCell className={NUM}>{amount(doc.sales, props.precision)}</TableCell>
+            <TableCell className={cn(NUM, GROUP_END)}>
+              {isReturn ? amount(negate(doc.sales), props.precision) : ''}
             </TableCell>
-          ))}
-        </DetailRow>
-      ))}
+            {props.costs ? (
+              <>
+                <TableCell className={NUM}>{amount(doc.cost, props.precision)}</TableCell>
+                <TableCell />
+                <TableCell className={GROUP_END} />
+              </>
+            ) : null}
+            {props.payments.map((payment, index) => (
+              <TableCell
+                key={payment.key}
+                className={cn(NUM, index === props.payments.length - 1 && GROUP_END)}
+              >
+                {amount(paidOf(doc.paid, payment.key) ?? '0', props.precision)}
+              </TableCell>
+            ))}
+          </DetailRow>
+        );
+      })}
       {documents.data.truncated ? (
         <NoteRow colSpan={props.span}>{t('reports.prompt.truncated')}</NoteRow>
       ) : null}

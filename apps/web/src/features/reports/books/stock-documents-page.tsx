@@ -1,7 +1,6 @@
 import { FileStack } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -25,6 +24,11 @@ import {
   amount,
   type BookColumn,
   COL,
+  detailParts,
+  detailText,
+  GROUP_END,
+  isZero,
+  MINUS,
   NUM,
   type Precision,
   quantity,
@@ -32,20 +36,23 @@ import {
 } from './book-format';
 import {
   BookActions,
+  BookBlank,
   BookPage,
   BookSheet,
   BookTable,
-  DateFields,
   DetailLabel,
   DetailRow,
+  DetailSkeleton,
   DrillCell,
   DrillRow,
+  EmptyRow,
   MultiPick,
   NoteRow,
   PickedField,
   PrecisionField,
   PromptDialog,
   SelectField,
+  SkeletonBody,
   TextCell,
   TotalRow,
 } from './book-kit';
@@ -101,15 +108,18 @@ export function StockDocumentsPage() {
       : []),
     ...['prn', 'cn', 'sn'].flatMap((key) => (search.get(key) ? [search.get(key) ?? ''] : [])),
   ].filter(Boolean);
+  const openPrompt = () => setPrompting(true);
   return (
-    <BookPage width={null}>
+    <BookPage columns={null}>
       <div className="print:hidden">
         <PageHeader
+          compact
           title={title}
           actions={
             <BookActions
-              ready={state.query !== null}
-              onPrompt={() => setPrompting(true)}
+              ready={state.query !== null && report.data !== undefined}
+              period={state.query}
+              onPrompt={openPrompt}
               excelPending={downloads.stockDocuments.isPending}
               onExcel={() => {
                 const query = state.query;
@@ -133,25 +143,24 @@ export function StockDocumentsPage() {
         options={options.data}
       />
       <ProblemAlert problem={action.problem ?? problemFromError(report.error)} />
-      {state.query && report.data ? (
+      {state.query && (report.data || report.isPending) ? (
         <BookSheet
           title={title}
-          from={state.query.from}
-          to={state.query.to}
+          period={state.query}
           filters={filters}
           orientation="landscape"
+          loading={!report.data}
         >
           <StockDocumentsTable
-            rows={report.data.rows}
-            totals={report.data.totals}
-            truncated={report.data.truncated}
+            report={report.data ?? null}
             warehouseIds={state.query.warehouseIds}
             precision={state.precision}
+            onPrompt={openPrompt}
           />
         </BookSheet>
-      ) : !state.query ? (
-        <EmptyState icon={FileStack} title={t('reports.prompt.waiting')} />
-      ) : null}
+      ) : (
+        <BookBlank title={title} icon={FileStack} orientation="landscape" onPrompt={openPrompt} />
+      )}
     </BookPage>
   );
 }
@@ -164,11 +173,11 @@ function stockDocumentColumns(values: boolean): BookColumn[] {
   return [
     COL.docNumber,
     COL.date,
-    textColumn(20, 12),
-    8.5,
-    9,
-    textColumn(14, 10),
-    6,
+    textColumn(20, 10),
+    COL.docType,
+    COL.person,
+    textColumn(14, 9),
+    COL.qty,
     ...(values ? [COL.money] : []),
     COL.money,
     COL.money,
@@ -232,80 +241,84 @@ function StockDocumentsPrompt(props: {
       title={props.title}
       valid={dates.valid}
       onSubmit={submit}
-    >
-      <div className="flex flex-col gap-4">
-        <MultiPick
-          label={t('reports.books.prompt.docTypes')}
-          options={DOC_TYPES.map((type) => ({
-            value: type,
-            label: t(`reports.books.docTypes.${type}`),
-          }))}
-          values={types}
-          onChange={setTypes}
-        />
-        <MultiPick
-          label={t('reports.books.prompt.warehouses')}
-          options={(props.options?.warehouses ?? []).map((w) => ({
-            value: String(w.id),
-            label: `${w.code ?? ''} - ${w.name}`,
-            keys: [w.code ?? ''],
-          }))}
-          values={warehouses}
-          onChange={setWarehouses}
-        />
-        <PickedField
-          label={t('reports.books.prompt.product')}
-          htmlFor="book-product"
-          picked={product?.label ?? null}
-          onClear={() => setProduct(null)}
-        >
-          <ProductSearch
-            id="book-product"
-            className="max-w-none"
-            pickLabel={t('reports.prompt.choose')}
-            onPick={(picked) =>
-              setProduct({ id: picked.id, label: `${picked.sku} - ${picked.name}` })
-            }
+      dates={dates}
+      filters={
+        <>
+          <MultiPick
+            label={t('reports.books.prompt.docTypes')}
+            options={DOC_TYPES.map((type) => ({
+              value: type,
+              label: t(`reports.books.docTypes.${type}`),
+            }))}
+            values={types}
+            onChange={setTypes}
           />
-        </PickedField>
-        <PickedField
-          label={t('reports.books.prompt.customer')}
-          htmlFor="book-customer"
-          picked={customer ? `${customer.name} · ${customer.code}` : customerLabel}
-          onClear={() => {
-            setCustomer(null);
-            setCustomerLabel(null);
-          }}
-        >
-          <CustomerPicker id="book-customer" value={customer} onChange={setCustomer} searchFirst />
-        </PickedField>
-      </div>
-      <div className="flex flex-col gap-4">
-        <PickedField
-          label={t('reports.books.prompt.supplier')}
-          htmlFor="book-supplier"
-          picked={supplier ? `${supplier.name} · ${supplier.code}` : supplierLabel}
-          onClear={() => {
-            setSupplier(null);
-            setSupplierLabel(null);
-          }}
-        >
-          <SupplierPicker id="book-supplier" value={supplier} onChange={setSupplier} floating />
-        </PickedField>
-        <SelectField
-          id="book-author"
-          label={t('reports.books.prompt.author')}
-          value={author}
-          options={(props.options?.users ?? []).map((u) => ({
-            value: String(u.id),
-            label: u.name,
-          }))}
-          onChange={setAuthor}
-        />
-        <PrecisionField value={precision} onChange={setPrecision} />
-        <DateFields {...dates} />
-      </div>
-    </PromptDialog>
+          <MultiPick
+            label={t('reports.books.prompt.warehouses')}
+            options={(props.options?.warehouses ?? []).map((w) => ({
+              value: String(w.id),
+              label: `${w.code ?? ''} - ${w.name}`,
+              keys: [w.code ?? ''],
+            }))}
+            values={warehouses}
+            onChange={setWarehouses}
+          />
+          <PickedField
+            label={t('reports.books.prompt.product')}
+            htmlFor="book-product"
+            picked={product?.label ?? null}
+            onClear={() => setProduct(null)}
+          >
+            <ProductSearch
+              id="book-product"
+              className="max-w-none"
+              pickLabel={t('reports.prompt.choose')}
+              onPick={(picked) =>
+                setProduct({ id: picked.id, label: `${picked.sku} - ${picked.name}` })
+              }
+            />
+          </PickedField>
+          <SelectField
+            id="book-author"
+            label={t('reports.books.prompt.author')}
+            value={author}
+            options={(props.options?.users ?? []).map((u) => ({
+              value: String(u.id),
+              label: u.name,
+            }))}
+            onChange={setAuthor}
+          />
+          <PickedField
+            label={t('reports.books.prompt.customer')}
+            htmlFor="book-customer"
+            picked={customer ? `${customer.name} · ${customer.code}` : customerLabel}
+            onClear={() => {
+              setCustomer(null);
+              setCustomerLabel(null);
+            }}
+          >
+            <CustomerPicker
+              id="book-customer"
+              value={customer}
+              onChange={setCustomer}
+              searchFirst
+            />
+          </PickedField>
+          <PickedField
+            label={t('reports.books.prompt.supplier')}
+            htmlFor="book-supplier"
+            picked={supplier ? `${supplier.name} · ${supplier.code}` : supplierLabel}
+            onClear={() => {
+              setSupplier(null);
+              setSupplierLabel(null);
+            }}
+          >
+            <SupplierPicker id="book-supplier" value={supplier} onChange={setSupplier} floating />
+          </PickedField>
+        </>
+      }
+      view={<PrecisionField value={precision} onChange={setPrecision} />}
+    />
   );
 }
 
@@ -324,42 +337,65 @@ function useDescription() {
       .join(' - ');
 }
 
+function StockDocumentsHead({ values }: { values: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <TableHeader>
+      <TableRow>
+        {(['number', 'date', 'description', 'docType', 'author', 'party'] as const).map((key) => (
+          <TableHead key={key} className={key === 'party' ? GROUP_END : undefined}>
+            {t(`reports.books.columns.${key}`)}
+          </TableHead>
+        ))}
+        <TableHead className="text-right">{t('reports.books.columns.qty')}</TableHead>
+        {values ? (
+          <TableHead className="text-right">{t('reports.books.columns.cost')}</TableHead>
+        ) : null}
+        <TableHead className="text-right">{t('reports.books.columns.total')}</TableHead>
+        <TableHead className="text-right">{t('reports.books.columns.net')}</TableHead>
+      </TableRow>
+    </TableHeader>
+  );
+}
+
 function StockDocumentsTable(props: {
-  rows: readonly StockDocumentRow[];
-  totals: { inValue: string | null; outValue: string | null; total: string; net: string };
-  truncated: boolean;
+  report: {
+    rows: readonly StockDocumentRow[];
+    totals: { inValue: string | null; outValue: string | null; total: string; net: string };
+    truncated: boolean;
+  } | null;
   warehouseIds?: number[];
   precision: Precision;
+  onPrompt: () => void;
 }) {
   const { t } = useTranslation();
   const drill = useDrill();
   const describe = useDescription();
-  const values = props.totals.inValue !== null;
+  const values = props.report ? props.report.totals.inValue !== null : true;
   const span = values ? 10 : 9;
-  if (props.rows.length === 0) {
-    return <EmptyState icon={FileStack} title={t('reports.prompt.empty')} />;
+  const columns = stockDocumentColumns(values);
+  if (props.report === null) {
+    return (
+      <BookTable columns={columns}>
+        <StockDocumentsHead values={values} />
+        <SkeletonBody columns={span} />
+      </BookTable>
+    );
+  }
+  if (props.report.rows.length === 0) {
+    return (
+      <BookTable columns={columns}>
+        <StockDocumentsHead values={values} />
+        <EmptyRow colSpan={span} onPrompt={props.onPrompt} />
+      </BookTable>
+    );
   }
   const money = (value: string | null, zero = '') => amount(value, props.precision, zero);
   return (
-    <BookTable columns={stockDocumentColumns(values)}>
-      <TableHeader>
-        <TableRow>
-          {(['number', 'date', 'description', 'docType', 'author', 'party', 'qty'] as const).map(
-            (key) => (
-              <TableHead key={key} className={key === 'qty' ? 'text-right' : 'text-center'}>
-                {t(`reports.books.columns.${key}`)}
-              </TableHead>
-            ),
-          )}
-          {values ? (
-            <TableHead className="text-right">{t('reports.books.columns.cost')}</TableHead>
-          ) : null}
-          <TableHead className="text-right">{t('reports.books.columns.total')}</TableHead>
-          <TableHead className="text-right">{t('reports.books.columns.net')}</TableHead>
-        </TableRow>
-      </TableHeader>
+    <BookTable columns={columns}>
+      <StockDocumentsHead values={values} />
       <TableBody>
-        {props.rows.map((row) => {
+        {props.report.rows.map((row) => {
           const key = `${row.docType}:${row.docId}`;
           const expanded = drill.open.has(key);
           const toggle = () => drill.toggle(key);
@@ -368,11 +404,11 @@ function StockDocumentsTable(props: {
             <Fragment key={key}>
               <DrillRow expanded={expanded} onToggle={toggle}>
                 <DrillCell expanded={expanded} onToggle={toggle} text={number} />
-                <TableCell>{row.date}</TableCell>
+                <TableCell className="tabular-nums">{row.date}</TableCell>
                 <TextCell text={describe(row)} />
                 <TextCell text={t(`reports.books.docTypes.${row.docType}`)} />
                 <TextCell text={row.authorName ?? ''} />
-                <TextCell text={row.partyName ?? ''} />
+                <TextCell text={row.partyName ?? ''} className={GROUP_END} />
                 <TableCell className={NUM}>{movedQty(row)}</TableCell>
                 {values ? <TableCell className={NUM}>{money(movedValue(row))}</TableCell> : null}
                 <TableCell className={NUM}>{row.total === null ? '' : money(row.total)}</TableCell>
@@ -391,21 +427,23 @@ function StockDocumentsTable(props: {
           );
         })}
         <TotalRow labelSpan={values ? 8 : 7}>
-          <TableCell className={NUM}>{money(props.totals.total, '0')}</TableCell>
-          <TableCell className={NUM}>{money(props.totals.net, '0')}</TableCell>
+          <TableCell className={NUM}>{money(props.report.totals.total, '0')}</TableCell>
+          <TableCell className={NUM}>{money(props.report.totals.net, '0')}</TableCell>
         </TotalRow>
-        {props.truncated ? <NoteRow colSpan={span}>{t('reports.prompt.truncated')}</NoteRow> : null}
+        {props.report.truncated ? (
+          <NoteRow colSpan={span}>{t('reports.prompt.truncated')}</NoteRow>
+        ) : null}
       </TableBody>
     </BookTable>
   );
 }
 
-/** What a document moved: «7» in, «-1» out, «+2 / -2» both ways (a transfer). */
+/** What a document moved: «7» in, «−1» out, «+2 / −2» both ways (a transfer). */
 function movedQty(row: StockDocumentRow): string {
   const inQty = quantity(row.inQty);
   const outQty = quantity(row.outQty);
-  if (inQty && outQty) return `+${inQty} / -${outQty}`;
-  return inQty || (outQty ? `-${outQty}` : '');
+  if (inQty && outQty) return `+${inQty} / ${MINUS}${outQty}`;
+  return inQty || (outQty ? `${MINUS}${outQty}` : '');
 }
 
 /** The cost that moved: the incoming side, the outgoing side, the outgoing one of a transfer. */
@@ -413,7 +451,10 @@ function movedValue(row: StockDocumentRow): string | null {
   return row.outQty !== '0' ? row.outValue : row.inValue;
 }
 
-/** The products of a document; a click opens the document itself. */
+/**
+ * The products of a document — code, name and, when known, the unit cost «нэгж 5,000» — with the
+ * warehouse, the quantity and the cost; a click opens the document itself.
+ */
 function DocumentDetail(props: {
   row: StockDocumentRow;
   warehouseIds?: number[];
@@ -427,9 +468,7 @@ function DocumentDetail(props: {
     docId: props.row.docId,
     ...(props.warehouseIds?.length ? { warehouseIds: props.warehouseIds } : {}),
   });
-  if (lines.isPending) {
-    return <NoteRow colSpan={props.span}>{t('reports.prompt.loadingLines')}</NoteRow>;
-  }
+  if (lines.isPending) return <DetailSkeleton colSpan={props.span} />;
   if (lines.error) {
     return (
       <NoteRow colSpan={props.span}>
@@ -441,23 +480,27 @@ function DocumentDetail(props: {
   return (
     <>
       {lines.data.map((line) => {
-        const text = `${line.sku} - ${line.name}`;
-        const incoming = !line.qty.startsWith('-');
+        const unit =
+          props.values && line.unitCost !== null && !isZero(line.unitCost)
+            ? t('reports.books.table.unitShort', {
+                cost: amount(line.unitCost, props.precision),
+              })
+            : null;
+        const parts = detailParts(line.sku, [line.name, unit]);
         return (
-          <DetailRow key={`${line.productId}:${line.warehouseId}`} href={href} label={text}>
-            <DetailLabel text={text} colSpan={3} />
-            <TextCell text={line.warehouseName} colSpan={3} />
-            <TableCell className={NUM}>
-              {incoming ? quantity(line.qty) : `-${quantity(line.qty.slice(1))}`}
-            </TableCell>
+          <DetailRow
+            key={`${line.productId}:${line.warehouseId}`}
+            href={href}
+            label={detailText(line.sku, parts)}
+          >
+            <DetailLabel number={line.sku} parts={parts} colSpan={3} />
+            <TextCell text={line.warehouseName} colSpan={3} className={GROUP_END} />
+            <TableCell className={NUM}>{quantity(line.qty)}</TableCell>
             {props.values ? (
               <TableCell className={NUM}>{amount(line.value, props.precision)}</TableCell>
             ) : null}
-            <TableCell colSpan={2} className={NUM}>
-              {line.unitCost && props.values
-                ? `${t('reports.books.table.unitCost')}: ${amount(line.unitCost, props.precision, '0')}`
-                : ''}
-            </TableCell>
+            <TableCell />
+            <TableCell />
           </DetailRow>
         );
       })}

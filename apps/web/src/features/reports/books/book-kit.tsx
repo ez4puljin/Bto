@@ -1,9 +1,22 @@
-import { ChevronDown, ChevronRight, Download, Printer, SlidersHorizontal, X } from 'lucide-react';
-import type { FormEvent, KeyboardEvent, ReactNode } from 'react';
+import { ChevronRight, Download, Info, Printer, SlidersHorizontal, X } from 'lucide-react';
+import { businessDate, businessDateTime } from '@tugeel/shared/time';
+import { Popover } from 'radix-ui';
+import {
+  type CSSProperties,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useState,
+} from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
+import type { LucideIcon } from 'lucide-react';
 import { Combobox, type ComboboxOption } from '@/components/combobox';
 import { DialogFormFooter, FormField } from '@/components/form';
+import { EmptyState } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,8 +26,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { TableCell, TableRow } from '@/components/ui/table';
+import { Label } from '@/components/ui/label';
+import { TableBody, TableCell } from '@/components/ui/table';
 import { useAuthState } from '@/app/auth-context';
 import { useCompanyName } from '@/features/company/api';
 import { cn } from '@/lib/utils';
@@ -22,21 +37,33 @@ import { DATE } from '../report-helpers';
 import {
   BOOK_TABLE,
   type BookColumn,
+  detailParts,
+  detailText,
+  PERIOD_PRESETS,
   type Precision,
   PRECISIONS,
+  paperRem,
+  periodText,
+  presetRange,
   tableMinRem,
 } from './book-format';
 import type { usePromptDates } from './book-state';
 import { DateInput } from '@/components/date-input';
 
-/** «Тайлан авах»: Erkhet's prompt window, two columns of conditions, the dates last. */
+/**
+ * «Тайлангийн нөхцөл» (2026-11-02): the report's name as the title, then «Хугацаа» across the
+ * whole width (the dates and the usual periods), «Шүүлтүүр» in two balanced columns and
+ * «Харагдац» (precision, grouping, the switches); the content scrolls under a fixed footer.
+ */
 export function PromptDialog(props: {
   open: boolean;
   title: string;
   onOpenChange: (open: boolean) => void;
   onSubmit: () => void;
   valid: boolean;
-  children: ReactNode;
+  dates: ReturnType<typeof usePromptDates>;
+  filters: ReactNode;
+  view: ReactNode;
 }) {
   const { t } = useTranslation();
   const submit = (event: FormEvent) => {
@@ -45,13 +72,24 @@ export function PromptDialog(props: {
   };
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent size="xl">
+      <DialogContent
+        size="xl"
+        className="[&_input[data-slot=input]]:h-9 [&_select]:h-9 [&_select]:text-[0.8125rem]"
+      >
         <DialogHeader>
-          <DialogTitle>{t('reports.prompt.title')}</DialogTitle>
-          <DialogDescription>{props.title}</DialogDescription>
+          <DialogTitle>{props.title}</DialogTitle>
+          <DialogDescription>{t('reports.prompt.description')}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit} className="flex flex-col gap-4">
-          <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">{props.children}</div>
+        <form onSubmit={submit} className="flex flex-col gap-5">
+          <PromptSection title={t('reports.prompt.period')}>
+            <PeriodFields {...props.dates} />
+          </PromptSection>
+          <PromptSection title={t('reports.prompt.filterSection')}>
+            <div className="grid items-start gap-x-6 gap-y-3 sm:grid-cols-2">{props.filters}</div>
+          </PromptSection>
+          <PromptSection title={t('reports.prompt.view')}>
+            <div className="grid items-end gap-x-6 gap-y-3 sm:grid-cols-3">{props.view}</div>
+          </PromptSection>
           <DialogFormFooter
             pending={false}
             disabled={!props.valid}
@@ -64,36 +102,76 @@ export function PromptDialog(props: {
   );
 }
 
-/** «Эхний огноо» and «Эцсийн огноо». */
-export function DateFields(props: ReturnType<typeof usePromptDates>) {
-  const { t } = useTranslation();
+/** A titled part of the prompt. */
+function PromptSection({ title, children }: { title: string; children: ReactNode }) {
+  const id = useId();
   return (
-    <>
-      <FormField label={t('reports.prompt.from')} htmlFor="book-from">
-        <DateInput
-          id="book-from"
-          required
-          value={props.start}
-          onChange={(value) => props.setStart(value)}
-        />
-      </FormField>
-      <FormField
-        label={t('reports.prompt.to')}
-        htmlFor="book-to"
-        error={
-          DATE.test(props.start) && DATE.test(props.end) && props.start > props.end
-            ? t('reports.prompt.invalidRange')
-            : undefined
-        }
-      >
-        <DateInput
-          id="book-to"
-          required
-          value={props.end}
-          onChange={(value) => props.setEnd(value)}
-        />
-      </FormField>
-    </>
+    <div role="group" aria-labelledby={id} className="flex flex-col gap-2.5">
+      <h3 id={id} className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
+/** «Эхний огноо» – «Эцсийн огноо», then «Энэ сар», «Өмнөх сар», «Энэ улирал», «Энэ жил». */
+function PeriodFields(props: ReturnType<typeof usePromptDates>) {
+  const { t } = useTranslation();
+  const today = businessDate();
+  return (
+    <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
+      <div className="w-40">
+        <FormField label={t('reports.prompt.from')} htmlFor="book-from">
+          <DateInput
+            id="book-from"
+            required
+            value={props.start}
+            onChange={(value) => props.setStart(value)}
+          />
+        </FormField>
+      </div>
+      <div className="w-40">
+        <FormField
+          label={t('reports.prompt.to')}
+          htmlFor="book-to"
+          error={
+            DATE.test(props.start) && DATE.test(props.end) && props.start > props.end
+              ? t('reports.prompt.invalidRange')
+              : undefined
+          }
+        >
+          <DateInput
+            id="book-to"
+            required
+            value={props.end}
+            onChange={(value) => props.setEnd(value)}
+          />
+        </FormField>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5 sm:mt-[1.4rem]">
+        {PERIOD_PRESETS.map((preset) => {
+          const range = presetRange(preset, today);
+          const active = range.from === props.start && range.to === props.end;
+          return (
+            <Button
+              key={preset}
+              type="button"
+              size="sm"
+              variant={active ? 'secondary' : 'outline'}
+              aria-pressed={active}
+              className="h-9"
+              onClick={() => {
+                props.setStart(range.from);
+                props.setEnd(range.to);
+              }}
+            >
+              {t(`reports.prompt.presets.${preset}`)}
+            </Button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -149,6 +227,25 @@ export function SelectField(props: {
   );
 }
 
+/** A switch of the prompt's «Харагдац»: a box and its label on the controls' line. */
+export function CheckField(props: {
+  id: string;
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex h-9 items-center gap-2">
+      <Checkbox
+        id={props.id}
+        checked={props.checked}
+        onCheckedChange={(value) => props.onChange(value === true)}
+      />
+      <Label htmlFor={props.id}>{props.label}</Label>
+    </div>
+  );
+}
+
 /**
  * A pick-many field like Erkhet's tag boxes: the chosen ones as chips with ×, then a searchable
  * list to add one more (none chosen: «Бүгд»).
@@ -196,7 +293,7 @@ export function MultiPick(props: {
         onChange={(value) => {
           if (value) props.onChange([...props.values, value]);
         }}
-        className="h-10 w-full max-w-none justify-between rounded-lg border-input px-3 text-base font-normal md:text-sm"
+        className="h-9 w-full max-w-none justify-between rounded-lg border-input px-3 text-[0.8125rem] font-normal"
       />
     </div>
   );
@@ -216,7 +313,7 @@ export function PickedField(props: {
       {props.picked ? (
         <div className="flex gap-2">
           <Input id={props.htmlFor} readOnly value={props.picked} />
-          <Button type="button" variant="outline" onClick={props.onClear}>
+          <Button type="button" variant="outline" className="h-9" onClick={props.onClear}>
             {t('reports.prompt.change')}
           </Button>
         </div>
@@ -227,23 +324,49 @@ export function PickedField(props: {
   );
 }
 
-/** The report's buttons: «Нөхцөл» (the prompt), «Excel» and «Хэвлэх». */
+/**
+ * The report's buttons: ⓘ (how to read the paper), «Excel», «Хэвлэх» and the main one, the
+ * prompt, named by the period it shows («Нөхцөл» before the first run).
+ */
 export function BookActions(props: {
   onPrompt: () => void;
   onExcel?: () => void;
   excelPending?: boolean;
+  /** The report is on screen (Excel and print have something to take). */
   ready: boolean;
+  period: { from: string; to: string } | null;
 }) {
   const { t } = useTranslation();
+  const period = props.period ? periodText(props.period.from, props.period.to) : null;
   return (
     <>
-      <Button variant="outline" onClick={props.onPrompt}>
-        <SlidersHorizontal />
-        {t('reports.prompt.conditions')}
-      </Button>
+      <Popover.Root>
+        <Popover.Trigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground"
+            aria-label={t('reports.prompt.help')}
+            title={t('reports.prompt.help')}
+          >
+            <Info />
+          </Button>
+        </Popover.Trigger>
+        <Popover.Portal>
+          <Popover.Content
+            align="end"
+            sideOffset={6}
+            collisionPadding={8}
+            className="z-50 w-80 rounded-xl border border-border bg-popover p-3 text-[0.8125rem] leading-relaxed text-popover-foreground shadow-popover"
+          >
+            {t('reports.prompt.drillHint')}
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
       {props.onExcel ? (
         <Button
           variant="outline"
+          size="sm"
           disabled={!props.ready || props.excelPending}
           onClick={props.onExcel}
         >
@@ -251,9 +374,18 @@ export function BookActions(props: {
           {t('reports.common.excel')}
         </Button>
       ) : null}
-      <Button variant="outline" disabled={!props.ready} onClick={() => window.print()}>
+      <Button variant="outline" size="sm" disabled={!props.ready} onClick={() => window.print()}>
         <Printer />
         {t('reports.prompt.print')}
+      </Button>
+      <Button
+        size="sm"
+        onClick={props.onPrompt}
+        aria-label={period ? t('reports.prompt.conditionsOf', { period }) : undefined}
+        title={period ? t('reports.prompt.conditionsOf', { period }) : undefined}
+      >
+        <SlidersHorizontal />
+        <span className="tabular-nums">{period ?? t('reports.prompt.conditions')}</span>
       </Button>
     </>
   );
@@ -261,78 +393,159 @@ export function BookActions(props: {
 
 /**
  * A report's column (2026-11-01): the page header and the paper share one width, sized to the
- * paper's table and centred, so the buttons line up with the paper's right edge; `null` runs the
- * whole width. Paper pages are the exception to "pages sit at the left" (docs/ui.md §4).
+ * paper's table (narrower below 1600px) and centred, so the buttons line up with the paper's right
+ * edge; `null` runs the whole width. Paper pages are the exception to "pages sit at the left"
+ * (docs/ui.md §4).
  */
-export function BookPage({ width, children }: { width: number | null; children: ReactNode }) {
+export function BookPage({
+  columns,
+  children,
+}: {
+  columns: readonly BookColumn[] | null;
+  children: ReactNode;
+}) {
+  const style =
+    columns === null
+      ? undefined
+      : ({
+          '--paper': `${paperRem(columns)}rem`,
+          '--paper-compact': `${paperRem(columns, true)}rem`,
+        } as CSSProperties);
   return (
     <div
-      className="mx-auto w-full print:max-w-none!"
-      style={width === null ? undefined : { maxWidth: `${width}rem` }}
+      className={cn(
+        'mx-auto w-full print:max-w-none!',
+        columns !== null && 'max-w-(--paper) max-[1600px]:max-w-(--paper-compact)',
+      )}
+      style={style}
     >
       {children}
     </div>
   );
 }
 
+/** The time a paper is printed, set again just before each print (Ulaanbaatar). */
+function usePrintedAt(): string {
+  const [at, setAt] = useState(() => businessDateTime(new Date()));
+  useEffect(() => {
+    const before = () => flushSync(() => setAt(businessDateTime(new Date())));
+    window.addEventListener('beforeprint', before);
+    return () => window.removeEventListener('beforeprint', before);
+  }, []);
+  return at;
+}
+
 /**
- * The report's paper as Erkhet draws it: the title in the middle, the company on the left with
- * its note, the period on the right «(төгрөгөөр)», the conditions, the table in one scroll box
- * with its head in view, the hint, and the lines to sign. `orientation` is the printed A4 sheet's.
+ * The report's paper as Erkhet draws it: the title in the middle (the page's heading), the company
+ * on the left with its note, the period on the right «(төгрөгөөр)» (and on paper the time it was
+ * printed), the conditions, then ONE scroll box with the table — its head and first column in
+ * view — and the lines to sign; the paper never runs past the window, so the box is the only thing
+ * that scrolls. Without a `period` it is the blank paper before the first run.
+ * `orientation` is the printed A4 sheet's, numbered «1 / 3» at the foot.
  */
 export function BookSheet(props: {
   title: string;
-  from: string;
-  to: string;
+  period: { from: string; to: string } | null;
   filters: readonly string[];
   orientation: 'portrait' | 'landscape';
+  loading?: boolean;
   children: ReactNode;
   footer?: ReactNode;
 }) {
   const { t } = useTranslation();
   const company = useCompanyName();
   const auth = useAuthState();
+  const printedAt = usePrintedAt();
   const me = auth.status === 'authenticated' ? auth.me.fullName : '';
   const filters = props.filters.join(', ');
   return (
-    <section className="rounded-xl bg-card px-5 py-6 shadow-card ring-1 ring-black/[0.06] md:px-8 md:py-8 2xl:px-10 print:rounded-none print:p-0 print:shadow-none print:ring-0">
-      <style media="print">{`@page{size:A4 ${props.orientation};margin:10mm 8mm}`}</style>
-      <h2 className="mb-4 text-center text-[1.25rem] font-semibold tracking-tight">
+    <section className="flex max-h-[calc(100dvh-10rem)] flex-col rounded-xl bg-card px-4 pt-6 pb-4 shadow-card ring-1 ring-black/[0.06] min-[1600px]:px-8 min-[1600px]:pb-6 print:block print:max-h-none print:rounded-none print:p-0 print:shadow-none print:ring-0">
+      <style media="print">{`@page{size:A4 ${props.orientation};margin:10mm 8mm 12mm;@bottom-right{content:counter(page) " / " counter(pages);font-size:8pt}}`}</style>
+      <h1 className="mb-3 text-center text-[1.25rem] leading-tight font-semibold tracking-tight text-balance">
         {props.title}
-      </h2>
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-3 text-[0.8125rem]">
-        <div className="text-center">
-          <p className="min-w-56 border-b border-foreground/70 px-4 font-semibold">{company}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{t('reports.prompt.companyNote')}</p>
+      </h1>
+      {props.period ? (
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3 text-[0.8125rem]">
+          <div className="text-center">
+            <p className="min-w-56 border-b border-foreground/70 px-4 font-semibold">{company}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {t('reports.prompt.companyNote')}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="tabular-nums">{periodText(props.period.from, props.period.to)}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {t('reports.prompt.currencyNote')}
+            </p>
+            <p className="mt-0.5 hidden text-xs tabular-nums print:block">
+              {t('reports.prompt.printedAt', { at: printedAt })}
+            </p>
+          </div>
         </div>
-        <div className="text-right">
-          <p className="tabular-nums">{`${props.from.replaceAll('-', '/')} - ${props.to.replaceAll('-', '/')}`}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{t('reports.prompt.currencyNote')}</p>
-        </div>
-      </div>
-      {filters ? (
+      ) : null}
+      {props.period && filters ? (
         <p className="mb-3 truncate text-[0.8125rem] print:whitespace-normal" title={filters}>
           <span className="text-muted-foreground">{t('reports.prompt.filters')}</span> {filters}
         </p>
       ) : null}
-      <div className="max-h-[calc(100dvh-10rem)] overflow-auto print:max-h-none print:overflow-visible">
+      {props.loading ? (
+        <p role="status" className="sr-only">
+          {t('reports.prompt.loading')}
+        </p>
+      ) : null}
+      <div className="min-h-0 flex-1 overflow-auto [scrollbar-width:thin] print:overflow-visible">
         {props.children}
-      </div>
-      <p className="mt-2 text-xs text-muted-foreground print:hidden">
-        {t('reports.prompt.drillHint')}
-      </p>
-      {props.footer}
-      <div className="mt-10 grid gap-3 pl-[15%] text-[0.8125rem] break-inside-avoid">
-        <p>{t('reports.prompt.preparedBy', { name: me })}</p>
-        <p>{t('reports.prompt.reviewedBy')}</p>
+        {props.footer}
+        {props.period ? (
+          <div className="mt-12 grid grid-cols-2 gap-x-16 pb-1 text-[0.8125rem] break-inside-avoid">
+            <Signature label={t('reports.prompt.preparedBy')} name={me} />
+            <Signature label={t('reports.prompt.reviewedBy')} />
+          </div>
+        ) : null}
       </div>
     </section>
   );
 }
 
+/** A line to sign: its label, a ruled blank and the name under /…/ when known. */
+function Signature(props: { label: string; name?: string }) {
+  return (
+    <p className="flex min-w-0 flex-wrap items-end gap-x-2 gap-y-1">
+      <span>{props.label}</span>
+      <span aria-hidden className="inline-block h-4 w-44 border-b border-foreground/60" />
+      {props.name ? <span className="text-muted-foreground">{`/${props.name}/`}</span> : null}
+    </p>
+  );
+}
+
+/** The blank paper before the first run: what to do and «Нөхцөл оруулах». */
+export function BookBlank(props: {
+  title: string;
+  icon: LucideIcon;
+  orientation: 'portrait' | 'landscape';
+  onPrompt: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <BookSheet title={props.title} period={null} filters={[]} orientation={props.orientation}>
+      <EmptyState
+        icon={props.icon}
+        title={t('reports.prompt.waiting')}
+        action={
+          <Button size="sm" onClick={props.onPrompt}>
+            <SlidersHorizontal />
+            {t('reports.prompt.start')}
+          </Button>
+        }
+      />
+    </BookSheet>
+  );
+}
+
 /**
  * The paper's table without the shadcn wrapper's own scroll box (the sheet holds the one box, so
- * the head sticks): fixed columns from `columns`, never narrower than their least widths.
+ * the head sticks): fixed columns from `columns` (narrower below 1600px), never narrower than
+ * their least widths.
  */
 export function BookTable({
   columns,
@@ -344,19 +557,49 @@ export function BookTable({
   return (
     <table
       data-slot="table"
-      className={cn(BOOK_TABLE, 'print:min-w-0!')}
-      style={{ minWidth: `${tableMinRem(columns)}rem` }}
+      className={cn(
+        BOOK_TABLE,
+        'min-w-(--table-min) max-[1600px]:min-w-(--table-min-compact) print:min-w-0!',
+      )}
+      style={
+        {
+          '--table-min': `${tableMinRem(columns)}rem`,
+          '--table-min-compact': `${tableMinRem(columns, true)}rem`,
+        } as CSSProperties
+      }
     >
       <colgroup>
-        {columns.map((column, index) => (
-          <col
-            key={index}
-            style={typeof column === 'number' ? { width: `${column}rem` } : undefined}
-          />
-        ))}
+        {columns.map((column, index) =>
+          'rem' in column ? (
+            <col
+              key={index}
+              className="w-(--col) max-[1600px]:w-(--col-compact)"
+              style={
+                {
+                  '--col': `${column.rem}rem`,
+                  '--col-compact': `${column.compact}rem`,
+                } as CSSProperties
+              }
+            />
+          ) : (
+            <col key={index} />
+          ),
+        )}
       </colgroup>
       {children}
     </table>
+  );
+}
+
+/** A head cell's label with its qualifier on a second, lighter line («Борлуулалт / НӨАТ-гүй»). */
+export function HeadLabel({ label, note }: { label: string; note: string }) {
+  return (
+    <>
+      {label}
+      <span className="block text-xs font-normal text-muted-foreground print:text-foreground">
+        {note}
+      </span>
+    </>
   );
 }
 
@@ -373,26 +616,49 @@ export function TextCell(props: { text: string; colSpan?: number; className?: st
   );
 }
 
-/** A group's row (an account, a warehouse, a category): its sums with «0». */
-export function GroupRow({ children }: { children: ReactNode }) {
-  return <TableRow className="bg-muted/50 font-semibold hover:bg-muted/50">{children}</TableRow>;
-}
+/** A body row's opaque ground (the sticky first cell takes it over). */
+const ITEM_ROW = 'bg-card';
 
-/** «НИЙТ ДҮН»: a heavier rule above, its label on the left across `labelSpan` columns. */
-export function TotalRow({ labelSpan, children }: { labelSpan: number; children: ReactNode }) {
-  const { t } = useTranslation();
+/** A group's row (an account, a warehouse, a category): bold under a darker rule, with «0». */
+export function GroupRow({ children }: { children: ReactNode }) {
   return (
-    <TableRow className="bg-muted/60 font-semibold hover:bg-muted/60 [&>td]:border-t-2 [&>td]:border-t-foreground/70!">
-      <TableCell colSpan={labelSpan}>{t('reports.prompt.total')}</TableCell>
+    <tr
+      data-slot="table-row"
+      className={cn(
+        ITEM_ROW,
+        'font-semibold text-foreground [&>td]:border-t [&>td]:border-t-foreground/25 [&>td]:pt-2! print:break-after-avoid',
+      )}
+    >
       {children}
-    </TableRow>
+    </tr>
   );
 }
 
-/** A row that opens its detail on a click of ▸, a double click or Enter. */
+/** «НИЙТ ДҮН»: a rule above, a double rule below (the accountant's), its label across `labelSpan`. */
+export function TotalRow({ labelSpan, children }: { labelSpan: number; children: ReactNode }) {
+  const { t } = useTranslation();
+  return (
+    <tr
+      data-slot="table-row"
+      className={cn(
+        ITEM_ROW,
+        'font-semibold text-foreground [&>td]:border-t [&>td]:border-t-foreground [&>td]:border-b-[3px]! [&>td]:border-b-foreground! [&>td]:[border-bottom-style:double] print:break-before-avoid',
+      )}
+    >
+      <TableCell colSpan={labelSpan}>{t('reports.prompt.total')}</TableCell>
+      {children}
+    </tr>
+  );
+}
+
+/**
+ * A row that opens its detail on a click of ▸, a double click or Enter; only an open row is
+ * tinted. `drillable={false}` (nothing moved in the period) is a plain row.
+ */
 export function DrillRow(props: {
   expanded: boolean;
   onToggle: () => void;
+  drillable?: boolean;
   className?: string;
   children: ReactNode;
 }) {
@@ -403,48 +669,62 @@ export function DrillRow(props: {
       props.onToggle();
     }
   };
+  if (props.drillable === false) {
+    return (
+      <tr data-slot="table-row" className={cn(ITEM_ROW, props.className)}>
+        {props.children}
+      </tr>
+    );
+  }
   return (
-    <TableRow
+    <tr
+      data-slot="table-row"
       tabIndex={0}
       aria-expanded={props.expanded}
       onDoubleClick={props.onToggle}
       onKeyDown={onKeyDown}
       className={cn(
-        'cursor-default select-none hover:bg-accent/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+        ITEM_ROW,
+        'cursor-default select-none hover:bg-[color-mix(in_oklab,var(--color-accent)_55%,var(--color-card))] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring aria-expanded:bg-accent',
         props.className,
       )}
     >
       {props.children}
-    </TableRow>
+    </tr>
   );
 }
 
-/** A drillable row's first cell: ▸ / ▾ then its code or number on one line («…» when cut). */
+/** A drillable row's first cell: ▸ (turning ▾ when open) then its code or number («…» when cut). */
 export function DrillCell(props: {
   expanded: boolean;
   onToggle: () => void;
   text: string;
   /** What the button names when the text is empty (a row without a code). */
   name?: string;
+  /** False when the row has no lines: an empty slot keeps the codes in line. */
+  drillable?: boolean;
 }) {
   return (
     <TableCell title={props.text || undefined}>
       <span className="flex min-w-0 items-center">
-        <DrillMark
-          expanded={props.expanded}
-          onToggle={props.onToggle}
-          name={props.name ?? props.text}
-        />
+        {props.drillable === false ? (
+          <span aria-hidden className="mr-1 size-5 shrink-0 print:hidden" />
+        ) : (
+          <DrillMark
+            expanded={props.expanded}
+            onToggle={props.onToggle}
+            name={props.name ?? props.text}
+          />
+        )}
         <span className="min-w-0 truncate print:whitespace-normal">{props.text}</span>
       </span>
     </TableCell>
   );
 }
 
-/** ▸ / ▾ before a drillable row's first text: a button opening the row on one click. */
+/** ▸ before a drillable row's first text, turning a quarter when open: opens the row on one click. */
 function DrillMark(props: { expanded: boolean; onToggle: () => void; name: string }) {
   const { t } = useTranslation();
-  const Icon = props.expanded ? ChevronDown : ChevronRight;
   const label = t(props.expanded ? 'reports.prompt.closeLines' : 'reports.prompt.openLines', {
     name: props.name,
   });
@@ -461,19 +741,30 @@ function DrillMark(props: { expanded: boolean; onToggle: () => void; name: strin
       onDoubleClick={(event) => event.stopPropagation()}
       className="-my-0.5 mr-1 grid size-5 shrink-0 place-items-center rounded text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring print:hidden"
     >
-      <Icon aria-hidden className="size-3.5" />
+      <ChevronRight
+        aria-hidden
+        className={cn(
+          'size-3.5 transition-transform duration-150 motion-reduce:transition-none',
+          props.expanded && 'rotate-90',
+        )}
+      />
     </button>
   );
 }
 
-/** A detail row: small, italic and lighter, like Erkhet's; a click opens the document behind it. */
+/** The ground of a detail row: a light tint with a blue mark at its start. */
+const DETAIL_ROW =
+  'bg-[color-mix(in_oklab,var(--color-muted)_45%,var(--color-card))] text-xs text-muted-foreground [&>td:first-child]:shadow-[inset_2px_0_0_var(--color-primary)]';
+
+/** A detail row: small and lighter under the row it opened; a click opens the document behind it. */
 export function DetailRow(props: { href: string | null; label: string; children: ReactNode }) {
   const navigate = useNavigate();
   const open = () => {
     if (props.href) void navigate(props.href);
   };
   return (
-    <TableRow
+    <tr
+      data-slot="table-row"
       role={props.href ? 'link' : undefined}
       aria-label={props.label}
       tabIndex={props.href ? 0 : undefined}
@@ -482,31 +773,112 @@ export function DetailRow(props: { href: string | null; label: string; children:
         if (event.key === 'Enter') open();
       }}
       className={cn(
-        'text-xs text-muted-foreground italic hover:bg-transparent [&>td]:border-border/60!',
+        DETAIL_ROW,
         props.href &&
-          'cursor-pointer hover:bg-accent/60 hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+          'group/detail cursor-pointer hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
       )}
     >
       {props.children}
-    </TableRow>
+    </tr>
   );
 }
 
-/** A detail row's label: left, indented under the row it opened, on one line. */
-export function DetailLabel(props: { text: string; colSpan: number }) {
-  return <TextCell text={props.text} colSpan={props.colSpan} className="pl-8!" />;
+/**
+ * A detail row's label, indented under the row it opened, on one line: the document's number in
+ * blue (underlined on hover), then date · type · party muted, joined with « · »; a part equal to
+ * the number or to one of `omit` (the group's or the row's own name) is left out.
+ */
+export function DetailLabel(props: {
+  number: string | null;
+  parts: readonly (string | null | undefined)[];
+  omit?: readonly (string | null | undefined)[];
+  colSpan: number;
+}) {
+  const parts = detailParts(props.number, props.parts, props.omit);
+  const text = detailText(props.number, parts);
+  return (
+    <TableCell
+      colSpan={props.colSpan}
+      title={text || undefined}
+      className="truncate pl-8! print:overflow-visible print:whitespace-normal"
+    >
+      {props.number ? (
+        <span className="text-primary tabular-nums group-hover/detail:underline print:text-foreground">
+          {props.number}
+        </span>
+      ) : null}
+      {parts.length > 0 ? `${props.number ? ' · ' : ''}${parts.join(' · ')}` : null}
+    </TableCell>
+  );
 }
 
-/** A full-width message row inside the table (loading, nothing, too many). */
+/** A full-width message row inside the table (nothing, too many). */
 export function NoteRow({ colSpan, children }: { colSpan: number; children: ReactNode }) {
   return (
-    <TableRow className="hover:bg-transparent">
-      <TableCell
-        colSpan={colSpan}
-        className="text-center whitespace-normal! text-muted-foreground italic"
-      >
+    <tr data-slot="table-row" className={ITEM_ROW}>
+      <TableCell colSpan={colSpan} className="text-center whitespace-normal! text-muted-foreground">
         {children}
       </TableCell>
-    </TableRow>
+    </tr>
+  );
+}
+
+/** The one row of an empty result: «Энэ нөхцөлд мөр алга» and «Нөхцөл өөрчлөх». */
+export function EmptyRow({ colSpan, onPrompt }: { colSpan: number; onPrompt: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <TableBody>
+      <tr data-slot="table-row" className={ITEM_ROW}>
+        <TableCell colSpan={colSpan} className="py-6! text-center whitespace-normal!">
+          <span className="text-muted-foreground">{t('reports.prompt.empty')}</span>
+          <Button variant="link" size="sm" className="ml-2 h-auto px-1" onClick={onPrompt}>
+            {t('reports.prompt.changeConditions')}
+          </Button>
+        </TableCell>
+      </tr>
+    </TableBody>
+  );
+}
+
+/** Placeholder rows while a report loads, under its real head. */
+export function SkeletonBody({ columns, rows = 8 }: { columns: number; rows?: number }) {
+  return (
+    <TableBody aria-hidden>
+      {Array.from({ length: rows }, (_, row) => (
+        <tr key={row} className={ITEM_ROW}>
+          {Array.from({ length: columns }, (_, column) => (
+            <td key={column}>
+              <div
+                className={cn(
+                  'my-0.5 h-3 animate-pulse rounded bg-fill',
+                  column === 0 ? 'w-3/4' : column === 1 ? 'w-5/6' : 'ml-auto w-1/2',
+                )}
+              />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </TableBody>
+  );
+}
+
+/** Two placeholder lines under a row while its detail loads. */
+export function DetailSkeleton({ colSpan }: { colSpan: number }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      {['w-1/3', 'w-1/4'].map((width, index) => (
+        <tr key={width} className={DETAIL_ROW}>
+          <td colSpan={colSpan} className="pl-8!">
+            {index === 0 ? (
+              <span role="status" className="sr-only">
+                {t('reports.prompt.loadingLines')}
+              </span>
+            ) : null}
+            <div aria-hidden className={cn('my-0.5 h-2.5 animate-pulse rounded bg-fill', width)} />
+          </td>
+        </tr>
+      ))}
+    </>
   );
 }

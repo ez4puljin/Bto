@@ -20,6 +20,8 @@ export interface Crumb {
  * one-line `description` and the actions.
  * The current page is never a crumb and a crumb that repeats the next one or the title is dropped,
  * so the title text appears once. Also names the browser tab «Title · Bto».
+ * `compact` (the reports' paper pages, whose paper carries the visible title as the page's h1):
+ * one row of the breadcrumb with ☆ and the actions; the title only names the tab.
  */
 export function PageHeader({
   title,
@@ -28,6 +30,7 @@ export function PageHeader({
   media,
   description,
   crumbs = [],
+  compact = false,
 }: {
   title: string;
   meta?: ReactNode;
@@ -37,6 +40,8 @@ export function PageHeader({
   /** A picture beside the title (a product's photo). */
   media?: ReactNode;
   crumbs?: readonly Crumb[];
+  /** The breadcrumb and the actions on one row, no visible title (the page shows its own). */
+  compact?: boolean;
 }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
@@ -70,6 +75,29 @@ export function PageHeader({
       )}
     </li>
   ));
+
+  if (compact) {
+    const listClass = 'flex flex-wrap items-center gap-1 text-[0.8125rem] text-muted-foreground';
+    return (
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex min-w-0 items-center gap-1 print:hidden">
+          {shown.length > 0 ? (
+            linked ? (
+              <nav aria-label={t('shell.breadcrumb')}>
+                <ol className={listClass}>{items}</ol>
+              </nav>
+            ) : (
+              <ol className={listClass}>{items}</ol>
+            )
+          ) : null}
+          {trail?.exact ? <FavoriteToggle path={trail.item.to} /> : null}
+        </div>
+        {actions ? (
+          <div className="flex flex-wrap items-center gap-2 print:hidden">{actions}</div>
+        ) : null}
+      </div>
+    );
+  }
 
   // The actions sit on the title's line (ADR-0066), whatever lines follow the title.
   return (
