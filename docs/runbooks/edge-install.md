@@ -1,5 +1,7 @@
 # Runbook: installing the store edge on a new PC — Windows or Ubuntu (ADR-0067, ADR-0136)
 
+Mongolian version with the update steps: [edge-install.mn.md](edge-install.mn.md).
+
 The store edge (`deploy/edge/docker-compose.edge.yml`: `edge-db`, `edge`, `kiosk`) runs in Docker, so the PC needs only Docker and git — no Node or pnpm. A setup script writes `deploy/edge/.env` with fresh local secrets and starts the edge; the edge is then linked to the centre from its own kiosk page with a one-time code. Nobody copies a token or the PIN key by hand.
 
 Until the centre goes live (S5, ADR-0026) the centre is the owner's dev server (`start.bat` on the owner's PC: `http://192.168.1.215:5173` or the api at `:3300`). This is a test setup: the scripts set `EBARIMT_PROVIDER=fake` and nothing reaches the tax office until the owner says otherwise.
