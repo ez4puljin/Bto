@@ -307,6 +307,14 @@ export function usePosMutations() {
         unwrap(await api.POST('/api/v1/pos/edge-nodes/{id}/token', { params: { path: { id } } })),
       onSuccess: () => refresh(POS_KEYS.nodes),
     }),
+    /** ADR-0136: a one-time code a new edge links with from its kiosk. */
+    linkCode: useMutation({
+      mutationFn: async (id: number) =>
+        unwrap(
+          await api.POST('/api/v1/pos/edge-nodes/{id}/link-code', { params: { path: { id } } }),
+        ),
+      onSuccess: () => refresh(POS_KEYS.nodes),
+    }),
     createTill: useMutation({
       mutationFn: async (body: TillRequest) =>
         unwrap(await api.POST('/api/v1/pos/tills', { body })),

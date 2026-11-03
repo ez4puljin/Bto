@@ -11,7 +11,7 @@ import { isPin } from '@tugeel/shared/pos';
 import { verify } from 'argon2';
 import { eq } from 'drizzle-orm';
 import { AppError } from '../../common/errors/app-error';
-import { EdgeConfig } from '../config/edge-env';
+import { EdgeLinkService } from './edge-link.service';
 import { EDGE_DB, type EdgeDb } from '../db/edge-db';
 import { edgePinAttempts } from '../db/schema';
 import type { BoundDevice } from './devices.service';
@@ -38,16 +38,12 @@ const LOCK_MS = 60_000;
  */
 @Injectable()
 export class KioskAuthService {
-  private readonly pepper: Buffer;
-
   constructor(
     @Inject(EDGE_DB) private readonly db: EdgeDb,
-    config: EdgeConfig,
+    private readonly link: EdgeLinkService,
     private readonly store: SnapshotStore,
     private readonly jwt: JwtService,
-  ) {
-    this.pepper = Buffer.from(config.get('POS_PIN_PEPPER'));
-  }
+  ) {}
 
   /** The till's sign-in list: active cashiers with a PIN, by name — the till's own when it has a list (ADR-0124). */
   cashiers(tillCode?: string): { userId: number; fullName: string }[] {
@@ -159,7 +155,7 @@ export class KioskAuthService {
     }
     const ok =
       isPin(pin) &&
-      (await verify(cashier.pinHash, pin, { secret: this.pepper }).catch(() => false));
+      (await verify(cashier.pinHash, pin, { secret: this.link.pinKey() }).catch(() => false));
     if (!ok) {
       const failed = (attempts?.failedCount ?? 0) + 1;
       const lock = failed >= MAX_FAILURES;

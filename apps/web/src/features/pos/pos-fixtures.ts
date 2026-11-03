@@ -24,6 +24,7 @@ export const NODE: Schemas['PosEdgeNode'] = {
   posapiLeftLotteries: 12000,
   posapiCheckedAt: STAMP,
   posapiError: null,
+  linkExpiresAt: null,
   status: 'ACTIVE',
   createdAt: STAMP,
   updatedAt: STAMP,

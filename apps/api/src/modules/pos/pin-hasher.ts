@@ -15,10 +15,14 @@ const TEST: HashOptions = { type: argon2id, memoryCost: 4_096, timeCost: 1, para
 @Injectable()
 export class PinHasher implements OnModuleInit {
   private readonly options: HashOptions;
+  /** The key an edge needs (ADR-0136): POS_PIN_PEPPER, AUTH_PEPPER only outside production. */
+  private readonly edgeKey: string | null;
   private dummyHash = '';
 
   constructor(config: AppConfig) {
-    const pepper = config.get('POS_PIN_PEPPER') ?? config.require('AUTH_PEPPER');
+    const own = config.get('POS_PIN_PEPPER');
+    const pepper = own ?? config.require('AUTH_PEPPER');
+    this.edgeKey = own ?? (config.get('NODE_ENV') === 'production' ? null : pepper);
     this.options =
       config.get('NODE_ENV') === 'test'
         ? { ...TEST, secret: Buffer.from(pepper) }
@@ -27,6 +31,14 @@ export class PinHasher implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     this.dummyHash = await this.hash(randomBytes(8).toString('hex'));
+  }
+
+  /**
+   * The PIN key a linked edge checks the hashes with; null in production without POS_PIN_PEPPER,
+   * where the staff's AUTH_PEPPER is never handed out.
+   */
+  sharedKey(): string | null {
+    return this.edgeKey;
   }
 
   hash(pin: string): Promise<string> {

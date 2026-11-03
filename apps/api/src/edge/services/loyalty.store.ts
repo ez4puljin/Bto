@@ -15,7 +15,7 @@ import {
 import { verify } from 'argon2';
 import { and, eq, gt, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { AppError } from '../../common/errors/app-error';
-import { EdgeConfig } from '../config/edge-env';
+import { EdgeLinkService } from './edge-link.service';
 import { EDGE_DB, type EdgeDb, type EdgeTx } from '../db/edge-db';
 import { edgeMemberPinAttempts, edgeOutbox, edgeSales, edgeState } from '../db/schema';
 
@@ -49,14 +49,11 @@ export class LoyaltyStore implements OnModuleInit {
   private feed: PosLoyaltyFeed | null = null;
   private byPhone = new Map<string, PosLoyaltyMemberFacts>();
   private byId = new Map<number, PosLoyaltyMemberFacts>();
-  private readonly pepper: Buffer;
 
   constructor(
     @Inject(EDGE_DB) private readonly db: EdgeDb,
-    config: EdgeConfig,
-  ) {
-    this.pepper = Buffer.from(config.get('POS_PIN_PEPPER'));
-  }
+    private readonly link: EdgeLinkService,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     const [row] = await this.db
@@ -177,7 +174,7 @@ export class LoyaltyStore implements OnModuleInit {
     const ok =
       typeof pin === 'string' &&
       isMemberPin(pin) &&
-      (await verify(member.pinHash, pin, { secret: this.pepper }).catch(() => false));
+      (await verify(member.pinHash, pin, { secret: this.link.pinKey() }).catch(() => false));
     if (ok) {
       if (attempts) {
         await this.db.delete(edgeMemberPinAttempts).where(eq(edgeMemberPinAttempts.memberId, id));

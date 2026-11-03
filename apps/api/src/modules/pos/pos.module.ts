@@ -8,6 +8,7 @@ import { PricingModule } from '../pricing';
 import { SalesModule } from '../sales';
 import {
   PosCashiersController,
+  PosEdgeLinkController,
   PosEdgeNodesController,
   PosPaymentTypesController,
   PosQuickButtonsController,
@@ -100,6 +101,7 @@ export class PosModule {}
   imports: [PosModule],
   controllers: [
     PosSettingsController,
+    PosEdgeLinkController,
     PosEdgeNodesController,
     PosTillsController,
     PosCashiersController,

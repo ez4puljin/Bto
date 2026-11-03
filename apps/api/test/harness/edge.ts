@@ -35,7 +35,8 @@ export async function edgeDatabase(): Promise<string> {
 export async function createEdgeApp(options: {
   databaseUrl: string;
   centralUrl: string;
-  nodeToken: string;
+  /** Absent: the edge starts unlinked and the kiosk links it with a code (ADR-0136). */
+  nodeToken?: string;
   /** ADR-0065: the store PosAPI and the taxpayer lookup (fakes the test runs); absent = fake receipts. */
   ebarimt?: { posapiUrl: string; lookupUrl: string; timeoutMs?: number };
 }): Promise<NestExpressApplication> {
@@ -52,10 +53,15 @@ export async function createEdgeApp(options: {
     delete process.env.POSAPI_TIMEOUT_MS;
   }
   process.env.EDGE_DATABASE_URL = options.databaseUrl;
-  process.env.CENTRAL_API_URL = options.centralUrl;
-  process.env.EDGE_NODE_TOKEN = options.nodeToken;
+  if (options.nodeToken) {
+    process.env.CENTRAL_API_URL = options.centralUrl;
+    process.env.EDGE_NODE_TOKEN = options.nodeToken;
+    process.env.POS_PIN_PEPPER = process.env.POS_PIN_PEPPER ?? process.env.AUTH_PEPPER;
+  } else {
+    delete process.env.CENTRAL_API_URL;
+    delete process.env.EDGE_NODE_TOKEN;
+  }
   process.env.EDGE_JWT_SECRET = 'test-edge-session-key-0123456789abcdef';
-  process.env.POS_PIN_PEPPER = process.env.POS_PIN_PEPPER ?? process.env.AUTH_PEPPER;
   process.env.EDGE_TIMERS = 'false';
   process.env.EDGE_PORT = '0';
   const moduleRef = await Test.createTestingModule({ imports: [EdgeModule.forRoot()] }).compile();

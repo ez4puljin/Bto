@@ -173,6 +173,13 @@ export class EdgeNodeDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   posapiCheckedAt: string | null;
   @ApiProperty({ type: String, nullable: true }) posapiError: string | null;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'ADR-0136: a link code is in force until then',
+  })
+  linkExpiresAt: string | null;
   @ApiProperty({ enum: POS_STATUSES }) status: PosStatus;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt: string;
@@ -212,6 +219,30 @@ export class EdgeNodePatchDto {
 export class EdgeTokenDto {
   @ApiProperty({ description: 'Shown once; the edge keeps it in its environment' }) token: string;
   @ApiProperty() prefix: string;
+}
+
+@ApiSchema({ name: 'PosEdgeLinkCode' })
+export class EdgeLinkCodeDto {
+  @ApiProperty({ example: 'K7PQ-X9MA', description: 'Shown once (ADR-0136)' }) code: string;
+  @ApiProperty({ type: String, format: 'date-time' }) expiresAt: string;
+}
+
+/** ADR-0136: what a new edge sends with the admin's code. */
+@ApiSchema({ name: 'PosEdgeLinkRequest' })
+export class EdgeLinkRequestDto {
+  @ApiProperty({ example: 'MRN1' }) @IsString() @MaxLength(16) nodeCode: string;
+  @ApiProperty({ example: 'K7PQ-X9MA' }) @IsString() @MaxLength(16) linkCode: string;
+}
+
+@ApiSchema({ name: 'PosEdgeLinkResponse' })
+export class EdgeLinkResponseDto {
+  @ApiProperty() nodeId: number;
+  @ApiProperty() nodeCode: string;
+  @ApiProperty() nodeName: string;
+  @ApiProperty({ type: String, nullable: true }) warehouseName: string | null;
+  @ApiProperty({ description: 'The node token; the edge keeps it in its own database' })
+  token: string;
+  @ApiProperty({ description: "The PIN key the tills' hashes were made with" }) pinPepper: string;
 }
 
 // ---------------------------------------------------------------- tills

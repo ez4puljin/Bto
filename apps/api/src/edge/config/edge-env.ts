@@ -19,14 +19,27 @@ export const EdgeEnvSchema = z.object({
   EDGE_PORT: z.coerce.number().int().min(0).max(65_535).default(3400),
   EDGE_DATABASE_URL: postgresUrl,
   EDGE_DB_POOL_MAX: z.coerce.number().int().min(1).max(20).default(5),
-  /** The centre's api, e.g. https://bto.example/ or http://host.docker.internal:3300 in tests. */
-  CENTRAL_API_URL: z.url({ protocol: /^https?$/ }),
+  /**
+   * The centre's api, e.g. https://bto.example/ or http://host.docker.internal:3300 in tests. With
+   * EDGE_NODE_TOKEN and POS_PIN_PEPPER it links the edge by the environment; without them the
+   * kiosk links it with an admin's code (ADR-0136).
+   */
+  CENTRAL_API_URL: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.url({ protocol: /^https?$/ }).optional(),
+  ),
   /** `tgs_<node>_<secret>` from «Супермаркет → Касс → Шинэ токен» (ADR-0063 #6). */
-  EDGE_NODE_TOKEN: z.string().trim().regex(EDGE_TOKEN_PATTERN),
+  EDGE_NODE_TOKEN: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.string().trim().regex(EDGE_TOKEN_PATTERN).optional(),
+  ),
   /** HS256 key of the kiosk sessions (12 hours). */
   EDGE_JWT_SECRET: z.string().min(32),
   /** The cashiers' PIN key, the same value as the centre's POS_PIN_PEPPER (or its AUTH_PEPPER). */
-  POS_PIN_PEPPER: z.string().min(32),
+  POS_PIN_PEPPER: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.string().min(32).optional(),
+  ),
   /**
    * fake: on-screen test receipts, nothing sent to the tax office (ADR-0067); posapi: real receipts
    * from the store PosAPI at POSAPI_URL (ADR-0065).
@@ -75,6 +88,13 @@ export function parseEdgeEnv(raw: Record<string, unknown>): EdgeEnv {
   // dev centre's pepper is accepted here; the session key is the edge's own.
   if (data.NODE_ENV === 'production' && data.EDGE_JWT_SECRET.startsWith('dev-')) {
     throw new Error('Invalid environment (edge): EDGE_JWT_SECRET is a development placeholder');
+  }
+  // ADR-0136: the environment links the edge with all three, or leaves the link to the kiosk.
+  const linkedByEnv = [data.CENTRAL_API_URL, data.EDGE_NODE_TOKEN, data.POS_PIN_PEPPER];
+  if (data.EDGE_NODE_TOKEN && linkedByEnv.some((value) => value === undefined)) {
+    throw new Error(
+      'Invalid environment (edge): EDGE_NODE_TOKEN needs CENTRAL_API_URL and POS_PIN_PEPPER',
+    );
   }
   if (data.EBARIMT_PROVIDER === 'posapi' && (!data.POSAPI_URL || !data.EBARIMT_BRANCH_NO)) {
     throw new Error(

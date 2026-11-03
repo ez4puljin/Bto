@@ -35,6 +35,7 @@ export function createKioskQueryClient(): QueryClient {
 export const kioskKeys = {
   all: ['kiosk'] as const,
   health: ['kiosk', 'health'] as const,
+  link: ['kiosk', 'link'] as const,
   device: (epoch: number) => ['kiosk', epoch, 'device'] as const,
   session: (epoch: number) => ['kiosk', epoch, 'session'] as const,
   recent: (epoch: number) => ['kiosk', epoch, 'recent'] as const,
@@ -56,6 +57,21 @@ export const kioskKeys = {
       [...codes],
     ] as const,
 };
+
+/**
+ * ADR-0136: whether the edge is linked to its centre. An edge older than the link answers 404:
+ * read as linked (its environment links it).
+ */
+export function useLinkState() {
+  const { client } = useKiosk();
+  return useQuery({
+    queryKey: kioskKeys.link,
+    queryFn: ({ signal }) => client.linkState(signal),
+    refetchInterval: 30_000,
+    retry: false,
+    staleTime: 0,
+  });
+}
 
 export function useHealth() {
   const { client } = useKiosk();

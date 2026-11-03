@@ -13,6 +13,7 @@ import { PrintableCache } from './ebarimt/printable.cache';
 import { TaxpayerClient } from './ebarimt/taxpayer.client';
 import { KioskGuard } from './guards/kiosk.guard';
 import { CentralClient } from './services/central.client';
+import { EdgeLinkService } from './services/edge-link.service';
 import { CheckoutService } from './services/checkout.service';
 import { CreditGate } from './services/credit-gate.service';
 import { CustomerStore } from './services/customer.store';
@@ -80,6 +81,7 @@ export class EdgeModule {
         LoyaltyStore,
         CreditGate,
         TillRecordsService,
+        EdgeLinkService,
         CentralClient,
         OutboxService,
         SyncRunner,

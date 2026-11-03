@@ -608,6 +608,27 @@ export interface EdgeEbarimtSummary {
   attention: number;
 }
 
+/**
+ * ADR-0136: whether this edge knows its centre. `env`: linked by `deploy/edge/.env` (the token
+ * and the PIN key typed there); `code`: linked from the kiosk with an admin's code.
+ */
+export interface EdgeLinkState {
+  linked: boolean;
+  source: 'env' | 'code' | null;
+  centralUrl: string | null;
+  nodeCode: string | null;
+  nodeName: string | null;
+  linkedAt: string | null;
+  /** The centre refused the token (a new one was issued): the kiosk may link again. */
+  rejected: boolean;
+}
+
+export interface EdgeLinkRequest {
+  centralUrl: string;
+  nodeCode: string;
+  linkCode: string;
+}
+
 export interface EdgePairRequest {
   tillCode: string;
   pairingCode: string;

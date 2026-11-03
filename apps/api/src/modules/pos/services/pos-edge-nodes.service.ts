@@ -1,7 +1,12 @@
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import {
   EDGE_CODE_PATTERN,
+  EDGE_LINK_ALPHABET,
+  EDGE_LINK_CODE_LENGTH,
+  EDGE_LINK_MAX_ATTEMPTS,
+  type EdgeLinkResponseWire,
+  normalizeEdgeLinkCode,
   POS_LIMITS,
   type PosStatus,
   TOKEN_PREFIX_LENGTH,
@@ -11,7 +16,8 @@ import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
-import { AuditService, type AuthContext, OrgService } from '../../identity';
+import { AuditService, type AuthContext, OrgService, systemActor } from '../../identity';
+import { PinHasher } from '../pin-hasher';
 import { posEdgeNodes } from '../schema';
 
 export interface EdgeNode {
@@ -35,6 +41,8 @@ export interface EdgeNode {
   posapiLeftLotteries: number | null;
   posapiCheckedAt: Date | null;
   posapiError: string | null;
+  /** ADR-0136: a link code is in force until then (the code itself is never shown again). */
+  linkExpiresAt: Date | null;
   status: PosStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -81,6 +89,7 @@ export class PosEdgeNodesService {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly org: OrgService,
+    private readonly pins: PinHasher,
   ) {}
 
   async list(): Promise<EdgeNode[]> {
@@ -170,6 +179,118 @@ export class PosEdgeNodesService {
     return { token, prefix };
   }
 
+  /**
+   * ADR-0136: a one-time code (eight letters and digits, 15 minutes) a new edge links with from its
+   * kiosk; shown once. A new code replaces the one in force and its wrong tries.
+   */
+  async issueLinkCode(ctx: AuthContext, id: number): Promise<{ code: string; expiresAt: Date }> {
+    let code = '';
+    for (let i = 0; i < EDGE_LINK_CODE_LENGTH; i++) {
+      code += EDGE_LINK_ALPHABET[randomInt(EDGE_LINK_ALPHABET.length)];
+    }
+    const expiresAt = new Date(Date.now() + POS_LIMITS.pairingCodeMinutes * 60_000);
+    await inTransaction(this.db, async (tx) => {
+      const node = await this.get(id, tx);
+      if (node.status !== 'ACTIVE') {
+        throw new AppError('EDGE_LINK_INVALID', 'the edge node is not active', { id });
+      }
+      await tx
+        .update(posEdgeNodes)
+        .set({
+          linkCodeHash: sha256(`${id}:${code}`),
+          linkExpiresAt: expiresAt,
+          linkAttempts: 0,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(posEdgeNodes.id, id));
+      await this.audit.record(tx, ctx, {
+        action: 'LINK_CODE',
+        entity: 'pos_edge_nodes',
+        entityId: id,
+        after: { expiresAt },
+      });
+    });
+    return { code, expiresAt };
+  }
+
+  /**
+   * ADR-0136: a new edge presents its node's code and the admin's link code; the centre answers a
+   * fresh token (the old one stops working) and the PIN key, and forgets the code. A wrong code
+   * counts against the one in force; the fifth voids it. Unknown, inactive or expired: one answer.
+   */
+  async claimLink(nodeCode: string, linkCode: string): Promise<EdgeLinkResponseWire> {
+    const pinPepper = this.pins.sharedKey();
+    if (pinPepper === null) {
+      throw new AppError('EDGE_LINK_PEPPER_MISSING', 'POS_PIN_PEPPER is not set on the centre');
+    }
+    const code = nodeCode.trim().toUpperCase();
+    const typed = normalizeEdgeLinkCode(linkCode);
+    const refused = () => new AppError('EDGE_LINK_INVALID', 'wrong or expired edge link code');
+    const outcome = await inTransaction(this.db, async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(posEdgeNodes)
+        .where(eq(posEdgeNodes.code, code))
+        .for('update');
+      if (!row?.linkCodeHash || !row.linkExpiresAt || row.status !== 'ACTIVE') return null;
+      if (row.linkExpiresAt.getTime() <= Date.now()) return null;
+      const presented = Buffer.from(sha256(`${row.id}:${typed ?? ''}`), 'hex');
+      const stored = Buffer.from(row.linkCodeHash, 'hex');
+      if (typed === null || !timingSafeEqual(presented, stored)) {
+        const attempts = row.linkAttempts + 1;
+        const voided = attempts >= EDGE_LINK_MAX_ATTEMPTS;
+        await tx
+          .update(posEdgeNodes)
+          .set(
+            voided
+              ? { linkCodeHash: null, linkExpiresAt: null, linkAttempts: 0 }
+              : { linkAttempts: attempts },
+          )
+          .where(eq(posEdgeNodes.id, row.id));
+        await this.audit.record(tx, systemActor('edge-link'), {
+          action: voided ? 'LINK_CODE_VOIDED' : 'LINK_FAILED',
+          entity: 'pos_edge_nodes',
+          entityId: row.id,
+          after: { attempts },
+        });
+        return null;
+      }
+      const secret = randomBytes(32).toString('base64url');
+      const token = `tgs_${row.id}_${secret}`;
+      const tokenHash = sha256(token);
+      const prefix = tokenHash.slice(0, TOKEN_PREFIX_LENGTH);
+      await tx
+        .update(posEdgeNodes)
+        .set({
+          tokenHash,
+          tokenPrefix: prefix,
+          tokenIssuedAt: sql`now()`,
+          linkCodeHash: null,
+          linkExpiresAt: null,
+          linkAttempts: 0,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(posEdgeNodes.id, row.id));
+      await this.audit.record(tx, systemActor('edge-link'), {
+        action: 'LINKED',
+        entity: 'pos_edge_nodes',
+        entityId: row.id,
+        after: { prefix },
+      });
+      return { node: await this.view(row, tx), token };
+    });
+    // A refused try is committed (it counts) before the caller hears no.
+    if (!outcome) throw refused();
+    return {
+      nodeId: outcome.node.id,
+      nodeCode: outcome.node.code,
+      nodeName: outcome.node.name,
+      warehouseName: outcome.node.warehouseName,
+      token: outcome.token,
+      pinPepper,
+    };
+  }
+
   /** The active node whose token this is, else null (the guard answers 401). */
   async authenticate(nodeId: number, secret: string): Promise<EdgeNode | null> {
     const [row] = await this.db.select().from(posEdgeNodes).where(eq(posEdgeNodes.id, nodeId));
@@ -251,6 +372,7 @@ export class PosEdgeNodesService {
       posapiLeftLotteries: row.posapiLeftLotteries,
       posapiCheckedAt: row.posapiCheckedAt,
       posapiError: row.posapiError,
+      linkExpiresAt: row.linkExpiresAt,
       status: row.status,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,

@@ -148,6 +148,11 @@ export const posEdgeNodes = pgTable(
     posapiLeftLotteries: integer('posapi_left_lotteries'),
     posapiCheckedAt: timestamp('posapi_checked_at', { withTimezone: true }),
     posapiError: text('posapi_error'),
+    /** ADR-0136: sha-256 of the one-time code a new edge links with, until it expires. */
+    linkCodeHash: text('link_code_hash'),
+    linkExpiresAt: timestamp('link_expires_at', { withTimezone: true }),
+    /** Wrong codes tried against the code in force; the fifth voids it. */
+    linkAttempts: integer('link_attempts').notNull().default(0),
     status: text('status', { enum: POS_STATUSES }).notNull().default('ACTIVE'),
     createdBy: userRef('created_by'),
     createdAt: createdAt(),
@@ -155,6 +160,10 @@ export const posEdgeNodes = pgTable(
   },
   (t) => [
     uniqueIndex('pos_edge_nodes_code').on(t.code),
+    check(
+      'pos_edge_nodes_link',
+      sql`(${t.linkCodeHash} IS NULL) = (${t.linkExpiresAt} IS NULL) AND ${t.linkAttempts} >= 0`,
+    ),
     check('pos_edge_nodes_code_shape', sql`${t.code} ~ '^[A-Z0-9][A-Z0-9_-]{0,15}$'`),
     check('pos_edge_nodes_name', sql`length(${t.name}) BETWEEN 1 AND ${lim(POS_LIMITS.maxName)}`),
     check('pos_edge_nodes_status', inList(t.status, POS_STATUSES)),

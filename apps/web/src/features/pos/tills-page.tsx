@@ -1,4 +1,4 @@
-import { KeyRound, Monitor, Pencil, Plus, QrCode, ShieldCheck } from 'lucide-react';
+import { KeyRound, Link2, Monitor, Pencil, Plus, QrCode, ShieldCheck } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHasPermission } from '@/app/auth-context';
@@ -52,7 +52,7 @@ const TILL_COLUMNS: readonly ColumnSpec[] = [
   { key: 'lastSale', kind: 'datetime' },
   { key: 'status', kind: 'status' },
   { key: 'spacer', kind: 'spacer' },
-  { key: 'actions', kind: 'actions', actions: 2 },
+  { key: 'actions', kind: 'actions', actions: 3 },
 ];
 
 /** The edge servers' columns; the PosAPI facts are two or three short lines. */
@@ -106,6 +106,22 @@ export function PosTillsPage() {
       .then((ok) => {
         if (ok) setTokenFor(null);
       });
+  };
+  // ADR-0136: the one-time code a new edge links with from its kiosk; the centre's address is this
+  // page's (the edge reaches the api through it as the browser does).
+  const linkCode = (node: EdgeNode) => {
+    void action.run(async () => {
+      const issued = await mutations.linkCode.mutateAsync(node.id);
+      setShown({
+        title: t('pos.nodes.linkTitle'),
+        description: t('pos.nodes.linkDescription', {
+          name: node.name,
+          url: window.location.origin,
+          node: node.code,
+        }),
+        code: issued.code,
+      });
+    });
   };
   // «3 кассчин · 1 хянагч · 2 ангилал», or «бүгд» for a till without lists (ADR-0124).
   const accessSummary = (till: Till): string => {
@@ -290,6 +306,11 @@ export function PosTillsPage() {
                   <RowActions>
                     {canManage ? (
                       <>
+                        <RowAction
+                          label={`${t('pos.actions.linkCode')}: ${node.code}`}
+                          icon={Link2}
+                          onClick={() => linkCode(node)}
+                        />
                         <RowAction
                           label={`${t('pos.actions.newToken')}: ${node.code}`}
                           icon={KeyRound}

@@ -75,6 +75,26 @@ export const edgeState = pgTable(
   (t) => [check('edge_state_single_row', sql`${t.id} = 1`)],
 );
 
+/**
+ * ADR-0136: the centre this edge was linked to from its kiosk with an admin's code — the address,
+ * the node's token and the PIN key the centre answered. One row; an edge configured by its
+ * environment (`EDGE_NODE_TOKEN`, `POS_PIN_PEPPER`) never writes it.
+ */
+export const edgeLink = pgTable(
+  'edge_link',
+  {
+    id: smallint('id').primaryKey().default(1),
+    centralUrl: text('central_url').notNull(),
+    nodeId: bigint('node_id', { mode: 'number' }).notNull(),
+    nodeCode: text('node_code').notNull(),
+    nodeName: text('node_name').notNull(),
+    token: text('token').notNull(),
+    pinPepper: text('pin_pepper').notNull(),
+    linkedAt: timestamp('linked_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check('edge_link_single_row', sql`${t.id} = 1`)],
+);
+
 /** A browser bound to a till with the admin's one-time pairing code. */
 export const edgeDevices = pgTable(
   'edge_devices',

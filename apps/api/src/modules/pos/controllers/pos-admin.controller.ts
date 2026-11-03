@@ -10,10 +10,15 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { formatEdgeLinkCode } from '@tugeel/shared/pos';
+import { Public } from '../../../common/auth/public.decorator';
 import { type AuthContext, CurrentUser, RequirePermission } from '../../identity';
 import {
   CashierDto,
   CashierStatusDto,
+  EdgeLinkCodeDto,
+  EdgeLinkRequestDto,
+  EdgeLinkResponseDto,
   EdgeNodeDto,
   EdgeNodePatchDto,
   EdgeNodeRequestDto,
@@ -110,6 +115,37 @@ export class PosEdgeNodesController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<EdgeTokenDto> {
     return this.nodes.issueToken(ctx, id);
+  }
+
+  /** ADR-0136: a one-time code to link a new edge from its kiosk (instead of typing the token). */
+  @Post(':id/link-code')
+  @HttpCode(200)
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: EdgeLinkCodeDto })
+  async issueLinkCode(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<EdgeLinkCodeDto> {
+    const { code, expiresAt } = await this.nodes.issueLinkCode(ctx, id);
+    return { code: formatEdgeLinkCode(code), expiresAt: expiresAt.toISOString() };
+  }
+}
+
+/**
+ * ADR-0136: the one public door a new edge knocks on — its node's code and the admin's one-time
+ * code buy the node token and the PIN key. Wrong codes count against the code in force.
+ */
+@ApiTags('pos-sync')
+@Controller('pos/edge-link')
+@Public()
+export class PosEdgeLinkController {
+  constructor(private readonly nodes: PosEdgeNodesService) {}
+
+  @Post()
+  @HttpCode(200)
+  @ApiOkResponse({ type: EdgeLinkResponseDto })
+  async link(@Body() body: EdgeLinkRequestDto): Promise<EdgeLinkResponseDto> {
+    return this.nodes.claimLink(body.nodeCode, body.linkCode);
   }
 }
 

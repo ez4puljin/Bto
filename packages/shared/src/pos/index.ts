@@ -288,6 +288,44 @@ export function parseEdgeToken(value: string): { nodeId: number; secret: string 
   return { nodeId: Number.parseInt(match[1], 10), secret: match[2] };
 }
 
+/**
+ * ADR-0136: the one-time code an admin takes from «Супермаркет → Касс» to link a new edge to the
+ * centre, eight letters and digits without the look-alikes (0/O, 1/I/L), shown as `ABCD-EF23`.
+ */
+export const EDGE_LINK_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+export const EDGE_LINK_CODE_LENGTH = 8;
+/** Wrong codes a node takes before its link code is voided (a new one is issued). */
+export const EDGE_LINK_MAX_ATTEMPTS = 5;
+
+/** The code as typed (any case, with dashes or spaces) in its stored form, or null. */
+export function normalizeEdgeLinkCode(value: string): string | null {
+  const code = value.replace(/[\s-]/g, '').toUpperCase();
+  if (code.length !== EDGE_LINK_CODE_LENGTH) return null;
+  for (const char of code) if (!EDGE_LINK_ALPHABET.includes(char)) return null;
+  return code;
+}
+
+/** `ABCDEFGH` → `ABCD-EFGH`, as the admin reads it out. */
+export function formatEdgeLinkCode(code: string): string {
+  return `${code.slice(0, 4)}-${code.slice(4)}`;
+}
+
+/** What a new edge sends the centre with the code (`POST /pos/edge-link`, ADR-0136). */
+export interface EdgeLinkRequestWire {
+  nodeCode: string;
+  linkCode: string;
+}
+
+/** The centre's answer: a fresh node token and the PIN key the tills' hashes were made with. */
+export interface EdgeLinkResponseWire {
+  nodeId: number;
+  nodeCode: string;
+  nodeName: string;
+  warehouseName: string | null;
+  token: string;
+  pinPepper: string;
+}
+
 // The till's coupons and partner vouchers (ADR-0110).
 export * from './vouchers';
 

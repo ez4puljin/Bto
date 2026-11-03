@@ -82,6 +82,51 @@ describe('pos admin', () => {
       .expect(403);
   });
 
+  it('links a new edge with a one-time code: a fresh token and the PIN key, five wrong tries void it', async () => {
+    const admin = posApi(app, actors.admin);
+    const node = (
+      await admin.createNode({ code: 'LNK1', name: 'Холбох', warehouseId: storeId }).expect(201)
+    ).body as EdgeNodeJson;
+    const old = await admin.issueToken(node.id);
+    const linkCode = (path: number) =>
+      admin.http().post(`/api/v1/pos/edge-nodes/${path}/link-code`).set(admin.auth);
+    // Only a manager issues a code.
+    await posApi(app, actors.office)
+      .http()
+      .post(`/api/v1/pos/edge-nodes/${node.id}/link-code`)
+      .set(posApi(app, actors.office).auth)
+      .expect(403);
+    const issued = (await linkCode(node.id).expect(200)).body as { code: string };
+    expect(issued.code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    const link = (body: { nodeCode: string; linkCode: string }) =>
+      admin.http().post('/api/v1/pos/edge-link').send(body);
+    // No session needed; a wrong code is refused, and so is an unknown node.
+    await link({ nodeCode: 'LNK1', linkCode: 'AAAA-AAAA' }).expect(422);
+    await link({ nodeCode: 'NOPE', linkCode: issued.code }).expect(422);
+    // Typed in lower case without the dash, it links: a new token, the old one is gone.
+    const linked = (
+      await link({ nodeCode: 'lnk1', linkCode: issued.code.replace('-', '').toLowerCase() }).expect(
+        200,
+      )
+    ).body as { nodeId: number; nodeCode: string; token: string; pinPepper: string };
+    expect(linked).toMatchObject({ nodeId: node.id, nodeCode: 'LNK1' });
+    expect(linked.pinPepper.length).toBeGreaterThanOrEqual(32);
+    await admin.heartbeat(old.token, { backlog: 0 }).expect(401);
+    await admin.heartbeat(linked.token, { backlog: 0 }).expect(200);
+    // The code is spent.
+    await link({ nodeCode: 'LNK1', linkCode: issued.code }).expect(422);
+    // Five wrong tries void a code in force: the right one no longer works.
+    const second = (await linkCode(node.id).expect(200)).body as { code: string };
+    for (let i = 0; i < 5; i++) {
+      await link({ nodeCode: 'LNK1', linkCode: 'BBBB-BBBB' }).expect(422);
+    }
+    await link({ nodeCode: 'LNK1', linkCode: second.code }).expect(422);
+    await admin.heartbeat(linked.token, { backlog: 0 }).expect(200);
+    // An inactive node issues no code.
+    await admin.updateNode(node.id, { status: 'INACTIVE' }).expect(200);
+    await linkCode(node.id).expect(422);
+  });
+
   it('keeps tills per node with their printers and hands out pairing codes', async () => {
     const admin = posApi(app, actors.admin);
     const node = (

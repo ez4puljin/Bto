@@ -8,7 +8,8 @@ import { ErrorScreen, LoadingScreen } from './components/layout';
 import { PrintProvider } from './components/receipt-print';
 import { KioskContext, type KioskServices, useCredentials, useKiosk } from './kiosk-context';
 import { useProblemText } from './messages';
-import { useSession } from './queries';
+import { useLinkState, useSession } from './queries';
+import { LinkScreen } from './screens/link-screen';
 import { LoginScreen } from './screens/login-screen';
 import { PairingScreen } from './screens/pairing-screen';
 import { SaleScreen } from './screens/sale-screen';
@@ -47,6 +48,12 @@ function KioskRoot() {
     void logout.catch(() => undefined);
   }, [clear, client, credentials]);
 
+  // ADR-0136: a new edge is linked first; one whose token the centre refused, before pairing.
+  // Not waited for: the screens below show at once, this one replaces them when the edge says so.
+  const link = useLinkState();
+  if (link.data && (!link.data.linked || (link.data.rejected && !deviceToken))) {
+    return <LinkScreen state={link.data} />;
+  }
   if (!deviceToken) return <PairingScreen onPaired={clear} />;
   if (!sessionToken) return <LoginScreen onNewCashier={clear} />;
   return <SessionGate cart={cart} onSignOut={signOut} />;

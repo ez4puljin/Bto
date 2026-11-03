@@ -36,10 +36,12 @@ services:
       LOG_LEVEL: info
       EDGE_PORT: '3400'
       EDGE_DATABASE_URL: postgres://edge:${EDGE_DB_PASSWORD}@edge-db:5432/tugeel_edge
-      CENTRAL_API_URL: ${CENTRAL_API_URL:-http://host.docker.internal:3300}
-      EDGE_NODE_TOKEN: ${EDGE_NODE_TOKEN:?set EDGE_NODE_TOKEN in deploy/edge/.env}
+      # ADR-0136: empty = the kiosk links the edge with an admin's code (kept in the edge database);
+      # all three set = linked by this file, as before.
+      CENTRAL_API_URL: ${CENTRAL_API_URL:-}
+      EDGE_NODE_TOKEN: ${EDGE_NODE_TOKEN:-}
+      POS_PIN_PEPPER: ${POS_PIN_PEPPER:-}
       EDGE_JWT_SECRET: ${EDGE_JWT_SECRET:?set EDGE_JWT_SECRET in deploy/edge/.env}
-      POS_PIN_PEPPER: ${POS_PIN_PEPPER:?set POS_PIN_PEPPER in deploy/edge/.env}
       # ADR-0065: fake (test receipts) or posapi (the store PosAPI on the LAN at POSAPI_URL).
       EBARIMT_PROVIDER: ${EBARIMT_PROVIDER:-fake}
       POSAPI_URL: ${POSAPI_URL:-}

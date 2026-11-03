@@ -29,6 +29,13 @@ import {
 const MONEY = /^\d{1,12}(\.\d{1,2})?$/;
 const QTY = /^\d{1,11}(\.\d{1,3})?$/;
 
+/** ADR-0136: the centre's address, the node's code and the admin's one-time code. */
+export class LinkDto {
+  @IsString() @MaxLength(200) centralUrl: string;
+  @IsString() @MaxLength(16) nodeCode: string;
+  @IsString() @MaxLength(16) linkCode: string;
+}
+
 export class PairDto {
   @IsString() @MaxLength(16) tillCode: string;
   @IsString() @MaxLength(32) pairingCode: string;

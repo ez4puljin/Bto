@@ -18,6 +18,7 @@ import type {
   EdgeDeviceInfo,
   EdgeEbarimtQueue,
   EdgeHealth,
+  EdgeLinkState,
   EdgeLoginResponse,
   EdgeCartLine,
   EdgeCustomer,
@@ -52,6 +53,7 @@ import {
   EbarimtResolveDto,
   EbarimtSendDataDto,
   LoginDto,
+  LinkDto,
   PairDto,
   ParkDto,
   QuoteDto,
@@ -84,6 +86,8 @@ import { LoyaltyStore } from '../services/loyalty.store';
 import { VoucherStore } from '../services/voucher.store';
 import { TillRecordsService } from '../services/till-records.service';
 import { DevicesService } from '../services/devices.service';
+import { EdgeLinkService } from '../services/edge-link.service';
+import { SyncRunner } from '../services/sync.runner';
 import { KioskAuthService } from '../services/kiosk-auth.service';
 import { OutboxService } from '../services/outbox.service';
 import { EdgeParkedService } from '../services/parked.service';
@@ -121,7 +125,29 @@ export class KioskController {
     private readonly vouchers: VoucherStore,
     private readonly loyalty: LoyaltyStore,
     private readonly records: TillRecordsService,
+    private readonly link: EdgeLinkService,
+    private readonly sync: SyncRunner,
   ) {}
+
+  /** ADR-0136: whether this edge knows its centre (the kiosk's first screen asks). */
+  @Get('link')
+  @EdgePublic()
+  linkState(): EdgeLinkState {
+    return this.link.state();
+  }
+
+  /**
+   * ADR-0136: links a new edge with an admin's code (or again after the centre refused its token);
+   * the first snapshot is pulled at once so the tills can pair.
+   */
+  @Post('link')
+  @HttpCode(200)
+  @EdgePublic()
+  async linkEdge(@Body() body: LinkDto): Promise<EdgeLinkState> {
+    const state = await this.link.linkWith(body);
+    void this.sync.pullOnce().catch(() => undefined);
+    return state;
+  }
 
   @Get('health')
   @EdgePublic()

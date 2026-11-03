@@ -15,6 +15,8 @@ import {
   type EdgeHealth,
   type EdgeLoginRequest,
   type EdgeLoginResponse,
+  type EdgeLinkRequest,
+  type EdgeLinkState,
   type EdgePairRequest,
   type EdgePairResponse,
   type EdgeParkedBasket,
@@ -228,6 +230,15 @@ export class EdgeClient {
 
   health(signal?: AbortSignal) {
     return this.request<EdgeHealth>('GET', '/health', { signal });
+  }
+
+  /** ADR-0136: whether the edge knows its centre; the first screen of a new edge links it. */
+  linkState(signal?: AbortSignal) {
+    return this.request<EdgeLinkState>('GET', '/link', { signal });
+  }
+
+  link(body: EdgeLinkRequest) {
+    return this.request<EdgeLinkState>('POST', '/link', { body });
   }
 
   pair(body: EdgePairRequest) {

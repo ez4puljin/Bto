@@ -37,6 +37,49 @@ describe('kiosk: pairing, PIN and the shift', () => {
     expect(edge.callsTo('GET /device')[0]?.headers.get(EDGE_DEVICE_HEADER)).toBe('device-1');
   });
 
+  it('links a new edge to its centre with the admin’s code before the till pairs (ADR-0136)', async () => {
+    let linked = false;
+    const state = () => ({
+      linked,
+      source: linked ? 'code' : null,
+      centralUrl: linked ? 'http://192.168.1.215:3300' : null,
+      nodeCode: linked ? 'MRN1' : null,
+      nodeName: linked ? 'Мөрөн' : null,
+      linkedAt: null,
+      rejected: false,
+    });
+    const edge = fakeEdge(
+      storeRoutes({
+        'GET /link': () => json(state()),
+        'POST /link': (call) => {
+          const body = call.body as { linkCode: string };
+          if (body.linkCode !== 'abcd-ef23') return problem('EDGE_LINK_INVALID', 422);
+          linked = true;
+          return json(state());
+        },
+      }),
+    );
+    const user = userEvent.setup();
+    renderKiosk(edge);
+
+    await user.type(await screen.findByLabelText(k.link.centralUrl), '192.168.1.215:3300');
+    await user.type(screen.getByLabelText(k.link.nodeCode), 'mrn1');
+    await user.type(screen.getByLabelText(k.link.linkCode), 'abcd-ef2');
+    await user.click(screen.getByRole('button', { name: k.link.submit }));
+    // Seven characters: refused before the edge is asked.
+    expect(screen.getByText(k.link.linkCodeInvalid)).toBeInTheDocument();
+    expect(edge.callsTo('POST /link')).toHaveLength(0);
+    await user.type(screen.getByLabelText(k.link.linkCode), '3');
+    await user.click(screen.getByRole('button', { name: k.link.submit }));
+    // Linked: the till's pairing comes next.
+    expect(await screen.findByLabelText(k.pair.tillCode)).toBeInTheDocument();
+    expect(edge.callsTo('POST /link')[0]?.body).toEqual({
+      centralUrl: '192.168.1.215:3300',
+      nodeCode: 'MRN1',
+      linkCode: 'abcd-ef23',
+    });
+  });
+
   it('refuses a wrong pairing code with the edge’s message', async () => {
     const edge = fakeEdge(storeRoutes({ 'POST /pair': () => problem('POS_PAIRING_INVALID', 401) }));
     const user = userEvent.setup();

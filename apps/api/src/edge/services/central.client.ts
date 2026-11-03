@@ -11,6 +11,7 @@ import type {
   LoyaltyFeedResponseWire,
 } from '@tugeel/shared/pos';
 import { EdgeConfig } from '../config/edge-env';
+import { EdgeLinkService } from './edge-link.service';
 
 /** A call to the centre that failed: no answer (offline), or an answer that is not a success. */
 export class CentralError extends Error {
@@ -32,13 +33,12 @@ const TIMEOUT_MS = 30_000;
  */
 @Injectable()
 export class CentralClient {
-  private readonly base: string;
-  private readonly token: string;
   private readonly creditTimeoutMs: number;
 
-  constructor(config: EdgeConfig) {
-    this.base = `${config.get('CENTRAL_API_URL').replace(/\/+$/, '')}/api/v1/pos/sync`;
-    this.token = config.get('EDGE_NODE_TOKEN');
+  constructor(
+    config: EdgeConfig,
+    private readonly link: EdgeLinkService,
+  ) {
     this.creditTimeoutMs = config.get('EDGE_CREDIT_CHECK_TIMEOUT_MS');
   }
 
@@ -89,12 +89,16 @@ export class CentralClient {
     body?: unknown,
     timeoutMs: number = TIMEOUT_MS,
   ): Promise<T> {
+    // ADR-0136: the centre and the token as the edge was linked (environment or kiosk code).
+    const link = this.link.current();
+    if (!link) throw new CentralError('edge not linked to a centre', null, 'EDGE_NOT_LINKED');
+    const base = `${link.centralUrl.replace(/\/+$/, '')}/api/v1/pos/sync`;
     let response: Response;
     try {
-      response = await fetch(`${this.base}${path}`, {
+      response = await fetch(`${base}${path}`, {
         method,
         headers: {
-          authorization: `Bearer ${this.token}`,
+          authorization: `Bearer ${link.token}`,
           accept: 'application/json',
           ...(body === undefined ? {} : { 'content-type': 'application/json' }),
         },
@@ -105,6 +109,8 @@ export class CentralClient {
       const reason = error instanceof Error ? error.message : String(error);
       throw new CentralError(`centre unreachable: ${reason}`, null, null);
     }
+    if (response.status === 401) this.link.markRejected();
+    else if (response.ok) this.link.markAccepted();
     if (!response.ok) {
       const problem = (await response.json().catch(() => null)) as { code?: string } | null;
       throw new CentralError(
