@@ -8,11 +8,16 @@ import {
   Post,
   Put,
   Query,
+  StreamableFile,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
+import { XLSX_CONTENT_TYPE } from '@tugeel/shared/files';
+import mn from '@tugeel/shared/i18n/mn.json';
 import { Decimal } from '@tugeel/shared/money';
+import { businessDate } from '@tugeel/shared/time';
 import { PRINT_KINDS, type PrintKind } from '@tugeel/shared/sales';
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
+import { xlsxFile } from '../../../common/excel/xlsx-file';
 import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
 import {
   SalesOrderBatchQueryDto,
@@ -29,6 +34,7 @@ import {
   SalesPickAssignRequestDto,
 } from '../dto/sales-orders.dto';
 import { overdueDto } from '../overdue';
+import { SalesOrderExportService } from '../services/sales-order-export.service';
 import { type OrderDetail, SalesOrderQueryService } from '../services/sales-order-query.service';
 import { type OrderInput, SalesOrdersService } from '../services/sales-orders.service';
 import { type PickPart, SalesPicksService } from '../services/sales-picks.service';
@@ -185,6 +191,7 @@ export class SalesOrdersController {
     private readonly orders: SalesOrdersService,
     private readonly queries: SalesOrderQueryService,
     private readonly picks: SalesPicksService,
+    private readonly exports: SalesOrderExportService,
   ) {}
 
   @Get()
@@ -214,6 +221,31 @@ export class SalesOrdersController {
       nextCursor: page.nextCursor,
       total: page.total,
     };
+  }
+
+  /**
+   * The listed orders' lines as one Excel sheet (the list's filters; ordered, picked, deducted and
+   * the amounts per line), at most 5,000 orders.
+   */
+  @Get('export.xlsx')
+  @RequirePermission(READ)
+  @ApiProduces(XLSX_CONTENT_TYPE)
+  @ApiOkResponse({ schema: { type: 'string', format: 'binary' } })
+  async exportExcel(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: SalesOrderListQueryDto,
+  ): Promise<StreamableFile> {
+    const buffer = await this.exports.workbook(ctx, {
+      ...query,
+      pipeline:
+        query.pipeline === undefined
+          ? undefined
+          : query.pipeline === 'none'
+            ? 'none'
+            : Number.parseInt(query.pipeline, 10),
+    });
+    const day = businessDate();
+    return xlsxFile(buffer, `sales-orders-${day}`, `${mn.sales.export.title} ${day}`);
   }
 
   /** Up to 100 orders the caller sees, whole, for one printed page (ADR-0057 #7). */

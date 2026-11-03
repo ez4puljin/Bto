@@ -121,6 +121,7 @@ Every board, pipeline and stage route carries `sales.orders.read`; the service c
 | Method and path | Notes |
 |---|---|
 | `GET /sales-orders?pipelineId \| pipeline=none&stageId&status&archived=exclude\|include\|only&q&customerId&mine&channel&fulfilment&paymentMethod&deliveryFrom&deliveryTo` | Keyset, newest first. Only what the caller may see. `q` matches the number, or customers through `idsWhere`. Rows carry the pipeline and stage names, `archivedAt`, `createdByName` and `paymentMethod` (the label, ADR-0058). `total` on the first page |
+| `GET /sales-orders/export.xlsx` (the list's query) | The listed orders' lines as one sheet (≤ 5,000 orders): number, dates, customer, board, pipeline, stage, status, warehouse, picker, product, ordered, reserved, picked, the deduction (ordered − picked, ADR-0130) and the amounts; only the caller's warehouses' lines. «Excel татах» on the board and the list (2026-11-03) |
 | `GET /sales-orders/batch?ids=…` | Up to 100 orders, full, for printing; unseen ids are left out |
 | `GET /sales-orders/product-info?productIds=1,2` | Per product: home warehouse, `sellable` (active and complete), base units available there |
 | `GET /sales-orders/:id` | Header (board, pipeline, stage, the caller's `rights`), lines with parts, events and moves with `actorName` (moves also `fromStageName` / `toStageName`, ADR-0059). 404 when not visible |

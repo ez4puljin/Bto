@@ -529,7 +529,8 @@ describe('warehouse sales page', () => {
     // A click beside the number opens the order too.
     await user.click(screen.getByRole('cell', { name: mn.sales.paymentMethods.CREDIT }));
     expect(await screen.findByRole('dialog', { name: '20261015_0005' })).toBeInTheDocument();
-    expect(router.state.location.search).toContain('order=5');
+    // The URL names the open order by its number.
+    await waitFor(() => expect(router.state.location.search).toContain('order=20261015_0005'));
   });
 
   it('opens a stage’s other cards as the list narrowed to that stage', async () => {

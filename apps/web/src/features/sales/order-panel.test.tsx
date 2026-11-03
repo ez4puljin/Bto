@@ -307,7 +307,7 @@ describe('order panel (ADR-0059)', () => {
     ]);
   });
 
-  it('searches the products by name or code and filters them by warehouse and picking', async () => {
+  it('searches the products by name or code and filters them by warehouse, picking and deduction', async () => {
     const picked: Schemas['SalesOrderDetail'] = {
       ...ORDER,
       lines: [
@@ -337,7 +337,8 @@ describe('order panel (ADR-0059)', () => {
       within(panel).getByRole('combobox', { name: mn.sales.order.warehouse }),
       WH1.name,
     );
-    expect(productNames(panel)).toEqual(['1Coca-Cola 0.5л']);
+    // Picked 0 of 1: the row is marked «Хасалт» (ADR-0130).
+    expect(productNames(panel)).toEqual([`1Coca-Cola 0.5л${mn.sales.pick.short}`]);
     await user.selectOptions(
       within(panel).getByRole('combobox', { name: mn.sales.order.warehouse }),
       mn.sales.panel.products.allWarehouses,
@@ -351,7 +352,15 @@ describe('order panel (ADR-0059)', () => {
       within(panel).getByRole('combobox', { name: mn.sales.panel.products.pickedFilter }),
       mn.sales.panel.products.picked.NOT_PICKED,
     );
-    expect(productNames(panel)).toEqual(['1Coca-Cola 0.5л', '900000033Говь Цэвэр ус 0.5л']);
+    expect(productNames(panel)).toEqual([
+      `1Coca-Cola 0.5л${mn.sales.pick.short}`,
+      '900000033Говь Цэвэр ус 0.5л',
+    ]);
+    await user.selectOptions(
+      within(panel).getByRole('combobox', { name: mn.sales.panel.products.pickedFilter }),
+      mn.sales.panel.products.picked.SHORT.replace('{{count}}', '1'),
+    );
+    expect(productNames(panel)).toEqual([`1Coca-Cola 0.5л${mn.sales.pick.short}`]);
   });
 
   it('keeps unsaved quantities while the sections change and asks before closing', async () => {

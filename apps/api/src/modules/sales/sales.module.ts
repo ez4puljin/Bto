@@ -15,6 +15,7 @@ import { SalesRepController } from './controllers/sales-rep.controller';
 import { SalesSettingsController } from './controllers/sales-settings.controller';
 import { SalesAccessService } from './services/sales-access.service';
 import { SalesBoardsService } from './services/sales-boards.service';
+import { SalesOrderExportService } from './services/sales-order-export.service';
 import { SalesOrderQueryService } from './services/sales-order-query.service';
 import { SalesOrdersService } from './services/sales-orders.service';
 import { SalesPicksService } from './services/sales-picks.service';
@@ -40,6 +41,7 @@ import { AppSettingsController } from './controllers/app-settings.controller';
     SalesSettingsService,
     AppSettingsService,
     SalesOrderQueryService,
+    SalesOrderExportService,
     SalesOrdersService,
     SalesPicksService,
     SalesRepOrdersService,
@@ -53,6 +55,7 @@ import { AppSettingsController } from './controllers/app-settings.controller';
     SalesSettingsService,
     AppSettingsService,
     SalesOrderQueryService,
+    SalesOrderExportService,
     SalesOrdersService,
     SalesPicksService,
     SalesRepOrdersService,

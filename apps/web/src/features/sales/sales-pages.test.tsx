@@ -392,7 +392,10 @@ describe('confirmed order in the panel (ADR-0059)', () => {
       within(panel).getByText(mn.sales.order.backorderedLines.replace('{{count}}', '1')),
     ).toBeInTheDocument();
     expect(within(panel).getByText('20 ш')).toBeInTheDocument();
-    expect(within(panel).getByText('10 ш')).toBeInTheDocument();
+    // The backorder sits under the reserved count.
+    expect(
+      within(panel).getByText(mn.sales.panel.products.backorderedLine.replace('{{qty}}', '10')),
+    ).toBeInTheDocument();
     // Frozen prices: no estimate.
     expect(within(panel).queryByText(mn.sales.panel.products.estimated)).toBeNull();
 

@@ -1,7 +1,16 @@
 import { isCancellable, isFinished, type PrintKind } from '@tugeel/shared/sales';
-import { Archive, ArchiveRestore, Ellipsis, Printer, Send, XCircle } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import {
+  Archive,
+  ArchiveRestore,
+  ChevronRight,
+  Ellipsis,
+  Printer,
+  Send,
+  XCircle,
+} from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FormField } from '@/components/form';
@@ -59,11 +68,14 @@ export function OrderPanel({
   tab,
   onTab,
   onClose,
+  onShown,
 }: {
   orderId: number | null;
   tab: PanelTab;
   onTab: (tab: PanelTab) => void;
   onClose: () => void;
+  /** The order is loaded: the page names it in the URL. */
+  onShown?: (order: SalesOrder) => void;
 }) {
   const { t } = useTranslation();
   const [dirty, setDirty] = useState({ properties: false, products: false });
@@ -105,6 +117,7 @@ export function OrderPanel({
               unsaved={unsaved}
               onDirtyProperties={onDirtyProperties}
               onDirtyProducts={onDirtyProducts}
+              onShown={onShown}
             />
           ) : null}
         </SheetContent>
@@ -125,6 +138,52 @@ export function OrderPanel({
   );
 }
 
+/**
+ * Where the order is — the board and pipeline, the stage — as links: the pipeline's board, the
+ * stage's orders as a list (where «Excel татах» takes them). Plain text while edits are unsaved.
+ */
+function OrderPlace({ order, unsaved }: { order: SalesOrder; unsaved: boolean }) {
+  const { t } = useTranslation();
+  if (order.pipelineId === null || !order.pipelineName) return null;
+  const pipelineName = placeName(order.boardName, order.pipelineName);
+  const base = `/sales/boards?pipeline=${order.pipelineId}`;
+  const link = 'text-link underline-offset-4 hover:underline';
+  return (
+    <nav
+      aria-label={t('sales.panel.stage')}
+      className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.8125rem] text-muted-foreground"
+    >
+      {unsaved ? (
+        <span>{pipelineName}</span>
+      ) : (
+        <Link
+          to={`${base}&view=board`}
+          className={link}
+          title={t('sales.panel.openPipeline', { name: pipelineName })}
+        >
+          {pipelineName}
+        </Link>
+      )}
+      {order.stageId !== null && order.stageName ? (
+        <>
+          <ChevronRight aria-hidden className="size-3.5" />
+          {unsaved ? (
+            <span>{order.stageName}</span>
+          ) : (
+            <Link
+              to={`${base}&view=list&lstage=${order.stageId}`}
+              className={link}
+              title={t('sales.panel.openStage', { name: order.stageName })}
+            >
+              {order.stageName}
+            </Link>
+          )}
+        </>
+      ) : null}
+    </nav>
+  );
+}
+
 function PanelBody({
   orderId,
   tab,
@@ -132,6 +191,7 @@ function PanelBody({
   unsaved,
   onDirtyProperties,
   onDirtyProducts,
+  onShown,
 }: {
   orderId: number;
   tab: PanelTab;
@@ -139,10 +199,14 @@ function PanelBody({
   unsaved: boolean;
   onDirtyProperties: (dirty: boolean) => void;
   onDirtyProducts: (dirty: boolean) => void;
+  onShown?: (order: SalesOrder) => void;
 }) {
   const { t } = useTranslation();
   const order = useSalesOrder(orderId);
   const detail = order.data;
+  useEffect(() => {
+    if (detail) onShown?.(detail);
+  }, [detail, onShown]);
   const pipeline = usePipeline(detail?.pipelineId ?? null);
   const mover = useMover();
   const tabs = PANEL_TABS;
@@ -155,16 +219,8 @@ function PanelBody({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <SheetTitle className="text-lg">{title}</SheetTitle>
-            <SheetDescription>
-              {detail
-                ? [
-                    detail.customerName,
-                    detail.pipelineName ? placeName(detail.boardName, detail.pipelineName) : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')
-                : ''}
-            </SheetDescription>
+            <SheetDescription>{detail?.customerName ?? ''}</SheetDescription>
+            {detail ? <OrderPlace order={detail} unsaved={unsaved} /> : null}
             {detail ? (
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
                 <OrderStatusBadge status={detail.status} />

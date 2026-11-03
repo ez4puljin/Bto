@@ -1,5 +1,6 @@
-import { Kanban, List, PanelLeftOpen, Plus, Settings2 } from 'lucide-react';
-import { useDeferredValue, useMemo, useState } from 'react';
+import { businessDate } from '@tugeel/shared/time';
+import { Download, Kanban, List, PanelLeftOpen, Plus, Settings2 } from 'lucide-react';
+import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
@@ -16,7 +17,10 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { saveBlob } from '@/lib/download';
 import { problemFromError } from '@/lib/problem';
+import { toast } from '@/lib/toast';
+import { useAction } from '@/lib/use-action';
 import { BoardView } from './board-view';
 import {
   DEFAULT_LIST_FILTERS,
@@ -37,7 +41,15 @@ import {
 } from './order-filters';
 import { OrderPanel } from './order-panel';
 import { type PanelTab, parsePanelTab } from './order-panel-tabs';
-import { useBoardTree, usePipeline, useStageCards } from './pipelines-api';
+import {
+  type ListQuery,
+  useBoardTree,
+  useOrderIdByNumber,
+  useOrdersExport,
+  usePipeline,
+  useStageCards,
+} from './pipelines-api';
+import type { SalesOrder } from './api';
 import { SheetFor } from './settings-page';
 import { WORK_VIEWS, type WorkView, useWorkPrefs } from './work-prefs';
 import { WorkPanel } from './work-panel';
@@ -48,7 +60,9 @@ import { WorkPanel } from './work-panel';
  * the search, the filters (the list's own pills too), the count and the view. The URL keeps the
  * pipeline (`?pipeline=`), the view (`?view=`) and every filter; the last pipeline, view and panel
  * are remembered per user in this browser. An open order (`?order=&tab=`) and the create dialog
- * (`?new=1&stage=`) live in the URL too (ADR-0059).
+ * (`?new=1&stage=`) live in the URL too (ADR-0059); the open order by its number
+ * (`?order=20261031_0003`, an old link's id still opens it) with its pipeline beside it. «Excel
+ * татах» downloads the lines of the orders the board or the list shows.
  */
 export function SalesWorkPage() {
   const { t } = useTranslation();
@@ -83,7 +97,22 @@ export function SalesWorkPage() {
   const query = orderFilterQuery(filters, q);
   const cards = useStageCards(view === 'BOARD' ? (current?.id ?? null) : null, query);
   const [listCount, setListCount] = useState<number | null>(null);
-  const openId = Number.parseInt(params.get('order') ?? '', 10) || null;
+  const orderParam = params.get('order') ?? '';
+  // Digits: an id (an old link); anything else: the order's number.
+  const orderNumber = orderParam === '' || /^\d+$/.test(orderParam) ? null : orderParam;
+  // The number the open panel reported: no lookup when the URL is rewritten to it.
+  const [known, setKnown] = useState<{ number: string; id: number } | null>(null);
+  const byNumber = useOrderIdByNumber(
+    orderNumber !== null && known?.number !== orderNumber ? orderNumber : null,
+  );
+  const openId =
+    orderNumber === null
+      ? Number.parseInt(orderParam, 10) || null
+      : known?.number === orderNumber
+        ? known.id
+        : (byNumber.data ?? null);
+  const exporting = useAction();
+  const exportOrders = useOrdersExport();
   const tab = parsePanelTab(params.get('tab'));
   const creating = canCreate && params.get('new') === '1';
   const newStage = Number.parseInt(params.get('stage') ?? '', 10) || null;
@@ -144,6 +173,44 @@ export function SalesWorkPage() {
       return cleared;
     });
   };
+  /** The URL names the open order by its number and shows its pipeline. */
+  const shown = useCallback(
+    (order: SalesOrder) => {
+      if (order.number) setKnown({ number: order.number, id: order.id });
+      setParams(
+        (previous) => {
+          const next = new URLSearchParams(previous);
+          if (next.get('order') === null) return previous;
+          if (order.number) next.set('order', order.number);
+          if (order.pipelineId !== null) next.set('pipeline', String(order.pipelineId));
+          return next.toString() === previous.toString() ? previous : next;
+        },
+        { replace: true },
+      );
+    },
+    [setParams],
+  );
+  /** What the board or the list shows, as the API takes it. */
+  const exportQuery = (): ListQuery => {
+    const pipelineId = current ? String(current.id) : undefined;
+    if (view === 'BOARD') return { ...query, ...(pipelineId ? { pipeline: pipelineId } : {}) };
+    return {
+      ...query,
+      ...(listFilters.scope === 'PIPELINE' && pipelineId ? { pipeline: pipelineId } : {}),
+      ...(listFilters.scope === 'NONE' ? { pipeline: 'none' } : {}),
+      ...(listFilters.scope === 'PIPELINE' && listFilters.stageId
+        ? { stageId: listFilters.stageId }
+        : {}),
+      ...(listFilters.status ? { status: listFilters.status } : {}),
+      archived: listFilters.archived,
+    };
+  };
+  const downloadExcel = () =>
+    void exporting.run(async () => {
+      const blob = await exportOrders.mutateAsync(exportQuery());
+      saveBlob(blob, `${current?.name ?? t('sales.export.title')} ${businessDate()}.xlsx`);
+      toast.success(t('sales.work.exportDone'));
+    });
   const count =
     view === 'BOARD' ? (cards.data ?? []).reduce((sum, stage) => sum + stage.count, 0) : listCount;
 
@@ -204,7 +271,11 @@ export function SalesWorkPage() {
           </>
         }
       />
-      <ProblemAlert problem={problemFromError(tree.error) ?? problemFromError(pipeline.error)} />
+      <ProblemAlert
+        problem={
+          problemFromError(tree.error) ?? problemFromError(pipeline.error) ?? exporting.problem
+        }
+      />
       {!tree.isPending && current === null ? (
         <EmptyState
           title={t('sales.work.empty')}
@@ -237,6 +308,15 @@ export function SalesWorkPage() {
                       {t('sales.work.count', { count })}
                     </span>
                   ) : null}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={exportOrders.isPending}
+                    onClick={downloadExcel}
+                  >
+                    <Download />
+                    {t('sales.work.export')}
+                  </Button>
                   {view === 'LIST' ? <ListColumnChooser columns={columns} /> : null}
                   <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
@@ -328,6 +408,7 @@ export function SalesWorkPage() {
         tab={tab}
         onTab={(next) => setMany({ tab: next === 'overview' ? null : next })}
         onClose={() => setMany({ order: null, tab: null })}
+        onShown={shown}
       />
       <OrderCreateDialog
         open={creating}

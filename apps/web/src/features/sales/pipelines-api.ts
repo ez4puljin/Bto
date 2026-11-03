@@ -129,6 +129,38 @@ export function useOrderList(query: ListQuery, enabled = true) {
   });
 }
 
+/** An order's id from its number (the list's search, the exact number kept); null when unseen. */
+export function useOrderIdByNumber(number: string | null) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...SALES_KEYS.orders, 'by-number', number],
+    enabled: number !== null,
+    queryFn: async ({ signal }) => {
+      const page = unwrap(
+        await api.GET('/api/v1/sales-orders', {
+          params: { query: { q: number ?? '', archived: 'include', limit: 20 } },
+          signal,
+        }),
+      );
+      return page.data.find((row) => row.number === number)?.id ?? null;
+    },
+  });
+}
+
+/** The listed orders' lines as an Excel file (the list's filters). */
+export function useOrdersExport() {
+  const api = useApiClient();
+  return useMutation({
+    mutationFn: async (query: ListQuery): Promise<Blob> =>
+      unwrap(
+        await api.GET('/api/v1/sales-orders/export.xlsx', {
+          params: { query },
+          parseAs: 'blob',
+        }),
+      ),
+  });
+}
+
 /** Up to 100 orders, whole, for one printed page. */
 export function useOrderBatch(ids: readonly number[]) {
   const api = useApiClient();
