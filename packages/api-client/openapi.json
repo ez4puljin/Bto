@@ -15715,6 +15715,215 @@
         ]
       }
     },
+    "/api/v1/sales-orders/export.xlsx": {
+      "get": {
+        "operationId": "SalesOrders_exportExcel",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Part of the number, or of a customer name, code or phone",
+            "schema": {
+              "maxLength": 60,
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "description": "Only the orders with a line in this warehouse (ADR-0126 #2)",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "mine",
+            "required": false,
+            "in": "query",
+            "description": "Only the orders the caller entered",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "channel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ADMIN",
+                "CUSTOMER_APP",
+                "SALES_REP",
+                "POS"
+              ]
+            }
+          },
+          {
+            "name": "fulfilment",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PICKUP",
+                "DELIVERY"
+              ]
+            }
+          },
+          {
+            "name": "paymentMethod",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CASH",
+                "BANK_TRANSFER",
+                "CREDIT"
+              ]
+            }
+          },
+          {
+            "name": "deliveryFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "pipeline",
+            "required": false,
+            "in": "query",
+            "description": "A pipeline's id, or 'none' for orders without one",
+            "schema": {
+              "pattern": "^(none|\\d{1,18})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "stageId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "SUBMITTED",
+                "APPROVAL_PENDING",
+                "CONFIRMED",
+                "PICKING",
+                "PACKED",
+                "DISPATCHED",
+                "DELIVERED",
+                "DELIVERY_FAILED",
+                "INVOICED",
+                "CLOSED",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "description": "Archived orders; default exclude",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "exclude",
+                "include",
+                "only"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The listed orders' lines as one Excel sheet (the list's filters; ordered, picked, deducted and\nthe amounts per line), at most 5,000 orders.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales-orders/batch": {
       "get": {
         "operationId": "SalesOrders_batch",
@@ -22162,6 +22371,47 @@
         ]
       }
     },
+    "/api/v1/pos/edge-link": {
+      "post": {
+        "operationId": "PosEdgeLink_link",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosEdgeLinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosEdgeLinkResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "pos-sync"
+        ]
+      }
+    },
     "/api/v1/pos/edge-nodes": {
       "get": {
         "operationId": "PosEdgeNodes_list",
@@ -22340,6 +22590,52 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/edge-nodes/{id}/link-code": {
+      "post": {
+        "operationId": "PosEdgeNodes_issueLinkCode",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosEdgeLinkCode"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "ADR-0136: a one-time code to link a new edge from its kiosk (instead of typing the token).",
         "tags": [
           "pos"
         ]
@@ -29676,6 +29972,62 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/product-sales/data": {
+      "get": {
+        "operationId": "BookReports_productSalesData",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductSalesData"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every sales line of the period for the browser to work the conditions by itself (ADR-0135).",
         "tags": [
           "reports"
         ]
@@ -53688,6 +54040,59 @@
           }
         }
       },
+      "PosEdgeLinkRequest": {
+        "type": "object",
+        "properties": {
+          "nodeCode": {
+            "type": "string",
+            "maxLength": 16,
+            "example": "MRN1"
+          },
+          "linkCode": {
+            "type": "string",
+            "maxLength": 16,
+            "example": "K7PQ-X9MA"
+          }
+        },
+        "required": [
+          "nodeCode",
+          "linkCode"
+        ]
+      },
+      "PosEdgeLinkResponse": {
+        "type": "object",
+        "properties": {
+          "nodeId": {
+            "type": "number"
+          },
+          "nodeCode": {
+            "type": "string"
+          },
+          "nodeName": {
+            "type": "string"
+          },
+          "warehouseName": {
+            "type": "string",
+            "nullable": true
+          },
+          "token": {
+            "type": "string",
+            "description": "The node token; the edge keeps it in its own database"
+          },
+          "pinPepper": {
+            "type": "string",
+            "description": "The PIN key the tills' hashes were made with"
+          }
+        },
+        "required": [
+          "nodeId",
+          "nodeCode",
+          "nodeName",
+          "warehouseName",
+          "token",
+          "pinPepper"
+        ]
+      },
       "PosEdgeNode": {
         "type": "object",
         "properties": {
@@ -53772,6 +54177,12 @@
             "type": "string",
             "nullable": true
           },
+          "linkExpiresAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "ADR-0136: a link code is in force until then"
+          },
           "status": {
             "enum": [
               "ACTIVE",
@@ -53808,6 +54219,7 @@
           "posapiLeftLotteries",
           "posapiCheckedAt",
           "posapiError",
+          "linkExpiresAt",
           "status",
           "createdAt",
           "updatedAt"
@@ -53872,6 +54284,24 @@
         "required": [
           "token",
           "prefix"
+        ]
+      },
+      "PosEdgeLinkCode": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "K7PQ-X9MA",
+            "description": "Shown once (ADR-0136)"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "code",
+          "expiresAt"
         ]
       },
       "PosTill": {
@@ -62970,6 +63400,307 @@
           "truncated"
         ]
       },
+      "ProductSalesDataLines": {
+        "type": "object",
+        "properties": {
+          "doc": {
+            "description": "Index into docs",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "product": {
+            "description": "Index into products",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "warehouse": {
+            "description": "Warehouse id, 0 for none",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "qty": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sales": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "returns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cost": {
+            "description": "Empty without reports.margins.view",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "doc",
+          "product",
+          "warehouse",
+          "qty",
+          "sales",
+          "returns",
+          "cost"
+        ]
+      },
+      "ProductSalesDataDoc": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "INVOICE",
+              "CREDIT_NOTE",
+              "POS_SALE",
+              "POS_RETURN",
+              "COST_ADJ"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "date": {
+            "type": "string"
+          },
+          "invoiceId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "userId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The order's author or the cashier"
+          },
+          "app": {
+            "type": "boolean",
+            "description": "An order of the customer app"
+          },
+          "source": {
+            "enum": [
+              "WHOLESALE",
+              "POS",
+              "COST_ADJ"
+            ],
+            "type": "string"
+          },
+          "tenders": {
+            "description": "A till sale's tenders (split weights)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaidAmount"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "number",
+          "date",
+          "invoiceId",
+          "customerId",
+          "userId",
+          "app",
+          "source",
+          "tenders"
+        ]
+      },
+      "ProductSalesDataProduct": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryId": {
+            "type": "number",
+            "nullable": true
+          },
+          "brandId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The main supplier"
+          },
+          "segmentIds": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "sku",
+          "name",
+          "unit",
+          "categoryId",
+          "brandId",
+          "segmentIds"
+        ]
+      },
+      "ProductSalesDataCustomer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "categoryId"
+        ]
+      },
+      "ProductSalesName": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "ProductSalesDataNames": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductSalesName"
+            }
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductSalesName"
+            }
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductSalesName"
+            }
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductSalesName"
+            }
+          }
+        },
+        "required": [
+          "categories",
+          "brands",
+          "segments",
+          "users"
+        ]
+      },
+      "ProductSalesData": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "margins": {
+            "type": "boolean"
+          },
+          "lines": {
+            "$ref": "#/components/schemas/ProductSalesDataLines"
+          },
+          "docs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductSalesDataDoc"
+            }
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductSalesDataProduct"
+            }
+          },
+          "customers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductSalesDataCustomer"
+            }
+          },
+          "names": {
+            "$ref": "#/components/schemas/ProductSalesDataNames"
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductSalesPayment"
+            }
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Too many lines: shorten the period"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "margins",
+          "lines",
+          "docs",
+          "products",
+          "customers",
+          "names",
+          "payments",
+          "truncated"
+        ]
+      },
       "ProductSalesDocument": {
         "type": "object",
         "properties": {
@@ -65432,6 +66163,10 @@
           "POS_DEV_ONLY",
           "POS_PAIRING_INVALID",
           "POS_DEVICE_UNKNOWN",
+          "EDGE_LINK_INVALID",
+          "EDGE_LINK_PEPPER_MISSING",
+          "EDGE_ALREADY_LINKED",
+          "EDGE_LINK_UNREACHABLE",
           "POS_PIN_INVALID",
           "POS_CASHIER_LOCKED",
           "POS_SESSION_EXPIRED",

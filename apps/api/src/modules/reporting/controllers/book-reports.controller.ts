@@ -7,6 +7,8 @@ import { xlsxFile } from '../../../common/excel/xlsx-file';
 import { type AuthContext, CurrentUser, RequirePermission } from '../../identity';
 import {
   BookReportOptionsDto,
+  ProductSalesDataDto,
+  ProductSalesDataQueryDto,
   ProductSalesDocumentsDto,
   ProductSalesQueryDto,
   ProductSalesReportDto,
@@ -113,6 +115,17 @@ export class BookReportsController {
       `product-sales-${query.from}-${query.to}`,
       `${T.productSales} ${query.from} – ${query.to}`,
     );
+  }
+
+  /** Every sales line of the period for the browser to work the conditions by itself (ADR-0135). */
+  @Get('product-sales/data')
+  @RequirePermission('reports.view')
+  @ApiOkResponse({ type: ProductSalesDataDto })
+  async productSalesData(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: ProductSalesDataQueryDto,
+  ): Promise<ProductSalesDataDto> {
+    return this.sales.data(ctx, query);
   }
 
   /** The documents behind one product (`productId` required). */

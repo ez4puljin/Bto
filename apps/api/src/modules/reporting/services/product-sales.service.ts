@@ -133,8 +133,95 @@ export interface ProductSalesDocuments extends DateRange {
   truncated: boolean;
 }
 
+/** A name of a group met in the period's data (a category, brand, segment or user). */
+export interface ProductSalesName {
+  id: number;
+  name: string;
+}
+
+export const DATA_SOURCES = ['WHOLESALE', 'POS', 'COST_ADJ'] as const;
+
+/** A document of the period's data with what the conditions and the groups read of it. */
+export interface ProductSalesDataDoc {
+  kind: SalesDocKind;
+  id: number;
+  number: string | null;
+  date: string;
+  /** The invoice a credit note corrects (its page shows the note). */
+  invoiceId: number | null;
+  customerId: number | null;
+  /** The order's author, or the till's cashier. */
+  userId: number | null;
+  /** An order of the customer app («Харилцагчийн апп»). */
+  app: boolean;
+  source: (typeof DATA_SOURCES)[number];
+  /** A till sale's tenders by payment key (the weights of its split), empty otherwise. */
+  tenders: PaidAmount[];
+}
+
+export interface ProductSalesDataProduct {
+  id: number;
+  sku: string;
+  name: string;
+  unit: string | null;
+  categoryId: number | null;
+  /** The main supplier (ADR-0098 #4). */
+  brandId: number | null;
+  /** The live hand-picked product segments it sits in. */
+  segmentIds: number[];
+}
+
+export interface ProductSalesDataCustomer {
+  id: number;
+  name: string;
+  categoryId: number | null;
+}
+
+/**
+ * The lines, one per document × product × warehouse, as parallel columns: `doc` and `product`
+ * index `docs` and `products`, `warehouse` is an id (0 for none); the figures as decimal text
+ * (`cost` empty without `reports.margins.view`).
+ */
+export interface ProductSalesDataLines {
+  doc: number[];
+  product: number[];
+  warehouse: number[];
+  qty: string[];
+  sales: string[];
+  returns: string[];
+  cost: string[];
+}
+
+/**
+ * Every sales line of a period for the browser to filter, group and split by itself (ADR-0135):
+ * the conditions other than the period change the report without asking the server again. Over
+ * `MAX_DATA_LINES` lines the data comes back `truncated` and empty.
+ */
+export interface ProductSalesData extends DateRange {
+  margins: boolean;
+  lines: ProductSalesDataLines;
+  docs: ProductSalesDataDoc[];
+  products: ProductSalesDataProduct[];
+  customers: ProductSalesDataCustomer[];
+  names: {
+    categories: ProductSalesName[];
+    brands: ProductSalesName[];
+    segments: ProductSalesName[];
+    users: ProductSalesName[];
+  };
+  /** Every payment the period's documents can be split into, in the columns' order. */
+  payments: ProductSalesPayment[];
+  truncated: boolean;
+}
+
 const MAX_ROWS = 5_000;
 const MAX_DOCUMENTS = 1_000;
+export const MAX_DATA_LINES = 200_000;
+
+/** `<column> = ANY(…)` of ids as one array parameter (any number of them). */
+function anyOf(column: SQL, ids: Iterable<number>): SQL {
+  return sql`${column} = ANY(${`{${[...ids].join(',')}}`}::bigint[])`;
+}
 
 /** Who took the order behind a line: the order's author, the till's cashier (alias `m`). */
 const CREATOR = sql`CASE WHEN m.source = 'POS'
@@ -380,6 +467,185 @@ export class ProductSalesService {
         cost: scope.margins ? money(dec(row.cost)) : null,
         paid: paid.get(`${scalarText(row.doc_kind)}:${int(row.doc_id)}`) ?? [],
       })),
+    };
+  }
+
+  /** Every sales line of the period with its documents, products and names (ADR-0135). */
+  async data(ctx: AuthContext, period: { from: string; to: string }): Promise<ProductSalesData> {
+    const scope = await this.context.scope(ctx);
+    const range = checkedRange(period.from, period.to);
+    const rows = await rowsOf(
+      this.db,
+      sql`SELECT m.doc_kind, m.doc_id, m.product_id, coalesce(m.warehouse_id, 0) AS warehouse_id,
+                 min(m.doc_number) AS doc_number, min(m.day) AS day,
+                 min(m.customer_id) AS customer_id, min(m.source) AS source,
+                 bool_or(m.channel = 'CUSTOMER_APP') AS app,
+                 min(CASE WHEN m.source = 'POS' THEN ps.cashier_user_id ELSE m.rep_user_id END)
+                   AS user_id,
+                 min(CASE WHEN m.doc_kind = 'INVOICE' THEN m.doc_id ELSE cn.invoice_id END)
+                   AS invoice_id,
+                 sum(m.qty_base) AS qty, sum(m.net_sales) AS sales, sum(m.returns) AS returns,
+                 sum(m.cost) AS cost
+            FROM reporting.sales_lines m
+            LEFT JOIN public.pos_sales ps ON m.source = 'POS' AND ps.id = m.doc_id
+            LEFT JOIN public.credit_notes cn ON m.doc_kind = 'CREDIT_NOTE' AND cn.id = m.doc_id
+           WHERE m.day BETWEEN ${range.from}::date AND ${range.to}::date
+             AND m.product_id IS NOT NULL
+           GROUP BY m.doc_kind, m.doc_id, m.product_id, m.warehouse_id
+           ORDER BY m.doc_kind, m.doc_id, m.product_id
+           LIMIT ${MAX_DATA_LINES + 1}`,
+    );
+    const empty: ProductSalesData = {
+      ...range,
+      margins: scope.margins,
+      lines: { doc: [], product: [], warehouse: [], qty: [], sales: [], returns: [], cost: [] },
+      docs: [],
+      products: [],
+      customers: [],
+      names: { categories: [], brands: [], segments: [], users: [] },
+      payments: [],
+      truncated: rows.length > MAX_DATA_LINES,
+    };
+    if (rows.length === 0 || empty.truncated) return empty;
+
+    const lines = empty.lines;
+    const docs: ProductSalesDataDoc[] = [];
+    const docIndex = new Map<string, number>();
+    const productIndex = new Map<number, number>();
+    for (const row of rows) {
+      const kind = row.doc_kind as SalesDocKind;
+      const key = `${kind}:${int(row.doc_id)}`;
+      let doc = docIndex.get(key);
+      if (doc === undefined) {
+        doc = docs.length;
+        docIndex.set(key, doc);
+        const source = DATA_SOURCES.find((value) => value === row.source) ?? 'COST_ADJ';
+        docs.push({
+          kind,
+          id: int(row.doc_id),
+          number: textOrNull(row.doc_number),
+          date: dateText(row.day) ?? '',
+          invoiceId: intOrNull(row.invoice_id),
+          customerId: intOrNull(row.customer_id),
+          userId: intOrNull(row.user_id),
+          app: row.app === true,
+          source,
+          tenders: source === 'WHOLESALE' ? [{ key: 'AR', amount: '1' }] : [],
+        });
+      }
+      const productId = int(row.product_id);
+      let product = productIndex.get(productId);
+      if (product === undefined) {
+        product = productIndex.size;
+        productIndex.set(productId, product);
+      }
+      lines.doc.push(doc);
+      lines.product.push(product);
+      lines.warehouse.push(int(row.warehouse_id));
+      lines.qty.push(dec(row.qty).toFixed());
+      lines.sales.push(dec(row.sales).toFixed());
+      lines.returns.push(dec(row.returns).toFixed());
+      if (scope.margins) lines.cost.push(dec(row.cost).toFixed());
+    }
+
+    const [tenders, products] = await Promise.all([
+      rowsOf(
+        this.db,
+        sql`SELECT t.sale_id,
+                   CASE WHEN t.kind = 'CREDIT' THEN 'AR'
+                        WHEN t.payment_type_id IS NOT NULL THEN 'T' || t.payment_type_id
+                        ELSE t.kind END AS pay_key,
+                   sum(t.amount) AS amount
+              FROM public.pos_tenders t
+              JOIN public.pos_sales s ON s.id = t.sale_id
+             WHERE s.sold_day::date BETWEEN ${range.from}::date AND ${range.to}::date
+             GROUP BY 1, 2 ORDER BY 1, 2`,
+      ),
+      rowsOf(
+        this.db,
+        sql`SELECT p.id, p.sku, p.name, p.category_id, u.name AS unit,
+                   (SELECT ps.supplier_id FROM public.product_suppliers ps
+                     WHERE ps.product_id = p.id AND ps.is_main) AS brand_id,
+                   (SELECT string_agg(sp.segment_id::text, ',' ORDER BY sp.segment_id)
+                      FROM public.segment_products sp
+                     WHERE sp.product_id = p.id AND sp.segment_id IN (${LIST_SEGMENTS})) AS segment_ids
+              FROM public.products p
+              LEFT JOIN public.product_units pu
+                ON pu.product_id = p.id AND pu.is_base AND pu.superseded_by IS NULL
+              LEFT JOIN public.uoms u ON u.id = pu.uom_id
+             WHERE ${anyOf(sql`p.id`, productIndex.keys())}`,
+      ),
+    ]);
+    for (const row of tenders) {
+      const doc =
+        docIndex.get(`POS_SALE:${int(row.sale_id)}`) ??
+        docIndex.get(`POS_RETURN:${int(row.sale_id)}`);
+      const amount = dec(row.amount);
+      if (doc === undefined || amount.isZero()) continue;
+      docs[doc]?.tenders.push({ key: scalarText(row.pay_key), amount: money(amount) });
+    }
+    for (const doc of docs) {
+      if (doc.source === 'POS' && doc.tenders.length === 0) {
+        doc.tenders.push({ key: NO_GROUP, amount: '1' });
+      }
+    }
+
+    const byId = new Map(products.map((row) => [int(row.id), row]));
+    const outProducts = [...productIndex.keys()].map((id): ProductSalesDataProduct => {
+      const row = byId.get(id) ?? {};
+      return {
+        id,
+        sku: textOrNull(row.sku) ?? '',
+        name: textOrNull(row.name) ?? '',
+        unit: textOrNull(row.unit),
+        categoryId: intOrNull(row.category_id),
+        brandId: intOrNull(row.brand_id),
+        segmentIds: (textOrNull(row.segment_ids) ?? '')
+          .split(',')
+          .filter(Boolean)
+          .map((value) => int(value)),
+      };
+    });
+    const ids = (values: readonly (number | null)[]) =>
+      new Set(values.filter((value): value is number => value !== null));
+    const customerIds = ids(docs.map((doc) => doc.customerId));
+    const named = async (table: SQL, set: Set<number>): Promise<ProductSalesName[]> =>
+      set.size === 0
+        ? []
+        : (await rowsOf(this.db, sql`${table} WHERE ${anyOf(sql`id`, set)} ORDER BY name`)).map(
+            (row) => ({ id: int(row.id), name: textOrNull(row.name) ?? '' }),
+          );
+    const [customers, categories, brands, segments, users] = await Promise.all([
+      customerIds.size === 0
+        ? Promise.resolve([])
+        : rowsOf(
+            this.db,
+            sql`SELECT id, name, category_id FROM public.customers
+                 WHERE ${anyOf(sql`id`, customerIds)}`,
+          ),
+      named(sql`SELECT id, name FROM public.categories`, ids(outProducts.map((p) => p.categoryId))),
+      named(sql`SELECT id, name FROM public.suppliers`, ids(outProducts.map((p) => p.brandId))),
+      named(
+        sql`SELECT id, name FROM public.segments`,
+        new Set(outProducts.flatMap((p) => p.segmentIds)),
+      ),
+      named(
+        sql`SELECT id, full_name AS name FROM public.users`,
+        ids(docs.map((doc) => doc.userId)),
+      ),
+    ]);
+    const keys = new Set(docs.flatMap((doc) => doc.tenders.map((tender) => tender.key)));
+    return {
+      ...empty,
+      docs,
+      products: outProducts,
+      customers: customers.map((row) => ({
+        id: int(row.id),
+        name: textOrNull(row.name) ?? '',
+        categoryId: intOrNull(row.category_id),
+      })),
+      names: { categories, brands, segments, users },
+      payments: await this.paymentColumns([...keys]),
     };
   }
 

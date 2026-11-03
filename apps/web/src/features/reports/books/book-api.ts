@@ -41,6 +41,7 @@ export type ProductSalesDocuments = Body<'/api/v1/reports/product-sales/document
 export type ProductSalesDocument = ProductSalesDocuments['rows'][number];
 export type ProductSalesPayment = ProductSales['payments'][number];
 export type PaidAmount = ProductSalesRow['paid'][number];
+export type ProductSalesData = Body<'/api/v1/reports/product-sales/data'>;
 
 export type StockDocuments = Body<'/api/v1/reports/stock-documents'>;
 export type StockDocumentRow = StockDocuments['rows'][number];
@@ -57,6 +58,7 @@ const KEYS = {
   stockBalanceLines: ['books', 'stock-balance-lines'] as const,
   productSales: ['books', 'product-sales'] as const,
   productSalesDocuments: ['books', 'product-sales-documents'] as const,
+  productSalesData: ['books', 'product-sales-data'] as const,
   stockDocuments: ['books', 'stock-documents'] as const,
   stockDocumentLines: ['books', 'stock-document-lines'] as const,
 };
@@ -166,6 +168,27 @@ export function useProductSales(query: ProductSalesQuery | null) {
       unwrap(
         await api.GET('/api/v1/reports/product-sales', {
           params: { query: query ?? ({} as ProductSalesQuery) },
+          signal,
+        }),
+      ),
+  });
+}
+
+/**
+ * The period's every sales line (ADR-0135), downloaded once per period: the page works the other
+ * conditions out of it. Not fetched again on focus (it may be large); a new period fetches anew.
+ */
+export function useProductSalesData(period: { from: string; to: string } | null) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.productSalesData, period?.from, period?.to],
+    enabled: period !== null,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/reports/product-sales/data', {
+          params: { query: { from: period?.from ?? '', to: period?.to ?? '' } },
           signal,
         }),
       ),

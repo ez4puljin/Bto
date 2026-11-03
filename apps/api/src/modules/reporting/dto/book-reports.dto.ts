@@ -13,6 +13,7 @@ import {
 import { queryIds } from '../../../common/pagination/page';
 import { BOOK_DOC_TYPES, type BookDocType } from '../services/book-sql';
 import {
+  DATA_SOURCES,
   PRODUCT_SALES_GROUPINGS,
   PRODUCT_SALES_KINDS,
   type ProductSalesGrouping,
@@ -279,6 +280,84 @@ export class ProductSalesDocumentsDto {
   @ApiProperty() to: string;
   @ApiProperty({ type: [ProductSalesDocumentDto] }) rows: ProductSalesDocumentDto[];
   @ApiProperty() truncated: boolean;
+}
+
+@ApiSchema({ name: 'ProductSalesDataQuery' })
+export class ProductSalesDataQueryDto extends RangeQueryDto {}
+
+@ApiSchema({ name: 'ProductSalesName' })
+export class ProductSalesNameDto {
+  @ApiProperty() id: number;
+  @ApiProperty() name: string;
+}
+
+@ApiSchema({ name: 'ProductSalesDataDoc' })
+export class ProductSalesDataDocDto {
+  @ApiProperty({ enum: SALES_DOC_KINDS }) kind: SalesDocKind;
+  @ApiProperty() id: number;
+  @ApiProperty({ type: String, nullable: true }) number: string | null;
+  @ApiProperty() date: string;
+  @ApiProperty({ type: Number, nullable: true }) invoiceId: number | null;
+  @ApiProperty({ type: Number, nullable: true }) customerId: number | null;
+  @ApiProperty({ type: Number, nullable: true, description: "The order's author or the cashier" })
+  userId: number | null;
+  @ApiProperty({ description: 'An order of the customer app' }) app: boolean;
+  @ApiProperty({ enum: DATA_SOURCES }) source: (typeof DATA_SOURCES)[number];
+  @ApiProperty({ type: [PaidAmountDto], description: "A till sale's tenders (split weights)" })
+  tenders: PaidAmountDto[];
+}
+
+@ApiSchema({ name: 'ProductSalesDataProduct' })
+export class ProductSalesDataProductDto {
+  @ApiProperty() id: number;
+  @ApiProperty() sku: string;
+  @ApiProperty() name: string;
+  @ApiProperty({ type: String, nullable: true }) unit: string | null;
+  @ApiProperty({ type: Number, nullable: true }) categoryId: number | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'The main supplier' })
+  brandId: number | null;
+  @ApiProperty({ type: [Number] }) segmentIds: number[];
+}
+
+@ApiSchema({ name: 'ProductSalesDataCustomer' })
+export class ProductSalesDataCustomerDto {
+  @ApiProperty() id: number;
+  @ApiProperty() name: string;
+  @ApiProperty({ type: Number, nullable: true }) categoryId: number | null;
+}
+
+@ApiSchema({ name: 'ProductSalesDataLines' })
+export class ProductSalesDataLinesDto {
+  @ApiProperty({ type: [Number], description: 'Index into docs' }) doc: number[];
+  @ApiProperty({ type: [Number], description: 'Index into products' }) product: number[];
+  @ApiProperty({ type: [Number], description: 'Warehouse id, 0 for none' }) warehouse: number[];
+  @ApiProperty({ type: [String] }) qty: string[];
+  @ApiProperty({ type: [String] }) sales: string[];
+  @ApiProperty({ type: [String] }) returns: string[];
+  @ApiProperty({ type: [String], description: 'Empty without reports.margins.view' })
+  cost: string[];
+}
+
+@ApiSchema({ name: 'ProductSalesDataNames' })
+export class ProductSalesDataNamesDto {
+  @ApiProperty({ type: [ProductSalesNameDto] }) categories: ProductSalesNameDto[];
+  @ApiProperty({ type: [ProductSalesNameDto] }) brands: ProductSalesNameDto[];
+  @ApiProperty({ type: [ProductSalesNameDto] }) segments: ProductSalesNameDto[];
+  @ApiProperty({ type: [ProductSalesNameDto] }) users: ProductSalesNameDto[];
+}
+
+@ApiSchema({ name: 'ProductSalesData' })
+export class ProductSalesDataDto {
+  @ApiProperty() from: string;
+  @ApiProperty() to: string;
+  @ApiProperty() margins: boolean;
+  @ApiProperty({ type: ProductSalesDataLinesDto }) lines: ProductSalesDataLinesDto;
+  @ApiProperty({ type: [ProductSalesDataDocDto] }) docs: ProductSalesDataDocDto[];
+  @ApiProperty({ type: [ProductSalesDataProductDto] }) products: ProductSalesDataProductDto[];
+  @ApiProperty({ type: [ProductSalesDataCustomerDto] }) customers: ProductSalesDataCustomerDto[];
+  @ApiProperty({ type: ProductSalesDataNamesDto }) names: ProductSalesDataNamesDto;
+  @ApiProperty({ type: [ProductSalesPaymentDto] }) payments: ProductSalesPaymentDto[];
+  @ApiProperty({ description: 'Too many lines: shorten the period' }) truncated: boolean;
 }
 
 // ------------------------------------------------------------- stock documents

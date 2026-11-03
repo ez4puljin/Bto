@@ -1,8 +1,19 @@
 import { ShoppingBasket } from 'lucide-react';
-import { Fragment, type ReactNode, useEffect, useMemo, useState } from 'react';
+import {
+  Fragment,
+  type ReactNode,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
+import { Combobox, type ComboboxOption } from '@/components/combobox';
+import { EmptyState, FilterBar, FilterChip, FilterToggle } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
+import { Button } from '@/components/ui/button';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ProductSearch } from '@/features/inventory/shared';
 import { CustomerPicker, type PickedCustomer } from '@/features/partners/customer-picker';
@@ -13,14 +24,14 @@ import { cn } from '@/lib/utils';
 import {
   type BookOptions,
   type PaidAmount,
+  type ProductSalesData,
   type ProductSalesDocument,
   type ProductSalesPayment,
   type ProductSalesQuery,
   type ProductSalesRow,
   useBookDownloads,
   useBookOptions,
-  useProductSales,
-  useProductSalesDocuments,
+  useProductSalesData,
 } from './book-api';
 import {
   addMoney,
@@ -47,7 +58,6 @@ import {
   CheckField,
   DetailLabel,
   DetailRow,
-  DetailSkeleton,
   DrillCell,
   DrillRow,
   EmptyRow,
@@ -65,6 +75,14 @@ import {
 } from './book-kit';
 import { salesDocHref } from './book-links';
 import { idParamOf, idsParam, useBookParams, useDrill, usePromptDates } from './book-state';
+import {
+  buildCube,
+  categoryTree,
+  type SalesConditions,
+  type SalesReport,
+  salesDocuments,
+  salesReport,
+} from './product-sales-cube';
 
 const GROUPINGS = ['none', 'category', 'brand', 'segment', 'user'] as const;
 type Grouping = (typeof GROUPINGS)[number];
@@ -72,6 +90,22 @@ const SOURCES = ['ALL', 'WHOLESALE', 'POS'] as const;
 const KINDS = ['ALL', 'SALES', 'RETURNS'] as const;
 type Source = (typeof SOURCES)[number];
 type Kind = (typeof KINDS)[number];
+/** The bar's filters («Цэвэрлэх» drops them; the period, grouping and split stay). */
+const FILTER_KEYS = [
+  'src',
+  'kind',
+  'w',
+  'rep',
+  'cc',
+  'cat',
+  'catn',
+  'br',
+  'sg',
+  'c',
+  'cn',
+  'pr',
+  'prn',
+];
 /** The documents that take goods back: their amount is a return. */
 const RETURN_KINDS: readonly ProductSalesDocument['kind'][] = ['CREDIT_NOTE', 'POS_RETURN'];
 
@@ -109,17 +143,74 @@ function useProductSalesQuery() {
   return { ...params, query, grouping, payments };
 }
 
-/** «Тайлан → Борлуулалт /Бараагаар/» (ADR-0133). */
+/** The address's conditions as the browser's report reads them (a category with its children). */
+function conditionsOf(
+  query: ProductSalesQuery,
+  categories: BookOptions['categories'] | undefined,
+): SalesConditions {
+  return {
+    source: query.source ?? 'ALL',
+    kind: query.kind ?? 'ALL',
+    repUserId: query.repUserId,
+    customerCategoryId: query.customerCategoryId,
+    customerId: query.customerId,
+    productId: query.productId,
+    categoryIds:
+      query.categoryId === undefined ? undefined : categoryTree(categories ?? [], query.categoryId),
+    warehouseId: query.warehouseId,
+    brandIds: query.brandIds ?? [],
+    segmentIds: query.segmentIds ?? [],
+  };
+}
+
+/**
+ * «Тайлан → Борлуулалт /Бараагаар/» (ADR-0133, ADR-0135): the period's lines come once; the
+ * conditions bar above the paper and the prompt change the report at once, in the browser.
+ */
 export function ProductSalesPage() {
   const { t } = useTranslation();
   const state = useProductSalesQuery();
   const [prompting, setPrompting] = useState(!state.ready);
-  const report = useProductSales(state.query);
+  const period = useMemo(
+    () => (state.ready ? { from: state.from, to: state.to } : null),
+    [state.ready, state.from, state.to],
+  );
+  const data = useProductSalesData(period);
+  const cube = useMemo(() => (data.data ? buildCube(data.data) : null), [data.data]);
   const options = useBookOptions();
   const downloads = useBookDownloads();
   const action = useAction();
   const title = t('reports.books.titles.productSales');
   const { search } = state;
+  // The table follows the conditions a moment later, so a pill answers at once on a long period.
+  const query = useDeferredValue(state.query);
+  const conditions = useMemo(
+    () => (query ? conditionsOf(query, options.data?.categories) : null),
+    [query, options.data?.categories],
+  );
+  const grouping: Grouping = query?.by ?? 'none';
+  const payments = query?.payments === true;
+  const names = useMemo(
+    () => ({
+      none: grouping === 'none' ? '' : t(`reports.books.noGroup.${grouping}`),
+      app: t('reports.books.appOrders'),
+    }),
+    [grouping, t],
+  );
+  const report = useMemo(
+    () =>
+      cube && conditions && !cube.data.truncated
+        ? salesReport(cube, conditions, grouping, payments, names)
+        : null,
+    [cube, conditions, grouping, payments, names],
+  );
+  const documentsOf = useCallback(
+    (productId: number, group: string | null) =>
+      cube && conditions
+        ? salesDocuments(cube, conditions, grouping, productId, group, payments)
+        : { rows: [], truncated: false },
+    [cube, conditions, grouping, payments],
+  );
   const filters = [
     ...(idParamOf(search, 'rep')
       ? [options.data?.users.find((u) => u.id === idParamOf(search, 'rep'))?.name ?? '']
@@ -142,8 +233,8 @@ export function ProductSalesPage() {
       : []),
     ...(search.get('kind') ? [t(`reports.books.prompt.kinds.${search.get('kind') as Kind}`)] : []),
   ].filter(Boolean);
-  const costs = report.data ? report.data.totals.cost !== null : true;
-  const paymentCount = report.data?.payments.length ?? 0;
+  const costs = cube ? cube.data.margins : true;
+  const paymentCount = report?.payments.length ?? 0;
   const openPrompt = () => setPrompting(true);
   return (
     <BookPage columns={productSalesColumns(costs, paymentCount)}>
@@ -153,23 +244,26 @@ export function ProductSalesPage() {
           title={title}
           actions={
             <BookActions
-              ready={state.query !== null && report.data !== undefined}
+              ready={state.query !== null && report !== null}
               period={state.query}
               onPrompt={openPrompt}
               excelPending={downloads.productSales.isPending}
               onExcel={() => {
-                const query = state.query;
-                if (!query) return;
+                const current = state.query;
+                if (!current) return;
                 void action.run(async () =>
                   saveBlob(
-                    await downloads.productSales.mutateAsync(query),
-                    `borluulalt-baraagaar-${query.from}-${query.to}.xlsx`,
+                    await downloads.productSales.mutateAsync(current),
+                    `borluulalt-baraagaar-${current.from}-${current.to}.xlsx`,
                   ),
                 );
               }}
             />
           }
         />
+        {state.query ? (
+          <SalesConditionBar state={state} options={options.data} data={data.data} />
+        ) : null}
       </div>
       <ProductSalesPrompt
         open={prompting}
@@ -178,22 +272,27 @@ export function ProductSalesPage() {
         title={title}
         options={options.data}
       />
-      <ProblemAlert problem={action.problem ?? problemFromError(report.error)} />
-      {state.query && (report.data || report.isPending) ? (
+      <ProblemAlert problem={action.problem ?? problemFromError(data.error)} />
+      {state.query && (data.data || data.isPending) ? (
         <BookSheet
           title={title}
           period={state.query}
           filters={filters}
           orientation="landscape"
-          loading={!report.data}
+          loading={!report && !cube?.data.truncated}
         >
-          <ProductSalesTable
-            report={report.data ?? null}
-            grouping={report.data?.by ?? state.grouping}
-            query={state.query}
-            precision={state.precision}
-            onPrompt={openPrompt}
-          />
+          {cube?.data.truncated ? (
+            <EmptyState icon={ShoppingBasket} title={t('reports.books.bar.tooMany')} />
+          ) : (
+            <ProductSalesTable
+              report={report}
+              grouping={grouping}
+              precision={state.precision}
+              costs={costs}
+              documentsOf={documentsOf}
+              onPrompt={openPrompt}
+            />
+          )}
         </BookSheet>
       ) : (
         <BookBlank
@@ -204,6 +303,168 @@ export function ProductSalesPage() {
         />
       )}
     </BookPage>
+  );
+}
+
+/**
+ * The live conditions above the paper (ADR-0135): pills that change the report at once — the
+ * grouping, the split by payment, the source and kind, the warehouse, the user, the customers'
+ * group, the products' group, brands and segments (those sold in the period); a picked customer or
+ * product shows as a chip to clear. «Цэвэрлэх» drops every filter but the period.
+ */
+function SalesConditionBar(props: {
+  state: ReturnType<typeof useProductSalesQuery>;
+  options: BookOptions | undefined;
+  data: ProductSalesData | undefined;
+}) {
+  const { t } = useTranslation();
+  const { search, update } = props.state;
+  const categories = useMemo(
+    () => categoryOptions(props.options?.categories ?? []),
+    [props.options?.categories],
+  );
+  const named = (list: readonly { id: number; name: string; code?: string | null }[]) =>
+    list.map((item) => ({ value: String(item.id), label: item.name, keys: [item.code ?? ''] }));
+  const brands = named(props.data?.names.brands ?? props.options?.brands ?? []);
+  const segments = named(props.data?.names.segments ?? props.options?.segments ?? []);
+  const pill = (
+    key: string,
+    label: string,
+    emptyLabel: string,
+    options: readonly ComboboxOption[],
+  ) => (
+    <Combobox
+      aria-label={label}
+      value={search.get(key) ?? ''}
+      emptyLabel={emptyLabel}
+      options={options}
+      onChange={(value) => update({ [key]: value })}
+    />
+  );
+  const many = (key: string, label: string, options: readonly ComboboxOption[]) => {
+    const chosen = search.getAll(key);
+    return (
+      <>
+        <Combobox
+          aria-label={label}
+          value=""
+          emptyLabel={chosen.length > 0 ? t('reports.books.bar.more', { name: label }) : label}
+          options={options.filter((option) => !chosen.includes(option.value))}
+          onChange={(value) => {
+            if (value) update({ [key]: [...chosen, value] });
+          }}
+        />
+        {chosen.map((value) => {
+          const name = options.find((option) => option.value === value)?.label ?? value;
+          return (
+            <FilterChip
+              key={`${key}:${value}`}
+              clearLabel={t('reports.prompt.remove', { name })}
+              onClear={() => update({ [key]: chosen.filter((v) => v !== value) })}
+            >
+              {name}
+            </FilterChip>
+          );
+        })}
+      </>
+    );
+  };
+  const chip = (key: string, labelKey: string) => {
+    const name = search.get(labelKey);
+    if (!search.get(key) || !name) return null;
+    return (
+      <FilterChip
+        clearLabel={t('reports.prompt.remove', { name })}
+        onClear={() => update({ [key]: null, [labelKey]: null })}
+      >
+        {name}
+      </FilterChip>
+    );
+  };
+  const filtered = FILTER_KEYS.some((key) => search.has(key));
+  return (
+    <FilterBar
+      className="mb-2"
+      end={
+        filtered ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => update(Object.fromEntries(FILTER_KEYS.map((key) => [key, null])))}
+          >
+            {t('reports.books.bar.clear')}
+          </Button>
+        ) : null
+      }
+    >
+      <Combobox
+        aria-label={t('reports.books.prompt.grouping')}
+        value={search.get('by') ?? ''}
+        emptyLabel={t('reports.books.prompt.groupings.none')}
+        options={GROUPINGS.filter((g) => g !== 'none').map((value) => ({
+          value,
+          label: t(`reports.books.prompt.groupings.${value}`),
+        }))}
+        onChange={(value) => update({ by: value })}
+      />
+      <FilterToggle
+        label={t('reports.books.prompt.payments')}
+        checked={search.get('pay') === '1'}
+        onCheckedChange={(checked) => update({ pay: checked ? '1' : null })}
+      />
+      {pill(
+        'src',
+        t('reports.books.prompt.source'),
+        t('reports.books.bar.allSources'),
+        SOURCES.filter((s) => s !== 'ALL').map((value) => ({
+          value,
+          label: t(`reports.books.prompt.sources.${value}`),
+        })),
+      )}
+      {pill(
+        'kind',
+        t('reports.books.prompt.kind'),
+        t('reports.books.bar.allKinds'),
+        KINDS.filter((k) => k !== 'ALL').map((value) => ({
+          value,
+          label: t(`reports.books.prompt.kinds.${value}`),
+        })),
+      )}
+      {pill(
+        'w',
+        t('reports.books.prompt.warehouse'),
+        t('reports.books.bar.allWarehouses'),
+        (props.options?.warehouses ?? []).map((w) => ({
+          value: String(w.id),
+          label: `${w.code ?? ''} - ${w.name}`,
+        })),
+      )}
+      {pill(
+        'rep',
+        t('reports.books.prompt.rep'),
+        t('reports.books.bar.allReps'),
+        named(props.data?.names.users ?? props.options?.users ?? []),
+      )}
+      {pill(
+        'cc',
+        t('reports.books.prompt.customerCategory'),
+        t('reports.books.bar.allCustomerCategories'),
+        named(props.options?.customerCategories ?? []),
+      )}
+      <Combobox
+        aria-label={t('reports.books.prompt.category')}
+        value={search.get('cat') ?? ''}
+        emptyLabel={t('reports.books.bar.allCategories')}
+        options={categories}
+        onChange={(value) =>
+          update({ cat: value, catn: categories.find((c) => c.value === value)?.label ?? null })
+        }
+      />
+      {many('br', t('reports.books.prompt.brands'), brands)}
+      {many('sg', t('reports.books.prompt.segments'), segments)}
+      {chip('c', 'cn')}
+      {chip('pr', 'prn')}
+    </FilterBar>
   );
 }
 
@@ -511,21 +772,22 @@ function ProductSalesHead(props: { costs: boolean; payments: readonly ProductSal
   );
 }
 
+type DocumentsOf = (
+  productId: number,
+  group: string | null,
+) => { rows: ProductSalesDocument[]; truncated: boolean };
+
 function ProductSalesTable(props: {
-  report: {
-    rows: readonly ProductSalesRow[];
-    totals: SalesTotals;
-    payments: readonly ProductSalesPayment[];
-    truncated: boolean;
-  } | null;
+  report: SalesReport | null;
   grouping: Grouping;
-  query: ProductSalesQuery;
   precision: Precision;
+  costs: boolean;
+  documentsOf: DocumentsOf;
   onPrompt: () => void;
 }) {
   const { t } = useTranslation();
   const drill = useDrill();
-  const costs = props.report ? props.report.totals.cost !== null : true;
+  const { costs } = props;
   const payments = props.report?.payments ?? [];
   const span = (costs ? 10 : 7) + payments.length;
   const groups = useMemo(() => {
@@ -641,9 +903,7 @@ function ProductSalesTable(props: {
                   </DrillRow>
                   {expanded ? (
                     <SalesDetail
-                      query={props.query}
-                      productId={row.productId}
-                      group={row.group}
+                      documents={props.documentsOf(row.productId, row.group)}
                       omit={[group.name]}
                       costs={costs}
                       payments={payments}
@@ -670,9 +930,7 @@ function ProductSalesTable(props: {
  * shows under «Борлуулалт» (net sales take it off) and under «Буцаалт», as the product's row does.
  */
 function SalesDetail(props: {
-  query: ProductSalesQuery;
-  productId: number;
-  group: string | null;
+  documents: ReturnType<DocumentsOf>;
   omit: readonly string[];
   costs: boolean;
   payments: readonly ProductSalesPayment[];
@@ -680,21 +938,13 @@ function SalesDetail(props: {
   span: number;
 }) {
   const { t } = useTranslation();
-  const documents = useProductSalesDocuments(props.query, props.productId, props.group);
-  if (documents.isPending) return <DetailSkeleton colSpan={props.span} />;
-  if (documents.error) {
-    return (
-      <NoteRow colSpan={props.span}>
-        <ProblemAlert problem={problemFromError(documents.error)} />
-      </NoteRow>
-    );
-  }
-  if (documents.data.rows.length === 0) {
+  const { documents } = props;
+  if (documents.rows.length === 0) {
     return <NoteRow colSpan={props.span}>{t('reports.prompt.noLines')}</NoteRow>;
   }
   return (
     <>
-      {documents.data.rows.map((doc) => {
+      {documents.rows.map((doc) => {
         const number = doc.number ?? String(doc.id);
         const parts = detailParts(
           number,
@@ -733,7 +983,7 @@ function SalesDetail(props: {
           </DetailRow>
         );
       })}
-      {documents.data.truncated ? (
+      {documents.truncated ? (
         <NoteRow colSpan={props.span}>{t('reports.prompt.truncated')}</NoteRow>
       ) : null}
     </>

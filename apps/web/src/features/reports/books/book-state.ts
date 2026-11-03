@@ -26,7 +26,26 @@ export function useBookParams() {
     },
     [setSearch],
   );
-  return { search, from, to, ready, precision, apply };
+  /** Changes some parameters in place (the live conditions; no new history entry). */
+  const update = useCallback(
+    (params: Record<string, string | readonly string[] | number | null | undefined>) => {
+      setSearch(
+        (current) => {
+          const next = new URLSearchParams(current);
+          for (const [key, value] of Object.entries(params)) {
+            next.delete(key);
+            if (value === null || value === undefined || value === '') continue;
+            if (Array.isArray(value)) for (const item of value) next.append(key, String(item));
+            else next.set(key, String(value));
+          }
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearch],
+  );
+  return { search, from, to, ready, precision, apply, update };
 }
 
 /** Positive whole numbers of a repeated parameter. */
