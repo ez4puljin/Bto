@@ -19,6 +19,7 @@ import type {
   EdgeEbarimtQueue,
   EdgeHealth,
   EdgeLinkState,
+  EdgeTillChoice,
   EdgeLoginResponse,
   EdgeCartLine,
   EdgeCustomer,
@@ -54,6 +55,7 @@ import {
   EbarimtSendDataDto,
   LoginDto,
   LinkDto,
+  OpenDto,
   PairDto,
   ParkDto,
   QuoteDto,
@@ -186,6 +188,28 @@ export class KioskController {
       body.pairingCode,
       userAgent ?? null,
     );
+    return { deviceToken: token, till };
+  }
+
+  /** ADR-0138: the active POS of this edge, for the kiosk's start page (`…:7400`). */
+  @Get('tills')
+  @EdgePublic()
+  tills(): EdgeTillChoice[] {
+    return [...(this.store.peek()?.tills.values() ?? [])]
+      .filter((till) => till.status === 'ACTIVE')
+      .map((till) => ({ code: till.code, name: till.name }))
+      .sort((a, b) => a.code.localeCompare(b.code, 'mn'));
+  }
+
+  /** ADR-0138: a browser that opened `…:7400/K1` is bound to К1 without a code. */
+  @Post('open')
+  @HttpCode(200)
+  @EdgePublic()
+  async open(
+    @Body() body: OpenDto,
+    @Headers('user-agent') userAgent: string | undefined,
+  ): Promise<EdgePairResponse> {
+    const { token, till } = await this.devices.open(body.tillCode, userAgent ?? null);
     return { deviceToken: token, till };
   }
 

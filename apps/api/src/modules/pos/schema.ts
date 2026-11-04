@@ -126,9 +126,6 @@ export const posEdgeNodes = pgTable(
     id: id(),
     code: text('code').notNull(),
     name: text('name').notNull(),
-    warehouseId: ref('warehouse_id')
-      .notNull()
-      .references(() => warehouses.id),
     tokenHash: text('token_hash'),
     tokenPrefix: text('token_prefix'),
     tokenIssuedAt: timestamp('token_issued_at', { withTimezone: true }),

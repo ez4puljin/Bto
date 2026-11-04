@@ -36,7 +36,7 @@ type Dialogs =
       warehouse: Warehouse | 'new';
       preset?: { kind: 'WHOLESALE' | 'STORE'; branchId: number };
     }
-  | { kind: 'node'; node: EdgeNode | null; warehouseId?: number }
+  | { kind: 'node'; node: EdgeNode | null }
   | { kind: 'till'; till: Till | null; node: EdgeNode }
   | { kind: 'tillAccess'; till: Till }
   | { kind: 'board'; board: SalesBoard | null; branchId?: number }
@@ -200,14 +200,7 @@ export function StructurePage() {
       {dialog?.kind === 'warehouse' ? (
         <WarehouseDialog warehouse={dialog.warehouse} preset={dialog.preset} onClose={close} />
       ) : null}
-      {dialog?.kind === 'node' ? (
-        <NodeDialog
-          open
-          node={dialog.node}
-          presetWarehouseId={dialog.warehouseId}
-          onClose={close}
-        />
-      ) : null}
+      {dialog?.kind === 'node' ? <NodeDialog open node={dialog.node} onClose={close} /> : null}
       {dialog?.kind === 'till' ? (
         <TillDialog open till={dialog.till} nodes={[dialog.node]} onClose={close} />
       ) : null}
@@ -348,7 +341,12 @@ function BranchCard(props: {
                   {props.canReadPos ? (
                     <StoreNodes
                       store={store}
-                      nodes={props.nodes.filter((node) => node.warehouseId === store.id)}
+                      nodes={props.nodes.filter((node) =>
+                        // ADR-0137: an edge belongs where its tills sell from.
+                        props.tills.some(
+                          (till) => till.edgeNodeId === node.id && till.warehouseId === store.id,
+                        ),
+                      )}
                       tills={props.tills}
                       canPos={props.canPos}
                       onOpen={props.onOpen}
@@ -407,7 +405,7 @@ function StoreNodes(props: {
             variant="ghost"
             size="sm"
             className="ml-auto text-link"
-            onClick={() => props.onOpen({ kind: 'node', node: null, warehouseId: props.store.id })}
+            onClick={() => props.onOpen({ kind: 'node', node: null })}
           >
             <Plus aria-hidden />
             {t('org.structure.addNode')}

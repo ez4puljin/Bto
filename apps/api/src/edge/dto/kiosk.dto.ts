@@ -36,6 +36,11 @@ export class LinkDto {
   @IsString() @MaxLength(16) linkCode: string;
 }
 
+/** ADR-0138: the till the address names. */
+export class OpenDto {
+  @IsString() @MaxLength(16) tillCode: string;
+}
+
 export class PairDto {
   @IsString() @MaxLength(16) tillCode: string;
   @IsString() @MaxLength(32) pairingCode: string;

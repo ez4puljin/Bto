@@ -117,4 +117,19 @@ describe('pos edge link', () => {
     expect(await sync.heartbeatOnce()).toBe(true);
     expect((await kiosk.get('/link').expect(200)).body).toMatchObject({ rejected: false });
   });
+
+  it('binds a browser that opens a POS by its address, without a code (ADR-0138)', async () => {
+    const kiosk = kioskApi(edge);
+    // The start page lists the active POS.
+    expect((await kiosk.get('/tills').expect(200)).body).toEqual([{ code: 'К1', name: 'Касс 1' }]);
+    // «…:7400/K1»: the Latin K of the address finds till К1.
+    const opened = (await kiosk.post('/open', { tillCode: 'K1' }).expect(200))
+      .body as EdgePairResponse;
+    expect(opened.till.code).toBe('К1');
+    kiosk.setDevice(opened.deviceToken);
+    expect((await kiosk.get('/device').expect(200)).body).toMatchObject({ till: { code: 'К1' } });
+    // No such POS: refused.
+    const missing = await kiosk.post('/open', { tillCode: 'X9' }).expect(409);
+    expect(missing.body).toMatchObject({ code: 'POS_TILL_INACTIVE' });
+  });
 });

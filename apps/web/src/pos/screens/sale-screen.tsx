@@ -26,8 +26,8 @@ import {
   LockKeyhole,
   LogOut,
   Menu,
-  Printer,
   ScanBarcode,
+  Settings,
   Search,
   Tag,
   Ticket,
@@ -59,6 +59,7 @@ import { type Cart, type CartLine, canDecrease } from '../cart';
 import { type ApprovalRequest, ApprovalDialog } from '../components/approval-dialog';
 import { CartTable } from '../components/cart-table';
 import { DaySummaryDialog } from '../components/day-summary-dialog';
+import { SettingsDialog } from '../components/settings-dialog';
 import { EbarimtDialog } from '../components/ebarimt-dialog';
 import { HistoryDialog } from '../components/history-dialog';
 import { KioskHeader } from '../components/kiosk-header';
@@ -87,6 +88,7 @@ type Dialogs =
   | 'cancel'
   | 'history'
   | 'daySummary'
+  | 'settings'
   | 'quick'
   | 'price'
   | 'parked'
@@ -130,7 +132,7 @@ export function SaleScreen(props: {
   const [dialog, setDialog] = useState<Dialogs>(null);
   const [attempt, setAttempt] = useState<PaymentAttempt | null>(null);
   const [receipt, setReceipt] = useState<EdgePrintableReceipt | null>(null);
-  const { print, printTest } = usePrint();
+  const { print } = usePrint();
   const health = useHealth();
   const ebarimt = health.data?.ebarimt;
   const ebarimtCount = ebarimt ? ebarimt.ready + ebarimt.attention : 0;
@@ -596,10 +598,10 @@ export function SaleScreen(props: {
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="h-11 text-[0.9375rem]"
-                onSelect={() => printTest(props.session.till.name, new Date().toISOString())}
+                onSelect={() => setDialog('settings')}
               >
-                <Printer />
-                {t('posKiosk.menu.printTest')}
+                <Settings />
+                {t('posKiosk.menu.settings')}
               </DropdownMenuItem>
               {ebarimt?.provider === 'posapi' ? (
                 <DropdownMenuItem
@@ -902,6 +904,12 @@ export function SaleScreen(props: {
       <HistoryDialog open={dialog === 'history'} onClose={closeDialog} onCloseAutoFocus={refocus} />
       <DaySummaryDialog
         open={dialog === 'daySummary'}
+        onClose={closeDialog}
+        onCloseAutoFocus={refocus}
+      />
+      <SettingsDialog
+        open={dialog === 'settings'}
+        tillName={props.session.till.name}
         onClose={closeDialog}
         onCloseAutoFocus={refocus}
       />

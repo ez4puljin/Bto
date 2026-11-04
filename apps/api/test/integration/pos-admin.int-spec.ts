@@ -51,12 +51,10 @@ describe('pos admin', () => {
 
   it('registers an edge node, issues its token once and lets only that token in', async () => {
     const admin = posApi(app, actors.admin);
-    await admin.createNode({ code: 'sm9', name: 'Дэлгүүр', warehouseId: wholesaleId }).expect(422);
-    const node = (
-      await admin.createNode({ code: 'sm9', name: 'Дэлгүүр', warehouseId: storeId }).expect(201)
-    ).body as EdgeNodeJson;
+    const node = (await admin.createNode({ code: 'sm9', name: 'Дэлгүүр' }).expect(201))
+      .body as EdgeNodeJson;
     expect(node).toMatchObject({ code: 'SM9', tokenPrefix: null, status: 'ACTIVE' });
-    await admin.createNode({ code: 'SM9', name: 'Давхар', warehouseId: storeId }).expect(409);
+    await admin.createNode({ code: 'SM9', name: 'Давхар' }).expect(409);
     const first = await admin.issueToken(node.id);
     expect(first.token).toMatch(new RegExp(`^tgs_${node.id}_[A-Za-z0-9_-]{32,}$`));
     const beat = (
@@ -77,16 +75,13 @@ describe('pos admin', () => {
     await admin.updateNode(node.id, { status: 'INACTIVE' }).expect(200);
     await admin.heartbeat(second.token, { backlog: 0 }).expect(401);
     await admin.updateNode(node.id, { status: 'ACTIVE' }).expect(200);
-    await posApi(app, actors.office)
-      .createNode({ code: 'SM8', name: 'x', warehouseId: storeId })
-      .expect(403);
+    await posApi(app, actors.office).createNode({ code: 'SM8', name: 'x' }).expect(403);
   });
 
   it('links a new edge with a one-time code: a fresh token and the PIN key, five wrong tries void it', async () => {
     const admin = posApi(app, actors.admin);
-    const node = (
-      await admin.createNode({ code: 'LNK1', name: 'Холбох', warehouseId: storeId }).expect(201)
-    ).body as EdgeNodeJson;
+    const node = (await admin.createNode({ code: 'LNK1', name: 'Холбох' }).expect(201))
+      .body as EdgeNodeJson;
     const old = await admin.issueToken(node.id);
     const linkCode = (path: number) =>
       admin.http().post(`/api/v1/pos/edge-nodes/${path}/link-code`).set(admin.auth);
@@ -129,13 +124,13 @@ describe('pos admin', () => {
 
   it('keeps tills per node with their printers and hands out pairing codes', async () => {
     const admin = posApi(app, actors.admin);
-    const node = (
-      await admin.createNode({ code: 'SM7', name: 'Дэлгүүр 7', warehouseId: storeId }).expect(201)
-    ).body as EdgeNodeJson;
+    const node = (await admin.createNode({ code: 'SM7', name: 'Дэлгүүр 7' }).expect(201))
+      .body as EdgeNodeJson;
     const till = (
       await admin
         .createTill({
           edgeNodeId: node.id,
+          warehouseId: storeId,
           code: ' к3 ',
           name: 'Касс 3',
           printerHost: '192.168.1.33',
@@ -144,10 +139,22 @@ describe('pos admin', () => {
     ).body as TillJson;
     expect(till).toMatchObject({ code: 'К3', printerHost: '192.168.1.33', printerPort: 9100 });
     await admin
-      .createTill({ edgeNodeId: node.id, code: 'К3', name: 'Давхар', printerHost: null })
+      .createTill({
+        edgeNodeId: node.id,
+        warehouseId: storeId,
+        code: 'К3',
+        name: 'Давхар',
+        printerHost: null,
+      })
       .expect(409);
     await admin
-      .createTill({ edgeNodeId: node.id, code: 'касс 3', name: 'x', printerHost: null })
+      .createTill({
+        edgeNodeId: node.id,
+        warehouseId: storeId,
+        code: 'касс 3',
+        name: 'x',
+        printerHost: null,
+      })
       .expect(422);
     const updated = (
       await admin

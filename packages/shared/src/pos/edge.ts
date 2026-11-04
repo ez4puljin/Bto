@@ -304,7 +304,7 @@ export interface SnapshotTill {
   id: number;
   code: string;
   name: string;
-  /** The STORE warehouse the till sells from (ADR-0123); absent in older snapshots. */
+  /** The warehouse the till sells from (ADR-0123, ADR-0137: a store's floor or a warehouse); absent in older snapshots. */
   warehouseId?: number;
   warehouseName?: string | null;
   /** ADR-0124: who may sign in / approve here and what it sells (subtrees expanded); empty or absent: no restriction. */
@@ -351,7 +351,8 @@ export interface PosSnapshot {
   version: string;
   generatedAt: string;
   businessDate: string;
-  node: { id: number; code: string; name: string; warehouseId: number; warehouseName: string };
+  /** ADR-0137: an edge has no warehouse of its own; each till names the one it sells from. */
+  node: { id: number; code: string; name: string };
   settings: {
     returnWindowDays: number;
     snapshotIntervalSec: number;
@@ -627,6 +628,12 @@ export interface EdgeLinkRequest {
   centralUrl: string;
   nodeCode: string;
   linkCode: string;
+}
+
+/** ADR-0138: an active POS the kiosk's start page offers, opened at its own address. */
+export interface EdgeTillChoice {
+  code: string;
+  name: string;
 }
 
 export interface EdgePairRequest {

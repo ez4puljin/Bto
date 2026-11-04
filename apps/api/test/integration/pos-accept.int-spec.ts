@@ -354,7 +354,7 @@ describe('pos accept', () => {
     ).body as { data: { code: string; isSystem: boolean }[] };
     return bins.data.find((bin) => bin.isSystem)?.code;
   }
-  it('sells from the till’s own STORE warehouse, not the edge’s (ADR-0123)', async () => {
+  it('sells from the till’s own warehouse, a store or a wholesale one (ADR-0123, ADR-0137)', async () => {
     const branchId = (store.store as { branchId: number | null }).branchId;
     const http = store.pos.http;
     const auth = store.pos.auth;
@@ -372,10 +372,24 @@ describe('pos accept', () => {
         .send({ code: 'PA2W', name: 'Бөөний агуулах PA2', kind: 'WHOLESALE', branchId })
         .expect(201)
     ).body as { id: number };
-    // Only a STORE warehouse of the edge's branch.
+    // ADR-0137: a till names its warehouse; a wholesale one gets its SALESFLOOR on the spot.
     await store.pos
-      .createTill({ edgeNodeId: store.node.id, code: 'К2', name: 'Касс 2', warehouseId: depot.id })
+      .createTill({ edgeNodeId: store.node.id, code: 'К5', name: 'Касс 5' })
       .expect(422);
+    const depotTill = (
+      await store.pos
+        .createTill({
+          edgeNodeId: store.node.id,
+          code: 'К5',
+          name: 'Агуулахын касс',
+          warehouseId: depot.id,
+        })
+        .expect(201)
+    ).body as { warehouseId: number; warehouseName: string | null };
+    expect(depotTill).toMatchObject({ warehouseId: depot.id, warehouseName: 'Бөөний агуулах PA2' });
+    expect((await inventoryApi(app, actors.admin).systemBin(depot.id, 'SALESFLOOR')).type).toBe(
+      'SALESFLOOR',
+    );
     const till2 = (
       await store.pos
         .createTill({
@@ -387,13 +401,6 @@ describe('pos accept', () => {
         .expect(201)
     ).body as { id: number; warehouseId: number; warehouseName: string | null };
     expect(till2).toMatchObject({ warehouseId: floor2.id, warehouseName: 'Хоёрдугаар заал' });
-    // A till without a warehouse takes its edge's.
-    const till3 = (
-      await store.pos
-        .createTill({ edgeNodeId: store.node.id, code: 'К3', name: 'Касс 3' })
-        .expect(201)
-    ).body as { warehouseId: number };
-    expect(till3.warehouseId).toBe(store.store.id);
 
     const floorBefore = await onHand(cola);
     const open = shiftOpenEvent({
@@ -437,7 +444,12 @@ describe('pos accept', () => {
   it('keeps a till to its own cashiers, approvers and categories (ADR-0124)', async () => {
     const till3 = (
       await store.pos
-        .createTill({ edgeNodeId: store.node.id, code: 'К4', name: 'Касс 4' })
+        .createTill({
+          edgeNodeId: store.node.id,
+          code: 'К4',
+          name: 'Касс 4',
+          warehouseId: store.store.id,
+        })
         .expect(201)
     ).body as { id: number };
     const other = await catalogApi(app, actors.admin).category('Архи PA');

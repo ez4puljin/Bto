@@ -14157,7 +14157,6 @@ export interface components {
             nodeId: number;
             nodeCode: string;
             nodeName: string;
-            warehouseName: string | null;
             /** @description The node token; the edge keeps it in its own database */
             token: string;
             /** @description The PIN key the tills' hashes were made with */
@@ -14168,8 +14167,6 @@ export interface components {
             /** @example SM1 */
             code: string;
             name: string;
-            warehouseId: number;
-            warehouseName: string | null;
             /** @description First 8 hex of the token hash */
             tokenPrefix: string | null;
             /** Format: date-time */
@@ -14212,12 +14209,9 @@ export interface components {
              */
             code: string;
             name: string;
-            /** @description The STORE warehouse the tills sell from */
-            warehouseId: number;
         };
         PosEdgeNodePatch: {
             name?: string;
-            warehouseId?: number;
             /** @enum {string} */
             status?: "ACTIVE" | "INACTIVE";
         };
@@ -14238,7 +14232,7 @@ export interface components {
         PosTill: {
             id: number;
             edgeNodeId: number;
-            /** @description The STORE warehouse it sells from (ADR-0123) */
+            /** @description The warehouse it sells from (ADR-0123, ADR-0137) */
             warehouseId: number;
             warehouseName: string | null;
             /** @description Who may sign in here (ADR-0124); empty: every cashier */
@@ -14269,8 +14263,8 @@ export interface components {
         };
         PosTillRequest: {
             edgeNodeId: number;
-            /** @description A STORE warehouse of the edge’s branch; the edge’s when absent */
-            warehouseId?: number;
+            /** @description ADR-0137: a store or a wholesale warehouse; the till sells from its SALESFLOOR */
+            warehouseId: number;
             /**
              * @description Capitals, digits and dashes, 1–8
              * @example К3

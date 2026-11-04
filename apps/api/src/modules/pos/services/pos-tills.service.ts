@@ -1,5 +1,6 @@
 import { createHash, randomInt } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
+import { TILL_WAREHOUSE_KINDS } from '@tugeel/shared/inventory';
 import { isTillCode, normalizeTillCode, POS_LIMITS, type PosStatus } from '@tugeel/shared/pos';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
@@ -8,6 +9,7 @@ import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { CategoriesService } from '../../catalog';
 import { AuditService, type AuthContext, OrgService } from '../../identity';
+import { SystemBinsService } from '../../inventory';
 import { posCashiers, posTillCategories, posTills, posTillUsers } from '../schema';
 import { PosEdgeNodesService } from './pos-edge-nodes.service';
 
@@ -38,8 +40,8 @@ export interface Till {
 
 export interface TillInput {
   edgeNodeId: number;
-  /** The edge's warehouse when absent. */
-  warehouseId?: number | null;
+  /** ADR-0137: a store's floor or a wholesale warehouse; its SALESFLOOR is what the till sells from. */
+  warehouseId: number;
   code: string;
   name: string;
   printerHost: string | null;
@@ -83,6 +85,7 @@ export class PosTillsService {
     private readonly nodes: PosEdgeNodesService,
     private readonly org: OrgService,
     private readonly categories: CategoriesService,
+    private readonly systemBins: SystemBinsService,
   ) {}
 
   async list(filter: { edgeNodeId?: number } = {}): Promise<Till[]> {
@@ -121,9 +124,9 @@ export class PosTillsService {
     const name = cleanName(input.name);
     const printerHost = cleanHost(input.printerHost);
     const id = await inTransaction(this.db, async (tx) => {
-      const node = await this.nodes.get(input.edgeNodeId, tx);
-      const warehouseId = input.warehouseId ?? node.warehouseId;
-      await this.assertStore(warehouseId, node.warehouseId, tx);
+      await this.nodes.get(input.edgeNodeId, tx);
+      const warehouseId = input.warehouseId;
+      await this.assertLocation(warehouseId, tx);
       const [row] = await tx
         .insert(posTills)
         .values({
@@ -154,8 +157,7 @@ export class PosTillsService {
     await inTransaction(this.db, async (tx) => {
       const before = await this.get(id, tx);
       if (patch.warehouseId !== undefined && patch.warehouseId !== before.warehouseId) {
-        const node = await this.nodes.get(before.edgeNodeId, tx);
-        await this.assertStore(patch.warehouseId, node.warehouseId, tx);
+        await this.assertLocation(patch.warehouseId, tx);
       }
       const set = {
         ...(patch.name !== undefined ? { name: cleanName(patch.name) } : {}),
@@ -322,26 +324,18 @@ export class PosTillsService {
     return till;
   }
 
-  /** A till's warehouse is a STORE of the edge's branch (ADR-0123). */
-  private async assertStore(warehouseId: number, edgeWarehouseId: number, tx: Tx): Promise<void> {
+  /**
+   * ADR-0137: a till sells from a store's floor or a wholesale warehouse, anywhere in the company;
+   * a wholesale warehouse gets its SALESFLOOR the first time a till is set to it.
+   */
+  private async assertLocation(warehouseId: number, tx: Tx): Promise<void> {
     const warehouse = await this.org.getWarehouse(warehouseId, tx);
-    if (warehouse.kind !== 'STORE') {
-      throw new AppError('WAREHOUSE_KIND_NOT_ALLOWED', 'a till sells from a STORE warehouse', {
+    if (!TILL_WAREHOUSE_KINDS.includes(warehouse.kind)) {
+      throw new AppError('WAREHOUSE_KIND_NOT_ALLOWED', 'a till sells from a store or a warehouse', {
         kind: warehouse.kind,
       });
     }
-    if (warehouseId !== edgeWarehouseId) {
-      const own = await this.org.getWarehouse(edgeWarehouseId, tx);
-      if (own.branchId !== warehouse.branchId) {
-        throw new AppError(
-          'WAREHOUSE_KIND_NOT_ALLOWED',
-          "a till's warehouse is in its edge's branch",
-          {
-            kind: warehouse.kind,
-          },
-        );
-      }
-    }
+    await this.systemBins.ensureSalesfloor(tx, warehouseId);
   }
 
   async touchSale(tillId: number, soldAt: Date, tx: Tx): Promise<void> {

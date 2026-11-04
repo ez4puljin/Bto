@@ -96,8 +96,6 @@ export class PosSnapshotService {
         id: node.id,
         code: node.code,
         name: node.name,
-        warehouseId: node.warehouseId,
-        warehouseName: node.warehouseName ?? '',
       },
       settings: {
         returnWindowDays: settings.returnWindowDays,

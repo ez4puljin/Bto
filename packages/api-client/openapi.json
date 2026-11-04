@@ -54071,10 +54071,6 @@
           "nodeName": {
             "type": "string"
           },
-          "warehouseName": {
-            "type": "string",
-            "nullable": true
-          },
           "token": {
             "type": "string",
             "description": "The node token; the edge keeps it in its own database"
@@ -54088,7 +54084,6 @@
           "nodeId",
           "nodeCode",
           "nodeName",
-          "warehouseName",
           "token",
           "pinPepper"
         ]
@@ -54105,13 +54100,6 @@
           },
           "name": {
             "type": "string"
-          },
-          "warehouseId": {
-            "type": "number"
-          },
-          "warehouseName": {
-            "type": "string",
-            "nullable": true
           },
           "tokenPrefix": {
             "type": "string",
@@ -54203,8 +54191,6 @@
           "id",
           "code",
           "name",
-          "warehouseId",
-          "warehouseName",
           "tokenPrefix",
           "tokenIssuedAt",
           "appVersion",
@@ -54237,17 +54223,11 @@
           "name": {
             "type": "string",
             "maxLength": 120
-          },
-          "warehouseId": {
-            "type": "number",
-            "minimum": 1,
-            "description": "The STORE warehouse the tills sell from"
           }
         },
         "required": [
           "code",
-          "name",
-          "warehouseId"
+          "name"
         ]
       },
       "PosEdgeNodePatch": {
@@ -54256,10 +54236,6 @@
           "name": {
             "type": "string",
             "maxLength": 120
-          },
-          "warehouseId": {
-            "type": "number",
-            "minimum": 1
           },
           "status": {
             "enum": [
@@ -54315,7 +54291,7 @@
           },
           "warehouseId": {
             "type": "number",
-            "description": "The STORE warehouse it sells from (ADR-0123)"
+            "description": "The warehouse it sells from (ADR-0123, ADR-0137)"
           },
           "warehouseName": {
             "type": "string",
@@ -54422,7 +54398,7 @@
           "warehouseId": {
             "type": "number",
             "minimum": 1,
-            "description": "A STORE warehouse of the edge’s branch; the edge’s when absent"
+            "description": "ADR-0137: a store or a wholesale warehouse; the till sells from its SALESFLOOR"
           },
           "code": {
             "type": "string",
@@ -54458,6 +54434,7 @@
         },
         "required": [
           "edgeNodeId",
+          "warehouseId",
           "code",
           "name"
         ]

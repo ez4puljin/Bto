@@ -41,6 +41,14 @@ const routes = () => ({
   'GET /api/v1/warehouses': () =>
     list([
       { id: 3, code: 'SM', name: 'Супермаркет', kind: 'STORE', branchId: 1, status: 'ACTIVE' },
+      {
+        id: 7,
+        code: 'WH7',
+        name: 'Жижиглэн архи',
+        kind: 'WHOLESALE',
+        branchId: 1,
+        status: 'ACTIVE',
+      },
     ]),
   'GET /api/v1/finance/attention': () =>
     json({ overdueAmount: '0.00', overdueCustomers: 0, openAmount: '0.00', openInvoices: 0 }),
@@ -92,23 +100,25 @@ describe('supermarket pages (ADR-0063 #8)', () => {
     });
     renderApp('/pos/tills?new=1', fetchMock);
     expect((await screen.findAllByText('SM1')).length).toBeGreaterThan(0);
-    expect(screen.getByText('192.168.1.31:9100')).toBeInTheDocument();
+    // No printer here: the cashier picks it in the POS app on their own PC.
+    expect(screen.queryByText('192.168.1.31:9100')).toBeNull();
     const dialog = within(await screen.findByRole('dialog', { name: mn.pos.tills.dialogTitle }));
     await user.type(dialog.getByLabelText(mn.pos.fields.code), 'к2');
     await user.type(dialog.getByLabelText(mn.pos.fields.name), 'Касс 2');
-    await user.type(dialog.getByLabelText(mn.pos.fields.printerHost), '192.168.1.32');
+    expect(dialog.queryByLabelText(mn.pos.fields.printerHost)).toBeNull();
+    expect(dialog.queryByLabelText(mn.pos.fields.drawerKick)).toBeNull();
+    // ADR-0137: no location, no till.
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    expect(calls(fetchMock, 'POST', '/api/v1/pos/tills')).toHaveLength(0);
+    // A wholesale warehouse may be the location too.
+    await user.selectOptions(dialog.getByLabelText(mn.pos.tills.location), 'WH7 · Жижиглэн архи');
     await user.click(dialog.getByRole('button', { name: mn.common.save }));
     await waitFor(() => expect(calls(fetchMock, 'POST', '/api/v1/pos/tills')).toHaveLength(1));
     expect(await bodyOf(calls(fetchMock, 'POST', '/api/v1/pos/tills')[0])).toEqual({
       edgeNodeId: 1,
-      // ADR-0123: the edge's warehouse unless another is picked.
-      warehouseId: 3,
+      warehouseId: 7,
       code: 'К2',
       name: 'Касс 2',
-      printerHost: '192.168.1.32',
-      printerPort: 9100,
-      printerName: null,
-      drawerKick: true,
     });
     expect(await screen.findByText(mn.pos.tills.created)).toBeInTheDocument();
   });

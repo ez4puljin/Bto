@@ -36,6 +36,7 @@ export const kioskKeys = {
   all: ['kiosk'] as const,
   health: ['kiosk', 'health'] as const,
   link: ['kiosk', 'link'] as const,
+  tills: ['kiosk', 'tills'] as const,
   device: (epoch: number) => ['kiosk', epoch, 'device'] as const,
   session: (epoch: number) => ['kiosk', epoch, 'session'] as const,
   recent: (epoch: number) => ['kiosk', epoch, 'recent'] as const,

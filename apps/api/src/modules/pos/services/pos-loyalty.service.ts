@@ -33,12 +33,12 @@ import { AuditService, type AuthContext, UserNamesService } from '../../identity
 import { PinHasher } from '../pin-hasher';
 import type { SaleDoc } from '../sale-doc';
 import {
-  posEdgeNodes,
   posLoyaltyEntries,
   posLoyaltyMembers,
   posLoyaltyTiers,
   posSaleLoyalty,
   posSales,
+  posTills,
 } from '../schema';
 
 type MemberRow = typeof posLoyaltyMembers.$inferSelect;
@@ -344,14 +344,15 @@ export class PosLoyaltyService {
           available: member.balance.toFixed(0),
         });
       }
-      const nodes = await tx
-        .select({ warehouseId: posEdgeNodes.warehouseId })
-        .from(posEdgeNodes)
-        .where(eq(posEdgeNodes.status, 'ACTIVE'));
+      // ADR-0137: the warehouses the active tills sell from.
+      const tills = await tx
+        .select({ warehouseId: posTills.warehouseId })
+        .from(posTills)
+        .where(eq(posTills.status, 'ACTIVE'));
       const amount = points.abs();
       const entry = await this.journal.post(tx, ctx, {
         entryDate: businessDate(),
-        warehouseIds: [...new Set(nodes.map((node) => node.warehouseId))],
+        warehouseIds: [...new Set(tills.map((till) => till.warehouseId))],
         description: `Бонус оноо: ${member.name} — ${reason}`.slice(0, 300),
         source: 'MANUAL',
         lines: points.gt(0)

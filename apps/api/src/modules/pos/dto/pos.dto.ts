@@ -153,8 +153,6 @@ export class EdgeNodeDto {
   @ApiProperty() id: number;
   @ApiProperty({ example: 'SM1' }) code: string;
   @ApiProperty() name: string;
-  @ApiProperty() warehouseId: number;
-  @ApiProperty({ type: String, nullable: true }) warehouseName: string | null;
   @ApiProperty({ type: String, nullable: true, description: 'First 8 hex of the token hash' })
   tokenPrefix: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) tokenIssuedAt: string | null;
@@ -197,10 +195,6 @@ export class EdgeNodeRequestDto {
   @IsString()
   @MaxLength(POS_LIMITS.maxName)
   name: string;
-  @ApiProperty({ description: 'The STORE warehouse the tills sell from' })
-  @IsInt()
-  @Min(1)
-  warehouseId: number;
 }
 
 @ApiSchema({ name: 'PosEdgeNodePatch' })
@@ -211,7 +205,6 @@ export class EdgeNodePatchDto {
   @IsString()
   @MaxLength(POS_LIMITS.maxName)
   name?: string;
-  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) warehouseId?: number;
   @ApiPropertyOptional({ enum: POS_STATUSES }) @IsOptional() @IsIn(POS_STATUSES) status?: PosStatus;
 }
 
@@ -239,7 +232,6 @@ export class EdgeLinkResponseDto {
   @ApiProperty() nodeId: number;
   @ApiProperty() nodeCode: string;
   @ApiProperty() nodeName: string;
-  @ApiProperty({ type: String, nullable: true }) warehouseName: string | null;
   @ApiProperty({ description: 'The node token; the edge keeps it in its own database' })
   token: string;
   @ApiProperty({ description: "The PIN key the tills' hashes were made with" }) pinPepper: string;
@@ -251,7 +243,8 @@ export class EdgeLinkResponseDto {
 export class TillDto {
   @ApiProperty() id: number;
   @ApiProperty() edgeNodeId: number;
-  @ApiProperty({ description: 'The STORE warehouse it sells from (ADR-0123)' }) warehouseId: number;
+  @ApiProperty({ description: 'The warehouse it sells from (ADR-0123, ADR-0137)' })
+  warehouseId: number;
   @ApiProperty({ type: String, nullable: true }) warehouseName: string | null;
   @ApiProperty({
     type: [Number],
@@ -283,13 +276,12 @@ export class TillDto {
 @ApiSchema({ name: 'PosTillRequest' })
 export class TillRequestDto {
   @ApiProperty() @IsInt() @Min(1) edgeNodeId: number;
-  @ApiPropertyOptional({
-    description: 'A STORE warehouse of the edge’s branch; the edge’s when absent',
+  @ApiProperty({
+    description: 'ADR-0137: a store or a wholesale warehouse; the till sells from its SALESFLOOR',
   })
-  @IsOptional()
   @IsInt()
   @Min(1)
-  warehouseId?: number;
+  warehouseId: number;
   @ApiProperty({ example: 'К3', description: 'Capitals, digits and dashes, 1–8' })
   @Transform(trimmed)
   @IsString()

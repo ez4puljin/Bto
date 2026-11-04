@@ -8,8 +8,6 @@ export const NODE: Schemas['PosEdgeNode'] = {
   id: 1,
   code: 'SM1',
   name: 'Оргил супермаркет',
-  warehouseId: 3,
-  warehouseName: 'Супермаркет',
   tokenPrefix: 'a1b2c3d4',
   tokenIssuedAt: STAMP,
   appVersion: null,

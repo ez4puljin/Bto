@@ -17,18 +17,19 @@ import type { FakeEdge } from './fake-edge';
  */
 export function renderKiosk(
   edge: FakeEdge,
-  options: { device?: string; session?: string; cashierId?: number } = {},
+  options: { device?: string; session?: string; cashierId?: number; addressTill?: string } = {},
 ) {
   if (options.device) localStorage.setItem(DEVICE_STORAGE_KEY, options.device);
   if (options.session) sessionStorage.setItem(SESSION_STORAGE_KEY, options.session);
   if (options.cashierId) sessionStorage.setItem(CASHIER_STORAGE_KEY, String(options.cashierId));
-  const credentials = new KioskCredentials();
+  const addressTill = options.addressTill ?? null;
+  const credentials = new KioskCredentials(undefined, addressTill);
   const client = new EdgeClient(credentials, { baseUrl: 'http://edge.test', fetch: edge.fetch });
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   // The receipt prints with the browser's own printing (ADR-0065); jsdom has no printer.
   const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
-  render(<KioskApp services={{ client, credentials }} queryClient={queryClient} />);
+  render(<KioskApp services={{ client, credentials, addressTill }} queryClient={queryClient} />);
   return { credentials, client, queryClient, print };
 }

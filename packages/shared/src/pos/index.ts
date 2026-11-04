@@ -153,6 +153,19 @@ export function tillCodeLookKey(value: string): string {
   return [...normalizeTillCode(value)].map((char) => TILL_CODE_LOOKALIKES[char] ?? char).join('');
 }
 
+/**
+ * ADR-0138: a POS opened by its address, `http://<edge>:7400/K1`: the code with its Cyrillic
+ * letters in their Latin look-alikes (`К1` → `K1`), anything else URL-encoded.
+ */
+export function tillCodeUrlSegment(code: string): string {
+  const latin = Object.fromEntries(
+    Object.entries(TILL_CODE_LOOKALIKES).map(([latinChar, cyrillic]) => [cyrillic, latinChar]),
+  );
+  return encodeURIComponent(
+    [...normalizeTillCode(code)].map((char) => latin[char] ?? char).join(''),
+  );
+}
+
 export function isTillCode(value: string): boolean {
   return TILL_CODE_PATTERN.test(value);
 }
@@ -321,7 +334,6 @@ export interface EdgeLinkResponseWire {
   nodeId: number;
   nodeCode: string;
   nodeName: string;
-  warehouseName: string | null;
   token: string;
   pinPepper: string;
 }

@@ -24,8 +24,6 @@ export interface EdgeNode {
   id: number;
   code: string;
   name: string;
-  warehouseId: number;
-  warehouseName: string | null;
   tokenPrefix: string | null;
   tokenIssuedAt: Date | null;
   appVersion: string | null;
@@ -51,12 +49,10 @@ export interface EdgeNode {
 export interface EdgeNodeInput {
   code: string;
   name: string;
-  warehouseId: number;
 }
 
 export interface EdgeNodePatch {
   name?: string;
-  warehouseId?: number;
   status?: PosStatus;
 }
 
@@ -94,13 +90,13 @@ export class PosEdgeNodesService {
 
   async list(): Promise<EdgeNode[]> {
     const rows = await this.db.select().from(posEdgeNodes).orderBy(asc(posEdgeNodes.id));
-    return Promise.all(rows.map((row) => this.view(row)));
+    return rows.map((row) => this.view(row));
   }
 
   async get(id: number, executor: Db | Tx = this.db): Promise<EdgeNode> {
     const [row] = await executor.select().from(posEdgeNodes).where(eq(posEdgeNodes.id, id));
     if (!row) throw notFound('pos_edge_node', id);
-    return this.view(row, executor);
+    return this.view(row);
   }
 
   async create(ctx: AuthContext, input: EdgeNodeInput): Promise<EdgeNode> {
@@ -111,10 +107,9 @@ export class PosEdgeNodesService {
       throw invalid('name', 'length', `1 to ${POS_LIMITS.maxName} characters`);
     }
     const id = await inTransaction(this.db, async (tx) => {
-      await this.assertStore(input.warehouseId, tx);
       const [row] = await tx
         .insert(posEdgeNodes)
-        .values({ code, name, warehouseId: input.warehouseId, createdBy: ctx.userId })
+        .values({ code, name, createdBy: ctx.userId })
         .onConflictDoNothing({ target: posEdgeNodes.code })
         .returning({ id: posEdgeNodes.id });
       if (!row) throw new AppError('DUPLICATE_VALUE', `edge node ${code} exists`, { code });
@@ -122,7 +117,7 @@ export class PosEdgeNodesService {
         action: 'CREATE',
         entity: 'pos_edge_nodes',
         entityId: row.id,
-        after: { code, name, warehouseId: input.warehouseId },
+        after: { code, name },
       });
       return row.id;
     });
@@ -132,7 +127,6 @@ export class PosEdgeNodesService {
   async update(ctx: AuthContext, id: number, patch: EdgeNodePatch): Promise<EdgeNode> {
     await inTransaction(this.db, async (tx) => {
       const before = await this.get(id, tx);
-      if (patch.warehouseId !== undefined) await this.assertStore(patch.warehouseId, tx);
       const name = patch.name?.trim();
       if (name !== undefined && (name.length === 0 || name.length > POS_LIMITS.maxName)) {
         throw invalid('name', 'length', `1 to ${POS_LIMITS.maxName} characters`);
@@ -141,7 +135,6 @@ export class PosEdgeNodesService {
         .update(posEdgeNodes)
         .set({
           ...(name !== undefined ? { name } : {}),
-          ...(patch.warehouseId !== undefined ? { warehouseId: patch.warehouseId } : {}),
           ...(patch.status !== undefined ? { status: patch.status } : {}),
           updatedAt: sql`now()`,
         })
@@ -150,7 +143,7 @@ export class PosEdgeNodesService {
         action: 'UPDATE',
         entity: 'pos_edge_nodes',
         entityId: id,
-        before: { name: before.name, warehouseId: before.warehouseId, status: before.status },
+        before: { name: before.name, status: before.status },
         after: patch,
       });
     });
@@ -277,7 +270,7 @@ export class PosEdgeNodesService {
         entityId: row.id,
         after: { prefix },
       });
-      return { node: await this.view(row, tx), token };
+      return { node: this.view(row), token };
     });
     // A refused try is committed (it counts) before the caller hears no.
     if (!outcome) throw refused();
@@ -285,7 +278,6 @@ export class PosEdgeNodesService {
       nodeId: outcome.node.id,
       nodeCode: outcome.node.code,
       nodeName: outcome.node.name,
-      warehouseName: outcome.node.warehouseName,
       token: outcome.token,
       pinPepper,
     };
@@ -341,23 +333,11 @@ export class PosEdgeNodesService {
       .where(eq(posEdgeNodes.id, nodeId));
   }
 
-  private async assertStore(warehouseId: number, tx: Tx): Promise<void> {
-    const warehouse = await this.org.getWarehouse(warehouseId, tx);
-    if (warehouse.kind !== 'STORE') {
-      throw new AppError('WAREHOUSE_KIND_NOT_ALLOWED', 'an edge serves a STORE warehouse', {
-        kind: warehouse.kind,
-      });
-    }
-  }
-
-  private async view(row: NodeRow, executor: Db | Tx = this.db): Promise<EdgeNode> {
-    const warehouse = await this.org.getWarehouse(row.warehouseId, executor).catch(() => null);
+  private view(row: NodeRow): EdgeNode {
     return {
       id: row.id,
       code: row.code,
       name: row.name,
-      warehouseId: row.warehouseId,
-      warehouseName: warehouse?.name ?? null,
       tokenPrefix: row.tokenPrefix,
       tokenIssuedAt: row.tokenIssuedAt,
       appVersion: row.appVersion,

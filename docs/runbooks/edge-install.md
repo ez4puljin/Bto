@@ -8,7 +8,7 @@ Until the centre goes live (S5, ADR-0026) the centre is the owner's dev server (
 
 ## Overview
 
-1. On the centre, «Супермаркет → Касс»: the store's edge server exists (create it once: code such as `MRN1`, name, the STORE warehouse).
+1. On the centre, «Супермаркет → Пос»: the store's edge server exists (create it once: code such as `MRN1`, name, the STORE warehouse).
 2. On the new PC: install Docker and git, clone the repository, run the setup script (§ Windows or § Ubuntu).
 3. Open `http://<new PC's address>:7400` → «Төв системтэй холбох»: the centre's address, the edge's code, the «Холбох код».
 4. Pair each till («Холбох код» of the till), cashiers sign in with their PIN.
@@ -16,7 +16,7 @@ Until the centre goes live (S5, ADR-0026) the centre is the owner's dev server (
 ## Before moving an edge that already runs elsewhere
 
 1. Close the open shifts on every till.
-2. In «Супермаркет → Касс» check that the old edge's backlog is 0 (every sale replayed to the centre).
+2. In «Супермаркет → Пос» check that the old edge's backlog is 0 (every sale replayed to the centre).
 3. Stop the old edge (`pnpm edge:down` on the owner's PC, or `docker compose … down` there). Never run two edges for one edge server: the link gives the new one a fresh token and the old one stops at once.
 
 Move at the start of a day, before the first sale: the new edge starts its own database, so its per-day sale numbers start again.
@@ -53,13 +53,13 @@ Move at the start of a day, before the first sale: the new edge starts its own d
 
 ## Link the edge to the centre (both systems)
 
-1. On the centre, «Супермаркет → Касс» → the edge server's row → **«Холбох код»** (the link icon). The window shows the code (`ABCD-EF23`, 15 minutes, shown once), the centre's address and the edge's code.
+1. On the centre, «Супермаркет → Пос» → the edge server's row → **«Холбох код»** (the link icon). The window shows the code (`ABCD-EF23`, 15 minutes, shown once), the centre's address and the edge's code.
 2. On any browser in the store, open `http://<edge PC's address>:7400`. A new edge shows **«Төв системтэй холбох»**:
    - «Төв системийн хаяг»: the centre's address as the window showed it. When it shows `localhost`, use the centre PC's LAN address instead, e.g. `http://192.168.1.215:5173` (the dev web, which passes `/api` on) or `http://192.168.1.215:3300` (the dev api).
    - «Edge серверийн код»: e.g. `MRN1`.
    - «Холбох код»: the code from step 1 (dashes and lower case are fine).
 3. «Холбох»: the edge asks the centre for its token and the PIN key, keeps them in its own database, and pulls the store's data at once. The till pairing screen follows.
-4. Each till: «Супермаркет → Касс» → the till's row → «Холбох код» (six digits), typed on the till's browser with the till's code. Then the cashier signs in with the PIN. A till's shortcut and printing: `pos-till-printing.md`.
+4. Each POS: open `http://<edge PC's address>:7400` and click the POS in the list («Пос сонгох»), or open `http://<edge PC's address>:7400/K1` (the POS's «Хаяг» on «Супермаркет → Пос») on that cashier's PC: it becomes POS К1 with no code (ADR-0138). Then the cashier signs in with the PIN. Without the path the page asks for the POS's six-digit «Холбох код» instead. A till's shortcut and printing: `pos-till-printing.md`.
 
 Five wrong codes void the code in force; take a new one. If the centre's answer is «POS_PIN_PEPPER тохируулаагүй», the centre runs in production without `POS_PIN_PEPPER`: set it there first (ADR-0136 #4).
 

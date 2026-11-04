@@ -9,12 +9,13 @@ import { PrintProvider } from './components/receipt-print';
 import { KioskContext, type KioskServices, useCredentials, useKiosk } from './kiosk-context';
 import { useProblemText } from './messages';
 import { useLinkState, useSession } from './queries';
+import { AddressOpen } from './screens/address-open';
 import { LinkScreen } from './screens/link-screen';
 import { LoginScreen } from './screens/login-screen';
-import { PairingScreen } from './screens/pairing-screen';
 import { SaleScreen } from './screens/sale-screen';
 import { ShiftCloseScreen, ShiftSummaryScreen } from './screens/shift-close-screen';
 import { ShiftOpenScreen } from './screens/shift-open-screen';
+import { TillChooser } from './screens/till-chooser';
 
 /**
  * The cashier's till screen (`pos.html`, ADR-0067): its own full-window app beside the admin,
@@ -35,7 +36,7 @@ export function KioskApp(props: { services: KioskServices; queryClient: QueryCli
 }
 
 function KioskRoot() {
-  const { client, credentials } = useKiosk();
+  const { client, credentials, addressTill } = useKiosk();
   const { deviceToken, sessionToken } = useCredentials();
   // The cart outlives an expired session: the same cashier signs in again and goes on.
   const cart = useCart();
@@ -54,7 +55,13 @@ function KioskRoot() {
   if (link.data && (!link.data.linked || (link.data.rejected && !deviceToken))) {
     return <LinkScreen state={link.data} />;
   }
-  if (!deviceToken) return <PairingScreen onPaired={clear} />;
+  if (!deviceToken) {
+    return addressTill ? (
+      <AddressOpen tillCode={addressTill} onOpened={clear} />
+    ) : (
+      <TillChooser onPaired={clear} />
+    );
+  }
   if (!sessionToken) return <LoginScreen onNewCashier={clear} />;
   return <SessionGate cart={cart} onSignOut={signOut} />;
 }

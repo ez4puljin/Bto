@@ -44,7 +44,13 @@ describe('pos races', () => {
     cola = await store.product('9401', 'Кола', '1000', '3');
     till2 = (
       await store.pos
-        .createTill({ edgeNodeId: store.node.id, code: 'К2', name: 'Касс 2', printerHost: null })
+        .createTill({
+          edgeNodeId: store.node.id,
+          warehouseId: store.store.id,
+          code: 'К2',
+          name: 'Касс 2',
+          printerHost: null,
+        })
         .expect(201)
     ).body as TillJson;
   });

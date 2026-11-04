@@ -41,6 +41,17 @@ export class SystemBinsService implements WarehouseCreatedHook {
   }
 
   /** Every warehouse's system bins, once per boot and process (idempotent, serialised). */
+  /**
+   * ADR-0137: a till sells from the warehouse's SALESFLOOR; a wholesale warehouse has none until a
+   * till is set to sell from it. Idempotent.
+   */
+  async ensureSalesfloor(tx: Tx, warehouseId: number): Promise<void> {
+    await tx.execute(sql`
+      INSERT INTO bins (warehouse_id, code, type, is_system)
+      VALUES (${warehouseId}::bigint, 'SALESFLOOR', 'SALESFLOOR', true)
+      ON CONFLICT (warehouse_id, type) WHERE is_system DO NOTHING`);
+  }
+
   async backfill(): Promise<number> {
     const warehouses = await this.org.listWarehouses();
     return inTransaction(this.db, async (tx) => {

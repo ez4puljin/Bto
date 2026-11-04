@@ -45,6 +45,12 @@ const COMMON_SYSTEM_BINS: readonly BinType[] = [
 ];
 
 /** The system bins of a warehouse kind (§5.1); the TRANSIT warehouse holds only its TRANSIT bin. */
+/**
+ * ADR-0137: the kinds a till may sell from. A store's SALESFLOOR is there from the start; a
+ * wholesale warehouse gets one when a till is first set to sell from it.
+ */
+export const TILL_WAREHOUSE_KINDS: readonly StockWarehouseKind[] = ['STORE', 'WHOLESALE'];
+
 export function systemBinTypes(kind: StockWarehouseKind): readonly BinType[] {
   switch (kind) {
     case 'WHOLESALE':

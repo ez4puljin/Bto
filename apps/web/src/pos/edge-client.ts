@@ -18,6 +18,7 @@ import {
   type EdgeLinkRequest,
   type EdgeLinkState,
   type EdgePairRequest,
+  type EdgeTillChoice,
   type EdgePairResponse,
   type EdgeParkedBasket,
   type EdgeParkRequest,
@@ -130,14 +131,22 @@ export class KioskCredentials {
   private state: KioskCredentialsState;
   private readonly storage: KioskStorage;
   private readonly listeners = new Set<() => void>();
+  /** ADR-0138: a page opened for one POS (`…/K1`) keeps that POS's tokens apart. */
+  private readonly keys: { device: string; session: string; cashier: string };
 
-  constructor(storage: KioskStorage = browserStorage()) {
+  constructor(storage: KioskStorage = browserStorage(), scope: string | null = null) {
     this.storage = storage;
-    const deviceToken = read(storage.local, DEVICE_STORAGE_KEY);
-    const cashier = Number.parseInt(read(storage.session, CASHIER_STORAGE_KEY) ?? '', 10);
+    const scoped = (key: string) => (scope ? `${key}@${scope}` : key);
+    this.keys = {
+      device: scoped(DEVICE_STORAGE_KEY),
+      session: scoped(SESSION_STORAGE_KEY),
+      cashier: scoped(CASHIER_STORAGE_KEY),
+    };
+    const deviceToken = read(storage.local, this.keys.device);
+    const cashier = Number.parseInt(read(storage.session, this.keys.cashier) ?? '', 10);
     this.state = {
       deviceToken,
-      sessionToken: deviceToken ? read(storage.session, SESSION_STORAGE_KEY) : null,
+      sessionToken: deviceToken ? read(storage.session, this.keys.session) : null,
       lastCashierId: Number.isSafeInteger(cashier) ? cashier : null,
       notice: null,
       epoch: 0,
@@ -154,22 +163,22 @@ export class KioskCredentials {
   readonly getSnapshot = (): KioskCredentialsState => this.state;
 
   paired(deviceToken: string): void {
-    write(this.storage.local, DEVICE_STORAGE_KEY, deviceToken);
-    write(this.storage.session, SESSION_STORAGE_KEY, null);
-    write(this.storage.session, CASHIER_STORAGE_KEY, null);
+    write(this.storage.local, this.keys.device, deviceToken);
+    write(this.storage.session, this.keys.session, null);
+    write(this.storage.session, this.keys.cashier, null);
     this.set({ deviceToken, sessionToken: null, lastCashierId: null, notice: null });
   }
 
   signedIn(sessionToken: string, cashierId: number): void {
-    write(this.storage.session, SESSION_STORAGE_KEY, sessionToken);
-    write(this.storage.session, CASHIER_STORAGE_KEY, String(cashierId));
+    write(this.storage.session, this.keys.session, sessionToken);
+    write(this.storage.session, this.keys.cashier, String(cashierId));
     this.set({ sessionToken, lastCashierId: cashierId, notice: null });
   }
 
   /** Back to the PIN screen; `notice` says why when the kiosk did it on its own. */
   signedOut(notice: KioskNotice | null = null): void {
-    write(this.storage.session, SESSION_STORAGE_KEY, null);
-    if (!notice) write(this.storage.session, CASHIER_STORAGE_KEY, null);
+    write(this.storage.session, this.keys.session, null);
+    if (!notice) write(this.storage.session, this.keys.cashier, null);
     this.set({
       sessionToken: null,
       notice,
@@ -179,9 +188,9 @@ export class KioskCredentials {
 
   /** Back to pairing: the edge no longer knows this browser. */
   unpaired(notice: KioskNotice | null = null): void {
-    write(this.storage.local, DEVICE_STORAGE_KEY, null);
-    write(this.storage.session, SESSION_STORAGE_KEY, null);
-    write(this.storage.session, CASHIER_STORAGE_KEY, null);
+    write(this.storage.local, this.keys.device, null);
+    write(this.storage.session, this.keys.session, null);
+    write(this.storage.session, this.keys.cashier, null);
     this.set({ deviceToken: null, sessionToken: null, lastCashierId: null, notice });
   }
 
@@ -239,6 +248,16 @@ export class EdgeClient {
 
   link(body: EdgeLinkRequest) {
     return this.request<EdgeLinkState>('POST', '/link', { body });
+  }
+
+  /** ADR-0138: the active POS the start page offers. */
+  tills(signal?: AbortSignal) {
+    return this.request<EdgeTillChoice[]>('GET', '/tills', { signal });
+  }
+
+  /** ADR-0138: the POS the page's address names, bound without a code. */
+  open(tillCode: string) {
+    return this.request<EdgePairResponse>('POST', '/open', { body: { tillCode } });
   }
 
   pair(body: EdgePairRequest) {

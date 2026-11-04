@@ -24,7 +24,8 @@ const SEEN_EVERY_MS = 60_000;
  * pairing code for a till, the browser trades it here for its own token (kept in its localStorage),
  * and the centre hears of the binding through the outbox (TILL_BOUND). Checked offline against the
  * code's hash in the snapshot; a code the snapshot does not know yet (issued since the last pull)
- * makes the edge pull once more when the centre is reachable.
+ * makes the edge pull once more when the centre is reachable. ADR-0138: a browser that opens a till
+ * by its address (`…:7400/K1`) is bound to it without a code; the cashier's PIN still guards it.
  */
 @Injectable()
 export class DevicesService {
@@ -50,6 +51,27 @@ export class DevicesService {
       this.store.get(); // no snapshot at all: POS_SNAPSHOT_MISSING says so
       throw new AppError('POS_PAIRING_INVALID', 'unknown till, wrong or expired pairing code');
     }
+    return this.bind(till, userAgent);
+  }
+
+  /** ADR-0138: the till the address names, active; bound with no code. */
+  async open(
+    tillCode: string,
+    userAgent: string | null,
+  ): Promise<{ token: string; till: { code: string; name: string } }> {
+    let till = this.byCode(tillCode);
+    if (!till && (await this.sync.pullOnce()) === 'changed') till = this.byCode(tillCode);
+    if (!till || till.status !== 'ACTIVE') {
+      this.store.get(); // no snapshot at all: POS_SNAPSHOT_MISSING says so
+      throw new AppError('POS_TILL_INACTIVE', `no active till ${tillCode}`, { code: tillCode });
+    }
+    return this.bind(till, userAgent);
+  }
+
+  private async bind(
+    till: SnapshotTill,
+    userAgent: string | null,
+  ): Promise<{ token: string; till: { code: string; name: string } }> {
     const token = randomBytes(32).toString('base64url');
     const tokenHash = sha256(token);
     const boundAt = new Date();
@@ -70,14 +92,19 @@ export class DevicesService {
     return { token, till: { code: till.code, name: till.name } };
   }
 
-  private pairable(tillCode: string, pairingCode: string): SnapshotTill | null {
+  /** The exact code first; else the till whose code looks the same (Latin «K1» for «К1»). */
+  private byCode(tillCode: string): SnapshotTill | undefined {
     const tills = this.store.peek()?.tills;
-    // The exact code first; else the till whose code looks the same (Latin «K1» for «К1»).
-    const till =
+    return (
       tills?.get(normalizeTillCode(tillCode)) ??
       [...(tills?.values() ?? [])].find(
         (candidate) => tillCodeLookKey(candidate.code) === tillCodeLookKey(tillCode),
-      );
+      )
+    );
+  }
+
+  private pairable(tillCode: string, pairingCode: string): SnapshotTill | null {
+    const till = this.byCode(tillCode);
     const valid =
       till !== undefined &&
       till.status === 'ACTIVE' &&

@@ -200,7 +200,13 @@ describe('pos shifts', () => {
   it('plays a till from the admin: the test till prices at RETAIL and runs the same path', async () => {
     const till2 = (
       await store.pos
-        .createTill({ edgeNodeId: store.node.id, code: 'К2', name: 'Касс 2', printerHost: null })
+        .createTill({
+          edgeNodeId: store.node.id,
+          warehouseId: store.store.id,
+          code: 'К2',
+          name: 'Касс 2',
+          printerHost: null,
+        })
         .expect(201)
     ).body as TillJson;
     const opened = (

@@ -16,7 +16,6 @@ export interface EdgeNodeJson {
   id: number;
   code: string;
   name: string;
-  warehouseId: number;
   tokenPrefix: string | null;
   backlog: number;
   lastSeenAt: string | null;
@@ -347,15 +346,18 @@ export async function posStore(app: NestExpressApplication, admin: string, prefi
   const category = await catalog.category(`Супермаркет ${prefix}`);
   const baseUomId = await catalog.uomId('PCS');
   const profile = await pricing.profile(`Супермаркет ${prefix}`);
-  const node = (
-    await pos
-      .createNode({ code: `${prefix}1`, name: `Дэлгүүр ${prefix}`, warehouseId: store.id })
-      .expect(201)
-  ).body as EdgeNodeJson;
+  const node = (await pos.createNode({ code: `${prefix}1`, name: `Дэлгүүр ${prefix}` }).expect(201))
+    .body as EdgeNodeJson;
   const edgeToken = (await pos.issueToken(node.id)).token;
   const till = (
     await pos
-      .createTill({ edgeNodeId: node.id, code: `К1`, name: 'Касс 1', printerHost: null })
+      .createTill({
+        edgeNodeId: node.id,
+        warehouseId: store.id,
+        code: `К1`,
+        name: 'Касс 1',
+        printerHost: null,
+      })
       .expect(201)
   ).body as TillJson;
   const cashierUser = await seedUser(app, { roles: ['POS_CASHIER'] });

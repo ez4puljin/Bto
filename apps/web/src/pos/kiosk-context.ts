@@ -4,6 +4,8 @@ import type { EdgeClient, KioskCredentials, KioskCredentialsState } from './edge
 export interface KioskServices {
   client: EdgeClient;
   credentials: KioskCredentials;
+  /** ADR-0138: the POS the page was opened for (`…:7400/K1`); null: pair with a code. */
+  addressTill?: string | null;
 }
 
 export const KioskContext = createContext<KioskServices | null>(null);

@@ -194,7 +194,7 @@ describe('kiosk: till records (ADR-0111)', () => {
     });
 
     const sheet = printed[0] ?? '';
-    expect(sheet).toContain(`${TILL.name} касс`);
+    expect(sheet).toContain(`${TILL.name} пос`);
     expect(sheet).toContain('Эхэлсэн: 09:00');
     expect(sheet).toContain('Хэвлэсэн: ');
     expect(sheet).toContain('Бэлэн мөнгө нийт - 42,000 / ....................');
@@ -209,7 +209,7 @@ describe('kiosk: till records (ADR-0111)', () => {
     expect(sheet).not.toMatch(/(^|[^0-9,])100 -/);
     expect(sheet).not.toMatch(/(^|[^0-9,])50 -/);
     expect(sheet).toContain('Нийт - 91,500');
-    expect(sheet).toContain(`Тушаасан ${TILL.name} касс - ______ (Гарын үсэг)`);
+    expect(sheet).toContain(`Тушаасан ${TILL.name} пос - ______ (Гарын үсэг)`);
     expect(sheet).toContain('Хүлээн авсан Заалны зохион байгуулагч - ______ (Гарын үсэг)');
 
     // The kept count fills the fields and prints again without a new count.
@@ -220,12 +220,14 @@ describe('kiosk: till records (ADR-0111)', () => {
     expect(printed[1]).toContain('20,000 - 4 ширхэг');
   });
 
-  it('prints a test slip from the menu', async () => {
+  it('prints a test slip from the POS settings', async () => {
     const { print, printed } = await openSale();
     const user = userEvent.setup();
-    await openMenuItem(user, k.menu.printTest);
+    await openMenuItem(user, k.menu.settings);
+    const settings = within(await screen.findByRole('dialog', { name: k.settings.title }));
+    await user.click(settings.getByRole('button', { name: k.menu.printTest }));
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
-    expect(printed[0]).toContain(`${TILL.name} касс`);
+    expect(printed[0]).toContain(`${TILL.name} пос`);
     expect(printed[0]).toContain(k.printTest.works);
   });
 });
