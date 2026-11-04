@@ -269,11 +269,11 @@ describe('kiosk: the sale screen', () => {
 
     expect(await screen.findByText(mn.errors.POS_SESSION_EXPIRED)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: CASHIER.fullName })).toBeInTheDocument();
-    expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
+    expect(sessionStorage.getItem(`${SESSION_STORAGE_KEY}@К1`)).toBeNull();
 
     await user.keyboard('112233');
     expect(await screen.findByText('Сүү 1л')).toBeInTheDocument();
-    expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).toBe('session-2');
+    expect(sessionStorage.getItem(`${SESSION_STORAGE_KEY}@К1`)).toBe('session-2');
     expect(edge.callsTo('POST /auth/pin')[0]?.body).toEqual({ userId: 7, pin: '112233' });
   });
 

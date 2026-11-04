@@ -71,6 +71,8 @@ $ip = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
   Select-Object -First 1 -ExpandProperty IPAddress
 if (-not $ip) { $ip = '<энэ компьютерийн IP>' }
 Write-Host ''
-Write-Host "Бэлэн. Кассын хуудас: http://${ip}:$port" -ForegroundColor Green
-Write-Host 'Анх удаа нээхэд «Төв системтэй холбох» дэлгэц гарна: төвийн хаяг, edge-ийн код,'
-Write-Host '«Супермаркет → Касс» хуудаснаас авсан «Холбох код»-ыг оруулна.'
+Write-Host "Бэлэн. Посын хуудас: http://${ip}:$port" -ForegroundColor Green
+Write-Host 'Анх удаа нээхэд «Төв системтэй холбох» дэлгэц гарна: төвийн хаяг, пос серверийн код,'
+Write-Host '«Супермаркет → Пос» хуудасны пос серверийн мөрөөс авсан «Холбох код»-ыг оруулна.'
+Write-Host 'Дараа нь энэ хаяг посын жагсаалтыг харуулна; кассчны компьютер өөрийн посыг сонгоно'
+Write-Host "(жишээ нь http://${ip}:$port/K1)."

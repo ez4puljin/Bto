@@ -15,7 +15,7 @@ import { LoginScreen } from './screens/login-screen';
 import { SaleScreen } from './screens/sale-screen';
 import { ShiftCloseScreen, ShiftSummaryScreen } from './screens/shift-close-screen';
 import { ShiftOpenScreen } from './screens/shift-open-screen';
-import { TillChooser } from './screens/till-chooser';
+import { StartAdopt, TillChooser } from './screens/till-chooser';
 
 /**
  * The cashier's till screen (`pos.html`, ADR-0067): its own full-window app beside the admin,
@@ -55,13 +55,15 @@ function KioskRoot() {
   if (link.data && (!link.data.linked || (link.data.rejected && !deviceToken))) {
     return <LinkScreen state={link.data} />;
   }
-  if (!deviceToken) {
-    return addressTill ? (
-      <AddressOpen tillCode={addressTill} onOpened={clear} />
+  // ADR-0138: the start page (`…:7400`) lists the POS; a token kept there moves to its POS.
+  if (!addressTill) {
+    return deviceToken ? (
+      <StartAdopt deviceToken={deviceToken} />
     ) : (
       <TillChooser onPaired={clear} />
     );
   }
+  if (!deviceToken) return <AddressOpen tillCode={addressTill} onOpened={clear} />;
   if (!sessionToken) return <LoginScreen onNewCashier={clear} />;
   return <SessionGate cart={cart} onSignOut={signOut} />;
 }

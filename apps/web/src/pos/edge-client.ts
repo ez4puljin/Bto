@@ -133,9 +133,12 @@ export class KioskCredentials {
   private readonly listeners = new Set<() => void>();
   /** ADR-0138: a page opened for one POS (`…/K1`) keeps that POS's tokens apart. */
   private readonly keys: { device: string; session: string; cashier: string };
+  /** The POS this page was opened for; null: the start page. */
+  readonly scope: string | null;
 
   constructor(storage: KioskStorage = browserStorage(), scope: string | null = null) {
     this.storage = storage;
+    this.scope = scope;
     const scoped = (key: string) => (scope ? `${key}@${scope}` : key);
     this.keys = {
       device: scoped(DEVICE_STORAGE_KEY),
@@ -167,6 +170,19 @@ export class KioskCredentials {
     write(this.storage.session, this.keys.session, null);
     write(this.storage.session, this.keys.cashier, null);
     this.set({ deviceToken, sessionToken: null, lastCashierId: null, notice: null });
+  }
+
+  /**
+   * ADR-0138: the start page never sells: a device token held there (an older code pairing) or
+   * just paired there is moved to its POS's own keys, for `…/K1` to use without a new binding.
+   */
+  adopt(tillCode: string, deviceToken: string): void {
+    const key = `${DEVICE_STORAGE_KEY}@${tillCode}`;
+    if (!read(this.storage.local, key)) write(this.storage.local, key, deviceToken);
+    write(this.storage.local, this.keys.device, null);
+    write(this.storage.session, this.keys.session, null);
+    write(this.storage.session, this.keys.cashier, null);
+    this.set({ deviceToken: null, sessionToken: null, lastCashierId: null, notice: null });
   }
 
   signedIn(sessionToken: string, cashierId: number): void {

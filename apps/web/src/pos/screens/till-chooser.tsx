@@ -1,13 +1,39 @@
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, Monitor } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { tillAddress } from '../address';
-import { BrandMark, CenteredScreen, LoadingScreen } from '../components/layout';
+import { BrandMark, CenteredScreen, ErrorScreen, LoadingScreen } from '../components/layout';
 import { useKiosk } from '../kiosk-context';
+import { useProblemText } from '../messages';
 import { kioskKeys } from '../queries';
 import { PairingScreen } from './pairing-screen';
+
+/**
+ * ADR-0138: a start page that still holds a device token (paired with a code before the POS had
+ * addresses): the token moves to its POS's own keys, then the list shows.
+ */
+export function StartAdopt({ deviceToken }: { deviceToken: string }) {
+  const { client, credentials } = useKiosk();
+  const problemText = useProblemText();
+  const device = useQuery({
+    queryKey: ['kiosk', 'start-device', deviceToken],
+    queryFn: ({ signal }) => client.device(signal),
+    retry: false,
+  });
+  const code = device.data?.till.code;
+  useEffect(() => {
+    if (code) credentials.adopt(code, deviceToken);
+  }, [code, credentials, deviceToken]);
+  // A token the edge no longer knows sends the page back by itself (the client forgets it).
+  if (device.isError) {
+    return (
+      <ErrorScreen message={problemText(device.error)} onRetry={() => void device.refetch()} />
+    );
+  }
+  return <LoadingScreen />;
+}
 
 /**
  * ADR-0138: the kiosk's start page (`…:7400`): the edge's active POS; a click opens the POS at its

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BrandMark, CenteredScreen, KioskAlert } from '../components/layout';
+import { tillAddress } from '../address';
 import { useCredentials, useKiosk } from '../kiosk-context';
 import { typeDigits } from '../keys';
 import { useProblemText } from '../messages';
@@ -18,7 +19,7 @@ const PAIRING_CODE = /^[0-9]{6}$/;
  */
 export function PairingScreen({ onPaired }: { onPaired: () => void }) {
   const { t } = useTranslation();
-  const { client, credentials } = useKiosk();
+  const { client, credentials, navigate } = useKiosk();
   const { notice } = useCredentials();
   const problemText = useProblemText();
   const [tillCode, setTillCode] = useState('');
@@ -28,6 +29,14 @@ export function PairingScreen({ onPaired }: { onPaired: () => void }) {
     mutationFn: (body: EdgePairRequest) => client.pair(body),
     onSuccess: (response) => {
       onPaired();
+      if (credentials.scope === null) {
+        // ADR-0138: paired on the start page: the POS's own page takes it from here.
+        credentials.adopt(response.till.code, response.deviceToken);
+        (navigate ?? ((url: string) => window.location.assign(url)))(
+          tillAddress(response.till.code, window.location),
+        );
+        return;
+      }
       credentials.paired(response.deviceToken);
     },
   });
