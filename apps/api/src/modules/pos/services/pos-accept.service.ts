@@ -113,7 +113,16 @@ export class PosAcceptService {
    * One replayed document: APPLIED or DUPLICATE on success; REJECTED (and logged) on a refusal the
    * edge cannot cure by trying again; anything else is thrown so the edge resends the batch.
    */
-  async applyEvent(node: EdgeNode, actor: Actor, event: SyncEvent): Promise<SyncOutcome> {
+  /**
+   * One replayed document in its own transaction. A refusal is logged for the admin, unless it is
+   * the admin's own replay of a logged one (ADR-0140): a replay that fails again adds no row.
+   */
+  async applyEvent(
+    node: EdgeNode,
+    actor: Actor,
+    event: SyncEvent,
+    options: { logRejection?: boolean } = {},
+  ): Promise<SyncOutcome> {
     const outcome = (
       status: SyncOutcome['status'],
       rest: Partial<Pick<SyncOutcome, 'id' | 'number' | 'code' | 'params'>>,
@@ -140,6 +149,7 @@ export class PosAcceptService {
         (error.errors?.[0]
           ? { path: error.errors[0].path, constraint: error.errors[0].constraint }
           : null);
+      if (options.logRejection === false) return outcome('REJECTED', { code: error.code, params });
       await this.db.insert(posSyncRejections).values({
         edgeNodeId: node.id,
         clientId: event.clientId,

@@ -1,6 +1,6 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { createHttpApp } from '../harness/apps';
-import type { ProductJson } from '../harness/catalog';
+import { idempotency, type ProductJson } from '../harness/catalog';
 import { financeApi, type JournalEntryJson, type PaymentJson } from '../harness/finance';
 import { expectReconciled } from '../harness/inventory';
 import {
@@ -11,6 +11,7 @@ import {
   saleEvent,
   type ShiftJson,
   shiftCloseEvent,
+  shiftOpenEvent,
   type TillJson,
 } from '../harness/pos';
 
@@ -250,5 +251,80 @@ describe('pos shifts', () => {
     const codes = (entry.lines ?? []).map((line) => line.accountCode).sort();
     // No variance line when the count matches.
     expect(codes).toEqual(['100102', '311004', '510102']);
+  });
+
+  it('closes from the centre a shift its edge left open, then replays what it blocked (ADR-0140)', async () => {
+    // An edge opened К1's shift and sold, then was replaced before closing it.
+    const { clientId: lostClientId, shift: lost } = await store.openShift('20000', 7);
+    const sold = saleDoc(
+      [{ product: cola, qty: '1' }],
+      {
+        tillCode: store.till.code,
+        shiftClientId: lostClientId,
+        cashierUserId: store.cashierId,
+        number: store.nextNumber(),
+        tenders: [{ kind: 'CASH', amount: '1300.00', tendered: '1300' }],
+      },
+      store.retailPrice,
+    );
+    expect((await store.replay([saleEvent(sold)]))[0]?.status).toBe('APPLIED');
+    // The new edge's own shift is refused while the lost one is open.
+    const fresh = shiftOpenEvent({
+      tillCode: store.till.code,
+      cashierUserId: store.cashierId,
+      number: store.shiftNumber(8),
+      openingFloat: '0',
+    });
+    const [busy] = await store.replay([fresh]);
+    expect(busy).toMatchObject({ status: 'REJECTED', code: 'POS_TILL_BUSY' });
+
+    // Replayed before the old shift is closed: refused again, and no second row.
+    const before = (await store.pos.rejections({ replayed: false })).data.filter(
+      (row) => row.clientId === fresh.clientId,
+    ) as { id: number }[];
+    expect(before).toHaveLength(1);
+    const early = (await store.pos.replay(before[0]?.id ?? 0).expect(200)).body as {
+      status: string;
+    };
+    expect(early.status).toBe('REJECTED');
+    expect(
+      (await store.pos.rejections({ replayed: false })).data.filter(
+        (row) => row.clientId === fresh.clientId,
+      ),
+    ).toHaveLength(1);
+
+    const close = (id: number, as = store.pos) =>
+      as.http().post(`/api/v1/pos/shifts/${id}/close`).set(as.auth).set(idempotency()).send({});
+    // Only a manager; the office reads.
+    await close(lost.id, posApi(app, actors.office)).expect(403);
+    const closed = (await close(lost.id).expect(200)).body as ShiftJson;
+    expect(closed).toMatchObject({
+      status: 'CLOSED',
+      expectedCash: '21300.00',
+      countedCash: '21300.00',
+      floatKept: '0.00',
+      variance: '0.00',
+      salesCount: 1,
+    });
+    expect((closed as { note?: string | null }).note).toBeTruthy();
+    const entry: JournalEntryJson = await financeApi(app, actors.accountant).journalGet(
+      closed.journalEntryId ?? 0,
+    );
+    // Cash as counted (expected − float), no variance line.
+    const cash = (entry.lines ?? []).find((line) => line.accountCode === '100102');
+    expect(cash?.debit).toBe('1300.00');
+    expect((entry.lines ?? []).some((line) => line.accountCode === '740101')).toBe(false);
+    // Closed already: refused.
+    await close(lost.id).expect(409);
+
+    // The refused shift now goes in.
+    const rejected = (await store.pos.rejections({ replayed: false })).data.find(
+      (row) => row.clientId === fresh.clientId,
+    ) as { id: number } | undefined;
+    expect(rejected).toBeDefined();
+    const replayed = (await store.pos.replay(rejected?.id ?? 0).expect(200)).body as {
+      status: string;
+    };
+    expect(replayed.status).toBe('APPLIED');
   });
 });

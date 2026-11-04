@@ -6,6 +6,7 @@ Updated: 2026-10-31 (attendance from the staff app — ADR-0131, branch `claude/
 
 | | |
 |---|---|
+| Phase (close a shift at the centre) | **Built 2026-11-04** on main (ADR-0140): «Супермаркет → Ээлж» → an open shift → «Төвөөс хаах»; the page lists «Төв хүлээж аваагүй баримт» with «Дахин оруулах». Owner clicks: close К1-261026-Э1, then replay the two SM1 documents top first. |
 | Phase (shift opens itself) | **Built 2026-11-04** on main (ADR-0139): after the PIN the POS opens its shift with no opening cash and shows the sale screen; «Ээлж хаах» unchanged. |
 | Phase (POS by address) | **Built 2026-11-04** on main (ADR-0138, no migration): `http://<edge>:7400/K1` opens POS К1 with no pairing code; «Супермаркет → Пос» shows each POS's «Хаяг». Owner clicks: on the cashier's PC open `http://192.168.1.152:7400/K1` after the Ubuntu edge is updated. |
 | Phase (till location, edge without a warehouse) | **Built 2026-11-04** on main (ADR-0137, migration `0066_pos_till_location`, bto_main migrated): «Супермаркет → Касс» — a new edge server takes only a code and a name; a till requires «Үлдэгдэл хасах байршил», a store floor or a wholesale warehouse (which gets a SALESFLOOR). Tills are «Пос» on screens; the POS form has no printer or drawer fields (the POS app's «Тохиргоо» on the cashier's PC picks the printer) and a new POS opens «Кассчид ба эрх». Owner clicks: «Шинэ касс сервер», «Шинэ касс» with a WH warehouse as `admin`. |

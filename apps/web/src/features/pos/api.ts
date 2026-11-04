@@ -125,6 +125,22 @@ export function useShifts(filter: ShiftFilter, options: { enabled?: boolean } = 
   });
 }
 
+/** The documents the centre refused and nobody has replayed yet (ADR-0063 #4). */
+export function useOpenRejections(enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...POS_KEYS.rejections, 'open'],
+    enabled,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/pos/sync-rejections', {
+          params: { query: { replayed: false, limit: 50 } },
+          signal,
+        }),
+      ).data,
+  });
+}
+
 export function useShift(id: number | null) {
   const api = useApiClient();
   return useQuery({
@@ -370,6 +386,27 @@ export function usePosMutations() {
           await api.POST('/api/v1/pos/cashiers/{userId}/unlock', { params: { path: { userId } } }),
         ),
       onSuccess: () => refresh(POS_KEYS.cashiers),
+    }),
+    /** ADR-0140: an admin closes a shift its edge can no longer close; cash as expected. */
+    closeAtCentre: useMutation({
+      mutationFn: async ({ id, key }: Keyed<{ id: number }>) =>
+        unwrap(
+          await api.POST('/api/v1/pos/shifts/{id}/close', {
+            params: { path: { id }, header: idempotencyKey(key) },
+            body: {},
+          }),
+        ),
+      onSuccess: () => refresh(POS_KEYS.shifts, ATTENTION_KEY, ['finance']),
+    }),
+    /** A refused document again, once what blocked it is fixed (ADR-0063 #4). */
+    replayRejection: useMutation({
+      mutationFn: async ({ id, key }: Keyed<{ id: number }>) =>
+        unwrap(
+          await api.POST('/api/v1/pos/sync-rejections/{id}/replay', {
+            params: { path: { id }, header: idempotencyKey(key) },
+          }),
+        ),
+      onSuccess: () => refresh(POS_KEYS.rejections, POS_KEYS.shifts, POS_KEYS.sales, ATTENTION_KEY),
     }),
     handOver: useMutation({
       mutationFn: async ({ id, key, ...body }: Keyed<HandoverRequest & { id: number }>) =>

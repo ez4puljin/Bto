@@ -28,6 +28,7 @@ import { problemFromError } from '@/lib/problem';
 import { hrefWithParam, useSetParam } from '@/lib/search-params';
 import { type ShiftStatus, useShifts, useTills } from './api';
 import { ShiftStatusBadge } from './badges';
+import { RejectionsCard } from './rejections-card';
 import { ShiftPanel } from './shift-panel';
 
 const isStatus = (value: string | null): value is ShiftStatus =>
@@ -70,6 +71,7 @@ export function PosShiftsPage() {
   return (
     <div>
       <PageHeader title={t('pos.shifts.title')} />
+      <RejectionsCard />
       <FilterBar>
         <NativeSelect
           variant="filter"

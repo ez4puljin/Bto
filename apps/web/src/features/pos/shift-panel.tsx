@@ -1,11 +1,12 @@
 import { Decimal } from '@tugeel/shared/money';
-import { handoverAmount } from '@tugeel/shared/pos';
+import { expectedCash, handoverAmount } from '@tugeel/shared/pos';
 import { businessDate } from '@tugeel/shared/time';
-import { HandCoins } from 'lucide-react';
+import { HandCoins, LockKeyhole } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DialogFormFooter, FormField } from '@/components/form';
 import { NativeSelect } from '@/components/native-select';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -55,7 +56,9 @@ export function ShiftPanel({ shiftId, onClose }: { shiftId: number | null; onClo
 function PanelActions({ shift }: { shift: Shift }) {
   const { t } = useTranslation();
   const canReceive = useHasPermission('finance.payments.record');
+  const canManage = useHasPermission('pos.manage');
   const [handing, setHanding] = useState(false);
+  if (shift.status === 'OPEN' && canManage) return <CloseAtCentre shift={shift} />;
   if (!canReceive || shift.status !== 'CLOSED') return null;
   return (
     <>
@@ -64,6 +67,55 @@ function PanelActions({ shift }: { shift: Shift }) {
         {t('pos.actions.handover')}
       </Button>
       <HandoverDialog open={handing} shift={shift} onClose={() => setHanding(false)} />
+    </>
+  );
+}
+
+/**
+ * ADR-0140: «Төвөөс хаах» — for a shift its POS server can no longer close (replaced or lost): the
+ * cash counted is the cash expected, and the close books as any other.
+ */
+function CloseAtCentre({ shift }: { shift: Shift }) {
+  const { t } = useTranslation();
+  const mutations = usePosMutations();
+  const action = useAction();
+  const [open, setOpen] = useState(false);
+  const [key] = useState(randomUuid);
+  const amount = expectedCash({
+    openingFloat: new Decimal(shift.openingFloat),
+    cashSales: new Decimal(shift.cashSales),
+    cashRefunds: new Decimal(shift.cashRefunds),
+  });
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        <LockKeyhole />
+        {t('pos.shifts.closeAtCentre')}
+      </Button>
+      <ConfirmDialog
+        open={open}
+        title={t('pos.shifts.closeAtCentreTitle', { number: shift.number })}
+        description={t('pos.shifts.closeAtCentreDescription', {
+          amount: formatTugrik(amount.toFixed(2)).replace('₮', ''),
+        })}
+        confirmLabel={t('pos.shifts.closeAtCentre')}
+        pending={mutations.closeAtCentre.isPending}
+        problem={action.problem}
+        onConfirm={() =>
+          void action
+            .run(async () => {
+              await mutations.closeAtCentre.mutateAsync({ id: shift.id, key });
+              toast.success(t('pos.shifts.closedAtCentre', { number: shift.number }));
+            })
+            .then((ok) => {
+              if (ok) setOpen(false);
+            })
+        }
+        onClose={() => {
+          action.clear();
+          setOpen(false);
+        }}
+      />
     </>
   );
 }

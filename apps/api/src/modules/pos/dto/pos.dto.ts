@@ -482,6 +482,16 @@ export class ShiftPageDto {
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
 }
 
+/** ADR-0140: an admin's close of a shift its edge can no longer close. */
+@ApiSchema({ name: 'PosShiftCloseAtCentreRequest' })
+export class ShiftCloseAtCentreDto {
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: POS_LIMITS.maxNote })
+  @IsOptional()
+  @IsString()
+  @MaxLength(POS_LIMITS.maxNote)
+  note?: string | null;
+}
+
 @ApiSchema({ name: 'PosHandoverRequest' })
 export class HandoverRequestDto {
   @ApiPropertyOptional({ type: Number, nullable: true, description: 'Default: the settings’ box' })

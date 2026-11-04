@@ -5603,6 +5603,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pos/shifts/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ADR-0140: closes from the centre a shift its edge can no longer close; cash as expected. */
+        post: operations["PosShifts_closeAtCentre"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pos/shifts/{id}/handover": {
         parameters: {
             query?: never;
@@ -14422,6 +14439,9 @@ export interface components {
         PosShiftPage: {
             data: components["schemas"]["PosShift"][];
             nextCursor: string | null;
+        };
+        PosShiftCloseAtCentreRequest: {
+            note?: string | null;
         };
         PosHandoverRequest: {
             /** @description Default: the settings’ box */
@@ -31249,6 +31269,43 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosShift"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosShifts_closeAtCentre: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosShiftCloseAtCentreRequest"];
+            };
+        };
         responses: {
             200: {
                 headers: {

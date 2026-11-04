@@ -33,7 +33,8 @@ export class PosReplayService {
     }
     const node = await this.nodes.get(row.edgeNodeId);
     const event = decodeEvent(row.kind, row.clientId, row.payload);
-    const outcome = await this.accept.applyEvent(node, ctx, event);
+    // A replay that fails again leaves the one row it came from (ADR-0140).
+    const outcome = await this.accept.applyEvent(node, ctx, event, { logRejection: false });
     if (outcome.status !== 'REJECTED') {
       await this.db
         .update(posSyncRejections)

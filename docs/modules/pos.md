@@ -78,6 +78,7 @@ Outside the module, the same migration: `POS_SHORTFALL` joins the adjustment rea
 | `GET /pos/sales`, `GET /pos/sales/:id` [read] | sales and returns (`q` on number, ДДТД, TIN, buyer; `tillId`, `shiftId`, `cashierUserId`, `kind`, `ebarimtStatus`, `from`, `to`; `total` on the first page); one with lines, tenders, shortfalls and its returns |
 | `GET /pos/shortfalls` [read]; `POST /pos/shortfalls/:id/resolve` [`inventory.adjustments.manage`] | the storekeeper's list; «Шалгасан» with a note |
 | `GET /pos/sync-rejections` [read]; `POST /pos/sync-rejections/:id/replay` [`pos.manage`, idempotent] | refused documents; a replay after the data was fixed |
+| `POST /pos/shifts/:id/close` [`pos.manage`, idempotent] | ADR-0140: closes an open shift its POS server cannot close (cash counted = expected, no variance, booked as any close); «Ээлж» lists the unreplayed rejections to replay |
 | `GET /pos/payment-types` [read], `PUT` [`pos.manage`] | ADR-0111: the ways to pay at the till, saved as the whole ordered list (`types`: id or null, name, kind, status); a type keeps its kind; exactly one active cash type, at most one active credit type |
 | `GET /pos/day-counts` [read] (`tillId`, `from`, `to`) | ADR-0111: the tills' banknote counts, newest first, every recount |
 | `GET /pos/quick-buttons` [read], `PUT` [`pos.manage`] | the F7 panel's groups and buttons; the PUT replaces the whole ordered set (≤ 12 groups of ≤ 60, a unit once per group) |

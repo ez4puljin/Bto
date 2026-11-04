@@ -7,6 +7,7 @@ import {
   DayCountDto,
   DayCountsQueryDto,
   HandoverRequestDto,
+  ShiftCloseAtCentreDto,
   PosAttentionDto,
   RejectionListQueryDto,
   RejectionPageDto,
@@ -66,6 +67,21 @@ export class PosShiftsController {
   @RequirePermission(READ)
   @ApiOkResponse({ type: ShiftDto })
   async get(@Param('id', ParseIntPipe) id: number): Promise<ShiftDto> {
+    return shiftDto(await this.query.getShift(id));
+  }
+
+  /** ADR-0140: closes from the centre a shift its edge can no longer close; cash as expected. */
+  @Post(':id/close')
+  @HttpCode(200)
+  @RequirePermission(MANAGE)
+  @Idempotent()
+  @ApiOkResponse({ type: ShiftDto })
+  async closeAtCentre(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: ShiftCloseAtCentreDto,
+  ): Promise<ShiftDto> {
+    await this.shifts.closeAtCentre(ctx, id, body.note ?? null);
     return shiftDto(await this.query.getShift(id));
   }
 

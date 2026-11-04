@@ -23244,6 +23244,71 @@
         ]
       }
     },
+    "/api/v1/pos/shifts/{id}/close": {
+      "post": {
+        "operationId": "PosShifts_closeAtCentre",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosShiftCloseAtCentreRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosShift"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "ADR-0140: closes from the centre a shift its edge can no longer close; cash as expected.",
+        "tags": [
+          "pos"
+        ]
+      }
+    },
     "/api/v1/pos/shifts/{id}/handover": {
       "post": {
         "operationId": "PosShifts_handOver",
@@ -54890,6 +54955,16 @@
           "data",
           "nextCursor"
         ]
+      },
+      "PosShiftCloseAtCentreRequest": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        }
       },
       "PosHandoverRequest": {
         "type": "object",

@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import mn from '@tugeel/shared/i18n/mn.json';
 import type { GlRole } from '@tugeel/shared/finance';
 import { Decimal } from '@tugeel/shared/money';
 import {
@@ -212,7 +213,12 @@ export class PosShiftsService {
    * Dr SALES_RETURN and VAT_PAYABLE for the returns, Cr POS_SALES and VAT_PAYABLE for the sales,
    * the variance on CASH_VARIANCE. A repeated close is a duplicate.
    */
-  async acceptClose(tx: Tx, actor: Actor, node: EdgeNode, doc: ShiftCloseDoc): Promise<Accepted> {
+  async acceptClose(
+    tx: Tx,
+    actor: Actor,
+    node: Pick<EdgeNode, 'id'>,
+    doc: ShiftCloseDoc,
+  ): Promise<Accepted> {
     const [row] = await tx
       .select()
       .from(posShifts)
@@ -304,6 +310,53 @@ export class PosShiftsService {
       },
     });
     return { id: row.id, number: row.number, created: true };
+  }
+
+  /**
+   * ADR-0140: an admin closes from the centre a shift its edge can no longer close (the edge was
+   * replaced or lost): the cash counted is taken as the cash expected (no variance), nothing is kept
+   * in the drawer, and the close books as any other (ADR-0064 #2). The shift's documents the edge
+   * still sends later are refused and wait in the rejections for a replay.
+   */
+  async closeAtCentre(ctx: AuthContext, shiftId: number, note: string | null): Promise<void> {
+    await inTransaction(this.db, async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(posShifts)
+        .where(eq(posShifts.id, shiftId))
+        .for('update');
+      if (!row) throw notFound('pos_shift', shiftId);
+      if (row.status !== 'OPEN') {
+        throw new AppError('POS_SHIFT_STATE_INVALID', `shift ${row.number} is ${row.status}`, {
+          status: row.status,
+          number: row.number,
+        });
+      }
+      const totals = await this.totals(row.id, tx);
+      const expected = expectedCash({
+        openingFloat: row.openingFloat,
+        cashSales: totals.cashSales,
+        cashRefunds: totals.cashRefunds,
+      });
+      await this.acceptClose(
+        tx,
+        ctx,
+        { id: row.edgeNodeId },
+        {
+          clientId: row.clientId,
+          closedAt: new Date(),
+          countedCash: expected,
+          floatKept: new Decimal(0),
+          note: note?.trim() || mn.pos.shifts.closedAtCentreNote,
+        },
+      );
+      await this.audit.record(tx, ctx, {
+        action: 'CLOSE_AT_CENTRE',
+        entity: 'pos_shifts',
+        entityId: row.id,
+        after: { number: row.number, countedCash: expected.toFixed(MONEY_SCALE) },
+      });
+    });
   }
 
   /**
