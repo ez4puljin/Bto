@@ -14,6 +14,8 @@ import { EDGE_DB, type EdgeDb } from '../db/edge-db';
 import { edgeOutbox, edgeSales, edgeState } from '../db/schema';
 
 const SEARCH_LIMIT = 20;
+/** Customers listed before anything is typed. */
+const BROWSE_LIMIT = 50;
 
 /**
  * The customers a till may charge (ADR-0109), as the centre's feed last answered: kept in the
@@ -74,7 +76,16 @@ export class CustomerStore implements OnModuleInit {
   /** By code, name, phone, TIN or registration number, with what is left of each limit. */
   async find(query: string): Promise<EdgeCustomer[]> {
     const terms = queryTerms(query);
-    if (terms.length === 0) return [];
+    // Nothing typed: the first customers of the feed in its order (by code), to pick from at once
+    // (owner 2026-11-04: «харилцагч нар гарч ирдэг байх ёстой»).
+    if (terms.length === 0) {
+      const first = this.search.slice(0, BROWSE_LIMIT).map((entry) => entry.customer);
+      const pending = await this.pending(
+        first.map((customer) => customer.id),
+        this.generatedAt(),
+      );
+      return first.map((customer) => this.view(customer, pending.get(customer.id)));
+    }
     const code = query.trim();
     const first: PosCustomerStanding[] = [];
     const strict: PosCustomerStanding[] = [];

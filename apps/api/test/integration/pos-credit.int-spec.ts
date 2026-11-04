@@ -155,6 +155,10 @@ describe('pos credit sales and the payment step', () => {
     });
     const byPhone = (await kiosk.get('/customers?q=99110001').expect(200)).body as EdgeCustomer[];
     expect(byPhone.map((customer) => customer.id)).toContain(shop.id);
+    // Nothing typed: the feed's first customers, to pick from at once (owner 2026-11-04).
+    const listed = (await kiosk.get('/customers?q=').expect(200)).body as EdgeCustomer[];
+    expect(listed.length).toBeGreaterThan(0);
+    expect(listed.length).toBeLessThanOrEqual(50);
     expect(await sync.pullCustomersOnce()).toBe('unchanged');
   });
 

@@ -171,7 +171,15 @@ describe('kiosk: the payment rows (ADR-0111)', () => {
     expect(typeButton(pay, 'Зээл')).toBeDisabled();
     expect(within(pay).getByText(k.pay.receiptChoice.noVat)).toBeInTheDocument();
     expect(within(pay).getByRole('button', { name: k.pay.print })).toBeDisabled();
-    await user.type(within(pay).getByLabelText(k.pay.credit.search), 'дэлгүүр{Enter}');
+    // The customers show before anything is typed (owner 2026-11-04), then narrow as it is.
+    expect(
+      await within(pay).findByRole('button', { name: /Туршилтын дэлгүүр/ }),
+    ).toBeInTheDocument();
+    expect(edge.callsTo('GET /customers')[0]?.url.searchParams.get('q')).toBe('');
+    await user.type(within(pay).getByLabelText(k.pay.credit.search), 'дэлгүүр');
+    await waitFor(() =>
+      expect(edge.callsTo('GET /customers').at(-1)?.url.searchParams.get('q')).toBe('дэлгүүр'),
+    );
     const held = await within(pay).findByRole('button', { name: /Хаалттай дэлгүүр/ });
     expect(held).toBeDisabled();
     await user.click(within(pay).getByRole('button', { name: /Туршилтын дэлгүүр/ }));
