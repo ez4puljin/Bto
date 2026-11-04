@@ -79,7 +79,6 @@ interface PayRow {
   key: number;
   type: PayType;
   amount: string;
-  rrn: string;
 }
 
 /**
@@ -185,7 +184,7 @@ function PaymentForm(props: {
     const first =
       types.find((type) => type.kind === 'CASH') ?? types.find((type) => type.kind === 'CARD');
     const due = new Decimal(props.attempt.total);
-    return first && due.gt(0) ? [{ key: 1, type: first, amount: fieldMoney(due), rrn: '' }] : [];
+    return first && due.gt(0) ? [{ key: 1, type: first, amount: fieldMoney(due) }] : [];
   });
   const [nextKey, setNextKey] = useState(2);
   const [step, setStep] = useState<'rows' | 'receipt'>('rows');
@@ -253,7 +252,7 @@ function PaymentForm(props: {
       if (only.type.kind === 'CREDIT') setCustomer(null);
       if (only.type.kind === 'POINTS') setPin('');
       const amount = type.kind === 'POINTS' ? Decimal.min(total.floor(), balance) : total;
-      setRows([{ key: nextKey, type, amount: amount.gt(0) ? fieldMoney(amount) : '', rrn: '' }]);
+      setRows([{ key: nextKey, type, amount: amount.gt(0) ? fieldMoney(amount) : '' }]);
       setNextKey((key) => key + 1);
       setOverLimit(null);
       return;
@@ -265,7 +264,6 @@ function PaymentForm(props: {
         key: nextKey,
         type,
         amount: prefill.gt(0) ? fieldMoney(prefill) : '',
-        rrn: '',
       },
     ]);
     setNextKey((key) => key + 1);
@@ -304,7 +302,7 @@ function PaymentForm(props: {
           ? {
               // The bank's terminal is set up on the POS PC itself (owner 2026-11-04): nothing typed.
               terminalId: null,
-              rrn: row.rrn.trim() || null,
+              rrn: null,
             }
           : {}),
       });
@@ -489,19 +487,6 @@ function PaymentForm(props: {
                           {formatTugrik(amount.toFixed(2))}
                         </Button>
                       ))}
-                    </div>
-                  ) : null}
-                  {row.type.kind === 'CARD' ? (
-                    <div>
-                      <Input
-                        aria-label={t('posKiosk.pay.rrn')}
-                        placeholder={t('posKiosk.pay.rrn')}
-                        autoComplete="off"
-                        maxLength={32}
-                        className="h-11"
-                        value={row.rrn}
-                        onChange={(event) => updateRow(row.key, { rrn: event.target.value })}
-                      />
                     </div>
                   ) : null}
                   {row.type.kind === 'CREDIT' ? (
