@@ -6,6 +6,7 @@ Updated: 2026-10-31 (attendance from the staff app — ADR-0131, branch `claude/
 
 | | |
 |---|---|
+| Phase (POS screen pass) | **Built 2026-11-04** on main: one search field in the header (scan or type a name, the products drop down), the tools under the total as small icon tiles, the receipt number shown from the first line, the payment opening on cash for the whole amount (another type swaps it, 1–9, Enter goes on) and no terminal ID asked for a card. Owner clicks: the POS on 1024×768 after the Ubuntu edge is updated. |
 | Phase (close a shift at the centre) | **Built 2026-11-04** on main (ADR-0140): «Супермаркет → Ээлж» → an open shift → «Төвөөс хаах»; the page lists «Төв хүлээж аваагүй баримт» with «Дахин оруулах». Owner clicks: close К1-261026-Э1, then replay the two SM1 documents top first. |
 | Phase (shift opens itself) | **Built 2026-11-04** on main (ADR-0139): after the PIN the POS opens its shift with no opening cash and shows the sale screen; «Ээлж хаах» unchanged. |
 | Phase (POS by address) | **Built 2026-11-04** on main (ADR-0138, no migration): `http://<edge>:7400/K1` opens POS К1 with no pairing code; «Супермаркет → Пос» shows each POS's «Хаяг». Owner clicks: on the cashier's PC open `http://192.168.1.152:7400/K1` after the Ubuntu edge is updated. |

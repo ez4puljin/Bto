@@ -368,6 +368,12 @@ export class KioskController {
     return this.records.count(kiosk.device.tillCode, cashierOf(kiosk), body);
   }
 
+  /** The receipt number the sale being rung up is expected to take (owner 2026-11-04). */
+  @Get('sales/next-number')
+  nextNumber(@Kiosk() kiosk: KioskContext): Promise<{ number: string }> {
+    return this.checkout.nextNumber(kiosk.device.tillCode);
+  }
+
   @Get('sales/recent')
   recent(@Kiosk() kiosk: KioskContext): Promise<EdgeReceipt[]> {
     return this.checkout.recent(kiosk.device.tillCode);

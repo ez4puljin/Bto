@@ -5856,6 +5856,17 @@
     },
     "sale": {
       "cart": "Сагс",
+      "findPlaceholder": "Баркод уншуулах эсвэл барааны нэр, код бичих (F6)",
+      "tiles": {
+        "quick": "Товч",
+        "price": "Үнэ",
+        "park": "Хадгалах",
+        "parked": "Сагс ({{count}})",
+        "vouchers": "Купон",
+        "vouchersCount": "Купон ({{count}})",
+        "member": "Бонус карт"
+      },
+      "receiptNumber": "Баримт № {{number}}",
       "scanLabel": "Баркод",
       "scanPlaceholder": "Баркод уншуулах эсвэл бичээд Enter",
       "keys": "↑/↓ мөр · + / − тоо · Delete хасах · F7 товч · F8 үнэ · F9 хадгалах",
@@ -5922,7 +5933,6 @@
       "cardAmount": "Картаар төлөх дүн",
       "cardRest": "Үлдэгдлийг картаар",
       "cardTooMuch": "Картын дүн төлөх дүнгээс их байна",
-      "terminalId": "Терминал (заавал биш)",
       "rrn": "RRN (заавал биш)",
       "change": "Хариулт",
       "short": "Дутуу",

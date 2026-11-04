@@ -266,6 +266,11 @@ export class EdgeClient {
     return this.request<EdgeLinkState>('POST', '/link', { body });
   }
 
+  /** The receipt number the sale being rung up is expected to take. */
+  nextNumber(signal?: AbortSignal) {
+    return this.request<{ number: string }>('GET', '/sales/next-number', { signal });
+  }
+
   /** ADR-0138: the active POS the start page offers. */
   tills(signal?: AbortSignal) {
     return this.request<EdgeTillChoice[]>('GET', '/tills', { signal });

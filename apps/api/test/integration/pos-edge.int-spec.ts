@@ -189,6 +189,8 @@ describe('pos edge', () => {
   });
 
   it('sells with change and by card; the centre posts them, filling the empty shelf', async () => {
+    // The till shows the number the sale will take while it is rung up.
+    const expected = (await kiosk.get('/sales/next-number').expect(200)).body as { number: string };
     const cash = (
       await sell(
         [
@@ -204,7 +206,12 @@ describe('pos edge', () => {
       ebarimt: { mode: 'TEST' },
       tillCode: 'К1',
     });
+    expect(cash.number).toBe(expected.number);
     receipts.push(cash);
+    // Taken: the next one follows.
+    expect(
+      ((await kiosk.get('/sales/next-number').expect(200)).body as { number: string }).number,
+    ).not.toBe(expected.number);
     await sell(
       [{ productUnitId: colaUnit(), qty: '1' }],
       [{ kind: 'CASH', amount: '1000', tendered: '1000' }],

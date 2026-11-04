@@ -46,7 +46,7 @@ import { CustomerStore } from './customer.store';
 import { KioskAuthService } from './kiosk-auth.service';
 import { LoyaltyStore } from './loyalty.store';
 import { OutboxService } from './outbox.service';
-import { nextSequence } from './sequences';
+import { nextSequence, peekSequence } from './sequences';
 import { EdgeShiftsService } from './shifts.service';
 import { type LoadedSnapshot, SnapshotStore } from './snapshot.store';
 import { refused, VoucherStore, viewOf } from './voucher.store';
@@ -441,6 +441,14 @@ export class CheckoutService {
       }
       return receipt;
     });
+  }
+
+  /** The number the till's next sale is expected to take today (owner 2026-11-04). */
+  async nextNumber(tillCode: string): Promise<{ number: string }> {
+    const day = businessDate();
+    return {
+      number: posSaleNumber(tillCode, day, await peekSequence(this.db, `SALE:${tillCode}`, day)),
+    };
   }
 
   async recent(tillCode: string): Promise<EdgeReceipt[]> {

@@ -26,9 +26,7 @@ import {
   LockKeyhole,
   LogOut,
   Menu,
-  ScanBarcode,
   Settings,
-  Search,
   Tag,
   Ticket,
   Undo2,
@@ -36,6 +34,7 @@ import {
 } from 'lucide-react';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -71,18 +70,17 @@ import { QuickDialog } from '../components/quick-dialog';
 import { ReceiptDialog } from '../components/receipt';
 import { usePrint } from '../components/print-context';
 import { ReturnsDialog } from '../components/returns-dialog';
-import { SearchDialog } from '../components/search-dialog';
+import { ProductFinder } from '../components/product-finder';
 import { MemberDialog } from '../components/member-dialog';
 import { VoucherDialog } from '../components/voucher-dialog';
 import { edgeProblemOf } from '../edge-client';
 import { useCredentials, useKiosk } from '../kiosk-context';
 import { isMinusKey, isPlusKey, keepFocus, typeDigits } from '../keys';
 import { useProblemText } from '../messages';
-import { kioskKeys, useHealth, useParked, useQuote } from '../queries';
+import { kioskKeys, useHealth, useParked, useQuote, useNextSaleNumber } from '../queries';
 import { useVoucherAdd } from '../vouchers';
 
 type Dialogs =
-  | 'search'
   | 'pay'
   | 'receipt'
   | 'cancel'
@@ -133,6 +131,7 @@ export function SaleScreen(props: {
   const [attempt, setAttempt] = useState<PaymentAttempt | null>(null);
   const [receipt, setReceipt] = useState<EdgePrintableReceipt | null>(null);
   const { print } = usePrint();
+  const nextNumber = useNextSaleNumber(cart.lines.length > 0);
   const health = useHealth();
   const ebarimt = health.data?.ebarimt;
   const ebarimtCount = ebarimt ? ebarimt.ready + ebarimt.attention : 0;
@@ -505,8 +504,10 @@ export function SaleScreen(props: {
         event.preventDefault();
         if (current.dialog !== null) return;
         setNotice(null);
-        if (event.key === 'F6') setDialog('search');
-        else if (event.key === 'F3') setDialog('member');
+        if (event.key === 'F6') {
+          scanInput.current?.focus();
+          scanInput.current?.select();
+        } else if (event.key === 'F3') setDialog('member');
         else if (event.key === 'F2') {
           if (current.cartEmpty) return;
           setDialog('vouchers');
@@ -537,16 +538,21 @@ export function SaleScreen(props: {
       <KioskHeader
         session={props.session}
         center={
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11 w-full max-w-lg justify-start gap-2 px-4 text-[0.9375rem] font-normal text-muted-foreground"
-            onMouseDown={keepFocus}
-            onClick={() => setDialog('search')}
-          >
-            <Search className="size-5" />
-            {t('posKiosk.header.search')}
-          </Button>
+          <div className="w-full max-w-xl">
+            <ProductFinder
+              inputRef={scanInput}
+              value={draft}
+              onChange={setDraft}
+              onScan={onScan}
+              onPick={(product, unitId) => {
+                addProduct(product, unitId);
+                setNotice(null);
+              }}
+              isCode={(text) => /^[0-9]+$/.test(text) || parseVoucherCode(text) !== null}
+              onCartKey={(event, empty) => cartKey(event, empty)}
+              onTypeKey={(event) => typeDigits(event, draft, setDraft)}
+            />
+          </div>
         }
         actions={
           <DropdownMenu modal={false}>
@@ -635,35 +641,12 @@ export function SaleScreen(props: {
           <h1 id="sale-cart" className="sr-only">
             {t('posKiosk.sale.cart')}
           </h1>
-          <div className="flex items-center gap-3">
-            <div className="relative w-full max-w-md">
-              <ScanBarcode
-                aria-hidden
-                className="pointer-events-none absolute top-1/2 left-3 size-5 -translate-y-1/2 text-muted-foreground"
-              />
-              <input
-                ref={scanInput}
-                autoFocus
-                aria-label={t('posKiosk.sale.scanLabel')}
-                placeholder={t('posKiosk.sale.scanPlaceholder')}
-                autoComplete="off"
-                spellCheck={false}
-                className="h-11 w-full rounded-lg border border-input bg-background pr-3 pl-10 font-mono text-base shadow-control outline-none placeholder:font-sans placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring"
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    const text = draft;
-                    setDraft('');
-                    onScan(text);
-                    return;
-                  }
-                  if (cartKey(event, draft === '')) return;
-                  typeDigits(event, draft, setDraft);
-                }}
-              />
-            </div>
+          <div
+            className={cn(
+              'items-center gap-3',
+              scanError || notice ? 'flex' : 'hidden min-[1500px]:flex',
+            )}
+          >
             {scanError ? (
               <KioskAlert className="flex min-w-0 flex-1 items-center gap-2 py-2.5">
                 <span className="min-w-0 flex-1 truncate">{scanError}</span>
@@ -685,7 +668,7 @@ export function SaleScreen(props: {
                 {notice}
               </p>
             ) : (
-              <p className="hidden min-w-0 flex-1 truncate text-right text-[0.8125rem] text-muted-foreground xl:block">
+              <p className="hidden min-w-0 flex-1 truncate text-right text-[0.8125rem] text-muted-foreground min-[1500px]:block">
                 {t('posKiosk.sale.keys')}
               </p>
             )}
@@ -710,9 +693,19 @@ export function SaleScreen(props: {
             <div
               className={cn('space-y-1', fresh || cart.lines.length === 0 ? null : 'opacity-60')}
             >
-              <p className="text-[0.9375rem] font-medium text-muted-foreground">
-                {t('posKiosk.sale.total')}
-              </p>
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="text-[0.9375rem] font-medium text-muted-foreground">
+                  {t('posKiosk.sale.total')}
+                </p>
+                {cart.lines.length > 0 && nextNumber.data ? (
+                  <p
+                    className="truncate font-mono text-[0.8125rem] text-muted-foreground"
+                    title={t('posKiosk.sale.receiptNumber', { number: nextNumber.data.number })}
+                  >
+                    {t('posKiosk.sale.receiptNumber', { number: nextNumber.data.number })}
+                  </p>
+                ) : null}
+              </div>
               <p
                 data-testid="sale-total"
                 className="font-mono text-4xl font-semibold tracking-tight xl:text-5xl"
@@ -763,79 +756,60 @@ export function SaleScreen(props: {
             ) : unpriced ? (
               <KioskAlert tone="warning">{t('posKiosk.sale.unpricedBlock')}</KioskAlert>
             ) : null}
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11"
-                onMouseDown={keepFocus}
+            <div className="grid grid-cols-3 gap-2">
+              <ToolTile
+                icon={<LayoutGrid />}
+                label={t('posKiosk.sale.tiles.quick')}
+                hotkey="F7"
                 onClick={() => setDialog('quick')}
-              >
-                <LayoutGrid />
-                {t('posKiosk.sale.quick')}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11"
-                onMouseDown={keepFocus}
+              />
+              <ToolTile
+                icon={<Tag />}
+                label={t('posKiosk.sale.tiles.price')}
+                hotkey="F8"
                 onClick={() => setDialog('price')}
-              >
-                <Tag />
-                {t('posKiosk.sale.priceCheck')}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11"
+              />
+              <ToolTile
+                icon={<Archive />}
+                label={t('posKiosk.sale.tiles.park')}
+                hotkey="F9"
                 disabled={cart.lines.length === 0}
-                onMouseDown={keepFocus}
                 onClick={() => void park()}
-              >
-                <Archive />
-                {t('posKiosk.sale.park')}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11"
-                onMouseDown={keepFocus}
+              />
+              <ToolTile
+                icon={<ArchiveRestore />}
+                label={t('posKiosk.sale.tiles.parked', { count: parked.data?.length ?? 0 })}
+                hotkey="F10"
                 onClick={() => setDialog('parked')}
-              >
-                <ArchiveRestore />
-                {t('posKiosk.sale.parked', { count: parked.data?.length ?? 0 })}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="col-span-2 h-11"
+              />
+              <ToolTile
+                icon={<Ticket />}
+                label={
+                  codes.length > 0
+                    ? t('posKiosk.sale.tiles.vouchersCount', { count: codes.length })
+                    : t('posKiosk.sale.tiles.vouchers')
+                }
+                hotkey="F2"
                 disabled={cart.lines.length === 0}
-                onMouseDown={keepFocus}
+                active={codes.length > 0}
                 onClick={() => setDialog('vouchers')}
-              >
-                <Ticket />
-                {codes.length > 0
-                  ? t('posKiosk.vouchers.buttonCount', { count: codes.length })
-                  : t('posKiosk.vouchers.button')}
-              </Button>
-              <Button
-                type="button"
-                variant={member ? 'secondary' : 'outline'}
-                className="col-span-2 h-11"
-                onMouseDown={keepFocus}
+              />
+              <ToolTile
+                icon={<Gift />}
+                label={member ? member.name : t('posKiosk.sale.tiles.member')}
+                hotkey="F3"
+                active={member !== null}
                 onClick={() => setDialog('member')}
-              >
-                <Gift />
-                <span className="truncate">
-                  {member
-                    ? t('posKiosk.loyalty.buttonMember', {
-                        name: member.name,
-                        points: formatMnt(member.balance),
-                      })
-                    : t('posKiosk.loyalty.button')}
-                </span>
-              </Button>
+              />
             </div>
+            {member ? (
+              <p className="truncate text-[0.8125rem] text-muted-foreground">
+                {t('posKiosk.loyalty.buttonMember', {
+                  name: member.name,
+                  points: formatMnt(member.balance),
+                })}
+              </p>
+            ) : null}
           </div>
           <div className="flex shrink-0 flex-col gap-3">
             <Button
@@ -862,15 +836,6 @@ export function SaleScreen(props: {
         </aside>
       </main>
 
-      <SearchDialog
-        open={dialog === 'search'}
-        onClose={closeDialog}
-        onCloseAutoFocus={refocus}
-        onPick={(product, unitId) => {
-          addProduct(product, unitId);
-          closeDialog();
-        }}
-      />
       <VoucherDialog
         open={dialog === 'vouchers'}
         lines={cart.wire}
@@ -962,5 +927,31 @@ export function SaleScreen(props: {
         }}
       />
     </div>
+  );
+}
+
+/** A tool under the total (owner 2026-11-04): a small icon, a short name and its key. */
+function ToolTile(props: {
+  icon: ReactNode;
+  label: string;
+  hotkey: string;
+  onClick: () => void;
+  disabled?: boolean;
+  active?: boolean;
+}) {
+  return (
+    <Button
+      type="button"
+      variant={props.active ? 'secondary' : 'outline'}
+      className="h-auto min-w-0 flex-col gap-0.5 px-1.5 py-2 text-[0.8125rem] leading-tight [&_svg]:size-5"
+      title={`${props.label} (${props.hotkey})`}
+      disabled={props.disabled}
+      onMouseDown={keepFocus}
+      onClick={props.onClick}
+    >
+      {props.icon}
+      <span className="w-full truncate">{props.label}</span>
+      <span className="text-[0.6875rem] font-normal text-muted-foreground">{props.hotkey}</span>
+    </Button>
   );
 }

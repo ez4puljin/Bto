@@ -40,6 +40,8 @@ export const kioskKeys = {
   device: (epoch: number) => ['kiosk', epoch, 'device'] as const,
   session: (epoch: number) => ['kiosk', epoch, 'session'] as const,
   recent: (epoch: number) => ['kiosk', epoch, 'recent'] as const,
+  /** Below `recent`: a sale refreshes it. */
+  nextNumber: (epoch: number) => ['kiosk', epoch, 'recent', 'next-number'] as const,
   /** Below `recent`: a sale or a return refreshes every day's history with it. */
   history: (epoch: number, day: string, q: string) =>
     ['kiosk', epoch, 'recent', 'history', day, q] as const,
@@ -70,6 +72,18 @@ export function useLinkState() {
     queryFn: ({ signal }) => client.linkState(signal),
     refetchInterval: 30_000,
     retry: false,
+    staleTime: 0,
+  });
+}
+
+/** The receipt number the sale being rung up will take (owner 2026-11-04): from the first line on. */
+export function useNextSaleNumber(enabled: boolean) {
+  const { client } = useKiosk();
+  const { epoch } = useCredentials();
+  return useQuery({
+    queryKey: kioskKeys.nextNumber(epoch),
+    queryFn: ({ signal }) => client.nextNumber(signal),
+    enabled,
     staleTime: 0,
   });
 }

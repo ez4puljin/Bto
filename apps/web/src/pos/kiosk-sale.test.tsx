@@ -56,6 +56,17 @@ describe('kiosk: the sale screen', () => {
     expect(edge.callsTo(`GET /products/barcode/${MILK_BARCODE}`)).toHaveLength(2);
   });
 
+  it('shows the receipt number the sale will take from the first line on', async () => {
+    const edge = await openSale({
+      'GET /sales/next-number': () => json({ number: 'К1-261017-0004' }),
+    });
+    const label = k.sale.receiptNumber.replace('{{number}}', 'К1-261017-0004');
+    expect(screen.queryByText(label)).toBeNull();
+    await wedgeScan(MILK_BARCODE);
+    expect(await screen.findByText(label)).toBeInTheDocument();
+    expect(edge.callsTo('GET /sales/next-number')).toHaveLength(1);
+  });
+
   it('says so for an unknown barcode', async () => {
     await openSale();
     await wedgeScan('4006381333948');
@@ -130,17 +141,20 @@ describe('kiosk: the sale screen', () => {
 
     await user.click(screen.getByRole('button', { name: k.sale.pay }));
     const pay = await screen.findByRole('dialog', { name: k.pay.title });
-    await user.click(
-      within(pay).getByRole('button', { name: new RegExp(mn.pos.tenderKinds.CASH) }),
+    // Cash opens for it all; less cash leaves the rest to the card.
+    const cash = within(pay).getByLabelText(
+      k.pay.rows.amount.replace('{{name}}', mn.pos.tenderKinds.CASH),
     );
+    expect(cash).toHaveValue('7000');
+    await user.clear(cash);
+    await user.type(cash, '5000');
     await user.click(
-      within(pay).getByRole('button', { name: new RegExp(mn.pos.tenderKinds.CARD) }),
+      within(pay).getByRole('button', { name: new RegExp(`^[0-9]+ ?${mn.pos.tenderKinds.CARD}$`) }),
     );
     const card = within(pay).getByLabelText(
       k.pay.rows.amount.replace('{{name}}', mn.pos.tenderKinds.CARD),
     );
-    expect(card).toHaveValue('');
-    await user.type(card, '2000');
+    expect(card).toHaveValue('2000');
     await user.click(within(pay).getByRole('button', { name: '10,000₮' }));
     expect(within(pay).getByText(k.pay.change).nextElementSibling).toHaveTextContent('5,000₮');
     await user.click(within(pay).getByRole('button', { name: k.pay.print }));
@@ -193,17 +207,17 @@ describe('kiosk: the sale screen', () => {
     expect(screen.getByRole('button', { name: k.sale.pay })).toBeDisabled();
   });
 
-  it('finds a product with F6 and adds the unit chosen with the arrows', async () => {
+  it('finds a product in the one search field (F6) and adds the unit chosen with the arrows', async () => {
     const edge = await openSale();
     const user = userEvent.setup();
     await user.keyboard('{F6}');
-    const search = await screen.findByRole('dialog', { name: k.search.title });
-    await user.type(within(search).getByRole('combobox'), 'сүү');
-    const options = await within(search).findAllByRole('option');
+    const field = screen.getByLabelText(k.sale.scanLabel);
+    await waitFor(() => expect(field).toHaveFocus());
+    await user.type(field, 'сүү');
+    const options = await screen.findAllByRole('option');
     expect(options).toHaveLength(2);
-    await user.keyboard('{ArrowDown}{Enter}');
+    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
 
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(qtyField('Сүү 1л (хайрцаг)')).toHaveValue('1');
     await waitFor(() =>
       expect(lastQuote(edge)).toEqual({ lines: [{ productUnitId: 12, qty: '1' }] }),

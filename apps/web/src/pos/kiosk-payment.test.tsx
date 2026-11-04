@@ -96,12 +96,11 @@ const typeButton = (pay: HTMLElement, name: string) =>
   within(pay).getByRole('button', { name: new RegExp(`^[0-9]+ ?${name}$`) });
 
 describe('kiosk: the payment rows (ADR-0111)', () => {
-  it('lists the admin’s types; a tapped one takes what is left, «Хольсон» is gone', async () => {
+  it('opens on cash for the whole amount; a tapped type takes what is left, «Хольсон» is gone', async () => {
     const { edge, user, pay } = await openPayment();
     expect(within(pay).queryByRole('radio')).toBeNull();
-    expect(within(pay).getByText(k.pay.rows.empty)).toBeInTheDocument();
-    expect(within(pay).getByRole('button', { name: k.pay.print })).toBeDisabled();
-    await user.click(typeButton(pay, 'Бэлэн'));
+    // Cash for it all already: one tap prints.
+    expect(within(pay).getByRole('button', { name: k.pay.print })).toBeEnabled();
     const cash = within(pay).getByLabelText(amountOf('Бэлэн'));
     expect(cash).toHaveValue('7000');
     await user.clear(cash);
@@ -123,7 +122,7 @@ describe('kiosk: the payment rows (ADR-0111)', () => {
     });
   });
 
-  it('adds the type by its place with 1–9 and takes a card by the terminal', async () => {
+  it('swaps the whole amount to the type pressed with 1–9; a card asks no terminal', async () => {
     const { edge, user, pay } = await openPayment();
     await user.keyboard('2');
     expect(within(pay).getByLabelText(amountOf('Khaanbank terminal'))).toHaveValue('7000');

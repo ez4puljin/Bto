@@ -78,14 +78,15 @@ interface PayRow {
   key: number;
   type: PayType;
   amount: string;
-  terminalId: string;
   rrn: string;
 }
 
 /**
  * «Төлбөр (F12)» (ADR-0111, owner 2026-10-27): the admin's payment types as buttons (1–9 add the
- * one in that place); each tap adds a row with what is left to pay, typed over as needed — cash may
- * exceed it (the change), the rest may not; a CREDIT row needs its customer (ADR-0109). When the
+ * one in that place). It opens with the first type (cash) for the whole amount (owner 2026-11-04:
+ * «илүү ухаалаг хялбар»); a tap on another type while one row pays it all swaps that row, otherwise
+ * it adds a row with what is left — cash may exceed it (the change), the rest may not; a CREDIT row
+ * needs its customer (ADR-0109). A card row asks no terminal: the bank's terminal is set up on the PC. When the
  * rows make the total, «Баримт хэвлэх» asks «Хувь хүн НӨАТ» or «Байгууллага НӨАТ» — a sale with
  * credit prints its slip without VAT at once.
  */
@@ -104,7 +105,17 @@ export function PaymentDialog(props: {
       open={props.open && attempt !== null}
       onOpenChange={(open) => (open ? undefined : props.onClose())}
     >
-      <DialogContent size="lg" onCloseAutoFocus={props.onCloseAutoFocus}>
+      <DialogContent
+        size="lg"
+        onCloseAutoFocus={props.onCloseAutoFocus}
+        // The form, not the prefilled amount, takes the focus: 1–9 pick a type, Enter goes on.
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          (event.target as HTMLElement | null)
+            ?.querySelector<HTMLFormElement>('form[data-pay-form]')
+            ?.focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{t('posKiosk.pay.title')}</DialogTitle>
           <DialogDescription>{t('posKiosk.pay.description')}</DialogDescription>
@@ -169,8 +180,13 @@ function PaymentForm(props: {
       : []),
   ];
   const [pin, setPin] = useState('');
-  const [rows, setRows] = useState<PayRow[]>([]);
-  const [nextKey, setNextKey] = useState(1);
+  const [rows, setRows] = useState<PayRow[]>(() => {
+    const first =
+      types.find((type) => type.kind === 'CASH') ?? types.find((type) => type.kind === 'CARD');
+    const due = new Decimal(props.attempt.total);
+    return first && due.gt(0) ? [{ key: 1, type: first, amount: fieldMoney(due), rrn: '' }] : [];
+  });
+  const [nextKey, setNextKey] = useState(2);
   const [step, setStep] = useState<'rows' | 'receipt'>('rows');
   const [receiptType, setReceiptType] = useState<ReceiptType>('B2C');
   const [buyer, setBuyer] = useState<EdgeTaxpayer | null>(null);
@@ -229,6 +245,18 @@ function PaymentForm(props: {
   const addRow = (type: PayType) => {
     if (type.kind === 'CREDIT' && creditRow) return;
     if (type.kind === 'POINTS' && pointsRow) return;
+    // One row paying it all: another type takes its place (cash ↔ card in one tap).
+    const only = rows.length === 1 ? rows[0] : undefined;
+    if (only && amounts[0]?.gte(total)) {
+      if (only.type.id === type.id && only.type.kind === type.kind) return;
+      if (only.type.kind === 'CREDIT') setCustomer(null);
+      if (only.type.kind === 'POINTS') setPin('');
+      const amount = type.kind === 'POINTS' ? Decimal.min(total.floor(), balance) : total;
+      setRows([{ key: nextKey, type, amount: amount.gt(0) ? fieldMoney(amount) : '', rrn: '' }]);
+      setNextKey((key) => key + 1);
+      setOverLimit(null);
+      return;
+    }
     const prefill = type.kind === 'POINTS' ? Decimal.min(remaining.floor(), balance) : remaining;
     setRows((current) => [
       ...current,
@@ -236,7 +264,6 @@ function PaymentForm(props: {
         key: nextKey,
         type,
         amount: prefill.gt(0) ? fieldMoney(prefill) : '',
-        terminalId: '',
         rrn: '',
       },
     ]);
@@ -273,7 +300,11 @@ function PaymentForm(props: {
         paymentTypeId: row.type.id,
         amount: wireMoney(amount),
         ...(row.type.kind === 'CARD'
-          ? { terminalId: row.terminalId.trim() || null, rrn: row.rrn.trim() || null }
+          ? {
+              // The bank's terminal is set up on the POS PC itself (owner 2026-11-04): nothing typed.
+              terminalId: null,
+              rrn: row.rrn.trim() || null,
+            }
           : {}),
       });
     });
@@ -312,6 +343,13 @@ function PaymentForm(props: {
   };
   // 1–9 add the type in that place while no field has the focus.
   const onKeyDown = (event: KeyboardEvent<HTMLFormElement>) => {
+    // Enter on the form itself (no field, no button) goes on, as in a field.
+    if (event.key === 'Enter' && event.target === event.currentTarget) {
+      event.preventDefault();
+      if (step === 'rows') printReceipt();
+      else if (receiptType === 'B2C' || buyer) pay(receiptType);
+      return;
+    }
     if (step !== 'rows' || event.target instanceof HTMLInputElement) return;
     const place = /^[1-9]$/.test(event.key) ? Number.parseInt(event.key, 10) - 1 : -1;
     const type = types[place];
@@ -336,7 +374,14 @@ function PaymentForm(props: {
   };
 
   return (
-    <form className="grid gap-4" onSubmit={submit} onKeyDown={onKeyDown} noValidate>
+    <form
+      data-pay-form
+      tabIndex={-1}
+      className="grid gap-4 outline-none"
+      onSubmit={submit}
+      onKeyDown={onKeyDown}
+      noValidate
+    >
       {vouchers.length > 0 ? (
         <ul aria-label={t('posKiosk.vouchers.taken')} className="space-y-1 text-[0.9375rem]">
           {vouchers.map((voucher) => (
@@ -400,7 +445,7 @@ function PaymentForm(props: {
                       <span className="truncate">{row.type.name}</span>
                     </span>
                     <Input
-                      autoFocus={index === rows.length - 1}
+                      autoFocus={index === rows.length - 1 && row.key > 1}
                       aria-label={t('posKiosk.pay.rows.amount', { name: row.type.name })}
                       inputMode="decimal"
                       autoComplete="off"
@@ -446,16 +491,7 @@ function PaymentForm(props: {
                     </div>
                   ) : null}
                   {row.type.kind === 'CARD' ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        aria-label={t('posKiosk.pay.terminalId')}
-                        placeholder={t('posKiosk.pay.terminalId')}
-                        autoComplete="off"
-                        maxLength={32}
-                        className="h-11"
-                        value={row.terminalId}
-                        onChange={(event) => updateRow(row.key, { terminalId: event.target.value })}
-                      />
+                    <div>
                       <Input
                         aria-label={t('posKiosk.pay.rrn')}
                         placeholder={t('posKiosk.pay.rrn')}
@@ -511,7 +547,11 @@ function PaymentForm(props: {
                   <Button
                     key={type.id ?? type.kind}
                     type="button"
-                    variant="outline"
+                    variant={
+                      rows.some((row) => row.type.id === type.id && row.type.kind === type.kind)
+                        ? 'secondary'
+                        : 'outline'
+                    }
                     onMouseDown={keepFocus}
                     className="h-12 justify-start gap-2 text-[0.9375rem] font-semibold"
                     disabled={
