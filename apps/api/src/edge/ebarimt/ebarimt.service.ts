@@ -694,7 +694,17 @@ export class EbarimtService implements OnApplicationBootstrap {
   /** What the state row holds of PosAPI (null on the fake provider or before the first read). */
   async info(): Promise<PosapiInfoWire | null> {
     if (!this.enabled) return null;
-    const [state] = await this.db.select().from(edgeState).where(eq(edgeState.id, 1));
+    // The PosAPI columns only, not the snapshot the row also holds.
+    const [state] = await this.db
+      .select({
+        posapiVersion: edgeState.posapiVersion,
+        posapiLastSent: edgeState.posapiLastSent,
+        posapiLeftLotteries: edgeState.posapiLeftLotteries,
+        posapiCheckedAt: edgeState.posapiCheckedAt,
+        posapiError: edgeState.posapiError,
+      })
+      .from(edgeState)
+      .where(eq(edgeState.id, 1));
     if (!state?.posapiCheckedAt) return null;
     return {
       version: state.posapiVersion,

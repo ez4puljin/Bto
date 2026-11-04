@@ -154,7 +154,17 @@ export class KioskController {
   @Get('health')
   @EdgePublic()
   async health(): Promise<EdgeHealth> {
-    const [state] = await this.db.select().from(edgeState).where(eq(edgeState.id, 1));
+    // Only the contact facts: the row also holds the snapshot and the feeds (megabytes of JSON),
+    // and every POS asks this every 10 seconds.
+    const [state] = await this.db
+      .select({
+        lastContactAt: edgeState.lastContactAt,
+        lastError: edgeState.lastError,
+        pulledAt: edgeState.pulledAt,
+        lastPushAt: edgeState.lastPushAt,
+      })
+      .from(edgeState)
+      .where(eq(edgeState.id, 1));
     const loaded = this.store.peek();
     const contact = state?.lastContactAt?.getTime() ?? 0;
     return {
