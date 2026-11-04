@@ -176,7 +176,7 @@ describe('kiosk: pairing, PIN and the shift', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(mn.errors.POS_CASHIER_LOCKED);
   });
 
-  it('signs in on the PIN pad and opens a shift when none is open', async () => {
+  it('signs in on the PIN pad and opens the shift by itself, with no opening cash', async () => {
     let shift: typeof SHIFT | null = null;
     const edge = fakeEdge(
       storeRoutes({
@@ -197,15 +197,13 @@ describe('kiosk: pairing, PIN and the shift', () => {
       await user.click(screen.getByRole('button', { name: digit }));
     }
 
-    expect(await screen.findByRole('heading', { name: k.shiftOpen.title })).toBeInTheDocument();
+    // No shift screen: the shift opens by itself with no opening cash.
+    expect(await screen.findByRole('button', { name: k.sale.pay })).toBeInTheDocument();
     expect(sessionStorage.getItem(`${SESSION_STORAGE_KEY}@К1`)).toBe('session-1');
     expect(edge.callsTo('GET /session')[0]?.headers.get('authorization')).toBe('Bearer session-1');
 
-    await user.type(screen.getByLabelText(mn.pos.fields.openingFloat), '50000');
-    await user.click(screen.getByRole('button', { name: k.shiftOpen.submit }));
-
-    expect(await screen.findByRole('button', { name: k.sale.pay })).toBeInTheDocument();
-    expect(edge.callsTo('POST /shifts/open')[0]?.body).toEqual({ openingFloat: '50000.00' });
+    expect(edge.callsTo('POST /shifts/open')).toHaveLength(1);
+    expect(edge.callsTo('POST /shifts/open')[0]?.body).toEqual({ openingFloat: '0' });
   });
 
   it('goes back to pairing when the edge no longer knows the device', async () => {
