@@ -8,6 +8,7 @@ import {
   type EdgeProductHit,
   type EdgeQuickGroup,
   type EdgeQuotedVoucher,
+  type EdgeQuotedLine,
   type EdgeQuoteResponse,
   type EdgeReceipt,
   type EdgeSaleRequest,
@@ -28,10 +29,13 @@ import {
   voucherPayments,
 } from '@tugeel/shared/pos';
 import {
+  type PricedPart,
   type QuoteCoupon,
   type QuoteLineInput,
   type QuoteResult,
+  perBasePrices,
   resolveQuote,
+  unitPriceOf,
 } from '@tugeel/shared/pricing';
 import { matchesQuery, matchesStrictly, queryTerms } from '@tugeel/shared/text';
 import { businessDate } from '@tugeel/shared/time';
@@ -210,6 +214,7 @@ export class CheckoutService {
               : null,
           total: priced ? line.total.toFixed(2) : null,
           discount: priced ? line.discountAmount.toFixed(2) : null,
+          bulk: priced ? this.bulkPrices(loaded, input, line.parts) : null,
         };
       }),
       subtotal: result.subtotal.toFixed(2),
@@ -704,6 +709,22 @@ export class CheckoutService {
       points: sums.POINTS,
       change: tendered.minus(sums.CASH),
     };
+  }
+
+  /** A line on the bulk price: one unit at the supermarket price and at the bulk price. */
+  private bulkPrices(
+    loaded: LoadedSnapshot,
+    input: QuoteLineInput,
+    parts: readonly PricedPart[],
+  ): EdgeQuotedLine['bulk'] {
+    const part = parts.find((candidate) => candidate.basis === 'RETAIL_BULK');
+    const terms = loaded.quote.products.get(input.productId)?.terms;
+    const factor = loaded.units.get(input.unitId)?.unit.factor;
+    if (!part || !terms || factor === undefined) return null;
+    const retail = perBasePrices(terms.warehousePrice, terms.profile).retail;
+    const retailPrice = unitPriceOf(retail, new Decimal(factor));
+    if (!retailPrice.gt(part.listPrice)) return null;
+    return { retailPrice: retailPrice.toFixed(2), bulkPrice: part.listPrice.toFixed(2) };
   }
 
   private hit(loaded: LoadedSnapshot, product: SnapshotProduct): EdgeProductHit {

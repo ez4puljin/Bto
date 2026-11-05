@@ -1,0 +1,457 @@
+// Props of Bto's React components, copied from apps/web/src at {{REF}}. Documentation, not
+// checked by a compiler: the code in the repository is the authority.
+// Everything here is on window.Bto, built for React 19 (components/lib, window.React, window.ReactDOM).
+import type * as React from 'react';
+
+type Primitive<T extends keyof React.JSX.IntrinsicElements> = React.ComponentProps<T>;
+/** A part that takes its element's or its Radix primitive's props, with `className`. */
+type Part = (props: Record<string, unknown> & { className?: string; children?: React.ReactNode }) => React.ReactElement;
+
+/* ---------- Actions and status ---------- */
+export interface ButtonProps extends Primitive<'button'> {
+  variant?: 'default' | 'outline' | 'secondary' | 'ghost' | 'destructive' | 'link';
+  size?: 'default' | 'xs' | 'sm' | 'lg' | 'icon' | 'icon-xs' | 'icon-sm' | 'icon-lg';
+  /** The request it sent is running: disabled, aria-busy and a spinner before the label. */
+  pending?: boolean;
+  asChild?: boolean;
+}
+export declare function Button(props: ButtonProps): React.ReactElement;
+export declare const buttonVariants: (options?: { variant?: ButtonProps['variant']; size?: ButtonProps['size']; className?: string }) => string;
+
+export interface BadgeProps extends Primitive<'span'> {
+  variant?: 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'outline' | 'ghost' | 'link';
+  asChild?: boolean;
+}
+export declare function Badge(props: BadgeProps): React.ReactElement;
+export declare const badgeVariants: (options?: { variant?: BadgeProps['variant']; className?: string }) => string;
+
+export interface AlertProps extends Primitive<'div'> {
+  variant?: 'default' | 'destructive';
+}
+export declare function Alert(props: AlertProps): React.ReactElement;
+export declare const AlertTitle: Part, AlertDescription: Part, AlertAction: Part;
+export interface ProblemAlertProps {
+  /** RFC 9457: `status`, a stable `code`, `params`, `errors`, `requestId`. null shows nothing. */
+  problem: { status: number; code: string; params?: Record<string, unknown>; errors?: { path: string; constraint: string; message: string }[]; requestId?: string } | null | undefined;
+  onRetry?: () => unknown;
+}
+export declare function ProblemAlert(props: ProblemAlertProps): React.ReactElement | null;
+
+/** Mount once. Confirmations go through `toast`, errors in a ProblemAlert. */
+export declare function Toaster(): React.ReactElement | null;
+export declare const toast: { success(message: string): number; info(message: string): number; warning(message: string): number };
+export declare function pauseToasts(): void;
+export declare function resumeToasts(): void;
+
+export interface DropdownMenuProps {
+  open?: boolean;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Pass false in a row of a list. */
+  modal?: boolean;
+  children?: React.ReactNode;
+}
+export declare function DropdownMenu(props: DropdownMenuProps): React.ReactElement;
+export interface DropdownMenuItemProps {
+  inset?: boolean;
+  variant?: 'default' | 'destructive';
+  children?: React.ReactNode;
+}
+export declare function DropdownMenuItem(props: DropdownMenuItemProps): React.ReactElement;
+export declare const DropdownMenuTrigger: Part, DropdownMenuContent: Part, DropdownMenuGroup: Part, DropdownMenuLabel: Part, DropdownMenuCheckboxItem: Part, DropdownMenuRadioGroup: Part, DropdownMenuRadioItem: Part, DropdownMenuSeparator: Part, DropdownMenuShortcut: Part, DropdownMenuSub: Part, DropdownMenuSubTrigger: Part, DropdownMenuSubContent: Part, DropdownMenuPortal: Part;
+
+/* ---------- Inputs ---------- */
+export type InputProps = Primitive<'input'>;
+export declare function Input(props: InputProps): React.ReactElement;
+export type TextareaProps = Primitive<'textarea'>;
+export declare function Textarea(props: TextareaProps): React.ReactElement;
+export type LabelProps = Primitive<'label'>;
+export declare function Label(props: LabelProps): React.ReactElement;
+export interface NativeSelectProps extends Primitive<'select'> {
+  variant?: 'default' | 'filter';
+  active?: boolean;
+}
+export declare function NativeSelect(props: NativeSelectProps): React.ReactElement;
+export interface SelectProps {
+  value?: string;
+  defaultValue?: string;
+  onValueChange?: (value: string) => void;
+  disabled?: boolean;
+  children?: React.ReactNode;
+}
+export declare function Select(props: SelectProps): React.ReactElement;
+export interface SelectTriggerProps {
+  size?: 'sm' | 'default';
+  children?: React.ReactNode;
+}
+export declare function SelectTrigger(props: SelectTriggerProps): React.ReactElement;
+export declare const SelectContent: Part, SelectGroup: Part, SelectItem: Part, SelectLabel: Part, SelectSeparator: Part, SelectValue: Part, SelectScrollUpButton: Part, SelectScrollDownButton: Part;
+export interface CheckboxProps {
+  checked?: boolean | 'indeterminate';
+  defaultChecked?: boolean | 'indeterminate';
+  onCheckedChange?: (checked: boolean | 'indeterminate') => void;
+  disabled?: boolean;
+  id?: string;
+  'aria-label'?: string;
+}
+export declare function Checkbox(props: CheckboxProps): React.ReactElement;
+export interface CheckboxGroupProps<T extends string | number = string> {
+  name: string;
+  options: { value: T; label: React.ReactNode; disabled?: boolean }[];
+  value: T[];
+  onChange: (value: T[]) => void;
+  disabled?: boolean;
+}
+export declare function CheckboxGroup<T extends string | number>(props: CheckboxGroupProps<T>): React.ReactElement;
+export interface SwitchProps {
+  checked?: boolean;
+  defaultChecked?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
+  disabled?: boolean;
+  id?: string;
+  'aria-label'?: string;
+}
+export declare function Switch(props: SwitchProps): React.ReactElement;
+export interface DateInputProps {
+  id?: string;
+  /** `YYYY-MM-DD` (DateInput), `YYYY-MM` (MonthInput), `HH:mm` (TimeInput); '' for none. */
+  value: string | null | undefined;
+  onChange: (value: string) => void;
+  min?: string;
+  max?: string;
+  disabled?: boolean;
+  required?: boolean;
+  name?: string;
+  autoFocus?: boolean;
+  className?: string;
+  onBlur?: () => void;
+  'aria-label'?: string;
+  variant?: 'default' | 'filter' | 'bare';
+  label?: string;
+}
+export declare function DateInput(props: DateInputProps): React.ReactElement;
+export declare function MonthInput(props: DateInputProps): React.ReactElement;
+export declare function TimeInput(props: DateInputProps): React.ReactElement;
+export interface ComboboxProps {
+  'aria-label': string;
+  value: string;
+  options: readonly { value: string; label: string; hint?: string; keys?: readonly string[] }[];
+  emptyLabel: string;
+  onChange: (value: string) => void;
+  className?: string;
+}
+export declare function Combobox(props: ComboboxProps): React.ReactElement;
+export interface ScanBoxProps {
+  onScan: (code: string) => void;
+  letters?: boolean;
+  disabled?: boolean;
+  autoFocus?: boolean;
+  label?: string;
+  placeholder?: string;
+}
+export declare function ScanBox(props: ScanBoxProps): React.ReactElement;
+
+/* ---------- Navigation ---------- */
+export interface BrandMarkProps {
+  className?: string;
+}
+export declare function BrandMark(props: BrandMarkProps): React.ReactElement;
+export interface TopBarProps {
+  menuOpen: boolean;
+  onMenu: () => void;
+  onSearch: () => void;
+  menuButtonRef: React.Ref<HTMLButtonElement>;
+}
+export declare function TopBar(props: TopBarProps): React.ReactElement;
+export interface PageHeaderProps {
+  title: string;
+  meta?: React.ReactNode;
+  description?: React.ReactNode;
+  actions?: React.ReactNode;
+  media?: React.ReactNode;
+  crumbs?: readonly { label: string; to?: string }[];
+  compact?: boolean;
+}
+export declare function PageHeader(props: PageHeaderProps): React.ReactElement;
+export interface TabsProps {
+  value?: string;
+  defaultValue?: string;
+  onValueChange?: (value: string) => void;
+  children?: React.ReactNode;
+}
+export declare function Tabs(props: TabsProps): React.ReactElement;
+export declare const TabsList: Part, TabsTrigger: Part, TabsContent: Part;
+export interface SegmentedControlProps<T extends string = string> {
+  options: readonly T[];
+  value: T;
+  label: (value: T) => string;
+  onChange: (value: T) => void;
+  name?: string;
+}
+export declare function SegmentedControl<T extends string>(props: SegmentedControlProps<T>): React.ReactElement;
+export interface ModuleTileProps {
+  to: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  variant?: 'page' | 'action' | 'home';
+  className?: string;
+}
+export declare function ModuleTile(props: ModuleTileProps): React.ReactElement;
+
+/* ---------- Lists ---------- */
+export interface FilterBarProps {
+  children: React.ReactNode;
+  end?: React.ReactNode;
+  className?: string;
+}
+export declare function FilterBar(props: FilterBarProps): React.ReactElement;
+export declare function SearchField(props: Primitive<'input'>): React.ReactElement;
+export interface FilterToggleProps {
+  label: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}
+export declare function FilterToggle(props: FilterToggleProps): React.ReactElement;
+export interface DateFilterProps {
+  label: string;
+  value: string | undefined;
+  onChange: (value: string | undefined) => void;
+}
+export declare function DateFilter(props: DateFilterProps): React.ReactElement;
+export interface FilterChipProps {
+  children: React.ReactNode;
+  clearLabel: string;
+  onClear: () => void;
+}
+export declare function FilterChip(props: FilterChipProps): React.ReactElement;
+export interface ColumnChooserProps<K extends string = string> {
+  keys: readonly K[];
+  locked: readonly K[];
+  label: (key: K) => string;
+  hidden: ReadonlySet<string>;
+  toggle: (key: K) => void;
+  showAll: () => void;
+}
+export declare function ColumnChooser<K extends string>(props: ColumnChooserProps<K>): React.ReactElement;
+export type TableProps = Primitive<'table'>;
+export declare function Table(props: TableProps): React.ReactElement;
+export declare const TableHeader: Part, TableBody: Part, TableFooter: Part, TableHead: Part, TableRow: Part, TableCell: Part, TableCaption: Part;
+export interface ColumnSpec {
+  key: string;
+  kind: 'check' | 'image' | 'icon' | 'code' | 'number' | 'date' | 'datetime' | 'money' | 'qty' | 'count' | 'percent' | 'status' | 'actions' | 'chevron' | 'spacer' | 'text';
+  width?: number;
+  weight?: number;
+  min?: number;
+  actions?: number;
+}
+export interface ListTableProps {
+  /** One entry per cell of a row: the checkbox, the spacer, the chevron and the actions included. */
+  columns: readonly ColumnSpec[];
+  children: React.ReactNode;
+  className?: string;
+  ref?: React.Ref<HTMLTableElement>;
+}
+export declare function ListTable(props: ListTableProps): React.ReactElement;
+export interface ListCardProps {
+  children: React.ReactNode;
+  className?: string;
+  scroll?: boolean;
+}
+export declare function ListCard(props: ListCardProps): React.ReactElement;
+export interface LinkRowProps {
+  to: string;
+  children: React.ReactNode;
+  className?: string;
+  selected?: boolean;
+}
+export declare function LinkRow(props: LinkRowProps): React.ReactElement;
+export interface ButtonRowProps {
+  onOpen: () => void;
+  children: React.ReactNode;
+  className?: string;
+  selected?: boolean;
+}
+export declare function ButtonRow(props: ButtonRowProps): React.ReactElement;
+export interface TruncateCellProps {
+  text: string;
+  children?: React.ReactNode;
+  className?: string;
+  fill?: boolean;
+}
+export declare function TruncateCell(props: TruncateCellProps): React.ReactElement;
+export declare function SpacerHead(): React.ReactElement;
+export declare function SpacerCell(): React.ReactElement;
+export declare function ChevronHead(): React.ReactElement;
+export declare function RowActions(props: { children: React.ReactNode }): React.ReactElement;
+export interface RowActionProps {
+  label: string;
+  icon: React.ComponentType;
+  onClick: () => void;
+  destructive?: boolean;
+  disabled?: boolean;
+}
+export declare function RowAction(props: RowActionProps): React.ReactElement;
+export declare function RowActionSpacer(): React.ReactElement;
+export interface EmptyStateProps {
+  title: string;
+  icon?: React.ComponentType;
+  action?: React.ReactNode;
+  onClearFilters?: () => void;
+}
+export declare function EmptyState(props: EmptyStateProps): React.ReactElement;
+export declare function LoadMore(props: { query: { hasNextPage: boolean; isFetchingNextPage: boolean; fetchNextPage: () => unknown } }): React.ReactElement | null;
+export declare function SkeletonRows(props: { columns: number; rows?: number }): React.ReactElement;
+export interface SelectionBarProps {
+  count: number;
+  onClear: () => void;
+  children?: React.ReactNode;
+}
+export declare function SelectionBar(props: SelectionBarProps): React.ReactElement | null;
+
+/* ---------- Forms and records ---------- */
+export interface FormSectionProps {
+  title?: string;
+  description?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+  step?: number;
+  plain?: boolean;
+}
+export declare function FormSection(props: FormSectionProps): React.ReactElement;
+export interface FormRowProps {
+  label: string;
+  htmlFor?: string;
+  hint?: React.ReactNode;
+  /** A key `validation.*` of the dictionary; anything else shows nothing. */
+  error?: string | undefined;
+  align?: 'start' | 'center';
+  children: React.ReactNode;
+}
+export declare function FormRow(props: FormRowProps): React.ReactElement;
+export interface FormFieldProps {
+  label: string;
+  htmlFor?: string;
+  hint?: React.ReactNode;
+  error?: string | undefined;
+  children: React.ReactNode;
+}
+export declare function FormField(props: FormFieldProps): React.ReactElement;
+export declare function FormFooter(props: { children: React.ReactNode }): React.ReactElement;
+export interface DialogFormFooterProps {
+  pending: boolean;
+  onCancel: () => void;
+  submitLabel?: string;
+  disabled?: boolean;
+}
+export declare function DialogFormFooter(props: DialogFormFooterProps): React.ReactElement;
+export declare function FieldError(props: { message?: string; id?: string }): React.ReactElement | null;
+export interface CardProps extends Primitive<'div'> {
+  size?: 'default' | 'sm';
+}
+export declare function Card(props: CardProps): React.ReactElement;
+export declare const CardHeader: Part, CardTitle: Part, CardDescription: Part, CardAction: Part, CardContent: Part, CardFooter: Part;
+export interface DetailCardProps {
+  title: string;
+  canEdit: boolean;
+  view: React.ReactNode;
+  edit: (close: () => void) => React.ReactNode;
+  actions?: React.ReactNode;
+  className?: string;
+}
+export declare function DetailCard(props: DetailCardProps): React.ReactElement;
+export interface FieldListProps {
+  items: readonly { label: string; value: React.ReactNode; hint?: React.ReactNode; wide?: boolean }[];
+  title?: string;
+  description?: string;
+  className?: string;
+  columns?: 1 | 2;
+}
+export declare function FieldList(props: FieldListProps): React.ReactElement;
+export interface FactChipsProps {
+  facts: { label: string; value: React.ReactNode }[];
+}
+export declare function FactChips(props: FactChipsProps): React.ReactElement;
+export interface TotalsGridProps {
+  items: readonly (readonly [string, React.ReactNode])[];
+  columns?: 3 | 4;
+}
+export declare function TotalsGrid(props: TotalsGridProps): React.ReactElement;
+export declare function PanelSection(props: { title: string; children: React.ReactNode }): React.ReactElement;
+export interface StickyActionsProps {
+  summary?: React.ReactNode;
+  children: React.ReactNode;
+}
+export declare function StickyActions(props: StickyActionsProps): React.ReactElement;
+
+/* ---------- Overlays ---------- */
+export interface DialogProps {
+  open?: boolean;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  modal?: boolean;
+  children?: React.ReactNode;
+}
+export declare function Dialog(props: DialogProps): React.ReactElement;
+export interface DialogContentProps {
+  showCloseButton?: boolean;
+  /** Screen-reader label of the close button; «Хаах» unless named. */
+  closeLabel?: string;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  onOpenAutoFocus?: (event: Event) => void;
+  onCloseAutoFocus?: (event: Event) => void;
+  className?: string;
+  children?: React.ReactNode;
+}
+export declare function DialogContent(props: DialogContentProps): React.ReactElement;
+export declare const DialogTrigger: Part, DialogClose: Part, DialogHeader: Part, DialogTitle: Part, DialogDescription: Part, DialogOverlay: Part, DialogPortal: Part;
+export declare function DialogFooter(props: Primitive<'div'> & { closeLabel?: string }): React.ReactElement;
+export interface ConfirmDialogProps {
+  open: boolean;
+  title: string;
+  description?: string;
+  confirmLabel: string;
+  /** Default `destructive`; posting a document is `default`. */
+  variant?: 'default' | 'destructive';
+  initialFocus?: 'confirm' | 'first';
+  pending?: boolean;
+  disabled?: boolean;
+  problem?: ProblemAlertProps['problem'];
+  onConfirm: () => void;
+  onClose: () => void;
+  children?: React.ReactNode;
+}
+export declare function ConfirmDialog(props: ConfirmDialogProps): React.ReactElement;
+export declare function Sheet(props: DialogProps): React.ReactElement;
+export interface SheetContentProps {
+  side?: 'top' | 'right' | 'bottom' | 'left';
+  closeLabel?: string;
+  className?: string;
+  children?: React.ReactNode;
+}
+export declare function SheetContent(props: SheetContentProps): React.ReactElement;
+export declare const SheetTrigger: Part, SheetClose: Part, SheetHeader: Part, SheetFooter: Part, SheetTitle: Part, SheetDescription: Part, SheetOverlay: Part, SheetPortal: Part;
+export interface RecordSheetProps {
+  open: boolean;
+  onClose: () => void;
+  size?: 'record' | 'panel';
+  title: string;
+  description?: string;
+  badges?: React.ReactNode;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+}
+export declare function RecordSheet(props: RecordSheetProps): React.ReactElement;
+
+/* ---------- Helpers: no cards ---------- */
+/** A router in memory, a signed-in test user and a query client: what a screen needs to render here. */
+export declare function BtoProvider(props: { route?: string; children: React.ReactNode }): React.ReactElement;
+/** The 40 icons of assets/Icons, by their lucide-react names. */
+export declare const icons: Record<'Bell' | 'Boxes' | 'CalendarDays' | 'Camera' | 'Check' | 'ChevronDown' | 'ChevronLeft' | 'ChevronRight' | 'CircleCheck' | 'Ellipsis' | 'FileChartColumn' | 'History' | 'Inbox' | 'Info' | 'Landmark' | 'LayoutGrid' | 'LoaderCircle' | 'Minus' | 'Package' | 'PackageMinus' | 'PackagePlus' | 'Pencil' | 'Plus' | 'Printer' | 'ReceiptText' | 'ScanBarcode' | 'Search' | 'Settings' | 'ShoppingCart' | 'SlidersHorizontal' | 'Smartphone' | 'Sparkles' | 'Star' | 'Store' | 'Trash2' | 'TriangleAlert' | 'Truck' | 'Users' | 'Warehouse' | 'X', React.ComponentType<{ className?: string }>>;
+export declare function cn(...parts: unknown[]): string;
+
+declare global {
+  interface Window {
+    Bto: typeof import('./index');
+  }
+}

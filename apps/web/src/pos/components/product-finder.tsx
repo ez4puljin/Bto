@@ -3,7 +3,7 @@ import { cn } from 'cn';
 import { ScanBarcode } from 'lucide-react';
 import { type KeyboardEvent, type RefObject, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatQty, formatTugrik } from '@/lib/money';
+import { formatTugrik } from '@/lib/money';
 import { useDebounced } from '@/lib/use-debounced';
 import { useProblemText } from '../messages';
 import { useProductSearch } from '../queries';
@@ -14,9 +14,12 @@ interface Option {
   unit: EdgeProductUnitHit;
 }
 
+/** One row per product, in its base unit: a box is scanned, never chosen here (owner 2026-11-05). */
 function optionsOf(hits: readonly EdgeProductHit[]): Option[] {
   return hits.flatMap((product) =>
-    product.units.map((unit) => ({ key: `${product.productId}:${unit.unitId}`, product, unit })),
+    product.units
+      .filter((unit) => unit.isBase)
+      .map((unit) => ({ key: `${product.productId}:${unit.unitId}`, product, unit })),
   );
 }
 
@@ -154,13 +157,7 @@ export function ProductFinder(props: {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[0.9375rem] font-medium">{option.product.name}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {option.product.sku} ·{' '}
-                      {option.unit.isBase
-                        ? option.unit.uomName
-                        : t('posKiosk.search.unitFactor', {
-                            uom: option.unit.uomName,
-                            factor: formatQty(option.unit.factor),
-                          })}
+                      {option.product.sku} · {option.unit.uomName}
                       {option.unit.barcodes?.[0] ? ` · ${option.unit.barcodes[0]}` : null}
                     </p>
                   </div>

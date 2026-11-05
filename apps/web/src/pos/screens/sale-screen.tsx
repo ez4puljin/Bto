@@ -167,6 +167,14 @@ export function SaleScreen(props: {
   const unpriced = fresh && quote.data.lines.some((line) => !line.priced);
   const canPay = fresh && !unpriced && new Decimal(quote.data.total).gt(0);
   const totals = cart.lines.length > 0 ? quote.data : undefined;
+  // What the bulk prices take off the supermarket prices (owner 2026-11-05).
+  const bulkSaving = (totals?.lines ?? []).reduce(
+    (sum, line) =>
+      line.bulk
+        ? sum.plus(new Decimal(line.bulk.retailPrice).minus(line.bulk.bulkPrice).times(line.qty))
+        : sum,
+    new Decimal(0),
+  );
 
   const focusScan = useCallback(() => scanInput.current?.focus(), []);
   const refocus = useCallback(
@@ -725,6 +733,12 @@ export function SaleScreen(props: {
               </p>
             </div>
             <dl className="space-y-1.5 border-t border-border pt-3 text-[0.9375rem]">
+              {bulkSaving.gt(0) ? (
+                <div className="flex justify-between text-success">
+                  <dt>{t('posKiosk.sale.bulkSaving')}</dt>
+                  <dd className="font-mono">{`−${formatMnt(bulkSaving.toFixed(2))}₮`}</dd>
+                </div>
+              ) : null}
               {totals && new Decimal(totals.discountTotal).gt(0) ? (
                 <>
                   <div className="flex justify-between">

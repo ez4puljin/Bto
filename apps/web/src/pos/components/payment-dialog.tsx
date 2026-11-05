@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { Decimal } from '@tugeel/shared/money';
 import type {
   EdgeApproval,
@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { formatMnt, formatTugrik } from '@/lib/money';
+import { useDebounced } from '@/lib/use-debounced';
 import { useScanGuard } from '@/lib/scan/use-wedge-scanner';
 import { fieldMoney, moneyOrZero, quickCash, wireMoney } from '../amounts';
 import { edgeProblemOf } from '../edge-client';
@@ -713,11 +714,12 @@ function CustomerSection(props: {
   const { client } = useKiosk();
   const problemText = useProblemText();
   const [q, setQ] = useState('');
-  const [query, setQuery] = useState('');
+  // The list shows at once and narrows as the cashier types (owner 2026-11-04).
+  const query = useDebounced(q.trim(), 200);
   const found = useQuery({
     queryKey: ['kiosk', 'customers', query],
     queryFn: ({ signal }) => client.customers(query, signal),
-    enabled: query.length > 0,
+    placeholderData: keepPreviousData,
   });
   const available = (customer: EdgeCustomer) =>
     customer.available === null
@@ -763,27 +765,21 @@ function CustomerSection(props: {
               onChange={(event) => setQ(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key !== 'Enter') return;
-                // Enter finds the customer here; it never pays.
+                // Enter takes the only customer found here; it never pays.
                 event.preventDefault();
-                setQuery(q.trim());
+                const only = found.data?.length === 1 ? found.data[0] : undefined;
+                if (only && !only.creditHold && query === q.trim()) props.onChange(only);
               }}
             />
-            <Button
-              type="button"
-              variant="secondary"
-              className="h-11 px-4"
-              disabled={!q.trim()}
-              onClick={() => setQuery(q.trim())}
-            >
-              <Search />
-              {t('posKiosk.pay.credit.find')}
-            </Button>
           </div>
           {found.data && found.data.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('posKiosk.pay.credit.none')}</p>
           ) : null}
           {found.data && found.data.length > 0 ? (
-            <ul className="max-h-48 space-y-1 overflow-y-auto">
+            <ul
+              aria-label={t('posKiosk.pay.credit.title')}
+              className="max-h-64 space-y-1 overflow-y-auto"
+            >
               {found.data.map((customer) => (
                 <li key={customer.id}>
                   <button
