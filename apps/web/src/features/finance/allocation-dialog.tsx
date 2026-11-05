@@ -29,6 +29,7 @@ import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
 import { useFinanceMutations, useOpenItems, useSupplierOpenItems } from './api';
 import { DateInput } from '@/components/date-input';
+import { MoneyInput } from '@/components/money-input';
 
 /** Whose open items the dialog pairs: a customer's receivables or a supplier's payables (F3). */
 export type AllocationParty = { kind: 'customer' | 'supplier'; id: number };
@@ -204,7 +205,7 @@ function AllocationForm({ party, onClose }: { party: AllocationParty; onClose: (
   ];
 
   return (
-    <DialogContent closeLabel={t('common.close')} size="lg">
+    <DialogContent closeLabel={t('common.close')} size="xl">
       <DialogHeader>
         <DialogTitle>{t('finance.allocations.title')}</DialogTitle>
         <DialogDescription>{texts.intro}</DialogDescription>
@@ -306,17 +307,13 @@ function AllocationForm({ party, onClose }: { party: AllocationParty; onClose: (
                           {formatTugrik(item.openAmount)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Input
+                          <MoneyInput
                             aria-label={`${t('finance.allocations.amount')}: ${item.number}`}
                             aria-invalid={wrong ? true : undefined}
-                            inputMode="decimal"
-                            className="ml-auto w-32 font-mono"
+                            className="ml-auto w-32"
                             value={raw}
-                            onChange={(event) =>
-                              setAmounts((previous) => ({
-                                ...previous,
-                                [item.id]: event.target.value.trim(),
-                              }))
+                            onValueChange={(next) =>
+                              setAmounts((previous) => ({ ...previous, [item.id]: next }))
                             }
                           />
                         </TableCell>

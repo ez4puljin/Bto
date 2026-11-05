@@ -517,4 +517,66 @@ describe('finance payables', () => {
     );
     expect(party.rows).toEqual([{ name: 'Шинэ нэр АП', kind: 'COMPANY' }]);
   });
+
+  it('bills the account the receipt names, and refuses one off the list (ADR-0154)', async () => {
+    const shop = await supplier('Тусгай данс АП');
+    for (const [code, name] of [
+      ['310177', 'Тусгай өглөг'],
+      ['313011', 'Тооллогын зөрүү'],
+    ] as const) {
+      await http()
+        .post('/api/v1/gl-accounts')
+        .set(bearer(admin))
+        .send({ code, name, journal: 'RECEIVABLE_PAYABLE' })
+        .expect(201);
+    }
+    const list = (
+      await http().get('/api/v1/receipts/counter-accounts').set(bearer(worker)).expect(200)
+    ).body as { code: string; isDefault: boolean }[];
+    expect(list.map((row) => row.code)).toEqual(expect.arrayContaining(['310177', '313011']));
+    expect(list.find((row) => row.isDefault)?.code).toBe('310101');
+    // The goods-received clearing is not a choice, nor is a money account.
+    expect(list.map((row) => row.code)).not.toContain('310201');
+    for (const code of ['310201', '100101']) {
+      await http()
+        .post('/api/v1/receipts')
+        .set(bearer(admin))
+        .set(idempotency())
+        .send({
+          supplierId: shop,
+          counterAccountCode: code,
+          lines: [{ productUnitId: unitOf(water, 'PCS').id, enteredQty: '1' }],
+        })
+        .expect(422);
+    }
+
+    const draft = await receipt(
+      shop,
+      [{ productUnitId: unitOf(water, 'PCS').id, enteredQty: '5', docUnitPrice: '1000' }],
+      { counterAccountCode: '310177' },
+    );
+    await costReceiptAsTyped(app, accountant, draft.id);
+    expect(await linesOf('GOODS_RECEIPT', String(draft.id))).toEqual({
+      '310201': '5000.00',
+      '310177': '-5000.00',
+    });
+    const detail = (await http().get(`/api/v1/receipts/${draft.id}`).set(bearer(admin)).expect(200))
+      .body as { counterAccountCode: string; counterAccountName: string };
+    expect(detail).toMatchObject({
+      counterAccountCode: '310177',
+      counterAccountName: 'Тусгай өглөг',
+    });
+
+    // The count difference takes its own key too, a re-costing stays on the same account.
+    const counted = await receipt(
+      shop,
+      [{ productUnitId: unitOf(water, 'PCS').id, enteredQty: '2', docUnitPrice: '1000' }],
+      { counterAccountCode: '313011' },
+    );
+    await costReceiptAsTyped(app, accountant, counted.id);
+    expect(await linesOf('GOODS_RECEIPT', String(counted.id))).toEqual({
+      '310201': '2000.00',
+      '313011': '-2000.00',
+    });
+  });
 });

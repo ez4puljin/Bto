@@ -428,6 +428,18 @@ export const finAuditLog = finSchema.table(
 // append-only triggers, the deferred balance trigger, and the copy of Bto's chart and money accounts.
 // ---------------------------------------------------------------------------------------------------
 
+/** What an account is on the screen (ADR-0149): Erkhet's «Журнал». */
+export const FIN_ACCOUNT_JOURNALS = [
+  'GENERAL',
+  'CASH',
+  'BANK',
+  'MONEY',
+  'RECEIVABLE_PAYABLE',
+  'VAT',
+  'INVENTORY',
+  'FIXED_ASSET',
+] as const;
+
 export const FIN_ACCOUNT_KINDS = ['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE'] as const;
 export const FIN_SIDES = ['DEBIT', 'CREDIT'] as const;
 export const FIN_MONEY_ACCOUNT_KINDS = ['CASH', 'BANK', 'CLEARING'] as const;
@@ -446,11 +458,19 @@ export const finAccountGroups = finSchema.table(
       .references(() => finCompanies.id),
     code: text('code').notNull(),
     name: text('name').notNull(),
+    /** The group above it and its place there (ADR-0148): Erkhet's tree; null at the top. */
+    parentId: ref('parent_id'),
+    sort: smallint('sort').notNull().default(0),
     status: status(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
+    foreignKey({
+      name: 'fin_account_groups_parent_fk',
+      columns: [t.companyId, t.parentId],
+      foreignColumns: [t.companyId, t.id],
+    }),
     unique('fin_account_groups_company_id_key').on(t.companyId, t.id),
     unique('fin_account_groups_company_code_key').on(t.companyId, t.code),
     check('fin_account_groups_code', codeShape(t.code)),
@@ -475,6 +495,9 @@ export const finAccounts = finSchema.table(
     kind: text('kind', { enum: FIN_ACCOUNT_KINDS }).notNull(),
     normalSide: text('normal_side', { enum: FIN_SIDES }).notNull(),
     control: text('control', { enum: FIN_ACCOUNT_CONTROLS }).notNull().default('NONE'),
+    /** Its type on the screen and its currency (ADR-0149); the ledger stays in the company's. */
+    journal: text('journal', { enum: FIN_ACCOUNT_JOURNALS }).notNull().default('GENERAL'),
+    currency: char('currency', { length: 3 }).notNull().default('MNT'),
     /** Its group in the chart (ADR-0102 #4); null for an account no import has grouped. */
     groupId: ref('group_id'),
     status: status(),
@@ -482,6 +505,11 @@ export const finAccounts = finSchema.table(
     updatedAt: updatedAt(),
   },
   (t) => [
+    check(
+      'fin_accounts_journal',
+      sql`${t.journal} IN ('GENERAL', 'CASH', 'BANK', 'MONEY', 'RECEIVABLE_PAYABLE', 'VAT', 'INVENTORY', 'FIXED_ASSET')`,
+    ),
+    check('fin_accounts_currency', sql`${t.currency} ~ '^[A-Z]{3}$'`),
     unique('fin_accounts_company_id_key').on(t.companyId, t.id),
     unique('fin_accounts_company_code_key').on(t.companyId, t.code),
     foreignKey({

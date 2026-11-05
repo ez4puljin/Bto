@@ -58,9 +58,10 @@ export function useUsers(filter: { q?: string; status?: UserStatusFilter }) {
   });
 }
 
-export function useUser(id: number) {
+export function useUser(id: number, enabled = true) {
   const api = useApiClient();
   return useQuery({
+    enabled,
     queryKey: [...KEYS.users, id],
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/v1/users/{id}', { params: { path: { id } }, signal })),
@@ -121,8 +122,18 @@ export function useSettings() {
 
 export interface AuditFilter {
   entity?: string;
+  action?: string;
   from?: string;
   to?: string;
+}
+
+/** The actions in the log with their counts (the «Үйлдэл» filter). */
+export function useAuditActions() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.audit, 'actions'],
+    queryFn: async ({ signal }) => unwrap(await api.GET('/api/v1/audit/actions', { signal })),
+  });
 }
 
 export function useAudit(filter: AuditFilter) {
@@ -136,6 +147,7 @@ export function useAudit(filter: AuditFilter) {
           params: {
             query: {
               entity: filter.entity || undefined,
+              action: filter.action || undefined,
               from: filter.from || undefined,
               to: filter.to || undefined,
               cursor: pageParam,

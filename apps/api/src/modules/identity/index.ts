@@ -42,5 +42,6 @@ export type { IssuedCode } from './services/password-codes';
 export { PermissionHoldersService } from './services/permission-holders.service';
 export { ScopeService } from './services/scope.service';
 export { SettingsService } from './services/settings.service';
+export { StaffAccountsService } from './services/staff-accounts.service';
 export { StorageService, type StoredFile } from './services/storage.service';
 export { UserNamesService, type UserSummary } from './services/user-names.service';

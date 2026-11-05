@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it } from 'vitest';
 import { ACCOUNTANT_ME, bodyOf, calls, UUID } from '@/test/inventory-fixtures';
+import { choose } from '@/test/choose';
 import { ADMIN_ME, json, problem, renderApp, signedIn } from '@/test/render-app';
 import { ACCOUNTS, CASH_BOX, ENTRY, ENTRY_ROW, NUMBERING } from './finance-fixtures';
 
@@ -62,12 +63,14 @@ describe('finance books (ADR-0060 #7, #8)', () => {
       dialog.getByLabelText(mn.finance.journal.dialog.descriptionField),
       'Бусад орлого',
     );
-    await user.selectOptions(dialog.getByLabelText(`${mn.finance.journal.dialog.account} 1`), '1');
+    await choose(user, dialog.getByLabelText(`${mn.finance.journal.dialog.account} 1`), /^100101/);
     // A line on the cash account names its cash box; the only one is chosen already (ADR-0090).
-    expect(dialog.getByLabelText(`${mn.finance.journal.dialog.moneyAccount} 1`)).toHaveValue('1');
+    expect(dialog.getByLabelText(`${mn.finance.journal.dialog.moneyAccount} 1`)).toHaveValue(
+      'Касс (Оргил Бөөний төв)',
+    );
     expect(dialog.queryByLabelText(`${mn.finance.journal.dialog.moneyAccount} 2`)).toBeNull();
     await user.type(dialog.getByLabelText(`${mn.finance.journal.dialog.debit} 1`), '5000');
-    await user.selectOptions(dialog.getByLabelText(`${mn.finance.journal.dialog.account} 2`), '8');
+    await choose(user, dialog.getByLabelText(`${mn.finance.journal.dialog.account} 2`), /^511020/);
     await user.type(dialog.getByLabelText(`${mn.finance.journal.dialog.credit} 2`), '4000');
     expect(dialog.getByText(/1,000/)).toBeInTheDocument();
     await user.click(dialog.getByRole('button', { name: mn.finance.journal.dialog.submit }));
@@ -180,9 +183,10 @@ describe('finance books (ADR-0060 #7, #8)', () => {
       dialog.getByLabelText(mn.finance.settings.moneyAccountDialog.bankAccountNo),
       '5000000000',
     );
-    await user.selectOptions(
+    await choose(
+      user,
       dialog.getByLabelText(mn.finance.settings.moneyAccountDialog.glAccount),
-      '1',
+      /^100101/,
     );
     const shown = dialog.getByRole('switch', { name: showToCustomers });
     expect(shown).not.toBeChecked();

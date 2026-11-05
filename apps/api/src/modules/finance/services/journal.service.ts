@@ -120,6 +120,7 @@ export interface JournalQuery {
   source?: JournalSource;
   accountId?: number;
   customerId?: number;
+  journal?: string;
   cursor?: string;
   limit?: number;
 }
@@ -430,6 +431,7 @@ export class JournalService {
       ...(query.to ? { to: query.to } : {}),
       ...(query.source ? { origin: originOf(query.source) } : {}),
       ...(query.accountId ? { accountId: query.accountId } : {}),
+      ...(query.journal ? { journal: query.journal } : {}),
       ...(partyId !== undefined ? { partyId } : {}),
       ...(typeof after?.date === 'string' && typeof after?.id === 'number'
         ? { after: { date: after.date, id: after.id } }

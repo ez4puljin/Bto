@@ -21,7 +21,7 @@ import { useSalesHistory } from '../queries';
 import { DayField } from './day-field';
 import { KioskAlert } from './layout';
 import { useReprint } from './print-context';
-import { ReceiptView } from './receipt';
+import { KioskReceiptView } from './receipt';
 
 const isTenderKind = (name: string): name is TenderKind =>
   (TENDER_KINDS as readonly string[]).includes(name);
@@ -85,7 +85,7 @@ function HistoryPanel() {
           </Button>
         </div>
         {reprint.isError ? <KioskAlert>{problemText(reprint.error)}</KioskAlert> : null}
-        <ReceiptView receipt={opened.receipt} copy={opened.copy} />
+        <KioskReceiptView receipt={opened.receipt} copy={opened.copy} />
       </div>
     );
   }

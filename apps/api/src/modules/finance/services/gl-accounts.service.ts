@@ -1,5 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { GlAccountKind, GlRole } from '@tugeel/shared/finance';
+import {
+  type AccountJournal,
+  accountKindOfCode,
+  type GlAccountKind,
+  type GlRole,
+} from '@tugeel/shared/finance';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
 import { DB } from '../../../common/db/db.tokens';
@@ -15,6 +20,7 @@ import {
 import { POSTING_KEY_OF_ROLE, ROLE_OF_POSTING_KEY } from '../../fin-bridge';
 import { type AuthContext, AuditService } from '../../identity';
 import { FinBooks } from './fin-books';
+import { ensureReceiptCounterKeysInTx } from './receipt-counter-key';
 
 export type AccountStatus = 'ACTIVE' | 'INACTIVE';
 
@@ -25,6 +31,10 @@ export interface GlAccount {
   kind: GlAccountKind;
   role: GlRole | null;
   status: AccountStatus;
+  /** Its group in the chart's tree (ADR-0148), or null. */
+  groupId: number | null;
+  journal: AccountJournal;
+  currency: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,7 +42,10 @@ export interface GlAccount {
 export interface GlAccountInput {
   code: string;
   name: string;
-  kind: GlAccountKind;
+  /** Left out: worked out from the code (ADR-0149). */
+  kind?: GlAccountKind;
+  journal?: AccountJournal;
+  currency?: string;
 }
 
 export interface GlAccountPatch {
@@ -40,6 +53,8 @@ export interface GlAccountPatch {
   name?: string;
   kind?: GlAccountKind;
   status?: AccountStatus;
+  journal?: AccountJournal;
+  currency?: string;
 }
 
 /** An account with its turnover and balance up to a date (debit − credit; negative = credit). */
@@ -135,18 +150,33 @@ export class GlAccountsService {
   async create(ctx: AuthContext, input: GlAccountInput): Promise<GlAccount> {
     const code = input.code.trim();
     const name = input.name.trim();
+    const kind = input.kind ?? accountKindOfCode(code);
+    if (!kind) throw invalid('code', 'accountCode', 'the code starts with a digit from 1 to 9');
     return inTransaction(this.db, async (tx) => {
       const row = await this.chart.createAccountInTx(tx, this.books.user(ctx), {
         company: await this.books.company(),
         code,
         name,
-        kind: input.kind,
+        kind,
+        ...(input.journal !== undefined ? { journal: input.journal } : {}),
+        ...(input.currency !== undefined ? { currency: input.currency } : {}),
       });
+      await ensureReceiptCounterKeysInTx(
+        tx,
+        this.chart,
+        this.books.user(ctx),
+        await this.books.company(),
+        [row],
+      );
       await this.audit.record(tx, ctx, {
         action: 'CREATE',
         entity: 'gl_accounts',
         entityId: row.id,
-        after: { code, name, kind: input.kind },
+        after: { code, name, kind, journal: row.journal, currency: row.currency },
+      });
+      await this.chart.ensureMoneyAccountInTx(tx, this.books.user(ctx), {
+        company: await this.books.company(),
+        accountId: row.id,
       });
       return toGlAccount(row, null);
     });
@@ -164,6 +194,8 @@ export class GlAccountsService {
         ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
         ...(patch.kind !== undefined ? { kind: patch.kind } : {}),
         ...(patch.status !== undefined ? { status: patch.status } : {}),
+        ...(patch.journal !== undefined ? { journal: patch.journal } : {}),
+        ...(patch.currency !== undefined ? { currency: patch.currency } : {}),
       };
       const changed = await this.chart.updateAccountInTx(tx, this.books.user(ctx), {
         company: await this.books.company(),
@@ -171,6 +203,10 @@ export class GlAccountsService {
         patch: set,
       });
       if (!changed) throw notFound('gl_account', id);
+      await this.chart.ensureMoneyAccountInTx(tx, this.books.user(ctx), {
+        company: await this.books.company(),
+        accountId: id,
+      });
       const { before, after } = changed;
       await this.audit.record(tx, ctx, {
         action: 'UPDATE',
@@ -292,6 +328,9 @@ function toGlAccount(account: FinAccountView, role: GlRole | null): GlAccount {
     kind: account.kind,
     role,
     status: account.status,
+    groupId: account.groupId,
+    journal: account.journal,
+    currency: account.currency,
     createdAt: account.createdAt,
     updatedAt: account.updatedAt,
   };

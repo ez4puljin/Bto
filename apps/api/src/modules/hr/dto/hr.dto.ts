@@ -158,7 +158,7 @@ export class AttendanceEventDto {
   @ApiProperty({ enum: ATTENDANCE_KINDS }) kind: 'IN' | 'OUT';
   @ApiProperty({ type: String, format: 'date-time' }) at: string;
   @ApiProperty({ description: 'The Ulaanbaatar date' }) businessDate: string;
-  @ApiProperty({ enum: ['APP', 'OFFICE'] }) source: 'APP' | 'OFFICE';
+  @ApiProperty({ enum: ['APP', 'OFFICE', 'REQUEST'] }) source: 'APP' | 'OFFICE' | 'REQUEST';
   @ApiProperty({ type: Number, nullable: true }) siteId: number | null;
   @ApiProperty({ type: String, nullable: true }) siteName: string | null;
   @ApiProperty({ type: String, nullable: true }) lat: string | null;

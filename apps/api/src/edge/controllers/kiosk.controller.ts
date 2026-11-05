@@ -42,6 +42,7 @@ import type {
   EdgeVoidResponse,
   PosapiInfoWire,
 } from '@tugeel/shared/pos';
+import { receiptLayoutFor } from '@tugeel/shared/pos';
 import { businessDate } from '@tugeel/shared/time';
 import { eq } from 'drizzle-orm';
 import { AppError } from '../../common/errors/app-error';
@@ -253,10 +254,12 @@ export class KioskController {
   async session(@Kiosk() kiosk: KioskContext): Promise<EdgeSession> {
     const loaded = this.store.get();
     const shift = await this.shifts.current(kiosk.device.tillCode);
+    const till = loaded.tills.get(kiosk.device.tillCode);
     return {
       till: {
+        ...(till ? { id: till.id } : {}),
         code: kiosk.device.tillCode,
-        name: loaded.tills.get(kiosk.device.tillCode)?.name ?? kiosk.device.tillCode,
+        name: till?.name ?? kiosk.device.tillCode,
       },
       cashier: cashierOf(kiosk),
       shift: shift ? await this.shifts.summary(shift) : null,
@@ -264,6 +267,14 @@ export class KioskController {
       companyName: loaded.snapshot.company.name,
       approvalRequired: loaded.snapshot.settings.supervisorRequired,
       paymentTypes: loaded.snapshot.paymentTypes ?? [],
+      receiptLayouts: {
+        SALE: receiptLayoutFor(loaded.snapshot.receiptTemplates, 'SALE', till?.saleTemplateId),
+        RETURN: receiptLayoutFor(
+          loaded.snapshot.receiptTemplates,
+          'RETURN',
+          till?.returnTemplateId,
+        ),
+      },
     };
   }
 

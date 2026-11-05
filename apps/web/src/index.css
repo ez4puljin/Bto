@@ -49,6 +49,12 @@
   --chart-3: #ff9500;
   --chart-4: #af52de;
   --chart-5: #5ac8fa;
+  /* The dashboards' series (ADR-0146), checked for colour blindness in this order. */
+  --series-1: #0071e3;
+  --series-2: #e8590c;
+  --series-3: #7c3aed;
+  --series-4: #0d9488;
+  --series-5: #c2255c;
   --radius: 0.875rem;
   --sidebar: #f9f9fb;
   --sidebar-foreground: #1d1d1f;

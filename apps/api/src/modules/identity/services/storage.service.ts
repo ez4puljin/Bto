@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Readable } from 'node:stream';
+import { Readable } from 'node:stream';
 import { Inject, Injectable } from '@nestjs/common';
 import {
   extensionFor,
@@ -80,6 +80,43 @@ export class StorageService {
       })
       .returning();
     if (!row) throw new Error('file insert returned no row');
+    return row;
+  }
+
+  /**
+   * A file the server itself brings in (ADR-0144: the photos of the employees imported from
+   * timely): PENDING with its bytes stored, ready for the caller's `confirm` in its transaction.
+   * No permission check: only server code calls it.
+   */
+  async ingest(input: {
+    kind: FileKind;
+    contentType: string;
+    bytes: Buffer;
+    ownerId: number | null;
+  }): Promise<StoredFile> {
+    const definition = fileKind(input.kind);
+    if (!definition.contentTypes.includes(input.contentType)) {
+      throw new AppError('UNSUPPORTED_MEDIA_TYPE', `${input.contentType} not allowed`, {
+        allowed: definition.contentTypes.join(', '),
+      });
+    }
+    if (input.bytes.length > definition.maxBytes) {
+      throw new AppError('PAYLOAD_TOO_LARGE', `file over ${definition.maxBytes} bytes`, {
+        maxBytes: definition.maxBytes,
+      });
+    }
+    const [row] = await this.db
+      .insert(files)
+      .values({
+        key: `${randomUUID()}.${extensionFor(input.contentType)}`,
+        kind: input.kind,
+        contentType: input.contentType,
+        sizeBytes: input.bytes.length,
+        ownerId: input.ownerId,
+      })
+      .returning();
+    if (!row) throw new Error('file insert returned no row');
+    await this.receiveUpload(row, Readable.from([input.bytes]));
     return row;
   }
 

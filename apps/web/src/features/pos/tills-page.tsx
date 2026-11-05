@@ -43,6 +43,7 @@ import { useCreateParam } from '@/lib/use-create-param';
 import { type EdgeNode, type Till, useEdgeNodes, usePosMutations, useTills } from './api';
 import { ActiveBadge } from './badges';
 import { OneTimeCodeDialog } from './one-time-code-dialog';
+import { useReceiptTemplates } from './receipt-templates-api';
 
 /** ADR-0138: the path that opens a POS on its edge's kiosk port without a code. */
 const tillPath = (code: string) => `/${tillCodeUrlSegment(code)}`;
@@ -593,6 +594,12 @@ function TillForm({
   const [code, setCode] = useState(till?.code ?? '');
   const [name, setName] = useState(till?.name ?? '');
   const [status, setStatus] = useState<Till['status']>(till?.status ?? 'ACTIVE');
+  // ADR-0141: the receipt templates this POS prints with; empty: the default of the kind.
+  const templates = useReceiptTemplates();
+  const [saleTemplateId, setSaleTemplateId] = useState<number | null>(till?.saleTemplateId ?? null);
+  const [returnTemplateId, setReturnTemplateId] = useState<number | null>(
+    till?.returnTemplateId ?? null,
+  );
   const [checked, setChecked] = useState(false);
   // The dialog may open before the nodes arrive (?new=1): take the first one then.
   useEffect(() => {
@@ -613,6 +620,8 @@ function TillForm({
             name: name.trim(),
             warehouseId,
             status,
+            saleTemplateId,
+            returnTemplateId,
           });
           toast.success(t('pos.tills.saved'));
         } else {
@@ -721,6 +730,40 @@ function TillForm({
             />
           </FormField>
         </div>
+        {till ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {(['SALE', 'RETURN'] as const).map((kind) => {
+              const value = kind === 'SALE' ? saleTemplateId : returnTemplateId;
+              const set = kind === 'SALE' ? setSaleTemplateId : setReturnTemplateId;
+              const options = (templates.data ?? []).filter((entry) => entry.kind === kind);
+              const fallback = options.find((entry) => entry.isDefault);
+              return (
+                <FormField
+                  key={kind}
+                  label={t(`pos.tills.template.${kind}`)}
+                  htmlFor={`till-template-${kind}`}
+                >
+                  <NativeSelect
+                    id={`till-template-${kind}`}
+                    value={value ?? ''}
+                    onChange={(event) => set(Number.parseInt(event.target.value, 10) || null)}
+                  >
+                    <option value="">
+                      {t('pos.tills.template.default', { name: fallback?.name ?? '' })}
+                    </option>
+                    {options
+                      .filter((entry) => !entry.isDefault || entry.id === value)
+                      .map((entry) => (
+                        <option key={entry.id} value={entry.id}>
+                          {entry.name}
+                        </option>
+                      ))}
+                  </NativeSelect>
+                </FormField>
+              );
+            })}
+          </div>
+        ) : null}
         {till ? (
           <div className="divide-y divide-border/80 overflow-hidden rounded-xl border border-border/90">
             <SwitchRow

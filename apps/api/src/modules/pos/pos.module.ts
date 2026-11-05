@@ -12,6 +12,7 @@ import {
   PosEdgeNodesController,
   PosPaymentTypesController,
   PosQuickButtonsController,
+  PosReceiptTemplatesController,
   PosSettingsController,
   PosTillsController,
 } from './controllers/pos-admin.controller';
@@ -47,6 +48,7 @@ import { PosEdgeNodesService } from './services/pos-edge-nodes.service';
 import { PosLoyaltyService } from './services/pos-loyalty.service';
 import { PosQueryService } from './services/pos-query.service';
 import { PosQuickButtonsService } from './services/pos-quick-buttons.service';
+import { PosReceiptTemplatesService } from './services/pos-receipt-templates.service';
 import { PosReplayService } from './services/pos-replay.service';
 import { PosSettingsService } from './services/pos-settings.service';
 import { PosShiftsService } from './services/pos-shifts.service';
@@ -64,6 +66,7 @@ const SERVICES = [
   PosShiftsService,
   PosVoidsService,
   PosQuickButtonsService,
+  PosReceiptTemplatesService,
   PosCustomersService,
   PosVouchersService,
   PosPaymentTypesService,
@@ -117,6 +120,7 @@ export class PosModule {}
     PosLoyaltyTiersController,
     PosSaleLoyaltyController,
     PosPaymentTypesController,
+    PosReceiptTemplatesController,
     PosAttentionController,
     PosDayCountsController,
     PosSyncController,

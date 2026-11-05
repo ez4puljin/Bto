@@ -15,8 +15,8 @@ dayjs.extend(timezone);
 export const ATTENDANCE_KINDS = ['IN', 'OUT'] as const;
 export type AttendanceKind = (typeof ATTENDANCE_KINDS)[number];
 
-/** APP: punched on the phone inside a work site; OFFICE: typed by HR as a correction. */
-export const ATTENDANCE_SOURCES = ['APP', 'OFFICE'] as const;
+/** APP: punched on the phone inside a work site; OFFICE: typed by HR as a correction; REQUEST: an approved time request's punch (ADR-0144). */
+export const ATTENDANCE_SOURCES = ['APP', 'OFFICE', 'REQUEST'] as const;
 export type AttendanceSource = (typeof ATTENDANCE_SOURCES)[number];
 
 export const HR_LIMITS = {
@@ -155,4 +155,134 @@ function minutesBetween(from: string, to: string): number {
 export function hoursAndMinutes(minutes: number): { hours: number; minutes: number } {
   const whole = Math.max(0, Math.round(minutes));
   return { hours: Math.floor(whole / 60), minutes: whole % 60 };
+}
+
+// Employees, schedules, time requests and the reports (ADR-0144).
+export * from './workforce';
+
+/**
+ * Who has left (ADR-0145): a staff user and an employee are one record, so a closed account is an
+ * employee gone, with or without the date HR gives when marking it.
+ */
+export const isEmployeeLeft = (employee: { status: string; leftOn: string | null }): boolean =>
+  employee.status === 'DISABLED' || employee.leftOn !== null;
+
+// ── The staff's own side (ADR-0146) ─────────────────────────────────────────
+
+export const EDUCATION_LEVELS = [
+  'SECONDARY_INCOMPLETE',
+  'SECONDARY',
+  'VOCATIONAL',
+  'BACHELOR',
+  'MASTER',
+  'DOCTOR',
+  'SCIENCE_DOCTOR',
+  'PROFESSOR',
+  'HONORARY_DOCTOR',
+] as const;
+export type EducationLevel = (typeof EDUCATION_LEVELS)[number];
+
+export const MARITAL_STATUSES = ['SINGLE', 'MARRIED', 'DIVORCED', 'WIDOWED'] as const;
+export type MaritalStatus = (typeof MARITAL_STATUSES)[number];
+
+export const JOB_LEVELS = ['EXECUTIVE', 'MANAGEMENT', 'SENIOR', 'MID', 'ENTRY'] as const;
+export type JobLevel = (typeof JOB_LEVELS)[number];
+
+export const LEFT_REASON_KINDS = ['PERSONAL', 'COMPANY', 'CONTRACT_END', 'RETIRED', 'OTHER'] as const;
+export type LeftReasonKind = (typeof LEFT_REASON_KINDS)[number];
+
+/** A notice pops up in the staff app; news is read from its list (ADR-0146 #2). */
+export const MESSAGE_KINDS = ['NOTICE', 'NEWS'] as const;
+export type MessageKind = (typeof MESSAGE_KINDS)[number];
+
+/** A vote is one single-choice question; a survey holds several of any kind (ADR-0146 #3). */
+export const POLL_KINDS = ['VOTE', 'SURVEY'] as const;
+export type PollKind = (typeof POLL_KINDS)[number];
+
+export const POLL_QUESTION_KINDS = ['SINGLE', 'MULTI', 'TEXT', 'SCALE'] as const;
+export type PollQuestionKind = (typeof POLL_QUESTION_KINDS)[number];
+
+export const FEEDBACK_CATEGORIES = ['SUGGESTION', 'COMPLAINT', 'QUESTION', 'OTHER'] as const;
+export type FeedbackCategory = (typeof FEEDBACK_CATEGORIES)[number];
+
+export const FEEDBACK_STATUSES = ['NEW', 'SEEN', 'DONE'] as const;
+export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number];
+
+export const HR_EVENT_KINDS = ['EVENT', 'MEETING', 'HOLIDAY'] as const;
+export type HrEventKind = (typeof HR_EVENT_KINDS)[number];
+
+/** What «Энэ сарын үйл явдлууд» shows on a day: HR's events, birthdays and work anniversaries. */
+export const CALENDAR_ITEM_KINDS = [...HR_EVENT_KINDS, 'BIRTHDAY', 'ANNIVERSARY'] as const;
+export type CalendarItemKind = (typeof CALENDAR_ITEM_KINDS)[number];
+
+/** A mood's five faces, sad to glad. */
+export const MOOD_SCORES = [1, 2, 3, 4, 5] as const;
+
+export const ENGAGEMENT_LIMITS = {
+  maxTitle: 120,
+  maxBody: 4000,
+  maxNote: 500,
+  maxCategory: 40,
+  maxDistrict: 60,
+  maxChildren: 12,
+  maxQuestions: 30,
+  minOptions: 2,
+  maxOptions: 20,
+  maxOptionText: 200,
+  maxAnswerText: 2000,
+  maxRecipients: 2000,
+  scaleMax: 5,
+} as const;
+
+/** The bands of the dashboard's charts: the upper bound in months or years, null for the last. */
+export const TENURE_BANDS = [
+  { key: '0-6m', months: 6 },
+  { key: '6m-1y', months: 12 },
+  { key: '1-2y', months: 24 },
+  { key: '2-3y', months: 36 },
+  { key: '3y+', months: null },
+] as const;
+export const AGE_BANDS = [
+  { key: '18-25', years: 26 },
+  { key: '26-33', years: 34 },
+  { key: '34-41', years: 42 },
+  { key: '42-49', years: 50 },
+  { key: '50+', years: null },
+] as const;
+export const CHILD_AGE_BANDS = [
+  { key: '0-2', years: 3 },
+  { key: '3-5', years: 6 },
+  { key: '6-10', years: 11 },
+  { key: '11-15', years: 16 },
+  { key: '16+', years: null },
+] as const;
+
+/** Whole years between two `YYYY-MM-DD` dates (an age, or a tenure in years). */
+export function yearsBetween(from: string, to: string): number {
+  const years = Number.parseInt(to.slice(0, 4), 10) - Number.parseInt(from.slice(0, 4), 10);
+  return to.slice(5) >= from.slice(5) ? years : years - 1;
+}
+
+/** Whole months between two `YYYY-MM-DD` dates. */
+export function monthsBetween(from: string, to: string): number {
+  const months =
+    (Number.parseInt(to.slice(0, 4), 10) - Number.parseInt(from.slice(0, 4), 10)) * 12 +
+    Number.parseInt(to.slice(5, 7), 10) -
+    Number.parseInt(from.slice(5, 7), 10);
+  return to.slice(8) >= from.slice(8) ? months : months - 1;
+}
+
+/** The band a whole-year figure falls in. */
+export function bandOfYears<K extends string>(
+  bands: readonly { key: K; years: number | null }[],
+  years: number,
+): K | null {
+  for (const band of bands) if (band.years === null || years < band.years) return band.key;
+  return null;
+}
+
+/** The band a tenure in whole months falls in. */
+export function tenureBand(months: number): (typeof TENURE_BANDS)[number]['key'] {
+  for (const band of TENURE_BANDS) if (band.months === null || months < band.months) return band.key;
+  return '3y+';
 }

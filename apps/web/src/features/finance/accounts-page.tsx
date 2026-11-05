@@ -1,6 +1,14 @@
-import { GL_ACCOUNT_KINDS, GL_ROLES, type GlAccountKind } from '@tugeel/shared/finance';
+import type { components } from '@tugeel/api-client';
+import {
+  ACCOUNT_CURRENCIES,
+  ACCOUNT_JOURNALS,
+  type AccountCurrency,
+  type AccountJournal,
+  GL_ROLES,
+} from '@tugeel/shared/finance';
+import { matchesQuery, queryTerms, searchKeys } from '@tugeel/shared/text';
 import { Ellipsis, ListTree, Plus } from 'lucide-react';
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
@@ -9,14 +17,17 @@ import {
   ChevronHead,
   EmptyState,
   FilterBar,
+  FilterToggle,
   LinkRow,
   ListCard,
   ListTable,
   LoadMore,
+  SearchField,
   SkeletonRows,
   TruncateCell,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
+import { Combobox } from '@/components/combobox';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
@@ -52,22 +63,22 @@ import {
   useAccountLedger,
   useAccountParties,
   useFinanceMutations,
+  useGlAccountGroups,
   useGlAccounts,
 } from './api';
 import { SourceBadge } from './badges';
 import { IssueAccountsDialog } from './issue-accounts-dialog';
 
 const CODE = /^[0-9A-Za-z][0-9A-Za-z._-]{0,15}$/;
-const isKind = (value: string): value is GlAccountKind =>
-  GL_ACCOUNT_KINDS.some((kind) => kind === value);
 const isRole = (value: string): value is GlRole => GL_ROLES.some((role) => role === value);
 
 /** The chart's columns (ADR-0119): the code, the name, the kind and role, three amounts, the menu. */
 const ACCOUNT_COLUMNS: readonly ColumnSpec[] = [
-  { key: 'code', kind: 'code' },
-  { key: 'name', kind: 'text', weight: 3, min: 14 },
-  { key: 'kind', kind: 'text', weight: 1 },
-  { key: 'role', kind: 'text', weight: 2 },
+  { key: 'code', kind: 'code', width: 11 },
+  { key: 'name', kind: 'text', weight: 4, min: 18 },
+  { key: 'journal', kind: 'text', weight: 2, min: 13 },
+  { key: 'currency', kind: 'code', width: 4.5 },
+  { key: 'role', kind: 'text', weight: 1, min: 6 },
   { key: 'debit', kind: 'money' },
   { key: 'credit', kind: 'money' },
   { key: 'balance', kind: 'money', width: 10 },
@@ -86,6 +97,120 @@ const LEDGER_COLUMNS: readonly ColumnSpec[] = [
   { key: 'balanceAfter', kind: 'money', width: 10 },
 ];
 
+type GroupRow = components['schemas']['GlAccountGroup'];
+type ChartLine =
+  | { group: GroupRow; account?: undefined; depth: number }
+  | { group?: undefined; account: GlAccount; depth: number };
+
+/**
+ * The chart as Erkhet shows it (ADR-0148): the group tree in its order with each group's accounts
+ * under it, ungrouped accounts last. `keepEmpty` shows the groups without accounts too; a search
+ * or the inactive view shows only the groups that hold a row.
+ */
+function chartLines(
+  groups: readonly GroupRow[],
+  accounts: readonly GlAccount[],
+  keepEmpty: boolean,
+): ChartLine[] {
+  const children = new Map<number | null, GroupRow[]>();
+  for (const group of groups) {
+    children.set(group.parentId, [...(children.get(group.parentId) ?? []), group]);
+  }
+  const held = new Map<number | null, GlAccount[]>();
+  for (const account of accounts) {
+    held.set(account.groupId, [...(held.get(account.groupId) ?? []), account]);
+  }
+  const walk = (parent: number | null, depth: number): ChartLine[] =>
+    [...(children.get(parent) ?? [])]
+      .sort((a, b) => a.sort - b.sort)
+      .flatMap((group) => {
+        const own = [...(held.get(group.id) ?? [])].sort((a, b) => a.code.localeCompare(b.code));
+        const below = walk(group.id, depth + 1);
+        if (!keepEmpty && own.length === 0 && below.length === 0) return [];
+        return [
+          { group, depth },
+          ...own.map((account) => ({ account, depth: depth + 1 })),
+          ...below,
+        ];
+      });
+  const loose = [...(held.get(null) ?? [])]
+    .sort((a, b) => a.code.localeCompare(b.code))
+    .map((account) => ({ account, depth: 0 }));
+  return [...walk(null, 0), ...loose];
+}
+
+/** One account's row: it opens the ledger, its code stays the keyboard's link. */
+function AccountRow(props: {
+  account: GlAccount;
+  depth: number;
+  canEdit: boolean;
+  canRole: boolean;
+  onEdit: (account: GlAccount) => void;
+  onRole: (account: GlAccount) => void;
+}) {
+  const { t } = useTranslation();
+  const { account, canEdit, canRole } = props;
+  return (
+    <LinkRow
+      to={`/finance/accounts/${account.id}`}
+      className={account.status === 'INACTIVE' ? 'text-muted-foreground' : undefined}
+    >
+      <TableCell className="font-mono" style={{ paddingLeft: `${0.75 + props.depth * 0.875}rem` }}>
+        <Link
+          className="font-medium underline-offset-4 hover:underline"
+          to={`/finance/accounts/${account.id}`}
+        >
+          {account.code}
+        </Link>
+      </TableCell>
+      <TruncateCell text={account.name}>
+        {account.name}
+        {account.status === 'INACTIVE' ? (
+          <Badge variant="secondary" className="ml-2">
+            {t('finance.accountStatuses.INACTIVE')}
+          </Badge>
+        ) : null}
+      </TruncateCell>
+      <TableCell className="truncate">{t(`finance.accountJournals.${account.journal}`)}</TableCell>
+      <TableCell className="font-mono">{account.currency}</TableCell>
+      <TableCell>{account.role ? t(`finance.roles.${account.role}`) : ''}</TableCell>
+      <TableCell className="text-right font-mono">{formatMnt(account.debit)}</TableCell>
+      <TableCell className="text-right font-mono">{formatMnt(account.credit)}</TableCell>
+      <TableCell className="text-right font-mono">{formatMnt(account.balance)}</TableCell>
+      <TableCell>
+        {canEdit || canRole ? (
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label={`${account.code}: ${t('common.actions')}`}
+              >
+                <Ellipsis />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {canEdit ? (
+                <DropdownMenuItem onSelect={() => props.onEdit(account)}>
+                  {t('common.edit')}
+                </DropdownMenuItem>
+              ) : null}
+              {canRole ? (
+                <DropdownMenuItem onSelect={() => props.onRole(account)}>
+                  {t('finance.actions.setRole')}
+                </DropdownMenuItem>
+              ) : null}
+              <DropdownMenuItem asChild>
+                <Link to={`/finance/accounts/${account.id}`}>{t('finance.actions.ledger')}</Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+      </TableCell>
+    </LinkRow>
+  );
+}
+
 /**
  * The chart of accounts (ADR-0060 #7) with each account's turnover and balance; the accountant
  * adds and edits accounts, an admin moves the roles the automatic entries post to.
@@ -99,7 +224,22 @@ export function AccountsPage() {
   const [roling, setRoling] = useState<GlAccount | null>(null);
   const [issueAccounts, setIssueAccounts] = useState(false);
   const accounts = useGlAccounts();
-  const rows = accounts.data ?? [];
+  const groups = useGlAccountGroups();
+  const [search, setSearch] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
+  const rows = useMemo(() => accounts.data ?? [], [accounts.data]);
+  const lines = useMemo(() => {
+    const terms = queryTerms(search);
+    return chartLines(
+      groups.data ?? [],
+      rows.filter(
+        (account) =>
+          (showInactive || account.status === 'ACTIVE') &&
+          (terms.length === 0 || matchesQuery(searchKeys(account.name, [account.code]), terms)),
+      ),
+      terms.length === 0 && !showInactive,
+    );
+  }, [groups.data, rows, search, showInactive]);
 
   return (
     <div>
@@ -124,6 +264,19 @@ export function AccountsPage() {
         accounts={rows}
         onClose={() => setIssueAccounts(false)}
       />
+      <FilterBar>
+        <SearchField
+          aria-label={t('finance.accounts.search')}
+          placeholder={t('finance.accounts.search')}
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <FilterToggle
+          label={t('finance.accounts.showInactive')}
+          checked={showInactive}
+          onCheckedChange={setShowInactive}
+        />
+      </FilterBar>
       <ProblemAlert problem={problemFromError(accounts.error)} onRetry={accounts.refetch} />
       <ListCard scroll>
         <ListTable columns={ACCOUNT_COLUMNS}>
@@ -132,6 +285,7 @@ export function AccountsPage() {
               <TableHead>{t('finance.fields.code')}</TableHead>
               <TableHead>{t('finance.fields.name')}</TableHead>
               <TableHead>{t('finance.fields.kind')}</TableHead>
+              <TableHead>{t('finance.accounts.currency')}</TableHead>
               <TableHead>{t('finance.fields.role')}</TableHead>
               <TableHead className="text-right">{t('finance.fields.debit')}</TableHead>
               <TableHead className="text-right">{t('finance.fields.credit')}</TableHead>
@@ -143,72 +297,35 @@ export function AccountsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {accounts.isPending ? <SkeletonRows columns={9} /> : null}
-            {rows.map((account) => (
-              // A row opens the account's ledger; its code stays the keyboard's link.
-              <LinkRow
-                key={account.id}
-                to={`/finance/accounts/${account.id}`}
-                className={account.status === 'INACTIVE' ? 'text-muted-foreground' : undefined}
-              >
-                <TableCell className="font-mono">
-                  <Link
-                    className="font-medium underline-offset-4 hover:underline"
-                    to={`/finance/accounts/${account.id}`}
+            {accounts.isPending ? <SkeletonRows columns={10} /> : null}
+            {lines.map((line) =>
+              line.group ? (
+                <TableRow key={`g${line.group.id}`} className="bg-muted/40 hover:bg-muted/40">
+                  <TableCell
+                    colSpan={10}
+                    className="py-1.5 font-semibold"
+                    style={{ paddingLeft: `${0.75 + line.depth * 0.875}rem` }}
                   >
-                    {account.code}
-                  </Link>
-                </TableCell>
-                <TruncateCell text={account.name}>
-                  {account.name}
-                  {account.status === 'INACTIVE' ? (
-                    <Badge variant="secondary" className="ml-2">
-                      {t('finance.accountStatuses.INACTIVE')}
-                    </Badge>
-                  ) : null}
-                </TruncateCell>
-                <TableCell>{t(`finance.accountKinds.${account.kind}`)}</TableCell>
-                <TableCell>{account.role ? t(`finance.roles.${account.role}`) : ''}</TableCell>
-                <TableCell className="text-right font-mono">{formatMnt(account.debit)}</TableCell>
-                <TableCell className="text-right font-mono">{formatMnt(account.credit)}</TableCell>
-                <TableCell className="text-right font-mono">{formatMnt(account.balance)}</TableCell>
-                <TableCell>
-                  {canEdit || canRole ? (
-                    <DropdownMenu modal={false}>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon-xs"
-                          aria-label={`${account.code}: ${t('common.actions')}`}
-                        >
-                          <Ellipsis />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {canEdit ? (
-                          <DropdownMenuItem onSelect={() => setEditing(account)}>
-                            {t('common.edit')}
-                          </DropdownMenuItem>
-                        ) : null}
-                        {canRole ? (
-                          <DropdownMenuItem onSelect={() => setRoling(account)}>
-                            {t('finance.actions.setRole')}
-                          </DropdownMenuItem>
-                        ) : null}
-                        <DropdownMenuItem asChild>
-                          <Link to={`/finance/accounts/${account.id}`}>
-                            {t('finance.actions.ledger')}
-                          </Link>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : null}
-                </TableCell>
-              </LinkRow>
-            ))}
+                    <span className="mr-2 font-mono text-muted-foreground">{line.group.code}</span>
+                    {line.group.name}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                // A row opens the account's ledger; its code stays the keyboard's link.
+                <AccountRow
+                  key={line.account.id}
+                  account={line.account}
+                  depth={line.depth}
+                  canEdit={canEdit}
+                  canRole={canRole}
+                  onEdit={setEditing}
+                  onRole={setRoling}
+                />
+              ),
+            )}
           </TableBody>
         </ListTable>
-        {!accounts.isPending && rows.length === 0 ? (
+        {!accounts.isPending && lines.length === 0 ? (
           <EmptyState icon={ListTree} title={t('finance.accounts.empty')} />
         ) : null}
       </ListCard>
@@ -233,7 +350,10 @@ function AccountDialog({
   const action = useAction();
   const [code, setCode] = useState(account?.code ?? '');
   const [name, setName] = useState(account?.name ?? '');
-  const [kind, setKind] = useState<GlAccountKind>(account?.kind ?? 'ASSET');
+  const [journal, setJournal] = useState<AccountJournal>(account?.journal ?? 'GENERAL');
+  const [currency, setCurrency] = useState<AccountCurrency>(
+    ACCOUNT_CURRENCIES.find((value) => value === account?.currency) ?? 'MNT',
+  );
   const [status, setStatus] = useState<GlAccount['status']>(account?.status ?? 'ACTIVE');
   const [checked, setChecked] = useState(false);
   const codeOk = CODE.test(code.trim());
@@ -246,10 +366,15 @@ function AccountDialog({
         if (account) {
           await mutations.updateAccount.mutateAsync({
             id: account.id,
-            body: { code: code.trim(), name: name.trim(), kind, status },
+            body: { code: code.trim(), name: name.trim(), journal, currency, status },
           });
         } else {
-          await mutations.createAccount.mutateAsync({ code: code.trim(), name: name.trim(), kind });
+          await mutations.createAccount.mutateAsync({
+            code: code.trim(),
+            name: name.trim(),
+            journal,
+            currency,
+          });
         }
         toast.success(t('finance.accounts.dialog.saved'));
       })
@@ -296,17 +421,28 @@ function AccountDialog({
               onChange={(event) => setName(event.target.value)}
             />
           </FormField>
-          <FormField label={t('finance.accounts.dialog.kind')} htmlFor="account-kind">
+          <FormField label={t('finance.fields.kind')} htmlFor="account-journal">
             <NativeSelect
-              id="account-kind"
-              value={kind}
-              onChange={(event) => {
-                if (isKind(event.target.value)) setKind(event.target.value);
-              }}
+              id="account-journal"
+              value={journal}
+              onChange={(event) => setJournal(event.target.value as AccountJournal)}
             >
-              {GL_ACCOUNT_KINDS.map((value) => (
+              {ACCOUNT_JOURNALS.map((value) => (
                 <option key={value} value={value}>
-                  {t(`finance.accountKinds.${value}`)}
+                  {t(`finance.accountJournals.${value}`)}
+                </option>
+              ))}
+            </NativeSelect>
+          </FormField>
+          <FormField label={t('finance.accounts.currency')} htmlFor="account-currency">
+            <NativeSelect
+              id="account-currency"
+              value={currency}
+              onChange={(event) => setCurrency(event.target.value as AccountCurrency)}
+            >
+              {ACCOUNT_CURRENCIES.map((value) => (
+                <option key={value} value={value}>
+                  {value} · {t(`finance.currencies.${value}`)}
                 </option>
               ))}
             </NativeSelect>
@@ -428,19 +564,16 @@ export function AccountLedgerPage() {
           onFrom={(value) => setParam('from', value)}
           onTo={(value) => setParam('to', value)}
         />
-        <NativeSelect
-          variant="filter"
+        <Combobox
           aria-label={t('finance.accounts.partyFilter')}
           value={partyId ?? ''}
-          onChange={(event) => setParam('partyId', event.target.value)}
-        >
-          <option value="">{t('finance.accounts.allParties')}</option>
-          {(parties.data ?? []).map((party) => (
-            <option key={party.partyId} value={party.partyId}>
-              {party.name}
-            </option>
-          ))}
-        </NativeSelect>
+          options={(parties.data ?? []).map((party) => ({
+            value: String(party.partyId),
+            label: party.name,
+          }))}
+          emptyLabel={t('finance.accounts.allParties')}
+          onChange={(value) => setParam('partyId', value)}
+        />
         {ledger.data?.pages[0] && from ? (
           <span className="text-sm text-muted-foreground">
             {t('finance.fields.opening')}:{' '}

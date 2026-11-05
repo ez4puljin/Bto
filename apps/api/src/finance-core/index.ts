@@ -31,6 +31,7 @@ export {
   type FinBranchRef,
   type FinChartImportApplied,
   type FinChartImportRow,
+  type FinGroupTreeRow,
   FinChartService,
   type FinChartTemplateAccount,
   type FinMoneyAccountInput,

@@ -14,6 +14,7 @@ import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from
 import type { AuthContext } from '../auth-context';
 import { Authenticated, CurrentUser, RequirePermission } from '../decorators/access.decorators';
 import {
+  AuditActionCountDto,
   AuditPageDto,
   AuditQueryDto,
   BranchDto,
@@ -176,6 +177,13 @@ export class SettingsController {
 @Controller('audit')
 export class AuditController {
   constructor(private readonly audit: AuditQueryService) {}
+
+  @Get('actions')
+  @RequirePermission('identity.audit.read')
+  @ApiOkResponse({ type: [AuditActionCountDto] })
+  actions(): Promise<AuditActionCountDto[]> {
+    return this.audit.actions();
+  }
 
   @Get()
   @RequirePermission('identity.audit.read')

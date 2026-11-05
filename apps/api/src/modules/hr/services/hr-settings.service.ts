@@ -1,19 +1,31 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   DEFAULT_SCHEDULE,
+  type EducationLevel,
+  type EmployeeGender,
+  type EmploymentType,
   HR_LIMITS,
+  type JobLevel,
+  type LeftReasonKind,
+  type MaritalStatus,
   minutesOf,
+  planOfDays,
+  planOfSchedule,
   type Schedule,
+  scheduleOnDate,
   TIME_PATTERN,
+  type WeekPlan,
+  weekdayIndex,
   WORKDAYS_PATTERN,
 } from '@tugeel/shared/hr';
+import { businessDate } from '@tugeel/shared/time';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { type AuthContext, actorUserId, AuditService, UserNamesService } from '../../identity';
-import { hrEmployees, hrEmployeeSites, hrSettings, hrWorkSites } from '../schema';
+import { hrEmployees, hrEmployeeSites, hrSchedules, hrSettings, hrWorkSites } from '../schema';
 import { ATTENDANCE_MANAGE } from './work-sites.service';
 
 export interface CompanySchedule extends Schedule {
@@ -30,14 +42,49 @@ export interface EmployeeTerms {
   siteIds: number[];
 }
 
-export interface Employee extends EmployeeTerms {
+/** The employee's card (ADR-0144). */
+export interface EmployeeCard {
+  firstName: string | null;
+  lastName: string | null;
+  position: string | null;
+  divisionId: number | null;
+  employmentType: EmploymentType;
+  gender: EmployeeGender | null;
+  employedOn: string | null;
+  leftOn: string | null;
+  leftReason: string | null;
+  photoFileId: number | null;
+  scheduleId: number | null;
+  externalRef: string | null;
+  birthDate: string | null;
+  education: EducationLevel | null;
+  maritalStatus: MaritalStatus | null;
+  district: string | null;
+  jobLevel: JobLevel | null;
+  leftReasonKind: LeftReasonKind | null;
+}
+
+export interface Employee extends EmployeeTerms, EmployeeCard {
   userId: number;
   fullName: string;
   phone: string | null;
+  lastLoginAt: Date | null;
+  lockedUntil: Date | null;
+  passwordSet: boolean;
   status: 'ACTIVE' | 'DISABLED';
   roles: string[];
-  /** The schedule that applies: the company's with the employee's own values over it. */
+  /** Today's schedule (the company's with the employee's own values over it, or their schedule's day). */
   schedule: Schedule;
+  /** ADR-0144: the week the employee follows — their schedule's days, else the hours above. */
+  plan: WeekPlan;
+  graceMinutes: number | null;
+  /** The grace that applies (the own, else the company's). */
+  grace: number;
+}
+
+/** The single-day schedule `summarizeDay` reads for this employee on a date (ADR-0144). */
+export function scheduleFor(employee: Pick<Employee, 'plan' | 'grace'>, date: string): Schedule {
+  return scheduleOnDate(employee.plan, weekdayIndex(date), employee.grace);
 }
 
 /**
@@ -89,7 +136,7 @@ export class HrSettingsService {
 
   /** Every staff record with its terms; the dashboard and the app keep only ACTIVE tracked ones. */
   async employees(executor: Db | Tx = this.db): Promise<Employee[]> {
-    const [staff, company, terms, sites] = await Promise.all([
+    const [staff, company, terms, sites, schedules] = await Promise.all([
       this.names.allStaff(),
       this.schedule(executor),
       executor.select().from(hrEmployees),
@@ -98,8 +145,13 @@ export class HrSettingsService {
         .from(hrEmployeeSites)
         .innerJoin(hrWorkSites, eq(hrWorkSites.id, hrEmployeeSites.siteId))
         .where(sql`${hrWorkSites.archivedAt} IS NULL`),
+      executor
+        .select({ id: hrSchedules.id, kind: hrSchedules.kind, days: hrSchedules.days })
+        .from(hrSchedules),
     ]);
     const own = new Map(terms.map((row) => [row.userId, row]));
+    const scheduleById = new Map(schedules.map((row) => [row.id, row]));
+    const today = businessDate();
     const siteIds = new Map<number, number[]>();
     for (const row of sites)
       siteIds.set(row.userId, [...(siteIds.get(row.userId) ?? []), row.siteId]);
@@ -113,19 +165,45 @@ export class HrSettingsService {
         workdays: mine?.workdays ?? null,
         siteIds: siteIds.get(user.id) ?? [],
       };
+      const merged: Schedule = {
+        workStart: employee.workStart ?? company.workStart,
+        workEnd: employee.workEnd ?? company.workEnd,
+        graceMinutes: employee.graceMinutes ?? company.graceMinutes,
+        workdays: employee.workdays ?? company.workdays,
+      };
+      const assigned = mine?.scheduleId ? scheduleById.get(mine.scheduleId) : undefined;
+      const plan = assigned ? planOfDays(assigned.kind, assigned.days) : planOfSchedule(merged);
       return {
         userId: user.id,
         fullName: user.fullName,
         phone: user.phone,
         status: user.status,
         roles: user.roles,
+        lastLoginAt: user.lastLoginAt,
+        lockedUntil: user.lockedUntil,
+        passwordSet: user.passwordSet,
         ...employee,
-        schedule: {
-          workStart: employee.workStart ?? company.workStart,
-          workEnd: employee.workEnd ?? company.workEnd,
-          graceMinutes: employee.graceMinutes ?? company.graceMinutes,
-          workdays: employee.workdays ?? company.workdays,
-        },
+        firstName: mine?.firstName ?? null,
+        lastName: mine?.lastName ?? null,
+        position: mine?.position ?? null,
+        divisionId: mine?.divisionId ?? null,
+        employmentType: mine?.employmentType ?? 'PERMANENT',
+        gender: mine?.gender ?? null,
+        employedOn: mine?.employedOn ?? null,
+        leftOn: mine?.leftOn ?? null,
+        leftReason: mine?.leftReason ?? null,
+        photoFileId: mine?.photoFileId ?? null,
+        scheduleId: mine?.scheduleId ?? null,
+        externalRef: mine?.externalRef ?? null,
+        birthDate: mine?.birthDate ?? null,
+        education: mine?.education ?? null,
+        maritalStatus: mine?.maritalStatus ?? null,
+        district: mine?.district ?? null,
+        jobLevel: mine?.jobLevel ?? null,
+        leftReasonKind: mine?.leftReasonKind ?? null,
+        plan,
+        grace: merged.graceMinutes,
+        schedule: scheduleOnDate(plan, weekdayIndex(today), merged.graceMinutes),
       };
     });
   }

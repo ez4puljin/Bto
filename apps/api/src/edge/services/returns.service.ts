@@ -19,6 +19,7 @@ import {
   type TenderWire,
   tillCodeLookKey,
   withinReturnWindow,
+  parsePosReceiptBarcode,
 } from '@tugeel/shared/pos';
 import { businessDate } from '@tugeel/shared/time';
 import { and, eq, or } from 'drizzle-orm';
@@ -59,9 +60,12 @@ export class EdgeReturnsService {
     private readonly loyalty: LoyaltyStore,
   ) {}
 
-  /** A sale by its receipt number, «K1-…» typed on a Latin keyboard included. */
+  /**
+   * A sale by its receipt number, «K1-…» typed on a Latin keyboard included, or by the receipt's
+   * scanned barcode (ADR-0142: the till's id, the day and the number of the day).
+   */
   async findSale(number: string): Promise<EdgeReturnSale> {
-    const typed = number.trim().toUpperCase();
+    const typed = this.fromBarcode(number) ?? number.trim().toUpperCase();
     const [sale] = await this.db
       .select()
       .from(edgeSales)
@@ -387,6 +391,14 @@ export class EdgeReturnsService {
    * How a return settles a bonus card sale (ADR-0112): `loyaltyReturn` from the sale's member part
    * and its earlier returns', under the member's lock, with the card's balance after it.
    */
+  /** ADR-0142: the sale number a scanned receipt barcode stands for; null for anything else. */
+  private fromBarcode(text: string): string | null {
+    const code = parsePosReceiptBarcode(text);
+    if (!code) return null;
+    const till = [...this.store.get().tills.values()].find((entry) => entry.id === code.tillId);
+    return till ? posSaleNumber(till.code, `20${code.day}`, Number.parseInt(code.seq, 10)) : null;
+  }
+
   private async cardReturn(
     tx: EdgeTx,
     sale: SaleRow,

@@ -183,6 +183,8 @@ export function DialogFormFooter(props: {
   onCancel: () => void;
   submitLabel?: string;
   disabled?: boolean;
+  /** «Хадгалаад шинэ» (ADR-0151): saves and keeps the dialog for the next one. */
+  onSaveAndNew?: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -190,6 +192,16 @@ export function DialogFormFooter(props: {
       <Button type="button" variant="ghost" onClick={props.onCancel}>
         {t('common.cancel')}
       </Button>
+      {props.onSaveAndNew ? (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={props.pending || props.disabled}
+          onClick={props.onSaveAndNew}
+        >
+          {t('common.saveAndNew')}
+        </Button>
+      ) : null}
       <Button type="submit" pending={props.pending} disabled={props.disabled}>
         {props.submitLabel ?? t('common.save')}
       </Button>

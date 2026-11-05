@@ -48,3 +48,60 @@ export function usePunch() {
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['attendance'] }),
   });
 }
+
+// «Цагийн хүсэлт» (ADR-0144): the person's own time requests — leave, trips, overtime, a missed
+// punch — the types HR keeps, the send and the take-back. Every write refreshes `['attendance']`.
+
+export type TimeRequest = components['schemas']['HrTimeRequest'];
+export type RequestType = components['schemas']['HrRequestType'];
+export type TimeRequestCreate = components['schemas']['HrTimeRequestCreate'];
+
+export function useRequestTypes() {
+  const { session } = useSignedIn();
+  return useQuery({
+    queryKey: ['attendance', 'request-types'],
+    queryFn: async () => unwrap(await session.client.GET('/api/v1/hr/request-types')),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useMyRequests() {
+  const { session } = useSignedIn();
+  return useQuery({
+    queryKey: ['attendance', 'requests'],
+    queryFn: async () => unwrap(await session.client.GET('/api/v1/hr/requests/mine')),
+    staleTime: 15_000,
+    refetchOnMount: true,
+  });
+}
+
+/** Sends a request; the key is kept by the form so a retried send is answered once. */
+export function useSendRequest() {
+  const { session } = useSignedIn();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ key, body }: { key: string; body: TimeRequestCreate }) =>
+      unwrap(
+        await session.client.POST('/api/v1/hr/requests', {
+          body,
+          params: { header: { 'Idempotency-Key': key } },
+        }),
+      ),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['attendance'] }),
+  });
+}
+
+/** Takes back a pending request. */
+export function useCancelRequest() {
+  const { session } = useSignedIn();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) =>
+      unwrap(
+        await session.client.POST('/api/v1/hr/requests/{id}/cancel', {
+          params: { path: { id } },
+        }),
+      ),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['attendance'] }),
+  });
+}

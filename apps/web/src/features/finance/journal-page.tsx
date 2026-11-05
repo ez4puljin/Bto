@@ -16,6 +16,7 @@ import {
   TruncateCell,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
+import { Combobox } from '@/components/combobox';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
@@ -55,6 +56,7 @@ import { SourceBadge } from './badges';
 import { JournalEntryDialog } from './journal-entry-dialog';
 import { FactChips, PanelSection, RecordSheet } from './panel';
 import { VoidDialog } from './void-dialog';
+import { accountOption } from './account-option';
 
 const isSource = (value: string | null): value is JournalSource =>
   JOURNAL_SOURCES.some((source) => source === value);
@@ -121,19 +123,13 @@ export function JournalPage() {
             </option>
           ))}
         </NativeSelect>
-        <NativeSelect
-          variant="filter"
+        <Combobox
           aria-label={t('finance.fields.account')}
           value={accountParam > 0 ? String(accountParam) : ''}
-          onChange={(event) => setParam('account', event.target.value)}
-        >
-          <option value="">{t('finance.journal.allAccounts')}</option>
-          {(accounts.data ?? []).map((account) => (
-            <option key={account.id} value={account.id}>
-              {account.code} · {account.name}
-            </option>
-          ))}
-        </NativeSelect>
+          options={(accounts.data ?? []).map(accountOption)}
+          emptyLabel={t('finance.journal.allAccounts')}
+          onChange={(value) => setParam('account', value)}
+        />
         <DateRangeFilter
           label={t('finance.fields.date')}
           fromLabel={t('finance.fields.from')}

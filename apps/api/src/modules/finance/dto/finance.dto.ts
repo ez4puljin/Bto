@@ -34,6 +34,10 @@ import {
   type PaymentStatus,
   SETTLEMENTS,
   type Settlement,
+  ACCOUNT_CURRENCIES,
+  ACCOUNT_JOURNALS,
+  type AccountCurrency,
+  type AccountJournal,
 } from '@tugeel/shared/finance';
 import { PRICE_BASES, type PriceBasis } from '@tugeel/shared/pricing';
 import { PAYMENT_METHODS, type PaymentMethod } from '@tugeel/shared/sales';
@@ -147,12 +151,97 @@ export class GlAccountDto {
   @ApiProperty({ enum: GL_ACCOUNT_KINDS }) kind: GlAccountKind;
   @ApiProperty({ enum: GL_ROLES, nullable: true }) role: GlRole | null;
   @ApiProperty({ enum: STATUSES }) status: AccountStatus;
+  @ApiProperty({ type: Number, nullable: true }) groupId: number | null;
+  @ApiProperty({ enum: ACCOUNT_JOURNALS, enumName: 'AccountJournal' }) journal: AccountJournal;
+  @ApiProperty({ example: 'MNT' }) currency: string;
   @ApiProperty({ example: '150000.00', description: 'Σ debit of the entries' }) debit: string;
   @ApiProperty({ example: '0.00' }) credit: string;
   @ApiProperty({ example: '150000.00', description: 'debit − credit; negative = credit' })
   balance: string;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt: string;
+}
+
+@ApiSchema({ name: 'GlAccountGroup' })
+export class GlAccountGroupDto {
+  @ApiProperty() id: number;
+  @ApiProperty() code: string;
+  @ApiProperty() name: string;
+  @ApiProperty({ type: Number, nullable: true }) parentId: number | null;
+  @ApiProperty() sort: number;
+  @ApiProperty({ enum: STATUSES }) status: AccountStatus;
+}
+
+@ApiSchema({ name: 'ChartGroupRow' })
+export class ChartGroupRowDto {
+  @ApiProperty() @IsString() @MaxLength(64) code: string;
+  @ApiProperty() @IsString() @MaxLength(200) name: string;
+  @ApiProperty({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  parentCode: string | null;
+  @ApiProperty() @IsInt() @Min(0) @Max(32000) sort: number;
+}
+
+@ApiSchema({ name: 'ChartAccountRow' })
+export class ChartAccountRowDto {
+  @ApiProperty() @IsString() @MaxLength(64) code: string;
+  @ApiProperty() @IsString() @MaxLength(200) name: string;
+  @ApiProperty({ enum: ['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE'] })
+  @IsIn(['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE'])
+  kind: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'INCOME' | 'EXPENSE';
+  @ApiProperty({ enum: ['DEBIT', 'CREDIT'], nullable: true })
+  @IsOptional()
+  @IsIn(['DEBIT', 'CREDIT'])
+  normalSide: 'DEBIT' | 'CREDIT' | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Null keeps the account’s own' })
+  @IsOptional()
+  @IsString()
+  control: string | null;
+  @ApiProperty() @IsString() @MaxLength(64) groupCode: string;
+  @ApiPropertyOptional({ enum: ACCOUNT_JOURNALS, enumName: 'AccountJournal' })
+  @IsOptional()
+  @IsIn(ACCOUNT_JOURNALS)
+  journal?: AccountJournal;
+  @ApiPropertyOptional({ enum: ACCOUNT_CURRENCIES })
+  @IsOptional()
+  @IsIn(ACCOUNT_CURRENCIES)
+  currency?: AccountCurrency;
+  @ApiProperty({ type: String, nullable: true, description: 'Re-points this posting key to it' })
+  @IsOptional()
+  @IsString()
+  key: string | null;
+}
+
+@ApiSchema({ name: 'ChartImportRequest' })
+export class ChartImportRequestDto {
+  @ApiProperty({ type: [ChartGroupRowDto] })
+  @IsArray()
+  @ArrayMaxSize(2000)
+  @ValidateNested({ each: true })
+  @Type(() => ChartGroupRowDto)
+  groups: ChartGroupRowDto[];
+  @ApiProperty({ type: [ChartAccountRowDto] })
+  @IsArray()
+  @ArrayMaxSize(5000)
+  @ValidateNested({ each: true })
+  @Type(() => ChartAccountRowDto)
+  accounts: ChartAccountRowDto[];
+  @ApiProperty({ type: [String], description: 'Accounts of the old chart to make inactive' })
+  @IsArray()
+  @ArrayMaxSize(1000)
+  @IsString({ each: true })
+  inactiveCodes: string[];
+}
+
+@ApiSchema({ name: 'ChartImportResult' })
+export class ChartImportResultDto {
+  @ApiProperty() created: number;
+  @ApiProperty() updated: number;
+  @ApiProperty() unchanged: number;
+  @ApiProperty() inactive: number;
+  @ApiProperty({ type: [String] }) rulesMoved: string[];
 }
 
 @ApiSchema({ name: 'GlAccountRequest' })
@@ -163,7 +252,18 @@ export class GlAccountRequestDto {
   @IsString()
   @MaxLength(FINANCE_LIMITS.maxName)
   name: string;
-  @ApiProperty({ enum: GL_ACCOUNT_KINDS }) @IsIn(GL_ACCOUNT_KINDS) kind: GlAccountKind;
+  @ApiPropertyOptional({ enum: GL_ACCOUNT_KINDS, description: 'Left out: from the code' })
+  @IsOptional()
+  @IsIn(GL_ACCOUNT_KINDS)
+  kind?: GlAccountKind;
+  @ApiPropertyOptional({ enum: ACCOUNT_JOURNALS, enumName: 'AccountJournal' })
+  @IsOptional()
+  @IsIn(ACCOUNT_JOURNALS)
+  journal?: AccountJournal;
+  @ApiPropertyOptional({ enum: ACCOUNT_CURRENCIES })
+  @IsOptional()
+  @IsIn(ACCOUNT_CURRENCIES)
+  currency?: AccountCurrency;
 }
 
 @ApiSchema({ name: 'GlAccountPatch' })
@@ -180,6 +280,14 @@ export class GlAccountPatchDto {
   @IsIn(GL_ACCOUNT_KINDS)
   kind?: GlAccountKind;
   @ApiPropertyOptional({ enum: STATUSES }) @IsOptional() @IsIn(STATUSES) status?: AccountStatus;
+  @ApiPropertyOptional({ enum: ACCOUNT_JOURNALS, enumName: 'AccountJournal' })
+  @IsOptional()
+  @IsIn(ACCOUNT_JOURNALS)
+  journal?: AccountJournal;
+  @ApiPropertyOptional({ enum: ACCOUNT_CURRENCIES })
+  @IsOptional()
+  @IsIn(ACCOUNT_CURRENCIES)
+  currency?: AccountCurrency;
 }
 
 @ApiSchema({ name: 'GlAccountRoleRequest' })
@@ -395,6 +503,49 @@ export class JournalEntryRequestDto {
   lines: JournalLineRequestDto[];
 }
 
+@ApiSchema({ name: 'TransactionParty' })
+export class TransactionPartyDto {
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  customerId?: number | null;
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  supplierId?: number | null;
+}
+
+@ApiSchema({ name: 'AccountTransactionRequest' })
+export class AccountTransactionRequestDto {
+  @ApiProperty({ enum: ACCOUNT_JOURNALS, enumName: 'AccountJournal' })
+  @IsIn(ACCOUNT_JOURNALS)
+  journal: AccountJournal;
+  @ApiProperty({ example: '2026-11-05' }) @Matches(DATE) entryDate: string;
+  @ApiProperty({ maxLength: FINANCE_LIMITS.maxDescription })
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(FINANCE_LIMITS.maxDescription)
+  description: string;
+  @ApiProperty() @IsInt() @Min(1) accountId: number;
+  @ApiProperty({ enum: ['DEBIT', 'CREDIT'] }) @IsIn(['DEBIT', 'CREDIT']) side: 'DEBIT' | 'CREDIT';
+  @ApiProperty() @IsInt() @Min(1) counterAccountId: number;
+  @ApiProperty({ example: '150000' }) @IsString() @Matches(MONEY) amount: string;
+  @ApiPropertyOptional({ type: TransactionPartyDto, nullable: true })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TransactionPartyDto)
+  party?: TransactionPartyDto | null;
+  @ApiPropertyOptional({ type: TransactionPartyDto, nullable: true })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TransactionPartyDto)
+  counterParty?: TransactionPartyDto | null;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() withVat?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() withCityTax?: boolean;
+}
+
 @ApiSchema({ name: 'JournalReverseRequest' })
 export class JournalReverseRequestDto {
   @ApiProperty({ maxLength: FINANCE_LIMITS.maxDescription })
@@ -457,6 +608,10 @@ export class JournalListQueryDto extends DateRangeQueryDto {
   source?: JournalSource;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) accountId?: number;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) customerId?: number;
+  @ApiPropertyOptional({ enum: ACCOUNT_JOURNALS, enumName: 'AccountJournal' })
+  @IsOptional()
+  @IsIn(ACCOUNT_JOURNALS)
+  journal?: AccountJournal;
 }
 
 @ApiSchema({ name: 'JournalPage' })

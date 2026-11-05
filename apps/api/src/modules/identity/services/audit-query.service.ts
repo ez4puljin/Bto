@@ -9,6 +9,7 @@ import { auditLog, users } from '../schema';
 
 export interface AuditQuery {
   entity?: string;
+  action?: string;
   entityId?: string;
   actorId?: number;
   /** Ulaanbaatar business dates, both inclusive. */
@@ -113,12 +114,22 @@ export class AuditQueryService {
     return toPage(rows, limit, (row) => ({ id: row.id }));
   }
 
+  /** Every action the log holds with its row count, most frequent first, for the filter. */
+  async actions(): Promise<{ action: string; count: number }[]> {
+    return this.db
+      .select({ action: auditLog.action, count: sql<number>`count(*)::int` })
+      .from(auditLog)
+      .groupBy(auditLog.action)
+      .orderBy(sql`count(*) DESC`, auditLog.action);
+  }
+
   async list(query: AuditQuery) {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const conditions: SQL[] = [];
     const after = decodeCursor(query.cursor);
     if (typeof after?.id === 'number') conditions.push(lt(auditLog.id, after.id));
     if (query.entity) conditions.push(eq(auditLog.entity, query.entity));
+    if (query.action) conditions.push(eq(auditLog.action, query.action));
     if (query.entityId) conditions.push(eq(auditLog.entityId, query.entityId));
     // actorId is a staff user's id: a customer account's rows carry the same numbers (ADR-0079).
     if (query.actorId !== undefined) {

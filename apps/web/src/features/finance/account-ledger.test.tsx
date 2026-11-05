@@ -4,6 +4,7 @@ import type { components } from '@tugeel/api-client';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it } from 'vitest';
 import { ACCOUNTANT_ME, calls } from '@/test/inventory-fixtures';
+import { choose } from '@/test/choose';
 import { json, renderApp, signedIn } from '@/test/render-app';
 import { ACCOUNTS } from './finance-fixtures';
 
@@ -46,8 +47,7 @@ describe('account ledger by party', () => {
       'Бат-Эрдэнэ Дорж',
     );
     const filter = screen.getByRole('combobox', { name: mn.finance.accounts.partyFilter });
-    expect(await screen.findByRole('option', { name: 'Бат-Эрдэнэ Дорж' })).toBeInTheDocument();
-    await user.selectOptions(filter, '12');
+    await choose(user, filter, 'Бат-Эрдэнэ Дорж');
     await waitFor(() =>
       expect(
         calls(fetchMock, 'GET', '/api/v1/gl-accounts/3/ledger').some(

@@ -6,11 +6,13 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { type components, idempotencyKey } from '@tugeel/api-client';
+import type { AccountJournal } from '@tugeel/shared/finance';
 import { useApiClient } from '@/app/api-client-context';
 import { ATTENTION_KEY } from '@/features/home/api';
 import { unwrap } from '@/lib/problem';
 
 type Schemas = components['schemas'];
+export type AccountTransactionRequest = Schemas['AccountTransactionRequest'];
 export type Invoice = Schemas['Invoice'];
 export type InvoiceDetail = Schemas['InvoiceDetail'];
 export type InvoiceLine = Schemas['InvoiceLine'];
@@ -238,6 +240,15 @@ export function useGlAccounts() {
   });
 }
 
+/** The chart's group tree (ADR-0148). */
+export function useGlAccountGroups() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.accounts, 'groups'],
+    queryFn: async ({ signal }) => unwrap(await api.GET('/api/v1/gl-accounts/groups', { signal })),
+  });
+}
+
 export function useAccountLedger(
   accountId: number | null,
   range: { from?: string; to?: string; partyId?: string },
@@ -287,6 +298,7 @@ export function useAccountParties(accountId: number | null) {
 }
 
 export interface JournalFilter {
+  journal?: AccountJournal;
   from?: string;
   to?: string;
   source?: JournalSource;
@@ -558,6 +570,16 @@ export function useFinanceMutations() {
           await api.POST('/api/v1/finance/allocations/{id}/reverse', {
             params: { path: { id }, header: idempotencyKey(key) },
             body: { reason },
+          }),
+        ),
+      onSuccess: () => changed(),
+    }),
+    postTransaction: useMutation({
+      mutationFn: async ({ key, body }: { key: string; body: AccountTransactionRequest }) =>
+        unwrap(
+          await api.POST('/api/v1/journal-entries/by-account', {
+            params: { header: idempotencyKey(key) },
+            body,
           }),
         ),
       onSuccess: () => changed(),

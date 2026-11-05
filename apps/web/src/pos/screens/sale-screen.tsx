@@ -11,6 +11,7 @@ import {
   type EdgeQuoteResponse,
   type EdgeSession,
   formatVoucherCode,
+  parsePosReceiptBarcode,
   parseVoucherCode,
   type VoidReason,
 } from '@tugeel/shared/pos';
@@ -128,6 +129,8 @@ export function SaleScreen(props: {
   const [draft, setDraft] = useState('');
   const [scanError, setScanError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialogs>(null);
+  /** ADR-0142: the scanned receipt the returns dialog opens with. */
+  const [returnNumber, setReturnNumber] = useState<string | null>(null);
   const [attempt, setAttempt] = useState<PaymentAttempt | null>(null);
   const [receipt, setReceipt] = useState<EdgePrintableReceipt | null>(null);
   const { print } = usePrint();
@@ -197,6 +200,13 @@ export function SaleScreen(props: {
           setScanError(null);
           setDialog('vouchers');
         } else setScanError(result.error);
+        return;
+      }
+      // A receipt's barcode opens its return (ADR-0142).
+      if (parsePosReceiptBarcode(text)) {
+        setScanError(null);
+        setReturnNumber(text.replace(/[\s-]/g, ''));
+        setDialog('returns');
         return;
       }
       const code = cleanBarcode(text);
@@ -462,6 +472,7 @@ export function SaleScreen(props: {
   };
 
   const returned = (done: EdgePrintableReceipt) => {
+    setReturnNumber(null);
     setReceipt(done);
     setDialog('receipt');
     print(done);
@@ -906,7 +917,11 @@ export function SaleScreen(props: {
       <ReturnsDialog
         open={dialog === 'returns'}
         approvalRequired={approvalRequired}
-        onClose={closeDialog}
+        initialNumber={returnNumber}
+        onClose={() => {
+          setReturnNumber(null);
+          closeDialog();
+        }}
         onCloseAutoFocus={refocus}
         onDone={returned}
       />

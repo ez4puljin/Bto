@@ -139,6 +139,8 @@ export function toReceiptDetailDto(receipt: ReceiptDetail, withCosts = false): R
     paymentMethod: receipt.paymentMethod,
     moneyAccountId: receipt.moneyAccountId,
     moneyAccountName: receipt.moneyAccountName,
+    counterAccountCode: receipt.counterAccountCode,
+    counterAccountName: receipt.counterAccountName,
     supplierVatPayer: receipt.supplierVatPayer,
     vatRatePct: receipt.vatRatePct.toFixed(),
     effectiveDate: receipt.effectiveDate,

@@ -343,7 +343,6 @@ function ReceiptScreen(props: {
             ? t('inventory.receipt.newTitle')
             : (detail.number ?? t('inventory.draftNo', { id: detail.id }))
         }
-        description={detail === null ? t('inventory.receipt.wholesaleOnly') : undefined}
         meta={
           detail ? (
             <>

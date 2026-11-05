@@ -5,21 +5,22 @@ import { useTranslation } from 'react-i18next';
 import { PAGE_RULES } from '@/lib/print-format';
 import { DaySummarySlip, TestSlip } from './day-summary-slip';
 import { type PrintJob, PrintContext } from './print-context';
-import { ReceiptView } from './receipt';
+import { RECEIPT_PRINT_WIDTH, useReceiptLayout } from '../receipt-layout';
+import { KioskReceiptView } from './receipt';
 
 /** The printout's own element, beside the app: everything else is hidden while printing. */
 const PRINT_ROOT_ID = 'bto-receipt-print';
 
 /**
  * The receipt printer is the till's Windows default printer (ADR-0065): the page prints the 80 mm
- * receipt with the browser's own printing. Chrome started with `--kiosk-printing` prints straight
- * away; without it the print dialog opens. The paper's width comes from the printer's driver.
+ * receipt (58 mm when its template says so, ADR-0141) with the browser's own printing. Chrome
+ * started with `--kiosk-printing` prints straight away; without it the print dialog opens.
  */
-const PRINT_RULES = `${PAGE_RULES.MM80}
+const printRules = (width: string) => `${PAGE_RULES.MM80}
 @media screen { #${PRINT_ROOT_ID} { display: none; } }
 @media print {
   body > :not(#${PRINT_ROOT_ID}) { display: none !important; }
-  #${PRINT_ROOT_ID} { display: block; width: 72mm; margin: 0 auto; }
+  #${PRINT_ROOT_ID} { display: block; width: ${width}; margin: 0 auto; }
 }`;
 
 /** Holds the job being printed (a receipt, the day's summary, a test slip) and its 80 mm sheet. */
@@ -58,17 +59,18 @@ export function PrintProvider({ children }: { children: ReactNode }) {
   );
   const current = job?.job ?? null;
   const receipt = current?.kind === 'receipt' ? current.printable : null;
+  const layout = useReceiptLayout(receipt?.receipt.kind);
   return (
     <PrintContext.Provider value={value}>
       {children}
       {createPortal(
         <div id={PRINT_ROOT_ID} aria-hidden={job === null} data-testid="receipt-print">
-          <style>{PRINT_RULES}</style>
+          <style>{printRules(RECEIPT_PRINT_WIDTH[layout?.paper ?? 'MM80'])}</style>
           {receipt?.receipt.credit ? (
             // A credit slip (ADR-0109): the customer's copy and the store's, signed, one sheet each.
             <>
               <div style={{ breakAfter: 'page' }}>
-                <ReceiptView
+                <KioskReceiptView
                   receipt={receipt.receipt}
                   copy={receipt.copy}
                   paper
@@ -76,7 +78,7 @@ export function PrintProvider({ children }: { children: ReactNode }) {
                   copyLabel={t('posKiosk.receipt.copyCustomer')}
                 />
               </div>
-              <ReceiptView
+              <KioskReceiptView
                 receipt={receipt.receipt}
                 copy={receipt.copy}
                 paper
@@ -85,7 +87,7 @@ export function PrintProvider({ children }: { children: ReactNode }) {
               />
             </>
           ) : receipt ? (
-            <ReceiptView
+            <KioskReceiptView
               receipt={receipt.receipt}
               print={receipt.print}
               copy={receipt.copy}

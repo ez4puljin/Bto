@@ -9,19 +9,20 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { DocumentHeader } from '@/components/document-layout';
+import { DocumentWorkspace } from '@/components/document-layout';
 import { FormField } from '@/components/form';
 import { LeaveGuard } from '@/components/leave-guard';
 import { ListTable, RowAction, RowActions } from '@/components/list';
-import { NativeSelect } from '@/components/native-select';
 import { ProblemAlert } from '@/components/problem-alert';
+import { SearchSelect } from '@/components/search-select';
 import { StickyActions } from '@/components/sticky-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { type PickedSupplier, SupplierPicker } from '@/features/partners/supplier-picker';
+import { SupplierSelect } from '@/features/partners/party-select';
+import type { PickedSupplier } from '@/features/partners/supplier-picker';
 import { useCurrentPricesOf } from '@/features/pricing/api';
 import type { ColumnSpec } from '@/lib/column-layout';
 import type { ValidationMessage } from '@/lib/forms';
@@ -40,7 +41,7 @@ import {
   type ReceiptCostingLine,
   useInventoryMutations,
   useReceiptCosting,
-  useReceiptPaymentAccounts,
+  useReceiptCounterAccounts,
 } from './api';
 import { type CostEntry, parseMoney } from './helpers';
 import { PriceCells, ReceiptTotals } from './receipt-costing';
@@ -59,13 +60,10 @@ import {
 } from './receipt-prices';
 import { DateInput } from '@/components/date-input';
 
-const PAYMENT_METHODS: readonly ReceiptPaymentMethod[] = ['CREDIT', 'CASH', 'BANK'];
-
 /** The header fields a refusal may name, with the message each shows under its field. */
 const FIELD_MESSAGES: Record<string, ValidationMessage> = {
   supplierId: 'validation.required',
   supplierDocDate: 'validation.date',
-  supplierDocNo: 'validation.tooLong',
   note: 'validation.tooLong',
   moneyAccountId: 'validation.moneyAccountRequired',
 };
@@ -79,8 +77,8 @@ const generalProblem = (problem: ProblemDetails | null) =>
 
 /**
  * One goods receipt in one window, after Erkhet's «Бараа материал орлого» (owner 2026-10-18,
- * 2026-10-23): the delivery note's header on top, the line panel, the lines below. No warehouse is
- * chosen: each line goes to its product's home warehouse (ADR-0099 #1). A new receipt and a draft
+ * 2026-10-23, 2026-11-05, ADR-0153): the document on the left, the line editor on the right, the
+ * lines below. The number comes with the first save. No warehouse is chosen: each line goes to its product's home warehouse (ADR-0099 #1). A new receipt and a draft
  * are edited here by any holder of the receipt right; a posted one reads the same way, with its
  * prices and discount still open to cost holders.
  */
@@ -116,12 +114,8 @@ function HeaderCard(props: { children: ReactNode; note?: ReactNode }) {
 }
 
 const HEADER_GRID = 'grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4';
-/**
- * The draft's six fields (date, supplier, delivery note, note, payment, account) in one row from
- * `xl`, so a 1366 laptop shows the first lines (ADR-0113).
- */
-const EDITOR_GRID =
-  'grid gap-x-3 gap-y-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[9.5rem_minmax(13rem,2fr)_minmax(7rem,1fr)_minmax(8rem,1.2fr)_minmax(10rem,1fr)_minmax(8.5rem,1fr)]';
+/** The document's fields beside the line editor (ADR-0153). */
+const EDITOR_GRID = 'grid gap-x-3 gap-y-3 sm:grid-cols-2';
 
 /** «Үнэ НӨАТ-тэй (10%)…», for cost holders, when the supplier's prices carry VAT. */
 function VatNote({ detail }: { detail: ReceiptDetail | null }) {
@@ -141,24 +135,22 @@ function ReadOnlyHeader({ detail }: { detail: ReceiptDetail }) {
   const items: [string, ReactNode][] = [
     [t('inventory.receipt.form.date'), detail.supplierDocDate ?? none],
     [t('inventory.receipts.supplier'), `${detail.supplierName} · ${detail.supplierCode}`],
-    [t('inventory.receipt.supplierDocNo'), detail.supplierDocNo ?? none],
+    [t('inventory.receipt.supplierDocNo'), detail.number ?? none],
+    // A number from a sheet or from before ADR-0153.
+    ...(detail.supplierDocNo
+      ? [[t('inventory.receipt.form.supplierNote'), detail.supplierDocNo] as [string, ReactNode]]
+      : []),
     [
       t('inventory.receipt.form.warehouses'),
       detail.warehouses.map((warehouse) => warehouse.name).join(', ') || none,
     ],
     [t('inventory.receipt.form.note'), detail.note ?? none],
     [
-      t('inventory.receipt.form.payment'),
-      t(`inventory.receipt.paymentMethods.${detail.paymentMethod}`),
+      t('inventory.receipt.form.counterAccount'),
+      detail.paymentMethod === 'CREDIT'
+        ? (detail.counterAccountName ?? t('inventory.receipt.paymentMethods.CREDIT'))
+        : (detail.moneyAccountName ?? none),
     ],
-    ...(detail.paymentMethod === 'CREDIT'
-      ? []
-      : [
-          [t('inventory.receipt.form.account'), detail.moneyAccountName ?? none] as [
-            string,
-            ReactNode,
-          ],
-        ]),
   ];
   return (
     <HeaderCard note={<VatNote detail={detail} />}>
@@ -182,7 +174,7 @@ function piecePrice(line: ReceiptLine): Decimal | null {
 
 /**
  * The lines table: №, code, product, warehouse, shelf, unit, quantity, the price cells for cost
- * holders, the sale price per piece (a new one bold, else the one in force) and the markup.
+ * holders and the markup on the sale price in force. A receipt sets no sale price (ADR-0153 #7).
  */
 function LinesTable(props: {
   lines: readonly ReceiptLine[];
@@ -228,7 +220,6 @@ function LinesTable(props: {
           { key: 'freeGoods', kind: 'status', width: 6 } as const,
         ]
       : []),
-    { key: 'salePrice', kind: 'money' },
     ...(props.prices ? [{ key: 'markup', kind: 'percent' } as const] : []),
     ...(props.actions ? [{ key: 'actions', kind: 'actions', actions: 2 } as const] : []),
   ];
@@ -260,7 +251,6 @@ function LinesTable(props: {
               <TableHead>{t('inventory.costing.freeGoods')}</TableHead>
             </>
           ) : null}
-          <TableHead className="text-right">{t('inventory.receipt.form.salePrice')}</TableHead>
           {props.prices ? (
             <TableHead className="text-right">{t('inventory.receipt.form.markup')}</TableHead>
           ) : null}
@@ -278,7 +268,7 @@ function LinesTable(props: {
             unit: line.unitName,
           });
           const cells = props.cells(line, name);
-          const sale = line.salePrice ?? priceOf.get(line.productId) ?? null;
+          const sale = priceOf.get(line.productId) ?? null;
           const base = cells.markupBase === undefined ? piecePrice(line) : cells.markupBase;
           const markup = sale !== null && base !== null ? markupPct(sale, base) : null;
           return (
@@ -319,17 +309,6 @@ function LinesTable(props: {
                 <PreviousCells line={line} previous={props.previous} />
               ) : null}
               {props.prices ? cells.prices : null}
-              <TableCell className="text-right font-mono">
-                {sale === null ? (
-                  t('common.none')
-                ) : line.salePrice ? (
-                  <span className="font-semibold" title={t('inventory.receipt.form.newSalePrice')}>
-                    {formatMnt(sale)}
-                  </span>
-                ) : (
-                  formatMnt(sale)
-                )}
-              </TableCell>
               {props.prices ? (
                 <TableCell className="text-right font-mono">
                   {markup === null ? t('common.none') : `${markup.toFixed(1)}%`}
@@ -415,10 +394,15 @@ function PrintLinks({ id }: { id: number }) {
 /** «12 мөр · 340.5 кг», under every receipt. */
 function LinesSummary({ detail, count }: { detail: ReceiptDetail | null; count: number }) {
   const { t } = useTranslation();
+  const canCost = useHasPermission('inventory.costs.manage');
   const weight = detail ? new Decimal(detail.weightKg) : null;
+  const total = canCost && detail?.totals ? new Decimal(detail.totals.netTotal) : null;
   return (
     <>
       {t('inventory.linesCount', { count })}
+      {total && total.gt(0)
+        ? ` · ${t('inventory.receipt.form.summaryTotal', { amount: formatMnt(total.toString()) })}`
+        : null}
       {weight && weight.gt(0)
         ? ` · ${t('inventory.receipt.form.weight', { kg: formatQty(weight.toDecimalPlaces(2).toString()) })}`
         : null}
@@ -623,9 +607,9 @@ function priceBody(entry: CostEntry, before: CostEntry | null): ReceiptLineUpdat
 }
 
 /**
- * A new receipt or a draft (owner, 2026-10-11 and 2026-10-23). Nothing exists until the first line
- * is added or «Хадгалах» is pressed: then the draft is created with the header (and that line) and
- * the address becomes the draft's, the page staying as it is. Each header change of a draft is
+ * A new receipt or a draft (owner, 2026-10-11, 2026-10-23, 2026-11-05). Nothing exists until the
+ * first line is saved: then the draft is created with the header and that line, takes its number,
+ * and the address becomes the draft's, the page staying as it is. Each header change of a draft is
  * saved at once (selects on change, texts when left). Lines come from the panel (ReceiptLinePanel);
  * every add is a line of its own (ADR-0103); a line chosen in the table opens in the panel.
  * Saves run one after another against the latest copy of the draft.
@@ -636,7 +620,7 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
   const navigate = useNavigate();
   const canCost = useHasPermission('inventory.costs.manage');
   const mutations = useInventoryMutations();
-  const accounts = useReceiptPaymentAccounts();
+  const accounts = useReceiptCounterAccounts();
   const action = useAction();
   const table = useRef<HTMLTableElement>(null);
 
@@ -645,10 +629,9 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
     detail ? { id: detail.supplierId, code: detail.supplierCode, name: detail.supplierName } : null,
   );
   const [docDate, setDocDate] = useState(detail ? (detail.supplierDocDate ?? '') : businessDate());
-  const [docNo, setDocNo] = useState(detail?.supplierDocNo ?? '');
   const [note, setNote] = useState(detail?.note ?? '');
   const [method, setMethod] = useState<ReceiptPaymentMethod>(detail?.paymentMethod ?? 'CREDIT');
-  const [accountId, setAccountId] = useState<number | null>(detail?.moneyAccountId ?? null);
+  const [counter, setCounter] = useState<string | null>(detail?.counterAccountCode ?? null);
   const [headerProblem, setHeaderProblem] = useState<ProblemDetails | null>(null);
   const [required, setRequired] = useState({ supplier: false, account: false });
   const [editing, setEditing] = useState<ReceiptLine | null>(null);
@@ -661,7 +644,6 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
   const started = useRef(false);
 
   const lines = detail?.lines ?? [];
-  const methodAccounts = (accounts.data ?? []).filter((account) => account.kind === method);
 
   // A new receipt starts with the supplier.
   useEffect(() => {
@@ -696,11 +678,10 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
       const receipt = await mutations.createReceipt.mutateAsync({
         key: createKey.current,
         supplierId: supplier.id,
-        ...(docNo.trim() ? { supplierDocNo: docNo.trim() } : {}),
         ...(docDate ? { supplierDocDate: docDate } : {}),
         ...(note.trim() ? { note: note.trim() } : {}),
         paymentMethod: method,
-        ...(method !== 'CREDIT' && accountId !== null ? { moneyAccountId: accountId } : {}),
+        ...(counter === null ? {} : { counterAccountCode: counter }),
         ...(first ? { lines: [first] } : {}),
       });
       draftId.current = receipt.id;
@@ -732,14 +713,12 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
       chain.current = chain.current.then(() =>
         action
           .run(async () => {
-            const sale = line.salePrice === null ? {} : { salePrice: line.salePrice || null };
             if (editing && !asNew) {
               await mutations.updateReceiptLine.mutateAsync({
                 id: editing.id,
                 body: {
                   enteredQty: line.enteredQty,
                   ...(line.price ? priceBody(line.price, entryOfLine(editing, false)) : {}),
-                  ...sale,
                 },
               });
               setEditing(null);
@@ -753,7 +732,6 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
                 enteredQty: line.enteredQty,
                 ...(line.warehouseId === undefined ? {} : { warehouseId: line.warehouseId }),
                 ...prices,
-                ...(line.salePrice ? { salePrice: line.salePrice } : {}),
               });
               return;
             }
@@ -765,7 +743,6 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
                 enteredQty: line.enteredQty,
                 ...(line.warehouseId === undefined ? {} : { warehouseId: line.warehouseId }),
                 ...prices,
-                ...(line.salePrice ? { salePrice: line.salePrice } : {}),
               },
             });
           })
@@ -774,21 +751,8 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
       );
     });
 
-  /** «Хадгалах» on a new receipt: the draft with its header alone. */
-  const saveNew = () => {
-    if (supplier === null) {
-      setRequired((previous) => ({ ...previous, supplier: true }));
-      return;
-    }
-    chain.current = chain.current.then(() =>
-      action.run(async () => {
-        if (draftId.current === null) await createDraft();
-      }),
-    );
-  };
-
   const askPost = () => {
-    if (method !== 'CREDIT' && accountId === null) {
+    if (method !== 'CREDIT' && detail?.moneyAccountId == null) {
       setRequired((previous) => ({ ...previous, account: true }));
       return;
     }
@@ -826,29 +790,23 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
       await navigate('/inventory/receipts');
     });
 
-  const changeMethod = (next: ReceiptPaymentMethod) => {
-    const before = { method, accountId };
-    const only = (accounts.data ?? []).filter((account) => account.kind === next);
-    const account = next === 'CREDIT' || only.length !== 1 ? null : (only[0]?.id ?? null);
-    setMethod(next);
-    setAccountId(account);
+  /** «Харилцсан данс» (ADR-0154): the account the bill credits, always a payable. */
+  const changeCounter = (code: string) => {
+    const before = { method, counter };
+    setMethod('CREDIT');
+    setCounter(code);
     setRequired((previous) => ({ ...previous, account: false }));
-    patchHeader(
-      next === 'CREDIT'
-        ? { paymentMethod: next }
-        : { paymentMethod: next, moneyAccountId: account },
-      () => {
-        setMethod(before.method);
-        setAccountId(before.accountId);
-      },
-    );
+    patchHeader({ paymentMethod: 'CREDIT', counterAccountCode: code }, () => {
+      setMethod(before.method);
+      setCounter(before.counter);
+    });
   };
 
-  const leaveText = (field: 'supplierDocNo' | 'note', value: string) => {
+  const leaveNote = (value: string) => {
     if (detail === null) return;
     const text = value.trim();
-    if (text === (detail[field] ?? '')) return;
-    patchHeader(field === 'note' ? { note: text || null } : { supplierDocNo: text || null });
+    if (text === (detail.note ?? '')) return;
+    patchHeader({ note: text || null });
   };
 
   const supplierError = required.supplier
@@ -858,7 +816,6 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
     ? 'validation.moneyAccountRequired'
     : fieldError(headerProblem, 'moneyAccountId');
 
-  // From 1600px the header and «Падааны нийт» sit side by side (ADR-0119).
   const header = (
     <HeaderCard note={<VatNote detail={detail} />}>
       <ProblemAlert problem={generalProblem(headerProblem)} />
@@ -879,97 +836,79 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
             }}
           />
         </FormField>
-        <FormField
-          label={t('inventory.receipts.supplier')}
-          htmlFor="receipt-supplier"
-          error={supplierError}
-        >
-          <SupplierPicker
-            floating
-            id="receipt-supplier"
-            value={supplier}
-            invalid={supplierError !== undefined}
-            onChange={(next) => {
-              const before = supplier;
-              setSupplier(next);
-              if (next) {
-                setRequired((previous) => ({ ...previous, supplier: false }));
-                if (next.id !== detail?.supplierId) {
-                  patchHeader({ supplierId: next.id }, () => setSupplier(before));
-                }
-              }
-            }}
-          />
-        </FormField>
-        <FormField
-          label={t('inventory.receipt.supplierDocNo')}
-          htmlFor="receipt-doc-no"
-          error={fieldError(headerProblem, 'supplierDocNo')}
-        >
+        <FormField label={t('inventory.receipt.supplierDocNo')} htmlFor="receipt-number">
           <Input
-            id="receipt-doc-no"
-            maxLength={50}
-            value={docNo}
-            onChange={(event) => setDocNo(event.target.value)}
-            onBlur={() => leaveText('supplierDocNo', docNo)}
+            id="receipt-number"
+            readOnly
+            tabIndex={-1}
+            className="bg-muted/40 font-mono"
+            placeholder={t('inventory.receipt.form.numberOnSave')}
+            value={detail?.number ?? ''}
           />
         </FormField>
-        <FormField
-          label={t('inventory.receipt.form.note')}
-          htmlFor="receipt-note"
-          error={fieldError(headerProblem, 'note')}
-        >
-          <Input
-            id="receipt-note"
-            maxLength={500}
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            onBlur={() => leaveText('note', note)}
-          />
-        </FormField>
-        <FormField label={t('inventory.receipt.form.payment')} htmlFor="receipt-payment">
-          <NativeSelect
-            id="receipt-payment"
-            value={method}
-            onChange={(event) => {
-              const next = PAYMENT_METHODS.find((value) => value === event.target.value);
-              if (next) changeMethod(next);
-            }}
-          >
-            {PAYMENT_METHODS.map((value) => (
-              <option key={value} value={value}>
-                {t(`inventory.receipt.paymentMethods.${value}`)}
-              </option>
-            ))}
-          </NativeSelect>
-        </FormField>
-        {method === 'CREDIT' ? null : (
+        <div className="sm:col-span-2">
           <FormField
-            label={t('inventory.receipt.form.account')}
-            htmlFor="receipt-account"
+            label={t('inventory.receipts.supplier')}
+            htmlFor="receipt-supplier"
+            error={supplierError}
+          >
+            <SupplierSelect
+              id="receipt-supplier"
+              value={supplier}
+              invalid={supplierError !== undefined}
+              onChange={(next) => {
+                const before = supplier;
+                setSupplier(next);
+                if (next) {
+                  setRequired((previous) => ({ ...previous, supplier: false }));
+                  if (next.id !== detail?.supplierId) {
+                    patchHeader({ supplierId: next.id }, () => setSupplier(before));
+                  }
+                }
+              }}
+            />
+          </FormField>
+        </div>
+        <div className="sm:col-span-2">
+          <FormField
+            label={t('inventory.receipt.form.counterAccount')}
+            htmlFor="receipt-counter"
             error={accountError}
           >
-            <NativeSelect
-              id="receipt-account"
-              aria-invalid={accountError !== undefined || undefined}
-              value={accountId ?? ''}
-              onChange={(event) => {
-                const next = event.target.value ? Number.parseInt(event.target.value, 10) : null;
-                const before = accountId;
-                setAccountId(next);
-                setRequired((previous) => ({ ...previous, account: false }));
-                patchHeader({ moneyAccountId: next }, () => setAccountId(before));
-              }}
-            >
-              <option value="">{t('inventory.receipt.form.pickAccount')}</option>
-              {methodAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name}
-                </option>
-              ))}
-            </NativeSelect>
+            <SearchSelect
+              id="receipt-counter"
+              invalid={accountError !== undefined}
+              value={
+                method === 'CREDIT'
+                  ? (counter ?? accounts.data?.find((row) => row.isDefault)?.code ?? '')
+                  : ''
+              }
+              chosenLabel={method === 'CREDIT' ? undefined : (detail?.moneyAccountName ?? '')}
+              options={(accounts.data ?? []).map((row) => ({
+                value: row.code,
+                label: `${row.code} · ${row.name}`,
+                keys: [row.code],
+              }))}
+              placeholder={t('inventory.receipt.form.pickAccount')}
+              onChange={changeCounter}
+            />
           </FormField>
-        )}
+        </div>
+        <div className="sm:col-span-2">
+          <FormField
+            label={t('inventory.receipt.form.note')}
+            htmlFor="receipt-note"
+            error={fieldError(headerProblem, 'note')}
+          >
+            <Input
+              id="receipt-note"
+              maxLength={500}
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              onBlur={() => leaveNote(note)}
+            />
+          </FormField>
+        </div>
       </div>
       <ProblemAlert problem={problemFromError(accounts.error)} onRetry={accounts.refetch} />
       {detail ? <ReceiptConfirmations detail={detail} /> : null}
@@ -978,17 +917,28 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
 
   return (
     <>
-      <DocumentHeader
-        main={header}
-        side={detail ? <ReceiptNoteCard detail={detail} editable /> : undefined}
-      />
-      <ReceiptLinePanel
-        supplierId={supplier?.id}
-        editing={editing}
-        pending={mutations.addReceiptLine.isPending || mutations.updateReceiptLine.isPending}
-        problem={confirm ? null : <ProblemAlert problem={action.problem} />}
-        onSubmit={submitLine}
-        onCancelEdit={() => setEditing(null)}
+      <DocumentWorkspace
+        document={
+          <>
+            {header}
+            {detail ? <ReceiptNoteCard detail={detail} editable /> : null}
+          </>
+        }
+        editor={
+          <ReceiptLinePanel
+            supplierId={supplier?.id}
+            editing={editing}
+            primary={lines.length === 0}
+            pending={
+              mutations.createReceipt.isPending ||
+              mutations.addReceiptLine.isPending ||
+              mutations.updateReceiptLine.isPending
+            }
+            problem={confirm ? null : <ProblemAlert problem={action.problem} />}
+            onSubmit={submitLine}
+            onCancelEdit={() => setEditing(null)}
+          />
+        }
       />
       <Card role="region" aria-labelledby="receipt-lines-title">
         <CardHeader>
@@ -1072,11 +1022,7 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
           <LinesSummary detail={detail} count={lines.filter((line) => !line.freeGoods).length} />
         }
       >
-        {detail === null ? (
-          <Button disabled={mutations.createReceipt.isPending} onClick={saveNew}>
-            {t('common.save')}
-          </Button>
-        ) : (
+        {detail === null ? null : (
           <>
             <PrintLinks id={detail.id} />
             {detail.lines.some((line) => line.expectedQty !== null) ? (
@@ -1108,11 +1054,7 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
         open={confirm === 'post'}
         variant="default"
         title={t('inventory.receipt.postTitle')}
-        description={
-          lines.some((line) => line.salePrice)
-            ? `${t('inventory.receipt.postDescription')} ${t('inventory.receipt.postSalePrices')}`
-            : t('inventory.receipt.postDescription')
-        }
+        description={t('inventory.receipt.postDescription')}
         confirmLabel={t('inventory.receipt.post')}
         pending={mutations.postReceipt.isPending}
         problem={action.problem}

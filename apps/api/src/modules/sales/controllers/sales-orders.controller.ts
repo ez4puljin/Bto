@@ -169,6 +169,16 @@ function toDetail(order: OrderDetail): SalesOrderDetailDto {
       actorName: move.actorName,
       createdAt: move.createdAt.toISOString(),
     })),
+    changes: order.changes.map((change) => ({
+      version: change.version,
+      status: change.status,
+      fields: change.fields,
+      lines: change.lines,
+      totalBefore: change.totalBefore?.toFixed(2) ?? null,
+      totalAfter: change.totalAfter?.toFixed(2) ?? null,
+      actorName: change.actorName,
+      createdAt: change.createdAt.toISOString(),
+    })),
     events: order.events.map((event) => ({
       fromStatus: event.fromStatus,
       toStatus: event.toStatus,

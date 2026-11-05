@@ -1,5 +1,5 @@
 import { Factory, ImageOff, Plus } from 'lucide-react';
-import { useDeferredValue, useMemo, useState } from 'react';
+import { useDeferredValue, useMemo, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
@@ -202,7 +202,9 @@ export function SupplierCreatePage() {
   const navigate = useNavigate();
   const nextCode = useNextSupplierCode();
   const mutations = usePartnersMutations();
-  const [key] = useState(randomUuid);
+  const [key, setKey] = useState(randomUuid);
+  const another = useRef(false);
+  const [round, setRound] = useState(0);
 
   const create = async (values: SupplierFormValues) => {
     try {
@@ -210,6 +212,14 @@ export function SupplierCreatePage() {
         key,
         ...supplierCreateBody(values, nextCode.data ?? ''),
       });
+      if (another.current) {
+        // A clean form with its next code; the page stays (ADR-0151).
+        toast.success(t('partners.supplier.created', { name: supplier.name }));
+        setKey(randomUuid());
+        await nextCode.refetch();
+        setRound((value) => value + 1);
+        return null;
+      }
       await navigate(`/partners/suppliers/${supplier.id}`);
       return null;
     } catch (error) {
@@ -225,6 +235,10 @@ export function SupplierCreatePage() {
         <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
       ) : (
         <SupplierForm
+          key={round}
+          onAnother={(value) => {
+            another.current = value;
+          }}
           page
           mode="create"
           defaultValues={emptySupplier(nextCode.data ?? '')}

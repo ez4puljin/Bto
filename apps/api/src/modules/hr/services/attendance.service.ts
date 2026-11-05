@@ -19,7 +19,7 @@ import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { type AuthContext, AuditService } from '../../identity';
 import { hrAttendanceEvents, hrEmployeeSites, hrWorkSites } from '../schema';
-import { type Employee, HrSettingsService } from './hr-settings.service';
+import { type Employee, HrSettingsService, scheduleFor } from './hr-settings.service';
 import { ATTENDANCE_MANAGE, WorkSitesService } from './work-sites.service';
 
 export interface PunchInput {
@@ -35,7 +35,7 @@ export interface AttendanceEvent {
   kind: AttendanceKind;
   at: Date;
   businessDate: string;
-  source: 'APP' | 'OFFICE';
+  source: 'APP' | 'OFFICE' | 'REQUEST';
   siteId: number | null;
   siteName: string | null;
   lat: string | null;
@@ -202,7 +202,7 @@ export class AttendanceService {
       this.liveEvents({ from, to: today, userIds: [ctx.userId] }),
     ]);
     const todayEvents = events.filter((event) => event.businessDate === today);
-    const day = summarizeDay(today, likes(todayEvents), employee.schedule, now);
+    const day = summarizeDay(today, likes(todayEvents), scheduleFor(employee, today), now);
     return {
       today,
       now,
@@ -212,7 +212,7 @@ export class AttendanceService {
       sites,
       todayEvents,
       day,
-      month: monthStats(from, today, events, employee.schedule, now),
+      month: monthStats(from, today, events, employee, now),
     };
   }
 
@@ -247,12 +247,14 @@ export class AttendanceService {
         ...row,
         fullName: employee?.fullName ?? '',
         roles: employee?.roles ?? [],
-        schedule: employee?.schedule ?? {
-          workStart: '09:00',
-          workEnd: '18:00',
-          graceMinutes: 0,
-          workdays: '1111110',
-        },
+        schedule: employee
+          ? scheduleFor(employee, date)
+          : {
+              workStart: '09:00',
+              workEnd: '18:00',
+              graceMinutes: 0,
+              workdays: '1111110',
+            },
       };
     });
     const past = date < today;
@@ -277,7 +279,7 @@ export class AttendanceService {
     }
     const month = employees.map((employee) => {
       const mine = events.filter((event) => event.userId === employee.userId);
-      const stats = monthStats(monthFrom, date, mine, employee.schedule, now);
+      const stats = monthStats(monthFrom, date, mine, employee, now);
       const arrivals = dayRows(monthFrom, date, [employee], mine, now)
         .map((row) => row.firstIn)
         .filter((at): at is string => at !== null)
@@ -370,6 +372,74 @@ export class AttendanceService {
       });
       return this.event(tx, row.id);
     });
+  }
+
+  /**
+   * ADR-0144: the punch an approved time request asks for, written in the request's transaction;
+   * it must keep the day's turns like HR's typed one.
+   */
+  async addRequestEventInTx(
+    tx: Tx,
+    ctx: AuthContext,
+    input: {
+      userId: number;
+      kind: AttendanceKind;
+      at: Date;
+      note: string;
+      lat: string | null;
+      lng: string | null;
+      accuracyM: number | null;
+    },
+  ): Promise<number> {
+    await this.lockUser(tx, input.userId);
+    const date = businessDate(input.at);
+    const live = await this.liveEvents({ from: date, to: date, userIds: [input.userId] }, tx);
+    const turns = [...live, { kind: input.kind, at: input.at }].sort(
+      (a, b) => a.at.getTime() - b.at.getTime(),
+    );
+    if (!alternates(turns)) {
+      throw new AppError('ATTENDANCE_EVENT_ORDER', 'IN and OUT must alternate', {
+        date,
+        kind: input.kind,
+      });
+    }
+    const [row] = await tx
+      .insert(hrAttendanceEvents)
+      .values({
+        userId: input.userId,
+        kind: input.kind,
+        at: input.at,
+        businessDate: date,
+        source: 'REQUEST',
+        note: input.note.slice(0, HR_LIMITS.maxNote),
+        lat: input.lat === null ? null : new Decimal(input.lat),
+        lng: input.lng === null ? null : new Decimal(input.lng),
+        accuracyM: input.accuracyM,
+        createdBy: ctx.userId,
+      })
+      .returning({ id: hrAttendanceEvents.id });
+    if (!row) throw new Error('event insert returned no row');
+    await this.audit.record(tx, ctx, {
+      action: 'CREATE',
+      entity: 'hr_attendance_event',
+      entityId: row.id,
+      after: {
+        userId: input.userId,
+        kind: input.kind,
+        at: input.at.toISOString(),
+        source: 'REQUEST',
+      },
+    });
+    return row.id;
+  }
+
+  /** Every live event of these people in a range (the reports, ADR-0144). */
+  async eventsOf(query: {
+    from: string;
+    to: string;
+    userIds: readonly number[];
+  }): Promise<AttendanceEvent[]> {
+    return this.liveEvents(query);
   }
 
   /** Strikes a punch out with a reason; the row stays for the record. */
@@ -564,7 +634,7 @@ function dayRows(
   for (let date = from; date <= to; date = addDays(date, 1)) {
     for (const employee of employees) {
       const mine = grouped.get(`${employee.userId}:${date}`) ?? [];
-      const summary = summarizeDay(date, likes(mine), employee.schedule, now);
+      const summary = summarizeDay(date, likes(mine), scheduleFor(employee, date), now);
       rows.push({
         ...summary,
         userId: employee.userId,
@@ -581,7 +651,7 @@ function monthStats(
   from: string,
   to: string,
   events: readonly AttendanceEvent[],
-  schedule: Schedule,
+  employee: Pick<Employee, 'plan' | 'grace'>,
   now: Date,
 ): MonthStats {
   const stats: MonthStats = {
@@ -598,6 +668,7 @@ function monthStats(
     byDate.set(event.businessDate, [...(byDate.get(event.businessDate) ?? []), event]);
   }
   for (let date = from; date <= to; date = addDays(date, 1)) {
+    const schedule = scheduleFor(employee, date);
     if (isWorkday(schedule.workdays, date)) stats.workdays += 1;
     const summary = summarizeDay(date, likes(byDate.get(date) ?? []), schedule, now);
     if (summary.firstIn !== null) stats.presentDays += 1;

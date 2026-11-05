@@ -4,8 +4,9 @@ import { Trash2 } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DialogFormFooter, FormField } from '@/components/form';
-import { NativeSelect } from '@/components/native-select';
+import { MoneyInput } from '@/components/money-input';
 import { ProblemAlert } from '@/components/problem-alert';
+import { SearchSelect } from '@/components/search-select';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -24,8 +25,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { CustomerPicker, type PickedCustomer } from '@/features/partners/customer-picker';
-import { type PickedSupplier, SupplierPicker } from '@/features/partners/supplier-picker';
+import type { PickedCustomer } from '@/features/partners/customer-picker';
+import { CustomerSelect, SupplierSelect } from '@/features/partners/party-select';
+import type { PickedSupplier } from '@/features/partners/supplier-picker';
 import { formatMnt } from '@/lib/money';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
@@ -38,6 +40,7 @@ import {
   useMoneyAccounts,
 } from './api';
 import { DateInput } from '@/components/date-input';
+import { accountOption } from './account-option';
 
 const MONEY = /^\d{1,12}(\.\d{1,2})?$/;
 
@@ -100,8 +103,14 @@ export function JournalEntryDialog({
   const boxesOf = (id: number | null): MoneyAccount[] =>
     id === null ? [] : (moneyAccounts.data ?? []).filter((box) => box.glAccountId === id);
   const needsBox = (line: LineDraft) => boxesOf(line.accountId).length > 0;
-  const needsCustomer = (line: LineDraft) => accountOf(line.accountId)?.role === 'AR';
-  const needsSupplier = (line: LineDraft) => accountOf(line.accountId)?.role === 'AP';
+  // A party's account by its journal (ADR-0149): a customer's on the asset side, else a supplier's.
+  const isPartyAccount = (id: number | null) => accountOf(id)?.journal === 'RECEIVABLE_PAYABLE';
+  const needsCustomer = (line: LineDraft) =>
+    accountOf(line.accountId)?.role === 'AR' ||
+    (isPartyAccount(line.accountId) && accountOf(line.accountId)?.kind !== 'LIABILITY');
+  const needsSupplier = (line: LineDraft) =>
+    accountOf(line.accountId)?.role === 'AP' ||
+    (isPartyAccount(line.accountId) && accountOf(line.accountId)?.kind === 'LIABILITY');
   const detailsMissing = (line: LineDraft) =>
     (needsBox(line) && line.moneyAccountId === null) ||
     (needsCustomer(line) && line.customer === null) ||
@@ -228,54 +237,38 @@ export function JournalEntryDialog({
                   <TableRow key={line.id}>
                     <TableCell className="align-top">
                       <div className="flex flex-col gap-2">
-                        <NativeSelect
+                        <SearchSelect
                           aria-label={`${t('finance.journal.dialog.account')} ${index + 1}`}
-                          value={line.accountId ?? ''}
-                          aria-invalid={checked && line.accountId === null ? true : undefined}
-                          onChange={(event) =>
-                            chooseAccount(line.id, Number.parseInt(event.target.value, 10) || null)
-                          }
-                        >
-                          <option value="">{t('finance.journal.dialog.chooseAccount')}</option>
-                          {(accounts.data ?? [])
+                          value={line.accountId === null ? '' : String(line.accountId)}
+                          options={(accounts.data ?? [])
                             .filter((account) => account.status === 'ACTIVE')
-                            .map((account) => (
-                              <option key={account.id} value={account.id}>
-                                {account.code} · {account.name}
-                              </option>
-                            ))}
-                        </NativeSelect>
+                            .map(accountOption)}
+                          placeholder={t('finance.journal.dialog.chooseAccount')}
+                          invalid={checked && line.accountId === null}
+                          onChange={(value) =>
+                            chooseAccount(line.id, Number.parseInt(value, 10) || null)
+                          }
+                        />
                         {needsBox(line) ? (
-                          <NativeSelect
+                          <SearchSelect
                             aria-label={`${t('finance.journal.dialog.moneyAccount')} ${index + 1}`}
-                            value={line.moneyAccountId ?? ''}
-                            aria-invalid={
-                              checked && line.moneyAccountId === null ? true : undefined
-                            }
-                            onChange={(event) =>
-                              patch(line.id, {
-                                moneyAccountId: Number.parseInt(event.target.value, 10) || null,
-                              })
-                            }
-                          >
-                            <option value="">
-                              {t('finance.journal.dialog.chooseMoneyAccount')}
-                            </option>
-                            {boxesOf(line.accountId)
+                            value={line.moneyAccountId === null ? '' : String(line.moneyAccountId)}
+                            options={boxesOf(line.accountId)
                               .filter((box) => box.status === 'ACTIVE')
-                              .map((box) => (
-                                <option key={box.id} value={box.id}>
-                                  {box.name}
-                                </option>
-                              ))}
-                          </NativeSelect>
+                              .map((box) => ({ value: String(box.id), label: box.name }))}
+                            placeholder={t('finance.journal.dialog.chooseMoneyAccount')}
+                            invalid={checked && line.moneyAccountId === null}
+                            onChange={(value) =>
+                              patch(line.id, { moneyAccountId: Number.parseInt(value, 10) || null })
+                            }
+                          />
                         ) : null}
                         {needsCustomer(line) ? (
                           <div className="flex flex-col gap-1">
                             <Label htmlFor={`entry-customer-${line.id}`} className="sr-only">
                               {`${t('finance.journal.dialog.customer')} ${index + 1}`}
                             </Label>
-                            <CustomerPicker
+                            <CustomerSelect
                               id={`entry-customer-${line.id}`}
                               value={line.customer}
                               onChange={(customer) => patch(line.id, { customer })}
@@ -288,7 +281,7 @@ export function JournalEntryDialog({
                             <Label htmlFor={`entry-supplier-${line.id}`} className="sr-only">
                               {`${t('finance.journal.dialog.supplier')} ${index + 1}`}
                             </Label>
-                            <SupplierPicker
+                            <SupplierSelect
                               id={`entry-supplier-${line.id}`}
                               value={line.supplier}
                               onChange={(supplier) => patch(line.id, { supplier })}
@@ -299,25 +292,17 @@ export function JournalEntryDialog({
                       </div>
                     </TableCell>
                     <TableCell className="align-top">
-                      <Input
+                      <MoneyInput
                         aria-label={`${t('finance.journal.dialog.debit')} ${index + 1}`}
-                        inputMode="decimal"
-                        className="text-right font-mono"
                         value={line.debit}
-                        onChange={(event) =>
-                          patch(line.id, { debit: event.target.value.trim(), credit: '' })
-                        }
+                        onValueChange={(raw) => patch(line.id, { debit: raw, credit: '' })}
                       />
                     </TableCell>
                     <TableCell className="align-top">
-                      <Input
+                      <MoneyInput
                         aria-label={`${t('finance.journal.dialog.credit')} ${index + 1}`}
-                        inputMode="decimal"
-                        className="text-right font-mono"
                         value={line.credit}
-                        onChange={(event) =>
-                          patch(line.id, { credit: event.target.value.trim(), debit: '' })
-                        }
+                        onValueChange={(raw) => patch(line.id, { credit: raw, debit: '' })}
                       />
                     </TableCell>
                     <TableCell className="align-top">

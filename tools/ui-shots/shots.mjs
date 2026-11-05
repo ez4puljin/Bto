@@ -322,7 +322,7 @@ async function load(cdp, state, url, { dialog = false, then = null } = {}) {
       await sleep(125);
     }
   }
-  await sleep(450);
+  await sleep(Number.parseInt(args.settle ?? '450', 10));
   await idle(state, { quiet: 300, timeout: 5_000 });
   if (then) {
     // A route's step after the load (a double click that opens a report row's detail).

@@ -499,3 +499,6 @@ export function orderHeaderIssues(
   }
   return issues;
 }
+
+// The wholesale documents' templates (ADR-0143).
+export * from './document-template';

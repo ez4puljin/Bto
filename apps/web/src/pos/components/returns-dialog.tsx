@@ -6,7 +6,7 @@ import type {
   EdgeReturnableLine,
 } from '@tugeel/shared/pos';
 import { Search } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -42,6 +42,8 @@ interface Chosen {
 export function ReturnsDialog(props: {
   open: boolean;
   approvalRequired: boolean;
+  /** ADR-0142: a receipt's scanned barcode or number, looked up at once. */
+  initialNumber?: string | null;
   onClose: () => void;
   onDone: (receipt: EdgePrintableReceipt) => void;
   onCloseAutoFocus: (event: Event) => void;
@@ -57,6 +59,7 @@ export function ReturnsDialog(props: {
         {props.open ? (
           <ReturnsPanel
             approvalRequired={props.approvalRequired}
+            initialNumber={props.initialNumber ?? null}
             onCancel={props.onClose}
             onDone={props.onDone}
           />
@@ -73,13 +76,14 @@ function partOf(line: EdgeReturnableLine, qty: string): Decimal {
 
 function ReturnsPanel(props: {
   approvalRequired: boolean;
+  initialNumber: string | null;
   onCancel: () => void;
   onDone: (receipt: EdgePrintableReceipt) => void;
 }) {
   const { t } = useTranslation();
   const { client } = useKiosk();
   const problemText = useProblemText();
-  const [number, setNumber] = useState('');
+  const [number, setNumber] = useState(props.initialNumber ?? '');
   const [sale, setSale] = useState<EdgeReturnSale | null>(null);
   const [chosen, setChosen] = useState<Record<number, Chosen>>({});
   const [approving, setApproving] = useState(false);
@@ -102,6 +106,14 @@ function ReturnsPanel(props: {
       setPending(false);
     }
   };
+
+  // A scanned receipt opens its sale straight away (ADR-0142).
+  const looked = useRef(false);
+  useEffect(() => {
+    if (looked.current || !props.initialNumber) return;
+    looked.current = true;
+    void find();
+  });
 
   const lines = sale
     ? sale.lines.flatMap((line) => {

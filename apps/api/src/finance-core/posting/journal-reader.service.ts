@@ -119,6 +119,8 @@ export class FinJournalReader {
       to?: string;
       origin?: FinEntryOrigin;
       accountId?: number;
+      /** Entries with a line on an account of this journal (ADR-0150). */
+      journal?: string;
       partyId?: string;
       after?: { date: string; id: number };
       limit: number;
@@ -160,6 +162,13 @@ export class FinJournalReader {
       );
     if (query.accountId !== undefined) {
       filters.push(lineFilter(eq(finJournalLines.accountId, query.accountId)));
+    }
+    if (query.journal !== undefined) {
+      filters.push(
+        lineFilter(
+          sql`${finJournalLines.accountId} IN (SELECT a.id FROM fin.accounts a WHERE a.company_id = ${finJournalLines.companyId} AND a.journal = ${query.journal})`,
+        ),
+      );
     }
     if (query.partyId !== undefined) {
       filters.push(lineFilter(eq(finJournalLines.partyId, Number.parseInt(query.partyId, 10))));

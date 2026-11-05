@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { problemFromError } from '@/lib/problem';
+import { toast } from '@/lib/toast';
 import { randomUuid } from '@/lib/uuid';
 import { useNextCustomerCode, usePartnersMutations } from './api';
 import { CustomerForm } from './customer-form';
@@ -21,7 +22,9 @@ export function CustomerCreatePage() {
   const [categoryId, setCategoryId] = useState<number>();
   const nextCode = useNextCustomerCode(categoryId);
   const mutations = usePartnersMutations();
-  const [key] = useState(randomUuid);
+  const [key, setKey] = useState(randomUuid);
+  const another = useRef(false);
+  const [round, setRound] = useState(0);
 
   const create = async (values: CustomerFormValues) => {
     try {
@@ -29,6 +32,14 @@ export function CustomerCreatePage() {
         key,
         ...customerCreateBody(values, nextCode.data ?? ''),
       });
+      if (another.current) {
+        // A clean form with its next code; the page stays (ADR-0151).
+        toast.success(t('partners.customer.created', { name: customer.name }));
+        setKey(randomUuid());
+        await nextCode.refetch();
+        setRound((value) => value + 1);
+        return null;
+      }
       await navigate(`/partners/customers/${customer.id}`);
       return null;
     } catch (error) {
@@ -45,6 +56,10 @@ export function CustomerCreatePage() {
         <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
       ) : (
         <CustomerForm
+          key={round}
+          onAnother={(value) => {
+            another.current = value;
+          }}
           page
           mode="create"
           defaultValues={emptyCustomer(nextCode.data ?? '')}

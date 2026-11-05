@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -31,6 +32,10 @@ import {
   PaymentTypesRequestDto,
   QuickButtonsRequestDto,
   QuickGroupDto,
+  ReceiptTemplateCreateDto,
+  ReceiptTemplateDetailDto,
+  ReceiptTemplateDraftDto,
+  ReceiptTemplateDto,
   TillAccessDto,
   TillDto,
   TillPatchDto,
@@ -41,6 +46,11 @@ import { PosCashiersService } from '../services/pos-cashiers.service';
 import { PosEdgeNodesService } from '../services/pos-edge-nodes.service';
 import { PosPaymentTypesService } from '../services/pos-payment-types.service';
 import { PosQuickButtonsService } from '../services/pos-quick-buttons.service';
+import {
+  PosReceiptTemplatesService,
+  type ReceiptTemplateDetail,
+  type ReceiptTemplateSummary,
+} from '../services/pos-receipt-templates.service';
 import { PosSettingsService } from '../services/pos-settings.service';
 import { PosTillsService } from '../services/pos-tills.service';
 import { cashierDto, edgeNodeDto, settingsDto, tillDto } from './mappers';
@@ -309,5 +319,134 @@ export class PosPaymentTypesController {
     return this.paymentTypes.replace(ctx, {
       types: body.types.map((type) => ({ ...type, id: type.id ?? null })),
     });
+  }
+}
+
+const templateDto = (row: ReceiptTemplateSummary): ReceiptTemplateDto => ({
+  id: row.id,
+  kind: row.kind,
+  name: row.name,
+  isDefault: row.isDefault,
+  version: row.version,
+  publishedAt: row.publishedAt.toISOString(),
+  hasDraft: row.hasDraft,
+  tills: row.tills,
+});
+
+const templateDetailDto = (row: ReceiptTemplateDetail): ReceiptTemplateDetailDto => ({
+  ...templateDto(row),
+  layout: row.layout as unknown as Record<string, unknown>,
+  draft: row.draft as unknown as Record<string, unknown> | null,
+  versions: row.versions.map((entry) => ({
+    version: entry.version,
+    publishedAt: entry.publishedAt.toISOString(),
+    publishedBy: entry.publishedBy,
+  })),
+});
+
+/**
+ * The receipt templates (ADR-0141): laid out from blocks in the office, a draft published as a new
+ * version, one default of each kind, chosen per POS; the edge takes the published layouts.
+ */
+@ApiTags('pos')
+@Controller('pos/receipt-templates')
+export class PosReceiptTemplatesController {
+  constructor(private readonly templates: PosReceiptTemplatesService) {}
+
+  @Get()
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: [ReceiptTemplateDto] })
+  async list(): Promise<ReceiptTemplateDto[]> {
+    return (await this.templates.list()).map(templateDto);
+  }
+
+  @Get(':id')
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: ReceiptTemplateDetailDto })
+  async get(@Param('id', ParseIntPipe) id: number): Promise<ReceiptTemplateDetailDto> {
+    return templateDetailDto(await this.templates.get(id));
+  }
+
+  @Post()
+  @RequirePermission(MANAGE)
+  @ApiCreatedResponse({ type: ReceiptTemplateDetailDto })
+  async create(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: ReceiptTemplateCreateDto,
+  ): Promise<ReceiptTemplateDetailDto> {
+    return templateDetailDto(
+      await this.templates.create(ctx, {
+        kind: body.kind,
+        name: body.name,
+        copyFromId: body.copyFromId ?? null,
+      }),
+    );
+  }
+
+  @Put(':id/draft')
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: ReceiptTemplateDetailDto })
+  async saveDraft(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: ReceiptTemplateDraftDto,
+  ): Promise<ReceiptTemplateDetailDto> {
+    return templateDetailDto(await this.templates.saveDraft(ctx, id, body));
+  }
+
+  @Post(':id/publish')
+  @HttpCode(200)
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: ReceiptTemplateDetailDto })
+  async publish(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<ReceiptTemplateDetailDto> {
+    return templateDetailDto(await this.templates.publish(ctx, id));
+  }
+
+  @Post(':id/discard')
+  @HttpCode(200)
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: ReceiptTemplateDetailDto })
+  async discard(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<ReceiptTemplateDetailDto> {
+    return templateDetailDto(await this.templates.discardDraft(ctx, id));
+  }
+
+  @Post(':id/default')
+  @HttpCode(200)
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: ReceiptTemplateDetailDto })
+  async makeDefault(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<ReceiptTemplateDetailDto> {
+    return templateDetailDto(await this.templates.makeDefault(ctx, id));
+  }
+
+  /** An earlier version's layout becomes the draft. */
+  @Post(':id/versions/:version/restore')
+  @HttpCode(200)
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: ReceiptTemplateDetailDto })
+  async restore(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('version', ParseIntPipe) version: number,
+  ): Promise<ReceiptTemplateDetailDto> {
+    return templateDetailDto(await this.templates.restore(ctx, id, version));
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @RequirePermission(MANAGE)
+  async remove(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<void> {
+    await this.templates.remove(ctx, id);
   }
 }

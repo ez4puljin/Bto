@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { SalesDocumentTemplatesController } from './controllers/sales-document-templates.controller';
 import { CatalogModule } from '../catalog';
 import { IdentityModule } from '../identity';
 import { InventoryModule } from '../inventory';
@@ -19,6 +20,7 @@ import { SalesOrderExportService } from './services/sales-order-export.service';
 import { SalesOrderQueryService } from './services/sales-order-query.service';
 import { SalesOrdersService } from './services/sales-orders.service';
 import { SalesPicksService } from './services/sales-picks.service';
+import { SalesDocumentTemplatesService } from './services/sales-document-templates.service';
 import { SalesPipelinesService } from './services/sales-pipelines.service';
 import { SalesRepOrdersService } from './services/sales-rep-orders.service';
 import { SalesRepShopService } from './services/sales-rep-shop.service';
@@ -37,6 +39,7 @@ import { AppSettingsController } from './controllers/app-settings.controller';
   providers: [
     SalesAccessService,
     SalesBoardsService,
+    SalesDocumentTemplatesService,
     SalesPipelinesService,
     SalesSettingsService,
     AppSettingsService,
@@ -51,6 +54,7 @@ import { AppSettingsController } from './controllers/app-settings.controller';
   exports: [
     SalesAccessService,
     SalesBoardsService,
+    SalesDocumentTemplatesService,
     SalesPipelinesService,
     SalesSettingsService,
     AppSettingsService,
@@ -72,6 +76,7 @@ export class SalesModule {}
     SalesOrdersController,
     SalesBoardsController,
     SalesPipelinesController,
+    SalesDocumentTemplatesController,
     SalesStagesController,
     SalesSettingsController,
     AppSettingsController,

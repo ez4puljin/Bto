@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { DetailCard, FieldList } from '@/components/detail';
 import { DialogFormFooter, FormField, FormFooter, FormRow, FormSection } from '@/components/form';
 import { NativeSelect } from '@/components/native-select';
+import { SearchSelect } from '@/components/search-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
@@ -55,6 +56,7 @@ import {
   useGlAccounts,
   useMoneyAccounts,
 } from './api';
+import { accountOption } from './account-option';
 
 const CODE = /^[0-9A-Za-z][0-9A-Za-z._-]{0,15}$/;
 const PATTERN_KEYS: Record<
@@ -379,7 +381,7 @@ function MoneyAccountDialog({
   };
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
-      <DialogContent closeLabel={t('common.close')}>
+      <DialogContent closeLabel={t('common.close')} size="lg">
         <DialogHeader>
           <DialogTitle>
             {account
@@ -496,18 +498,13 @@ function MoneyAccountDialog({
             htmlFor="money-gl"
             error={checked && glAccountId === null ? 'validation.required' : undefined}
           >
-            <NativeSelect
+            <SearchSelect
               id="money-gl"
-              value={glAccountId ?? ''}
-              onChange={(event) => setGlAccountId(Number.parseInt(event.target.value, 10) || null)}
-            >
-              <option value="">{t('finance.journal.dialog.chooseAccount')}</option>
-              {assets.map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.code} · {entry.name}
-                </option>
-              ))}
-            </NativeSelect>
+              value={glAccountId === null ? '' : String(glAccountId)}
+              options={assets.map(accountOption)}
+              placeholder={t('finance.journal.dialog.chooseAccount')}
+              onChange={(value) => setGlAccountId(Number.parseInt(value, 10) || null)}
+            />
           </FormField>
           {account ? (
             <div className="flex items-center justify-between gap-3">

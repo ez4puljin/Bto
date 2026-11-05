@@ -1,9 +1,18 @@
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { Bell, CalendarCheck, ChevronRight, Send, Server, User } from 'lucide-react-native';
+import {
+  Bell,
+  CalendarCheck,
+  ChevronRight,
+  Send,
+  Server,
+  User,
+  UsersRound,
+} from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { feedCount, useFeed } from '../../src/api/community';
 import { useNotificationSummary } from '../../src/api/notifications';
 import { useRepContext } from '../../src/api/rep';
 import { initialsOf } from '../../src/format/format';
@@ -31,6 +40,7 @@ export default function ProfileScreen() {
   const { cart, pending, stageId } = useShop();
   const context = useRepContext();
   const unread = useNotificationSummary().data?.unread ?? 0;
+  const community = feedCount(useFeed().data);
   const roleName = useRoleName();
   const [leaving, setLeaving] = useState(false);
   const stageName =
@@ -73,6 +83,22 @@ export default function ProfileScreen() {
             }
             title={t('mobile.attendance.title')}
             onPress={() => router.push('/attendance')}
+          />
+          <Row
+            minHeight={52}
+            icon={
+              <IconTile color={colors.tint.indigo}>
+                <UsersRound size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+              </IconTile>
+            }
+            title={t('mobile.community.title')}
+            accessibilityLabel={
+              community > 0
+                ? t('mobile.community.unreadLabel', { n: community })
+                : t('mobile.community.title')
+            }
+            right={<CountBadge count={community} ring={colors.card} />}
+            onPress={() => router.push('/community')}
           />
           <Row
             minHeight={52}

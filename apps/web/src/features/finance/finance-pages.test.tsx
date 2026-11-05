@@ -139,7 +139,7 @@ describe('finance pages (ADR-0060 #11)', () => {
       await screen.findByRole('dialog', { name: mn.finance.payments.dialog.title }),
     );
     await user.type(dialog.getByLabelText(mn.finance.payments.dialog.customer), 'Номин');
-    await user.click(await dialog.findByRole('button', { name: /Номин дэлгүүр/ }));
+    await user.click(await screen.findByRole('option', { name: /Номин дэлгүүр/ }));
     await user.type(dialog.getByLabelText(mn.finance.payments.dialog.amount), '50000');
     // The open invoice is settled first; the preview shows the whole 50,000₮ on it.
     const invoiceRow = await dialog.findByRole('row', { name: /Н-20261016-0001/ });
@@ -270,8 +270,8 @@ describe('finance pages (ADR-0060 #11)', () => {
     // The older invoice (due 2026-10-31) is settled whole first, the rest goes on the next one.
     const amount = (number: string) =>
       dialog.getByLabelText(`${mn.finance.allocations.amount}: ${number}`);
-    expect(amount('Н-20261001-0003')).toHaveValue('30000');
-    expect(amount('Н-20261016-0001')).toHaveValue('50000');
+    expect(amount('Н-20261001-0003')).toHaveValue('30,000');
+    expect(amount('Н-20261016-0001')).toHaveValue('50,000');
     expect(calls(fetchMock, 'POST', '/api/v1/finance/allocations')).toHaveLength(0);
     // More than the invoice still owes is refused before sending.
     await user.clear(amount('Н-20261001-0003'));

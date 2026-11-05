@@ -176,6 +176,16 @@ export class ReceiptWarehouseDto {
   @ApiProperty() name: string;
 }
 
+@ApiSchema({ name: 'ReceiptCounterAccount' })
+export class ReceiptCounterAccountDto {
+  @ApiProperty() code: string;
+  @ApiProperty() name: string;
+  @ApiProperty({
+    description: 'The payable’s own account: what a receipt without a choice credits',
+  })
+  isDefault: boolean;
+}
+
 @ApiSchema({ name: 'ReceiptPaymentAccount' })
 export class ReceiptPaymentAccountDto {
   @ApiProperty() id: number;
@@ -205,6 +215,8 @@ export class ReceiptDetailDto {
   @ApiProperty({ enum: RECEIPT_PAYMENT_METHODS }) paymentMethod: ReceiptPaymentMethod;
   @ApiProperty({ type: Number, nullable: true }) moneyAccountId: number | null;
   @ApiProperty({ type: String, nullable: true }) moneyAccountName: string | null;
+  @ApiProperty({ type: String, nullable: true }) counterAccountCode: string | null;
+  @ApiProperty({ type: String, nullable: true }) counterAccountName: string | null;
   @ApiProperty() supplierVatPayer: boolean;
   @ApiProperty({ example: '10', description: 'VAT inside the delivery-note prices' })
   vatRatePct: string;
@@ -382,6 +394,16 @@ class ReceiptHeaderFieldsDto {
   @IsInt()
   @Min(1)
   moneyAccountId?: number | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'The account the bill credits, from GET /receipts/counter-accounts (ADR-0154)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  counterAccountCode?: string | null;
 
   @ApiPropertyOptional({
     type: String,

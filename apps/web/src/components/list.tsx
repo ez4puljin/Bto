@@ -130,7 +130,7 @@ export function SegmentedControl<T extends string>(props: {
     <div
       role="tablist"
       aria-label={props.name}
-      className="inline-flex rounded-full bg-black/[0.05] p-0.5"
+      className="inline-flex w-fit rounded-full bg-black/[0.05] p-0.5"
     >
       {props.options.map((value) => {
         const selected = value === props.value;

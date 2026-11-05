@@ -60,7 +60,14 @@ export class UserNamesService {
    * Every staff record with the system role codes or custom role names it holds, for a module that
    * lists the whole staff (attendance, ADR-0131). Disabled users included: the caller says.
    */
-  async allStaff(): Promise<(UserSummary & { roles: string[] })[]> {
+  async allStaff(): Promise<
+    (UserSummary & {
+      roles: string[];
+      lastLoginAt: Date | null;
+      lockedUntil: Date | null;
+      passwordSet: boolean;
+    })[]
+  > {
     const { rows } = await this.db.execute<{
       id: string;
       username: string;
@@ -68,8 +75,12 @@ export class UserNamesService {
       full_name: string;
       status: 'ACTIVE' | 'DISABLED';
       roles: string[];
+      last_login_at: Date | string | null;
+      locked_until: Date | string | null;
+      password_set: boolean;
     }>(sql`
-      SELECT u.id::text, u.username, u.phone, u.full_name, u.status,
+      SELECT u.id::text, u.username, u.phone, u.full_name, u.status, u.last_login_at, u.locked_until,
+             u.password_hash IS NOT NULL AS password_set,
              ARRAY(SELECT coalesce(r.code, r.name) FROM user_roles ur JOIN roles r ON r.id = ur.role_id
                     WHERE ur.user_id = u.id ORDER BY r.is_system DESC, r.code, r.name) AS roles
         FROM users u
@@ -81,6 +92,9 @@ export class UserNamesService {
       fullName: row.full_name,
       status: row.status,
       roles: row.roles,
+      lastLoginAt: row.last_login_at === null ? null : new Date(row.last_login_at),
+      lockedUntil: row.locked_until === null ? null : new Date(row.locked_until),
+      passwordSet: row.password_set,
     }));
   }
 

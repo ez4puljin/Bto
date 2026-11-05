@@ -118,6 +118,17 @@ export function useSession() {
   });
 }
 
+/** The session as last read, never fetched here: for parts mounted before the cashier signs in (the printout). */
+export function useCachedSession() {
+  const { client } = useKiosk();
+  const { epoch } = useCredentials();
+  return useQuery({
+    queryKey: kioskKeys.session(epoch),
+    queryFn: ({ signal }) => client.session(signal),
+    enabled: false,
+  });
+}
+
 /** «Борлуулалтын түүх» (ADR-0111): the till's sales and returns of `day`, narrowed by number. */
 export function useSalesHistory(day: string, q: string) {
   const { client } = useKiosk();

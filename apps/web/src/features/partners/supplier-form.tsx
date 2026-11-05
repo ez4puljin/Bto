@@ -63,6 +63,8 @@ export function SupplierForm(props: {
   onSubmit: (values: SupplierFormValues) => Promise<ProblemDetails | null>;
   /** Editing in a card: «Болих» returns to reading (ADR-0042). */
   onCancel?: () => void;
+  /** The `/new` page: which button saved, «Хадгалаад шинэ» or «Хадгалах» (ADR-0151). */
+  onAnother?: (another: boolean) => void;
   /** The `/new` page: fields in a card, buttons at the window's foot (`PartnerFormFrame`). */
   page?: boolean;
 }) {
@@ -178,7 +180,17 @@ export function SupplierForm(props: {
           {t('common.cancel')}
         </Button>
       ) : null}
-      <Button type="submit" disabled={isSubmitting}>
+      {props.onAnother ? (
+        <Button
+          type="submit"
+          variant="outline"
+          disabled={isSubmitting}
+          onClick={() => props.onAnother?.(true)}
+        >
+          {t('common.saveAndNew')}
+        </Button>
+      ) : null}
+      <Button type="submit" disabled={isSubmitting} onClick={() => props.onAnother?.(false)}>
         {props.submitLabel}
       </Button>
     </>

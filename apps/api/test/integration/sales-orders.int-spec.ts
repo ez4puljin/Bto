@@ -315,6 +315,33 @@ describe('sales orders', () => {
     expect(audit.rows.map((row) => row.action)).toEqual(['CREATE', 'UPDATE', 'CANCEL']);
   });
 
+  it('keeps a version of each saved edit, none for a save that changed nothing (ADR-0147)', async () => {
+    const body = orderBody(shop.id, [{ productUnitId: pcs(juice), qty: '1' }]);
+    const draft = await orders().draft(body);
+    await orders().update(draft.id, body).expect(200);
+    const edited = (
+      await orders()
+        .update(
+          draft.id,
+          orderBody(shop.id, [{ productUnitId: pcs(juice), qty: '3' }], { note: 'Нэмсэн' }),
+        )
+        .expect(200)
+    ).body as OrderJson & {
+      changes: {
+        version: number;
+        fields: { field: string; before: string | null; after: string | null }[];
+        lines: { kind: string; qtyBefore: string; qtyAfter: string }[];
+      }[];
+    };
+    expect(edited.changes).toHaveLength(1);
+    expect(edited.changes[0]).toMatchObject({
+      version: 1,
+      fields: [{ field: 'note', after: 'Нэмсэн' }],
+      lines: [{ kind: 'CHANGED' }],
+    });
+    expect(Number.parseFloat(edited.changes[0]?.lines[0]?.qtyAfter ?? '')).toBe(3);
+  });
+
   it('numbers new orders in the company format, one counter for all, and lists them', async () => {
     const one = await orders().draft(orderBody(shop.id, [{ productUnitId: pcs(juice), qty: '1' }]));
     const two = await orders().draft(orderBody(shop.id, [{ productUnitId: pcs(juice), qty: '1' }]));

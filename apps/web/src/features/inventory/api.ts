@@ -383,6 +383,18 @@ export function useReceiptCosting(id: number, enabled: boolean) {
 }
 
 /** The cash boxes and bank accounts a receipt paid at once may name (inventory.receipts.manage). */
+/** The accounts a receipt's bill may credit (ADR-0154). */
+export function useReceiptCounterAccounts(enabled = true) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.receipts, 'counter-accounts'],
+    enabled,
+    staleTime: 5 * 60_000,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/receipts/counter-accounts', { signal })),
+  });
+}
+
 export function useReceiptPaymentAccounts(enabled = true) {
   const api = useApiClient();
   return useQuery({

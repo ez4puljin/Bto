@@ -328,6 +328,8 @@ export const goodsReceipts = pgTable(
     /** The finance module's cash box or bank account for CASH / BANK (no FK: inventory cannot
      * depend on finance; checked through the RECEIPT_MONEY_ACCOUNTS hook). */
     moneyAccountId: integer('money_account_id'),
+    /** The account the bill credits, its code in the chart; null: the payable's own (ADR-0154). */
+    counterAccountCode: text('counter_account_code'),
     /** VAT inside the delivery-note prices: the company rate when both sides pay VAT, else 0. */
     vatRatePct: percent('vat_rate_pct').notNull().default(zero),
     /** The delivery note's total pieces (Σ base quantity), checked at the last confirmation. */
@@ -352,8 +354,11 @@ export const goodsReceipts = pgTable(
     check('goods_receipts_status', inList(t.status, RECEIPT_STATUSES)),
     check(
       'goods_receipts_posted',
-      sql`(${t.status} = 'POSTED') = (${t.number} IS NOT NULL AND ${t.postedAt} IS NOT NULL
-        AND ${t.effectiveDate} IS NOT NULL AND ${t.costingStatus} IS NOT NULL)`,
+      // A receipt has its number from the first save (ADR-0153): a draft may carry one, a posted
+      // receipt must.
+      sql`(${t.status} = 'POSTED') = (${t.postedAt} IS NOT NULL
+        AND ${t.effectiveDate} IS NOT NULL AND ${t.costingStatus} IS NOT NULL)
+        AND (${t.status} <> 'POSTED' OR ${t.number} IS NOT NULL)`,
     ),
     check(
       'goods_receipts_costing',

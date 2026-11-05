@@ -42,6 +42,8 @@ export const TILL: Schemas['PosTill'] = {
   printerPort: 9100,
   printerName: null,
   drawerKick: true,
+  saleTemplateId: null,
+  returnTemplateId: null,
   status: 'ACTIVE',
   lastSaleAt: STAMP,
   pairingExpiresAt: null,

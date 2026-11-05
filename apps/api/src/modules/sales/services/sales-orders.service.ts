@@ -60,9 +60,11 @@ import {
   type SaleSink,
   type SaleSnapshot,
 } from '../hooks';
+import { diffOrder } from './order-changes';
 import {
   orderStatusEvents,
   salesBoards,
+  salesOrderChanges,
   salesOrderLineParts,
   salesOrderLines,
   salesOrders,
@@ -313,6 +315,7 @@ export class SalesOrdersService implements OnModuleInit {
       // An admin changes an order in any stage (ADR-0126 #4); others need the stage's EDIT right.
       if (!ctx.permissions.has('sales.boards.manage')) assertCanEdit(access, order);
       const header = await this.checkedHeader(tx, input);
+      const previous = await this.queries.detail(ctx, id, tx);
       // A picking or packed order: the warehouses whose lines change are opened again (their goods
       // back on the shelves); the other warehouses keep their picked counts (ADR-0126 #4).
       const picking = order.status === 'PICKING' || order.status === 'PACKED';
@@ -368,8 +371,47 @@ export class SalesOrdersService implements OnModuleInit {
         entityId: id,
         after: { ...header, lines: input.lines.length, ...(repriced ?? {}) },
       });
+      await this.recordChange(tx, ctx, previous, await this.queries.detail(ctx, id, tx));
     });
     return this.queries.detail(ctx, id);
+  }
+
+  /** The save's version (ADR-0147), under the order's lock; a save that changed nothing makes none. */
+  private async recordChange(
+    tx: Tx,
+    ctx: AuthContext,
+    before: OrderDetail,
+    after: OrderDetail,
+  ): Promise<void> {
+    const facts = (order: OrderDetail) => ({
+      header: {
+        fulfilment: order.fulfilment,
+        deliveryDate: order.deliveryDate,
+        address: order.addressText,
+        contactName: order.contactName,
+        contactPhone: order.contactPhone,
+        paymentMethod: order.paymentMethod,
+        note: order.note,
+      },
+      lines: order.lines,
+    });
+    const { fields, lines } = diffOrder(facts(before), facts(after));
+    const totalMoved = before.total?.toFixed(2) !== after.total?.toFixed(2);
+    if (fields.length === 0 && lines.length === 0 && !totalMoved) return;
+    const [last] = await tx
+      .select({ version: sql<number>`coalesce(max(${salesOrderChanges.version}), 0)::int` })
+      .from(salesOrderChanges)
+      .where(eq(salesOrderChanges.orderId, before.id));
+    await tx.insert(salesOrderChanges).values({
+      orderId: before.id,
+      version: (last?.version ?? 0) + 1,
+      status: before.status,
+      fields,
+      lines,
+      totalBefore: before.total,
+      totalAfter: after.total,
+      actorId: ctx.userId,
+    });
   }
 
   /**

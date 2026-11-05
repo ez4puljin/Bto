@@ -26,6 +26,9 @@ import {
   VOUCHER_KINDS,
   VOUCHER_LIMITS,
   type VoucherKind,
+  RECEIPT_TEMPLATE_KINDS,
+  RECEIPT_TEMPLATE_LIMITS,
+  type ReceiptTemplateKind,
 } from '@tugeel/shared/pos';
 import { CLASSIFICATION_CODE_PATTERN, DISTRICT_CODE_PATTERN } from '@tugeel/shared/mn';
 import { PRICE_BASES, type PriceBasis } from '@tugeel/shared/pricing';
@@ -38,6 +41,7 @@ import {
   IsIn,
   IsInt,
   IsISO8601,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -265,6 +269,13 @@ export class TillDto {
   @ApiProperty({ type: String, nullable: true, description: 'ADR-0111: information only' })
   printerName: string | null;
   @ApiProperty() drawerKick: boolean;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'ADR-0141: null prints with the default',
+  })
+  saleTemplateId: number | null;
+  @ApiProperty({ type: Number, nullable: true }) returnTemplateId: number | null;
   @ApiProperty({ enum: POS_STATUSES }) status: PosStatus;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) lastSaleAt: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
@@ -340,6 +351,16 @@ export class TillPatchDto {
   @MaxLength(POS_LIMITS.maxName)
   printerName?: string | null;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() drawerKick?: boolean;
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'ADR-0141; null: the default' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  saleTemplateId?: number | null;
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  returnTemplateId?: number | null;
   @ApiPropertyOptional({ enum: POS_STATUSES }) @IsOptional() @IsIn(POS_STATUSES) status?: PosStatus;
 }
 
@@ -1509,4 +1530,85 @@ export class VoidPageDto {
   total: number | null;
   @ApiProperty({ type: String, nullable: true, description: 'The voids’ sum, first page only' })
   sum: string | null;
+}
+
+@ApiSchema({ name: 'PosReceiptTemplateTill' })
+export class ReceiptTemplateTillDto {
+  @ApiProperty() id: number;
+  @ApiProperty() code: string;
+  @ApiProperty() name: string;
+}
+
+@ApiSchema({ name: 'PosReceiptTemplate' })
+export class ReceiptTemplateDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ enum: RECEIPT_TEMPLATE_KINDS, enumName: 'ReceiptTemplateKind' })
+  kind: ReceiptTemplateKind;
+  @ApiProperty() name: string;
+  @ApiProperty() isDefault: boolean;
+  @ApiProperty({ description: 'The published version in force' }) version: number;
+  @ApiProperty({ type: String, format: 'date-time' }) publishedAt: string;
+  @ApiProperty({ description: 'Unpublished edits are waiting' }) hasDraft: boolean;
+  @ApiProperty({ type: [ReceiptTemplateTillDto], description: 'The POS that chose it' })
+  tills: ReceiptTemplateTillDto[];
+}
+
+@ApiSchema({ name: 'PosReceiptTemplateVersion' })
+export class ReceiptTemplateVersionDto {
+  @ApiProperty() version: number;
+  @ApiProperty({ type: String, format: 'date-time' }) publishedAt: string;
+  @ApiProperty({ type: String, nullable: true }) publishedBy: string | null;
+}
+
+@ApiSchema({ name: 'PosReceiptTemplateDetail' })
+export class ReceiptTemplateDetailDto extends ReceiptTemplateDto {
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: true,
+    description: 'The published ReceiptLayout (@tugeel/shared/pos): paper, size, blocks',
+  })
+  layout: Record<string, unknown>;
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: true,
+    nullable: true,
+    description: 'The unpublished ReceiptLayout; null: none',
+  })
+  draft: Record<string, unknown> | null;
+  @ApiProperty({ type: [ReceiptTemplateVersionDto] }) versions: ReceiptTemplateVersionDto[];
+}
+
+@ApiSchema({ name: 'PosReceiptTemplateCreate' })
+export class ReceiptTemplateCreateDto {
+  @ApiProperty({ enum: RECEIPT_TEMPLATE_KINDS, enumName: 'ReceiptTemplateKind' })
+  @IsIn(RECEIPT_TEMPLATE_KINDS)
+  kind: ReceiptTemplateKind;
+  @ApiProperty({ maxLength: RECEIPT_TEMPLATE_LIMITS.maxName })
+  @Transform(trimmed)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(RECEIPT_TEMPLATE_LIMITS.maxName)
+  name: string;
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Copy its published layout' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  copyFromId?: number | null;
+}
+
+@ApiSchema({ name: 'PosReceiptTemplateDraft' })
+export class ReceiptTemplateDraftDto {
+  @ApiProperty({ maxLength: RECEIPT_TEMPLATE_LIMITS.maxName })
+  @Transform(trimmed)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(RECEIPT_TEMPLATE_LIMITS.maxName)
+  name: string;
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: true,
+    description: 'A ReceiptLayout; checked by checkReceiptLayout',
+  })
+  @IsObject()
+  layout: Record<string, unknown>;
 }

@@ -44,6 +44,7 @@ import {
   type StageRights,
   type StageView,
 } from './sales-access.service';
+import { SalesDocumentTemplatesService } from './sales-document-templates.service';
 import { assertManager, checkedName } from './sales-boards.service';
 
 export interface StageInput {
@@ -68,6 +69,9 @@ export interface PipelineInput {
   kind: PipelineKind;
   /** The STORE warehouse a TRANSFER stage moves the picked goods into (ADR-0125). */
   transferWarehouseId: number | null;
+  /** ADR-0143: the document templates; null: the default; absent: kept as they are. */
+  pickListTemplateId?: number | null;
+  deliveryNoteTemplateId?: number | null;
   roles: Record<PipelineRight, readonly number[]>;
   stages: readonly StageInput[];
 }
@@ -101,6 +105,7 @@ export class SalesPipelinesService {
     private readonly audit: AuditService,
     private readonly access: SalesAccessService,
     private readonly org: OrgService,
+    private readonly documents: SalesDocumentTemplatesService,
   ) {}
 
   /** A pipeline the caller sees, with the rights on it and on each stage; 404 otherwise. */
@@ -129,6 +134,7 @@ export class SalesPipelinesService {
     {
       await this.liveBoard(tx, input.boardId);
       await this.checkTransferTarget(tx, input, stages);
+      await this.checkDocumentTemplates(tx, input);
       const [counted] = await tx
         .select({
           live: sql<string>`count(*) FILTER (WHERE archived_at IS NULL)`,
@@ -148,6 +154,8 @@ export class SalesPipelinesService {
           ownOrdersOnly: input.ownOrdersOnly,
           kind: input.kind,
           transferWarehouseId: storeOf(input),
+          pickListTemplateId: input.pickListTemplateId ?? null,
+          deliveryNoteTemplateId: input.deliveryNoteTemplateId ?? null,
           createdBy: actorUserId(ctx),
         })
         .returning({ id: salesPipelines.id });
@@ -200,6 +208,7 @@ export class SalesPipelinesService {
       for (const stage of removed) await this.assertStageFree(tx, stage);
       await this.assertCustomerAppStage(tx, id, stages, input.ownOrdersOnly);
       await this.checkTransferTarget(tx, input, stages);
+      await this.checkDocumentTemplates(tx, input);
       if (input.kind === 'TRANSFER') await this.assertNoAppChannel(tx, id);
 
       await tx
@@ -211,6 +220,12 @@ export class SalesPipelinesService {
           ownOrdersOnly: input.ownOrdersOnly,
           kind: input.kind,
           transferWarehouseId: storeOf(input),
+          ...(input.pickListTemplateId !== undefined
+            ? { pickListTemplateId: input.pickListTemplateId }
+            : {}),
+          ...(input.deliveryNoteTemplateId !== undefined
+            ? { deliveryNoteTemplateId: input.deliveryNoteTemplateId }
+            : {}),
           updatedAt: sql`now()`,
         })
         .where(eq(salesPipelines.id, id));
@@ -280,6 +295,22 @@ export class SalesPipelinesService {
       });
       if (entries.length > 0) await this.audit.recordMany(tx, ctx, entries);
     });
+  }
+
+  /** ADR-0143: a pipeline's document templates are of their kinds. */
+  private async checkDocumentTemplates(tx: Tx, input: PipelineInput): Promise<void> {
+    await this.documents.assertKind(
+      tx,
+      input.pickListTemplateId,
+      'PICK_LIST',
+      'pickListTemplateId',
+    );
+    await this.documents.assertKind(
+      tx,
+      input.deliveryNoteTemplateId,
+      'DELIVERY_NOTE',
+      'deliveryNoteTemplateId',
+    );
   }
 
   /**
@@ -406,6 +437,8 @@ export class SalesPipelinesService {
           ownOrdersOnly: source.ownOrdersOnly,
           kind: source.kind,
           transferWarehouseId: source.transferWarehouseId,
+          pickListTemplateId: source.pickListTemplateId,
+          deliveryNoteTemplateId: source.deliveryNoteTemplateId,
           roles: source.roles,
           stages,
         },
@@ -853,6 +886,8 @@ function summaryOf(input: PipelineInput, name: string) {
     ownOrdersOnly: input.ownOrdersOnly,
     kind: input.kind,
     transferWarehouseId: storeOf(input),
+    pickListTemplateId: input.pickListTemplateId,
+    deliveryNoteTemplateId: input.deliveryNoteTemplateId,
     roles: rolesFor(input),
   };
 }

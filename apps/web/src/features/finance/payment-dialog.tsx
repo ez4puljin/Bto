@@ -1,10 +1,12 @@
 import { allocateFifo, PAYMENT_KINDS, type PaymentKind } from '@tugeel/shared/finance';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DialogFormFooter, FormField } from '@/components/form';
 import { NativeSelect } from '@/components/native-select';
+import { MoneyInput } from '@/components/money-input';
+import { SearchSelect } from '@/components/search-select';
 import { ProblemAlert } from '@/components/problem-alert';
 import {
   Dialog,
@@ -25,13 +27,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useUsers } from '@/features/identity/api';
-import { CustomerPicker, type PickedCustomer } from '@/features/partners/customer-picker';
+import type { PickedCustomer } from '@/features/partners/customer-picker';
+import { CustomerSelect } from '@/features/partners/party-select';
 import { formatMnt, formatTugrik } from '@/lib/money';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
 import { useFinanceMutations, useGlAccounts, useInvoices, useMoneyAccounts } from './api';
 import { DateInput } from '@/components/date-input';
+import { accountOption } from './account-option';
 
 const MONEY = /^\d{1,12}(\.\d{1,2})?$/;
 const isKind = (value: string): value is PaymentKind =>
@@ -81,7 +85,8 @@ function PaymentForm({
   const users = useUsers({});
   const mutations = useFinanceMutations();
   const action = useAction();
-  const [key] = useState(randomUuid);
+  const [key, setKey] = useState(randomUuid);
+  const formRef = useRef<HTMLFormElement>(null);
   const [kind, setKind] = useState<PaymentKind>('CUSTOMER_PAYMENT');
   const [moneyAccountId, setMoneyAccountId] = useState<number | null>(null);
   const [customer, setCustomer] = useState<PickedCustomer | null>(preset);
@@ -133,6 +138,10 @@ function PaymentForm({
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    save(false);
+  };
+  /** «Хадгалаад шинэ» (ADR-0151) keeps the kind, the account, the date and who took it. */
+  const save = (another: boolean) => {
     setChecked(true);
     if (
       amountValue === null ||
@@ -168,18 +177,31 @@ function PaymentForm({
         },
       });
       toast.success(t('finance.payments.recorded', { number: payment.number }));
+      if (another) {
+        formRef.current?.reset();
+        setKey(randomUuid());
+        setChecked(false);
+        setCustomer(null);
+        setAmount('');
+        setDescription('');
+        setReference('');
+        setCounterparty('');
+        setManual(false);
+        setChosen({});
+        return;
+      }
       // The page replaces the address with the voucher, which closes the dialog.
       onRecorded(payment.id);
     });
   };
 
   return (
-    <DialogContent closeLabel={t('common.close')} size="lg">
+    <DialogContent closeLabel={t('common.close')} size="xl">
       <DialogHeader>
         <DialogTitle>{t('finance.payments.dialog.title')}</DialogTitle>
         <DialogDescription>{t('finance.payments.dialog.intro')}</DialogDescription>
       </DialogHeader>
-      <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
+      <form ref={formRef} className="flex flex-col gap-4" onSubmit={submit} noValidate>
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField label={t('finance.payments.dialog.kind')} htmlFor="payment-kind">
             <NativeSelect
@@ -197,19 +219,15 @@ function PaymentForm({
             </NativeSelect>
           </FormField>
           <FormField label={t('finance.payments.dialog.moneyAccount')} htmlFor="payment-account">
-            <NativeSelect
+            <SearchSelect
               id="payment-account"
-              value={moneyAccountId ?? ''}
-              onChange={(event) =>
-                setMoneyAccountId(Number.parseInt(event.target.value, 10) || null)
-              }
-            >
-              {activeAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name} · {formatTugrik(account.balance)}
-                </option>
-              ))}
-            </NativeSelect>
+              value={moneyAccountId === null ? '' : String(moneyAccountId)}
+              options={activeAccounts.map((account) => ({
+                value: String(account.id),
+                label: `${account.name} · ${formatTugrik(account.balance)}`,
+              }))}
+              onChange={(value) => setMoneyAccountId(Number.parseInt(value, 10) || null)}
+            />
           </FormField>
         </div>
         {customerKind ? (
@@ -224,7 +242,7 @@ function PaymentForm({
               ) : undefined
             }
           >
-            <CustomerPicker
+            <CustomerSelect
               id="payment-customer"
               value={customer}
               onChange={setCustomer}
@@ -243,18 +261,13 @@ function PaymentForm({
               ) : undefined
             }
           >
-            <NativeSelect
+            <SearchSelect
               id="payment-gl-account"
-              value={glAccountId ?? ''}
-              onChange={(event) => setGlAccountId(Number.parseInt(event.target.value, 10) || null)}
-            >
-              <option value="">{t('finance.journal.dialog.chooseAccount')}</option>
-              {accountOptions.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.code} · {account.name}
-                </option>
-              ))}
-            </NativeSelect>
+              value={glAccountId === null ? '' : String(glAccountId)}
+              options={accountOptions.map(accountOption)}
+              placeholder={t('finance.journal.dialog.chooseAccount')}
+              onChange={(value) => setGlAccountId(Number.parseInt(value, 10) || null)}
+            />
           </FormField>
         )}
         <div className="grid gap-4 sm:grid-cols-2">
@@ -267,12 +280,11 @@ function PaymentForm({
                 : undefined
             }
           >
-            <Input
+            <MoneyInput
               id="payment-amount"
-              inputMode="decimal"
-              className="font-mono"
+              className="h-12 text-lg font-semibold"
               value={amount}
-              onChange={(event) => setAmount(event.target.value.trim())}
+              onValueChange={setAmount}
             />
           </FormField>
           <FormField label={t('finance.payments.dialog.paidOn')} htmlFor="payment-date">
@@ -327,16 +339,12 @@ function PaymentForm({
                           </TableCell>
                           <TableCell className="text-right">
                             {manual ? (
-                              <Input
+                              <MoneyInput
                                 aria-label={`${t('finance.payments.dialog.allocate')}: ${invoice.number}`}
-                                inputMode="decimal"
-                                className="ml-auto w-32 font-mono"
+                                className="ml-auto w-32"
                                 value={chosen[invoice.id] ?? ''}
-                                onChange={(event) =>
-                                  setChosen((previous) => ({
-                                    ...previous,
-                                    [invoice.id]: event.target.value.trim(),
-                                  }))
+                                onValueChange={(raw) =>
+                                  setChosen((previous) => ({ ...previous, [invoice.id]: raw }))
                                 }
                               />
                             ) : (
@@ -418,6 +426,7 @@ function PaymentForm({
           pending={mutations.recordPayment.isPending}
           onCancel={onClose}
           submitLabel={t('finance.payments.dialog.submit')}
+          {...(preset ? {} : { onSaveAndNew: () => save(true) })}
         />
       </form>
     </DialogContent>

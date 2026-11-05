@@ -21,7 +21,7 @@ import { formatUbDateTime } from '@/lib/dayjs';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
 import { cn } from '@/lib/utils';
-import { type AuditEntry, type AuditFilter, useAudit } from './api';
+import { type AuditEntry, type AuditFilter, useAudit, useAuditActions } from './api';
 import { AUDIT_ENTITIES, isAuditAction, isAuditEntity } from './labels';
 
 /** The log's columns (ADR-0119); the entity wraps (session ids are long), the details fold out. */
@@ -52,7 +52,7 @@ function Actor({ entry }: { entry: AuditEntry }) {
 }
 
 /**
- * Who changed what and when, newest first (SPEC §5.1). The filters live in the URL (`?entity=`,
+ * Who changed what and when, newest first (SPEC §5.1). The filters live in the URL (`?entity=`, `?action=`,
  * `?from=`, `?to=`), so a filtered log can be shared and survives a reload (ADR-0066); a row with
  * a before / after unfolds them under it.
  */
@@ -62,12 +62,16 @@ export function AuditPage() {
   const setParam = useSetParam();
   const filter: AuditFilter = {
     entity: params.get('entity') ?? undefined,
+    action: params.get('action') ?? undefined,
     from: params.get('from') ?? undefined,
     to: params.get('to') ?? undefined,
   };
-  const filtered = Boolean(filter.entity || filter.from || filter.to);
+  const filtered = Boolean(filter.entity || filter.action || filter.from || filter.to);
   const [open, setOpen] = useState<number | null>(null);
   const audit = useAudit(filter);
+  const actions = useAuditActions();
+  const actionLabel = (action: string) =>
+    isAuditAction(action) ? t(`audit.actions.${action}`) : action;
   const rows = audit.data?.pages.flatMap((page) => page.data) ?? [];
 
   // One navigation for the three: separate setParam calls would each start from the same address.
@@ -75,7 +79,7 @@ export function AuditPage() {
     setParams(
       (previous) => {
         const next = new URLSearchParams(previous);
-        for (const key of ['entity', 'from', 'to']) next.delete(key);
+        for (const key of ['entity', 'action', 'from', 'to']) next.delete(key);
         return next;
       },
       { replace: true },
@@ -95,6 +99,19 @@ export function AuditPage() {
           {AUDIT_ENTITIES.map((entity) => (
             <option key={entity} value={entity}>
               {t(`audit.entities.${entity}`)}
+            </option>
+          ))}
+        </NativeSelect>
+        <NativeSelect
+          variant="filter"
+          aria-label={t('audit.action')}
+          value={filter.action ?? ''}
+          onChange={(event) => setParam('action', event.target.value)}
+        >
+          <option value="">{t('audit.allActions')}</option>
+          {(actions.data ?? []).map((row) => (
+            <option key={row.action} value={row.action}>
+              {t('audit.actionCount', { action: actionLabel(row.action), count: row.count })}
             </option>
           ))}
         </NativeSelect>

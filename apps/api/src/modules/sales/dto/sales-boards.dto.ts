@@ -178,6 +178,20 @@ export class SalesPipelineRequestDto {
   @IsInt()
   @Min(1)
   transferWarehouseId?: number | null;
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'ADR-0143: its pick list template; null: the default; absent: kept',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  pickListTemplateId?: number | null;
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'ADR-0143: as above' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  deliveryNoteTemplateId?: number | null;
   @ApiProperty({ type: SalesPipelineRolesDto })
   @ValidateNested()
   @Type(() => SalesPipelineRolesDto)
@@ -234,6 +248,9 @@ export class SalesPipelineDto {
     description: 'The STORE warehouse a TRANSFER stage moves the picked goods into (ADR-0125)',
   })
   transferWarehouseId: number | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'ADR-0143; null: the default' })
+  pickListTemplateId: number | null;
+  @ApiProperty({ type: Number, nullable: true }) deliveryNoteTemplateId: number | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) archivedAt: string | null;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
   @ApiProperty({ type: SalesPipelineRolesDto }) roles: SalesPipelineRolesDto;

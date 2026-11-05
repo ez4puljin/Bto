@@ -14,6 +14,7 @@ import type {
   EdgeShiftSummary,
   EdgeSupervisor,
 } from '@tugeel/shared/pos';
+import { posReceiptBarcode } from '@tugeel/shared/pos';
 import { SyncRunner } from '../../src/edge/services/sync.runner';
 import { createHttpApp } from '../harness/apps';
 import { type ProductJson, unitOf } from '../harness/catalog';
@@ -203,6 +204,12 @@ describe('pos till tools', () => {
     const latin = sold.number.replace('К', 'K');
     const found = (await kiosk.get(`/returns/sale?number=${encodeURIComponent(latin)}`).expect(200))
       .body as EdgeReturnSale;
+    // ADR-0142: the receipt's barcode (the till's id, the day, the number) finds it too.
+    const barcode = posReceiptBarcode(store.till.id, sold.number);
+    expect(barcode).toMatch(/^993[0-9]{15}$/);
+    const scanned = (await kiosk.get(`/returns/sale?number=${barcode ?? ''}`).expect(200))
+      .body as EdgeReturnSale;
+    expect(scanned.clientId).toBe(sold.clientId);
     expect(found).toMatchObject({
       clientId: sold.clientId,
       withinWindow: true,

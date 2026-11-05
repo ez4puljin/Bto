@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { CommunityPopupGate } from '../../src/community/popup-gate';
 import { ThumbKeeper } from '../../src/images/thumb-keeper';
 import { NoticePopupGate } from '../../src/notifications/popup-gate';
 import { isRep, mayPick, mayRequestTransfers } from '../../src/state/phase';
@@ -29,6 +30,7 @@ export default function StaffLayout() {
         <StatusBar style="light" />
         {rep ? <NoticePopupGate /> : null}
         {rep ? <ThumbKeeper /> : null}
+        <CommunityPopupGate />
         <Stack
           screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}
         >
@@ -49,6 +51,19 @@ export default function StaffLayout() {
           </Stack.Protected>
           {/* «Ирц» (ADR-0131): first for staff with neither right, a profile row for the rest. */}
           <Stack.Screen name="attendance/history" />
+          {/* «Цагийн хүсэлт» (ADR-0144): every staff member sends their own. */}
+          <Stack.Screen name="attendance/requests" />
+          {/* «Хамт олон» (ADR-0146): every staff member's, from their profile. */}
+          <Stack.Screen name="community/index" />
+          <Stack.Screen name="community/messages" />
+          <Stack.Screen name="community/message/[id]" />
+          <Stack.Screen name="community/polls" />
+          <Stack.Screen name="community/poll/[id]" />
+          <Stack.Screen name="community/calendar" />
+          <Stack.Screen name="community/thanks" />
+          <Stack.Screen name="community/feedback" />
+          <Stack.Screen name="community/location" />
+          <Stack.Screen name="community/profile" />
           {/* The profile without the rep's context: a seller's and any other staff member's. */}
           <Stack.Protected guard={rep}>
             <Stack.Screen

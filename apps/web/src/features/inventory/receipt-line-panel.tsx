@@ -1,10 +1,13 @@
 import { markupPct } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
+import { Pencil } from 'lucide-react';
 import { Popover } from 'radix-ui';
 import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router';
 import { useApiClient } from '@/app/api-client-context';
 import { useHasPermission } from '@/app/auth-context';
+import { MoneyInput } from '@/components/money-input';
 import { NativeSelect } from '@/components/native-select';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useBarcodeLookup, useProductLookup } from '@/features/catalog/api';
 import { useCurrentPricesOf } from '@/features/pricing/api';
+import { BINS_SOON } from '@/lib/features';
 import { formatMnt, formatQty } from '@/lib/money';
 import { problemFromError, unwrap } from '@/lib/problem';
 import { useScanGuard, useWedgeScanner } from '@/lib/scan/use-wedge-scanner';
@@ -55,8 +59,6 @@ export interface PanelLine {
   enteredQty: string;
   /** The delivery note's price as typed (cost holders); null when the panel shows no prices. */
   price: CostEntry | null;
-  /** Whole tugriks per base unit; '' leaves none; null when the user may not set sale prices. */
-  salePrice: string | null;
   /** Only for a product without a home warehouse: the one it is received into. */
   warehouseId?: number;
 }
@@ -79,21 +81,15 @@ function productOfLine(line: ReceiptLine): PanelProduct {
   };
 }
 
-/** A whole-tugrik sale price as typed, or null. */
-function parseWhole(text: string): string | null {
-  const value = text.trim().replace(/[\s,]/g, '');
-  return /^\d{1,12}$/.test(value) && new Decimal(value).gt(0)
-    ? new Decimal(value).toFixed(0)
-    : null;
-}
-
 /**
- * The line entry of the receipt window (ADR-0099 #3), after Erkhet's one-line editor: the product
- * (name, code or barcode; a scan anywhere on the page lands here), its unit, the quantity, the
- * delivery note's price for cost holders and a new sale price per piece for price holders; Enter
- * moves to the next field and adds the line from the last one. A product without a home warehouse
- * asks for the warehouse it goes into, which becomes its home. Under the fields: the home
- * warehouse and its stock, the weight, the last receipt price, the sale price and the markup. A
+ * The line entry of the receipt window (ADR-0099 #3, ADR-0153), after Erkhet's one-line editor: the
+ * product (name, code or barcode; a scan anywhere on the page lands here), its location and weight
+ * as the product has them, its unit, the quantity, the delivery note's price for cost holders and a
+ * Enter moves to the next field and saves the line from
+ * the last one, emptying the fields. «Бараа засах» opens the product in a new tab, and coming back
+ * reads its location and weight again. A product without a home warehouse asks for the warehouse it
+ * goes into, which becomes its home. Under the fields: the stock, the last receipt price, the sale
+ * price and the markup. A
  * line of the table opens here for editing (its product and unit stay). With a supplier chosen the
  * search shows that supplier's products, or all products at a switch (ADR-0103). The `free`
  * variant takes free goods: a product, its unit and the quantity, no prices and no scanner.
@@ -103,10 +99,12 @@ export function ReceiptLinePanel(props: {
   pending: boolean;
   /** The receipt's supplier: its products are searched first (ADR-0103). */
   supplierId?: number;
-  /** Free goods (урамшуулал): no prices, no sale price, no page-wide scanner. */
+  /** Free goods (урамшуулал): no prices, no page-wide scanner. */
   free?: boolean;
-  /** Shown beside «Нэмэх» (the free goods' «Болих»). */
+  /** Shown beside the save button (the free goods' «Болих»). */
   onClose?: () => void;
+  /** The save button is the window's blue one while there is no line to post yet. */
+  primary?: boolean;
   /** A problem to show under the fields (a refused add). */
   problem?: ReactNode;
   onSubmit: (line: PanelLine) => Promise<boolean>;
@@ -116,7 +114,6 @@ export function ReceiptLinePanel(props: {
   const { editing } = props;
   const free = props.free === true;
   const canCost = useHasPermission('inventory.costs.manage') && !free;
-  const canPrice = useHasPermission('pricing.prices.manage') && !free;
   const api = useApiClient();
   const lookupBarcode = useBarcodeLookup();
   const warehouses = useWarehouseOptions(WHOLESALE);
@@ -129,13 +126,11 @@ export function ReceiptLinePanel(props: {
   const qtyRef = useRef<HTMLInputElement>(null);
   const priceRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
-  const saleRef = useRef<HTMLInputElement>(null);
 
   const [product, setProduct] = useState<PanelProduct | null>(null);
   const [unitId, setUnitId] = useState<number | null>(null);
   const [qty, setQty] = useState('1');
   const [entry, setEntry] = useState<CostEntry>(START);
-  const [sale, setSale] = useState('');
   const [warehouseId, setWarehouseId] = useState<number | undefined>();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
@@ -153,7 +148,6 @@ export function ReceiptLinePanel(props: {
       setUnitId(editing.productUnitId);
       setQty(new Decimal(editing.enteredQty).toString());
       setEntry(entryOfLine(editing, false));
-      setSale(editing.salePrice ?? '');
       setWarehouseId(undefined);
       setSearch('');
       setMessage(null);
@@ -162,7 +156,6 @@ export function ReceiptLinePanel(props: {
       setUnitId(null);
       setQty('1');
       setEntry(START);
-      setSale('');
     }
   }
   useEffect(() => {
@@ -192,6 +185,32 @@ export function ReceiptLinePanel(props: {
   useEffect(() => {
     if (homeless) warehouseRef.current?.focus();
   }, [homeless]);
+  const homeRow = locations.data?.find((row) => row.isHome);
+  const homeName = editing ? editing.warehouseName : home === undefined ? '' : warehouseName(home);
+  const locationText =
+    !BINS_SOON && homeRow?.defaultBinCode ? `${homeName} · ${homeRow.defaultBinCode}` : homeName;
+  // Back from «Бараа засах»: what the product says now.
+  const editedProduct = useRef(false);
+  useEffect(() => {
+    const back = () => {
+      if (!editedProduct.current || productId === 0) return;
+      editedProduct.current = false;
+      void locations.refetch();
+      void api
+        .GET('/api/v1/products/{id}', { params: { path: { id: productId } } })
+        .then(unwrap)
+        .then((fresh) =>
+          setProduct((before) =>
+            before?.id === fresh.id
+              ? { ...before, name: fresh.name, weightKg: fresh.weightKg }
+              : before,
+          ),
+        )
+        .catch(() => undefined);
+    };
+    window.addEventListener('focus', back);
+    return () => window.removeEventListener('focus', back);
+  }, [api, locations, productId]);
   const stock = useProductStock(productId, product !== null && home !== undefined);
   const onHand = stock.data?.warehouses.find((row) => row.warehouseId === home)?.onHand ?? null;
   const last = useLastReceiptPrices(product ? [product.id] : [], canCost && product !== null);
@@ -206,11 +225,7 @@ export function ReceiptLinePanel(props: {
     amount !== null && qtyValue && unit && !entry.free
       ? amount.dividedBy(new Decimal(qtyValue).times(unit.factorToBase))
       : null;
-  const newSale = canPrice ? parseWhole(sale) : null;
-  const markup =
-    pieceCost !== null && (newSale ?? salePrice) !== null
-      ? markupPct(newSale ?? salePrice ?? 0, pieceCost)
-      : null;
+  const markup = pieceCost !== null && salePrice !== null ? markupPct(salePrice, pieceCost) : null;
 
   const chooseProduct = (next: PanelProduct, unitPick?: number) => {
     setProduct(next);
@@ -257,7 +272,6 @@ export function ReceiptLinePanel(props: {
         ];
         setQty('1');
         setEntry(START);
-        setSale('');
         chooseProduct(
           {
             id: resolved.product.id,
@@ -291,7 +305,6 @@ export function ReceiptLinePanel(props: {
         ? amountRef.current
         : priceRef.current
       : null,
-    canPrice ? saleRef.current : null,
   ];
   const next = (from: HTMLElement) => {
     const fields = chain().filter((field): field is HTMLElement => field !== null);
@@ -320,7 +333,6 @@ export function ReceiptLinePanel(props: {
     setUnitId(null);
     setQty('1');
     setEntry(START);
-    setSale('');
     setWarehouseId(undefined);
     // The search box replaces the chosen product once this renders.
     window.setTimeout(() => searchRef.current?.focus(), 0);
@@ -342,11 +354,6 @@ export function ReceiptLinePanel(props: {
       setMessage(t('inventory.receipt.form.scanPriceInvalid'));
       return;
     }
-    if (canPrice && sale.trim() !== '' && newSale === null) {
-      setMessage(t('inventory.receipt.panel.salePriceInvalid'));
-      saleRef.current?.focus();
-      return;
-    }
     if (homeless && warehouseId === undefined) {
       setMessage(t('inventory.receipt.panel.pickHome'));
       warehouseRef.current?.focus();
@@ -357,14 +364,19 @@ export function ReceiptLinePanel(props: {
       productUnitId: unitId,
       enteredQty: qtyValue,
       price: free ? { ...START, free: true } : canCost ? entry : null,
-      salePrice: canPrice ? (newSale ?? '') : null,
       ...(homeless && warehouseId !== undefined ? { warehouseId } : {}),
     });
     if (saved && !editing) reset();
   };
 
-  const field = (label: string, id: string, control: ReactNode, hint?: ReactNode) => (
-    <div className="flex min-w-0 flex-col gap-1.5">
+  const field = (
+    label: string,
+    id: string,
+    control: ReactNode,
+    hint?: ReactNode,
+    span = 'sm:col-span-2',
+  ) => (
+    <div className={`flex min-w-0 flex-col gap-1.5 ${span}`}>
       <Label htmlFor={id} title={label} className="block truncate leading-snug">
         {label}
       </Label>
@@ -416,10 +428,10 @@ export function ReceiptLinePanel(props: {
         ) : null}
       </CardHeader>
       <CardContent ref={root} className="flex flex-col gap-3">
-        {/* The fields and the add button in one row on a desktop (ADR-0113), so the lines start
-            high; the button is outline: the window's one blue button is its step («Батлах»). */}
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
-          <div className="grid min-w-0 flex-1 gap-x-3 gap-y-3 sm:grid-cols-2 lg:grid-cols-[minmax(16rem,2.4fr)_minmax(7rem,1fr)_minmax(6rem,0.8fr)_minmax(7rem,1fr)_minmax(7rem,1fr)_minmax(7rem,1fr)]">
+        {/* Six columns: the product, then the location and unit, the quantity and prices, the
+            weight and save (ADR-0153). */}
+        <div className="flex flex-col gap-3">
+          <div className="grid min-w-0 items-start gap-x-3 gap-y-3 sm:grid-cols-6">
             {field(
               t('inventory.product'),
               `${ids}-product`,
@@ -490,7 +502,6 @@ export function ReceiptLinePanel(props: {
                           if (chosen) {
                             setQty('1');
                             setEntry(START);
-                            setSale('');
                             chooseProduct(chosen);
                           } else if (typed) {
                             // A code typed by hand: looked up as a barcode or product code.
@@ -535,7 +546,6 @@ export function ReceiptLinePanel(props: {
                                 event.preventDefault();
                                 setQty('1');
                                 setEntry(START);
-                                setSale('');
                                 chooseProduct(match);
                               }}
                             >
@@ -557,7 +567,68 @@ export function ReceiptLinePanel(props: {
                   </Popover.Portal>
                 </Popover.Root>
               ),
+              undefined,
+              'sm:col-span-6',
             )}
+            <div className="flex min-w-0 flex-col gap-1.5 sm:col-span-4">
+              <Label
+                htmlFor={homeless ? `${ids}-home` : `${ids}-location`}
+                className="block truncate leading-snug"
+              >
+                {t('inventory.receipt.panel.location')}
+              </Label>
+              <div className="flex min-w-0 gap-2">
+                {homeless ? (
+                  <NativeSelect
+                    ref={warehouseRef}
+                    id={`${ids}-home`}
+                    aria-label={t('inventory.receipt.panel.homeLabel')}
+                    className="min-w-0 flex-1"
+                    value={warehouseId ?? ''}
+                    onChange={(event) =>
+                      setWarehouseId(
+                        event.target.value ? Number.parseInt(event.target.value, 10) : undefined,
+                      )
+                    }
+                    onKeyDown={onEnter}
+                  >
+                    <option value="">{t('inventory.pickWarehouse')}</option>
+                    {warehouses.options.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                ) : (
+                  <Input
+                    id={`${ids}-location`}
+                    readOnly
+                    tabIndex={-1}
+                    className="min-w-0 flex-1 bg-muted/40"
+                    value={locationText}
+                  />
+                )}
+                {product ? (
+                  <Button variant="outline" asChild>
+                    <Link
+                      to={`/catalog/products/${product.id}`}
+                      target="_blank"
+                      onClick={() => {
+                        editedProduct.current = true;
+                      }}
+                    >
+                      <Pencil />
+                      {t('inventory.receipt.panel.editProduct')}
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button variant="outline" disabled>
+                    <Pencil />
+                    {t('inventory.receipt.panel.editProduct')}
+                  </Button>
+                )}
+              </div>
+            </div>
             {field(
               t('inventory.unit'),
               `${ids}-unit`,
@@ -602,12 +673,9 @@ export function ReceiptLinePanel(props: {
               ? field(
                   t('inventory.receipt.form.unitPrice'),
                   `${ids}-price`,
-                  <Input
+                  <MoneyInput
                     ref={priceRef}
                     id={`${ids}-price`}
-                    inputMode="decimal"
-                    autoComplete="off"
-                    className="text-right font-mono"
                     disabled={entry.free}
                     value={entry.source === 'unitPrice' ? entry.value : ''}
                     placeholder={
@@ -615,9 +683,7 @@ export function ReceiptLinePanel(props: {
                         ? formatMnt(amount.dividedBy(qtyValue).toDecimalPlaces(2).toString())
                         : undefined
                     }
-                    onChange={(event) =>
-                      setEntry({ source: 'unitPrice', value: event.target.value, free: false })
-                    }
+                    onValueChange={(value) => setEntry({ source: 'unitPrice', value, free: false })}
                     onKeyDown={(event) => {
                       guard(event, entry.value, (value) => setEntry({ ...entry, value }));
                       if (!event.defaultPrevented) onEnter(event);
@@ -636,12 +702,9 @@ export function ReceiptLinePanel(props: {
               ? field(
                   t('inventory.receipt.form.amount'),
                   `${ids}-amount`,
-                  <Input
+                  <MoneyInput
                     ref={amountRef}
                     id={`${ids}-amount`}
-                    inputMode="decimal"
-                    autoComplete="off"
-                    className="text-right font-mono"
                     disabled={entry.free}
                     value={entry.source === 'amount' ? entry.value : ''}
                     placeholder={
@@ -649,9 +712,7 @@ export function ReceiptLinePanel(props: {
                         ? formatMnt(amount.toString())
                         : undefined
                     }
-                    onChange={(event) =>
-                      setEntry({ source: 'amount', value: event.target.value, free: false })
-                    }
+                    onValueChange={(value) => setEntry({ source: 'amount', value, free: false })}
                     onKeyDown={(event) => {
                       guard(event, entry.value, (value) => setEntry({ ...entry, value }));
                       if (!event.defaultPrevented) onEnter(event);
@@ -659,99 +720,64 @@ export function ReceiptLinePanel(props: {
                   />,
                 )
               : null}
-            {canPrice
-              ? field(
-                  t('inventory.receipt.panel.salePrice'),
-                  `${ids}-sale`,
-                  <Input
-                    ref={saleRef}
-                    id={`${ids}-sale`}
-                    inputMode="numeric"
-                    autoComplete="off"
-                    className="text-right font-mono"
-                    value={sale}
-                    placeholder={salePrice ? formatMnt(salePrice) : undefined}
-                    onChange={(event) => setSale(event.target.value)}
-                    onKeyDown={(event) => {
-                      guard(event, sale, setSale);
-                      if (!event.defaultPrevented) onEnter(event);
-                    }}
-                  />,
-                )
-              : null}
-          </div>
-          <div className="ml-auto flex shrink-0 items-center gap-2 xl:pt-[25px]">
-            {props.onClose ? (
-              <Button variant="ghost" onClick={props.onClose}>
-                {t('common.cancel')}
+            {field(
+              t('inventory.receipt.panel.weightField'),
+              `${ids}-weight`,
+              <Input
+                id={`${ids}-weight`}
+                readOnly
+                tabIndex={-1}
+                className="bg-muted/40 text-right font-mono"
+                value={product?.weightKg ? formatQty(product.weightKg) : ''}
+                placeholder={product ? none : undefined}
+              />,
+              product?.weightKg && qtyValue && unit
+                ? t('inventory.receipt.panel.weightTotal', {
+                    total: formatQty(
+                      new Decimal(product.weightKg)
+                        .times(qtyValue)
+                        .times(unit.factorToBase)
+                        .toDecimalPlaces(3)
+                        .toString(),
+                    ),
+                  })
+                : undefined,
+            )}
+            <div className="flex items-center justify-end gap-2 sm:col-span-2 sm:col-start-5 sm:pt-[25px]">
+              {props.onClose ? (
+                <Button variant="ghost" onClick={props.onClose}>
+                  {t('common.cancel')}
+                </Button>
+              ) : null}
+              {editing ? (
+                <Button variant="ghost" onClick={props.onCancelEdit}>
+                  {t('common.cancel')}
+                </Button>
+              ) : null}
+              <Button
+                className="flex-1"
+                variant={props.primary ? 'default' : 'outline'}
+                pending={props.pending}
+                onClick={() => void submit()}
+              >
+                {free ? t('inventory.add') : t('common.save')}
               </Button>
-            ) : null}
-            {editing ? (
-              <Button variant="ghost" onClick={props.onCancelEdit}>
-                {t('common.cancel')}
-              </Button>
-            ) : null}
-            <Button variant="outline" pending={props.pending} onClick={() => void submit()}>
-              {editing ? t('common.save') : t('inventory.add')}
-            </Button>
+            </div>
           </div>
         </div>
-        {homeless ? (
-          <div className="flex items-center gap-2">
-            <Label htmlFor={`${ids}-home`} className="text-warning">
-              {t('inventory.receipt.panel.homeLabel')}
-            </Label>
-            <NativeSelect
-              ref={warehouseRef}
-              id={`${ids}-home`}
-              className="w-56"
-              value={warehouseId ?? ''}
-              onChange={(event) =>
-                setWarehouseId(
-                  event.target.value ? Number.parseInt(event.target.value, 10) : undefined,
-                )
-              }
-              onKeyDown={onEnter}
-            >
-              <option value="">{t('inventory.pickWarehouse')}</option>
-              {warehouses.options.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                </option>
-              ))}
-            </NativeSelect>
-          </div>
-        ) : null}
         {product ? (
           <dl
             aria-label={t('inventory.receipt.panel.infoLabel')}
             className="flex flex-wrap gap-x-6 gap-y-1 rounded-lg bg-muted/50 px-3 py-2 text-[0.8125rem]"
           >
-            <Info label={t('inventory.receipt.panel.home')}>
+            <Info label={t('inventory.receipt.panel.stock')}>
               {home === undefined
                 ? locations.isSuccess
                   ? t('inventory.receipt.panel.noHome')
                   : none
-                : `${warehouseName(home)} · ${t('inventory.receipt.panel.onHand', {
-                    qty: onHand === null ? '…' : formatQty(onHand),
-                  })}`}
-            </Info>
-            <Info label={t('inventory.receipt.panel.weight')}>
-              {product.weightKg
-                ? t('inventory.receipt.panel.weightValue', {
-                    kg: formatQty(product.weightKg),
-                    total:
-                      qtyValue && unit
-                        ? formatQty(
-                            new Decimal(product.weightKg)
-                              .times(qtyValue)
-                              .times(unit.factorToBase)
-                              .toDecimalPlaces(3)
-                              .toString(),
-                          )
-                        : '…',
-                  })
-                : none}
+                : onHand === null
+                  ? none
+                  : formatQty(onHand)}
             </Info>
             {canCost ? (
               <Info label={t('inventory.receipt.panel.lastPrice')}>

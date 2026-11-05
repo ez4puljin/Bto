@@ -27,6 +27,22 @@ export interface ReceiptMoneyAccounts {
 
 export const RECEIPT_MONEY_ACCOUNTS = Symbol('RECEIPT_MONEY_ACCOUNTS');
 
+/** An account a receipt's bill may credit (ADR-0154); finance's chart, by code. */
+export interface ReceiptCounterAccount {
+  code: string;
+  name: string;
+  /** The payable's own account: what a receipt without a choice credits. */
+  isDefault: boolean;
+}
+
+export interface ReceiptCounterAccounts {
+  active(executor?: Db | Tx): Promise<ReceiptCounterAccount[]>;
+  /** Refuses a code that is not on the list (422 `counterAccountCode`). */
+  assertUsable(tx: Tx, code: string): Promise<ReceiptCounterAccount>;
+}
+
+export const RECEIPT_COUNTER_ACCOUNTS = Symbol('RECEIPT_COUNTER_ACCOUNTS');
+
 /**
  * What inventory asks of pricing (ADR-0099 #5): a receipt line may carry a new warehouse price per
  * base unit, put in force by the receipt's posting from its business date, in the posting's
@@ -78,6 +94,8 @@ export interface ReceiptBookFacts {
   version: number;
   totals: ReceiptBookTotals;
   previous: ReceiptBookTotals | null;
+  /** The account the bill credits; null: the key AP's (ADR-0154). */
+  counterAccountCode: string | null;
   /** The document's warehouses: the books tag it with their branch when they share one (ADR-0106 #4). */
   warehouseIds: number[];
 }

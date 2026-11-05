@@ -12,6 +12,7 @@ import { AuditService, type AuthContext, OrgService } from '../../identity';
 import { SystemBinsService } from '../../inventory';
 import { posCashiers, posTillCategories, posTills, posTillUsers } from '../schema';
 import { PosEdgeNodesService } from './pos-edge-nodes.service';
+import { PosReceiptTemplatesService } from './pos-receipt-templates.service';
 
 export interface Till {
   id: number;
@@ -31,6 +32,9 @@ export interface Till {
   /** ADR-0111: the till PC's printer as the admin noted it (information only). */
   printerName: string | null;
   drawerKick: boolean;
+  /** ADR-0141: the receipt templates it prints with; null: the default of the kind. */
+  saleTemplateId: number | null;
+  returnTemplateId: number | null;
   status: PosStatus;
   lastSaleAt: Date | null;
   pairingExpiresAt: Date | null;
@@ -57,6 +61,8 @@ export interface TillPatch {
   printerPort?: number;
   printerName?: string | null;
   drawerKick?: boolean;
+  saleTemplateId?: number | null;
+  returnTemplateId?: number | null;
   status?: PosStatus;
 }
 
@@ -86,6 +92,7 @@ export class PosTillsService {
     private readonly org: OrgService,
     private readonly categories: CategoriesService,
     private readonly systemBins: SystemBinsService,
+    private readonly templates: PosReceiptTemplatesService,
   ) {}
 
   async list(filter: { edgeNodeId?: number } = {}): Promise<Till[]> {
@@ -159,6 +166,8 @@ export class PosTillsService {
       if (patch.warehouseId !== undefined && patch.warehouseId !== before.warehouseId) {
         await this.assertLocation(patch.warehouseId, tx);
       }
+      await this.templates.assertKind(tx, patch.saleTemplateId, 'SALE', 'saleTemplateId');
+      await this.templates.assertKind(tx, patch.returnTemplateId, 'RETURN', 'returnTemplateId');
       const set = {
         ...(patch.name !== undefined ? { name: cleanName(patch.name) } : {}),
         ...(patch.warehouseId !== undefined ? { warehouseId: patch.warehouseId } : {}),
@@ -168,6 +177,10 @@ export class PosTillsService {
           ? { printerName: patch.printerName?.trim() || null }
           : {}),
         ...(patch.drawerKick !== undefined ? { drawerKick: patch.drawerKick } : {}),
+        ...(patch.saleTemplateId !== undefined ? { saleTemplateId: patch.saleTemplateId } : {}),
+        ...(patch.returnTemplateId !== undefined
+          ? { returnTemplateId: patch.returnTemplateId }
+          : {}),
         ...(patch.status !== undefined ? { status: patch.status } : {}),
       };
       await tx
@@ -185,6 +198,8 @@ export class PosTillsService {
           printerPort: before.printerPort,
           printerName: before.printerName,
           drawerKick: before.drawerKick,
+          saleTemplateId: before.saleTemplateId,
+          returnTemplateId: before.returnTemplateId,
           status: before.status,
         },
         after: set,
@@ -382,6 +397,8 @@ function view(
     printerPort: row.printerPort,
     printerName: row.printerName,
     drawerKick: row.drawerKick,
+    saleTemplateId: row.saleTemplateId,
+    returnTemplateId: row.returnTemplateId,
     status: row.status,
     lastSaleAt: row.lastSaleAt,
     pairingExpiresAt: row.pairingExpiresAt,
