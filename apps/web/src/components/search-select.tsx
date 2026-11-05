@@ -65,6 +65,18 @@ export function SearchSelect(props: {
     if (!open && document.activeElement === input.current) input.current?.select();
   }, [open, props.value]);
 
+  // The arrows keep the active row in sight, moving only the list (never the page).
+  const list = useRef<HTMLUListElement>(null);
+  useLayoutEffect(() => {
+    const box = list.current;
+    const row = box?.children[current];
+    if (!box || !(row instanceof HTMLElement)) return;
+    if (row.offsetTop < box.scrollTop) box.scrollTop = row.offsetTop;
+    else if (row.offsetTop + row.offsetHeight > box.scrollTop + box.clientHeight) {
+      box.scrollTop = row.offsetTop + row.offsetHeight - box.clientHeight;
+    }
+  }, [current]);
+
   const close = () => {
     setOpen(false);
     setSearch('');
@@ -121,6 +133,8 @@ export function SearchSelect(props: {
             aria-invalid={props.invalid ? true : undefined}
             autoComplete="off"
             className="pr-9"
+            // A choice cut by a narrow field reads whole on hover.
+            title={!open && chosenLabel ? chosenLabel : undefined}
             placeholder={open ? chosenLabel || props.placeholder : props.placeholder}
             value={open ? search : chosenLabel}
             onFocus={(event) => event.target.select()}
@@ -173,7 +187,12 @@ export function SearchSelect(props: {
               {t(props.searching ? 'common.loading' : 'common.noMatches')}
             </p>
           ) : (
-            <ul id={listId} role="listbox" className="flex max-h-72 flex-col overflow-y-auto">
+            <ul
+              ref={list}
+              id={listId}
+              role="listbox"
+              className="relative flex max-h-72 flex-col overflow-y-auto"
+            >
               {rows.map((option, position) => (
                 <li
                   key={option.value}

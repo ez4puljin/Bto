@@ -290,9 +290,15 @@ const summary = (id: number, fields: Partial<Schemas['ReceiptSummary']> = {}) =>
     ...fields,
   }) satisfies Schemas['ReceiptSummary'];
 
-const panel = () => within(screen.getByRole('region', { name: panelText.title }));
-const findPanel = async () => within(await screen.findByRole('region', { name: panelText.title }));
-const productSearch = () => panel().getByRole('searchbox', { name: mn.inventory.product });
+const panel = () => within(screen.getByRole('rowgroup', { name: panelText.title }));
+const findPanel = async () =>
+  within(await screen.findByRole('rowgroup', { name: panelText.title }));
+const productSearch = () => panel().getByRole('combobox', { name: mn.inventory.product });
+/** A draft's discounts and free goods open in a sheet from the window's foot (ADR-0156). */
+async function openDiscounts(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: new RegExp(discountsText.open) }));
+  return within(await screen.findByRole('region', { name: discountsText.title }));
+}
 /** The query of each product lookup the page made, in order. */
 const lookups = (fetchMock: ReturnType<typeof signedIn>) =>
   calls(fetchMock, 'GET', '/api/v1/products/lookup').map(
@@ -499,15 +505,6 @@ describe('a new receipt (owner 2026-10-18 and 2026-10-23: one window like Erkhet
     expect(await info.findByText('44')).toBeInTheDocument();
     expect(await info.findByText('1,100₮/ш (1,100₮/ш) · 2026-10-01 · МСМ ХХК')).toBeInTheDocument();
     expect(await info.findByText('1,500₮')).toBeInTheDocument();
-    // The last receipt price waits under «Нэгж үнэ» too.
-    expect(
-      panel().getByText(
-        panelText.lastPriceHint
-          .replace('{{price}}', '1,100')
-          .replace('{{unit}}', 'ш')
-          .replace('{{date}}', '2026-10-01'),
-      ),
-    ).toBeInTheDocument();
     // The search kept to the chosen supplier's products (ADR-0103).
     expect(lookups(fetchMock).at(-1)?.get('supplierId')).toBe('3');
     await user.keyboard('3{Enter}');
@@ -540,7 +537,7 @@ describe('a new receipt (owner 2026-10-18 and 2026-10-23: one window like Erkhet
       expect(panel().getByPlaceholderText(panelText.supplierSearch)).toHaveFocus(),
     );
     // The panel empties for the next product.
-    expect(await panel().findByRole('searchbox', { name: mn.inventory.product })).toHaveValue('');
+    expect(await panel().findByRole('combobox', { name: mn.inventory.product })).toHaveValue('');
     const lines = within(screen.getByRole('region', { name: form.linesTitle }));
     expect(lines.getByRole('cell', { name: WH1.name })).toBeInTheDocument();
     expect(lines.getByRole('cell', { name: '3,600' })).toBeInTheDocument();
@@ -571,7 +568,7 @@ describe('a new receipt (owner 2026-10-18 and 2026-10-23: one window like Erkhet
     // A line is what saves: no empty document.
     expect(screen.getAllByRole('button', { name: mn.common.save })).toHaveLength(1);
     expect(
-      within(screen.getByRole('region', { name: panelText.title })).getByRole('button', {
+      within(screen.getByRole('rowgroup', { name: panelText.title })).getByRole('button', {
         name: mn.common.save,
       }),
     ).toBeInTheDocument();
@@ -624,14 +621,15 @@ describe('the line panel (ADR-0099 #3)', () => {
     const byCode = lookups(fetchMock).find((query) => query.get('q') === COLA.sku);
     expect(byCode?.get('limit')).toBe('5');
     // The weight is the product's, filled by itself.
-    const weight = (total: string) => panelText.weightTotal.replace('{{total}}', total);
-    await waitFor(() => expect(panel().getByLabelText(panelText.weightField)).toHaveValue('0.26'));
-    expect(await panel().findByText(weight('6.24'))).toBeInTheDocument();
+    await waitFor(() =>
+      expect(panel().getByLabelText(panelText.weightTotalLabel)).toHaveValue('6.24'),
+    );
+    expect(info.getByText('0.26')).toBeInTheDocument();
 
     // The same code again counts one more box, never a quantity of the barcode's digits.
     await wedgeScan('4006381333931');
     await waitFor(() => expect(qty).toHaveValue('2'));
-    expect(panel().getByText(weight('12.48'))).toBeInTheDocument();
+    expect(panel().getByLabelText(panelText.weightTotalLabel)).toHaveValue('12.48');
     expect(calls(fetchMock, 'POST', '/api/v1/receipts/5/lines')).toHaveLength(0);
     await user.keyboard('{Enter}');
     await waitFor(() =>
@@ -671,15 +669,16 @@ describe('the line panel (ADR-0099 #3)', () => {
     renderApp('/inventory/receipts/5', fetchMock);
     const user = userEvent.setup();
     await findPanel();
-    const scope = within(panel().getByRole('radiogroup', { name: panelText.scope }));
+    expect(productSearch()).toHaveAttribute('placeholder', panelText.supplierSearch);
+
+    // The cursor in the box lists the supplier's products before anything is typed; the switch
+    // stands at the head of that list.
+    await user.click(productSearch());
+    const scope = within(await screen.findByRole('radiogroup', { name: panelText.scope }));
     const supplierOnly = scope.getByRole('radio', { name: panelText.scopes.supplier });
     const all = scope.getByRole('radio', { name: panelText.scopes.all });
     expect(supplierOnly).toHaveAttribute('aria-checked', 'true');
     expect(all).toHaveAttribute('aria-checked', 'false');
-    expect(productSearch()).toHaveAttribute('placeholder', panelText.supplierSearch);
-
-    // The cursor in the box lists the supplier's products before anything is typed.
-    await user.click(productSearch());
     const listed = () => within(screen.getByRole('listbox')).getAllByRole('option');
     await waitFor(() => expect(listed()).toHaveLength(3));
     expect(lookups(fetchMock).at(-1)?.get('supplierId')).toBe('3');
@@ -696,6 +695,11 @@ describe('the line panel (ADR-0099 #3)', () => {
     await waitFor(() => expect(lookups(fetchMock).at(-1)?.get('supplierId')).toBeNull());
     expect(lookups(fetchMock).at(-1)?.get('q')).toBe('Будаа');
     expect(productSearch()).toHaveAttribute('placeholder', mn.inventory.productSearchPlaceholder);
+    expect(productSearch()).toHaveFocus();
+
+    // F4 flips it back without leaving the box.
+    await user.keyboard('{F4}');
+    expect(supplierOnly).toHaveAttribute('aria-checked', 'true');
     expect(productSearch()).toHaveFocus();
   });
 
@@ -793,12 +797,12 @@ describe('the line panel (ADR-0099 #3)', () => {
     renderApp('/inventory/receipts/5', fetchMock);
     const user = userEvent.setup();
     const lines = within(await screen.findByRole('region', { name: form.linesTitle }));
-    // The table only reads.
-    expect(lines.queryByRole('textbox')).toBeNull();
+    // The table's rows only read; the fields are the editor's, in its head.
+    expect(within(lines.getAllByRole('rowgroup')[1]!).queryByRole('textbox')).toBeNull();
     expect(lines.getByRole('columnheader', { name: form.markup })).toBeInTheDocument();
 
     await user.click(lines.getByRole('button', { name: `${mn.common.edit}: ${RICE_UNIT}` }));
-    const edit = within(screen.getByRole('region', { name: panelText.editTitle }));
+    const edit = within(screen.getByRole('rowgroup', { name: panelText.editTitle }));
     const qty = edit.getByLabelText(mn.inventory.qty);
     expect(qty).toHaveValue('5');
     expect(edit.getByLabelText(form.unitPrice)).toHaveValue('1,000');
@@ -819,7 +823,7 @@ describe('the line panel (ADR-0099 #3)', () => {
       docUnitPrice: '1500',
     });
     // The edit ends: the panel is for new lines again.
-    expect(await screen.findByRole('region', { name: panelText.title })).toBeInTheDocument();
+    expect(await screen.findByRole('rowgroup', { name: panelText.title })).toBeInTheDocument();
     expect(await lines.findByRole('cell', { name: '10,500' })).toBeInTheDocument();
   }, 15_000);
 
@@ -835,6 +839,30 @@ describe('the line panel (ADR-0099 #3)', () => {
     await user.click(lines.getByRole('button', { name: `${mn.inventory.remove}: ${RICE_UNIT}` }));
     await waitFor(() => expect(lines.queryByRole('cell', { name: 'Будаа' })).toBeNull());
     expect(calls(fetchMock, 'DELETE', '/api/v1/receipt-lines/2')).toHaveLength(1);
+  });
+
+  it('answers F2 and Ctrl+Enter, and goes back to the search after an edit (ADR-0156)', async () => {
+    const fetchMock = signedIn(WAREHOUSE_ME, {
+      ...editorRoutes,
+      'GET /api/v1/receipts/5': () => json({ ...DRAFT, lines: [BOX_LINE] }),
+    });
+    renderApp('/inventory/receipts/5', fetchMock);
+    const user = userEvent.setup();
+    const lines = within(await screen.findByRole('region', { name: form.linesTitle }));
+    await user.click(lines.getByRole('button', { name: `${mn.common.edit}: ${COLA_UNIT}` }));
+    const edit = within(screen.getByRole('rowgroup', { name: panelText.editTitle }));
+    await waitFor(() => expect(edit.getByLabelText(mn.inventory.qty)).toHaveFocus());
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(productSearch()).toHaveFocus());
+
+    (document.activeElement as HTMLElement).blur();
+    await user.keyboard('{F2}');
+    expect(productSearch()).toHaveFocus();
+
+    await user.keyboard('{Control>}{Enter}{/Control}');
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByRole('button', { name: mn.inventory.receipt.post })).toBeInTheDocument();
+    expect(calls(fetchMock, 'POST', '/api/v1/receipts/5/post')).toHaveLength(0);
   });
 
   it('reads no scan while the posting dialog is open', async () => {
@@ -979,7 +1007,7 @@ describe('the delivery note header', () => {
     expect(header.getByText('Касс')).toBeInTheDocument();
     expect(header.getByText(`${WH1.name}, ${WH2.name}`)).toBeInTheDocument();
     expect(header.queryByRole('textbox')).toBeNull();
-    expect(screen.queryByRole('region', { name: panelText.title })).toBeNull();
+    expect(screen.queryByRole('rowgroup', { name: panelText.title })).toBeNull();
     expect(screen.queryByRole('button', { name: mn.inventory.receipt.post })).toBeNull();
     // Both papers open in a new tab.
     const document = screen.getByRole('link', { name: mn.inventory.receipt.print.document });
@@ -998,11 +1026,13 @@ describe('the delivery note header', () => {
         'GET /api/v1/receipts/5': () => json({ ...DRAFT, lines: [BOX_LINE] }),
       }),
     );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: mn.common.print }));
     expect(
-      await screen.findByRole('link', { name: mn.inventory.receipt.print.document }),
+      await screen.findByRole('menuitem', { name: mn.inventory.receipt.print.document }),
     ).toHaveAttribute('href', '/inventory/receipts/5/print/document');
     expect(
-      screen.getByRole('link', { name: mn.inventory.receipt.print.warehouse }),
+      screen.getByRole('menuitem', { name: mn.inventory.receipt.print.warehouse }),
     ).toHaveAttribute('href', '/inventory/receipts/5/print/warehouse');
   });
 });
@@ -1042,7 +1072,8 @@ describe('delivery-note prices (ADR-0078, ADR-0099)', () => {
       }),
     );
     expect(await screen.findByText(form.vatNote.replace('{{rate}}', '10'))).toBeInTheDocument();
-    const totals = within(screen.getByLabelText(mn.inventory.costing.total));
+    await userEvent.setup().click(screen.getByRole('button', { name: /мөр/ }));
+    const totals = within(await screen.findByLabelText(mn.inventory.costing.total));
     expect(totals.getByText('48,000₮')).toBeInTheDocument();
     expect(totals.getByText(form.vatTotal)).toBeInTheDocument();
     expect(totals.getByText('4,363.64₮')).toBeInTheDocument();
@@ -1104,7 +1135,7 @@ describe('discounts and free goods of a draft (ADR-0103)', () => {
     renderApp('/inventory/receipts/5', fetchMock);
     const user = userEvent.setup();
     const puts = () => calls(fetchMock, 'PUT', '/api/v1/receipts/5/discounts');
-    const card = within(await screen.findByRole('region', { name: discountsText.title }));
+    const card = await openDiscounts(user);
     expect(card.getByText(discountsText.empty)).toBeInTheDocument();
 
     await user.click(card.getByRole('button', { name: discountsText.add }));
@@ -1179,7 +1210,7 @@ describe('discounts and free goods of a draft (ADR-0103)', () => {
     });
     renderApp('/inventory/receipts/5', fetchMock);
     const user = userEvent.setup();
-    const card = within(await screen.findByRole('region', { name: discountsText.title }));
+    const card = await openDiscounts(user);
     expect(card.getByText(discountsText.tooLarge)).toBeInTheDocument();
     // 9,000₮ off rice of 5,000₮ comes to no tugriks yet.
     const tooLarge = within(card.getByRole('row', { name: new RegExp(discountsText.kinds.LINES) }));
@@ -1223,13 +1254,13 @@ describe('discounts and free goods of a draft (ADR-0103)', () => {
     });
     renderApp('/inventory/receipts/5', fetchMock);
     const user = userEvent.setup();
-    const card = within(await screen.findByRole('region', { name: discountsText.title }));
+    const card = await openDiscounts(user);
     await user.click(card.getByRole('button', { name: discountsText.add }));
     await user.click(await screen.findByRole('menuitem', { name: discountsText.kinds.FREE }));
     const free = within(card.getByRole('region', { name: discountsText.freeTitle }));
     // A product, its unit and the quantity: no prices.
     expect(free.queryByLabelText(form.unitPrice)).toBeNull();
-    await user.click(free.getByRole('searchbox', { name: mn.inventory.product }));
+    await user.click(free.getByRole('combobox', { name: mn.inventory.product }));
     await user.keyboard('Будаа');
     await waitFor(() =>
       expect(screen.getByRole('option', { name: /Будаа/ })).toHaveAttribute(
@@ -1252,10 +1283,11 @@ describe('discounts and free goods of a draft (ADR-0103)', () => {
     const freeList = within(await card.findByRole('region', { name: discountsText.freeList }));
     const row = within(freeList.getByRole('row', { name: /Будаа/ }));
     expect(row.getByRole('cell', { name: '3' })).toBeInTheDocument();
-    // Not among the lines bought.
-    const lines = within(screen.getByRole('region', { name: form.linesTitle }));
-    expect(lines.getByRole('cell', { name: COLA.name })).toBeInTheDocument();
-    expect(lines.queryByRole('cell', { name: 'Будаа' })).toBeNull();
+    // Not among the lines bought, behind the sheet.
+    const hidden = { hidden: true };
+    const lines = within(screen.getByRole('region', { name: form.linesTitle, ...hidden }));
+    expect(lines.getByRole('cell', { name: COLA.name, ...hidden })).toBeInTheDocument();
+    expect(lines.queryByRole('cell', { name: 'Будаа', ...hidden })).toBeNull();
 
     await user.click(
       freeList.getByRole('button', { name: `${mn.inventory.remove}: ${RICE_UNIT}` }),

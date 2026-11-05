@@ -86,7 +86,7 @@ export function AppShell() {
       <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} firstLinkRef={firstLink} />
       <main
         inert={menuOpen ? true : undefined}
-        className="min-w-0 flex-1 px-4 pt-5 pb-10 md:px-8 print:p-0"
+        className="min-w-0 flex-1 px-4 pt-5 pb-10 md:px-8 lg:has-data-[slot=document-window]:py-2.5 print:p-0"
       >
         {/*
          * A new page rises in (`page-enter`): the key is the module and the page (the first two

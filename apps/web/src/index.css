@@ -271,6 +271,18 @@
 @utility page-enter {
   animation: bto-page-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
+/* A line just added to a document: a green tint that fades, so the eye finds where it landed. */
+@keyframes bto-row-landed {
+  from {
+    background-color: var(--color-success-soft);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+@utility row-landed {
+  animation: bto-row-landed 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
 /* Apple-like easing for things that open and move (dialogs, sheets, lifts). */
 @utility ease-apple {
   transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);

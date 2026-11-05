@@ -2079,7 +2079,9 @@
         "counterAccount": "Харилцсан данс",
         "numberOnSave": "Хадгалахад олгоно",
         "supplierNote": "Нийлүүлэгчийн падаан",
-        "summaryTotal": "нийт {{amount}}₮"
+        "summaryTotal": "нийт {{amount}}₮",
+        "saving": "Хадгалж байна…",
+        "saved": "Хадгалсан"
       },
       "panel": {
         "title": "Бараа нэмэх",
@@ -2104,17 +2106,32 @@
           "all": "Бүх бараа"
         },
         "supplierSearch": "Нийлүүлэгчийн бараанаас хайх",
-        "lastPriceHint": "Өмнө: {{price}}₮/{{unit}} · {{date}}",
         "weight": "Жин",
         "weightValue": "{{kg}} кг/ш · нийт {{total}} кг",
         "location": "Байршил",
         "editProduct": "Бараа засах",
         "weightField": "Хувийн жин (кг)",
-        "weightTotal": "нийт {{total}} кг",
+        "weightTotalLabel": "Нийт жин",
+        "weightTotal": "{{total}} кг",
+        "landed": "{{name}} нэмэгдлээ",
+        "keys": {
+          "search": "F2",
+          "enter": "↵",
+          "escape": "Esc",
+          "post": "Ctrl ↵",
+          "scope": "F4"
+        },
+        "hints": {
+          "search": "бараа хайх",
+          "next": "дараагийн талбар",
+          "cancel": "болих",
+          "scope": "солих"
+        },
         "stock": "Үлдэгдэл"
       },
       "discounts": {
         "title": "Хөнгөлөлт, урамшуулал",
+        "open": "Хөнгөлөлт",
         "add": "Нэмэх",
         "freeTitle": "Урамшуулал бараа нэмэх",
         "freeList": "Урамшуулал бараа (үнэгүй)",

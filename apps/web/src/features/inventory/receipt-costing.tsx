@@ -19,6 +19,8 @@ export function PriceCells(props: {
   enteredQty: string;
   entry: CostEntry;
   editable: boolean;
+  /** A draft's table lists free goods apart, so it has no «Бонус» cell (ADR-0156). */
+  noFreeCell?: boolean;
   onChange?: (patch: Partial<CostEntry>) => void;
   onLeave?: (column: PriceColumn) => void;
   onEnter?: (column: PriceColumn, field: HTMLInputElement) => void;
@@ -48,11 +50,13 @@ export function PriceCells(props: {
         <TableCell className="text-right font-mono">
           {amount === null ? none : formatMnt(amount.toString())}
         </TableCell>
-        <TableCell>
-          {entry.free ? (
-            <Badge variant="secondary">{t('inventory.costing.freeGoods')}</Badge>
-          ) : null}
-        </TableCell>
+        {props.noFreeCell ? null : (
+          <TableCell>
+            {entry.free ? (
+              <Badge variant="secondary">{t('inventory.costing.freeGoods')}</Badge>
+            ) : null}
+          </TableCell>
+        )}
       </>
     );
   }
@@ -99,9 +103,9 @@ export function PriceCells(props: {
 
 /**
  * The receipt's totals for cost holders, as the server computed them (with the discount and the
- * payable when the note has a discount, ADR-0099 #4).
+ * payable when the note has a discount, ADR-0099 #4). `stacked`: one above the other (a popover).
  */
-export function ReceiptTotals({ detail }: { detail: ReceiptDetail }) {
+export function ReceiptTotals({ detail, stacked }: { detail: ReceiptDetail; stacked?: boolean }) {
   const { t } = useTranslation();
   const totals = detail.totals;
   if (!totals || detail.lines.length === 0) return null;
@@ -120,7 +124,13 @@ export function ReceiptTotals({ detail }: { detail: ReceiptDetail }) {
     [t('inventory.receipt.form.costTotal'), totals.costTotal],
   ];
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+    <div
+      className={
+        stacked
+          ? 'flex flex-col-reverse gap-3'
+          : 'flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between'
+      }
+    >
       <p className="max-w-xl text-[0.8125rem] text-muted-foreground">
         {detail.status === 'DRAFT'
           ? t('inventory.receipt.form.pricedHint', {

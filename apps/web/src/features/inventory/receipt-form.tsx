@@ -3,23 +3,50 @@ import type { ProblemDetails } from '@tugeel/api-client';
 import { markupPct } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
-import { Check, Pencil, Printer, ScanBarcode, Trash2 } from 'lucide-react';
-import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
+import {
+  BadgePercent,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  LoaderCircle,
+  Pencil,
+  Printer,
+  ScanBarcode,
+  Trash2,
+} from 'lucide-react';
+import { Popover } from 'radix-ui';
+import {
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { DocumentWorkspace } from '@/components/document-layout';
+import { DENSE_FIELDS, DocumentWindow } from '@/components/document-layout';
 import { FormField } from '@/components/form';
 import { LeaveGuard } from '@/components/leave-guard';
-import { ListTable, RowAction, RowActions } from '@/components/list';
+import { EmptyState, ListTable, RowAction, RowActions } from '@/components/list';
 import { ProblemAlert } from '@/components/problem-alert';
 import { SearchSelect } from '@/components/search-select';
 import { StickyActions } from '@/components/sticky-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { Kbd } from '@/components/ui/kbd';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SupplierSelect } from '@/features/partners/party-select';
 import type { PickedSupplier } from '@/features/partners/supplier-picker';
@@ -30,6 +57,7 @@ import { formatMnt, formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
+import { cn } from '@/lib/utils';
 import { randomUuid } from '@/lib/uuid';
 import {
   type ReceiptDetail,
@@ -75,25 +103,31 @@ const fieldError = (problem: ProblemDetails | null, path: string): ValidationMes
 const generalProblem = (problem: ProblemDetails | null) =>
   problem && !(problem.errors ?? []).some((error) => error.path in FIELD_MESSAGES) ? problem : null;
 
+/** The page's title, placed by the form with what only the form knows. */
+type ReceiptHead = (extra?: { meta?: ReactNode; actions?: ReactNode }) => ReactNode;
+
 /**
  * One goods receipt in one window, after Erkhet's «Бараа материал орлого» (owner 2026-10-18,
- * 2026-10-23, 2026-11-05, ADR-0153): the document on the left, the line editor on the right, the
- * lines below. The number comes with the first save. No warehouse is chosen: each line goes to its product's home warehouse (ADR-0099 #1). A new receipt and a draft
- * are edited here by any holder of the receipt right; a posted one reads the same way, with its
- * prices and discount still open to cost holders.
+ * 2026-10-23, 2026-11-05, 2026-11-06, ADR-0153, ADR-0156). A new receipt and a draft are edited here
+ * by any holder of the receipt right: the document's fields in one strip, then one card where the
+ * line editor stands under the columns of the lines it fills and the steps close its foot. The number
+ * comes with the first save. No warehouse is chosen: each line goes to its product's home warehouse
+ * (ADR-0099 #1). A posted one reads as a page, with its prices and discount still open to cost
+ * holders.
  */
 export function ReceiptForm(props: {
   detail: ReceiptDetail | null;
   focusScan: boolean;
   onCreated: (id: number) => void;
+  head: ReceiptHead;
 }) {
   const { detail } = props;
   const canManage = useHasPermission('inventory.receipts.manage');
   const editsDraft = canManage && (detail === null || detail.status === 'DRAFT');
   return editsDraft ? (
-    <DraftEditor detail={detail} onCreated={props.onCreated} />
+    <DraftEditor detail={detail} onCreated={props.onCreated} head={props.head} />
   ) : detail ? (
-    <ReceiptView detail={detail} />
+    <ReceiptView detail={detail} head={props.head} />
   ) : null;
 }
 
@@ -101,11 +135,11 @@ export function ReceiptForm(props: {
 function HeaderCard(props: { children: ReactNode; note?: ReactNode }) {
   const { t } = useTranslation();
   return (
-    <Card role="region" aria-labelledby="receipt-header-title">
+    <Card size="sm" role="region" aria-labelledby="receipt-header-title">
       <CardHeader>
         <CardTitle id="receipt-header-title">{t('inventory.receipt.form.header')}</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+      <CardContent className="flex flex-col gap-2">
         {props.children}
         {props.note}
       </CardContent>
@@ -114,8 +148,15 @@ function HeaderCard(props: { children: ReactNode; note?: ReactNode }) {
 }
 
 const HEADER_GRID = 'grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4';
-/** The document's fields beside the line editor (ADR-0153). */
-const EDITOR_GRID = 'grid gap-x-3 gap-y-3 sm:grid-cols-2';
+/**
+ * The document's fields in one strip over the lines (ADR-0156): the supplier first, where the cursor
+ * starts, then the date, the number, the account and the note.
+ */
+const STRIP_GRID =
+  'grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_9.5rem_10rem_minmax(0,1.7fr)_minmax(0,1.1fr)]';
+/** Only the lines scroll: the table's own box stops scrolling and its head stays in view. */
+const LINES_SCROLLER =
+  'min-h-0 flex-1 overflow-auto [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] [&_[data-slot=table-container]]:overflow-visible';
 
 /** «Үнэ НӨАТ-тэй (10%)…», for cost holders, when the supplier's prices carry VAT. */
 function VatNote({ detail }: { detail: ReceiptDetail | null }) {
@@ -183,6 +224,12 @@ function LinesTable(props: {
   actions: boolean;
   selectedId?: number | null;
   onSelect?: (line: ReceiptLine) => void;
+  /** The line editor under the column heads, with its name (ADR-0156): the head stays in view. */
+  entry?: { label: string; rows: ReactNode };
+  /** The line just added: it flashes where it landed. */
+  landedId?: number | null;
+  /** The line being removed: dimmed until the server answers. */
+  removingId?: number | null;
   /** The price check (ADR-0115): each line's previous price and the unit price typed now. */
   previous?: {
     of: (line: ReceiptLine) => ReceiptCostingLine | undefined;
@@ -199,33 +246,65 @@ function LinesTable(props: {
   const priceOf = new Map((current.data ?? []).map((row) => [row.productId, row.warehousePrice]));
   const expected = props.lines.some((line) => line.expectedQty !== null);
   const check = props.prices && props.previous !== undefined;
-  // One entry per cell, under the same conditions as the header cells (ADR-0119).
-  const columns: ColumnSpec[] = [
-    { key: 'lineNo', kind: 'count', width: 3 },
-    { key: 'sku', kind: 'code' },
-    { key: 'product', kind: 'text', weight: 3, min: 14 },
-    { key: 'warehouse', kind: 'text', weight: 1 },
+  const { entry } = props;
+  // A draft's table: narrow enough for a 1366 window with the editor's fields in its columns; free
+  // goods are listed apart, so it has no «Бонус» (ADR-0156). The last two columns hold «Хадгалах».
+  const draftColumns: ColumnSpec[] = [
+    { key: 'lineNo', kind: 'count', width: 2.75 },
+    { key: 'sku', kind: 'code', width: 5 },
+    { key: 'product', kind: 'text', weight: 3, min: 13 },
+    { key: 'warehouse', kind: 'text', weight: 1, min: 10 },
     ...(BINS_SOON ? [] : [{ key: 'bin', kind: 'code', width: 8 } as const]),
-    { key: 'unit', kind: 'text', weight: 1, min: 4 },
-    ...(expected ? [{ key: 'expected', kind: 'qty' } as const] : []),
-    { key: 'qty', kind: 'qty' },
-    { key: 'weight', kind: 'qty' },
-    ...(check
-      ? [{ key: 'previous', kind: 'qty', width: 8 } as const, { key: 'diff', kind: 'qty' } as const]
-      : []),
+    { key: 'unit', kind: 'code', width: 5 },
+    ...(expected ? [{ key: 'expected', kind: 'qty', width: 5.5 } as const] : []),
+    { key: 'qty', kind: 'qty', width: 5 },
+    { key: 'weight', kind: 'qty', width: 5 },
     ...(props.prices
       ? [
-          { key: 'unitPrice', kind: 'money' } as const,
-          { key: 'amount', kind: 'money' } as const,
-          { key: 'freeGoods', kind: 'status', width: 6 } as const,
+          { key: 'unitPrice', kind: 'money', width: 6 } as const,
+          { key: 'amount', kind: 'money', width: 6.25 } as const,
+          { key: 'markup', kind: 'percent', width: 5.25 } as const,
         ]
       : []),
-    ...(props.prices ? [{ key: 'markup', kind: 'percent' } as const] : []),
-    ...(props.actions ? [{ key: 'actions', kind: 'actions', actions: 2 } as const] : []),
+    { key: 'actions', kind: 'actions', width: props.prices ? 5 : 10 },
   ];
+  // One entry per cell, under the same conditions as the header cells (ADR-0119).
+  const columns: ColumnSpec[] = entry
+    ? draftColumns
+    : [
+        { key: 'lineNo', kind: 'count', width: 3 },
+        { key: 'sku', kind: 'code' },
+        { key: 'product', kind: 'text', weight: 3, min: 14 },
+        { key: 'warehouse', kind: 'text', weight: 1 },
+        ...(BINS_SOON ? [] : [{ key: 'bin', kind: 'code', width: 8 } as const]),
+        { key: 'unit', kind: 'text', weight: 1, min: 4 },
+        ...(expected ? [{ key: 'expected', kind: 'qty' } as const] : []),
+        { key: 'qty', kind: 'qty' },
+        { key: 'weight', kind: 'qty' },
+        ...(check
+          ? [
+              { key: 'previous', kind: 'qty', width: 8 } as const,
+              { key: 'diff', kind: 'qty' } as const,
+            ]
+          : []),
+        ...(props.prices
+          ? [
+              { key: 'unitPrice', kind: 'money' } as const,
+              { key: 'amount', kind: 'money' } as const,
+              { key: 'freeGoods', kind: 'status', width: 6 } as const,
+            ]
+          : []),
+        ...(props.prices ? [{ key: 'markup', kind: 'percent' } as const] : []),
+        ...(props.actions ? [{ key: 'actions', kind: 'actions', actions: 2 } as const] : []),
+      ];
   return (
     <ListTable ref={props.table} columns={columns}>
-      <TableHeader>
+      <TableHeader
+        aria-label={entry?.label}
+        className={
+          entry ? 'sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--color-border)]' : undefined
+        }
+      >
         <TableRow>
           <TableHead className="text-right">{t('inventory.receipt.form.lineNo')}</TableHead>
           <TableHead>{t('inventory.sku')}</TableHead>
@@ -248,7 +327,7 @@ function LinesTable(props: {
             <>
               <TableHead className="text-right">{t('inventory.receipt.form.unitPrice')}</TableHead>
               <TableHead className="text-right">{t('inventory.receipt.form.amount')}</TableHead>
-              <TableHead>{t('inventory.costing.freeGoods')}</TableHead>
+              {entry ? null : <TableHead>{t('inventory.costing.freeGoods')}</TableHead>}
             </>
           ) : null}
           {props.prices ? (
@@ -260,6 +339,7 @@ function LinesTable(props: {
             </TableHead>
           ) : null}
         </TableRow>
+        {entry?.rows}
       </TableHeader>
       <TableBody>
         {props.lines.map((line, index) => {
@@ -275,7 +355,12 @@ function LinesTable(props: {
             <TableRow
               key={line.id}
               data-state={props.selectedId === line.id ? 'selected' : undefined}
-              className={props.onSelect ? 'cursor-pointer' : undefined}
+              className={cn(
+                props.onSelect && 'cursor-pointer',
+                entry && 'data-[state=selected]:bg-secondary/50',
+                props.landedId === line.id && 'row-landed motion-reduce:animate-none',
+                props.removingId === line.id && 'opacity-50',
+              )}
               onClick={(event) => {
                 // Fields and buttons inside the row keep their own clicks.
                 if (event.target instanceof HTMLElement && event.target.closest('input,button')) {
@@ -288,8 +373,16 @@ function LinesTable(props: {
                 {index + 1}
               </TableCell>
               <TableCell className="font-mono text-[0.8125rem]">{line.productSku}</TableCell>
-              <TableCell className="whitespace-normal">{line.productName}</TableCell>
-              <TableCell>{line.warehouseName}</TableCell>
+              {/* A draft's rows keep one height: the whole name on hover. */}
+              <TableCell
+                className={entry ? undefined : 'whitespace-normal'}
+                title={entry ? line.productName : undefined}
+              >
+                {line.productName}
+              </TableCell>
+              <TableCell title={entry ? line.warehouseName : undefined}>
+                {line.warehouseName}
+              </TableCell>
               {BINS_SOON ? null : <TableCell className="font-mono">{line.binCode}</TableCell>}
               <TableCell>{line.unitName}</TableCell>
               {expected ? (
@@ -391,6 +484,100 @@ function PrintLinks({ id }: { id: number }) {
   );
 }
 
+/** «Хэвлэх» at a draft's foot: the same two papers from one button, each in a new tab. */
+function PrintMenu({ id }: { id: number }) {
+  const { t } = useTranslation();
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Printer />
+          {t('common.print')}
+          <ChevronDown />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" side="top">
+        <DropdownMenuItem asChild>
+          <Link to={`/inventory/receipts/${id}/print/document`} target="_blank">
+            {t('inventory.receipt.print.document')}
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to={`/inventory/receipts/${id}/print/warehouse`} target="_blank">
+            {t('inventory.receipt.print.warehouse')}
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/**
+ * The foot's count and total: a click opens what makes them up (the totals for cost holders, the
+ * lines that have no weight), so the window keeps its height.
+ */
+function SummaryPopover({ detail, count }: { detail: ReceiptDetail | null; count: number }) {
+  const { t } = useTranslation();
+  const canCost = useHasPermission('inventory.costs.manage');
+  const hasLines = (detail?.lines.length ?? 0) > 0;
+  const showsTotals = canCost && hasLines && Boolean(detail?.totals);
+  const missing = hasLines ? (detail?.weightMissing ?? 0) : 0;
+  const summary = <LinesSummary detail={detail} count={count} />;
+  if (!detail || (!showsTotals && missing === 0)) {
+    return <span className="px-1 font-medium whitespace-nowrap tabular-nums">{summary}</span>;
+  }
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <Button variant="ghost" size="sm" className="-ml-1 gap-1 px-2 tabular-nums">
+          {summary}
+          <ChevronUp className="opacity-60" />
+        </Button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          side="top"
+          align="start"
+          sideOffset={6}
+          collisionPadding={8}
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          className="z-50 flex w-96 flex-col gap-3 rounded-xl border border-border bg-popover p-3 text-sm text-popover-foreground shadow-popover outline-none"
+        >
+          {showsTotals ? <ReceiptTotals detail={detail} stacked /> : null}
+          {missing > 0 ? (
+            <p className="text-[0.8125rem] text-muted-foreground">
+              {t('inventory.receipt.form.weightMissing', { count: missing })}
+            </p>
+          ) : null}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+/** «Хадгалж байна» / «Хадгалсан» beside the title: a header field is saved when left. */
+function SaveState(props: { saving: boolean; saved: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <span
+      aria-live="polite"
+      className="inline-flex items-center gap-1 text-[0.8125rem] whitespace-nowrap text-muted-foreground"
+    >
+      {props.saving ? (
+        <>
+          <LoaderCircle aria-hidden className="size-3.5 animate-spin" />
+          {t('inventory.receipt.form.saving')}
+        </>
+      ) : props.saved ? (
+        <>
+          <Check aria-hidden className="size-3.5 text-success" />
+          {t('inventory.receipt.form.saved')}
+        </>
+      ) : null}
+    </span>
+  );
+}
+
 /** «12 мөр · 340.5 кг», under every receipt. */
 function LinesSummary({ detail, count }: { detail: ReceiptDetail | null; count: number }) {
   const { t } = useTranslation();
@@ -416,7 +603,7 @@ function LinesSummary({ detail, count }: { detail: ReceiptDetail | null; count: 
  * wait or until the re-costing deadline, saved at once with «Өртөг хадгалах» or
  * «Хадгалаад дараагийнх».
  */
-function ReceiptView({ detail }: { detail: ReceiptDetail }) {
+function ReceiptView({ detail, head }: { detail: ReceiptDetail; head: ReceiptHead }) {
   const { t } = useTranslation();
   const canCost = useHasPermission('inventory.costs.manage');
   const changeable = canCost && costsChangeable(detail);
@@ -443,7 +630,8 @@ function ReceiptView({ detail }: { detail: ReceiptDetail }) {
   }).length;
 
   return (
-    <>
+    <div className="space-y-3">
+      {head()}
       <ReadOnlyHeader detail={detail} />
       <Card role="region" aria-labelledby="receipt-lines-title">
         <CardHeader>
@@ -542,7 +730,7 @@ function ReceiptView({ detail }: { detail: ReceiptDetail }) {
         description={t('inventory.costing.unsavedDescription')}
         leaveLabel={t('inventory.costing.leave')}
       />
-    </>
+    </div>
   );
 }
 
@@ -593,6 +781,15 @@ function NoteAmountCheck(props: {
   );
 }
 
+/** A dialog or sheet over the window; a popover (the search's list, the totals) is not one. */
+function modalOpen(): boolean {
+  return Array.from(document.querySelectorAll('[role="dialog"], [role="alertdialog"]')).some(
+    (open) =>
+      open.getAttribute('data-state') === 'open' &&
+      !open.parentElement?.hasAttribute('data-radix-popper-content-wrapper'),
+  );
+}
+
 /** A line's price fields as the API takes them, from what the panel holds. */
 function priceBody(entry: CostEntry, before: CostEntry | null): ReceiptLineUpdate {
   if (entry.free) return { freeGoods: true };
@@ -614,7 +811,11 @@ function priceBody(entry: CostEntry, before: CostEntry | null): ReceiptLineUpdat
  * every add is a line of its own (ADR-0103); a line chosen in the table opens in the panel.
  * Saves run one after another against the latest copy of the draft.
  */
-function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: number) => void }) {
+function DraftEditor(props: {
+  detail: ReceiptDetail | null;
+  onCreated: (id: number) => void;
+  head: ReceiptHead;
+}) {
   const { detail } = props;
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -623,6 +824,10 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
   const accounts = useReceiptCounterAccounts();
   const action = useAction();
   const table = useRef<HTMLTableElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  const productSearch = useRef<HTMLInputElement>(null);
+  const [discountsOpen, setDiscountsOpen] = useState(false);
+  const [headerSaved, setHeaderSaved] = useState(false);
 
   // The header as typed; a draft's copy follows the server through the saves below.
   const [supplier, setSupplier] = useState<PickedSupplier | null>(
@@ -644,6 +849,36 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
   const started = useRef(false);
 
   const lines = detail?.lines ?? [];
+  const bought = lines.filter((line) => !line.freeGoods);
+
+  // A line added shows where it landed: the lines scroll to it and it flashes once.
+  const lastId = bought.at(-1)?.id ?? null;
+  const [last, setLast] = useState<{ id: number | null; landed: number | null }>({
+    id: lastId,
+    landed: null,
+  });
+  if (last.id !== lastId) {
+    const added = lastId !== null && (last.id === null || lastId > last.id);
+    setLast({ id: lastId, landed: added ? lastId : null });
+  }
+  useLayoutEffect(() => {
+    const box = scroller.current;
+    if (box && last.landed !== null) box.scrollTop = box.scrollHeight;
+  }, [last.landed]);
+
+  // Ctrl+Enter takes the step, from anywhere in the window (a scanner's Enter comes alone).
+  const postByKey = useEffectEvent((event: KeyboardEvent) => {
+    if (!(event.ctrlKey || event.metaKey) || event.key !== 'Enter') return;
+    if (detail === null || lines.length === 0 || confirm !== null || modalOpen()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    askPost();
+  });
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => postByKey(event);
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, []);
 
   // A new receipt starts with the supplier.
   useEffect(() => {
@@ -661,7 +896,9 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
       if (id === null) return;
       try {
         await mutations.updateReceipt.mutateAsync({ id, body });
+        setHeaderSaved(true);
       } catch (error) {
+        setHeaderSaved(false);
         setHeaderProblem(problemFromError(error));
         undo?.();
       }
@@ -816,37 +1053,15 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
     ? 'validation.moneyAccountRequired'
     : fieldError(headerProblem, 'moneyAccountId');
 
-  const header = (
-    <HeaderCard note={<VatNote detail={detail} />}>
-      <ProblemAlert problem={generalProblem(headerProblem)} />
-      <div className={EDITOR_GRID}>
-        <FormField
-          label={t('inventory.receipt.form.date')}
-          htmlFor="receipt-date"
-          error={fieldError(headerProblem, 'supplierDocDate')}
-        >
-          <DateInput
-            id="receipt-date"
-            value={docDate}
-            onChange={(value) => setDocDate(value)}
-            onBlur={() => {
-              if (detail !== null && docDate !== (detail.supplierDocDate ?? '')) {
-                patchHeader({ supplierDocDate: docDate || null });
-              }
-            }}
-          />
-        </FormField>
-        <FormField label={t('inventory.receipt.supplierDocNo')} htmlFor="receipt-number">
-          <Input
-            id="receipt-number"
-            readOnly
-            tabIndex={-1}
-            className="bg-muted/40 font-mono"
-            placeholder={t('inventory.receipt.form.numberOnSave')}
-            value={detail?.number ?? ''}
-          />
-        </FormField>
-        <div className="sm:col-span-2">
+  const strip = (
+    <Card
+      size="sm"
+      role="region"
+      aria-label={t('inventory.receipt.form.header')}
+      className="shrink-0 gap-0 py-2"
+    >
+      <CardContent className={DENSE_FIELDS}>
+        <div className={STRIP_GRID}>
           <FormField
             label={t('inventory.receipts.supplier')}
             htmlFor="receipt-supplier"
@@ -864,12 +1079,41 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
                   if (next.id !== detail?.supplierId) {
                     patchHeader({ supplierId: next.id }, () => setSupplier(before));
                   }
+                  // The supplier chosen, the next thing is its first product.
+                  if (lines.length === 0) {
+                    window.setTimeout(() => productSearch.current?.focus(), 0);
+                  }
                 }
               }}
             />
           </FormField>
-        </div>
-        <div className="sm:col-span-2">
+          <FormField
+            label={t('inventory.receipt.form.date')}
+            htmlFor="receipt-date"
+            error={fieldError(headerProblem, 'supplierDocDate')}
+          >
+            <DateInput
+              id="receipt-date"
+              value={docDate}
+              onChange={(value) => setDocDate(value)}
+              onBlur={() => {
+                if (detail !== null && docDate !== (detail.supplierDocDate ?? '')) {
+                  patchHeader({ supplierDocDate: docDate || null });
+                }
+              }}
+            />
+          </FormField>
+          <FormField label={t('inventory.receipt.supplierDocNo')} htmlFor="receipt-number">
+            <Input
+              id="receipt-number"
+              readOnly
+              tabIndex={-1}
+              title={detail?.number ?? undefined}
+              className="border-transparent bg-muted/60 font-mono shadow-none"
+              placeholder={t('inventory.receipt.form.numberOnSave')}
+              value={detail?.number ?? ''}
+            />
+          </FormField>
           <FormField
             label={t('inventory.receipt.form.counterAccount')}
             htmlFor="receipt-counter"
@@ -893,8 +1137,6 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
               onChange={changeCounter}
             />
           </FormField>
-        </div>
-        <div className="sm:col-span-2">
           <FormField
             label={t('inventory.receipt.form.note')}
             htmlFor="receipt-note"
@@ -909,52 +1151,71 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
             />
           </FormField>
         </div>
-      </div>
-      <ProblemAlert problem={problemFromError(accounts.error)} onRetry={accounts.refetch} />
-      {detail ? <ReceiptConfirmations detail={detail} /> : null}
-    </HeaderCard>
+      </CardContent>
+    </Card>
   );
 
+  const discounts = detail ? discountsOf(detail) : [];
+  const freeCount = lines.length - bought.length;
+  const expected = bought.some((line) => line.expectedQty !== null);
+
   return (
-    <>
-      <DocumentWorkspace
-        document={
+    <DocumentWindow>
+      {props.head({
+        meta: detail ? <ReceiptConfirmations detail={detail} /> : null,
+        actions: (
           <>
-            {header}
-            {detail ? <ReceiptNoteCard detail={detail} editable /> : null}
+            <VatNote detail={detail} />
+            <SaveState saving={mutations.updateReceipt.isPending} saved={headerSaved} />
           </>
-        }
-        editor={
-          <ReceiptLinePanel
-            supplierId={supplier?.id}
-            editing={editing}
-            primary={lines.length === 0}
-            pending={
-              mutations.createReceipt.isPending ||
-              mutations.addReceiptLine.isPending ||
-              mutations.updateReceiptLine.isPending
-            }
-            problem={confirm ? null : <ProblemAlert problem={action.problem} />}
-            onSubmit={submitLine}
-            onCancelEdit={() => setEditing(null)}
-          />
-        }
-      />
-      <Card role="region" aria-labelledby="receipt-lines-title">
-        <CardHeader>
-          <CardTitle id="receipt-lines-title">{t('inventory.receipt.form.linesTitle')}</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {lines.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('inventory.receipt.linesEmpty')}</p>
-          ) : (
+        ),
+      })}
+      <div className="flex min-h-0 flex-1 flex-col gap-2">
+        <ProblemAlert problem={generalProblem(headerProblem)} />
+        <ProblemAlert problem={problemFromError(accounts.error)} onRetry={accounts.refetch} />
+        {strip}
+        <Card
+          size="sm"
+          role="region"
+          aria-label={t('inventory.receipt.form.linesTitle')}
+          className="min-h-0 flex-1 gap-0 py-0"
+        >
+          <div ref={scroller} className={LINES_SCROLLER}>
             <LinesTable
-              lines={lines.filter((line) => !line.freeGoods)}
+              lines={bought}
               table={table}
               prices={canCost}
               actions
               selectedId={editing?.id ?? null}
               onSelect={(line) => setEditing(line)}
+              landedId={last.landed}
+              removingId={
+                mutations.removeReceiptLine.isPending ? mutations.removeReceiptLine.variables : null
+              }
+              entry={{
+                label: editing
+                  ? t('inventory.receipt.panel.editTitle')
+                  : t('inventory.receipt.panel.title'),
+                rows: (
+                  <ReceiptLinePanel
+                    supplierId={supplier?.id}
+                    editing={editing}
+                    primary={lines.length === 0}
+                    expected={expected}
+                    searchInput={productSearch}
+                    pending={
+                      mutations.createReceipt.isPending ||
+                      mutations.addReceiptLine.isPending ||
+                      mutations.updateReceiptLine.isPending
+                    }
+                    problem={
+                      confirm || discountsOpen ? null : <ProblemAlert problem={action.problem} />
+                    }
+                    onSubmit={submitLine}
+                    onCancelEdit={() => setEditing(null)}
+                  />
+                ),
+              }}
               cells={(line, name) => ({
                 prices: (
                   <PriceCells
@@ -962,6 +1223,7 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
                     enteredQty={line.enteredQty}
                     entry={entryOfLine(line, false)}
                     editable={false}
+                    noFreeCell
                   />
                 ),
                 actions: (
@@ -984,72 +1246,100 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
                 ),
               })}
             />
-          )}
-          {canCost && detail ? <ReceiptTotals detail={detail} /> : null}
-          {detail && detail.weightMissing > 0 && lines.length > 0 ? (
-            <p className="text-[0.8125rem] text-muted-foreground">
-              {t('inventory.receipt.form.weightMissing', { count: detail.weightMissing })}
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
-      {canCost && detail ? (
-        <ReceiptDiscountsCard
-          lines={lines}
-          discounts={discountsOf(detail)}
-          editable
-          pending={mutations.setReceiptDiscounts.isPending}
-          tooLarge={detail.totals?.discountTooLarge}
-          onChange={(next: DiscountDraft[]) =>
-            void action.run(() =>
-              mutations.setReceiptDiscounts.mutateAsync({
-                id: detail.id,
-                discounts: next.map(toDiscountRequest),
-              }),
-            )
-          }
-          free={{
-            supplierId: supplier?.id,
-            pending: mutations.addReceiptLine.isPending,
-            onAdd: (line) => submitLine(line, true),
-            onRemove: (lineId) =>
-              void action.run(() => mutations.removeReceiptLine.mutateAsync(lineId)),
-          }}
-        />
-      ) : null}
-      <StickyActions
-        summary={
-          <LinesSummary detail={detail} count={lines.filter((line) => !line.freeGoods).length} />
-        }
-      >
-        {detail === null ? null : (
-          <>
-            <PrintLinks id={detail.id} />
-            {detail.lines.some((line) => line.expectedQty !== null) ? (
-              <Button variant="outline" asChild>
-                <Link to={`/inventory/receipts/${detail.id}/receive`}>
-                  <ScanBarcode />
-                  {t('inventory.receipt.receive.open')}
-                </Link>
-              </Button>
+            {bought.length === 0 ? (
+              <EmptyState title={t('inventory.receipt.linesEmpty')} icon={ScanBarcode} />
             ) : null}
-            {detail.origin === 'ORDER' ? null : (
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border bg-card px-3 py-1.5 text-[0.8125rem]">
+            <SummaryPopover detail={detail} count={bought.length} />
+            {detail ? <ReceiptNoteCard detail={detail} editable inline /> : null}
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              {canCost && detail ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    detail.totals?.discountTooLarge && 'border-destructive text-destructive',
+                  )}
+                  onClick={() => {
+                    action.clear();
+                    setDiscountsOpen(true);
+                  }}
+                >
+                  <BadgePercent />
+                  {t('inventory.receipt.discounts.open')}
+                  {discounts.length + freeCount > 0 ? (
+                    <Badge variant="secondary" className="tabular-nums">
+                      {discounts.length + freeCount}
+                    </Badge>
+                  ) : null}
+                </Button>
+              ) : null}
+              {detail ? <PrintMenu id={detail.id} /> : null}
+              {detail?.lines.some((line) => line.expectedQty !== null) ? (
+                <Button variant="outline" size="sm" asChild>
+                  <Link to={`/inventory/receipts/${detail.id}/receive`}>
+                    <ScanBarcode />
+                    {t('inventory.receipt.receive.open')}
+                  </Link>
+                </Button>
+              ) : null}
+              {detail && detail.origin !== 'ORDER' ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    action.clear();
+                    setConfirm('cancel');
+                  }}
+                >
+                  {t('inventory.receipt.cancel')}
+                </Button>
+              ) : null}
               <Button
-                variant="ghost"
-                onClick={() => {
-                  action.clear();
-                  setConfirm('cancel');
-                }}
+                size="sm"
+                disabled={lines.length === 0}
+                aria-keyshortcuts="Control+Enter"
+                onClick={askPost}
               >
-                {t('inventory.receipt.cancel')}
+                {t('inventory.receipt.post')}
+                <Kbd>{t('inventory.receipt.panel.keys.post')}</Kbd>
               </Button>
-            )}
-            <Button disabled={lines.length === 0} onClick={askPost}>
-              {t('inventory.receipt.post')}
-            </Button>
-          </>
-        )}
-      </StickyActions>
+            </div>
+          </div>
+        </Card>
+      </div>
+      {canCost && detail ? (
+        <Sheet open={discountsOpen} onOpenChange={setDiscountsOpen}>
+          <SheetContent aria-describedby={undefined} className="sm:max-w-3xl">
+            <SheetTitle className="sr-only">{t('inventory.receipt.discounts.title')}</SheetTitle>
+            <ProblemAlert problem={action.problem} />
+            <ReceiptDiscountsCard
+              plain
+              lines={lines}
+              discounts={discounts}
+              editable
+              pending={mutations.setReceiptDiscounts.isPending}
+              tooLarge={detail.totals?.discountTooLarge}
+              onChange={(next: DiscountDraft[]) =>
+                void action.run(() =>
+                  mutations.setReceiptDiscounts.mutateAsync({
+                    id: detail.id,
+                    discounts: next.map(toDiscountRequest),
+                  }),
+                )
+              }
+              free={{
+                supplierId: supplier?.id,
+                pending: mutations.addReceiptLine.isPending,
+                onAdd: (line) => submitLine(line, true),
+                onRemove: (lineId) =>
+                  void action.run(() => mutations.removeReceiptLine.mutateAsync(lineId)),
+              }}
+            />
+          </SheetContent>
+        </Sheet>
+      ) : null}
       <ConfirmDialog
         open={confirm === 'post'}
         variant="default"
@@ -1070,6 +1360,6 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
         onConfirm={cancel}
         onClose={() => setConfirm(null)}
       />
-    </>
+    </DocumentWindow>
   );
 }

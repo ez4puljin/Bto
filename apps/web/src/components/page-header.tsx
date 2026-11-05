@@ -22,6 +22,8 @@ export interface Crumb {
  * so the title text appears once. Also names the browser tab «Title · Bto».
  * `compact` (the reports' paper pages, whose paper carries the visible title as the page's h1):
  * one row of the breadcrumb with ☆ and the actions; the title only names the tab.
+ * `dense` (a document window, whose lines should start high): the breadcrumb, a smaller title, the
+ * meta and the actions on one row.
  */
 export function PageHeader({
   title,
@@ -31,6 +33,7 @@ export function PageHeader({
   description,
   crumbs = [],
   compact = false,
+  dense = false,
 }: {
   title: string;
   meta?: ReactNode;
@@ -42,6 +45,8 @@ export function PageHeader({
   crumbs?: readonly Crumb[];
   /** The breadcrumb and the actions on one row, no visible title (the page shows its own). */
   compact?: boolean;
+  /** The breadcrumb, a smaller title, the meta and the actions on one row. */
+  dense?: boolean;
 }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
@@ -94,6 +99,39 @@ export function PageHeader({
         </div>
         {actions ? (
           <div className="flex flex-wrap items-center gap-2 print:hidden">{actions}</div>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (dense) {
+    const listClass = 'flex flex-wrap items-center gap-1 text-[0.8125rem] text-muted-foreground';
+    return (
+      <div className="mb-2 flex shrink-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+        {shown.length > 0 ? (
+          <div className="flex min-w-0 items-center gap-1 print:hidden">
+            {linked ? (
+              <nav aria-label={t('shell.breadcrumb')}>
+                <ol className={listClass}>{items}</ol>
+              </nav>
+            ) : (
+              <ol className={listClass}>{items}</ol>
+            )}
+            <ChevronRight
+              aria-hidden
+              className="size-3.5 shrink-0 text-muted-foreground opacity-60"
+            />
+          </div>
+        ) : null}
+        <h1 className="text-lg leading-tight font-semibold tracking-tight">{title}</h1>
+        {trail?.exact ? <FavoriteToggle path={trail.item.to} /> : null}
+        {meta ? (
+          <div className="ml-1.5 flex flex-wrap items-center gap-2 text-[0.8125rem] text-muted-foreground">
+            {meta}
+          </div>
+        ) : null}
+        {actions ? (
+          <div className="ml-auto flex flex-wrap items-center gap-2 print:hidden">{actions}</div>
         ) : null}
       </div>
     );
