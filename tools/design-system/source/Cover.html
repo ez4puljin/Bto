@@ -1,0 +1,62 @@
+<!-- @dsCard height=320 -->
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<title>Bto cover</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { position: relative; background: var(--canvas); overflow: hidden; }
+  .name { position: absolute; left: 32px; bottom: 32px; max-width: 440px; }
+  .name h1 { margin: 0; font-family: var(--font-sans); font-size: 120px; line-height: .95; font-weight: 600; letter-spacing: -0.025em; color: var(--foreground); }
+  .name p { margin: 12px 0 0; font-family: var(--font-sans); font-size: 14px; line-height: 20px; color: var(--muted-foreground); }
+  svg { position: absolute; left: 480px; top: 0; }
+  .brand { fill: var(--primary); }
+  .brand-deep { fill: var(--primary-hover); }
+  .ink { fill: var(--foreground); }
+  .tint { fill: var(--secondary); }
+  .white { fill: var(--card); }
+  .green { fill: var(--toggle); }
+  .slab { rx: var(--radius-2xl); }
+  .pill { rx: 17px; }
+  .pill-lg { rx: 22px; }
+</style>
+</head>
+<body>
+<!--
+  blocks: primary 464x176 slab (the one blue), foreground 176x128 and secondary 272x128 under it; toggle only as one small capsule.
+  arrangement: one tall slab with two satellites, bleeding off the top, right and bottom edges, split by a space-4 gap.
+  pattern: capsules, because "every button, filter pill and segmented control is a capsule" is this system's own sentence; rows read like its filter bar.
+  scales: pill height control-h-sm 34px, switch control-h-lg 44px, gaps space-3 12px and space-4 16px, block corners radius-2xl 18px, pills half their height.
+-->
+<svg width="480" height="320" viewBox="0 0 480 320" role="presentation" aria-hidden="true">
+  <rect class="brand slab" x="16" y="-18" width="482" height="194" />
+  <rect class="ink slab" x="16" y="192" width="176" height="146" />
+  <rect class="tint slab" x="208" y="192" width="290" height="146" />
+
+  <rect class="white pill" x="40" y="24" width="168" height="34" />
+  <rect class="brand-deep pill" x="220" y="24" width="96" height="34" />
+  <rect class="brand-deep pill" x="328" y="24" width="152" height="34" />
+
+  <rect class="brand-deep pill" x="40" y="70" width="84" height="34" />
+  <rect class="white pill" x="136" y="70" width="108" height="34" />
+  <rect class="brand-deep pill" x="256" y="70" width="224" height="34" />
+
+  <rect class="brand-deep pill" x="40" y="116" width="228" height="34" />
+  <rect class="brand-deep pill" x="280" y="116" width="60" height="34" />
+  <rect class="white pill" x="352" y="116" width="128" height="34" />
+
+  <rect class="white pill" x="40" y="216" width="128" height="34" />
+  <rect class="tint pill" x="40" y="262" width="84" height="34" />
+
+  <rect class="green pill-lg" x="232" y="216" width="76" height="44" />
+  <circle class="white" cx="286" cy="238" r="18" />
+  <rect class="brand pill" x="324" y="221" width="156" height="34" />
+  <rect class="white pill" x="232" y="276" width="248" height="34" />
+</svg>
+<div class="name">
+  <h1>Bto</h1>
+  <p>A calm grey canvas, white cards, one blue for actions.</p>
+</div>
+</body>
+</html>
