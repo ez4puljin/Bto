@@ -188,7 +188,13 @@ export type MaritalStatus = (typeof MARITAL_STATUSES)[number];
 export const JOB_LEVELS = ['EXECUTIVE', 'MANAGEMENT', 'SENIOR', 'MID', 'ENTRY'] as const;
 export type JobLevel = (typeof JOB_LEVELS)[number];
 
-export const LEFT_REASON_KINDS = ['PERSONAL', 'COMPANY', 'CONTRACT_END', 'RETIRED', 'OTHER'] as const;
+export const LEFT_REASON_KINDS = [
+  'PERSONAL',
+  'COMPANY',
+  'CONTRACT_END',
+  'RETIRED',
+  'OTHER',
+] as const;
 export type LeftReasonKind = (typeof LEFT_REASON_KINDS)[number];
 
 /** A notice pops up in the staff app; news is read from its list (ADR-0146 #2). */
@@ -283,6 +289,7 @@ export function bandOfYears<K extends string>(
 
 /** The band a tenure in whole months falls in. */
 export function tenureBand(months: number): (typeof TENURE_BANDS)[number]['key'] {
-  for (const band of TENURE_BANDS) if (band.months === null || months < band.months) return band.key;
+  for (const band of TENURE_BANDS)
+    if (band.months === null || months < band.months) return band.key;
   return '3y+';
 }

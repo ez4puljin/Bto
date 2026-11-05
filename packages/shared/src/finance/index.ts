@@ -334,7 +334,43 @@ export const ACCOUNT_JOURNALS = [
 export type AccountJournal = (typeof ACCOUNT_JOURNALS)[number];
 
 /** Erkhet's currencies, in its order; an account names one, the ledger itself stays in MNT. */
-export const ACCOUNT_CURRENCIES = ["MNT","USD","EUR","CNY","RUB","JPY","GBP","CHF","KRW","HKD","AUD","CAD","SGD","SEK","BGN","HUF","EGP","INR","KZT","KPW","CZK","TWD","THB","IDR","MYR","AED","KWD","NZD","DKK","PLN","UAH","NOK","NPR","TRY","ZAR"] as const;
+export const ACCOUNT_CURRENCIES = [
+  'MNT',
+  'USD',
+  'EUR',
+  'CNY',
+  'RUB',
+  'JPY',
+  'GBP',
+  'CHF',
+  'KRW',
+  'HKD',
+  'AUD',
+  'CAD',
+  'SGD',
+  'SEK',
+  'BGN',
+  'HUF',
+  'EGP',
+  'INR',
+  'KZT',
+  'KPW',
+  'CZK',
+  'TWD',
+  'THB',
+  'IDR',
+  'MYR',
+  'AED',
+  'KWD',
+  'NZD',
+  'DKK',
+  'PLN',
+  'UAH',
+  'NOK',
+  'NPR',
+  'TRY',
+  'ZAR',
+] as const;
 export type AccountCurrency = (typeof ACCOUNT_CURRENCIES)[number];
 
 /** The accounting kind a chart code falls in, by its first digits (ADR-0149); null: not a number. */
