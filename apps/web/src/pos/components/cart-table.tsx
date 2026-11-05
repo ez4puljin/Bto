@@ -28,7 +28,7 @@ interface CartTableProps {
 
 /**
  * The basket, one line per product so that as many as possible show (owner 2026-11-05): number,
- * name, quantity, unit price and line total. The − / + / remove buttons work the selected line from
+ * code, name, quantity, unit price and line total. The − / + / remove buttons work the selected line from
  * the bar under the list; a line on the bulk price shows it against the supermarket price.
  */
 export function CartTable(props: CartTableProps) {
@@ -51,16 +51,19 @@ export function CartTable(props: CartTableProps) {
               <th scope="col" className="h-8 w-10 pl-3 font-medium">
                 {t('posKiosk.sale.columns.no')}
               </th>
+              <th scope="col" className="h-8 w-[4.5rem] px-2 font-medium">
+                {t('posKiosk.sale.columns.code')}
+              </th>
               <th scope="col" className="h-8 px-2 font-medium">
                 {t('posKiosk.sale.columns.name')}
               </th>
-              <th scope="col" className="h-8 w-20 px-2 text-center font-medium">
+              <th scope="col" className="h-8 w-20 px-2 text-center font-medium xl:w-[14%]">
                 {t('posKiosk.sale.columns.qty')}
               </th>
-              <th scope="col" className="h-8 w-34 px-2 text-right font-medium">
+              <th scope="col" className="h-8 w-34 px-2 text-right font-medium xl:w-[20%]">
                 {t('posKiosk.sale.columns.price')}
               </th>
-              <th scope="col" className="h-8 w-28 pr-3 pl-2 text-right font-medium">
+              <th scope="col" className="h-8 w-28 pr-3 pl-2 text-right font-medium xl:w-[18%]">
                 {t('posKiosk.sale.columns.total')}
               </th>
             </tr>
@@ -205,8 +208,11 @@ function CartRow(
       )}
     >
       <td className="h-9 pl-3 font-mono text-xs text-muted-foreground">{props.index + 1}</td>
+      <td className="truncate px-2 font-mono text-xs text-muted-foreground" title={line.sku}>
+        {line.sku}
+      </td>
       <td className="px-2">
-        <div className="flex min-w-0 items-center gap-1.5" title={`${line.name} · ${line.sku}`}>
+        <div className="flex min-w-0 items-center gap-1.5" title={line.name}>
           <span className="min-w-0 truncate font-medium">{line.name}</span>
           <span className="shrink-0 rounded-full bg-fill px-1.5 text-xs font-medium">
             {line.uomName}
@@ -218,7 +224,7 @@ function CartRow(
           aria-label={t('posKiosk.sale.qtyFor', { name: label })}
           inputMode="decimal"
           autoComplete="off"
-          className="h-7 w-full rounded-md border border-input bg-background px-1 text-center font-mono text-sm font-semibold outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring"
+          className="mx-auto block h-7 w-full max-w-20 rounded-md border border-input bg-background px-1 text-center font-mono text-sm font-semibold outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring"
           value={draft ?? formatQty(line.qty)}
           onFocus={(event) => {
             setDraft(line.qty);
