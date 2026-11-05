@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import mn from '@tugeel/shared/i18n/mn.json';
+import type { EdgeQuoteRequest } from '@tugeel/shared/pos';
 import type { EdgeSaleRequest } from '@tugeel/shared/pos';
 import { describe, expect, it } from 'vitest';
 import { wedgeScan } from '@/test/scan';
@@ -12,6 +13,7 @@ import {
   type EdgeHandler,
   fakeEdge,
   json,
+  quoteOf,
   printable,
   problem,
   receiptOf,
@@ -207,22 +209,44 @@ describe('kiosk: the sale screen', () => {
     expect(screen.getByRole('button', { name: k.sale.pay })).toBeDisabled();
   });
 
-  it('finds a product in the one search field (F6) and adds the unit chosen with the arrows', async () => {
+  it('finds a product in the one search field (F6): one row in its base unit, with its price', async () => {
     const edge = await openSale();
     const user = userEvent.setup();
     await user.keyboard('{F6}');
     const field = screen.getByLabelText(k.sale.scanLabel);
     await waitFor(() => expect(field).toHaveFocus());
     await user.type(field, 'сүү');
+    // The box of 12 is not offered (owner 2026-11-05); a scan of its barcode still adds it.
     const options = await screen.findAllByRole('option');
-    expect(options).toHaveLength(2);
-    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+    expect(options).toHaveLength(1);
+    expect(options[0]).toHaveTextContent('3,500');
+    await user.keyboard('{ArrowDown}{Enter}');
 
-    expect(qtyField('Сүү 1л (хайрцаг)')).toHaveValue('1');
+    expect(qtyField('Сүү 1л (ш)')).toHaveValue('1');
     await waitFor(() =>
-      expect(lastQuote(edge)).toEqual({ lines: [{ productUnitId: 12, qty: '1' }] }),
+      expect(lastQuote(edge)).toEqual({ lines: [{ productUnitId: 11, qty: '1' }] }),
     );
     await waitFor(() => expect(screen.getByLabelText(k.sale.scanLabel)).toHaveFocus());
+  });
+
+  it('shows a line on the bulk price against the supermarket price', async () => {
+    await openSale({
+      'POST /quote': (call) => {
+        const quote = quoteOf(call.body as EdgeQuoteRequest);
+        return json({
+          ...quote,
+          lines: quote.lines.map((line) => ({
+            ...line,
+            bulk: { retailPrice: '3885.00', bulkPrice: '3675.00' },
+          })),
+        });
+      },
+    });
+    await wedgeScan(MILK_BARCODE);
+    expect(await screen.findByText(k.sale.priceBulk)).toBeInTheDocument();
+    expect(screen.getByText(k.sale.priceRetail)).toBeInTheDocument();
+    expect(screen.getByText(/3,885/)).toBeInTheDocument();
+    expect(screen.getByText(/3,675/)).toBeInTheDocument();
   });
 
   it('changes the selected line with + / − and removes it with Delete', async () => {

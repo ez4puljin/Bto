@@ -807,6 +807,8 @@ export interface EdgeQuotedLine {
   unitPrice: string | null;
   total: string | null;
   discount: string | null;
+  /** Set while the line is charged the bulk price: one unit's list prices, to compare on the till. */
+  bulk?: { retailPrice: string; bulkPrice: string } | null;
 }
 
 export interface EdgeQuoteResponse {
