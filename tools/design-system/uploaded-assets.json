@@ -1,0 +1,288 @@
+{
+  "logos": [
+    {
+      "name": "staff-icon.png",
+      "file": "apps/mobile/assets/icon.png",
+      "blob": "bd4e8512b1a1ae2a3c94b40e1ec710fc",
+      "size": 10446,
+      "sha256": "ff5f9ae09045d5bdb7ca43a772a35716a3b804ab8c43c010e8fc6effd2fab49d"
+    },
+    {
+      "name": "staff-splash-icon.png",
+      "file": "apps/mobile/assets/splash-icon.png",
+      "blob": "9e2b09cacc2ff21494dfcc060b205f2f",
+      "size": 5513,
+      "sha256": "e1beac90f65a046fa9986c61931e4a5e4ed47731426671744f31562c6013724c"
+    },
+    {
+      "name": "staff-adaptive-icon.png",
+      "file": "apps/mobile/assets/adaptive-icon.png",
+      "blob": "045dfafa352cb5f87b83c79ba57932fb",
+      "size": 8471,
+      "sha256": "adb1332433db02dcdf896e9cb9bd9b4a1e307bec01bb2ad33586fff49e41129f"
+    },
+    {
+      "name": "bto300-icon.png",
+      "file": "apps/mobile/assets/customer/icon.png",
+      "blob": "762a89109cc4da55bddf10e2b7369da1",
+      "size": 25514,
+      "sha256": "d7baad3e32f0c930cbffef49fa9efb8ba4d608bfaef7a722f690f36869bd9567"
+    },
+    {
+      "name": "bto300-splash-icon.png",
+      "file": "apps/mobile/assets/customer/splash-icon.png",
+      "blob": "b47916a18b01fa851059fc6944ad5c2e",
+      "size": 18694,
+      "sha256": "05076f178c77612d0a11c59ee9533fd2a57e37107e8594407cadbc4b8d644a2c"
+    },
+    {
+      "name": "bto300-adaptive-icon.png",
+      "file": "apps/mobile/assets/customer/adaptive-icon.png",
+      "blob": "c0eb864d477ebcf1134fe482a6c0dd01",
+      "size": 19157,
+      "sha256": "ece25154eac12a804117044ac9366d4b4d99c2a88765b1e7f7f2ef838dbadd54"
+    }
+  ],
+  "icons": [
+    {
+      "name": "check",
+      "blob": "ade1ebb36a3ff970e0cd862987803b6b",
+      "size": 215,
+      "sha256": "0db538aafd63553ff85a07e5fca09d668162a421e71d78f6db6620be86acf268"
+    },
+    {
+      "name": "minus",
+      "blob": "1937e13ea93e275d4e61654c2b5750ba",
+      "size": 208,
+      "sha256": "9072928e599fdb10292755813f45e90d3118c4f331367a2e023ef3f77d1f3e68"
+    },
+    {
+      "name": "x",
+      "blob": "7dc99912c0bceffba4b0e757c7142e08",
+      "size": 238,
+      "sha256": "3dead86a0f3219bd60bd18e251b3f251250b2036a6412e1b3bfcc170542f1df4"
+    },
+    {
+      "name": "plus",
+      "blob": "8cdb33cd3602b38e3dde4f8dce3f4ab3",
+      "size": 234,
+      "sha256": "f8d27483cc799eba6b474d1016a4f9b1c7f85ffa0545d4a88dfa9b2f9e83489c"
+    },
+    {
+      "name": "search",
+      "blob": "fe9b6a2818e81d545451aa3e243c0ec4",
+      "size": 255,
+      "sha256": "ee23c42cfdab190d86ad56ef3c8b71597175fbabcc15d471caf7cd7420180a42"
+    },
+    {
+      "name": "chevron-down",
+      "blob": "4f23d501d61bcbbf3547f34c3e9d2212",
+      "size": 212,
+      "sha256": "c09cf91b95e1aaf75ac965e5fcf441d8b4c2d363f4b860e19735230cee3c59f5"
+    },
+    {
+      "name": "chevron-right",
+      "blob": "994882f32a05e75cf4bdc11832571603",
+      "size": 213,
+      "sha256": "5f176c4e956c6e075a00cceea4322653e903f3f4640c2a85d01385f104e69ed9"
+    },
+    {
+      "name": "chevron-left",
+      "blob": "c8091124976ecf35ec81926fb2f9f05a",
+      "size": 214,
+      "sha256": "027b535e0a3c3784d075f44f0c9bfa1e09543868ca4af07f05433e2e50b1e697"
+    },
+    {
+      "name": "ellipsis",
+      "blob": "32833f304c98068cb4b8a36d74af778d",
+      "size": 298,
+      "sha256": "93c3981ea8b4358586dcbf9bc34c7c5f555e3ea3c298a66bf27e7ce44b1521d3"
+    },
+    {
+      "name": "pencil",
+      "blob": "fb9ae538951e89a74da6e0e3c5d831ea",
+      "size": 355,
+      "sha256": "0c2b563cfc2762bb399b055bf06d03711706ab01f646470eb8b8087d1496d145"
+    },
+    {
+      "name": "trash-2",
+      "blob": "81f8de60d77974fb14e728e41e7c55ff",
+      "size": 373,
+      "sha256": "393047ed57b6b5efda24d27d82ed959bec16b54f2bf15a05b6313425739a7cc2"
+    },
+    {
+      "name": "printer",
+      "blob": "42cccf3f65651885719893a34e5c5baa",
+      "size": 386,
+      "sha256": "0a6dea03a16bcdf89f2cadf6f79d6c919f10559496597c831c42edc20b8eebee"
+    },
+    {
+      "name": "star",
+      "blob": "0d4b87e2c0eed355ace2eabb30a33479",
+      "size": 564,
+      "sha256": "8bd8d461910c815f7aa8926483751420fb9a11c3d1a00e0b9649a71adb0ea600"
+    },
+    {
+      "name": "info",
+      "blob": "cb513dbe008b97656653ed870d440865",
+      "size": 276,
+      "sha256": "853da8306ea94eb89b453935223e615a9404d56cabddf765a8051d04e5b17126"
+    },
+    {
+      "name": "circle-check",
+      "blob": "178d1f5dbad87ce6b5c3ddc0335e0668",
+      "size": 258,
+      "sha256": "57b5b21331f41b4bec1354418798b1c891145d03e8c6496da817c6175855c277"
+    },
+    {
+      "name": "triangle-alert",
+      "blob": "67bd7ce305b78b130904c9f179c3f583",
+      "size": 325,
+      "sha256": "9c5cd29f0cb7afcd0e545e90a1a66d873e58a86c44f0d2a469112a5668baa779"
+    },
+    {
+      "name": "loader-circle",
+      "blob": "a8c99541712513913980634e4c4bec64",
+      "size": 227,
+      "sha256": "6a45b6227a9ac0055dff0075407213a1a30d499c29ec69d596a6e02b3a7185b9"
+    },
+    {
+      "name": "inbox",
+      "blob": "0ca9dc879348a0ab0bf342892b1eb32e",
+      "size": 370,
+      "sha256": "269e1664a6ddfe09f069d16e11483ebd209ff7c3c47bc24c252f4ebe6470edfc"
+    },
+    {
+      "name": "calendar-days",
+      "blob": "d3889b1a6a464e2b990cd9bb7114e0cf",
+      "size": 477,
+      "sha256": "606131bf7056f589757b44dc91a79749b0f51b7c167af55c818d1a21b46a78c5"
+    },
+    {
+      "name": "camera",
+      "blob": "8a6cbf680a43602172b15cc315120c8f",
+      "size": 417,
+      "sha256": "551b3d0e3b954a4140a181b00e437deea4dbbb41854cb93aa91bddf1012e355e"
+    },
+    {
+      "name": "layout-grid",
+      "blob": "7a1cb3bc23edf3c848ff80df41ce1599",
+      "size": 398,
+      "sha256": "3d3c0f3974673618c2253a2a062d6f38316336cdf154a8eb6e041e4bb26f7500"
+    },
+    {
+      "name": "bell",
+      "blob": "c582271b8c49a86583a05a6e06c7c6f6",
+      "size": 371,
+      "sha256": "2563b674c330146c2c28c8d454e6bfc2bbd990d2a46bb4ef82d1164721290c67"
+    },
+    {
+      "name": "sparkles",
+      "blob": "6c96109caa1cb67f31d90bc00c5b62d5",
+      "size": 551,
+      "sha256": "1ac3537e5d3e32ec58a4274081a11a0fdc485a51ca8764a865fbb5b81ca5e980"
+    },
+    {
+      "name": "settings",
+      "blob": "ff24a014da651329b7f7238a61f171d0",
+      "size": 566,
+      "sha256": "191fa452dfc61c01a59f631b768c63944310091c61ff814c38985b25afd75a42"
+    },
+    {
+      "name": "shopping-cart",
+      "blob": "1339deb6f34e086fe36bb62da5e72574",
+      "size": 443,
+      "sha256": "01d9480ae55ea4d78ccb7b7754c987a73c19c85ba3110b64180590a0defb26d7"
+    },
+    {
+      "name": "warehouse",
+      "blob": "0e7707ecebd742990a6c8675ceed3c91",
+      "size": 429,
+      "sha256": "355a2e4ec0267fb137f43617e4333a5fa80bceab7fb093c818e43c48f51fd151"
+    },
+    {
+      "name": "package",
+      "blob": "b6f2316e061d0bcf81abc35183e8bc40",
+      "size": 432,
+      "sha256": "f81211b0df156a2bc81d78a0195b380c247ffde16736e260d1cedab19b40cdf0"
+    },
+    {
+      "name": "users",
+      "blob": "bb4e729238170bfd20ef724caca872fc",
+      "size": 367,
+      "sha256": "2f874e2ef601395fd633af69b7b7cbd8de9c007465b32153067e56585ee1c9e6"
+    },
+    {
+      "name": "landmark",
+      "blob": "7f06f59f8f0ead88c99abf7c1e4f6fe7",
+      "size": 418,
+      "sha256": "2a47f09c4d627fa16eef63ab12556b98d51fc4843c4dccf54ac3feb1c227dc17"
+    },
+    {
+      "name": "file-chart-column",
+      "blob": "cdf32950fc980c1c91521b3abe35df87",
+      "size": 431,
+      "sha256": "e88d6c34c8c441d5f823e01459a7d3205b147d8af6419a0f2a576ed5546279a8"
+    },
+    {
+      "name": "store",
+      "blob": "e4222fcd11a1e184b49328d9a732b76c",
+      "size": 567,
+      "sha256": "64e8c8f52863b294b8d199a966418f30d525e187a8e8a9c69a7a7ac32a95b2ee"
+    },
+    {
+      "name": "smartphone",
+      "blob": "261bc3f21e4c348a2d0a44078483599b",
+      "size": 272,
+      "sha256": "9208e7bbdea8f69be71eaac7e82f5019f83c448654f5487cefe9c7127e6adac4"
+    },
+    {
+      "name": "package-plus",
+      "blob": "729d5cfa7715ba71b1fc7a5b5828cd2c",
+      "size": 475,
+      "sha256": "0fa94b6362af97b3e60866be4799115cfd8e2685491192281506c573c99db743"
+    },
+    {
+      "name": "package-minus",
+      "blob": "e2c9e12ef65c02b4ddc89139eb967ad9",
+      "size": 445,
+      "sha256": "0c06eb622283e61adb11706f091c8f821a921aecdf3773b14998c10b5b9bfd79"
+    },
+    {
+      "name": "boxes",
+      "blob": "8099a37d24255113c6f6159bfd9d7173",
+      "size": 822,
+      "sha256": "1e67e09041e4065253013fec05ea72a361e7cc74d1da0ab464a78a5313ed0a5d"
+    },
+    {
+      "name": "scan-barcode",
+      "blob": "e9d286f079739f571ab115ad7290ab79",
+      "size": 425,
+      "sha256": "e382607e6e4767fedb44325a0d63aeca2fa2fcd03d76bb3db623bcd7895e0662"
+    },
+    {
+      "name": "truck",
+      "blob": "2f8f1e7ce83ed51c1ca46b0a6c320279",
+      "size": 457,
+      "sha256": "43eb39ce1e893887c86b80343fa97ed8a45e7aa1b3e6f5b7d467dc0acc1c2858"
+    },
+    {
+      "name": "receipt-text",
+      "blob": "83f0f32764515a0ea4a2541650164c79",
+      "size": 714,
+      "sha256": "cc28f96c18a9a8e12036e7f1880f52c363430395c7e49e403a6673a5727ce11e"
+    },
+    {
+      "name": "history",
+      "blob": "16ef4894216dce4ef24f69e650f760be",
+      "size": 304,
+      "sha256": "8dec37187d3fa3b0237646417ebdb2a3c1063004a0787b4016082374b761791a"
+    },
+    {
+      "name": "sliders-horizontal",
+      "blob": "ca6edcc346874eed064bc75e172173e5",
+      "size": 414,
+      "sha256": "6ed83dfbc2c9512c2130cae341e00f06d856d47abf14a71e75ad708b50cb937a"
+    }
+  ]
+}
