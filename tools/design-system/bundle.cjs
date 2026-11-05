@@ -40,7 +40,12 @@ function pruneDictionary(all, keys, prefixes) {
       const dotted = trail ? `${trail}.${key}` : key;
       if (typeof value === 'string') {
         const base = dotted.replace(/_(zero|one|two|few|many|other)$/, '');
-        if (keys.has(dotted) || keys.has(base) || prefixes.some((prefix) => dotted.startsWith(prefix))) out[key] = value;
+        if (
+          keys.has(dotted) ||
+          keys.has(base) ||
+          prefixes.some((prefix) => dotted.startsWith(prefix))
+        )
+          out[key] = value;
       } else {
         const inner = walk(value, dotted);
         if (Object.keys(inner).length > 0) out[key] = inner;
@@ -55,11 +60,19 @@ function plugin(dictionary) {
   return {
     name: 'bto',
     setup(build) {
-      build.onResolve({ filter: /^(react|react-dom|react-dom\/client|react\/jsx-runtime|react\/jsx-dev-runtime)$/ }, (args) => ({
-        path: args.path,
-        namespace: 'bto-global',
+      build.onResolve(
+        {
+          filter: /^(react|react-dom|react-dom\/client|react\/jsx-runtime|react\/jsx-dev-runtime)$/,
+        },
+        (args) => ({
+          path: args.path,
+          namespace: 'bto-global',
+        }),
+      );
+      build.onLoad({ filter: /.*/, namespace: 'bto-global' }, (args) => ({
+        contents: GLOBALS[args.path],
+        loader: 'js',
       }));
-      build.onLoad({ filter: /.*/, namespace: 'bto-global' }, (args) => ({ contents: GLOBALS[args.path], loader: 'js' }));
       build.onResolve({ filter: /^@\// }, (args) => {
         if (STUBS[args.path]) return { path: STUBS[args.path] };
         return build.resolve(`./${args.path.slice(2)}`, { resolveDir: WEB, kind: args.kind });
@@ -71,7 +84,10 @@ function plugin(dictionary) {
         return { path: path.join(SHARED, 'src', sub || '.', 'index.ts') };
       });
       if (dictionary) {
-        build.onLoad({ filter: /[\\/]i18n[\\/]mn\.json$/ }, () => ({ contents: JSON.stringify(dictionary), loader: 'json' }));
+        build.onLoad({ filter: /[\\/]i18n[\\/]mn\.json$/ }, () => ({
+          contents: JSON.stringify(dictionary),
+          loader: 'json',
+        }));
       }
     },
   };
@@ -89,7 +105,11 @@ const common = {
   charset: 'utf8',
   legalComments: 'inline',
   jsx: 'automatic',
-  define: { 'process.env.NODE_ENV': '"production"', 'import.meta.env.DEV': 'false', 'import.meta.env.PROD': 'true' },
+  define: {
+    'process.env.NODE_ENV': '"production"',
+    'import.meta.env.DEV': 'false',
+    'import.meta.env.PROD': 'true',
+  },
   logLevel: 'warning',
   absWorkingDir: ROOT,
 };
@@ -109,7 +129,14 @@ async function buildBundle() {
   const own = Object.keys(first.metafile.inputs)
     .filter((file) => !file.startsWith('bto-global:'))
     .map((file) => path.resolve(ROOT, file))
-    .filter((file) => /[\\/](apps[\\/]web|packages[\\/]shared[\\/]src|tools[\\/]design-system[\\/]live)[\\/]/.test(file) && !file.endsWith('.json'));
+    // pnpm's hoisted linker keeps some packages in apps/web/node_modules: those are not our classes.
+    .filter((file) => !/[\\/]node_modules[\\/]/.test(file))
+    .filter(
+      (file) =>
+        /[\\/](apps[\\/]web|packages[\\/]shared[\\/]src|tools[\\/]design-system[\\/]live)[\\/]/.test(
+          file,
+        ) && !file.endsWith('.json'),
+    );
   const mn = JSON.parse(fs.readFileSync(path.join(SHARED, 'i18n', 'mn.json'), 'utf8'));
   const keys = new Set(['app.name']);
   const prefixes = [...WHOLE].map((name) => `${name}.`);
@@ -154,15 +181,25 @@ window.ReactDOM = Object.assign({}, dom, client);`,
       {
         name: 'react-global',
         setup(build) {
-          build.onResolve({ filter: /^react$/ }, (args) => ({ path: args.path, namespace: 'bto-global' }));
-          build.onLoad({ filter: /.*/, namespace: 'bto-global' }, () => ({ contents: GLOBALS.react, loader: 'js' }));
+          build.onResolve({ filter: /^react$/ }, (args) => ({
+            path: args.path,
+            namespace: 'bto-global',
+          }));
+          build.onLoad({ filter: /.*/, namespace: 'bto-global' }, () => ({
+            contents: GLOBALS.react,
+            loader: 'js',
+          }));
         },
       },
     ],
   });
-  fs.writeFileSync(path.join(COMPONENTS, 'lib', 'react-dom.js'), safeScript(dom.outputFiles[0].text));
+  fs.writeFileSync(
+    path.join(COMPONENTS, 'lib', 'react-dom.js'),
+    safeScript(dom.outputFiles[0].text),
+  );
   for (const name of ['react.js', 'react-dom.js']) {
-    if (fs.statSync(path.join(COMPONENTS, 'lib', name)).size > 2 * 1024 * 1024) throw new Error(`${name} over 2 MB`);
+    if (fs.statSync(path.join(COMPONENTS, 'lib', name)).size > 2 * 1024 * 1024)
+      throw new Error(`${name} over 2 MB`);
   }
 }
 
@@ -179,7 +216,10 @@ async function buildCss(own) {
     .filter((name) => name.endsWith('.preview.jsx'))
     .map((name) => path.join(SOURCE, 'components', name));
   const candidates = new Scanner({ sources: [] }).scanFiles(
-    [...own, ...previews].map((file) => ({ content: fs.readFileSync(file, 'utf8'), extension: path.extname(file).slice(1) })),
+    [...own, ...previews].map((file) => ({
+      content: fs.readFileSync(file, 'utf8'),
+      extension: path.extname(file).slice(1),
+    })),
   );
   const optimized = optimize(compiler.build([...new Set(candidates)]), { minify: true });
   let css = typeof optimized === 'string' ? optimized : optimized.code;

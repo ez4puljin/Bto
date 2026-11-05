@@ -12,7 +12,13 @@ function Demo() {
   const [value, setValue] = React.useState('1');
   return (
     <div className="p-4">
-      <Combobox aria-label="Нийлүүлэгч" value={value} options={OPTIONS} emptyLabel="Бүх нийлүүлэгч" onChange={setValue} />
+      <Combobox
+        aria-label="Нийлүүлэгч"
+        value={value}
+        options={OPTIONS}
+        emptyLabel="Бүх нийлүүлэгч"
+        onChange={setValue}
+      />
     </div>
   );
 }

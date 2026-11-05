@@ -1,6 +1,14 @@
 const {
-  Button, ColumnChooser, Combobox, DateFilter, FilterBar, FilterChip, FilterToggle, NativeSelect,
-  SearchField, BtoProvider,
+  Button,
+  ColumnChooser,
+  Combobox,
+  DateFilter,
+  FilterBar,
+  FilterChip,
+  FilterToggle,
+  NativeSelect,
+  SearchField,
+  BtoProvider,
 } = Bto;
 
 const SUPPLIERS = [
@@ -39,15 +47,35 @@ function Demo() {
           />
         }
       >
-        <SearchField placeholder="Бараа хайх" aria-label="Бараа хайх" value={search} onChange={(event) => setSearch(event.target.value)} />
-        <NativeSelect variant="filter" aria-label="Агуулах" value={warehouse} onChange={(event) => setWarehouse(event.target.value)}>
+        <SearchField
+          placeholder="Бараа хайх"
+          aria-label="Бараа хайх"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <NativeSelect
+          variant="filter"
+          aria-label="Агуулах"
+          value={warehouse}
+          onChange={(event) => setWarehouse(event.target.value)}
+        >
           <option value="">Бүх агуулах</option>
           <option value="hall">Заал</option>
         </NativeSelect>
         <FilterToggle label="Идэвхтэй" checked={active} onCheckedChange={setActive} />
         <DateFilter label="Огноо" value={date} onChange={setDate} />
-        <Combobox aria-label="Нийлүүлэгч" value={supplier} options={SUPPLIERS} emptyLabel="Бүх нийлүүлэгч" onChange={setSupplier} />
-        {chip ? <FilterChip clearLabel="Арилгах" onClear={() => setChip(false)}>Ангилал: Хүнс</FilterChip> : null}
+        <Combobox
+          aria-label="Нийлүүлэгч"
+          value={supplier}
+          options={SUPPLIERS}
+          emptyLabel="Бүх нийлүүлэгч"
+          onChange={setSupplier}
+        />
+        {chip ? (
+          <FilterChip clearLabel="Арилгах" onClear={() => setChip(false)}>
+            Ангилал: Хүнс
+          </FilterChip>
+        ) : null}
       </FilterBar>
     </div>
   );

@@ -8,8 +8,20 @@ function Demo() {
   const [paper, setPaper] = React.useState('a4');
   return (
     <div className="flex flex-wrap items-center gap-3 p-4">
-      <SegmentedControl options={Object.keys(STATE)} value={state} label={(key) => STATE[key]} onChange={setState} name="Төлөв" />
-      <SegmentedControl options={Object.keys(PAPER)} value={paper} label={(key) => PAPER[key]} onChange={setPaper} name="Цаасны хэмжээ" />
+      <SegmentedControl
+        options={Object.keys(STATE)}
+        value={state}
+        label={(key) => STATE[key]}
+        onChange={setState}
+        name="Төлөв"
+      />
+      <SegmentedControl
+        options={Object.keys(PAPER)}
+        value={paper}
+        label={(key) => PAPER[key]}
+        onChange={setPaper}
+        name="Цаасны хэмжээ"
+      />
     </div>
   );
 }

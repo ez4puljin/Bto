@@ -28,6 +28,8 @@ pnpm design:check
 
 Stand-ins in the bundle: `live/inbox-stub.jsx` (the bell reads the server), `live/camera-stub.jsx` (no camera, no ZXing), `live/provider.jsx` (a test user holding every right). `live/module-tile.jsx` carries the tile's exact classes, because the code has no such component.
 
+Build from a checkout with its own `pnpm install`. The web's `cn` is 0.4.0 in `apps/web/node_modules`, and an older copy sits at the root: a worktree with no `node_modules` would take the root's through the main checkout, and the bundle would merge classes differently from the app.
+
 ## Publishing
 
 Nothing here can publish: it needs Claude Code's artifact tools and the owner's account. Ask Claude Code to publish `tmp/design-system/project` to that artifact. It has to:

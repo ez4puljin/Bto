@@ -1,5 +1,6 @@
-import { cn } from 'cn';
 import { Link } from 'react-router';
+// Through the app's file: a bare 'cn' from here would be the older copy hoisted to the root.
+import { cn } from '@/lib/utils';
 
 // The code has no tile component: these are the exact classes of features/home/module-page.tsx
 // (`page`, `action`) and features/home/home-page.tsx (`home`).

@@ -17,7 +17,10 @@ function Demo() {
         <DateFilter label="Эхлэх" value={from} onChange={setFrom} />
         <DateFilter label="Дуусах" value={to} onChange={setTo} />
       </div>
-      <p className="text-xs text-muted-foreground">Fields · filter pills, tinted while they narrow the list. Open a calendar with its button; try typing 20261101.</p>
+      <p className="text-xs text-muted-foreground">
+        Fields · filter pills, tinted while they narrow the list. Open a calendar with its button;
+        try typing 20261101.
+      </p>
     </div>
   );
 }

@@ -1,6 +1,16 @@
 const {
-  Button, Dialog, DialogContent, DialogDescription, DialogFormFooter, DialogHeader, DialogTitle,
-  FormField, Input, Toaster, toast, BtoProvider,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFormFooter,
+  DialogHeader,
+  DialogTitle,
+  FormField,
+  Input,
+  Toaster,
+  toast,
+  BtoProvider,
 } = Bto;
 
 // The page's frames refuse a form's submit, so this preview answers the submit button and Enter itself.
@@ -29,19 +39,41 @@ function Demo() {
   };
   return (
     <div className="p-4">
-      <Button variant="outline" onClick={() => setOpen(true)}>Шинэ утга оруулах</Button>
-      {open && firstView ? <div className="fixed inset-0 z-50 bg-black/25 backdrop-blur-[2px]" onClick={close} /> : null}
-      <Dialog modal={!firstView} open={open} onOpenChange={(next) => { if (!next) close(); }}>
+      <Button variant="outline" onClick={() => setOpen(true)}>
+        Шинэ утга оруулах
+      </Button>
+      {open && firstView ? (
+        <div className="fixed inset-0 z-50 bg-black/25 backdrop-blur-[2px]" onClick={close} />
+      ) : null}
+      <Dialog
+        modal={!firstView}
+        open={open}
+        onOpenChange={(next) => {
+          if (!next) close();
+        }}
+      >
         <DialogContent
-          onOpenAutoFocus={(event) => { if (firstView) event.preventDefault(); }}
-          onInteractOutside={(event) => { if (firstView) event.preventDefault(); }}
+          onOpenAutoFocus={(event) => {
+            if (firstView) event.preventDefault();
+          }}
+          onInteractOutside={(event) => {
+            if (firstView) event.preventDefault();
+          }}
         >
-          <form className="grid gap-4" {...submitted(() => { close(); toast.success('Хадгалагдлаа'); })}>
+          <form
+            className="grid gap-4"
+            {...submitted(() => {
+              close();
+              toast.success('Хадгалагдлаа');
+            })}
+          >
             <DialogHeader>
               <DialogTitle>Шинэ утга оруулах</DialogTitle>
               <DialogDescription>Хүчинтэй болох огноогоо заана уу.</DialogDescription>
             </DialogHeader>
-            <FormField label="Утга" htmlFor="value"><Input id="value" defaultValue="10" /></FormField>
+            <FormField label="Утга" htmlFor="value">
+              <Input id="value" defaultValue="10" />
+            </FormField>
             <DialogFormFooter pending={false} onCancel={close} />
           </form>
         </DialogContent>

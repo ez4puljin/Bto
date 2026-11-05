@@ -4,182 +4,140 @@
     "group": "Brand",
     "height": 112,
     "width": 800,
-    "source": [
-      "apps/web/src/pos/components/layout.tsx"
-    ]
+    "source": ["apps/web/src/pos/components/layout.tsx"]
   },
   {
     "name": "Button",
     "group": "Actions",
     "height": 290,
     "width": 800,
-    "source": [
-      "apps/web/src/components/ui/button.tsx"
-    ]
+    "source": ["apps/web/src/components/ui/button.tsx"]
   },
   {
     "name": "DropdownMenu",
     "group": "Actions",
     "height": 230,
     "width": 800,
-    "source": [
-      "apps/web/src/components/ui/dropdown-menu.tsx"
-    ]
+    "source": ["apps/web/src/components/ui/dropdown-menu.tsx"]
   },
   {
     "name": "Badge",
     "group": "Status",
     "height": 96,
     "width": 800,
-    "source": [
-      "apps/web/src/components/ui/badge.tsx"
-    ]
+    "source": ["apps/web/src/components/ui/badge.tsx"]
   },
   {
     "name": "Alert",
     "group": "Status",
     "height": 190,
     "width": 800,
-    "source": [
-      "apps/web/src/components/ui/alert.tsx",
-      "apps/web/src/components/problem-alert.tsx"
-    ]
+    "source": ["apps/web/src/components/ui/alert.tsx", "apps/web/src/components/problem-alert.tsx"]
   },
   {
     "name": "Toaster",
     "group": "Status",
     "height": 170,
     "width": 800,
-    "source": [
-      "apps/web/src/components/toaster.tsx"
-    ]
+    "source": ["apps/web/src/components/toaster.tsx"]
   },
   {
     "name": "Input",
     "group": "Inputs",
     "height": 170,
     "width": 800,
-    "source": [
-      "apps/web/src/components/ui/input.tsx"
-    ]
+    "source": ["apps/web/src/components/ui/input.tsx"]
   },
   {
     "name": "Textarea",
     "group": "Inputs",
     "height": 112,
     "width": 800,
-    "source": [
-      "apps/web/src/components/ui/textarea.tsx"
-    ]
+    "source": ["apps/web/src/components/ui/textarea.tsx"]
   },
   {
     "name": "Label",
     "group": "Inputs",
     "height": 105,
     "width": 800,
-    "source": [
-      "apps/web/src/components/ui/label.tsx"
-    ]
+    "source": ["apps/web/src/components/ui/label.tsx"]
   },
   {
     "name": "Select",
     "group": "Inputs",
     "height": 210,
     "width": 800,
-    "source": [
-      "apps/web/src/components/ui/select.tsx",
-      "apps/web/src/components/native-select.tsx"
-    ]
+    "source": ["apps/web/src/components/ui/select.tsx", "apps/web/src/components/native-select.tsx"]
   },
   {
     "name": "Checkbox",
     "group": "Inputs",
     "height": 136,
     "width": 800,
-    "source": [
-      "apps/web/src/components/ui/checkbox.tsx"
-    ]
+    "source": ["apps/web/src/components/ui/checkbox.tsx"]
   },
   {
     "name": "CheckboxGroup",
     "group": "Inputs",
     "height": 86,
     "width": 800,
-    "source": [
-      "apps/web/src/components/checkbox-group.tsx"
-    ]
+    "source": ["apps/web/src/components/checkbox-group.tsx"]
   },
   {
     "name": "Switch",
     "group": "Inputs",
     "height": 100,
     "width": 800,
-    "source": [
-      "apps/web/src/components/ui/switch.tsx"
-    ]
+    "source": ["apps/web/src/components/ui/switch.tsx"]
   },
   {
     "name": "DateInput",
     "group": "Inputs",
     "height": 440,
     "width": 800,
-    "source": [
-      "apps/web/src/components/date-input.tsx"
-    ]
+    "source": ["apps/web/src/components/date-input.tsx"]
   },
   {
     "name": "Combobox",
     "group": "Inputs",
     "height": 320,
     "width": 800,
-    "source": [
-      "apps/web/src/components/combobox.tsx"
-    ]
+    "source": ["apps/web/src/components/combobox.tsx"]
   },
   {
     "name": "ScanBox",
     "group": "Inputs",
     "height": 118,
     "width": 800,
-    "source": [
-      "apps/web/src/components/scan-box.tsx"
-    ]
+    "source": ["apps/web/src/components/scan-box.tsx"]
   },
   {
     "name": "TopBar",
     "group": "Navigation",
     "height": 520,
     "width": 1366,
-    "source": [
-      "apps/web/src/app/top-bar.tsx"
-    ]
+    "source": ["apps/web/src/app/top-bar.tsx"]
   },
   {
     "name": "PageHeader",
     "group": "Navigation",
     "height": 272,
     "width": 800,
-    "source": [
-      "apps/web/src/components/page-header.tsx"
-    ]
+    "source": ["apps/web/src/components/page-header.tsx"]
   },
   {
     "name": "Tabs",
     "group": "Navigation",
     "height": 126,
     "width": 800,
-    "source": [
-      "apps/web/src/components/ui/tabs.tsx"
-    ]
+    "source": ["apps/web/src/components/ui/tabs.tsx"]
   },
   {
     "name": "SegmentedControl",
     "group": "Navigation",
     "height": 80,
     "width": 800,
-    "source": [
-      "apps/web/src/components/list.tsx"
-    ]
+    "source": ["apps/web/src/components/list.tsx"]
   },
   {
     "name": "ModuleTile",
@@ -196,118 +154,90 @@
     "group": "Lists",
     "height": 400,
     "width": 960,
-    "source": [
-      "apps/web/src/components/list.tsx"
-    ]
+    "source": ["apps/web/src/components/list.tsx"]
   },
   {
     "name": "ColumnChooser",
     "group": "Lists",
     "height": 300,
     "width": 800,
-    "source": [
-      "apps/web/src/components/column-chooser.tsx"
-    ]
+    "source": ["apps/web/src/components/column-chooser.tsx"]
   },
   {
     "name": "Table",
     "group": "Lists",
     "height": 200,
     "width": 1120,
-    "source": [
-      "apps/web/src/components/ui/table.tsx",
-      "apps/web/src/components/list.tsx"
-    ]
+    "source": ["apps/web/src/components/ui/table.tsx", "apps/web/src/components/list.tsx"]
   },
   {
     "name": "ListCard",
     "group": "Lists",
     "height": 330,
     "width": 800,
-    "source": [
-      "apps/web/src/components/list.tsx"
-    ]
+    "source": ["apps/web/src/components/list.tsx"]
   },
   {
     "name": "SelectionBar",
     "group": "Lists",
     "height": 108,
     "width": 800,
-    "source": [
-      "apps/web/src/components/selection-bar.tsx"
-    ]
+    "source": ["apps/web/src/components/selection-bar.tsx"]
   },
   {
     "name": "FormSection",
     "group": "Forms and records",
     "height": 404,
     "width": 800,
-    "source": [
-      "apps/web/src/components/form.tsx"
-    ]
+    "source": ["apps/web/src/components/form.tsx"]
   },
   {
     "name": "Card",
     "group": "Forms and records",
     "height": 232,
     "width": 800,
-    "source": [
-      "apps/web/src/components/ui/card.tsx"
-    ]
+    "source": ["apps/web/src/components/ui/card.tsx"]
   },
   {
     "name": "DetailCard",
     "group": "Forms and records",
     "height": 290,
     "width": 800,
-    "source": [
-      "apps/web/src/components/detail.tsx"
-    ]
+    "source": ["apps/web/src/components/detail.tsx"]
   },
   {
     "name": "FactChips",
     "group": "Forms and records",
     "height": 182,
     "width": 800,
-    "source": [
-      "apps/web/src/components/record-sheet.tsx"
-    ]
+    "source": ["apps/web/src/components/record-sheet.tsx"]
   },
   {
     "name": "StickyActions",
     "group": "Forms and records",
     "height": 106,
     "width": 800,
-    "source": [
-      "apps/web/src/components/sticky-actions.tsx"
-    ]
+    "source": ["apps/web/src/components/sticky-actions.tsx"]
   },
   {
     "name": "Dialog",
     "group": "Overlays",
     "height": 300,
     "width": 800,
-    "source": [
-      "apps/web/src/components/ui/dialog.tsx"
-    ]
+    "source": ["apps/web/src/components/ui/dialog.tsx"]
   },
   {
     "name": "ConfirmDialog",
     "group": "Overlays",
     "height": 250,
     "width": 800,
-    "source": [
-      "apps/web/src/components/confirm-dialog.tsx"
-    ]
+    "source": ["apps/web/src/components/confirm-dialog.tsx"]
   },
   {
     "name": "Sheet",
     "group": "Overlays",
     "height": 360,
     "width": 1024,
-    "source": [
-      "apps/web/src/components/ui/sheet.tsx",
-      "apps/web/src/components/record-sheet.tsx"
-    ]
+    "source": ["apps/web/src/components/ui/sheet.tsx", "apps/web/src/components/record-sheet.tsx"]
   }
 ]

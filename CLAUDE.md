@@ -43,6 +43,7 @@ Confirmed 2026-10-10 from the npm registry (exact pins in every `package.json`; 
 | react, react-dom, react-router, @tanstack/react-query | 19.2.3, 19.2.3, 7.18.4, 5.104.1 | ONE React workspace-wide, the Expo SDK's (ADR-0061; a test fails on a second copy); v8 of React Router exists; stay on 7 (docs: reactrouter.com/7.18.4) |
 | tailwindcss, shadcn, radix-ui, cn, lucide-react | 4.3.3, 4.21.4 (`radix-nova`), 1.7.0, 0.4.0, 1.53.0 | never `shadcn init --defaults` |
 | recharts, react-is | 3.10.1, 19.2.3 (web only) | the reports' charts (ADR-0108); colours only from the design tokens |
+| esbuild, @tailwindcss/node, @tailwindcss/oxide | 0.28.2, 4.3.3, 4.3.3 (root, dev only) | `pnpm design:build` alone; the Tailwind pair stays on the version of `tailwindcss` |
 | i18next, react-i18next, @fontsource-variable/inter | 26.4.2, 17.0.16, 5.3.0 | Inter is the web font (ADR-0042); PDFs embed Noto Sans (ADR-0011) |
 | openapi-typescript, openapi-fetch | 7.13.0, 0.17.0 | |
 | TanStack Table | not used in delivery 1 (decided 2026-10-11): plain shadcn tables, server-side filters, keyset "load more" | choose 8.21.3 (frozen since 2025-04) or 9.x when a screen first needs client-side sorting or grouping |
@@ -78,6 +79,7 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): producti
 | `pnpm check` | ts:single-version → prettier → build packages → eslint → lint-guard self-test → typecheck → core:standalone → gen:api freshness → drizzle-kit check → unit (Jest + Vitest) → integration → integrity (`--runInBand`) → build |
 | `pnpm gen:api` | export OpenAPI from the api build and regenerate `packages/api-client`; commit the result |
 | `pnpm ui:shots -- --out tmp/ui-shots/<name> [--only <regex>]` | with `pnpm dev` running: pictures of every route at 1366×633, 1536×730 and 1920×969 in a headless Chrome or Edge, with layout measurements and a gallery (ADR-0066); signs in with a dev login from a gitignored file (`--logins`), never printed |
+| `pnpm design:build` / `pnpm design:check [Name,Name]` | rebuilds the «Bto Design System» artifact from this checkout into `tmp/design-system/project` and lists what moved in the code / renders each card in a headless Chrome or Edge; publishing is a request to Claude Code (`tools/design-system/README.md`) |
 | `pnpm ci:rehearse` / `pnpm docker:build` | run the CI check job in Linux Docker against HEAD / build both images |
 | `pnpm mobile:apk [-- --variant customer]` | a release APK built on this PC: the staff app, or «Bto300» with `--variant customer` (`apps/mobile/variants.json`, ADR-0085) (JDK 17 and the Android SDK in `C:\Android`, a robocopy mirror in `C:\Android\m`; ~10 min, never while `pnpm check` runs); `BTO_SERVER=http://<LAN address>:<port>` sets the server the app starts with; the APK lands in `apps/mobile/build/apk/` (ADR-0061, `docs/modules/mobile.md` §9) |
 

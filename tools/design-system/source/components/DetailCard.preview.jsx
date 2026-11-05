@@ -1,4 +1,15 @@
-const { Button, DetailCard, FieldList, FormFooter, FormRow, FormSection, Input, toast, Toaster, BtoProvider } = Bto;
+const {
+  Button,
+  DetailCard,
+  FieldList,
+  FormFooter,
+  FormRow,
+  FormSection,
+  Input,
+  toast,
+  Toaster,
+  BtoProvider,
+} = Bto;
 
 // The page's frames refuse a form's submit, so this preview answers the submit button and Enter itself.
 const submitted = (save) => ({
@@ -29,7 +40,11 @@ function Demo() {
             columns={1}
             items={[
               { label: 'Нийлүүлэгч', value: supplier },
-              { label: 'Падаан', value: <span className="font-mono">20261015_0003</span>, hint: '2026-10-15' },
+              {
+                label: 'Падаан',
+                value: <span className="font-mono">20261015_0003</span>,
+                hint: '2026-10-15',
+              },
               { label: 'Тэмдэглэл', value: '' },
             ]}
           />
@@ -45,11 +60,17 @@ function Demo() {
           >
             <FormSection>
               <FormRow label="Нийлүүлэгч" htmlFor="supplier">
-                <Input id="supplier" value={draft} onChange={(event) => setDraft(event.target.value)} />
+                <Input
+                  id="supplier"
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                />
               </FormRow>
             </FormSection>
             <FormFooter>
-              <Button type="button" variant="ghost" onClick={close}>Болих</Button>
+              <Button type="button" variant="ghost" onClick={close}>
+                Болих
+              </Button>
               <Button type="submit">Хадгалах</Button>
             </FormFooter>
           </form>

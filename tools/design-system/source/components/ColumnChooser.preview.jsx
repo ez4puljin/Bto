@@ -1,6 +1,12 @@
 const { ColumnChooser, BtoProvider } = Bto;
 
-const COLUMNS = { code: 'Код', name: 'Нэр', supplier: 'Нийлүүлэгч', price: 'Үнэ', stock: 'Үлдэгдэл' };
+const COLUMNS = {
+  code: 'Код',
+  name: 'Нэр',
+  supplier: 'Нийлүүлэгч',
+  price: 'Үнэ',
+  stock: 'Үлдэгдэл',
+};
 
 function Demo() {
   const [hidden, setHidden] = React.useState(new Set(['stock']));
@@ -21,7 +27,10 @@ function Demo() {
         showAll={() => setHidden(new Set())}
       />
       <span className="text-[0.8125rem] text-muted-foreground">
-        {Object.keys(COLUMNS).filter((key) => !hidden.has(key)).map((key) => COLUMNS[key]).join(' · ')}
+        {Object.keys(COLUMNS)
+          .filter((key) => !hidden.has(key))
+          .map((key) => COLUMNS[key])
+          .join(' · ')}
       </span>
     </div>
   );

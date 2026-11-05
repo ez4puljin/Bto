@@ -9,7 +9,9 @@ function Demo() {
         <Input defaultValue="99" aria-invalid aria-label="Утас" />
         <Input defaultValue="Идэвхгүй" disabled aria-label="Идэвхгүй" />
       </div>
-      <p className="text-xs text-muted-foreground">At rest · filled · in error · disabled. Click a field for its focus ring.</p>
+      <p className="text-xs text-muted-foreground">
+        At rest · filled · in error · disabled. Click a field for its focus ring.
+      </p>
     </div>
   );
 }

@@ -14,13 +14,16 @@ const note = noteArg > 0 ? process.argv[noteArg + 1] : `Re-synced to ${rev.ref}.
 // A file that no longer matches its upload keeps its old record until it is uploaded again
 // (assets.cjs reports it), so the page never shows a broken tile.
 const logoFiles = {};
-for (const { name, blob, size } of uploaded.logos) logoFiles[name] = { name, blob, size, type: 'image/png' };
+for (const { name, blob, size } of uploaded.logos)
+  logoFiles[name] = { name, blob, size, type: 'image/png' };
 const iconFiles = {};
 for (const { name: stem, blob, size } of uploaded.icons) {
   const name = `${stem}.svg`;
   iconFiles[name] = { name, blob, size, type: 'image/svg+xml' };
 }
-const matching = uploaded.logos.filter(({ file, sha256 }) => sha(path.join(ROOT, file)) === sha256).length;
+const matching = uploaded.logos.filter(
+  ({ file, sha256 }) => sha(path.join(ROOT, file)) === sha256,
+).length;
 
 const index = {
   v: 3,
@@ -29,14 +32,34 @@ const index = {
   title: 'Bto Design System',
   namespace: 'Bto',
   libraries: [
-    { name: 'react', version: require('react/package.json').version, global: 'React', file: 'components/lib/react.js' },
-    { name: 'react-dom', version: require('react-dom/package.json').version, global: 'ReactDOM', file: 'components/lib/react-dom.js' },
+    {
+      name: 'react',
+      version: require('react/package.json').version,
+      global: 'React',
+      file: 'components/lib/react.js',
+    },
+    {
+      name: 'react-dom',
+      version: require('react-dom/package.json').version,
+      global: 'ReactDOM',
+      file: 'components/lib/react-dom.js',
+    },
   ],
   sections: {},
   groups: ['Logos', 'Icons'],
   assetGroups: {
-    Logos: { name: 'Logos', tile: 'm', order: uploaded.logos.map(({ name }) => name), files: logoFiles },
-    Icons: { name: 'Icons', tile: 'xs', order: uploaded.icons.map(({ name }) => `${name}.svg`), files: iconFiles },
+    Logos: {
+      name: 'Logos',
+      tile: 'm',
+      order: uploaded.logos.map(({ name }) => name),
+      files: logoFiles,
+    },
+    Icons: {
+      name: 'Icons',
+      tile: 'xs',
+      order: uploaded.icons.map(({ name }) => `${name}.svg`),
+      files: iconFiles,
+    },
   },
   blobs: {},
   docs: { readme: 'project/README.md', sections: [] },
@@ -48,4 +71,6 @@ const index = {
   },
 };
 fs.writeFileSync(path.join(OUT, 'design-system.json'), `${JSON.stringify(index, null, 2)}\n`);
-console.log(`design-system.json: ${matching} of ${uploaded.logos.length} logos and the icons as uploaded`);
+console.log(
+  `design-system.json: ${matching} of ${uploaded.logos.length} logos and the icons as uploaded`,
+);

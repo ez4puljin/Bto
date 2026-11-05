@@ -11,7 +11,10 @@ function Demo() {
         <Badge variant="destructive">Зээл хаалттай</Badge>
         <Badge variant="outline">Цуцлагдсан</Badge>
       </div>
-      <p className="text-xs text-muted-foreground">default in progress · secondary draft · success done · warning attention · destructive refused · outline cancelled</p>
+      <p className="text-xs text-muted-foreground">
+        default in progress · secondary draft · success done · warning attention · destructive
+        refused · outline cancelled
+      </p>
     </div>
   );
 }

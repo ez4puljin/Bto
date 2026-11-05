@@ -11,7 +11,9 @@ function Demo() {
           Bto
         </span>
       </div>
-      <p className="text-xs text-muted-foreground">Top bar size · default (till, sign-in) · with the name</p>
+      <p className="text-xs text-muted-foreground">
+        Top bar size · default (till, sign-in) · with the name
+      </p>
     </div>
   );
 }

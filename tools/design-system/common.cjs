@@ -60,7 +60,9 @@ function syncColors(color, make) {
       report(`colour removed from index.css: ${token.name}`);
       color.splice(index, 1);
     } else if (norm(web.get(token.name)) !== norm(token.value)) {
-      report(`colour changed in index.css: ${token.name} ${token.value} → ${web.get(token.name)}; check its note in tokens.cjs`);
+      report(
+        `colour changed in index.css: ${token.name} ${token.value} → ${web.get(token.name)}; check its note in tokens.cjs`,
+      );
       token.value = web.get(token.name);
     }
   }
@@ -68,23 +70,46 @@ function syncColors(color, make) {
   let added = 0;
   for (const [name, value] of web) {
     if (known.has(name)) continue;
-    color.splice(insertAt + added, 0, make(name, value, 'New in index.css: its note is still to write in tokens.cjs.'));
+    color.splice(
+      insertAt + added,
+      0,
+      make(name, value, 'New in index.css: its note is still to write in tokens.cjs.'),
+    );
     added += 1;
     report(`colour new in index.css: ${name} ${value}; write its note in tokens.cjs`);
   }
 
-  const phone = fs.readFileSync(path.join(ROOT, 'apps', 'mobile', 'src', 'theme', 'tokens.ts'), 'utf8');
+  const phone = fs.readFileSync(
+    path.join(ROOT, 'apps', 'mobile', 'src', 'theme', 'tokens.ts'),
+    'utf8',
+  );
   const block = /export const colors = \{([\s\S]*?)\n\}/.exec(phone);
   if (!block) throw new Error('no colors in the phone tokens');
-  const values = new Map([...block[1].matchAll(/^\s*(\w+):\s*'([^']+)'/gm)].map((match) => [match[1], match[2]]));
+  const values = new Map(
+    [...block[1].matchAll(/^\s*(\w+):\s*'([^']+)'/gm)].map((match) => [match[1], match[2]]),
+  );
   for (const token of color) {
     if (!token.name.startsWith('app-')) continue;
     const value = values.get(camel(token.name.slice('app-'.length)));
     if (value !== undefined && norm(value) !== norm(token.value)) {
-      report(`colour changed in the phone tokens: ${token.name} ${token.value} → ${value.toLowerCase()}; check its note in tokens.cjs`);
+      report(
+        `colour changed in the phone tokens: ${token.name} ${token.value} → ${value.toLowerCase()}; check its note in tokens.cjs`,
+      );
       token.value = value.toLowerCase();
     }
   }
 }
 
-module.exports = { HERE, ROOT, SOURCE, WEB, SHARED, WORK, OUT, REPORT, report, revision, syncColors };
+module.exports = {
+  HERE,
+  ROOT,
+  SOURCE,
+  WEB,
+  SHARED,
+  WORK,
+  OUT,
+  REPORT,
+  report,
+  revision,
+  syncColors,
+};
