@@ -5888,6 +5888,7 @@
       "lineDiscount": "Хөнгөлөлт −{{amount}}",
       "priceRetail": "Жижиглэн",
       "priceBulk": "Бөөний",
+      "bulkSaving": "Бөөний хөнгөлөлт",
       "lineActions": "Сонгосон мөр",
       "noLineSelected": "Мөр сонгоно уу",
       "totals": "Төлөх дүн",

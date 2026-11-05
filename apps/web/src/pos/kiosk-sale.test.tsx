@@ -247,6 +247,8 @@ describe('kiosk: the sale screen', () => {
     expect(screen.getByText(k.sale.priceRetail)).toBeInTheDocument();
     expect(screen.getByText(/3,885/)).toBeInTheDocument();
     expect(screen.getByText(/3,675/)).toBeInTheDocument();
+    // The totals show what the bulk price takes off: (3,885 − 3,675) × 1.
+    expect(screen.getByText(k.sale.bulkSaving).nextElementSibling).toHaveTextContent('−210₮');
   });
 
   it('changes the selected line with + / − and removes it with Delete', async () => {
