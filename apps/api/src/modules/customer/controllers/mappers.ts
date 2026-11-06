@@ -173,6 +173,7 @@ export function statementDto(statement: StoreStatement): CustomerAppStatementDto
       orderNumber: entry.order?.number ?? null,
       orderChannel: entry.order?.channel ?? null,
       orderTakerName: entry.order?.takerName ?? null,
+      description: entry.description,
       debit: cents(entry.debit),
       credit: cents(entry.credit),
       balance: cents(entry.balance),

@@ -23,6 +23,7 @@ import { problemFrom } from '../../../src/api/problem';
 import { type CartLine, linesOf } from '../../../src/cart/cart';
 import { useCustomerSendOrder } from '../../../src/cart/use-customer-send';
 import { creditWarningOf } from '../../../src/customer/account';
+import { accountRoute } from '../../../src/customer/notifications';
 import { orderDealHintsOf } from '../../../src/customer/deals';
 import {
   lineDetailOf,
@@ -122,7 +123,7 @@ export default function StoreCartScreen() {
             <CreditNote
               warning={warning}
               variant="cart"
-              onAccount={() => router.navigate('/account')}
+              onAccount={() => router.navigate(accountRoute)}
             />
           </View>
         ) : null}

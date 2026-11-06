@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { Bell, LockKeyhole, Wallet } from 'lucide-react-native';
+import { Bell, LockKeyhole } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -73,16 +73,6 @@ export default function CustomerProfileScreen() {
 
         <SectionHeader>{t('mobile.customer.profile.settings')}</SectionHeader>
         <Group inset={ICON_INSET}>
-          <Row
-            minHeight={52}
-            icon={
-              <IconTile color={colors.tint.blue}>
-                <Wallet size={16} strokeWidth={2.2} color={colors.primaryForeground} />
-              </IconTile>
-            }
-            title={t('mobile.customer.tabs.account')}
-            onPress={() => router.push('/account')}
-          />
           <Row
             minHeight={52}
             icon={

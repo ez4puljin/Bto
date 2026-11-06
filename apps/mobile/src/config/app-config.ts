@@ -7,6 +7,8 @@ export interface AppConfig {
   defaultServer: string | null;
   /** A production build talks only to `defaultServer`: no server screen, no server chip. */
   serverFixed: boolean;
+  /** This build offers its own new APK from the server (ADR-0166). */
+  selfUpdate: boolean;
 }
 
 /** `app.config.ts`'s `extra`, read defensively: an old or odd build is the staff app. */
@@ -23,5 +25,6 @@ export function appConfigOf(extra: unknown): AppConfig {
     variant: value.variant === 'customer' ? 'customer' : 'staff',
     defaultServer,
     serverFixed: value.serverFixed === true && defaultServer !== null,
+    selfUpdate: value.selfUpdate === true,
   };
 }

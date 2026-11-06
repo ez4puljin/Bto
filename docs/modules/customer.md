@@ -24,6 +24,8 @@ None (nobody imports the module). `CustomerHttpModule` is loaded by the api's `A
 
 ## 4. REST surface (`/api/v1`)
 
+`GET /app-releases/:variant` (`{ release: { version, versionCode, sizeBytes } | null }`) and `GET /app-releases/:variant/apk` are `@Public()`: an app's newest published APK from `<STORAGE_LOCAL_DIR>/releases/<variant>/` (ADR-0166).
+
 Every `/customer-app/*` route is `@CustomerRoute()`: only a customer token reaches it (a staff token: 403 `STAFF_TOKEN`), and the store is always the token's own — no route takes a customer id from the client. Another store's order or invoice answers 404, as one that does not exist. Money: prices and orders in whole MNT strings, finance in two decimals.
 
 | Route | What |
@@ -51,7 +53,7 @@ Every `/customer-app/*` route is `@CustomerRoute()`: only a customer token reach
 | `GET /customer-app/payments?cursor&limit` | the store's posted payments and refunds with their method (CASH / BANK) and the invoices each settled; `total` on the first page |
 | `GET /customer-app/statement?from&to` | «Тооцооны хуулга» (ADR-0086, 2026-10-20): the balance before `from`, every ledger entry of `from` … `to` oldest first with its debit, credit, kind, number, invoice and the balance after it, a purchase's order and who took it (`orderId`, `orderNumber`, `orderChannel`, `orderTakerName`, ADR-0087), the totals and the closing balance; `to` today at the latest, at most 366 days (422 otherwise) |
 | `GET /customer-app/orders/reps` | the reps who took the store's orders, by name: the order filter's «ХТ» (ADR-0087) |
-| `GET /customer-app/bank-accounts` | the ACTIVE bank accounts finance marks «Харилцагчид харуулах» |
+| `GET /customer-app/bank-accounts` | the ACTIVE bank accounts finance marks «Харилцагчид харуулах», with `iban` and `accountHolder` (ADR-0167) |
 | `GET /customer-app/notifications/summary`, `GET /customer-app/notifications`, `POST /customer-app/notifications/read` | the bell: running notices for customers (with their product ids) and the store's notifications (kind, document ids, payload by value), read idempotently |
 | `GET /customer/contacts` [`identity.settings.read`], `PUT /customer/contacts` [`identity.settings.manage`] | the admins' list: the whole ordered list each save (phones typed locally are stored in E.164) |
 | `GET /customer/attention` [`sales.boards.manage`] | `{ activeAccounts, ordersOpen }`: the admin home's warning |

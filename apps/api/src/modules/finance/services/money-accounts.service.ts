@@ -27,6 +27,8 @@ export interface MoneyAccount {
   branchName: string | null;
   bankName: string | null;
   bankAccountNo: string | null;
+  iban: string | null;
+  accountHolder: string | null;
   glAccountId: number;
   glAccountCode: string;
   glAccountName: string;
@@ -46,6 +48,8 @@ export interface MoneyAccountInput {
   branchId: number | null;
   bankName: string | null;
   bankAccountNo: string | null;
+  iban?: string | null;
+  accountHolder?: string | null;
   glAccountId: number;
   /** «Харилцагчид харуулах» (ADR-0079 #7); false when left out. */
   showToCustomers?: boolean;
@@ -57,6 +61,8 @@ export interface CustomerBankAccount {
   name: string;
   bankName: string | null;
   bankAccountNo: string | null;
+  iban: string | null;
+  accountHolder: string | null;
 }
 
 export type MoneyAccountPatch = Partial<Omit<MoneyAccountInput, 'kind'>> & {
@@ -120,7 +126,14 @@ export class MoneyAccountsService {
     });
     return accounts
       .filter((row) => row.showToCustomers && row.kind === 'BANK' && row.status === 'ACTIVE')
-      .map(({ id, name, bankName, bankAccountNo }) => ({ id, name, bankName, bankAccountNo }));
+      .map(({ id, name, bankName, bankAccountNo, iban, accountHolder }) => ({
+        id,
+        name,
+        bankName,
+        bankAccountNo,
+        iban,
+        accountHolder,
+      }));
   }
 
   async create(ctx: AuthContext, input: MoneyAccountInput): Promise<MoneyAccount> {
@@ -137,6 +150,8 @@ export class MoneyAccountsService {
         accountId: values.glAccountId,
         bankName: values.bankName,
         bankAccountNo: values.bankAccountNo,
+        iban: values.iban,
+        accountHolder: values.accountHolder,
         showToCustomers,
       });
       await this.audit.record(tx, ctx, {
@@ -159,6 +174,9 @@ export class MoneyAccountsService {
         bankName: patch.bankName === undefined ? before.bankName : patch.bankName,
         bankAccountNo:
           patch.bankAccountNo === undefined ? before.bankAccountNo : patch.bankAccountNo,
+        iban: patch.iban === undefined ? before.iban : patch.iban,
+        accountHolder:
+          patch.accountHolder === undefined ? before.accountHolder : patch.accountHolder,
         glAccountId: patch.glAccountId ?? before.glAccountId,
       });
       const showToCustomers = shown(before.kind, patch.showToCustomers ?? before.showToCustomers);
@@ -174,6 +192,8 @@ export class MoneyAccountsService {
           accountId: values.glAccountId,
           bankName: values.bankName,
           bankAccountNo: values.bankAccountNo,
+          iban: values.iban,
+          accountHolder: values.accountHolder,
           showToCustomers,
           status,
         },
@@ -188,6 +208,8 @@ export class MoneyAccountsService {
           branchId: before.branchId,
           bankName: before.bankName,
           bankAccountNo: before.bankAccountNo,
+          iban: before.iban,
+          accountHolder: before.accountHolder,
           glAccountId: before.glAccountId,
           showToCustomers: before.showToCustomers,
           status: before.status,
@@ -210,6 +232,9 @@ export class MoneyAccountsService {
       branchId: input.branchId,
       bankName: input.bankName?.trim() || null,
       bankAccountNo: input.bankAccountNo?.trim() || null,
+      // Kept whole and in capitals, however it was typed or pasted; the app groups it to read.
+      iban: input.iban?.replace(/\s+/g, '').toUpperCase() || null,
+      accountHolder: input.accountHolder?.trim() || null,
       glAccountId: input.glAccountId,
     };
   }
@@ -263,6 +288,8 @@ export class MoneyAccountsService {
         branchName: branchId === null ? null : (branches.get(branchId)?.name ?? null),
         bankName: account.bankName,
         bankAccountNo: account.bankAccountNo,
+        iban: account.iban,
+        accountHolder: account.accountHolder,
         glAccountId: account.accountId,
         glAccountCode: account.accountCode,
         glAccountName: account.accountName,

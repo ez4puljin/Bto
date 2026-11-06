@@ -22,6 +22,7 @@ import {
 import { problemFrom } from '../../src/api/problem';
 import { feedDayOf, type LinePart, storeLineOf } from '../../src/customer/feed-lines';
 import {
+  accountRoute,
   type NoticeTab,
   noticeTabsOf,
   STORE_TILES,
@@ -32,14 +33,18 @@ import {
 import { ubTime } from '../../src/dates/dates';
 import { formatMnt } from '../../src/format/format';
 import { feedOf, unreadIds } from '../../src/notifications/feed';
-import { KIND_STYLES, KindIcon, useNoticeEyebrow } from '../../src/notifications/kinds';
+import { KIND_STYLES, useNoticeEyebrow } from '../../src/notifications/kinds';
 import { useCustomer } from '../../src/state/session';
-import { colors, fonts, spacing, storeType, type } from '../../src/theme/tokens';
+import { colors, fonts, spacing, type } from '../../src/theme/tokens';
+import { CompanyLogo, CompanyMark } from '../../src/ui/brand';
 import { Separator } from '../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../src/ui/kit';
 import { HeaderTextButton, StoreHeader } from '../../src/ui/store-header';
+import { StoreTabs } from '../../src/ui/store-tabs';
 import { Page } from '../../src/ui/layout';
 import { Text } from '../../src/ui/text';
+import { UpdateCard } from '../../src/updates/update-card';
+import { useAppUpdate } from '../../src/updates/use-app-update';
 
 /**
  * «Мэдэгдэл» of «Bto300» (the Notifications board, ADR-0079 #8, ADR-0092 #8) in two tabs:
@@ -47,6 +52,8 @@ import { Text } from '../../src/ui/text';
  * an invoice due) by day, newest first; «Урамшуулал» the admin's notices as picture cards. Each tab
  * counts its unread and the screen opens on the first with any. A tap marks a notification read and
  * opens its order, invoice or «Тооцоо», a notice its page; «Бүгдийг уншсан» marks what is loaded.
+ * The company's emblem marks every notification, a small tile saying its kind, and a new version of
+ * the app waits on top of both tabs with its download (ADR-0166).
  */
 export default function CustomerNotificationsScreen() {
   const { t } = useTranslation();
@@ -56,6 +63,7 @@ export default function CustomerNotificationsScreen() {
   const summary = useStoreNotificationSummary();
   const mine = useStoreNotifications();
   const { mutate: markRead, isPending } = useStoreMarkRead();
+  const update = useAppUpdate();
   const notices = useMemo(
     () =>
       [...(summary.data?.notices ?? [])].sort((a, b) =>
@@ -98,7 +106,7 @@ export default function CustomerNotificationsScreen() {
   const openNotification = (notification: StoreNotification) => {
     if (!notification.read) markRead({ notificationIds: [notification.id] });
     const target = storeTargetOf(notification);
-    if (target === '/account') router.navigate('/account');
+    if (target === accountRoute) router.dismissTo(accountRoute);
     else if (target !== null) router.push(target);
   };
 
@@ -109,25 +117,17 @@ export default function CustomerNotificationsScreen() {
 
   const head = (
     <View>
-      <View
-        accessibilityRole="tablist"
-        accessibilityLabel={t('mobile.customer.notifications.tabs.label')}
+      {update ? <UpdateCard release={update} /> : null}
+      <StoreTabs
+        label={t('mobile.customer.notifications.tabs.label')}
+        tabs={[
+          { key: 'orders', label: tabLabel('orders', tabs.orders) },
+          { key: 'promos', label: tabLabel('promos', tabs.promos) },
+        ]}
+        selected={tab}
+        onSelect={setChosen}
         style={styles.tabs}
-      >
-        {(['orders', 'promos'] as const).map((name) => (
-          <Pressable
-            key={name}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: tab === name }}
-            onPress={() => setChosen(name)}
-            style={[styles.tabButton, tab === name ? styles.tabOn : styles.tabOff]}
-          >
-            <Text style={storeType.tabButton} numberOfLines={1}>
-              {tabLabel(name, name === 'orders' ? tabs.orders : tabs.promos)}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      />
       {summary.error ? <ProblemText problem={problemFrom(summary.error)} /> : null}
       {mine.error && tab === 'orders' ? <ProblemText problem={problemFrom(mine.error)} /> : null}
     </View>
@@ -232,18 +232,18 @@ export default function CustomerNotificationsScreen() {
 
 /** The white icon of a notification's tile. */
 function TileIcon({ tile }: { tile: StoreTile }) {
-  const props = { size: 18, strokeWidth: 2.4, color: colors.primaryForeground };
+  const props = { size: 11, strokeWidth: 3, color: colors.primaryForeground };
   switch (tile) {
     case 'check':
-      return <Check {...props} strokeWidth={2.6} />;
+      return <Check {...props} />;
     case 'cross':
-      return <X {...props} strokeWidth={2.6} />;
+      return <X {...props} />;
     case 'clock':
       return <Clock {...props} />;
     case 'money':
-      return <Banknote {...props} strokeWidth={2.2} />;
+      return <Banknote {...props} strokeWidth={2.6} />;
     case 'receipt':
-      return <Receipt {...props} strokeWidth={2.2} />;
+      return <Receipt {...props} strokeWidth={2.6} />;
   }
 }
 
@@ -293,8 +293,11 @@ function NotificationRow({
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
-      <View style={[styles.tile, { backgroundColor: tile.color }]}>
-        <TileIcon tile={tile.tile} />
+      <View style={styles.picture}>
+        <CompanyMark size={38} />
+        <View style={[styles.tile, { backgroundColor: tile.color }]}>
+          <TileIcon tile={tile.tile} />
+        </View>
       </View>
       <View style={styles.text}>
         <View style={styles.head}>
@@ -345,7 +348,7 @@ function PromoCard({ notice, onPress }: { notice: StoreNotice; onPress: () => vo
             transition={120}
           />
         ) : (
-          <KindIcon kind={notice.kind} size={44} />
+          <CompanyLogo height={64} />
         )}
       </View>
       <View style={styles.cardBody}>
@@ -372,16 +375,7 @@ function PromoCard({ notice, onPress }: { notice: StoreNotice; onPress: () => vo
 
 const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  tabs: { flexDirection: 'row', gap: spacing.md, marginTop: 14, marginBottom: spacing.xs },
-  tabButton: {
-    flex: 1,
-    height: 38,
-    borderRadius: 5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabOn: { backgroundColor: colors.primary },
-  tabOff: { backgroundColor: colors.placeholder },
+  tabs: { marginTop: 14, marginBottom: spacing.xs },
   day: { marginTop: 18, marginBottom: spacing.sm, marginHorizontal: spacing.xs },
   cell: {
     backgroundColor: colors.card,
@@ -400,10 +394,16 @@ const styles = StyleSheet.create({
     paddingRight: 14,
   },
   pressed: { backgroundColor: colors.accent },
+  picture: { width: 38, height: 38 },
   tile: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    position: 'absolute',
+    right: -4,
+    bottom: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
   },

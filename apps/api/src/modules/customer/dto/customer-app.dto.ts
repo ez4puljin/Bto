@@ -809,6 +809,8 @@ export class CustomerAppStatementEntryDto {
   orderChannel: OrderChannel | null;
   @ApiProperty({ type: String, nullable: true, description: 'The rep of a SALES_REP order' })
   orderTakerName: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'A payment’s «Гүйлгээний утга»' })
+  description: string | null;
   @ApiProperty({ example: '350000.00', description: '«Дебит»: a purchase or a refund' })
   debit: string;
   @ApiProperty({ example: '0.00', description: '«Кредит»: a payment or a return' })
@@ -835,6 +837,8 @@ export class CustomerAppBankAccountDto {
   @ApiProperty() name: string;
   @ApiProperty({ type: String, nullable: true }) bankName: string | null;
   @ApiProperty({ type: String, nullable: true }) bankAccountNo: string | null;
+  @ApiProperty({ type: String, nullable: true }) iban: string | null;
+  @ApiProperty({ type: String, nullable: true }) accountHolder: string | null;
 }
 
 // ---------------------------------------------------------------------------- the notifications

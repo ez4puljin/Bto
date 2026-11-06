@@ -8164,6 +8164,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app-releases/{variant}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AppReleases_latest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/refresh-state": {
         parameters: {
             query?: never;
@@ -15806,6 +15822,8 @@ export interface components {
             branchName: string | null;
             bankName: string | null;
             bankAccountNo: string | null;
+            iban: string | null;
+            accountHolder: string | null;
             glAccountId: number;
             /** @example 100101 */
             glAccountCode: string;
@@ -15833,6 +15851,8 @@ export interface components {
             branchId?: number | null;
             bankName?: string | null;
             bankAccountNo?: string | null;
+            iban?: string | null;
+            accountHolder?: string | null;
             /** @description The asset account the vouchers hit */
             glAccountId: number;
             /** @description Shown in the customer app; bank accounts only */
@@ -15844,6 +15864,8 @@ export interface components {
             branchId?: number | null;
             bankName?: string | null;
             bankAccountNo?: string | null;
+            iban?: string | null;
+            accountHolder?: string | null;
             glAccountId?: number;
             /** @description Shown in the customer app; bank accounts only */
             showToCustomers?: boolean;
@@ -18634,6 +18656,8 @@ export interface components {
             orderChannel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS" | null;
             /** @description The rep of a SALES_REP order */
             orderTakerName: string | null;
+            /** @description A payment’s «Гүйлгээний утга» */
+            description: string | null;
             /**
              * @description «Дебит»: a purchase or a refund
              * @example 350000.00
@@ -18666,6 +18690,8 @@ export interface components {
             name: string;
             bankName: string | null;
             bankAccountNo: string | null;
+            iban: string | null;
+            accountHolder: string | null;
         };
         CustomerAppNotice: {
             id: number;
@@ -18926,6 +18952,20 @@ export interface components {
             subcategories: components["schemas"]["CustomerAppHomeCategory"][];
             /** @description «Шинээр нэмэгдсэн бараа» (new) and «Хямдралтай бараа» (deals) of its subtree */
             sections: components["schemas"]["SalesRepHomeSection"][];
+        };
+        AppRelease: {
+            /** @example 0.4.0 */
+            version: string;
+            /**
+             * @description Grows with every build; the phone compares it with its own.
+             * @example 445441
+             */
+            versionCode: number;
+            /** @example 78500000 */
+            sizeBytes: number;
+        };
+        AppReleaseLookup: {
+            release: components["schemas"]["AppRelease"] | null;
         };
         ReportRefreshState: {
             /**
@@ -39841,6 +39881,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesRepCategoryPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AppReleases_latest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                variant: "staff" | "customer";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppReleaseLookup"];
                 };
             };
             /** @description RFC 9457 problem details */

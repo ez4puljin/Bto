@@ -26,7 +26,7 @@ import { AuditService, type AuthContext, UserNamesService } from '../../identity
 import { CustomersService } from '../../partners';
 import { PAYMENT_LISTENER, type PaymentListener } from '../hooks';
 import { invoices } from '../schema';
-import { FinBooks } from './fin-books';
+import { FinBooks, VOUCHER_MEMO } from './fin-books';
 import { FinPosting } from './fin-posting';
 import { GlAccountsService } from './gl-accounts.service';
 import { documentLabel } from './invoicing.service';
@@ -179,7 +179,7 @@ const KIND_OF_TYPE = new Map<string, PaymentKind>(
 
 /** A voucher's own texts and who handed the money in, kept as the document's attributes. */
 const ATTRIBUTE = {
-  memo: 'memo',
+  memo: VOUCHER_MEMO,
   reference: 'reference',
   counterparty: 'counterparty',
   collectedBy: 'collectedBy',

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  hasPhoneCode,
+  publishOptionsOf,
+  releaseOf,
   apkFileName,
   apkOptionsOf,
   javaMajor,
@@ -67,5 +70,32 @@ describe('the APK build environment', () => {
     expect(
       apkFileName({ prefix: 'bto-staff', version: '0.6.0', versionCode: 7, debug: true }),
     ).toBe('bto-staff-0.6.0-7-debug.apk');
+  });
+
+  it('reads what a published APK is from its name (ADR-0166)', () => {
+    const variants = { staff: { apkPrefix: 'bto-staff' }, customer: { apkPrefix: 'bto300' } };
+    expect(releaseOf('bto300-0.4.0-445441.apk', variants)).toEqual({
+      variant: 'customer',
+      version: '0.4.0',
+      versionCode: 445441,
+      fileName: 'bto300-0.4.0-445441.apk',
+    });
+    expect(releaseOf('bto-staff-0.11.0-7.apk', variants)?.variant).toBe('staff');
+    expect(releaseOf('bto300-0.4.0-7-debug.apk', variants)).toBeNull();
+    expect(releaseOf('other-0.4.0-7.apk', variants)).toBeNull();
+  });
+
+  it('refuses an emulator’s APK for the phones (ADR-0166)', () => {
+    expect(hasPhoneCode(Buffer.from('PK lib/arm64-v8a/libreactnative.so'))).toBe(true);
+    expect(hasPhoneCode(Buffer.from('PK lib/x86_64/libreactnative.so'))).toBe(false);
+  });
+
+  it('reads the publish options (ADR-0166)', () => {
+    expect(publishOptionsOf(['--', 'a.apk', '--storage', 'D:/s', '--emulator'])).toEqual({
+      apk: 'a.apk',
+      storage: 'D:/s',
+      emulator: true,
+    });
+    expect(publishOptionsOf([])).toEqual({ apk: null, storage: null, emulator: false });
   });
 });

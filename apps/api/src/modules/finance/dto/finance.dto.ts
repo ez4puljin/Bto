@@ -362,6 +362,8 @@ export class MoneyAccountDto {
   @ApiProperty({ type: String, nullable: true }) branchName: string | null;
   @ApiProperty({ type: String, nullable: true }) bankName: string | null;
   @ApiProperty({ type: String, nullable: true }) bankAccountNo: string | null;
+  @ApiProperty({ type: String, nullable: true }) iban: string | null;
+  @ApiProperty({ type: String, nullable: true }) accountHolder: string | null;
   @ApiProperty() glAccountId: number;
   @ApiProperty({ example: '100101' }) glAccountCode: string;
   @ApiProperty() glAccountName: string;
@@ -400,6 +402,18 @@ export class MoneyAccountRequestDto {
   @IsString()
   @MaxLength(40)
   bankAccountNo?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: 40 })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(40)
+  iban?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: 120 })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(120)
+  accountHolder?: string | null;
   @ApiProperty({ description: 'The asset account the vouchers hit' })
   @IsInt()
   @Min(1)
@@ -436,6 +450,18 @@ export class MoneyAccountPatchDto {
   @IsString()
   @MaxLength(40)
   bankAccountNo?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: 40 })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(40)
+  iban?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: 120 })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(120)
+  accountHolder?: string | null;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) glAccountId?: number;
   @ApiPropertyOptional({ description: 'Shown in the customer app; bank accounts only' })
   @IsOptional()

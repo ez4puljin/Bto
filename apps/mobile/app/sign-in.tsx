@@ -1,4 +1,3 @@
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Clock, LogOut } from 'lucide-react-native';
 import { useRef, useState } from 'react';
@@ -11,13 +10,12 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import customerIcon from '../assets/customer/splash-icon.png';
 import type { AppProblem } from '../src/api/problem';
 import { phoneInput, phoneOf } from '../src/customer/sign-in';
 import { FieldRow, SignInProblem } from '../src/customer/sign-in-rows';
 import { useSession } from '../src/state/session';
-import { colors, radii, shadows, spacing, TOUCH, type } from '../src/theme/tokens';
-import { ServerChip, useAppName } from '../src/ui/brand';
+import { colors, radii, spacing, TOUCH, type } from '../src/theme/tokens';
+import { CompanyLogo, ServerChip } from '../src/ui/brand';
 import { PillButton } from '../src/ui/controls';
 import { PasswordToggle } from '../src/ui/field';
 import { Group } from '../src/ui/grouped';
@@ -25,14 +23,14 @@ import { Page, SectionHeader } from '../src/ui/layout';
 import { Text, type TextInput } from '../src/ui/text';
 
 /**
- * «Bto300»'s sign-in (the Login board, ADR-0079 #3, #13): the store's phone after «+976» and its
- * password. A first password, or a forgotten one, starts from the office's one-time code on
- * «Нууц үг тавих»; no SMS. A development build shows its server under the form.
+ * «Bto300»'s sign-in (the Login board, ADR-0079 #3, #13): the company's logo and name (ADR-0166),
+ * the store's phone after «+976» and its password. A first password, or a forgotten one, starts from
+ * the office's one-time code on «Нууц үг тавих»; no SMS. A development build shows its server under
+ * the form.
  */
 export default function SignInScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const appName = useAppName();
   const { session, state, server, setServer, serverFixed } = useSession();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -59,22 +57,10 @@ export default function SignInScreen() {
       >
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <View style={styles.mark}>
-            <View
-              style={styles.logo}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
-            >
-              <Image
-                source={customerIcon}
-                contentFit="contain"
-                accessible={false}
-                style={styles.logoImage}
-              />
-            </View>
-            <Text accessibilityRole="header" style={type.largeTitle}>
-              {appName}
+            <CompanyLogo height={84} />
+            <Text accessibilityRole="header" style={[type.title3, styles.company]}>
+              {t('brand.company')}
             </Text>
-            <Text style={[type.body, styles.company]}>{t('brand.company')}</Text>
           </View>
 
           {reason === 'expired' ? (
@@ -169,10 +155,8 @@ export default function SignInScreen() {
 const styles = StyleSheet.create({
   grow: { flex: 1 },
   body: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 56, paddingBottom: spacing.lg },
-  mark: { alignItems: 'center', gap: 10 },
-  logo: { width: 84, height: 84, borderRadius: 24, boxShadow: shadows.brand },
-  logoImage: { width: 84, height: 84, borderRadius: 24 },
-  company: { color: colors.muted, textAlign: 'center' },
+  mark: { alignItems: 'center', gap: spacing.md },
+  company: { textAlign: 'center' },
   notice: {
     marginTop: spacing.xl,
     flexDirection: 'row',

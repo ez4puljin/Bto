@@ -254,6 +254,7 @@ describe('customer app account (ADR-0079)', () => {
         customerId: store.customerId,
         amount: '1000',
         paidOn: addDays(today, -1),
+        description: 'Дэлгүүрийн тооцоо 10-р сар',
       })
       .expect(201);
     const statement = (from: string, to: string, target: AppStore = store) =>
@@ -283,6 +284,8 @@ describe('customer app account (ADR-0079)', () => {
       orderTakerName: null,
     });
     expect(todays.entries[2]).toMatchObject({ orderId: null, orderChannel: null });
+    // A purchase carries no «Гүйлгээний утга»; a payment carries its own (ADR-0167 #6).
+    expect(todays.entries[0]).toMatchObject({ description: null });
     const invoice = (await store.api.get(`/invoices/${invoiceId}`).expect(200)).body as Record<
       string,
       unknown
@@ -303,6 +306,7 @@ describe('customer app account (ADR-0079)', () => {
       'PAYMENT',
     ]);
     expect(twoDays).toMatchObject({ totalCredit: '7000.00', closing: '5500.00' });
+    expect(twoDays.entries[0]).toMatchObject({ description: 'Дэлгүүрийн тооцоо 10-р сар' });
 
     const quiet = (await statement(addDays(today, -30), addDays(today, -2)).expect(200)).body;
     expect(quiet).toMatchObject({ opening: '0.00', entries: [], closing: '0.00' });
@@ -328,6 +332,8 @@ describe('customer app account (ADR-0079)', () => {
           kind: 'BANK',
           bankName: 'Хаан банк',
           bankAccountNo: '5012345678',
+          iban: ' mn12 0005 0050 1234 5678 ',
+          accountHolder: 'Бүтэн-Оргил ХХК',
           glAccountId: bankGl.id,
           showToCustomers: true,
         })
@@ -352,7 +358,14 @@ describe('customer app account (ADR-0079)', () => {
       })
       .expect(422);
     expect((await store.api.get('/bank-accounts').expect(200)).body).toEqual([
-      { id: shown.id, name: 'Хаан банк', bankName: 'Хаан банк', bankAccountNo: '5012345678' },
+      {
+        id: shown.id,
+        name: 'Хаан банк',
+        bankName: 'Хаан банк',
+        bankAccountNo: '5012345678',
+        iban: 'MN120005005012345678',
+        accountHolder: 'Бүтэн-Оргил ХХК',
+      },
     ]);
     await finance.patchMoneyAccount(shown.id, { status: 'INACTIVE' }).expect(200);
     expect((await store.api.get('/bank-accounts').expect(200)).body).toEqual([]);

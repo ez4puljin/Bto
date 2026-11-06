@@ -25,6 +25,7 @@ import {
 } from '../src/server/server-url';
 import { useSession } from '../src/state/session';
 import { colors, radii, tabular, TOUCH, type } from '../src/theme/tokens';
+import { APP } from '../src/config/app';
 import { BrandLockup } from '../src/ui/brand';
 import { PillButton } from '../src/ui/controls';
 import { TextField } from '../src/ui/field';
@@ -253,10 +254,15 @@ export default function ServerScreen() {
 
           <View style={styles.spacer} />
           <Text style={[type.caption, styles.version]}>
-            {t('mobile.profile.versionLine', {
-              version: Constants.expoConfig?.version ?? '',
-              build: Constants.expoConfig?.android?.versionCode ?? '',
-            })}
+            {t(
+              APP.variant === 'customer'
+                ? 'mobile.customer.versionLine'
+                : 'mobile.profile.versionLine',
+              {
+                version: Constants.expoConfig?.version ?? '',
+                build: Constants.expoConfig?.android?.versionCode ?? '',
+              },
+            )}
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>

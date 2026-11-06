@@ -199,6 +199,8 @@ export class MoneyAccountsController {
         branchId: body.branchId ?? null,
         bankName: body.bankName ?? null,
         bankAccountNo: body.bankAccountNo ?? null,
+        iban: body.iban ?? null,
+        accountHolder: body.accountHolder ?? null,
         glAccountId: body.glAccountId,
         showToCustomers: body.showToCustomers ?? false,
       }),

@@ -186,6 +186,8 @@ export const CASH_BOX: Schemas['MoneyAccount'] = {
   branchName: 'Оргил Бөөний төв',
   bankName: null,
   bankAccountNo: null,
+  iban: null,
+  accountHolder: null,
   glAccountId: 1,
   glAccountCode: '100101',
   glAccountName: 'Касс',

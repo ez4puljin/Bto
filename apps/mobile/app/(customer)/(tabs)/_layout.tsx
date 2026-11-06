@@ -9,7 +9,7 @@ import { colors } from '../../../src/theme/tokens';
 /**
  * «Нүүр», «Бараа», [баркод], «Сагс», «Захиалга» on «Bto300»'s flat bar (ADR-0095, the E-mart
  * structure): the barcode camera raised in the middle, the cart's count on «Сагс»; «Профайл» and
- * the bell open from «Нүүр», «Тооцоо» from «Профайл».
+ * the bell open from «Нүүр»; «Тооцоо» is a part of «Захиалга» (ADR-0166).
  */
 export default function CustomerTabsLayout() {
   const { t } = useTranslation();
