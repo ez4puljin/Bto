@@ -38893,6 +38893,16 @@
             "schema": {
               "type": "number"
             }
+          },
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "query",
+            "description": "The file the person saw: a newer one in the month is a conflict",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -79365,6 +79375,10 @@
           "period": {
             "type": "number"
           },
+          "rowNo": {
+            "type": "number",
+            "description": "The line’s row in the month’s file"
+          },
           "receiptKey": {
             "type": "string"
           },
@@ -79411,6 +79425,7 @@
         },
         "required": [
           "period",
+          "rowNo",
           "receiptKey",
           "ddtd",
           "deliveryNoteNo",
@@ -79782,6 +79797,11 @@
             "nullable": true,
             "minimum": 1,
             "description": "null: undoes the links"
+          },
+          "previousSupplierId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Wanted with supplierId null: whose link the person saw; anyone else’s stays"
           }
         },
         "required": [
@@ -79950,6 +79970,7 @@
           "EBARIMT_FILE_MONTHS",
           "EBARIMT_FILE_LIMIT",
           "EBARIMT_CELL_CONFLICT",
+          "EBARIMT_FILE_CHANGED",
           "PICK_INCOMPLETE",
           "PICK_TAKEN",
           "PICK_STATE_INVALID",

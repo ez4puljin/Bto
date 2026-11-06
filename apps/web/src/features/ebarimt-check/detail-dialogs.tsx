@@ -329,7 +329,7 @@ export function EntriesDialog(props: {
   const showLinks = !props.row || rows.some((row) => row.link);
 
   /** Links go month by month: a link belongs to its month. A receipt taken meanwhile is said. */
-  const setLink = (items: readonly EbarimtEntry[], supplierId: number | null) => {
+  const setLink = (items: readonly EbarimtEntry[], supplierId: number) => {
     let linked = 0;
     let skipped = 0;
     void action
@@ -346,10 +346,29 @@ export function EntriesDialog(props: {
       })
       .then((done) => {
         if (!done) return;
-        if (supplierId === null) toast.success(t('ebarimtCheck.entries.unlinkedDone'));
-        else if (skipped === 0)
-          toast.success(t('ebarimtCheck.entries.linkedDone', { count: linked }));
-        else toast.warning(t('ebarimtCheck.entries.linkedPartly', { linked, skipped }));
+        if (skipped > 0) toast.warning(t('ebarimtCheck.entries.linkedPartly', { linked, skipped }));
+        else if (linked === 0) toast.info(t('ebarimtCheck.entries.alreadyLinked'));
+        else toast.success(t('ebarimtCheck.entries.linkedDone', { count: linked }));
+      });
+  };
+
+  /** Only the link the person saw: a colleague's since then stays, and they are told. */
+  const undoLink = (row: EbarimtEntry) => {
+    let unlinked = 0;
+    void action
+      .run(async () => {
+        const result = await mutations.link.mutateAsync({
+          period: row.period,
+          receiptKeys: [row.receiptKey],
+          supplierId: null,
+          previousSupplierId: row.link?.supplierId,
+        });
+        unlinked = result.unlinked;
+      })
+      .then((done) => {
+        if (!done) return;
+        if (unlinked > 0) toast.success(t('ebarimtCheck.entries.unlinkedDone'));
+        else toast.warning(t('ebarimtCheck.entries.unlinkChanged'));
       });
   };
 
@@ -430,9 +449,7 @@ export function EntriesDialog(props: {
               </TableHeader>
               <TableBody>
                 {rows.map((row) => (
-                  <TableRow
-                    key={`${row.period}:${row.receiptKey}:${row.docDate}:${row.totalAmount}`}
-                  >
+                  <TableRow key={`${row.period}:${row.rowNo}`}>
                     <TableCell className="font-mono">{row.deliveryNoteNo ?? '—'}</TableCell>
                     <TableCell className="max-w-44 font-mono text-xs break-all whitespace-normal text-muted-foreground">
                       {row.ddtd ?? '—'}
@@ -478,7 +495,7 @@ export function EntriesDialog(props: {
                                   note: row.deliveryNoteNo ?? row.ddtd ?? row.ttd,
                                 })}
                                 disabled={mutations.link.isPending}
-                                onClick={() => setLink([row], null)}
+                                onClick={() => undoLink(row)}
                               >
                                 <Unlink />
                               </Button>

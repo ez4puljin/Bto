@@ -284,7 +284,7 @@ describe('EbarimtPage', () => {
     expect(screen.getByRole('link', { name: 'Альфа' })).toBeInTheDocument();
   });
 
-  it('keeps what is typed in a row that leaves the list', async () => {
+  it('holds a row on the list while a cell of it is open, and saves only when asked', async () => {
     let answer: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => {
       answer = resolve;
@@ -309,10 +309,17 @@ describe('EbarimtPage', () => {
     await user.click(screen.getByRole('button', { name: /Альфа: тайлбар/i }));
     await user.type(screen.getByRole('textbox', { name: /Альфа: тайлбар/i }), 'Ярьсан');
     answer();
-    await waitFor(() => expect(screen.queryByRole('link', { name: 'Альфа' })).toBeNull());
+    // The report has made the row even: «Дутуутай» would drop it, but a half-typed text stays open.
+    await waitFor(() =>
+      expect(calls(fetchMock, 'GET', '/api/v1/ebarimt-check/report').length).toBe(2),
+    );
+    expect(screen.getByRole('link', { name: 'Альфа' })).toBeInTheDocument();
+    expect(calls(fetchMock, 'PUT', '/api/v1/ebarimt-check/month-values')).toHaveLength(0);
+    await user.keyboard('{Enter}');
     await waitFor(() =>
       expect(calls(fetchMock, 'PUT', '/api/v1/ebarimt-check/month-values')).toHaveLength(1),
     );
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Альфа' })).toBeNull());
     expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/ebarimt-check/month-values')[0])).toEqual({
       period: 202610,
       supplierId: 1,
@@ -334,6 +341,16 @@ describe('EbarimtPage', () => {
     expect(await screen.findByRole('checkbox', { name: 'Альфа: сонгох' })).not.toBeChecked();
   });
 
+  it('finds the ticks of the month it settles on when opened through the menu', async () => {
+    sessionStorage.setItem(
+      `tugeel.ebarimt.ticks.v1:${ADMIN_ME.id}`,
+      JSON.stringify({ period: 202610, ids: [1] }),
+    );
+    const { router } = renderApp('/finance/ebarimt', signedIn(ADMIN_ME, REPORT_ROUTES));
+    expect(await screen.findByRole('checkbox', { name: 'Альфа: сонгох' })).toBeChecked();
+    expect(router.state.location.search).toContain('period=202610');
+  });
+
   it('clears nothing when the tab already chosen is clicked', async () => {
     const { router } = renderApp(`${PAGE}&q=Бета`, signedIn(ADMIN_ME, REPORT_ROUTES));
     const user = userEvent.setup();
@@ -343,6 +360,77 @@ describe('EbarimtPage', () => {
     expect(screen.getByRole('searchbox', { name: mn.ebarimtCheck.filters.search })).toHaveValue(
       'Бета',
     );
+  });
+
+  it('shows last December chosen alone', async () => {
+    renderApp(`${PAGE}&mode=range&months=202512`, signedIn(ADMIN_ME, REPORT_ROUTES));
+    expect(await screen.findByRole('link', { name: 'Альфа' })).toBeInTheDocument();
+  });
+
+  it('keeps a refused cell said by name while another cell saves', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...REPORT_ROUTES,
+      'PUT /api/v1/ebarimt-check/month-values': async (request) => {
+        const body = (await request.clone().json()) as { supplierId: number };
+        return body.supplierId === 1
+          ? problem('EBARIMT_CELL_CONFLICT', 409, { value: '300.00' })
+          : new Response(null, { status: 204 });
+      },
+    });
+    renderApp(PAGE, fetchMock);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Альфа: НӨАТ чөлөөлөгдөх дүн/ }));
+    await user.type(
+      screen.getByRole('textbox', { name: 'Альфа: НӨАТ чөлөөлөгдөх дүн' }),
+      '{Control>}a{/Control}250{Enter}',
+    );
+    const alert = await screen.findByText(/өөр хэрэглэгч түрүүлж/);
+    await user.click(screen.getByRole('button', { name: /Бета: НӨАТ чөлөөлөгдөх дүн/ }));
+    await user.type(
+      screen.getByRole('textbox', { name: 'Бета: НӨАТ чөлөөлөгдөх дүн' }),
+      '75{Enter}',
+    );
+    await waitFor(() =>
+      expect(calls(fetchMock, 'PUT', '/api/v1/ebarimt-check/month-values')).toHaveLength(2),
+    );
+    expect(alert).toBeInTheDocument();
+    expect(screen.getByText('Альфа: НӨАТ чөлөөлөгдөх дүн')).toBeInTheDocument();
+  });
+
+  it('takes pasted text only when it is plainly an amount', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...REPORT_ROUTES,
+      'PUT /api/v1/ebarimt-check/month-values': () => new Response(null, { status: 204 }),
+    });
+    renderApp(PAGE, fetchMock);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Альфа: НӨАТ чөлөөлөгдөх дүн/ }));
+    const input = screen.getByRole('textbox', { name: 'Альфа: НӨАТ чөлөөлөгдөх дүн' });
+    await user.clear(input);
+    for (const text of ['(1,234)', '\u20135000', '1234,56', '1.234']) {
+      await user.paste(text);
+      expect(input).toHaveAttribute('aria-invalid', 'true');
+      expect(input).toHaveValue('');
+    }
+    // The refused sign is cleared by emptying the cell: it is empty, so leaving it closes it.
+    await user.keyboard('{Escape}');
+    expect(calls(fetchMock, 'PUT', '/api/v1/ebarimt-check/month-values')).toHaveLength(0);
+  });
+
+  it('closes a cell holding only a refused minus, and lets the browser’s shortcuts through', async () => {
+    const fetchMock = signedIn(ADMIN_ME, REPORT_ROUTES);
+    renderApp(PAGE, fetchMock);
+    const user = userEvent.setup();
+    // Бета's exempt amount is zero, so the cell opens empty.
+    await user.click(await screen.findByRole('button', { name: /Бета: НӨАТ чөлөөлөгдөх дүн/ }));
+    const input = screen.getByRole('textbox', { name: 'Бета: НӨАТ чөлөөлөгдөх дүн' });
+    await user.click(input);
+    await user.keyboard('{Control>}-{/Control}');
+    expect(input).not.toHaveAttribute('aria-invalid');
+    await user.keyboard('-');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    await user.keyboard('{Enter}');
+    expect(screen.queryByRole('textbox', { name: 'Бета: НӨАТ чөлөөлөгдөх дүн' })).toBeNull();
   });
 
   it('marks a purchase still waiting for its price check', async () => {

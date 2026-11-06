@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { EBARIMT_DIFF_TOLERANCE, type EbarimtHistoryKind } from '@tugeel/shared/ebarimt-check';
 import { Decimal } from '@tugeel/shared/money';
-import { and, asc, eq, inArray, lte, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, lte, or, sql } from 'drizzle-orm';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { actorUserId, type AuthContext } from '../../identity';
 import { ebarimtCheckHistory } from '../schema';
@@ -9,6 +9,9 @@ import { allocateEntries, EbarimtDataService, registerOwners } from './ebarimt-d
 
 const CHUNK = 500;
 const SAME = new Decimal(EBARIMT_DIFF_TOLERANCE);
+
+/** Two-key pg_advisory_xact_lock (this, the month): one month's totals are noted one at a time. */
+const EBARIMT_SYNC_LOCK = 72_030_201;
 
 export type EbarimtHistoryRow = typeof ebarimtCheckHistory.$inferSelect;
 
@@ -35,6 +38,8 @@ export class EbarimtHistoryService {
     source: string | null,
     only?: readonly number[],
   ): Promise<void> {
+    // Two links landing together would each see only its own and note a wrong last figure.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${EBARIMT_SYNC_LOCK}, ${period})`);
     const files = await this.data.activeFiles([period], tx);
     const file = files.get(period);
     const entries = file ? await this.data.entriesOf([file.id], tx) : [];

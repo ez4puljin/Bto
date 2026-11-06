@@ -30,6 +30,7 @@ import {
   EbarimtEntriesDto,
   EbarimtEntriesQueryDto,
   EbarimtFileOverviewDto,
+  EbarimtFileRemoveQueryDto,
   EbarimtFilesQueryDto,
   EbarimtImportRequestDto,
   EbarimtImportResultDto,
@@ -185,9 +186,10 @@ export class EbarimtCheckController {
   async removeFile(
     @CurrentUser() ctx: AuthContext,
     @Param('period', ParseIntPipe) period: number,
+    @Query() query: EbarimtFileRemoveQueryDto,
   ): Promise<void> {
     if (!isPeriod(period)) throw invalid('period', 'isPeriod', 'a month like 202610');
-    await this.files.remove(ctx, period);
+    await this.files.remove(ctx, period, query.fileId);
   }
 
   @Get('files/:id/download')

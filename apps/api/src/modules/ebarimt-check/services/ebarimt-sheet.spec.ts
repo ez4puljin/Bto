@@ -174,6 +174,17 @@ describe('readEbarimtSheet', () => {
     }
   });
 
+  it('reads a hyperlink over formatted text by its text', async () => {
+    const sheet = await readEbarimtSheet(
+      await streamOf([
+        lineWith({
+          ttd: { text: { richText: [{ text: '7100011' }] }, hyperlink: 'https://x.test' },
+        }),
+      ]),
+    );
+    expect(sheet.rows[0]?.ttd).toBe('7100011');
+  });
+
   it('takes a worked-out formula by its result', async () => {
     const sheet = await readEbarimtSheet(
       await streamOf([lineWith({ total: { formula: 'F2+G2', result: 2 } })]),

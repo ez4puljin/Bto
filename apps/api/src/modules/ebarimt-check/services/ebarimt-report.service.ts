@@ -149,6 +149,7 @@ export interface EbarimtReceiptBrief {
 
 export interface EbarimtEntryView {
   period: number;
+  rowNo: number;
   receiptKey: string;
   ddtd: string | null;
   deliveryNoteNo: string | null;
@@ -548,6 +549,7 @@ export class EbarimtReportService {
       const owner = link ? supplierOf.get(link.supplierId) : undefined;
       rows.push({
         period,
+        rowNo: entry.rowNo,
         receiptKey: entry.receiptKey,
         ddtd: entry.ddtd,
         deliveryNoteNo: entry.deliveryNoteNo,

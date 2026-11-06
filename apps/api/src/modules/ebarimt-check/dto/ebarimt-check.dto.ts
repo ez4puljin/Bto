@@ -81,6 +81,14 @@ export class EbarimtFilesQueryDto {
   @ApiProperty({ example: 2026 }) @Type(() => Number) @IsInt() @Min(2000) @Max(2100) year!: number;
 }
 
+export class EbarimtFileRemoveQueryDto {
+  @ApiProperty({ description: 'The file the person saw: a newer one in the month is a conflict' })
+  @Type(() => Number)
+  @IsInt()
+  @IsPositive()
+  fileId!: number;
+}
+
 export class EbarimtImportRequestDto {
   @ApiProperty({ description: 'An uploaded file of kind ebarimt.source' })
   @IsInt()
@@ -262,6 +270,7 @@ export class EbarimtEntryLinkDto {
 
 export class EbarimtEntryViewDto {
   @ApiProperty() period!: number;
+  @ApiProperty({ description: 'The line’s row in the month’s file' }) rowNo!: number;
   @ApiProperty() receiptKey!: string;
   @ApiProperty({ type: String, nullable: true }) ddtd!: string | null;
   @ApiProperty({ type: String, nullable: true }) deliveryNoteNo!: string | null;
@@ -294,7 +303,10 @@ export class EbarimtMonthValueRequestDto {
     description:
       'The amount the cell showed, wanted with exemptAmount: a change since is a conflict',
   })
-  @ValidateIf((body: EbarimtMonthValueRequestDto) => body.exemptAmount !== undefined)
+  @ValidateIf(
+    (body: EbarimtMonthValueRequestDto) =>
+      body.exemptAmount !== undefined || body.previousExemptAmount !== undefined,
+  )
   @Matches(EBARIMT_AMOUNT_PATTERN)
   previousExemptAmount?: string;
 
@@ -390,6 +402,14 @@ export class EbarimtLinkRequestDto {
   @IsInt()
   @IsPositive()
   supplierId!: number | null;
+
+  @ApiPropertyOptional({
+    description: 'Wanted with supplierId null: whose link the person saw; anyone else’s stays',
+  })
+  @ValidateIf((body: EbarimtLinkRequestDto) => body.supplierId === null)
+  @IsInt()
+  @IsPositive()
+  previousSupplierId?: number;
 }
 
 export class EbarimtLinkResultDto {

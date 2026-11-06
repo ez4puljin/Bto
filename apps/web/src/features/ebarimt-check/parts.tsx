@@ -39,6 +39,25 @@ export function DiffValue(props: { value: string; className?: string }) {
   );
 }
 
+/** Text that is plainly an amount: digits, commas grouping thousands, at most two decimals. */
+const PLAIN_AMOUNT = /^\s*(\d{1,3}(,\d{3})+|\d+)(\.\d{0,2})?\s*$/;
+
+/** A minus or dash, or the brackets of an accounting format's negative. */
+const SIGNED_TEXT = /[-\u2212\u2013\u2014()]/;
+
+/** Tells the page while a cell is open, so what was typed is never lost to a filter. */
+function useHoldsRow(editing: boolean, onEditing: ((editing: boolean) => void) | undefined) {
+  const report = useRef(onEditing);
+  useEffect(() => {
+    report.current = onEditing;
+  });
+  useEffect(() => {
+    if (!editing) return undefined;
+    report.current?.(true);
+    return () => report.current?.(false);
+  }, [editing]);
+}
+
 /**
  * A cell that reads as text until clicked: Enter or leaving saves, Esc gives up. Each edit starts from
  * the value of the moment, and nothing arriving while it is typed in touches what is typed; a save
@@ -60,6 +79,8 @@ export function InlineText(props: {
   startEditing?: boolean;
   /** Typing ended, saved or not. */
   onClosed?: () => void;
+  /** The cell opened or closed: its row stays on the list meanwhile. */
+  onEditing?: (editing: boolean) => void;
   onSave: (value: string, shown: string) => void;
   onRevert?: () => void;
 }) {
@@ -74,19 +95,7 @@ export function InlineText(props: {
   useEffect(() => {
     if (editing) input.current?.select();
   }, [editing]);
-  // A row that leaves the list while it is typed in (a register just made it even) keeps the text.
-  const latest = useRef({ editing, draft, onSave: props.onSave });
-  useEffect(() => {
-    latest.current = { editing, draft, onSave: props.onSave };
-  });
-  useEffect(
-    () => () => {
-      const now = latest.current;
-      if (!now.editing || finished.current) return;
-      if (now.draft.trim() !== shown.current.trim()) now.onSave(now.draft.trim(), shown.current);
-    },
-    [],
-  );
+  useHoldsRow(editing, props.onEditing);
   const open = () => {
     finished.current = false;
     shown.current = props.value;
@@ -189,6 +198,7 @@ export function InlineAmount(props: {
   value: string;
   label: string;
   editable: boolean;
+  onEditing?: (editing: boolean) => void;
   onSave: (value: string, shown: string) => void;
 }) {
   const { t } = useTranslation();
@@ -204,22 +214,7 @@ export function InlineAmount(props: {
   useEffect(() => {
     if (editing) input.current?.select();
   }, [editing]);
-  // A row that leaves the list while it is typed in keeps an amount that can be one.
-  const latest = useRef({ editing, draft, onSave: props.onSave });
-  useEffect(() => {
-    latest.current = { editing, draft, onSave: props.onSave };
-  });
-  useEffect(
-    () => () => {
-      const now = latest.current;
-      if (!now.editing || finished.current || signed.current) return;
-      const typed = now.draft.endsWith('.') ? now.draft.slice(0, -1) : now.draft;
-      const next = typed === '' ? '0' : typed;
-      if (!EBARIMT_AMOUNT_PATTERN.test(next) || new Decimal(next).equals(shown.current)) return;
-      now.onSave(next, shown.current);
-    },
-    [],
-  );
+  useHoldsRow(editing, props.onEditing);
   if (!props.editable) {
     return (
       <span className={cn('font-mono', amount.isZero() ? 'text-muted-foreground' : 'text-warning')}>
@@ -227,8 +222,20 @@ export function InlineAmount(props: {
       </span>
     );
   }
+  const close = () => {
+    finished.current = true;
+    signed.current = false;
+    setSignedShown(false);
+    setInvalid(false);
+    setEditing(false);
+  };
   const commit = () => {
     if (finished.current) return;
+    // Only a refused minus was ever typed: there is nothing to save or to keep open.
+    if (signed.current && draft === '') {
+      close();
+      return;
+    }
     const typed = draft.endsWith('.') ? draft.slice(0, -1) : draft;
     const next = typed === '' ? '0' : typed;
     if (signed.current || !EBARIMT_AMOUNT_PATTERN.test(next)) {
@@ -264,21 +271,22 @@ export function InlineAmount(props: {
           }}
           onBlur={commit}
           onPaste={(event) => {
-            if (!/[-\u2212]/.test(event.clipboardData.getData('text'))) return;
+            const pasted = event.clipboardData.getData('text');
+            if (PLAIN_AMOUNT.test(pasted)) return;
+            // Anything else would lose its sign or its notation in the money field, and read as
+            // another amount.
             event.preventDefault();
-            refuseSign();
+            if (SIGNED_TEXT.test(pasted)) refuseSign();
+            else setInvalid(true);
           }}
           onKeyDown={(event) => {
-            if (event.key === '-' || event.key === '\u2212') {
+            const shortcut = event.ctrlKey || event.metaKey || event.altKey;
+            if (!shortcut && (event.key === '-' || event.key === '\u2212')) {
               event.preventDefault();
               refuseSign();
             }
             if (event.key === 'Enter') commit();
-            if (event.key === 'Escape') {
-              finished.current = true;
-              setInvalid(false);
-              setEditing(false);
-            }
+            if (event.key === 'Escape') close();
           }}
         />
         {invalid ? (

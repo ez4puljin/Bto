@@ -71,7 +71,7 @@ function cellText(value: ExcelJS.CellValue): string {
   if (typeof value === 'object') {
     if ('result' in value) return cellText(value.result);
     if ('richText' in value) return value.richText.map((part) => part.text).join('');
-    if ('text' in value) return String(value.text);
+    if ('text' in value) return cellText(value.text);
     return '';
   }
   return String(value).trim();

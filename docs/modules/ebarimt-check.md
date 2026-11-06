@@ -33,13 +33,13 @@ A **period** is year × 100 + month (202610). Helpers in `@tugeel/shared/ebarimt
 | `GET entries?periods&supplierId` or `&ttd` | read | e-Barimt's lines behind a figure |
 | `GET files?year` | read | Last December and the year's months with their files, and the latest month holding one |
 | `POST files` (idempotent) | edit | Reads an uploaded `ebarimt.source` file into the month of its dates |
-| `DELETE files/:period` | settings | Takes the month's file out of force |
+| `DELETE files/:period?fileId` | settings | Takes the month's file out of force, if it is still the file named |
 | `GET files/:id/download` | read | The file as uploaded |
 | `GET settings`, `PUT settings` | read, settings | The accounts and which count |
 | `PUT month-values` | edit | Exempt amount and/or note of a supplier's month, each with the value its cell showed |
 | `PUT assignments` | assign | Suppliers given to an employee from a period on |
 | `PUT suppliers/:id/profile` | edit | Registers, phone, remark, each with the value its cell showed; null returns to the record's |
-| `PUT receipt-links` | edit | Receipts counted for a supplier; `supplierId` null undoes; a receipt already linked is skipped |
+| `PUT receipt-links` | edit | Receipts counted for a supplier; `supplierId` null undoes; a receipt already linked is skipped, and undoing names whose link it saw (`previousSupplierId`) |
 
 Rights: `ebarimt.check.read`, `.edit`, `.assign`, `.settings` (ADMIN all; ACCOUNTANT read, edit, settings; PROCUREMENT read, edit).
 
@@ -59,11 +59,11 @@ Rights: `ebarimt.check.read`, `.edit`, `.assign`, `.settings` (ADMIN all; ACCOUN
 
 e-Barimt's export «EBARIMT Падаан (Худалдан авалт)»: heads «Падаан №, ДДТД, Огноо, Харилцагчийн нэр, Харилцагчийн ТТД, НӨАТ, Цэвэр дүн, Нийт дүн, Төрөл», found by their words within the first ten rows; «ТТД», «Огноо» and «Нийт дүн» are required. A line with no TTD is skipped. Dates may be text or date cells, and only a real day counts. A blank total, an error cell (a register's too), a formula never worked out, an amount of 1,000,000,000,000 or more, or a text amount in any notation but digits, commas grouping thousands and at most two decimals refuses the file, naming the row. `.xlsx` only, at most 5 MiB and 20,000 lines; read in the API request before any transaction (ADR-0170 #5); `ebarimt-sheet.ts`.
 
-Errors: `EBARIMT_FILE_UNREADABLE`, `EBARIMT_FILE_COLUMNS`, `EBARIMT_FILE_EMPTY`, `EBARIMT_FILE_ROW` (`row`), `EBARIMT_FILE_MONTHS` (`months`), `EBARIMT_FILE_LIMIT` (`max`).
+Errors: `EBARIMT_FILE_UNREADABLE`, `EBARIMT_FILE_COLUMNS`, `EBARIMT_FILE_EMPTY`, `EBARIMT_FILE_ROW` (`row`), `EBARIMT_FILE_MONTHS` (`months`), `EBARIMT_FILE_LIMIT` (`max`); `EBARIMT_FILE_CHANGED` (`name`) on taking away a file that is no longer the month's.
 
 ## Screen
 
-The month, mode, chosen months, employee, «Дутуутай», filters and the open brief of receipts stay in the address (`period`, `mode`, `months`, `emp`, `missing`, `q`, `c_<column>`, `receipts`), so a receipt opened from the brief comes back to it. Months chosen one by one make one read after 250 ms, the last rows staying dimmed; a month's rows never stand in for another's. Wide tables use `DialogContent size="2xl"`.
+The month, mode, chosen months, employee, «Дутуутай», filters and the open brief of receipts stay in the address (`period`, `mode`, `months`, `emp`, `missing`, `q`, `c_<column>`, `receipts`), so a receipt opened from the brief comes back to it. Months chosen one by one make one read after 250 ms, the last rows staying dimmed; a month's rows never stand in for another's. Wide tables use `DialogContent size="2xl"`. A cell open for typing holds its row on the list and saves only on Enter or leaving it; rows are keyed by month, so an open cell never carries to another month. A refused cell is listed by name above the table until it saves, is dismissed or the month changes.
 
 ## Tests
 

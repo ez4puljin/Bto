@@ -677,7 +677,12 @@ describe('ebarimt check', () => {
     await http()
       .put('/api/v1/ebarimt-check/receipt-links')
       .set(bearer(accountant))
-      .send({ period: 202603, receiptKeys: ['DDTD-D'], supplierId: null })
+      .send({
+        period: 202603,
+        receiptKeys: ['DDTD-D'],
+        supplierId: null,
+        previousSupplierId: gamma,
+      })
       .expect(200);
     const undone = await report([202603]);
     expect(rowOf(undone, gamma).ebarimtAmount).toBe('0.00');
@@ -716,7 +721,12 @@ describe('ebarimt check', () => {
     await http()
       .put('/api/v1/ebarimt-check/receipt-links')
       .set(bearer(accountant))
-      .send({ period: 202603, receiptKeys: ['DDTD-D'], supplierId: null })
+      .send({
+        period: 202603,
+        receiptKeys: ['DDTD-D'],
+        supplierId: null,
+        previousSupplierId: gamma,
+      })
       .expect(200);
   });
 
@@ -893,10 +903,26 @@ describe('ebarimt check', () => {
     expect(taken).toMatchObject({ linked: 0, skipped: 1 });
     expect(rowOf(await report([202607]), beta).ebarimtAmount).toBe('3500.00');
 
+    // Undoing from a view that showed another supplier's link leaves this one standing.
+    const stale = (
+      await http()
+        .put('/api/v1/ebarimt-check/receipt-links')
+        .set(bearer(accountant))
+        .send({
+          period: 202607,
+          receiptKeys: ['DUP-1'],
+          supplierId: null,
+          previousSupplierId: gamma,
+        })
+        .expect(200)
+    ).body as { unlinked: number; skipped: number };
+    expect(stale).toMatchObject({ unlinked: 0, skipped: 1 });
+    expect(rowOf(await report([202607]), beta).ebarimtAmount).toBe('3500.00');
+
     await http()
       .put('/api/v1/ebarimt-check/receipt-links')
       .set(bearer(accountant))
-      .send({ period: 202607, receiptKeys: ['DUP-1'], supplierId: null })
+      .send({ period: 202607, receiptKeys: ['DUP-1'], supplierId: null, previousSupplierId: beta })
       .expect(200);
     expect(rowOf(await report([202607]), beta).ebarimtAmount).toBe('0.00');
   });
@@ -1000,6 +1026,22 @@ describe('ebarimt check', () => {
       .set(bearer(accountant))
       .send({ period: 202603, receiptKeys: ['DDTD-D'] })
       .expect(422);
+    await http()
+      .put('/api/v1/ebarimt-check/receipt-links')
+      .set(bearer(accountant))
+      .send({ period: 202603, receiptKeys: ['DDTD-D'], supplierId: null })
+      .expect(422);
+    await http()
+      .put('/api/v1/ebarimt-check/month-values')
+      .set(bearer(accountant))
+      .send({
+        period: 202603,
+        supplierId: alpha,
+        note: 'x',
+        previousNote: null,
+        previousExemptAmount: 'abc',
+      })
+      .expect(422);
   });
 
   it('adds months up in a consolidated view, each month’s figures beside', async () => {
@@ -1051,7 +1093,18 @@ describe('ebarimt check', () => {
     expect((bytes.body as Buffer).length).toBeGreaterThan(100);
     expect(bytes.headers['content-disposition']).toContain('EBARIMT.xlsx');
 
-    await http().delete('/api/v1/ebarimt-check/files/202604').set(bearer(accountant)).expect(204);
+    // A file seen before a colleague's newer one is not the one taken away.
+    const newer = await http()
+      .delete('/api/v1/ebarimt-check/files/202604')
+      .query({ fileId: april.id + 1 })
+      .set(bearer(accountant))
+      .expect(409);
+    expect(newer.body).toMatchObject({ code: 'EBARIMT_FILE_CHANGED' });
+    await http()
+      .delete('/api/v1/ebarimt-check/files/202604')
+      .query({ fileId: april.id })
+      .set(bearer(accountant))
+      .expect(204);
     const after = await report([202604]);
     expect(after.noFile).toEqual([202604]);
     expect(rowOf(after, alpha).ebarimtAmount).toBe('0.00');
@@ -1059,7 +1112,11 @@ describe('ebarimt check', () => {
       ['INIT', '1000.00'],
       ['REMOVE', '0.00'],
     ]);
-    await http().delete('/api/v1/ebarimt-check/files/202604').set(bearer(accountant)).expect(404);
+    await http()
+      .delete('/api/v1/ebarimt-check/files/202604')
+      .query({ fileId: april.id })
+      .set(bearer(accountant))
+      .expect(404);
     const kept = await sql.query<{ status: string }>(
       'SELECT status FROM ebarimt_check_files WHERE period = 202604',
     );

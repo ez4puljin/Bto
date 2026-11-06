@@ -226,7 +226,12 @@ export function FilesDialog(props: { year: number; onClose: () => void }) {
             onClose={() => setRemoving(null)}
             onConfirm={() =>
               void removal
-                .run(() => mutations.removeFile.mutateAsync(removing.period))
+                .run(() =>
+                  mutations.removeFile.mutateAsync({
+                    period: removing.period,
+                    fileId: removing.file?.id ?? 0,
+                  }),
+                )
                 .then((done) => {
                   if (!done) return;
                   setRemoving(null);
@@ -488,19 +493,26 @@ export function UnregisteredDialog(props: {
   const rest = props.rows.reduce((total, row) => total.plus(row.amount), new Decimal(0));
   const restCount = props.rows.reduce((total, row) => total + row.count, 0);
   const linked = live.reduce((total, link) => total.plus(link.amount), new Decimal(0));
+  let unlinked = 0;
   const unlink = (link: EbarimtLink) =>
     void action
       .run(() =>
-        mutations.link.mutateAsync({
-          period: link.period,
-          receiptKeys: [link.receiptKey],
-          supplierId: null,
-        }),
+        mutations.link
+          .mutateAsync({
+            period: link.period,
+            receiptKeys: [link.receiptKey],
+            supplierId: null,
+            previousSupplierId: link.supplierId,
+          })
+          .then((result) => {
+            unlinked = result.unlinked;
+          }),
       )
       .then((done) => {
         if (!done) return;
         setUnlinking(null);
-        toast.success(t('ebarimtCheck.entries.unlinkedDone'));
+        if (unlinked > 0) toast.success(t('ebarimtCheck.entries.unlinkedDone'));
+        else toast.warning(t('ebarimtCheck.entries.unlinkChanged'));
       });
   return (
     <Dialog open onOpenChange={(open) => !open && props.onClose()}>
@@ -746,11 +758,16 @@ export function UnregisteredDialog(props: {
             open
             variant="destructive"
             title={t('ebarimtCheck.unregistered.unlinkTitle')}
-            description={t('ebarimtCheck.unregistered.unlinkText', {
-              ttd: unlinking.ttd,
-              amount: formatMnt(unlinking.amount),
-              supplier: unlinking.supplierName,
-            })}
+            description={t(
+              unlinking.stale
+                ? 'ebarimtCheck.unregistered.unlinkTextStale'
+                : 'ebarimtCheck.unregistered.unlinkText',
+              {
+                ttd: unlinking.ttd,
+                amount: formatMnt(unlinking.amount),
+                supplier: unlinking.supplierName,
+              },
+            )}
             confirmLabel={t('ebarimtCheck.unregistered.unlinkConfirm')}
             pending={mutations.link.isPending}
             problem={action.problem}

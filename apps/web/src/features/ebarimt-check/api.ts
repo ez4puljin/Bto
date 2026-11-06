@@ -193,13 +193,13 @@ export function useEbarimtMutations() {
       onSuccess: changed,
     }),
     removeFile: useMutation({
-      mutationFn: async (period: number) =>
+      mutationFn: async ({ period, fileId }: { period: number; fileId: number }) =>
         unwrap(
           await api.DELETE('/api/v1/ebarimt-check/files/{period}', {
-            params: { path: { period } },
+            params: { path: { period }, query: { fileId } },
           }),
         ),
-      onSuccess: changed,
+      onSettled: changed,
     }),
     download: useMutation({
       mutationFn: async (id: number): Promise<Blob> =>
@@ -276,6 +276,7 @@ export function useEbarimtMutations() {
         period: number;
         receiptKeys: string[];
         supplierId: number | null;
+        previousSupplierId?: number;
       }) => unwrap(await api.PUT('/api/v1/ebarimt-check/receipt-links', { body })),
       onSuccess: changed,
     }),

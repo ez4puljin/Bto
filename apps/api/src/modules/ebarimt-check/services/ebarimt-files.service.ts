@@ -6,7 +6,7 @@ import type { Readable } from 'node:stream';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
-import { notFound } from '../../../common/errors/app-error';
+import { AppError, notFound } from '../../../common/errors/app-error';
 import {
   actorUserId,
   type AuthContext,
@@ -155,8 +155,11 @@ export class EbarimtFilesService {
     };
   }
 
-  /** Takes a month's file out of force; its rows stay, and its links wait for a new file. */
-  async remove(ctx: AuthContext, period: number): Promise<void> {
+  /**
+   * Takes a month's file out of force; its rows stay, and its links wait for a new file. `fileId`
+   * is the file the person saw: a colleague's newer one stays, and they are told.
+   */
+  async remove(ctx: AuthContext, period: number, fileId: number): Promise<void> {
     await inTransaction(this.db, async (tx) => {
       const [file] = await tx
         .select()
@@ -164,6 +167,11 @@ export class EbarimtFilesService {
         .where(and(eq(ebarimtCheckFiles.period, period), eq(ebarimtCheckFiles.status, 'ACTIVE')))
         .for('update');
       if (!file) throw notFound('ebarimt file of period', period);
+      if (file.id !== fileId) {
+        throw new AppError('EBARIMT_FILE_CHANGED', 'a newer file stands in this month', {
+          name: file.fileName,
+        });
+      }
       await tx
         .update(ebarimtCheckFiles)
         .set({ status: 'REMOVED', closedBy: actorUserId(ctx), closedAt: new Date() })

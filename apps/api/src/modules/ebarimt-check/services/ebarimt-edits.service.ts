@@ -272,12 +272,18 @@ export class EbarimtEditsService {
 
   /**
    * Receipts of a month counted for a chosen supplier; `supplierId` null undoes them. A receipt must
-   * be in the month's file to be linked; undoing needs only its link. A receipt already counted for
-   * someone is undone first, never taken over: a colleague may have just linked it.
+   * be in the month's file to be linked; undoing needs only its link, and only the link the person
+   * saw (`previousSupplierId`). A receipt already counted for someone is undone first, never taken
+   * over: a colleague may have just linked it. What could not be done is counted in `skipped`.
    */
   async linkReceipts(
     ctx: AuthContext,
-    input: { period: number; receiptKeys: readonly string[]; supplierId: number | null },
+    input: {
+      period: number;
+      receiptKeys: readonly string[];
+      supplierId: number | null;
+      previousSupplierId?: number;
+    },
   ): Promise<{ linked: number; unlinked: number; skipped: number }> {
     const receiptKeys = [...new Set(input.receiptKeys)];
     if (input.supplierId !== null) await this.assertSuppliers([input.supplierId]);
@@ -314,7 +320,7 @@ export class EbarimtEditsService {
       for (const receiptKey of receiptKeys) {
         const link = linkOf.get(receiptKey);
         if (input.supplierId === null) {
-          if (!link) {
+          if (!link || link.supplierId !== input.previousSupplierId) {
             skipped += 1;
             continue;
           }

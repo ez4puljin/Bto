@@ -1,3 +1,4 @@
+import type { ProblemDetails } from '@tugeel/api-client';
 import {
   EBARIMT_LIMITS,
   isPeriod,
@@ -68,7 +69,7 @@ import {
 } from '@/components/ui/table';
 import type { ColumnSpec } from '@/lib/column-layout';
 import { problemFromError } from '@/lib/problem';
-import { useAction } from '@/lib/use-action';
+import { toast } from '@/lib/toast';
 import { useDebounced } from '@/lib/use-debounced';
 import { cn } from '@/lib/utils';
 import {
@@ -90,6 +91,12 @@ import {
 } from './helpers';
 import { AssignDialog, FilesDialog, SettingsDialog, UnregisteredDialog } from './manage-dialogs';
 import { DiffValue, InlineAmount, InlineText } from './parts';
+
+interface CellRefusal {
+  key: string;
+  label: string;
+  problem: ProblemDetails | null;
+}
 
 type Mode = 'month' | 'range';
 const MODES: readonly Mode[] = ['month', 'range'];
@@ -306,8 +313,15 @@ export function EbarimtPage() {
     () => yearMonths.filter((month) => month.file).map((month) => month.period),
     [yearMonths],
   );
+  const lastDecember = periodOf(year - 1, 12);
   const monthsParam = params.get('months');
-  const chosenRange = useMemo(() => readMonths(monthsParam) ?? withFile, [monthsParam, withFile]);
+  const chosenRange = useMemo(
+    () =>
+      readMonths(monthsParam)?.filter(
+        (value) => periodYear(value) === year || value === lastDecember,
+      ) ?? withFile,
+    [monthsParam, withFile, year, lastDecember],
+  );
   // Chips clicked faster than the address settles still add up.
   const rangeNow = useRef<readonly number[]>(chosenRange);
   useEffect(() => {
@@ -326,7 +340,10 @@ export function EbarimtPage() {
   }, [hasPeriod, monthMode, period, settledKey]);
   const report = useEbarimtReport(periods, year);
   const mutations = useEbarimtMutations();
-  const action = useAction();
+  // A cell open for typing keeps its row on the list, whatever the row's figures do meanwhile.
+  const [holding, setHolding] = useState<number | null>(null);
+  // Each cell's refused save stays until that cell saves, it is dismissed, or the month changes.
+  const [refusals, setRefusals] = useState<readonly CellRefusal[]>([]);
 
   const employee = params.get('emp') ?? 'all';
   const setEmployee = (next: string) => update({ emp: next === 'all' ? null : next });
@@ -344,29 +361,34 @@ export function EbarimtPage() {
   );
 
   // Ticked rows, shift-click for a run from the row ticked last; a month's ticks are its own.
-  const [ticked, setTicked] = useState<ReadonlySet<number>>(() => readTicks(ticksKey, period));
+  const [ticked, setTicked] = useState<ReadonlySet<number>>(() =>
+    hasPeriod ? readTicks(ticksKey, period) : new Set(),
+  );
   const anchor = useRef<number | null>(null);
   const clearTicks = () => {
     setTicked(new Set());
     anchor.current = null;
   };
-  useEffect(() => writeTicks(ticksKey, period, ticked), [ticksKey, period, ticked]);
-  const clearError = action.clear;
-  const viewed = useRef(`${period}:${mode}`);
+  // Opened without a month, the page's month is only known once the address settles.
+  const viewed = useRef(hasPeriod ? `${period}:${mode}` : null);
   useEffect(() => {
-    if (viewed.current === `${period}:${mode}`) return;
+    if (!hasPeriod || viewed.current === `${period}:${mode}`) return;
     viewed.current = `${period}:${mode}`;
-    setTicked(new Set());
+    setTicked(readTicks(ticksKey, period));
     anchor.current = null;
     setEntriesOf(null);
     setHistoryOf(null);
-    clearError();
-  }, [period, mode, clearError]);
+    setHolding(null);
+    setRefusals([]);
+  }, [hasPeriod, period, mode, ticksKey]);
+  useEffect(() => {
+    if (hasPeriod) writeTicks(ticksKey, period, ticked);
+  }, [hasPeriod, ticksKey, period, ticked]);
 
   const nothingAsked = monthMode ? !hasPeriod : chosenRange.length === 0;
   // Another year just chosen: the months it reads have not settled, and nothing of the last shows.
-  const lastAsked = periods[periods.length - 1];
-  const otherYear = !monthMode && lastAsked !== undefined && periodYear(lastAsked) !== year;
+  const otherYear =
+    !monthMode && periods.some((value) => periodYear(value) !== year && value !== lastDecember);
   const nothingToShow = nothingAsked || otherYear;
   const rows = useMemo(
     () => (nothingToShow ? [] : (report.data?.rows ?? [])),
@@ -417,6 +439,7 @@ export function EbarimtPage() {
       rows.filter((row) => {
         const keys = searchIndex.get(row.supplierId);
         if (!keys) return false;
+        if (row.supplierId === holding) return true;
         if (employee !== 'all') {
           const wanted = employee === 'none' ? null : Number.parseInt(employee, 10);
           if (!row.employeeMonths.some((month) => month.userId === wanted)) return false;
@@ -437,7 +460,7 @@ export function EbarimtPage() {
           diffOk(row.diffAmount, cf.diff)
         );
       }),
-    [rows, searchIndex, employee, onlyMissing, search, columnFilters],
+    [rows, searchIndex, holding, employee, onlyMissing, search, columnFilters],
   );
   const hasColumnFilters = Object.values(columnFilters).some((value) => value !== '');
   const missingCount = rows.filter((row) => diffStateOf(row.diffAmount) === 'missing').length;
@@ -484,26 +507,47 @@ export function EbarimtPage() {
     setTicked(next);
   };
 
+  /** One cell's save: what it refuses is said by name and stays, as focus has moved on by then. */
+  const saveCell = (key: string, label: string, write: () => Promise<unknown>) =>
+    void write().then(
+      () => setRefusals((list) => list.filter((entry) => entry.key !== key)),
+      (error: unknown) => {
+        const problem = problemFromError(error);
+        setRefusals((list) => [
+          ...list.filter((entry) => entry.key !== key),
+          { key, label, problem },
+        ]);
+        // A page already left has no list to show it in.
+        toast.warning(t('ebarimtCheck.cells.refused', { label }));
+      },
+    );
   const saveExempt = (row: EbarimtRow, exemptAmount: string, shown: string) =>
-    void action.run(() =>
-      mutations.saveMonthValue.mutateAsync({
-        period,
-        supplierId: row.supplierId,
-        exemptAmount,
-        previousExemptAmount: shown,
-      }),
+    saveCell(
+      `${period}:${row.supplierId}:exempt`,
+      t('ebarimtCheck.cells.exemptName', { name: row.name }),
+      () =>
+        mutations.saveMonthValue.mutateAsync({
+          period,
+          supplierId: row.supplierId,
+          exemptAmount,
+          previousExemptAmount: shown,
+        }),
     );
   const saveNote = (row: EbarimtRow, note: string, shown: string) =>
-    void action.run(() =>
-      mutations.saveMonthValue.mutateAsync({
-        period,
-        supplierId: row.supplierId,
-        note: note || null,
-        previousNote: shown || null,
-      }),
+    saveCell(
+      `${period}:${row.supplierId}:note`,
+      t('ebarimtCheck.cells.noteName', { name: row.name }),
+      () =>
+        mutations.saveMonthValue.mutateAsync({
+          period,
+          supplierId: row.supplierId,
+          note: note || null,
+          previousNote: shown || null,
+        }),
     );
   const saveProfile = (
     row: EbarimtRow,
+    label: string,
     changes: {
       registers?: string | null;
       previousRegisters?: string;
@@ -513,8 +557,12 @@ export function EbarimtPage() {
       previousRemark?: string;
     },
   ) =>
-    void action.run(() =>
+    saveCell(`${row.supplierId}:${label}`, label, () =>
       mutations.saveProfile.mutateAsync({ supplierId: row.supplierId, ...changes }),
+    );
+  const holdRow = (row: EbarimtRow) => (editing: boolean) =>
+    setHolding((current) =>
+      editing ? row.supplierId : current === row.supplierId ? null : current,
     );
 
   const togglePeriod = (value: number) =>
@@ -523,9 +571,8 @@ export function EbarimtPage() {
         ? rangeNow.current.filter((other) => other !== value)
         : [...rangeNow.current, value].sort((a, b) => a - b),
     );
-  const previousDecember = periodOf(year - 1, 12);
   const offered = yearMonths.map((month) => month.period);
-  const allOfYear = offered.filter((value) => value !== previousDecember);
+  const allOfYear = offered.filter((value) => value !== lastDecember);
   const presets: { label: string; periods: number[] }[] = [
     {
       label: t('ebarimtCheck.presets.withDecember', { year: year - 1, next: year }),
@@ -538,7 +585,7 @@ export function EbarimtPage() {
     { label: t('ebarimtCheck.presets.q4'), periods: quarter(year, [10, 11, 12]) },
   ];
   const filesDone = yearMonths.filter(
-    (month) => month.file && month.period !== previousDecember,
+    (month) => month.file && month.period !== lastDecember,
   ).length;
   const noFile = nothingToShow ? [] : (report.data?.noFile ?? []);
   const unregistered = nothingToShow ? [] : (report.data?.unregistered ?? []);
@@ -776,7 +823,23 @@ export function EbarimtPage() {
         </div>
       </FilterBar>
 
-      <ProblemAlert problem={action.problem} />
+      {refusals.map((refusal) => (
+        <div key={refusal.key} role="alert" className="mb-3 flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="mb-1 text-[0.8125rem] font-medium text-destructive">{refusal.label}</p>
+            <ProblemAlert problem={refusal.problem} />
+          </div>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label={t('ebarimtCheck.cells.refusedDismiss', { label: refusal.label })}
+            title={t('ebarimtCheck.cells.refusedDismiss', { label: refusal.label })}
+            onClick={() => setRefusals((list) => list.filter((entry) => entry.key !== refusal.key))}
+          >
+            <X />
+          </Button>
+        </div>
+      ))}
       <ProblemAlert problem={problemFromError(overview.error)} onRetry={overview.refetch} />
       <ProblemAlert problem={problemFromError(report.error)} onRetry={report.refetch} />
 
@@ -901,7 +964,7 @@ export function EbarimtPage() {
                 .join('; ');
               return (
                 <TableRow
-                  key={row.supplierId}
+                  key={`${monthMode ? period : 'range'}:${row.supplierId}`}
                   data-supplier={row.supplierId}
                   className={cn(
                     'group/row',
@@ -941,8 +1004,12 @@ export function EbarimtPage() {
                     <SupplierCell
                       row={row}
                       editable={canEdit}
+                      onEditing={holdRow(row)}
                       onSave={(remark, shown) =>
-                        saveProfile(row, { remark: remark || null, previousRemark: shown })
+                        saveProfile(row, t('ebarimtCheck.cells.remarkName', { name: row.name }), {
+                          remark: remark || null,
+                          previousRemark: shown,
+                        })
                       }
                     />
                   </TableCell>
@@ -969,11 +1036,20 @@ export function EbarimtPage() {
                           </span>
                         ) : undefined
                       }
+                      onEditing={holdRow(row)}
                       onSave={(registers, shown) =>
-                        saveProfile(row, { registers, previousRegisters: shown })
+                        saveProfile(
+                          row,
+                          t('ebarimtCheck.cells.registersName', { name: row.name }),
+                          { registers, previousRegisters: shown },
+                        )
                       }
                       onRevert={() =>
-                        saveProfile(row, { registers: null, previousRegisters: row.registers })
+                        saveProfile(
+                          row,
+                          t('ebarimtCheck.cells.registersName', { name: row.name }),
+                          { registers: null, previousRegisters: row.registers },
+                        )
                       }
                     />
                   </TableCell>
@@ -998,11 +1074,20 @@ export function EbarimtPage() {
                           label={t('ebarimtCheck.cells.phoneName', { name: row.name })}
                           editable={canEdit}
                           maxLength={EBARIMT_LIMITS.maxPhone}
+                          onEditing={holdRow(row)}
                           onSave={(phone, shown) =>
-                            saveProfile(row, { phone, previousPhone: shown })
+                            saveProfile(
+                              row,
+                              t('ebarimtCheck.cells.phoneName', { name: row.name }),
+                              { phone, previousPhone: shown },
+                            )
                           }
                           onRevert={() =>
-                            saveProfile(row, { phone: null, previousPhone: row.phone })
+                            saveProfile(
+                              row,
+                              t('ebarimtCheck.cells.phoneName', { name: row.name }),
+                              { phone: null, previousPhone: row.phone },
+                            )
                           }
                         />
                       </div>
@@ -1061,6 +1146,7 @@ export function EbarimtPage() {
                       value={row.exemptAmount}
                       label={t('ebarimtCheck.cells.exemptName', { name: row.name })}
                       editable={canEdit && monthMode}
+                      onEditing={holdRow(row)}
                       onSave={(amount, shown) => saveExempt(row, amount, shown)}
                     />
                   </TableCell>
@@ -1076,6 +1162,7 @@ export function EbarimtPage() {
                         label={t('ebarimtCheck.cells.noteName', { name: row.name })}
                         editable={canEdit}
                         maxLength={EBARIMT_LIMITS.maxNote}
+                        onEditing={holdRow(row)}
                         onSave={(note, shown) => saveNote(row, note, shown)}
                       />
                     ) : (
@@ -1246,6 +1333,7 @@ function EmployeeChip(props: { active: boolean; onClick: () => void; children: R
 function SupplierCell(props: {
   row: EbarimtRow;
   editable: boolean;
+  onEditing: (editing: boolean) => void;
   onSave: (remark: string, shown: string) => void;
 }) {
   const { t } = useTranslation();
@@ -1290,6 +1378,7 @@ function SupplierCell(props: {
           editable={props.editable}
           startEditing={adding}
           maxLength={EBARIMT_LIMITS.maxRemark}
+          onEditing={props.onEditing}
           onClosed={() => setAdding(false)}
           onSave={props.onSave}
         />
