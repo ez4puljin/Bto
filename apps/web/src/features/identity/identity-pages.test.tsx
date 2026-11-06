@@ -20,14 +20,31 @@ const STAMP = '2026-10-01T02:00:00.000Z';
 const list = <T,>(data: T[]) => json({ data, nextCursor: null });
 
 const ROLES: Schemas['Role'][] = [
-  { id: 1, code: 'ADMIN', name: null, isSystem: true, permissions: [...PERMISSIONS], userCount: 1 },
-  { id: 4, code: 'WAREHOUSE', name: null, isSystem: true, permissions: [], userCount: 0 },
+  {
+    id: 1,
+    code: 'ADMIN',
+    name: null,
+    isSystem: true,
+    permissions: [...PERMISSIONS],
+    customized: false,
+    userCount: 1,
+  },
+  {
+    id: 4,
+    code: 'WAREHOUSE',
+    name: null,
+    isSystem: true,
+    permissions: [],
+    customized: false,
+    userCount: 0,
+  },
   {
     id: 20,
     code: null,
     name: 'Ахлах нярав',
     isSystem: false,
     permissions: ['identity.audit.read'],
+    customized: false,
     userCount: 0,
   },
 ];
@@ -92,11 +109,12 @@ describe('menu and page access', () => {
 });
 
 describe('roles', () => {
-  it('keeps system roles read-only and edits a custom role with assignable permissions', async () => {
+  it('edits a custom role with assignable permissions', async () => {
     let patched: unknown;
     renderApp(
       '/roles',
       signedIn(ADMIN_ME, {
+        'GET /api/v1/users': () => list([]),
         'GET /api/v1/roles': () => list(ROLES),
         'GET /api/v1/permissions': () => list(CATALOG),
         'PATCH /api/v1/roles/20': async (request) => {
@@ -106,7 +124,6 @@ describe('roles', () => {
       }),
     );
     const user = userEvent.setup();
-    // System roles are only read; the custom one is edited from its row.
     expect(await screen.findAllByText(mn.roles.systemBadge)).toHaveLength(2);
     await user.click(screen.getByRole('button', { name: `${mn.common.edit}: Ахлах нярав` }));
     const dialog = within(await screen.findByRole('dialog'));
@@ -126,6 +143,128 @@ describe('roles', () => {
         permissions: ['identity.audit.read', 'identity.settings.read'],
       }),
     );
+  });
+});
+
+describe("system roles and a staff member's rights (ADR-0163)", () => {
+  it('changes a system role: its name stays, only the rights are sent, no delete', async () => {
+    let patched: unknown;
+    const warehouse: Schemas['Role'] = {
+      id: 4,
+      code: 'WAREHOUSE',
+      name: null,
+      isSystem: true,
+      permissions: ['identity.audit.read'],
+      customized: true,
+      userCount: 3,
+    };
+    renderApp(
+      '/roles',
+      signedIn(ADMIN_ME, {
+        'GET /api/v1/users': () => list([]),
+        'GET /api/v1/roles': () => list([ROLES[0]!, warehouse]),
+        'GET /api/v1/permissions': () => list(CATALOG),
+        'PATCH /api/v1/roles/4': async (request) => {
+          patched = await request.json();
+          return json(warehouse);
+        },
+      }),
+    );
+    const user = userEvent.setup();
+    expect(await screen.findByText(mn.roles.customizedBadge)).toBeInTheDocument();
+    const name = mn.roles.system.WAREHOUSE;
+    expect(screen.queryByRole('button', { name: `${mn.common.delete}: ${name}` })).toBeNull();
+    await user.click(screen.getByRole('button', { name: `${mn.common.edit}: ${name}` }));
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByLabelText(mn.roles.form.name)).toHaveAttribute('readonly');
+    await user.click(
+      await dialog.findByRole('checkbox', { name: mn.permissions.identity.settings.read }),
+    );
+    expect(
+      dialog.queryByRole('checkbox', { name: mn.permissions.identity.users.manage }),
+    ).toBeNull();
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    await waitFor(() =>
+      expect(patched).toEqual({
+        permissions: ['identity.audit.read', 'identity.settings.read'],
+      }),
+    );
+  });
+
+  it('goes back to the code and locks what ADMIN cannot lose', async () => {
+    renderApp(
+      '/roles',
+      signedIn(ADMIN_ME, {
+        'GET /api/v1/users': () => list([]),
+        'GET /api/v1/roles': () => list(ROLES),
+        'GET /api/v1/permissions': () => list(CATALOG),
+      }),
+    );
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole('button', {
+        name: `${mn.common.edit}: ${mn.roles.system.ADMIN}`,
+      }),
+    );
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(
+      await dialog.findByRole('checkbox', { name: mn.permissions.identity.roles.manage }),
+    ).toBeDisabled();
+    const audit = dialog.getByRole('checkbox', { name: mn.permissions.identity.audit.read });
+    expect(audit).toBeEnabled();
+    await user.click(audit);
+    expect(audit).not.toBeChecked();
+    await user.click(dialog.getByRole('button', { name: mn.roles.form.reset }));
+    expect(audit).toBeChecked();
+  });
+
+  it('shows what a staff member holds and lacks, and through which role', async () => {
+    const dorj: Schemas['UserSummary'] = {
+      id: 7,
+      username: 'p99112233',
+      fullName: 'Дорж Нямаа',
+      phone: '+97699112233',
+      status: 'ACTIVE',
+      roleIds: [4],
+      lastLoginAt: null,
+      lockedUntil: null,
+    };
+    const keeper: Schemas['Role'] = {
+      id: 4,
+      code: 'WAREHOUSE',
+      name: null,
+      isSystem: true,
+      permissions: ['identity.audit.read'],
+      customized: false,
+      userCount: 1,
+    };
+    renderApp(
+      '/roles?user=7',
+      signedIn(ADMIN_ME, {
+        'GET /api/v1/users': () => list([dorj]),
+        'GET /api/v1/roles': () => list([ROLES[0]!, keeper]),
+      }),
+    );
+    const user = userEvent.setup();
+    const panel = within(
+      await screen.findByRole('region', {
+        name: mn.roles.staff.title.replace('{{name}}', dorj.fullName),
+      }),
+    );
+    const held = mn.permissions.identity.audit.read;
+    const missing = mn.permissions.identity.settings.read;
+    expect(panel.getByText(held, { exact: false })).toBeInTheDocument();
+    expect(panel.getByText(missing)).toBeInTheDocument();
+    // Only their roles stay in the list above.
+    expect(
+      screen.queryByRole('button', { name: `${mn.common.edit}: ${mn.roles.system.ADMIN}` }),
+    ).toBeNull();
+    await user.click(panel.getByRole('tab', { name: mn.roles.staff.show.HELD }));
+    expect(panel.getByText(held, { exact: false })).toBeInTheDocument();
+    expect(panel.queryByText(missing)).toBeNull();
+    await user.click(panel.getByRole('tab', { name: mn.roles.staff.show.MISSING }));
+    expect(panel.queryByText(held, { exact: false })).toBeNull();
+    expect(panel.getByText(missing)).toBeInTheDocument();
   });
 });
 

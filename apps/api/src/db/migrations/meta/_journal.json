@@ -526,6 +526,13 @@
       "when": 1793862588832,
       "tag": "0075_receipt_counter_account",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1793971451835,
+      "tag": "0080_role_permission_overrides",
+      "breakpoints": true
     }
   ]
 }

@@ -9225,6 +9225,8 @@ export interface components {
             name: string | null;
             isSystem: boolean;
             permissions: components["schemas"]["Permission"][];
+            /** @description A system role whose rights differ from the code (ADR-0163) */
+            customized: boolean;
             userCount: number;
         };
         RoleList: {
@@ -9238,6 +9240,7 @@ export interface components {
             permissions: components["schemas"]["Permission"][];
         };
         RoleUpdateRequest: {
+            /** @description Custom roles only */
             name?: string;
             permissions?: components["schemas"]["Permission"][];
         };

@@ -1,12 +1,19 @@
 import {
   isSystemRole,
   PERMISSIONS,
-  SYSTEM_ROLE_PERMISSIONS,
   SYSTEM_ROLES,
+  systemRolePermissions,
 } from '@tugeel/shared/auth';
 import { and, eq, notInArray, sql } from 'drizzle-orm';
 import type { Tx } from '../../common/db/db.types';
-import { permissions, rolePermissions, roles, TRANSIT_CODE, warehouses } from './schema';
+import {
+  permissions,
+  rolePermissionOverrides,
+  rolePermissions,
+  roles,
+  TRANSIT_CODE,
+  warehouses,
+} from './schema';
 
 type Warehouse = typeof warehouses.$inferSelect;
 
@@ -14,9 +21,10 @@ type Warehouse = typeof warehouses.$inferSelect;
 const REFERENCE_DATA_LOCK = 72_026_102;
 
 /**
- * Makes `permissions`, the system roles and their `role_permissions` equal to the code catalog in
- * @tugeel/shared/auth (ADR-0027 #4). Idempotent; custom roles keep their own permissions, except
- * codes that left the catalog (removed by the foreign-key cascade).
+ * Makes `permissions` and the system roles equal to the code catalog in @tugeel/shared/auth
+ * (ADR-0027 #4), and each system role's `role_permissions` equal to the code's set with the admin's
+ * ticks on top (ADR-0163 #2). Idempotent; custom roles keep their own permissions, except codes
+ * that left the catalog (removed by the foreign-key cascade).
  */
 export async function syncAccessCatalog(tx: Tx): Promise<void> {
   await tx.execute(sql`SELECT pg_advisory_xact_lock(${REFERENCE_DATA_LOCK})`);
@@ -35,8 +43,15 @@ export async function syncAccessCatalog(tx: Tx): Promise<void> {
     .from(roles)
     .where(eq(roles.isSystem, true));
   for (const role of systemRoles) {
+    const overrides = await tx
+      .select({
+        permissionCode: rolePermissionOverrides.permissionCode,
+        granted: rolePermissionOverrides.granted,
+      })
+      .from(rolePermissionOverrides)
+      .where(eq(rolePermissionOverrides.roleId, role.id));
     const desired: string[] = isSystemRole(role.code)
-      ? [...SYSTEM_ROLE_PERMISSIONS[role.code]]
+      ? systemRolePermissions(role.code, overrides)
       : [];
     await tx
       .delete(rolePermissions)

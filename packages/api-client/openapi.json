@@ -37819,6 +37819,10 @@
               "$ref": "#/components/schemas/Permission"
             }
           },
+          "customized": {
+            "type": "boolean",
+            "description": "A system role whose rights differ from the code (ADR-0163)"
+          },
           "userCount": {
             "type": "number"
           }
@@ -37829,6 +37833,7 @@
           "name",
           "isSystem",
           "permissions",
+          "customized",
           "userCount"
         ]
       },
@@ -37878,7 +37883,8 @@
         "properties": {
           "name": {
             "type": "string",
-            "maxLength": 60
+            "maxLength": 60,
+            "description": "Custom roles only"
           },
           "permissions": {
             "type": "array",

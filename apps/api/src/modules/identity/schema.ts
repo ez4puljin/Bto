@@ -101,6 +101,25 @@ export const rolePermissions = pgTable(
   (t) => [primaryKey({ columns: [t.roleId, t.permissionCode] })],
 );
 
+/**
+ * An admin's ticks on a system role, as differences from the code's set (ADR-0163 #2): `granted`
+ * adds the right, otherwise it takes it away. `role_permissions` stays what the guard reads; the
+ * boot sync rebuilds a system role's rows from the code and these.
+ */
+export const rolePermissionOverrides = pgTable(
+  'role_permission_overrides',
+  {
+    roleId: bigint('role_id', { mode: 'number' })
+      .notNull()
+      .references(() => roles.id, { onDelete: 'cascade' }),
+    permissionCode: text('permission_code')
+      .notNull()
+      .references(() => permissions.code, { onDelete: 'cascade' }),
+    granted: boolean('granted').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.roleId, t.permissionCode] })],
+);
+
 export const userRoles = pgTable(
   'user_roles',
   {

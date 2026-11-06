@@ -1,9 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  ADMIN_LOCKED_PERMISSIONS,
   isAssignablePermission,
   isPermission,
+  isSystemRole,
   type Permission,
   PERMISSIONS,
+  type SystemRole,
+  systemRoleOverrides,
 } from '@tugeel/shared/auth';
 import { asc, desc, eq, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
@@ -11,7 +15,13 @@ import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError } from '../../../common/errors/app-error';
 import type { AuthContext } from '../auth-context';
-import { rolePermissions, roles, userCompanyRoles, userRoles } from '../schema';
+import {
+  rolePermissionOverrides,
+  rolePermissions,
+  roles,
+  userCompanyRoles,
+  userRoles,
+} from '../schema';
 import { AuditService } from './audit.service';
 
 export interface RoleView {
@@ -20,6 +30,8 @@ export interface RoleView {
   name: string | null;
   isSystem: boolean;
   permissions: Permission[];
+  /** A system role an admin has changed (it differs from the code's set, ADR-0163). */
+  customized: boolean;
   userCount: number;
 }
 
@@ -33,8 +45,9 @@ function invalid(path: string, constraint: string, message: string): AppError {
 }
 
 /**
- * System roles come from the code catalog and are read-only; admins build custom roles from the
- * assignable permissions (ADR-0027 #5).
+ * Admins build custom roles from the assignable permissions (ADR-0027 #5) and change the rights of
+ * system roles too (ADR-0163): a system role keeps its code and label and cannot be deleted, and
+ * its ticks are stored as differences from the code's set, so they survive every boot.
  */
 @Injectable()
 export class RolesService {
@@ -56,6 +69,8 @@ export class RolesService {
         isSystem: roles.isSystem,
         permissions: sql<string[]>`ARRAY(SELECT rp.permission_code FROM role_permissions rp
           WHERE rp.role_id = ${roles.id} ORDER BY rp.permission_code)`,
+        customized: sql<boolean>`EXISTS (SELECT 1 FROM role_permission_overrides o
+          WHERE o.role_id = ${roles.id})`,
         userCount: sql<number>`(SELECT count(*)::int FROM user_roles ur WHERE ur.role_id = ${roles.id})`,
       })
       .from(roles)
@@ -88,17 +103,26 @@ export class RolesService {
   }
 
   async update(actor: AuthContext, id: number, patch: Partial<CustomRoleInput>): Promise<RoleView> {
-    const permissions =
-      patch.permissions === undefined ? undefined : this.assignable(patch.permissions);
     return inTransaction(this.db, async (tx) => {
-      const before = await this.lockCustom(tx, id);
+      const before = await this.lock(tx, id);
+      const system = before.code !== null && isSystemRole(before.code) ? before.code : null;
+      if (system && patch.name !== undefined) {
+        // A system role is labelled by its code everywhere (the staff form's hint, the app).
+        throw invalid('name', 'systemRole', 'a system role keeps its name');
+      }
       if (patch.name !== undefined) {
         await tx
           .update(roles)
           .set({ name: patch.name.trim(), updatedAt: sql`now()` })
           .where(eq(roles.id, id));
       }
-      if (permissions) await this.replacePermissions(tx, id, permissions);
+      if (patch.permissions !== undefined) {
+        if (system) {
+          await this.setSystemPermissions(tx, id, system, patch.permissions);
+        } else {
+          await this.replacePermissions(tx, id, this.assignable(patch.permissions));
+        }
+      }
       const after = await this.get(id, tx);
       await this.audit.record(tx, actor, {
         action: 'UPDATE',
@@ -141,29 +165,67 @@ export class RolesService {
     });
   }
 
-  /** Locks a custom role for change; system roles are read-only (409 ROLE_SYSTEM_READONLY). */
-  private async lockCustom(tx: Tx, id: number): Promise<RoleView> {
+  private async lock(tx: Tx, id: number): Promise<RoleView> {
     const [row] = await tx
-      .select({ id: roles.id, isSystem: roles.isSystem })
+      .select({ id: roles.id })
       .from(roles)
       .where(eq(roles.id, id))
       .for('update');
     if (!row) throw new AppError('NOT_FOUND', `role ${id} not found`, { id });
-    if (row.isSystem)
-      throw new AppError('ROLE_SYSTEM_READONLY', `role ${id} is a system role`, { id });
     return this.get(id, tx);
   }
 
-  private assignable(codes: string[]): Permission[] {
+  /** Locks a role to delete it; a system role stays (409 ROLE_SYSTEM_READONLY). */
+  private async lockCustom(tx: Tx, id: number): Promise<RoleView> {
+    const role = await this.lock(tx, id);
+    if (role.isSystem)
+      throw new AppError('ROLE_SYSTEM_READONLY', `role ${id} is a system role`, { id });
+    return role;
+  }
+
+  /**
+   * The ticks on a system role (ADR-0163): the rights it holds now, and the differences from the
+   * code's set the boot sync rebuilds them from. The admin-only codes stay with ADMIN, which
+   * cannot lose what keeps this screen reachable (#3).
+   */
+  private async setSystemPermissions(
+    tx: Tx,
+    id: number,
+    role: SystemRole,
+    codes: string[],
+  ): Promise<void> {
+    const permissions = role === 'ADMIN' ? this.known(codes) : this.assignable(codes);
+    if (role === 'ADMIN') {
+      const missing = ADMIN_LOCKED_PERMISSIONS.find((code) => !permissions.includes(code));
+      if (missing) throw invalid('permissions', 'adminLocked', `ADMIN keeps ${missing}`);
+    }
+    await this.replacePermissions(tx, id, permissions);
+    await tx.delete(rolePermissionOverrides).where(eq(rolePermissionOverrides.roleId, id));
+    const overrides = systemRoleOverrides(role, permissions);
+    if (overrides.length) {
+      await tx
+        .insert(rolePermissionOverrides)
+        .values(overrides.map((override) => ({ roleId: id, ...override })));
+    }
+  }
+
+  private known(codes: string[]): Permission[] {
     const unique = [...new Set(codes)];
     for (const code of unique) {
       if (!isPermission(code))
         throw invalid('permissions', 'isPermission', `unknown permission ${code}`);
+    }
+    return unique as Permission[];
+  }
+
+  private assignable(codes: string[]): Permission[] {
+    const unique = this.known(codes);
+    for (const code of unique) {
       if (!isAssignablePermission(code)) {
         throw invalid('permissions', 'isAssignable', `${code} is reserved for the ADMIN role`);
       }
     }
-    return unique as Permission[];
+    return unique;
   }
 
   private async replacePermissions(tx: Tx, roleId: number, codes: Permission[]): Promise<void> {
