@@ -97,11 +97,7 @@ export const ebarimtCheckEntries = pgTable(
     /** «Төрөл» as printed. */
     kind: text('kind'),
   },
-  (t) => [
-    index('ebarimt_check_entries_file_idx').on(t.ebarimtFileId, t.rowNo),
-    index('ebarimt_check_entries_ttd_idx').on(t.ebarimtFileId, t.ttd),
-    index('ebarimt_check_entries_key_idx').on(t.ebarimtFileId, t.receiptKey),
-  ],
+  (t) => [index('ebarimt_check_entries_file_idx').on(t.ebarimtFileId, t.rowNo)],
 );
 
 /** What people wrote for a supplier's month: the amount exempt from VAT and a note. */
@@ -230,7 +226,7 @@ export const ebarimtCheckHistory = pgTable(
     check('ebarimt_check_history_field', sql`${t.field} IN ('EMPLOYEE', 'EBARIMT', 'EXEMPT')`),
     check(
       'ebarimt_check_history_kind',
-      sql`${t.kind} IN ('INIT', 'FILE', 'MANUAL', 'REVERT', 'LINK', 'UNLINK', 'EDIT')`,
+      sql`${t.kind} IN ('INIT', 'FILE', 'MANUAL', 'REVERT', 'LINK', 'UNLINK', 'EDIT', 'REMOVE')`,
     ),
   ],
 );

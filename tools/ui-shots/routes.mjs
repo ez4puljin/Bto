@@ -123,6 +123,7 @@ export const ROUTES = [
   { area: 'partners', name: 'supplier', path: '/partners/suppliers/{supplier}' },
   { area: 'partners', name: 'supplier-new', path: '/partners/suppliers/new' },
 
+  { area: 'finance', name: 'ebarimt-check', path: '/finance/ebarimt' },
   { area: 'finance', name: 'invoices', path: '/finance/invoices' },
   {
     area: 'finance',

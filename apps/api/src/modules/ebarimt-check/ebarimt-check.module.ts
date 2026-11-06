@@ -13,8 +13,8 @@ import { EbarimtSettingsService } from './services/ebarimt-settings.service';
 
 /**
  * «Ebarimt» (docs/modules/ebarimt-check.md, ADR-0168): a month's purchases from the posted goods
- * receipts against e-Barimt's file, by supplier. It only reads the other modules and nobody imports
- * it; it posts nothing and moves no stock or money.
+ * receipts against e-Barimt's file, by supplier. It reads the other modules and attaches its file
+ * through identity's storage; nobody imports it, and it posts nothing and moves no stock or money.
  */
 @Module({
   imports: [IdentityModule, PartnersModule, InventoryModule, ProcurementModule],

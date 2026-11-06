@@ -10,10 +10,19 @@ import { formatMnt } from '@/lib/money';
 
 const TOLERANCE = new Decimal(EBARIMT_DIFF_TOLERANCE);
 
+/** A plain button's keyboard ring (docs/ui.md §8), drawn inside: a table cell clips what is outside. */
+export const FOCUS_RING =
+  'outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring';
+
 /** An amount in the table: whole tugriks read easier, nothing reads as a dash. */
 export function amountText(value: string): string {
   const amount = new Decimal(value);
   return amount.isZero() ? '—' : formatMnt(amount.toDecimalPlaces(0).toFixed(0));
+}
+
+/** More than the tolerance reads as an amount, as the differences do. */
+export function hasAmount(value: string): boolean {
+  return new Decimal(value).abs().greaterThan(TOLERANCE);
 }
 
 export type DiffState = 'missing' | 'ok' | 'over';
@@ -23,6 +32,15 @@ export function diffStateOf(value: string): DiffState {
   if (diff.greaterThan(TOLERANCE)) return 'missing';
   if (diff.lessThan(TOLERANCE.negated())) return 'over';
   return 'ok';
+}
+
+/**
+ * A name in a narrow cell: people go by their given name, which stands last, so «А Б» reads «А.Б» with
+ * the first word as its initial. The whole name stays in the cell's title.
+ */
+export function shortName(name: string): string {
+  const [first, second, ...rest] = name.trim().split(/\s+/);
+  return first && second && rest.length === 0 ? `${first.charAt(0)}.${second}` : name;
 }
 
 /** «3-р сар» within the year looked at, «2025/12» outside it. */

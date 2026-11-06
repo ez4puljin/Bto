@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   type EbarimtHistoryField,
   type EbarimtHistoryKind,
+  normalizeTaxId,
   periodDays,
   periodOfDate,
 } from '@tugeel/shared/ebarimt-check';
@@ -20,6 +21,7 @@ import {
   type EbarimtLinkRow,
   EbarimtDataService,
   type EbarimtSupplier,
+  OrdererTimeline,
   registerOwners,
 } from './ebarimt-data.service';
 import { EbarimtHistoryService } from './ebarimt-history.service';
@@ -31,6 +33,8 @@ export interface EbarimtPeriodValues {
   period: number;
   purchaseAmount: Decimal;
   receiptCount: number;
+  /** Of those, how many wait for their price check: the amount is the delivery note's for now. */
+  pendingCount: number;
   ebarimtAmount: Decimal;
   ebarimtCount: number;
   exemptAmount: Decimal;
@@ -76,6 +80,7 @@ export interface EbarimtReportRow {
   employeeMonths: EbarimtEmployeeMonths[];
   purchaseAmount: Decimal;
   receiptCount: number;
+  pendingCount: number;
   ebarimtAmount: Decimal;
   ebarimtCount: number;
   linkedAmount: Decimal;
@@ -137,7 +142,9 @@ export interface EbarimtReceiptBrief {
   lineCount: number;
   warehouses: string;
   note: string | null;
-  amount: Decimal;
+  /** Null: posted with neither prices nor the delivery note's total. */
+  amount: Decimal | null;
+  createdByName: string | null;
 }
 
 export interface EbarimtEntryView {
@@ -188,7 +195,7 @@ export class EbarimtReportService {
       return { periods, noFile: [], rows: [], unregistered: [], links: [], accountCodes: [] };
     }
     const asked = new Set(periods);
-    const [counted, suppliers, files, links, monthValues, assignments, orderers, history, posted] =
+    const [counted, suppliers, files, links, monthValues, assignments, changes, history, posted] =
       await Promise.all([
         this.settings.counted(),
         this.data.suppliersWithProfiles(),
@@ -203,25 +210,30 @@ export class EbarimtReportService {
           .from(ebarimtCheckAssignments)
           .where(and(lte(ebarimtCheckAssignments.period, last)))
           .orderBy(asc(ebarimtCheckAssignments.period)),
-        this.orderers.allUserIds(),
+        this.orderers.changes(),
         this.history.ofPeriods(periods, this.db),
         this.receipts.postedBetween(periodDays(first).from, periodDays(last).to),
       ]);
     const entries = await this.data.entriesOf([...files.values()].map((file) => file.id));
     const fileOfEntry = new Map([...files.values()].map((file) => [file.id, file.period]));
     const owners = registerOwners(suppliers);
+    const orderers = new OrdererTimeline(changes);
 
     // Receipts: only months asked for (the span between two chosen months may hold others) and
     // only the accounts that count.
-    const purchases = new Map<string, { amount: Decimal; count: number }>();
+    const purchases = new Map<string, { amount: Decimal; count: number; pending: number }>();
     for (const receipt of posted) {
       const period = periodOfDate(receipt.day);
       if (period === null || !asked.has(period)) continue;
       const code = receipt.counterAccountCode ?? counted.defaultCode;
       if (code === null || !counted.codes.has(code)) continue;
       const key = `${period}:${receipt.supplierId}`;
-      const sum = purchases.get(key) ?? { amount: ZERO, count: 0 };
-      purchases.set(key, { amount: sum.amount.plus(receipt.netAmount), count: sum.count + 1 });
+      const sum = purchases.get(key) ?? { amount: ZERO, count: 0, pending: 0 };
+      purchases.set(key, {
+        amount: sum.amount.plus(receipt.netAmount ?? ZERO),
+        count: sum.count + 1,
+        pending: sum.pending + (receipt.costingStatus === 'PENDING' ? 1 : 0),
+      });
     }
 
     // e-Barimt, month by month: a link belongs to its month.
@@ -259,7 +271,7 @@ export class EbarimtReportService {
       else choicesOf.set(choice.supplierId, [choice]);
     }
     const employeeAt = (supplierId: number, period: number): number | null => {
-      const orderer = orderers.get(supplierId) ?? null;
+      const orderer = orderers.at(supplierId, period);
       let userId = orderer;
       for (const choice of choicesOf.get(supplierId) ?? []) {
         if (choice.period > period) break;
@@ -270,7 +282,7 @@ export class EbarimtReportService {
 
     const names = await this.userNames.namesOf([
       ...new Set([
-        ...orderers.values(),
+        ...changes.flatMap((row) => (row.userId === null ? [] : [row.userId])),
         ...assignments.flatMap((row) => (row.userId === null ? [] : [row.userId])),
         ...history.flatMap((row) => [row.userId, row.changedBy].flatMap((id) => id ?? [])),
         ...links.flatMap((row) => (row.createdBy === null ? [] : [row.createdBy])),
@@ -287,7 +299,7 @@ export class EbarimtReportService {
     }
     for (const row of history) {
       const count = eventCount.get(`${row.period}:${row.supplierId}:${row.field}`) ?? 0;
-      if (row.field === 'EBARIMT' && count < 2) continue;
+      if (row.field === 'EBARIMT' && row.kind === 'INIT' && count < 2) continue;
       const list = historyOf.get(row.supplierId) ?? [];
       list.push({
         period: row.period,
@@ -312,6 +324,7 @@ export class EbarimtReportService {
           period,
           purchaseAmount: purchase?.amount ?? ZERO,
           receiptCount: purchase?.count ?? 0,
+          pendingCount: purchase?.pending ?? 0,
           ebarimtAmount: total?.amount ?? ZERO,
           ebarimtCount: total?.count ?? 0,
           exemptAmount: value?.exemptAmount ?? ZERO,
@@ -335,7 +348,7 @@ export class EbarimtReportService {
         ZERO,
       );
       const employeeUserId = employeeAt(supplier.id, last);
-      const orderer = orderers.get(supplier.id) ?? null;
+      const orderer = orderers.at(supplier.id, last);
       rows.push({
         supplierId: supplier.id,
         code: supplier.code,
@@ -356,6 +369,7 @@ export class EbarimtReportService {
         employeeMonths: this.employeeMonths(supplier, periods, employeeAt, nameOf),
         purchaseAmount,
         receiptCount: byPeriod.reduce((count, values) => count + values.receiptCount, 0),
+        pendingCount: byPeriod.reduce((count, values) => count + values.pendingCount, 0),
         ebarimtAmount,
         ebarimtCount: byPeriod.reduce((count, values) => count + values.ebarimtCount, 0),
         linkedAmount,
@@ -388,9 +402,11 @@ export class EbarimtReportService {
 
     const supplierOf = new Map(suppliers.map((supplier) => [supplier.id, supplier]));
     const linkViews: EbarimtLinkView[] = links.map((link) => {
-      const entry = (entriesByPeriod.get(link.period) ?? []).find(
+      // A key can stand on several lines of a file, and the supplier's figure counts them all.
+      const lines = (entriesByPeriod.get(link.period) ?? []).filter(
         (row) => row.receiptKey === link.receiptKey,
       );
+      const entry = lines[0];
       const supplier = supplierOf.get(link.supplierId);
       return {
         period: link.period,
@@ -399,7 +415,7 @@ export class EbarimtReportService {
         partnerName: entry?.partnerName ?? null,
         deliveryNoteNo: entry?.deliveryNoteNo ?? null,
         docDate: entry?.docDate ?? null,
-        amount: entry?.totalAmount ?? link.amount,
+        amount: entry ? lines.reduce((sum, row) => sum.plus(row.totalAmount), ZERO) : link.amount,
         supplierId: link.supplierId,
         supplierCode: supplier?.code ?? '',
         supplierName: supplier?.name ?? '',
@@ -460,6 +476,9 @@ export class EbarimtReportService {
     ]);
     const optionOf = new Map(options.map((option) => [option.code, option]));
     const defaultCode = options.find((option) => option.isDefault)?.code ?? null;
+    const names = await this.userNames.namesOf(
+      posted.flatMap((receipt) => (receipt.createdBy === null ? [] : [receipt.createdBy])),
+    );
     const rows: EbarimtReceiptBrief[] = [];
     for (const receipt of posted) {
       const period = periodOfDate(receipt.day);
@@ -480,6 +499,7 @@ export class EbarimtReportService {
         warehouses: receipt.warehouses,
         note: receipt.note,
         amount: receipt.netAmount,
+        createdByName: receipt.createdBy === null ? null : (names.get(receipt.createdBy) ?? null),
       });
     }
     return rows;
@@ -501,7 +521,11 @@ export class EbarimtReportService {
         ? null
         : (suppliers.find((row) => row.id === target.supplierId) ?? null);
     if (target.supplierId !== undefined && !supplier) throw notFound('supplier', target.supplierId);
-    const registers = supplier ? supplier.registerList : target.ttd ? [target.ttd] : [];
+    const registers = supplier
+      ? supplier.registerList
+      : target.ttd
+        ? [normalizeTaxId(target.ttd)]
+        : [];
     const wanted = new Set(registers);
     const entries = await this.data.entriesOf([...files.values()].map((file) => file.id));
     const periodOfFile = new Map([...files.values()].map((file) => [file.id, file.period]));

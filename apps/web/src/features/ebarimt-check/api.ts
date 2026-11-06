@@ -1,22 +1,24 @@
 import { type components, idempotencyKey } from '@tugeel/api-client';
+import { periodYear } from '@tugeel/shared/ebarimt-check';
 import { XLSX_CONTENT_TYPE } from '@tugeel/shared/files';
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Decimal } from '@tugeel/shared/money';
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { useApiClient } from '@/app/api-client-context';
 import { unwrap } from '@/lib/problem';
 import { uploadFile } from '@/lib/upload';
 
-export type EbarimtReport = components['schemas']['EbarimtReportDto'];
+type EbarimtReport = components['schemas']['EbarimtReportDto'];
 export type EbarimtRow = components['schemas']['EbarimtReportRowDto'];
 export type EbarimtHistoryEvent = components['schemas']['EbarimtHistoryEventDto'];
 export type EbarimtUnregistered = components['schemas']['EbarimtUnregisteredRowDto'];
 export type EbarimtLink = components['schemas']['EbarimtLinkViewDto'];
-export type EbarimtReceipt = components['schemas']['EbarimtReceiptBriefDto'];
 export type EbarimtEntry = components['schemas']['EbarimtEntryViewDto'];
 export type EbarimtMonth = components['schemas']['EbarimtMonthDto'];
-export type EbarimtAccount = components['schemas']['EbarimtAccountOptionDto'];
 
 const KEYS = {
   all: ['ebarimt-check'] as const,
+  reports: ['ebarimt-check', 'report'] as const,
   report: (periods: readonly number[]) => ['ebarimt-check', 'report', periods.join(',')] as const,
   receipts: (periods: readonly number[], supplierId: number) =>
     ['ebarimt-check', 'receipts', periods.join(','), supplierId] as const,
@@ -31,12 +33,23 @@ export interface EntriesTarget {
   ttd?: string;
 }
 
-export function useEbarimtReport(periods: readonly number[]) {
+/**
+ * The report of these months. A month's rows never stand in for another's, since a cell under the
+ * wrong month could be typed into, nor a year's for another's; months of a year chosen one by one
+ * keep the last choice's rows until the next arrive, because nothing there is typed month by month.
+ */
+export function useEbarimtReport(periods: readonly number[], year: number) {
   const api = useApiClient();
-  return useQuery({
+  return useQuery<EbarimtReport>({
     queryKey: KEYS.report(periods),
     enabled: periods.length > 0,
-    placeholderData: keepPreviousData,
+    placeholderData: (previous) =>
+      periods.length > 1 &&
+      previous &&
+      previous.periods.length > 1 &&
+      periodYear(previous.periods[previous.periods.length - 1] as number) === year
+        ? previous
+        : undefined,
     queryFn: async ({ signal }) =>
       unwrap(
         await api.GET('/api/v1/ebarimt-check/report', {
@@ -75,11 +88,11 @@ export function useEbarimtEntries(periods: readonly number[], target: EntriesTar
   });
 }
 
+/** Last December and the year's months: another year's never stand in for them. */
 export function useEbarimtFiles(year: number) {
   const api = useApiClient();
   return useQuery({
     queryKey: KEYS.files(year),
-    placeholderData: keepPreviousData,
     queryFn: async ({ signal }) =>
       unwrap(
         await api.GET('/api/v1/ebarimt-check/files', {
@@ -90,14 +103,71 @@ export function useEbarimtFiles(year: number) {
   });
 }
 
-export function useEbarimtSettings(enabled: boolean) {
+export function useEbarimtSettings() {
   const api = useApiClient();
   return useQuery({
     queryKey: KEYS.settings,
-    enabled,
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/v1/ebarimt-check/settings', { signal })),
   });
+}
+
+/** Everything the page shows, read again; a query that is switched off sends nothing. */
+export function useEbarimtRefresh() {
+  const queryClient = useQueryClient();
+  return useCallback(
+    () => void queryClient.invalidateQueries({ queryKey: KEYS.all }),
+    [queryClient],
+  );
+}
+
+type Reports = [readonly unknown[], EbarimtReport | undefined][];
+
+/** Writes a supplier's row into every report held, so a saved cell shows at once. */
+function patchRow(
+  client: QueryClient,
+  supplierId: number,
+  patch: (row: EbarimtRow) => EbarimtRow,
+): Reports {
+  const held = client.getQueriesData<EbarimtReport>({ queryKey: KEYS.reports });
+  for (const [key, report] of held) {
+    if (!report) continue;
+    client.setQueryData<EbarimtReport>(key, {
+      ...report,
+      rows: report.rows.map((row) => (row.supplierId === supplierId ? patch(row) : row)),
+    });
+  }
+  return held;
+}
+
+function restore(client: QueryClient, held: Reports | undefined) {
+  for (const [key, report] of held ?? []) client.setQueryData(key, report);
+}
+
+/** A month's exempt amount or note in a row of that month, the difference following. */
+function withMonthValue(
+  row: EbarimtRow,
+  value: { period: number; exemptAmount?: string; note?: string | null },
+): EbarimtRow {
+  if (!row.byPeriod.some((month) => month.period === value.period)) return row;
+  const byPeriod = row.byPeriod.map((month) =>
+    month.period !== value.period
+      ? month
+      : {
+          ...month,
+          ...(value.exemptAmount === undefined
+            ? {}
+            : { exemptAmount: new Decimal(value.exemptAmount).toFixed(2) }),
+          ...(value.note === undefined ? {} : { note: value.note }),
+        },
+  );
+  const exempt = byPeriod.reduce((sum, month) => sum.plus(month.exemptAmount), new Decimal(0));
+  return {
+    ...row,
+    byPeriod,
+    exemptAmount: exempt.toFixed(2),
+    diffAmount: new Decimal(row.purchaseAmount).minus(row.ebarimtAmount).minus(exempt).toFixed(2),
+  };
 }
 
 /** Everything the page writes; each change reloads what it can move. */
@@ -150,9 +220,16 @@ export function useEbarimtMutations() {
         period: number;
         supplierId: number;
         exemptAmount?: string;
+        previousExemptAmount?: string;
         note?: string | null;
+        previousNote?: string | null;
       }) => unwrap(await api.PUT('/api/v1/ebarimt-check/month-values', { body })),
-      onSuccess: changed,
+      onMutate: async (body) => {
+        await queryClient.cancelQueries({ queryKey: KEYS.reports });
+        return { held: patchRow(queryClient, body.supplierId, (row) => withMonthValue(row, body)) };
+      },
+      onError: (_error, _body, context) => restore(queryClient, context?.held),
+      onSettled: changed,
     }),
     saveProfile: useMutation({
       mutationFn: async ({
@@ -161,8 +238,11 @@ export function useEbarimtMutations() {
       }: {
         supplierId: number;
         registers?: string | null;
+        previousRegisters?: string;
         phone?: string | null;
+        previousPhone?: string;
         remark?: string | null;
+        previousRemark?: string;
       }) =>
         unwrap(
           await api.PUT('/api/v1/ebarimt-check/suppliers/{id}/profile', {
@@ -170,7 +250,21 @@ export function useEbarimtMutations() {
             body,
           }),
         ),
-      onSuccess: changed,
+      onMutate: async ({ supplierId, registers, phone, remark }) => {
+        await queryClient.cancelQueries({ queryKey: KEYS.reports });
+        return {
+          held: patchRow(queryClient, supplierId, (row) => ({
+            ...row,
+            ...(registers === undefined
+              ? {}
+              : { registers: registers ?? row.registersDefault ?? row.registers }),
+            ...(phone === undefined ? {} : { phone: phone ?? row.phoneDefault ?? row.phone }),
+            ...(remark === undefined ? {} : { remark: remark ?? '' }),
+          })),
+        };
+      },
+      onError: (_error, _body, context) => restore(queryClient, context?.held),
+      onSettled: changed,
     }),
     assign: useMutation({
       mutationFn: async (body: { period: number; supplierIds: number[]; userId: number | null }) =>

@@ -89,6 +89,12 @@ export class EbarimtFilesService {
     const sheet = await readEbarimtSheet(body);
     const result = await inTransaction(this.db, async (tx) => {
       await this.storage.confirm(tx, input.fileId, KIND);
+      // A month that ever held a file has had its first reading, even if it matched nobody.
+      const [earlier] = await tx
+        .select({ id: ebarimtCheckFiles.id })
+        .from(ebarimtCheckFiles)
+        .where(eq(ebarimtCheckFiles.period, sheet.period))
+        .limit(1);
       const [previous] = await tx
         .select()
         .from(ebarimtCheckFiles)
@@ -124,7 +130,13 @@ export class EbarimtFilesService {
               .map((row) => ({ ...row, ebarimtFileId: file.id })),
           );
       }
-      await this.history.syncEbarimt(tx, ctx, sheet.period, 'FILE', input.fileName);
+      await this.history.syncEbarimt(
+        tx,
+        ctx,
+        sheet.period,
+        earlier ? 'FILE' : 'INIT',
+        input.fileName,
+      );
       await this.audit.record(tx, ctx, {
         action: previous ? 'UPDATE' : 'CREATE',
         entity: 'ebarimt_check_files',
@@ -156,7 +168,7 @@ export class EbarimtFilesService {
         .update(ebarimtCheckFiles)
         .set({ status: 'REMOVED', closedBy: actorUserId(ctx), closedAt: new Date() })
         .where(eq(ebarimtCheckFiles.id, file.id));
-      await this.history.syncEbarimt(tx, ctx, period, 'FILE', file.fileName);
+      await this.history.syncEbarimt(tx, ctx, period, 'REMOVE', file.fileName);
       await this.audit.record(tx, ctx, {
         action: 'DELETE',
         entity: 'ebarimt_check_files',

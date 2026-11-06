@@ -78881,6 +78881,9 @@
           "receiptCount": {
             "type": "number"
           },
+          "pendingCount": {
+            "type": "number"
+          },
           "ebarimtAmount": {
             "type": "string"
           },
@@ -78899,6 +78902,7 @@
           "period",
           "purchaseAmount",
           "receiptCount",
+          "pendingCount",
           "ebarimtAmount",
           "ebarimtCount",
           "exemptAmount",
@@ -78922,7 +78926,8 @@
           "REVERT",
           "LINK",
           "UNLINK",
-          "EDIT"
+          "EDIT",
+          "REMOVE"
         ]
       },
       "EbarimtHistoryEventDto": {
@@ -79041,6 +79046,9 @@
           "receiptCount": {
             "type": "number"
           },
+          "pendingCount": {
+            "type": "number"
+          },
           "ebarimtAmount": {
             "type": "string"
           },
@@ -79087,6 +79095,7 @@
           "employeeMonths",
           "purchaseAmount",
           "receiptCount",
+          "pendingCount",
           "ebarimtAmount",
           "ebarimtCount",
           "linkedAmount",
@@ -79283,7 +79292,12 @@
             "nullable": true
           },
           "amount": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -79299,7 +79313,8 @@
           "lineCount",
           "warehouses",
           "note",
-          "amount"
+          "amount",
+          "createdByName"
         ]
       },
       "EbarimtReceiptListDto": {
@@ -79652,14 +79667,23 @@
           },
           "exemptAmount": {
             "type": "string",
-            "pattern": "^\\d{1,12}(\\.\\d{1,2})?$",
-            "example": "626673.00",
+            "example": "12500.00",
             "description": "Exempt from VAT, up to 2 decimals"
+          },
+          "previousExemptAmount": {
+            "type": "string",
+            "description": "The amount the cell showed, wanted with exemptAmount: a change since is a conflict"
           },
           "note": {
             "type": "string",
             "nullable": true,
             "maxLength": 500
+          },
+          "previousNote": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500,
+            "description": "The note the cell showed, wanted with note: a change since is a conflict"
           }
         },
         "required": [
@@ -79714,16 +79738,28 @@
             "maxLength": 200,
             "description": "null: the record’s"
           },
+          "previousRegisters": {
+            "type": "string",
+            "description": "What the cell showed, wanted with registers"
+          },
           "phone": {
             "type": "string",
             "nullable": true,
             "maxLength": 60,
             "description": "null: the record’s"
           },
+          "previousPhone": {
+            "type": "string",
+            "description": "What the cell showed, wanted with phone"
+          },
           "remark": {
             "type": "string",
             "nullable": true,
             "maxLength": 300
+          },
+          "previousRemark": {
+            "type": "string",
+            "description": "What the cell showed, wanted with remark"
           }
         }
       },
@@ -79912,6 +79948,8 @@
           "EBARIMT_FILE_EMPTY",
           "EBARIMT_FILE_ROW",
           "EBARIMT_FILE_MONTHS",
+          "EBARIMT_FILE_LIMIT",
+          "EBARIMT_CELL_CONFLICT",
           "PICK_INCOMPLETE",
           "PICK_TAKEN",
           "PICK_STATE_INVALID",

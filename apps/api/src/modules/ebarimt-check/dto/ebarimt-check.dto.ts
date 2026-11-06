@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  EBARIMT_AMOUNT_PATTERN,
   EBARIMT_HISTORY_FIELDS,
   EBARIMT_HISTORY_KINDS,
   EBARIMT_LIMITS,
@@ -22,6 +23,7 @@ import {
   Min,
   MinLength,
   registerDecorator,
+  ValidateIf,
   type ValidationOptions,
 } from 'class-validator';
 
@@ -142,6 +144,7 @@ export class EbarimtPeriodValuesDto {
   @ApiProperty() period!: number;
   @ApiProperty() purchaseAmount!: string;
   @ApiProperty() receiptCount!: number;
+  @ApiProperty() pendingCount!: number;
   @ApiProperty() ebarimtAmount!: string;
   @ApiProperty() ebarimtCount!: number;
   @ApiProperty() exemptAmount!: string;
@@ -185,6 +188,7 @@ export class EbarimtReportRowDto {
   @ApiProperty({ type: [EbarimtEmployeeMonthsDto] }) employeeMonths!: EbarimtEmployeeMonthsDto[];
   @ApiProperty() purchaseAmount!: string;
   @ApiProperty() receiptCount!: number;
+  @ApiProperty() pendingCount!: number;
   @ApiProperty() ebarimtAmount!: string;
   @ApiProperty() ebarimtCount!: number;
   @ApiProperty() linkedAmount!: string;
@@ -240,7 +244,8 @@ export class EbarimtReceiptBriefDto {
   @ApiProperty() lineCount!: number;
   @ApiProperty() warehouses!: string;
   @ApiProperty({ type: String, nullable: true }) note!: string | null;
-  @ApiProperty() amount!: string;
+  @ApiProperty({ type: String, nullable: true }) amount!: string | null;
+  @ApiProperty({ type: String, nullable: true }) createdByName!: string | null;
 }
 
 export class EbarimtReceiptListDto {
@@ -280,16 +285,36 @@ export class EbarimtMonthValueRequestDto {
   @ApiProperty() @IsPeriod() period!: number;
   @ApiProperty() @IsInt() @IsPositive() supplierId!: number;
 
-  @ApiPropertyOptional({ example: '626673.00', description: 'Exempt from VAT, up to 2 decimals' })
-  @IsOptional()
-  @Matches(/^\d{1,12}(\.\d{1,2})?$/)
+  @ApiPropertyOptional({ example: '12500.00', description: 'Exempt from VAT, up to 2 decimals' })
+  @ValidateIf((_, value) => value !== undefined)
+  @Matches(EBARIMT_AMOUNT_PATTERN)
   exemptAmount?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'The amount the cell showed, wanted with exemptAmount: a change since is a conflict',
+  })
+  @ValidateIf((body: EbarimtMonthValueRequestDto) => body.exemptAmount !== undefined)
+  @Matches(EBARIMT_AMOUNT_PATTERN)
+  previousExemptAmount?: string;
 
   @ApiPropertyOptional({ type: String, nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(EBARIMT_LIMITS.maxNote)
   note?: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'The note the cell showed, wanted with note: a change since is a conflict',
+  })
+  @ValidateIf(
+    (body: EbarimtMonthValueRequestDto) => body.note !== undefined && body.previousNote !== null,
+  )
+  @IsString()
+  @MaxLength(EBARIMT_LIMITS.maxNote)
+  previousNote?: string | null;
 }
 
 export class EbarimtAssignRequestDto {
@@ -304,7 +329,7 @@ export class EbarimtAssignRequestDto {
   supplierIds!: number[];
 
   @ApiProperty({ type: Number, nullable: true, description: 'null: back to the own orderer' })
-  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
   @IsInt()
   @IsPositive()
   userId!: number | null;
@@ -321,17 +346,32 @@ export class EbarimtProfileRequestDto {
   @MaxLength(EBARIMT_LIMITS.maxRegisters)
   registers?: string | null;
 
+  @ApiPropertyOptional({ description: 'What the cell showed, wanted with registers' })
+  @ValidateIf((body: EbarimtProfileRequestDto) => body.registers !== undefined)
+  @IsString()
+  previousRegisters?: string;
+
   @ApiPropertyOptional({ type: String, nullable: true, description: 'null: the record’s' })
   @IsOptional()
   @IsString()
   @MaxLength(EBARIMT_LIMITS.maxPhone)
   phone?: string | null;
 
+  @ApiPropertyOptional({ description: 'What the cell showed, wanted with phone' })
+  @ValidateIf((body: EbarimtProfileRequestDto) => body.phone !== undefined)
+  @IsString()
+  previousPhone?: string;
+
   @ApiPropertyOptional({ type: String, nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(EBARIMT_LIMITS.maxRemark)
   remark?: string | null;
+
+  @ApiPropertyOptional({ description: 'What the cell showed, wanted with remark' })
+  @ValidateIf((body: EbarimtProfileRequestDto) => body.remark !== undefined)
+  @IsString()
+  previousRemark?: string;
 }
 
 export class EbarimtLinkRequestDto {
@@ -346,7 +386,7 @@ export class EbarimtLinkRequestDto {
   receiptKeys!: string[];
 
   @ApiProperty({ type: Number, nullable: true, description: 'null: undoes the links' })
-  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
   @IsInt()
   @IsPositive()
   supplierId!: number | null;

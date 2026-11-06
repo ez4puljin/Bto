@@ -79,6 +79,7 @@ export {
   purchaseOrderLoads,
   purchaseOrders,
   purchaseOrderSuppliers,
+  supplierOrdererHistory,
   supplierOrderers,
   trucks,
 } from '../modules/procurement/schema';

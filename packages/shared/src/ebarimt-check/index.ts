@@ -20,14 +20,17 @@ export const EBARIMT_LIMITS = {
   maxReceiptKeys: 2_000,
 } as const;
 
-/** A difference smaller than this reads as none: half a tugrik, as the delivery notes round. */
+/** A difference of this or less reads as none: half a tugrik, as the delivery notes round. */
 export const EBARIMT_DIFF_TOLERANCE = '0.5';
+
+/** An amount typed on the page: not negative, at most two decimals. */
+export const EBARIMT_AMOUNT_PATTERN = /^\d{1,12}(\.\d{1,2})?$/;
 
 /** The history of a supplier's month: which value changed. */
 export const EBARIMT_HISTORY_FIELDS = ['EMPLOYEE', 'EBARIMT', 'EXEMPT'] as const;
 export type EbarimtHistoryField = (typeof EBARIMT_HISTORY_FIELDS)[number];
 
-/** Why it changed: first seen, a new file, by hand, a link taken or undone, a register edited. */
+/** Why it changed: first seen, a new file, by hand, a link taken or undone, a register edited, a file taken away. */
 export const EBARIMT_HISTORY_KINDS = [
   'INIT',
   'FILE',
@@ -36,11 +39,11 @@ export const EBARIMT_HISTORY_KINDS = [
   'LINK',
   'UNLINK',
   'EDIT',
+  'REMOVE',
 ] as const;
 export type EbarimtHistoryKind = (typeof EBARIMT_HISTORY_KINDS)[number];
 
 export const EBARIMT_FILE_STATUSES = ['ACTIVE', 'REPLACED', 'REMOVED'] as const;
-export type EbarimtFileStatus = (typeof EBARIMT_FILE_STATUSES)[number];
 
 export function periodOf(year: number, month: number): number {
   return year * 100 + month;

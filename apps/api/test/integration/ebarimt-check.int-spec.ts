@@ -1,4 +1,5 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { previousPeriod } from '@tugeel/shared/ebarimt-check';
 import { XLSX_CONTENT_TYPE } from '@tugeel/shared/files';
 import { businessDate } from '@tugeel/shared/time';
 import ExcelJS from 'exceljs';
@@ -30,6 +31,7 @@ interface RowJson {
   employeeMonths: { userId: number | null; periods: number[] }[];
   purchaseAmount: string;
   receiptCount: number;
+  pendingCount: number;
   ebarimtAmount: string;
   ebarimtCount: number;
   linkedAmount: string;
@@ -160,12 +162,26 @@ describe('ebarimt check', () => {
       .send({ fileId, fileName: 'EBARIMT.xlsx' })
       .expect(status);
   };
-  /** A posted receipt of a supplier on a day; `costed` runs the accountant's price check. */
+  /** The kinds and amounts of a row's e-Barimt history, in order. */
+  const ebarimtHistory = (row: RowJson) =>
+    row.history
+      .filter((event) => event.field === 'EBARIMT')
+      .map((event) => [event.kind, event.amount]);
+  const setOrderer = (supplierId: number, userId: number | null) =>
+    http()
+      .put(`/api/v1/procurement/supplier-orderers/${supplierId}`)
+      .set(bearer(admin))
+      .send({ userId })
+      .expect(200);
+  /**
+   * A posted receipt of a supplier on a day; `noteAmount`: the delivery note's total when it differs
+   * from what was typed; `costed` runs the accountant's price check.
+   */
   const receipt = async (
     supplierId: number,
     day: string,
     price: string,
-    options: { counterAccountCode?: string; costed?: boolean } = {},
+    options: { counterAccountCode?: string; costed?: boolean; noteAmount?: string } = {},
   ) => {
     const draft = (
       await http()
@@ -181,7 +197,12 @@ describe('ebarimt check', () => {
         })
         .expect(201)
     ).body as { id: number };
-    await postReceipt(app, admin, draft.id);
+    await postReceipt(
+      app,
+      admin,
+      draft.id,
+      options.noteAmount ? { amount: options.noteAmount } : {},
+    );
     if (options.costed) await costReceiptAsTyped(app, admin, draft.id);
     return draft.id;
   };
@@ -193,9 +214,10 @@ describe('ebarimt check', () => {
     admin = (await login(app, adminUser)).accessToken;
     accountant = (await login(app, await seedUser(app, { roles: ['ACCOUNTANT'] }))).accessToken;
     keeper = (await login(app, await seedUser(app, { roles: ['WAREHOUSE'] }))).accessToken;
-    const staff = await seedUser(app, { roles: ['OFFICE'] });
-    const staffTwo = await seedUser(app, { roles: ['OFFICE'] });
-    reader = (await login(app, staff)).accessToken;
+    // An orderer holds the right to type a purchase order's quantities.
+    const staff = await seedUser(app, { roles: ['PROCUREMENT'] });
+    const staffTwo = await seedUser(app, { roles: ['PROCUREMENT'] });
+    reader = (await login(app, await seedUser(app, { roles: ['OFFICE'] }))).accessToken;
     staffId = staff.id;
     staffTwoId = staffTwo.id;
     const partners = partnersApi(app, admin);
@@ -244,6 +266,7 @@ describe('ebarimt check', () => {
     expect(march).toMatchObject({
       purchaseAmount: '57000.00',
       receiptCount: 2,
+      pendingCount: 1,
       ebarimtAmount: '0.00',
       diffAmount: '57000.00',
     });
@@ -253,13 +276,54 @@ describe('ebarimt check', () => {
         .query({ periods: '202603', supplierId: alpha })
         .set(bearer(admin))
         .expect(200)
-    ).body as { data: { id: number; amount: string; counted: boolean; pricePending: boolean }[] };
+    ).body as {
+      data: {
+        id: number;
+        amount: string;
+        counted: boolean;
+        pricePending: boolean;
+        createdByName: string | null;
+      }[];
+    };
     expect(brief.data.map((row) => row.amount).sort()).toEqual(['50000.00', '7000.00']);
+    expect(brief.data.every((row) => row.createdByName)).toBe(true);
     expect(brief.data.find((row) => row.id === id)).toMatchObject({
       counted: true,
       pricePending: false,
     });
     expect(brief.data.find((row) => row.id !== id)?.pricePending).toBe(true);
+  });
+
+  it('counts a receipt before its price check at the delivery note’s total, and says so', async () => {
+    const delta = (await partnersApi(app, admin).supplier({ name: 'Дельта ЕБ' })).id;
+    const id = await receipt(delta, '2026-06-10', '3000', { noteAmount: '2500.00' });
+    const before = rowOf(await report([202606]), delta);
+    expect(before).toMatchObject({
+      purchaseAmount: '2500.00',
+      receiptCount: 1,
+      pendingCount: 1,
+    });
+    const brief = async () =>
+      (
+        await http()
+          .get('/api/v1/ebarimt-check/receipts')
+          .query({ periods: '202606', supplierId: delta })
+          .set(bearer(admin))
+          .expect(200)
+      ).body as { data: { amount: string; pricePending: boolean }[] };
+    expect((await brief()).data).toEqual([
+      expect.objectContaining({ amount: '2500.00', pricePending: true }),
+    ]);
+
+    // The price check settles it at the payable.
+    await costReceiptAsTyped(app, admin, id, { noteTotalAmount: '3000.00' });
+    expect(rowOf(await report([202606]), delta)).toMatchObject({
+      purchaseAmount: '3000.00',
+      pendingCount: 0,
+    });
+    expect((await brief()).data).toEqual([
+      expect.objectContaining({ amount: '3000.00', pricePending: false }),
+    ]);
   });
 
   it('counts only the accounts the settings name', async () => {
@@ -450,12 +514,12 @@ describe('ebarimt check', () => {
     await http()
       .put('/api/v1/ebarimt-check/month-values')
       .set(bearer(accountant))
-      .send({ period: 202603, supplierId: alpha, exemptAmount: '2000' })
+      .send({ period: 202603, supplierId: alpha, exemptAmount: '2000', previousExemptAmount: '0' })
       .expect(204);
     await http()
       .put('/api/v1/ebarimt-check/month-values')
       .set(bearer(accountant))
-      .send({ period: 202603, supplierId: alpha, note: 'Ярьсан' })
+      .send({ period: 202603, supplierId: alpha, note: 'Ярьсан', previousNote: null })
       .expect(204);
     const row = rowOf(await report([202603]), alpha);
     expect(row).toMatchObject({ exemptAmount: '2000.00', diffAmount: '0.00' });
@@ -465,12 +529,28 @@ describe('ebarimt check', () => {
     await http()
       .put('/api/v1/ebarimt-check/month-values')
       .set(bearer(accountant))
-      .send({ period: 202603, supplierId: alpha, exemptAmount: '-5' })
+      .send({ period: 202603, supplierId: alpha, exemptAmount: '-5', previousExemptAmount: '2000' })
       .expect(422);
     await http()
       .put('/api/v1/ebarimt-check/month-values')
       .set(bearer(accountant))
-      .send({ period: 202613, supplierId: alpha, note: 'x' })
+      .send({ period: 202613, supplierId: alpha, note: 'x', previousNote: null })
+      .expect(422);
+    await http()
+      .put('/api/v1/ebarimt-check/month-values')
+      .set(bearer(accountant))
+      .send({
+        period: 202603,
+        supplierId: alpha,
+        exemptAmount: '1000000000000',
+        previousExemptAmount: '2000',
+      })
+      .expect(422);
+    // An amount cleared is zero, never a null that would wipe it by accident.
+    await http()
+      .put('/api/v1/ebarimt-check/month-values')
+      .set(bearer(accountant))
+      .send({ period: 202603, supplierId: alpha, exemptAmount: null, previousExemptAmount: '2000' })
       .expect(422);
   });
 
@@ -478,7 +558,14 @@ describe('ebarimt check', () => {
     await http()
       .put(`/api/v1/ebarimt-check/suppliers/${gamma}/profile`)
       .set(bearer(accountant))
-      .send({ registers: '7000003; 7999999', phone: '99112233', remark: 'Шивнэ' })
+      .send({
+        registers: '7000003; 7999999',
+        previousRegisters: '',
+        phone: '99112233',
+        previousPhone: '',
+        remark: 'Шивнэ',
+        previousRemark: '',
+      })
       .expect(204);
     const march = await report([202603]);
     expect(rowOf(march, gamma)).toMatchObject({
@@ -488,6 +575,8 @@ describe('ebarimt check', () => {
       remark: 'Шивнэ',
       ebarimtAmount: '5500.00',
     });
+    // A total rising from nothing is a change to read, not a first reading to hide.
+    expect(ebarimtHistory(rowOf(march, gamma))).toEqual([['EDIT', '5500.00']]);
     expect(march.unregistered).toEqual([]);
     const record = await sql.query<{ reg_no: string | null; phone: string | null }>(
       'SELECT reg_no, phone FROM suppliers WHERE id = $1',
@@ -498,7 +587,7 @@ describe('ebarimt check', () => {
     await http()
       .put(`/api/v1/ebarimt-check/suppliers/${gamma}/profile`)
       .set(bearer(accountant))
-      .send({ registers: null })
+      .send({ registers: null, previousRegisters: '7000003; 7999999' })
       .expect(204);
     const after = await report([202603]);
     expect(rowOf(after, gamma)).toMatchObject({
@@ -514,7 +603,7 @@ describe('ebarimt check', () => {
     await http()
       .put(`/api/v1/ebarimt-check/suppliers/${gamma}/profile`)
       .set(bearer(accountant))
-      .send({ registers: '7000002' })
+      .send({ registers: '7000002', previousRegisters: '' })
       .expect(204);
     const march = await report([202603]);
     expect(rowOf(march, gamma)).toMatchObject({
@@ -528,7 +617,7 @@ describe('ebarimt check', () => {
     await http()
       .put(`/api/v1/ebarimt-check/suppliers/${gamma}/profile`)
       .set(bearer(accountant))
-      .send({ registers: null })
+      .send({ registers: null, previousRegisters: '7000002' })
       .expect(204);
   });
 
@@ -541,6 +630,15 @@ describe('ebarimt check', () => {
         .expect(200)
     ).body as { rows: { receiptKey: string; link: unknown }[] };
     expect(entries.rows.map((row) => row.receiptKey)).toEqual(['DDTD-D']);
+    // However the register was written, it is the same one.
+    const padded = (
+      await http()
+        .get('/api/v1/ebarimt-check/entries')
+        .query({ periods: '202603', ttd: '007999999' })
+        .set(bearer(admin))
+        .expect(200)
+    ).body as { rows: { receiptKey: string }[] };
+    expect(padded.rows.map((row) => row.receiptKey)).toEqual(['DDTD-D']);
 
     const linked = (
       await http()
@@ -555,6 +653,7 @@ describe('ebarimt check', () => {
       ebarimtAmount: '5500.00',
       linkedAmount: '5500.00',
     });
+    expect(ebarimtHistory(rowOf(march, gamma)).at(-1)).toEqual(['LINK', '5500.00']);
     expect(march.unregistered).toEqual([]);
     expect(march.links).toEqual([
       expect.objectContaining({ receiptKey: 'DDTD-D', supplierId: gamma, stale: false }),
@@ -564,7 +663,7 @@ describe('ebarimt check', () => {
     await http()
       .put(`/api/v1/ebarimt-check/suppliers/${beta}/profile`)
       .set(bearer(accountant))
-      .send({ registers: '7000002;7999999' })
+      .send({ registers: '7000002;7999999', previousRegisters: '7000002' })
       .expect(204);
     const both = await report([202603]);
     expect(rowOf(both, beta).ebarimtAmount).toBe('11000.00');
@@ -572,7 +671,7 @@ describe('ebarimt check', () => {
     await http()
       .put(`/api/v1/ebarimt-check/suppliers/${beta}/profile`)
       .set(bearer(accountant))
-      .send({ registers: null })
+      .send({ registers: null, previousRegisters: '7000002;7999999' })
       .expect(204);
 
     await http()
@@ -622,11 +721,7 @@ describe('ebarimt check', () => {
   });
 
   it('gives a supplier to another employee from a month on, never touching its own orderer', async () => {
-    await sql.query(
-      `INSERT INTO supplier_orderers (supplier_id, user_id) VALUES ($1, $2)
-       ON CONFLICT (supplier_id) DO UPDATE SET user_id = EXCLUDED.user_id`,
-      [alpha, staffId],
-    );
+    await setOrderer(alpha, staffId);
     // By default: the supplier's own, in every month.
     expect(rowOf(await report([202603]), alpha)).toMatchObject({
       employeeUserId: staffId,
@@ -690,6 +785,221 @@ describe('ebarimt check', () => {
         .history.filter((event) => event.field === 'EMPLOYEE')
         .map((event) => event.kind),
     ).toEqual(['MANUAL']);
+    // A choice carries forward: the months after it show where it came from.
+    expect(
+      rowOf(await report([202604]), alpha)
+        .history.filter((event) => event.field === 'EMPLOYEE')
+        .map((event) => event.period),
+    ).toEqual([202603]);
+    expect(
+      rowOf(await report([202605]), alpha)
+        .history.filter((event) => event.field === 'EMPLOYEE')
+        .map((event) => [event.period, event.kind]),
+    ).toEqual([
+      [202603, 'MANUAL'],
+      [202605, 'REVERT'],
+    ]);
+  });
+
+  it('keeps a past month’s employee when the supplier’s own orderer changes', async () => {
+    const delta = (await partnersApi(app, admin).supplier({ name: 'Эпсилон ЕБ' })).id;
+    const previous = previousPeriod(thisPeriod);
+    await setOrderer(delta, staffId);
+    // Named again: nothing changed, nothing to note.
+    await setOrderer(delta, staffId);
+    await setOrderer(delta, staffTwoId);
+
+    // This month has the new one; before the changes the first one stands.
+    expect(rowOf(await report([thisPeriod]), delta)).toMatchObject({
+      employeeUserId: staffTwoId,
+      employeeAssigned: false,
+    });
+    expect(rowOf(await report([previous]), delta)).toMatchObject({
+      employeeUserId: staffId,
+      employeeAssigned: false,
+    });
+    const range = rowOf(await report([previous, thisPeriod]), delta);
+    expect(range.employeeMonths).toHaveLength(2);
+    expect(range.employeeMonths).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ userId: staffId, periods: [previous] }),
+        expect.objectContaining({ userId: staffTwoId, periods: [thisPeriod] }),
+      ]),
+    );
+
+    const noted = await sql.query<{ user_id: string | null }>(
+      'SELECT user_id FROM supplier_orderer_history WHERE supplier_id = $1 ORDER BY id',
+      [delta],
+    );
+    expect(noted.rows.map((row) => Number.parseInt(row.user_id ?? '', 10))).toEqual([
+      staffId,
+      staffTwoId,
+    ]);
+
+    // Taken away: this month nobody, the past as it was.
+    await setOrderer(delta, null);
+    expect(rowOf(await report([thisPeriod]), delta).employeeUserId).toBeNull();
+    expect(rowOf(await report([previous]), delta).employeeUserId).toBe(staffId);
+  });
+
+  it('links every line of a receipt that stands twice in the file', async () => {
+    await importFile(
+      await exportOf([
+        {
+          ddtd: 'DUP-1',
+          note: '701',
+          date: '2026-07-02',
+          name: 'Давхар',
+          ttd: '7999998',
+          total: 1000,
+        },
+        {
+          ddtd: 'DUP-1',
+          note: '701',
+          date: '2026-07-02',
+          name: 'Давхар',
+          ttd: '7999998',
+          total: 2500,
+        },
+      ]),
+    );
+    const july = await report([202607]);
+    expect(july.unregistered).toEqual([
+      expect.objectContaining({ ttd: '7999998', amount: '3500.00', count: 2 }),
+    ]);
+    await http()
+      .put('/api/v1/ebarimt-check/receipt-links')
+      .set(bearer(accountant))
+      .send({ period: 202607, receiptKeys: ['DUP-1'], supplierId: beta })
+      .expect(200);
+    const linked = await report([202607]);
+    expect(linked.links).toEqual([
+      expect.objectContaining({ receiptKey: 'DUP-1', amount: '3500.00' }),
+    ]);
+    expect(rowOf(linked, beta)).toMatchObject({
+      ebarimtAmount: '3500.00',
+      linkedAmount: '3500.00',
+    });
+    expect(linked.unregistered).toEqual([]);
+
+    // A colleague's link is undone first, never taken over.
+    const taken = (
+      await http()
+        .put('/api/v1/ebarimt-check/receipt-links')
+        .set(bearer(accountant))
+        .send({ period: 202607, receiptKeys: ['DUP-1'], supplierId: gamma })
+        .expect(200)
+    ).body as { linked: number; skipped: number };
+    expect(taken).toMatchObject({ linked: 0, skipped: 1 });
+    expect(rowOf(await report([202607]), beta).ebarimtAmount).toBe('3500.00');
+
+    await http()
+      .put('/api/v1/ebarimt-check/receipt-links')
+      .set(bearer(accountant))
+      .send({ period: 202607, receiptKeys: ['DUP-1'], supplierId: null })
+      .expect(200);
+    expect(rowOf(await report([202607]), beta).ebarimtAmount).toBe('0.00');
+  });
+
+  it('reads a later file as a change, though the month’s first matched nobody', async () => {
+    await importFile(
+      await exportOf([
+        {
+          ddtd: 'SEP-1',
+          note: '901',
+          date: '2026-09-02',
+          name: 'Бусад',
+          ttd: '7999997',
+          total: 700,
+        },
+      ]),
+    );
+    await importFile(
+      await exportOf([
+        {
+          ddtd: 'SEP-2',
+          note: '902',
+          date: '2026-09-03',
+          name: 'Альфа',
+          ttd: '7000001',
+          total: 900,
+        },
+      ]),
+    );
+    expect(ebarimtHistory(rowOf(await report([202609]), alpha))).toEqual([['FILE', '900.00']]);
+  });
+
+  it('keeps its logs from being rewritten', async () => {
+    for (const table of ['supplier_orderer_history', 'ebarimt_check_history']) {
+      await expect(sql.query(`DELETE FROM ${table}`)).rejects.toMatchObject({ code: '42501' });
+      await expect(sql.query(`UPDATE ${table} SET changed_by = NULL`)).rejects.toMatchObject({
+        code: '42501',
+      });
+    }
+  });
+
+  it('tells who writes a cell second, keeping what the first wrote', async () => {
+    const zeta = (await partnersApi(app, admin).supplier({ name: 'Зета ЕБ' })).id;
+    const month = (body: Record<string, unknown>) =>
+      http()
+        .put('/api/v1/ebarimt-check/month-values')
+        .set(bearer(accountant))
+        .send({ period: 202608, supplierId: zeta, ...body });
+    const profile = (body: Record<string, unknown>) =>
+      http()
+        .put(`/api/v1/ebarimt-check/suppliers/${zeta}/profile`)
+        .set(bearer(accountant))
+        .send(body);
+
+    // Two people at one empty cell, at once: one lands, the other is told what is there now.
+    const both = await Promise.all([
+      month({ exemptAmount: '100', previousExemptAmount: '0' }),
+      month({ exemptAmount: '200', previousExemptAmount: '0' }),
+    ]);
+    expect(both.map((answer) => answer.status).sort()).toEqual([204, 409]);
+    const told = both.find((answer) => answer.status === 409)?.body as {
+      code: string;
+      params: { value: string };
+    };
+    const row = rowOf(await report([202608]), zeta);
+    expect(told.code).toBe('EBARIMT_CELL_CONFLICT');
+    expect(told.params.value).toBe(row.exemptAmount);
+    expect(row.history.filter((event) => event.field === 'EXEMPT')).toHaveLength(1);
+
+    // The same month's other cell is not in the way, and has its own turn.
+    await month({ note: 'Эхнийх', previousNote: null }).expect(204);
+    const lateNote = await month({ note: 'Хоёр дахь', previousNote: null }).expect(409);
+    expect(lateNote.body).toMatchObject({ params: { value: 'Эхнийх' } });
+    expect(rowOf(await report([202608]), zeta).byPeriod[0]?.note).toBe('Эхнийх');
+    await month({ note: 'Хоёр дахь', previousNote: 'Эхнийх' }).expect(204);
+
+    await profile({ phone: '88001122', previousPhone: '' }).expect(204);
+    const lateIn = await profile({ phone: '88003344', previousPhone: '' }).expect(409);
+    expect(lateIn.body).toMatchObject({
+      code: 'EBARIMT_CELL_CONFLICT',
+      params: { value: '88001122' },
+    });
+    expect(rowOf(await report([202608]), zeta).phone).toBe('88001122');
+
+    // A write that does not say what it replaces is not taken.
+    await month({ exemptAmount: '5' }).expect(422);
+    await month({ note: 'x' }).expect(422);
+    await profile({ phone: '1' }).expect(422);
+    await profile({ remark: 'x' }).expect(422);
+    await profile({ registers: '1' }).expect(422);
+  });
+
+  it('wants the value a write is about', async () => {
+    await http()
+      .put('/api/v1/ebarimt-check/assignments')
+      .set(bearer(admin))
+      .send({ period: 202603, supplierIds: [alpha] })
+      .expect(422);
+    await http()
+      .put('/api/v1/ebarimt-check/receipt-links')
+      .set(bearer(accountant))
+      .send({ period: 202603, receiptKeys: ['DDTD-D'] })
+      .expect(422);
   });
 
   it('adds months up in a consolidated view, each month’s figures beside', async () => {
@@ -745,6 +1055,10 @@ describe('ebarimt check', () => {
     const after = await report([202604]);
     expect(after.noFile).toEqual([202604]);
     expect(rowOf(after, alpha).ebarimtAmount).toBe('0.00');
+    expect(ebarimtHistory(rowOf(after, alpha))).toEqual([
+      ['INIT', '1000.00'],
+      ['REMOVE', '0.00'],
+    ]);
     await http().delete('/api/v1/ebarimt-check/files/202604').set(bearer(accountant)).expect(404);
     const kept = await sql.query<{ status: string }>(
       'SELECT status FROM ebarimt_check_files WHERE period = 202604',
@@ -792,7 +1106,7 @@ describe('ebarimt check', () => {
     await http()
       .put('/api/v1/ebarimt-check/month-values')
       .set(bearer(buyer))
-      .send({ period, supplierId: alpha, note: 'Ярьсан' })
+      .send({ period, supplierId: alpha, note: 'Ярьсан', previousNote: null })
       .expect(204);
     await http()
       .put('/api/v1/ebarimt-check/settings')

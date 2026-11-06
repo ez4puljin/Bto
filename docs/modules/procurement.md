@@ -10,7 +10,7 @@ The work is walked by the owner on the development environment only; no real bus
 - API: `apps/api/src/modules/procurement/`; the statuses, column groups, history kinds and box arithmetic in `packages/shared/src/procurement`.
 - Web: `apps/web/src/features/procurement/` (`orders-pages.tsx` the list, the create dialog and the print; `order-detail-page.tsx`, `order-table.tsx`, `order-header.tsx`, `order-edits.ts` the detail page; `order-history-page.tsx`). The keeper's scanner screen and the receipt window belong to inventory (`apps/web/src/features/inventory/receipt-receive-page.tsx`, `receipt-form.tsx`).
 
-**Dependencies.** procurement depends on `identity`, `partners`, `catalog` and `inventory`, each through its `index.ts` (MODULE_DEPS). Nothing imports procurement: inventory declares the `RECEIPT_PROGRESS` hook and procurement binds it. Counts and prices typed on the order page go through inventory's own services (`ReceiptsService.countLineInTx`, `PUT /receipts/:id/costs`); the history reads identity's `AuditQueryService`.
+**Dependencies.** procurement depends on `identity`, `partners`, `catalog` and `inventory`, each through its `index.ts` (MODULE_DEPS). Only `ebarimt-check` imports procurement, for `SupplierOrderersService.changes` (ADR-0170); inventory declares the `RECEIPT_PROGRESS` hook and procurement binds it. Counts and prices typed on the order page go through inventory's own services (`ReceiptsService.countLineInTx`, `PUT /receipts/:id/costs`); the history reads identity's `AuditQueryService`.
 
 ## 1. Owner's answers behind the design
 
@@ -34,6 +34,7 @@ The scope is in `docs/workflows.md` §4 (slice 1, four question rounds of 2026-1
 | `purchase_order_suppliers` | A supplier inside an order: `status`, `receipt_id` (the draft or posted goods receipt from «Ирсэн» on) and `status_changed_at/by`. | (order, supplier) unique; `receipt_id` unique; CHECK `receipt_id IS NOT NULL ⇔ status ∈ {ARRIVED, ACCOUNTING, RECEIVED}`; deleted only by `removeSupplier` in «Бэлдэж» |
 | `purchase_order_lines` | An ordered product: `product_unit_id`, `qty`, `factor_snapshot`, `qty_base`, `shipped_qty` (in the line's unit; NULL until typed, 0 = not shipped), `updated_by/at`. | (order supplier, product) unique; qty > 0 (a zero deletes the row); `shipped_qty IS NULL OR ≥ 0` |
 | `supplier_orderers` | The orderer of a supplier, by user. | Primary key on the supplier; index on the user |
+| `supplier_orderer_history` | Every change of a supplier's orderer with its date (ADR-0170, migration `0086_ebarimt_review`); user NULL: none. Those standing at the migration are its first rows, dated 2000-01-01. Append-only: role app holds no UPDATE or DELETE (`0087_ebarimt_history_guard`). | Index on supplier, date, id |
 | `trucks` | A company truck (ADR-0121): `name`, `plate`, `capacity_kg`, `is_active`. Kept by managers on «Машинууд» (`/procurement/trucks`, ADR-0122) and from the order's «Шинэ машин…» dialog; a deactivated truck keeps its name on the loads it carries. | Name unique and 1–80; plate NULL or 1–20; capacity NULL or > 0 |
 | `purchase_order_loads` | A truck named on an order (ADR-0121): `order_id`, `truck_id`, `note`, `created_by`. Removing one deletes its load lines (what rode on it is unassigned again). | (order, truck) unique; note NULL or 1–300 |
 | `purchase_order_load_lines` | A quantity of one order line on one load (ADR-0122), in the line's own unit: `load_id`, `line_id`, `qty`, `created_by`. The sum over a line's loads never exceeds its ordered quantity (checked by `OrderLoadsService.setLines`, `PO_LOAD_OVER`). | (load, line) unique; qty > 0; index on the line |
@@ -49,8 +50,9 @@ Inventory's side of the same migrations is listed in `docs/modules/inventory.md`
 |---|---|
 | `ProcurementModule` | The services below. Binds inventory's `RECEIPT_PROGRESS` to `OrderProgressService`, so a supplier follows its receipt in the receipt's transaction. |
 | `ProcurementHttpModule` | The controllers (api only). |
+| `SupplierOrderersService`, `SupplierOrdererChange` | `changes`, for `ebarimt-check` (ADR-0170). |
 
-Services (not exported beyond the module):
+Services (the rest are not exported beyond the module):
 
 **`PurchaseOrdersService`**
 - `create`, `update` (the note), `addSuppliers`, `removeSupplier`;
@@ -69,7 +71,7 @@ Services (not exported beyond the module):
 - `list`: the order's history over the audit rows; `workbook`: the same as one sheet.
 
 **`SupplierOrderersService`**
-- `get`, `candidates` (active holders of `procurement.orders.edit`), `set`.
+- `get`, `candidates` (active holders of `procurement.orders.edit`), `set` (notes a change in `supplier_orderer_history`), `changes` (every change, oldest first; read by `ebarimt-check`).
 
 **`OrderProgressService`**
 - ARRIVED → ACCOUNTING on `receiptPostedInTx`; ACCOUNTING → RECEIVED on `receiptCostedInTx`.

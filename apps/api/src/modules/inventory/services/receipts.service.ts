@@ -320,8 +320,12 @@ export interface PostedReceiptFact {
   lineCount: number;
   warehouses: string;
   note: string | null;
-  /** The payable: the latest costing's, else the typed prices less the discount. */
-  netAmount: Decimal;
+  /**
+   * What the supplier is owed: the costing's payable; before the price check, the delivery note's
+   * total, else the typed prices less the discount; null when nothing says yet.
+   */
+  netAmount: Decimal | null;
+  createdBy: number | null;
 }
 
 export interface ReceiptQuery {
@@ -1621,7 +1625,8 @@ export class ReceiptsService implements OnModuleInit {
 
   /**
    * The posted receipts whose delivery note (else posting) falls in a span of days, each with what
-   * the supplier is owed, the same figures the receipts list shows (ADR-0168).
+   * the supplier is owed (ADR-0168). A receipt still waiting for its price check counts at its
+   * delivery note's total, which posting required (ADR-0170): the prices may not be typed yet.
    */
   async postedBetween(from: string, to: string, supplierId?: number): Promise<PostedReceiptFact[]> {
     const day = sql`coalesce(goods_receipts.supplier_doc_date, goods_receipts.effective_date)`;
@@ -1635,7 +1640,12 @@ export class ReceiptsService implements OnModuleInit {
         counterAccountCode: goodsReceipts.counterAccountCode,
         costingStatus: goodsReceipts.costingStatus,
         costingVersion: goodsReceipts.costingVersion,
+        noteTotalAmount: goodsReceipts.noteTotalAmount,
+        createdBy: goodsReceipts.createdBy,
         note: goodsReceipts.note,
+        typedTotal: sql<
+          string | null
+        >`(SELECT sum(l.doc_amount) FROM goods_receipt_lines l WHERE l.receipt_id = goods_receipts.id)`,
         lineCount: sql<string>`(SELECT count(*) FROM goods_receipt_lines l WHERE l.receipt_id = goods_receipts.id)`,
         warehouses: sql<
           string | null
@@ -1655,14 +1665,25 @@ export class ReceiptsService implements OnModuleInit {
       rows.filter((row) => row.costingVersion > 0).map((row) => row.id),
     );
     const typed = await this.typedPayables(
-      rows.filter((row) => row.costingVersion === 0).map((row) => row.id),
+      rows
+        .filter((row) => row.costingVersion === 0 && row.noteTotalAmount === null)
+        .map((row) => row.id),
     );
-    return rows.map(({ costingVersion, lineCount, warehouses, ...row }) => ({
-      ...row,
-      lineCount: Number.parseInt(lineCount, 10),
-      warehouses: warehouses ?? '',
-      netAmount: (costingVersion > 0 ? costed.get(row.id) : typed.get(row.id)) ?? new Decimal(0),
-    }));
+    return rows.map(
+      ({ costingVersion, lineCount, warehouses, noteTotalAmount, typedTotal, ...row }) => {
+        let netAmount: Decimal | null;
+        if (costingVersion > 0) netAmount = costed.get(row.id) ?? new Decimal(0);
+        else if (noteTotalAmount !== null) netAmount = noteTotalAmount;
+        else
+          netAmount = typedTotal === null ? null : (typed.get(row.id) ?? new Decimal(typedTotal));
+        return {
+          ...row,
+          lineCount: Number.parseInt(lineCount, 10),
+          warehouses: warehouses ?? '',
+          netAmount,
+        };
+      },
+    );
   }
 
   // -------------------------------------------------------------------------------------------

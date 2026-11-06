@@ -4,7 +4,7 @@ import { and, desc, eq, inArray, isNull, lte } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
-import { invalid, notFound } from '../../../common/errors/app-error';
+import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { actorUserId, type AuthContext, AuditService, UserNamesService } from '../../identity';
 import { SuppliersService } from '../../partners';
 import { SupplierOrderersService } from '../../procurement';
@@ -14,10 +14,19 @@ import {
   ebarimtCheckReceiptLinks,
   ebarimtCheckSupplierProfiles,
 } from '../schema';
-import { EbarimtDataService } from './ebarimt-data.service';
+import { EbarimtDataService, OrdererTimeline, registerOwners } from './ebarimt-data.service';
 import { EbarimtHistoryService } from './ebarimt-history.service';
 
-/** What the page writes, each cell on its own: two people at two cells never overwrite each other. */
+/** A colleague's change since the cell was read: reported, never written over. */
+const cellConflict = (value: string | null | undefined) =>
+  new AppError('EBARIMT_CELL_CONFLICT', 'a colleague changed this cell meanwhile', {
+    value: value || '—',
+  });
+
+/**
+ * What the page writes, each cell on its own and naming the value it replaces: two people, at two
+ * cells or at one, never overwrite each other (owner 2026-10-30, ADR-0118, ADR-0170).
+ */
 @Injectable()
 export class EbarimtEditsService {
   constructor(
@@ -33,48 +42,57 @@ export class EbarimtEditsService {
   /** A supplier's month: the amount exempt from VAT and/or the note. */
   async saveMonthValue(
     ctx: AuthContext,
-    input: { period: number; supplierId: number; exemptAmount?: Decimal; note?: string | null },
+    input: {
+      period: number;
+      supplierId: number;
+      exemptAmount?: Decimal;
+      previousExemptAmount?: Decimal;
+      note?: string | null;
+      previousNote?: string | null;
+    },
   ): Promise<void> {
     await this.assertSuppliers([input.supplierId]);
     const note = input.note === undefined ? undefined : input.note?.trim() || null;
     const amount = input.exemptAmount === undefined ? undefined : toMoney(input.exemptAmount);
+    const key = and(
+      eq(ebarimtCheckMonthValues.period, input.period),
+      eq(ebarimtCheckMonthValues.supplierId, input.supplierId),
+    );
     await inTransaction(this.db, async (tx) => {
-      const [before] = await tx
-        .select()
-        .from(ebarimtCheckMonthValues)
-        .where(
-          and(
-            eq(ebarimtCheckMonthValues.period, input.period),
-            eq(ebarimtCheckMonthValues.supplierId, input.supplierId),
-          ),
-        )
-        .for('update');
-      const changes = {
-        ...(amount === undefined ? {} : { exemptAmount: amount }),
-        ...(note === undefined ? {} : { note }),
-        updatedBy: actorUserId(ctx),
-        updatedAt: new Date(),
-      };
-      if (before) {
-        await tx
-          .update(ebarimtCheckMonthValues)
-          .set(changes)
-          .where(
-            and(
-              eq(ebarimtCheckMonthValues.period, input.period),
-              eq(ebarimtCheckMonthValues.supplierId, input.supplierId),
-            ),
-          );
-      } else {
-        await tx.insert(ebarimtCheckMonthValues).values({
+      // The row first: two people's first saves of one month then meet on its lock.
+      const created = await tx
+        .insert(ebarimtCheckMonthValues)
+        .values({
           period: input.period,
           supplierId: input.supplierId,
-          exemptAmount: amount ?? new Decimal(0),
-          note: note ?? null,
+          exemptAmount: new Decimal(0),
           updatedBy: actorUserId(ctx),
-        });
-      }
+        })
+        .onConflictDoNothing()
+        .returning({ period: ebarimtCheckMonthValues.period });
+      const isNew = created.length > 0;
+      const [before] = await tx.select().from(ebarimtCheckMonthValues).where(key).for('update');
       const was = before?.exemptAmount ?? new Decimal(0);
+      const wasNote = before?.note ?? null;
+      if (amount !== undefined && input.previousExemptAmount?.equals(was) === false) {
+        throw cellConflict(was.toFixed(2));
+      }
+      if (
+        note !== undefined &&
+        input.previousNote !== undefined &&
+        (input.previousNote?.trim() || null) !== wasNote
+      ) {
+        throw cellConflict(wasNote);
+      }
+      await tx
+        .update(ebarimtCheckMonthValues)
+        .set({
+          ...(amount === undefined ? {} : { exemptAmount: amount }),
+          ...(note === undefined ? {} : { note }),
+          updatedBy: actorUserId(ctx),
+          updatedAt: new Date(),
+        })
+        .where(key);
       if (amount !== undefined && !amount.equals(was)) {
         await this.history.record(tx, ctx, {
           period: input.period,
@@ -85,16 +103,16 @@ export class EbarimtEditsService {
         });
       }
       await this.audit.record(tx, ctx, {
-        action: before ? 'UPDATE' : 'CREATE',
+        action: isNew ? 'CREATE' : 'UPDATE',
         entity: 'ebarimt_check_month_values',
         entityId: input.supplierId,
-        before: before
-          ? { period: input.period, exemptAmount: was.toFixed(2), note: before.note }
-          : null,
+        before: isNew
+          ? null
+          : { period: input.period, exemptAmount: was.toFixed(2), note: wasNote },
         after: {
           period: input.period,
           exemptAmount: (amount ?? was).toFixed(2),
-          note: note === undefined ? (before?.note ?? null) : note,
+          note: note === undefined ? wasNote : note,
         },
       });
     });
@@ -115,7 +133,7 @@ export class EbarimtEditsService {
       const names = await this.userNames.namesOf([input.userId]);
       if (!names.has(input.userId)) throw invalid('userId', 'exists', 'no such staff member');
     }
-    const orderers = await this.orderers.allUserIds();
+    const orderers = new OrdererTimeline(await this.orderers.changes());
     return inTransaction(this.db, async (tx) => {
       let changed = 0;
       for (const supplierId of supplierIds) {
@@ -131,7 +149,7 @@ export class EbarimtEditsService {
           .orderBy(desc(ebarimtCheckAssignments.period))
           .limit(1)
           .for('update');
-        const orderer = orderers.get(supplierId) ?? null;
+        const orderer = orderers.at(supplierId, input.period);
         // Already theirs this month: nothing to write.
         if ((current?.userId ?? orderer) === (input.userId ?? orderer)) continue;
         await tx
@@ -168,13 +186,21 @@ export class EbarimtEditsService {
 
   /**
    * A supplier's values on this page (every month's): registers, phone, remark. Undefined leaves a
-   * value; null goes back to the record's. A new register moves e-Barimt's totals, which the history
-   * notes for every month holding a file.
+   * value; null goes back to the record's; `previous…` is what the cell showed, the record's value
+   * included. A new register moves e-Barimt's totals, which the history notes for every month holding
+   * a file.
    */
   async saveProfile(
     ctx: AuthContext,
     supplierId: number,
-    input: { registers?: string | null; phone?: string | null; remark?: string | null },
+    input: {
+      registers?: string | null;
+      previousRegisters?: string;
+      phone?: string | null;
+      previousPhone?: string;
+      remark?: string | null;
+      previousRemark?: string;
+    },
   ): Promise<void> {
     await this.assertSuppliers([supplierId]);
     const trim = (value: string | null | undefined) =>
@@ -183,33 +209,58 @@ export class EbarimtEditsService {
     const phone = trim(input.phone);
     const remark = trim(input.remark);
     const periods = registers === undefined ? [] : await this.data.allActivePeriods();
+    const key = eq(ebarimtCheckSupplierProfiles.supplierId, supplierId);
     await inTransaction(this.db, async (tx) => {
+      // The row first: two people's first saves of one supplier then meet on its lock.
+      const created = await tx
+        .insert(ebarimtCheckSupplierProfiles)
+        .values({ supplierId, updatedBy: actorUserId(ctx) })
+        .onConflictDoNothing()
+        .returning({ supplierId: ebarimtCheckSupplierProfiles.supplierId });
+      const isNew = created.length > 0;
       const [before] = await tx
         .select()
         .from(ebarimtCheckSupplierProfiles)
-        .where(eq(ebarimtCheckSupplierProfiles.supplierId, supplierId))
+        .where(key)
         .for('update');
-      const changes = {
-        ...(registers === undefined ? {} : { registers }),
-        ...(phone === undefined ? {} : { phone }),
-        ...(remark === undefined ? {} : { remark: remark || null }),
-        updatedBy: actorUserId(ctx),
-        updatedAt: new Date(),
-      };
+      const shown = (await this.data.suppliersWithProfiles(tx)).find(
+        (supplier) => supplier.id === supplierId,
+      );
+      const moved = (previous: string | undefined, now: string | undefined) =>
+        previous !== undefined && previous.trim() !== (now ?? '').trim();
+      if (registers !== undefined && moved(input.previousRegisters, shown?.registers)) {
+        throw cellConflict(shown?.registers);
+      }
+      if (phone !== undefined && moved(input.previousPhone, shown?.phone)) {
+        throw cellConflict(shown?.phone);
+      }
+      if (remark !== undefined && moved(input.previousRemark, shown?.remark)) {
+        throw cellConflict(shown?.remark);
+      }
       await tx
-        .insert(ebarimtCheckSupplierProfiles)
-        .values({ supplierId, ...changes })
-        .onConflictDoUpdate({ target: ebarimtCheckSupplierProfiles.supplierId, set: changes });
+        .update(ebarimtCheckSupplierProfiles)
+        .set({
+          ...(registers === undefined ? {} : { registers }),
+          ...(phone === undefined ? {} : { phone }),
+          ...(remark === undefined ? {} : { remark: remark || null }),
+          updatedBy: actorUserId(ctx),
+          updatedAt: new Date(),
+        })
+        .where(key);
       for (const period of periods) {
         await this.history.syncEbarimt(tx, ctx, period, 'EDIT', registers ?? null, [supplierId]);
       }
       await this.audit.record(tx, ctx, {
-        action: before ? 'UPDATE' : 'CREATE',
+        action: isNew ? 'CREATE' : 'UPDATE',
         entity: 'ebarimt_check_supplier_profiles',
         entityId: supplierId,
-        before: before
-          ? { registers: before.registers, phone: before.phone, remark: before.remark }
-          : null,
+        before: isNew
+          ? null
+          : {
+              registers: before?.registers ?? null,
+              phone: before?.phone ?? null,
+              remark: before?.remark ?? null,
+            },
         after: {
           registers: registers === undefined ? (before?.registers ?? null) : registers,
           phone: phone === undefined ? (before?.phone ?? null) : phone,
@@ -221,7 +272,8 @@ export class EbarimtEditsService {
 
   /**
    * Receipts of a month counted for a chosen supplier; `supplierId` null undoes them. A receipt must
-   * be in the month's file to be linked; undoing needs only its link.
+   * be in the month's file to be linked; undoing needs only its link. A receipt already counted for
+   * someone is undone first, never taken over: a colleague may have just linked it.
    */
   async linkReceipts(
     ctx: AuthContext,
@@ -232,7 +284,15 @@ export class EbarimtEditsService {
     const files = await this.data.activeFiles([input.period]);
     const file = files.get(input.period);
     const entries = file ? await this.data.entriesOf([file.id]) : [];
-    const entryOf = new Map(entries.map((entry) => [entry.receiptKey, entry]));
+    // A key can stand on several lines of a file: a link takes them all.
+    const entryOf = new Map<string, { ttd: string; amount: Decimal }>();
+    for (const entry of entries) {
+      const seen = entryOf.get(entry.receiptKey);
+      entryOf.set(entry.receiptKey, {
+        ttd: seen?.ttd ?? entry.ttd,
+        amount: (seen?.amount ?? new Decimal(0)).plus(entry.totalAmount),
+      });
+    }
     return inTransaction(this.db, async (tx) => {
       const existing = await tx
         .select()
@@ -250,45 +310,65 @@ export class EbarimtEditsService {
       let unlinked = 0;
       let skipped = 0;
       const ttds = new Set<string>();
+      const moved = new Set<number>();
       for (const receiptKey of receiptKeys) {
         const link = linkOf.get(receiptKey);
-        const entry = entryOf.get(receiptKey);
-        if (input.supplierId !== null && !entry) {
-          skipped += 1;
-          continue;
-        }
-        if (link && link.supplierId !== input.supplierId) {
+        if (input.supplierId === null) {
+          if (!link) {
+            skipped += 1;
+            continue;
+          }
           await tx
             .update(ebarimtCheckReceiptLinks)
             .set({ removedBy: actorUserId(ctx), removedAt: new Date() })
             .where(eq(ebarimtCheckReceiptLinks.id, link.id));
           ttds.add(link.ttd);
-          if (input.supplierId === null) unlinked += 1;
-        }
-        if (input.supplierId === null) {
-          if (!link) skipped += 1;
+          moved.add(link.supplierId);
+          unlinked += 1;
           continue;
         }
-        if (link?.supplierId === input.supplierId) continue;
-        await tx.insert(ebarimtCheckReceiptLinks).values({
-          period: input.period,
-          receiptKey,
-          supplierId: input.supplierId,
-          ttd: entry?.ttd ?? '',
-          amount: entry?.totalAmount ?? new Decimal(0),
-          createdBy: actorUserId(ctx),
-        });
-        ttds.add(entry?.ttd ?? '');
+        if (link) {
+          if (link.supplierId !== input.supplierId) skipped += 1;
+          continue;
+        }
+        const entry = entryOf.get(receiptKey);
+        if (!entry) {
+          skipped += 1;
+          continue;
+        }
+        // Two people's first links of one receipt: the one index holds them apart.
+        const inserted = await tx
+          .insert(ebarimtCheckReceiptLinks)
+          .values({
+            period: input.period,
+            receiptKey,
+            supplierId: input.supplierId,
+            ttd: entry.ttd,
+            amount: entry.amount,
+            createdBy: actorUserId(ctx),
+          })
+          .onConflictDoNothing()
+          .returning({ id: ebarimtCheckReceiptLinks.id });
+        if (inserted.length === 0) {
+          skipped += 1;
+          continue;
+        }
+        ttds.add(entry.ttd);
+        moved.add(input.supplierId);
         linked += 1;
       }
       if (linked + unlinked > 0) {
         const source = [...ttds].sort().join(', ').slice(0, 300);
+        // Only whom a link can move: its suppliers and those holding its registers.
+        const owners = registerOwners(await this.data.suppliersWithProfiles(tx));
+        for (const ttd of ttds) for (const holder of owners.get(ttd) ?? []) moved.add(holder);
         await this.history.syncEbarimt(
           tx,
           ctx,
           input.period,
           input.supplierId === null ? 'UNLINK' : 'LINK',
           source,
+          [...moved],
         );
       }
       await this.audit.record(tx, ctx, {

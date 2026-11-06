@@ -1,10 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { splitRegisters } from '@tugeel/shared/ebarimt-check';
+import { periodDays, splitRegisters } from '@tugeel/shared/ebarimt-check';
 import { Decimal } from '@tugeel/shared/money';
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { SuppliersService } from '../../partners';
+import type { SupplierOrdererChange } from '../../procurement';
 import {
   ebarimtCheckEntries,
   ebarimtCheckFiles,
@@ -49,6 +50,37 @@ export interface EbarimtUnregistered {
 export interface EbarimtAllocation {
   bySupplier: Map<number, EbarimtTotal>;
   unregistered: Map<string, EbarimtUnregistered>;
+}
+
+/**
+ * Who a supplier's own orderer was in a month (ADR-0170): the last change by the month's end, so a
+ * later change leaves the past alone. Before its first orderer a supplier had nobody, and that first
+ * one stands for those months too: nobody is wronged, and the list is not left empty.
+ */
+export class OrdererTimeline {
+  private readonly bySupplier = new Map<number, SupplierOrdererChange[]>();
+
+  /** `changes`: oldest first. */
+  constructor(changes: readonly SupplierOrdererChange[]) {
+    for (const change of changes) {
+      const list = this.bySupplier.get(change.supplierId);
+      if (list) list.push(change);
+      else this.bySupplier.set(change.supplierId, [change]);
+    }
+  }
+
+  at(supplierId: number, period: number): number | null {
+    const changes = this.bySupplier.get(supplierId);
+    const first = changes?.[0];
+    if (!changes || !first) return null;
+    const end = periodDays(period).to;
+    let held = first;
+    for (const change of changes) {
+      if (change.effectiveDate > end) break;
+      held = change;
+    }
+    return held.userId;
+  }
 }
 
 /** Who holds which register: a register may stand on several suppliers. */

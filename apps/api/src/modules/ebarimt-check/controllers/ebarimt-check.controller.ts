@@ -119,7 +119,12 @@ export class EbarimtCheckController {
   @ApiOkResponse({ type: EbarimtReceiptListDto })
   async receipts(@Query() query: EbarimtReceiptsQueryDto): Promise<EbarimtReceiptListDto> {
     const rows = await this.report.receiptsOf(query.periods, query.supplierId);
-    return { data: rows.map((row) => ({ ...row, amount: money(row.amount) })) };
+    return {
+      data: rows.map((row) => ({
+        ...row,
+        amount: row.amount === null ? null : money(row.amount),
+      })),
+    };
   }
 
   /** e-Barimt's lines behind a figure: a supplier's, or one register's. */
@@ -231,7 +236,12 @@ export class EbarimtCheckController {
       period: body.period,
       supplierId: body.supplierId,
       exemptAmount: body.exemptAmount === undefined ? undefined : new Decimal(body.exemptAmount),
+      previousExemptAmount:
+        body.previousExemptAmount === undefined
+          ? undefined
+          : new Decimal(body.previousExemptAmount),
       note: body.note,
+      previousNote: body.previousNote,
     });
   }
 
@@ -242,7 +252,7 @@ export class EbarimtCheckController {
     @CurrentUser() ctx: AuthContext,
     @Body() body: EbarimtAssignRequestDto,
   ): Promise<EbarimtAssignResultDto> {
-    return this.edits.assignEmployee(ctx, { ...body, userId: body.userId ?? null });
+    return this.edits.assignEmployee(ctx, body);
   }
 
   @Put('suppliers/:id/profile')
@@ -264,6 +274,6 @@ export class EbarimtCheckController {
     @CurrentUser() ctx: AuthContext,
     @Body() body: EbarimtLinkRequestDto,
   ): Promise<EbarimtLinkResultDto> {
-    return this.edits.linkReceipts(ctx, { ...body, supplierId: body.supplierId ?? null });
+    return this.edits.linkReceipts(ctx, body);
   }
 }

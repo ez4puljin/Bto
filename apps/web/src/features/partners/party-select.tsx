@@ -47,12 +47,23 @@ export function CustomerSelect(props: PartyProps<PickedCustomer>) {
 }
 
 /** The same for an active supplier. */
-export function SupplierSelect(props: PartyProps<PickedSupplier>) {
+export function SupplierSelect(
+  props: PartyProps<PickedSupplier> & {
+    /** Inactive suppliers too (a report that still lists them, ADR-0170). */
+    includeInactive?: boolean;
+    /** Enter takes a row at once: offer only rows of what is typed now, never the last search's. */
+    freshOnly?: boolean;
+  },
+) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const q = useDeferredValue(search.trim());
-  const suppliers = useSuppliers({ q, status: 'ACTIVE' }, { enabled: q !== '', limit: ROWS });
-  const rows = q === '' ? [] : (suppliers.data?.pages[0]?.data ?? []);
+  const suppliers = useSuppliers(
+    { q, status: props.includeInactive ? undefined : 'ACTIVE' },
+    { enabled: q !== '', limit: ROWS },
+  );
+  const stale = props.freshOnly === true && (q !== search.trim() || suppliers.isPlaceholderData);
+  const rows = q === '' || stale ? [] : (suppliers.data?.pages[0]?.data ?? []);
   return (
     <SearchSelect
       id={props.id}

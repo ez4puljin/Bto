@@ -1,13 +1,13 @@
 import mn from '@tugeel/shared/i18n/mn.json';
-import { screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { bodyOf, calls } from '@/test/inventory-fixtures';
-import { ADMIN_ME, json, renderApp, signedIn } from '@/test/render-app';
+import { ADMIN_ME, json, problem, renderApp, signedIn } from '@/test/render-app';
 
 const row = (over: Record<string, unknown>) => ({
   supplierId: 1,
-  code: '50188',
+  code: '90001',
   name: 'Альфа',
   status: 'ACTIVE',
   registers: '7000001',
@@ -17,12 +17,13 @@ const row = (over: Record<string, unknown>) => ({
   remark: '',
   sharedRegisters: [],
   employeeUserId: 7,
-  employeeName: 'Дэнсмаа',
-  ordererName: 'Дэнсмаа',
+  employeeName: 'Тестбат',
+  ordererName: 'Тестбат',
   employeeAssigned: false,
-  employeeMonths: [{ userId: 7, name: 'Дэнсмаа', periods: [202610] }],
+  employeeMonths: [{ userId: 7, name: 'Тестбат', periods: [202610] }],
   purchaseAmount: '1000.00',
   receiptCount: 1,
+  pendingCount: 0,
   ebarimtAmount: '400.00',
   ebarimtCount: 1,
   linkedAmount: '0.00',
@@ -33,6 +34,7 @@ const row = (over: Record<string, unknown>) => ({
       period: 202610,
       purchaseAmount: '1000.00',
       receiptCount: 1,
+      pendingCount: 0,
       ebarimtAmount: '400.00',
       ebarimtCount: 1,
       exemptAmount: '100.00',
@@ -55,7 +57,7 @@ const REPORT = {
     row({}),
     row({
       supplierId: 2,
-      code: '50474',
+      code: '90002',
       name: 'Бета',
       registers: '',
       employeeUserId: null,
@@ -87,6 +89,8 @@ const REPORT_ROUTES = {
 };
 
 describe('EbarimtPage', () => {
+  beforeEach(() => sessionStorage.clear());
+
   it('lists every supplier with the month’s figures from the system, and filters them', async () => {
     renderApp(PAGE, signedIn(ADMIN_ME, REPORT_ROUTES));
     const user = userEvent.setup();
@@ -100,7 +104,7 @@ describe('EbarimtPage', () => {
     expect(screen.queryByRole('link', { name: 'Бета' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Дутуутай \(1\)/ }));
 
-    await user.click(screen.getByRole('button', { name: /Дэнсмаа \(1\)/ }));
+    await user.click(screen.getByRole('button', { name: /Тестбат \(1\)/ }));
     expect(screen.queryByRole('link', { name: 'Бета' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Ажилтангүй \(1\)/ }));
     expect(await screen.findByRole('link', { name: 'Бета' })).toBeInTheDocument();
@@ -127,13 +131,14 @@ describe('EbarimtPage', () => {
               warehouses: 'Бөөний',
               note: null,
               amount: '1000.00',
+              createdByName: 'Нярав',
             },
           ],
         }),
     });
     renderApp(PAGE, fetchMock);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: /Альфа: 1 орлогын баримт/ }));
+    await user.click(await screen.findByRole('button', { name: /Альфа: орлого 1,000, 1 баримт/ }));
     const dialog = await screen.findByRole('dialog');
     const link = await within(dialog).findByRole('link', { name: /GR-2026-000042/ });
     expect(link).toHaveAttribute('href', '/inventory/receipts/42');
@@ -149,7 +154,9 @@ describe('EbarimtPage', () => {
     });
     renderApp(PAGE, fetchMock);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Альфа: НӨАТ чөлөөлөгдөх дүн' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Альфа: НӨАТ чөлөөлөгдөх дүн: 100' }),
+    );
     const input = screen.getByRole('textbox', { name: 'Альфа: НӨАТ чөлөөлөгдөх дүн' });
     await user.clear(input);
     await user.type(input, '2,500{Enter}');
@@ -160,7 +167,232 @@ describe('EbarimtPage', () => {
       period: 202610,
       supplierId: 1,
       exemptAmount: '2500',
+      previousExemptAmount: '100.00',
     });
+  });
+
+  it('shows a saved amount and its difference at once, before the server answers', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...REPORT_ROUTES,
+      // The answer never comes: only the page's own arithmetic can show the new figures.
+      'PUT /api/v1/ebarimt-check/month-values': () => new Promise<Response>(() => undefined),
+    });
+    renderApp(PAGE, fetchMock);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Альфа: НӨАТ чөлөөлөгдөх дүн/ }));
+    const input = screen.getByRole('textbox', { name: 'Альфа: НӨАТ чөлөөлөгдөх дүн' });
+    await user.clear(input);
+    await user.type(input, '250{Enter}');
+    expect(
+      await screen.findByRole('button', { name: 'Альфа: НӨАТ чөлөөлөгдөх дүн: 250' }),
+    ).toBeInTheDocument();
+    const alpha = screen.getByRole('link', { name: 'Альфа' }).closest('tr') as HTMLElement;
+    expect(within(alpha).getByText('350')).toBeInTheDocument();
+  });
+
+  it('says when a colleague changed the cell first, and shows what they wrote', async () => {
+    let refused = false;
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...REPORT_ROUTES,
+      'GET /api/v1/ebarimt-check/report': () =>
+        json(
+          refused
+            ? { ...REPORT, rows: [row({ exemptAmount: '300.00', diffAmount: '300.00' })] }
+            : REPORT,
+        ),
+      'PUT /api/v1/ebarimt-check/month-values': () => {
+        refused = true;
+        return problem('EBARIMT_CELL_CONFLICT', 409, { value: '300.00' });
+      },
+    });
+    renderApp(PAGE, fetchMock);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Альфа: НӨАТ чөлөөлөгдөх дүн/ }));
+    const input = screen.getByRole('textbox', { name: 'Альфа: НӨАТ чөлөөлөгдөх дүн' });
+    await user.clear(input);
+    await user.type(input, '250{Enter}');
+    expect(await screen.findByText(/өөр хэрэглэгч түрүүлж/)).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Альфа: НӨАТ чөлөөлөгдөх дүн: 300' }),
+    ).toBeInTheDocument();
+  });
+
+  it('refuses a minus rather than saving the opposite amount', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...REPORT_ROUTES,
+      'PUT /api/v1/ebarimt-check/month-values': () => new Response(null, { status: 204 }),
+    });
+    renderApp(PAGE, fetchMock);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Альфа: НӨАТ чөлөөлөгдөх дүн/ }));
+    const input = screen.getByRole('textbox', { name: 'Альфа: НӨАТ чөлөөлөгдөх дүн' });
+    await user.clear(input);
+    await user.type(input, '-500{Enter}');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(calls(fetchMock, 'PUT', '/api/v1/ebarimt-check/month-values')).toHaveLength(0);
+    await user.clear(input);
+    await user.type(input, '500{Enter}');
+    await waitFor(() =>
+      expect(calls(fetchMock, 'PUT', '/api/v1/ebarimt-check/month-values')).toHaveLength(1),
+    );
+  });
+
+  it('stands the brief open again when its address names it, as back from a receipt', async () => {
+    const { router } = renderApp(
+      `${PAGE}&receipts=1`,
+      signedIn(ADMIN_ME, {
+        ...REPORT_ROUTES,
+        'GET /api/v1/ebarimt-check/receipts': () => json({ data: [] }),
+      }),
+    );
+    const user = userEvent.setup();
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(await screen.findByText(mn.ebarimtCheck.receipts.empty)).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(router.state.location.search).not.toContain('receipts'));
+  });
+
+  it('reads once when months are chosen one after another, the rows staying', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...REPORT_ROUTES,
+      'GET /api/v1/ebarimt-check/report': () =>
+        json({ ...REPORT, periods: [202512, 202609, 202610] }),
+      'GET /api/v1/ebarimt-check/files': () =>
+        json({
+          latestPeriod: 202610,
+          months: [
+            { period: 202512, file: { id: 1 } },
+            { period: 202609, file: { id: 2 } },
+            { period: 202610, file: { id: 3 } },
+          ],
+        }),
+    });
+    renderApp(`${PAGE}&mode=range`, fetchMock);
+    await screen.findByRole('link', { name: 'Альфа' });
+    const reads = () => calls(fetchMock, 'GET', '/api/v1/ebarimt-check/report');
+    expect(reads()).toHaveLength(1);
+    const months = screen.getByRole('group', { name: mn.ebarimtCheck.monthsTitle });
+    // In one go: no timer can fire between these, whatever the machine's load.
+    fireEvent.click(within(months).getByRole('button', { name: '9' }));
+    fireEvent.click(within(months).getByRole('button', { name: '9' }));
+    fireEvent.click(within(months).getByRole('button', { name: '10' }));
+    expect(screen.getByRole('link', { name: 'Альфа' })).toBeInTheDocument();
+    await waitFor(() => expect(reads()).toHaveLength(2));
+    expect(new URL(reads()[1]?.url ?? 'http://x').searchParams.get('periods')).toBe(
+      '202512,202609',
+    );
+    expect(screen.getByRole('link', { name: 'Альфа' })).toBeInTheDocument();
+  });
+
+  it('keeps what is typed in a row that leaves the list', async () => {
+    let answer: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    let saved = false;
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...REPORT_ROUTES,
+      // The register typed makes the row even, and «Дутуутай» drops it.
+      'GET /api/v1/ebarimt-check/report': () =>
+        json(saved ? { ...REPORT, rows: [row({ diffAmount: '0.00' })] } : REPORT),
+      'PUT /api/v1/ebarimt-check/suppliers/1/profile': async () => {
+        await gate;
+        saved = true;
+        return new Response(null, { status: 204 });
+      },
+      'PUT /api/v1/ebarimt-check/month-values': () => new Response(null, { status: 204 }),
+    });
+    renderApp(`${PAGE}&missing=1`, fetchMock);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Альфа: регистр/ }));
+    await user.type(screen.getByRole('textbox', { name: 'Альфа: регистр' }), '5{Enter}');
+    await user.click(screen.getByRole('button', { name: /Альфа: тайлбар/i }));
+    await user.type(screen.getByRole('textbox', { name: /Альфа: тайлбар/i }), 'Ярьсан');
+    answer();
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Альфа' })).toBeNull());
+    await waitFor(() =>
+      expect(calls(fetchMock, 'PUT', '/api/v1/ebarimt-check/month-values')).toHaveLength(1),
+    );
+    expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/ebarimt-check/month-values')[0])).toEqual({
+      period: 202610,
+      supplierId: 1,
+      note: 'Ярьсан',
+      previousNote: null,
+    });
+  });
+
+  it('keeps a month’s ticks through a receipt and back, and no other month’s', async () => {
+    const key = `tugeel.ebarimt.ticks.v1:${ADMIN_ME.id}`;
+    sessionStorage.setItem(key, JSON.stringify({ period: 202610, ids: [1] }));
+    const first = renderApp(PAGE, signedIn(ADMIN_ME, REPORT_ROUTES));
+    expect(await screen.findByRole('checkbox', { name: 'Альфа: сонгох' })).toBeChecked();
+    first.router.dispose();
+    cleanup();
+
+    sessionStorage.setItem(key, JSON.stringify({ period: 202609, ids: [1] }));
+    renderApp(PAGE, signedIn(ADMIN_ME, REPORT_ROUTES));
+    expect(await screen.findByRole('checkbox', { name: 'Альфа: сонгох' })).not.toBeChecked();
+  });
+
+  it('clears nothing when the tab already chosen is clicked', async () => {
+    const { router } = renderApp(`${PAGE}&q=Бета`, signedIn(ADMIN_ME, REPORT_ROUTES));
+    const user = userEvent.setup();
+    await screen.findByRole('link', { name: 'Бета' });
+    await user.click(screen.getByRole('tab', { name: mn.ebarimtCheck.modes.month }));
+    expect(new URLSearchParams(router.state.location.search).get('q')).toBe('Бета');
+    expect(screen.getByRole('searchbox', { name: mn.ebarimtCheck.filters.search })).toHaveValue(
+      'Бета',
+    );
+  });
+
+  it('marks a purchase still waiting for its price check', async () => {
+    renderApp(
+      PAGE,
+      signedIn(ADMIN_ME, {
+        ...REPORT_ROUTES,
+        'GET /api/v1/ebarimt-check/report': () =>
+          json({ ...REPORT, rows: [row({ pendingCount: 2 })] }),
+      }),
+    );
+    const button = await screen.findByRole('button', { name: /Альфа: орлого/ });
+    expect(button).toHaveAttribute('title', expect.stringContaining('2 баримтын үнэ шалгаагүй'));
+  });
+
+  it('counts the ticks a filter hides, and leaves them out of nothing', async () => {
+    renderApp(PAGE, signedIn(ADMIN_ME, REPORT_ROUTES));
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('checkbox', { name: 'Альфа: сонгох' }));
+    expect(screen.queryByText(/шүүлтээс гадуур/)).not.toBeInTheDocument();
+    await user.type(
+      screen.getByRole('searchbox', { name: mn.ebarimtCheck.filters.search }),
+      'Бета',
+    );
+    expect(await screen.findByText('1 нь шүүлтээс гадуур')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Альфа' })).not.toBeInTheDocument();
+  });
+
+  it('opens with the filters its address holds, as when coming back from a receipt', async () => {
+    renderApp(`${PAGE}&c_supplier=Бета`, signedIn(ADMIN_ME, REPORT_ROUTES));
+    expect(await screen.findByRole('link', { name: 'Бета' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Альфа' })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('textbox', {
+        name: mn.ebarimtCheck.filters.column.replace(
+          '{{column}}',
+          mn.ebarimtCheck.columns.supplier,
+        ),
+      }),
+    ).toHaveValue('Бета');
+  });
+
+  it('keeps what is searched in the address', async () => {
+    const { router } = renderApp(PAGE, signedIn(ADMIN_ME, REPORT_ROUTES));
+    const user = userEvent.setup();
+    await screen.findByRole('link', { name: 'Альфа' });
+    await user.type(screen.getByRole('searchbox', { name: mn.ebarimtCheck.filters.search }), 'Бе');
+    await user.click(screen.getByRole('button', { name: /Дутуутай \(1\)/ }));
+    await waitFor(() => expect(router.state.location.search).toContain('missing=1'));
+    expect(new URLSearchParams(router.state.location.search).get('q')).toBe('Бе');
   });
 
   it('says which month has no file and offers the upload', async () => {

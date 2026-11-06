@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, sql } from 'drizzle-orm';
+import { businessDate } from '@tugeel/shared/time';
+import { asc, eq, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -12,8 +13,14 @@ import {
   UserNamesService,
 } from '../../identity';
 import { SuppliersService } from '../../partners';
-import { supplierOrderers } from '../schema';
+import { supplierOrdererHistory, supplierOrderers } from '../schema';
 import { assertManage, EDIT } from './support';
+
+export interface SupplierOrdererChange {
+  supplierId: number;
+  userId: number | null;
+  effectiveDate: string;
+}
 
 export interface SupplierOrderer {
   supplierId: number;
@@ -46,12 +53,16 @@ export class SupplierOrderersService {
     return { supplierId, userId: row.userId, fullName: names.get(row.userId) ?? null };
   }
 
-  /** Every supplier's orderer (ADR-0168). */
-  async allUserIds(executor: Db | Tx = this.db): Promise<Map<number, number>> {
-    const rows = await executor
-      .select({ supplierId: supplierOrderers.supplierId, userId: supplierOrderers.userId })
-      .from(supplierOrderers);
-    return new Map(rows.map((row) => [row.supplierId, row.userId]));
+  /** Every change of every supplier's orderer, oldest first (ADR-0170). */
+  async changes(executor: Db | Tx = this.db): Promise<SupplierOrdererChange[]> {
+    return executor
+      .select({
+        supplierId: supplierOrdererHistory.supplierId,
+        userId: supplierOrdererHistory.userId,
+        effectiveDate: supplierOrdererHistory.effectiveDate,
+      })
+      .from(supplierOrdererHistory)
+      .orderBy(asc(supplierOrdererHistory.effectiveDate), asc(supplierOrdererHistory.id));
   }
 
   /** The staff members who may be an orderer: the active holders of the edit right, by name. */
@@ -85,6 +96,14 @@ export class SupplierOrderersService {
             target: supplierOrderers.supplierId,
             set: { userId, updatedBy: actorUserId(ctx), updatedAt: sql`now()` },
           });
+      }
+      if ((before?.userId ?? null) !== userId) {
+        await tx.insert(supplierOrdererHistory).values({
+          supplierId,
+          userId,
+          effectiveDate: businessDate(),
+          changedBy: actorUserId(ctx),
+        });
       }
       await this.audit.record(tx, ctx, {
         action: 'UPDATE',

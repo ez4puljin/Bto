@@ -87,7 +87,6 @@ export {
   type ReceiptDetail,
   type ReceiptInput,
   type ReceiptLineInput,
-  type PostedReceiptFact,
   ReceiptsService,
   type ReceiptSummary,
 } from './services/receipts.service';

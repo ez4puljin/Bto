@@ -60,9 +60,6 @@ export class EbarimtSettingsService {
 
   async save(ctx: AuthContext, accountCodes: readonly string[]): Promise<EbarimtAccountOption[]> {
     const codes = [...new Set(accountCodes)];
-    if (codes.length === 0) {
-      throw invalid('accountCodes', 'atLeastOne', 'at least one account counts');
-    }
     const options = await this.options();
     const known = new Set(options.map((option) => option.code));
     for (const code of codes) {

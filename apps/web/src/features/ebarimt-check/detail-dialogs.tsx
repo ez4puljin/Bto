@@ -23,13 +23,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SupplierSelect } from '@/features/partners/party-select';
 import { formatUbMinute } from '@/lib/dayjs';
 import { formatCount, formatMnt } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { cn } from '@/lib/utils';
-import { SupplierSelect } from '@/features/partners/party-select';
 import {
   type EbarimtEntry,
   type EbarimtHistoryEvent,
@@ -43,6 +43,11 @@ import { DiffValue, Stat } from './parts';
 
 const sum = (values: readonly string[]) =>
   values.reduce((total, value) => total.plus(value), new Decimal(0)).toFixed(2);
+
+/** A long table in a dialog keeps its head and its totals in view. */
+const SCROLLER =
+  'min-h-0 flex-1 overflow-auto [&_[data-slot=table-container]]:overflow-visible [&_[data-slot=table-head]]:sticky [&_[data-slot=table-head]]:top-0 [&_[data-slot=table-head]]:z-10 [&_[data-slot=table-head]]:bg-popover';
+const STUCK_FOOT = 'sticky bottom-0 bg-popover';
 
 function RowStats({ row }: { row: EbarimtRow }) {
   const { t } = useTranslation();
@@ -157,7 +162,7 @@ export function ReceiptsDialog(props: {
   const multi = props.periods.length > 1;
   return (
     <Dialog open onOpenChange={(open) => !open && props.onClose()}>
-      <DialogContent size="xl" className="flex max-h-[85vh] flex-col">
+      <DialogContent size="2xl" guard={false} className="flex max-h-[85vh] flex-col">
         <DialogHeader>
           <DialogTitle>
             {props.row.name} · {t('ebarimtCheck.receipts.title')}
@@ -172,20 +177,21 @@ export function ReceiptsDialog(props: {
         <RowStats row={props.row} />
         <PerMonthTable row={props.row} baseYear={props.baseYear} />
         <ProblemAlert problem={problemFromError(receipts.error)} onRetry={receipts.refetch} />
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className={SCROLLER}>
           {receipts.isPending ? (
             <p className="py-6 text-sm text-muted-foreground">{t('common.loading')}</p>
-          ) : rows.length === 0 ? (
+          ) : rows.length === 0 && !receipts.isError ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
               {t('ebarimtCheck.receipts.empty')}
             </p>
-          ) : (
+          ) : rows.length === 0 ? null : (
             <Table>
               <TableHeader>
                 <TableRow>
                   {multi ? <TableHead>{t('ebarimtCheck.receipts.columns.month')}</TableHead> : null}
                   <TableHead>{t('ebarimtCheck.receipts.columns.date')}</TableHead>
                   <TableHead>{t('ebarimtCheck.receipts.columns.number')}</TableHead>
+                  <TableHead>{t('ebarimtCheck.receipts.columns.deliveryNote')}</TableHead>
                   <TableHead>{t('ebarimtCheck.receipts.columns.note')}</TableHead>
                   <TableHead>{t('ebarimtCheck.receipts.columns.warehouses')}</TableHead>
                   <TableHead>{t('ebarimtCheck.receipts.columns.account')}</TableHead>
@@ -195,6 +201,7 @@ export function ReceiptsDialog(props: {
                   <TableHead className="text-right">
                     {t('ebarimtCheck.receipts.columns.amount')}
                   </TableHead>
+                  <TableHead>{t('ebarimtCheck.receipts.columns.createdBy')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -219,8 +226,13 @@ export function ReceiptsDialog(props: {
                       ) : null}
                     </TableCell>
                     <TableCell className="font-mono">{row.supplierDocNo ?? '—'}</TableCell>
-                    <TableCell>{row.warehouses || '—'}</TableCell>
-                    <TableCell>
+                    <TableCell className="max-w-48 truncate" title={row.note ?? undefined}>
+                      {row.note ?? '—'}
+                    </TableCell>
+                    <TableCell className="max-w-48 truncate" title={row.warehouses || undefined}>
+                      {row.warehouses || '—'}
+                    </TableCell>
+                    <TableCell title={row.accountName ?? undefined}>
                       <span className="font-mono">{row.accountCode ?? '—'}</span>
                       {row.counted ? null : (
                         <Badge
@@ -236,22 +248,24 @@ export function ReceiptsDialog(props: {
                       {formatCount(row.lineCount)}
                     </TableCell>
                     <TableCell className="text-right font-mono font-medium">
-                      {formatMnt(row.amount)}
+                      {row.amount === null ? '—' : formatMnt(row.amount)}
                     </TableCell>
+                    <TableCell className="whitespace-nowrap">{row.createdByName ?? '—'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
-              <TableFooter>
+              <TableFooter className={STUCK_FOOT}>
                 <TableRow>
-                  <TableCell colSpan={multi ? 6 : 5} className="font-medium">
+                  <TableCell colSpan={multi ? 7 : 6} className="font-medium">
                     {t('ebarimtCheck.receipts.total', { count: counted.length })}
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {formatCount(counted.reduce((total, row) => total + row.lineCount, 0))}
                   </TableCell>
                   <TableCell className="text-right font-mono font-semibold">
-                    {formatMnt(sum(counted.map((row) => row.amount)))}
+                    {formatMnt(sum(counted.flatMap((row) => row.amount ?? [])))}
                   </TableCell>
+                  <TableCell />
                 </TableRow>
               </TableFooter>
             </Table>
@@ -262,22 +276,31 @@ export function ReceiptsDialog(props: {
   );
 }
 
-function LinkPicker(props: { disabled: boolean; onPick: (supplierId: number) => void }) {
-  const { t } = useTranslation();
+/**
+ * A supplier chosen for a receipt. An inactive one counts too: it stays on the list while it has
+ * figures. Only rows of what is typed now can be taken, and nothing while a link is being written.
+ */
+function LinkPicker(props: {
+  label: string;
+  disabled: boolean;
+  onPick: (supplierId: number) => void;
+}) {
   const id = useId();
   return (
-    <div>
+    <fieldset disabled={props.disabled} className="contents">
       <label htmlFor={id} className="sr-only">
-        {t('ebarimtCheck.entries.linkPick')}
+        {props.label}
       </label>
       <SupplierSelect
         id={id}
         value={null}
+        includeInactive
+        freshOnly
         onChange={(supplier) => {
-          if (supplier && !props.disabled) props.onPick(supplier.id);
+          if (supplier) props.onPick(supplier.id);
         }}
       />
-    </div>
+    </fieldset>
   );
 }
 
@@ -303,29 +326,36 @@ export function EntriesDialog(props: {
   const action = useAction();
   const rows = entries.data?.rows ?? [];
   const unlinked = rows.filter((row) => !row.link);
-  const multi = props.periods.length > 1;
   const showLinks = !props.row || rows.some((row) => row.link);
 
-  /** Links go month by month: a link belongs to its month. */
-  const setLink = (items: readonly EbarimtEntry[], supplierId: number | null) =>
-    void action.run(async () => {
-      const periods = new Map<number, string[]>();
-      for (const item of items) {
-        periods.set(item.period, [...(periods.get(item.period) ?? []), item.receiptKey]);
-      }
-      for (const [period, receiptKeys] of periods) {
-        await mutations.link.mutateAsync({ period, receiptKeys, supplierId });
-      }
-      toast.success(
-        supplierId === null
-          ? t('ebarimtCheck.entries.unlinkedDone')
-          : t('ebarimtCheck.entries.linkedDone', { count: items.length }),
-      );
-    });
+  /** Links go month by month: a link belongs to its month. A receipt taken meanwhile is said. */
+  const setLink = (items: readonly EbarimtEntry[], supplierId: number | null) => {
+    let linked = 0;
+    let skipped = 0;
+    void action
+      .run(async () => {
+        const periods = new Map<number, string[]>();
+        for (const item of items) {
+          periods.set(item.period, [...(periods.get(item.period) ?? []), item.receiptKey]);
+        }
+        for (const [period, receiptKeys] of periods) {
+          const result = await mutations.link.mutateAsync({ period, receiptKeys, supplierId });
+          linked += result.linked;
+          skipped += result.skipped;
+        }
+      })
+      .then((done) => {
+        if (!done) return;
+        if (supplierId === null) toast.success(t('ebarimtCheck.entries.unlinkedDone'));
+        else if (skipped === 0)
+          toast.success(t('ebarimtCheck.entries.linkedDone', { count: linked }));
+        else toast.warning(t('ebarimtCheck.entries.linkedPartly', { linked, skipped }));
+      });
+  };
 
   return (
     <Dialog open onOpenChange={(open) => !open && props.onClose()}>
-      <DialogContent size="xl" className="flex max-h-[85vh] flex-col">
+      <DialogContent size="2xl" guard={false} className="flex max-h-[85vh] flex-col">
         <DialogHeader>
           <DialogTitle>
             {props.row
@@ -344,14 +374,17 @@ export function EntriesDialog(props: {
             <RowStats row={props.row} />
             <PerMonthTable row={props.row} baseYear={props.baseYear} />
           </>
-        ) : (
-          <p className="text-[13px] text-warning">{t('ebarimtCheck.entries.unregisteredHint')}</p>
-        )}
+        ) : canEdit ? (
+          <p className="text-[0.8125rem] text-warning">
+            {t('ebarimtCheck.entries.unregisteredHint')}
+          </p>
+        ) : null}
         {!props.row && canEdit && unlinked.length > 1 ? (
-          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-canvas px-3 py-2 text-[13px]">
+          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-canvas px-3 py-2 text-[0.8125rem]">
             <span>{t('ebarimtCheck.entries.bulkLink', { count: unlinked.length })}</span>
             <div className="w-72">
               <LinkPicker
+                label={t('ebarimtCheck.entries.bulkLink', { count: unlinked.length })}
                 disabled={mutations.link.isPending}
                 onPick={(supplierId) => setLink(unlinked, supplierId)}
               />
@@ -360,21 +393,23 @@ export function EntriesDialog(props: {
         ) : null}
         <ProblemAlert problem={action.problem} />
         <ProblemAlert problem={problemFromError(entries.error)} onRetry={entries.refetch} />
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className={SCROLLER}>
           {entries.isPending ? (
             <p className="py-6 text-sm text-muted-foreground">{t('common.loading')}</p>
-          ) : rows.length === 0 ? (
+          ) : rows.length === 0 && !entries.isError ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
               {props.row && entries.data?.registers.length === 0
-                ? t('ebarimtCheck.entries.noRegisters')
+                ? canEdit
+                  ? t('ebarimtCheck.entries.noRegisters')
+                  : t('ebarimtCheck.entries.noRegistersRead')
                 : t('ebarimtCheck.entries.empty')}
             </p>
-          ) : (
+          ) : rows.length === 0 ? null : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  {multi ? <TableHead>{t('ebarimtCheck.entries.columns.month')}</TableHead> : null}
                   <TableHead>{t('ebarimtCheck.entries.columns.deliveryNote')}</TableHead>
+                  <TableHead>{t('ebarimtCheck.entries.columns.ddtd')}</TableHead>
                   <TableHead>{t('ebarimtCheck.entries.columns.date')}</TableHead>
                   <TableHead>{t('ebarimtCheck.entries.columns.partner')}</TableHead>
                   <TableHead>{t('ebarimtCheck.entries.columns.ttd')}</TableHead>
@@ -395,16 +430,22 @@ export function EntriesDialog(props: {
               </TableHeader>
               <TableBody>
                 {rows.map((row) => (
-                  <TableRow key={`${row.period}:${row.receiptKey}`} title={row.ddtd ?? undefined}>
-                    {multi ? <TableCell>{labels.name(row.period)}</TableCell> : null}
+                  <TableRow
+                    key={`${row.period}:${row.receiptKey}:${row.docDate}:${row.totalAmount}`}
+                  >
                     <TableCell className="font-mono">{row.deliveryNoteNo ?? '—'}</TableCell>
+                    <TableCell className="max-w-44 font-mono text-xs break-all whitespace-normal text-muted-foreground">
+                      {row.ddtd ?? '—'}
+                    </TableCell>
                     <TableCell className="whitespace-nowrap">{row.docDate}</TableCell>
-                    <TableCell className="max-w-56 truncate">{row.partnerName ?? '—'}</TableCell>
+                    <TableCell className="max-w-40 truncate" title={row.partnerName ?? undefined}>
+                      {row.partnerName ?? '—'}
+                    </TableCell>
                     <TableCell className="font-mono">{row.ttd}</TableCell>
-                    <TableCell className="text-right font-mono">
+                    <TableCell className="text-right font-mono text-xs">
                       {formatMnt(row.vatAmount)}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
+                    <TableCell className="text-right font-mono text-xs">
                       {formatMnt(row.netAmount)}
                     </TableCell>
                     <TableCell className="text-right font-mono font-medium">
@@ -412,7 +453,7 @@ export function EntriesDialog(props: {
                     </TableCell>
                     <TableCell>{row.kind ?? '—'}</TableCell>
                     {showLinks ? (
-                      <TableCell className="min-w-52 whitespace-nowrap">
+                      <TableCell className="min-w-44 whitespace-nowrap">
                         {row.link ? (
                           <div className="flex items-center gap-1">
                             <Link2 aria-hidden className="size-3.5 shrink-0 text-warning" />
@@ -430,8 +471,12 @@ export function EntriesDialog(props: {
                               <Button
                                 size="icon-xs"
                                 variant="ghost"
-                                aria-label={t('ebarimtCheck.entries.unlink')}
-                                title={t('ebarimtCheck.entries.unlink')}
+                                aria-label={t('ebarimtCheck.entries.unlink', {
+                                  note: row.deliveryNoteNo ?? row.ddtd ?? row.ttd,
+                                })}
+                                title={t('ebarimtCheck.entries.unlink', {
+                                  note: row.deliveryNoteNo ?? row.ddtd ?? row.ttd,
+                                })}
                                 disabled={mutations.link.isPending}
                                 onClick={() => setLink([row], null)}
                               >
@@ -441,6 +486,9 @@ export function EntriesDialog(props: {
                           </div>
                         ) : !props.row && canEdit ? (
                           <LinkPicker
+                            label={t('ebarimtCheck.entries.linkPick', {
+                              note: row.deliveryNoteNo ?? row.ddtd ?? row.ttd,
+                            })}
                             disabled={mutations.link.isPending}
                             onPick={(supplierId) => setLink([row], supplierId)}
                           />
@@ -452,15 +500,15 @@ export function EntriesDialog(props: {
                   </TableRow>
                 ))}
               </TableBody>
-              <TableFooter>
+              <TableFooter className={STUCK_FOOT}>
                 <TableRow>
-                  <TableCell colSpan={multi ? 5 : 4} className="font-medium">
+                  <TableCell colSpan={5} className="font-medium">
                     {t('ebarimtCheck.entries.total', { count: rows.length })}
                   </TableCell>
-                  <TableCell className="text-right font-mono">
+                  <TableCell className="text-right font-mono text-xs">
                     {formatMnt(sum(rows.map((row) => row.vatAmount)))}
                   </TableCell>
-                  <TableCell className="text-right font-mono">
+                  <TableCell className="text-right font-mono text-xs">
                     {formatMnt(sum(rows.map((row) => row.netAmount)))}
                   </TableCell>
                   <TableCell className="text-right font-mono font-semibold">
@@ -472,7 +520,7 @@ export function EntriesDialog(props: {
             </Table>
           )}
           {entries.data?.noFile.length ? (
-            <p className="mt-2 text-[13px] text-warning">
+            <p className="mt-2 text-[0.8125rem] text-warning">
               {t('ebarimtCheck.entries.noFile', { months: labels.many(entries.data.noFile) })}
             </p>
           ) : null}
@@ -490,13 +538,13 @@ export function HistoryDialog(props: { row: EbarimtRow; baseYear: number; onClos
     event.field === 'EMPLOYEE' ? (event.userName ?? '—') : formatMnt(event.amount ?? '0');
   return (
     <Dialog open onOpenChange={(open) => !open && props.onClose()}>
-      <DialogContent size="lg" className="flex max-h-[85vh] flex-col">
+      <DialogContent size="lg" guard={false} className="flex max-h-[85vh] flex-col">
         <DialogHeader>
           <DialogTitle>
             {props.row.name} · {t('ebarimtCheck.history.title')}
           </DialogTitle>
         </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className={SCROLLER}>
           <Table>
             <TableHeader>
               <TableRow>

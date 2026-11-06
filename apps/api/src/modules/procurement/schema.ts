@@ -256,3 +256,22 @@ export const supplierOrderers = pgTable(
   },
   (t) => [index('supplier_orderers_user_idx').on(t.userId)],
 );
+
+/**
+ * Each change of a supplier's orderer from its business date on (ADR-0170): `supplier_orderers` holds
+ * only today's, and a month's list must keep who held the supplier then. NULL: nobody from that date.
+ */
+export const supplierOrdererHistory = pgTable(
+  'supplier_orderer_history',
+  {
+    id: id(),
+    supplierId: ref('supplier_id')
+      .notNull()
+      .references(() => suppliers.id),
+    userId: ref('user_id').references(() => users.id),
+    effectiveDate: date('effective_date', { mode: 'string' }).notNull(),
+    changedBy: userRef('changed_by'),
+    changedAt: timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('supplier_orderer_history_supplier_idx').on(t.supplierId, t.effectiveDate, t.id)],
+);
