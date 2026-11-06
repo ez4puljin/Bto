@@ -9,6 +9,7 @@ import { businessDate } from '@tugeel/shared/time';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DialogFormFooter, FormField } from '@/components/form';
@@ -29,6 +30,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -40,25 +42,61 @@ import {
 import { problemFromError, settle } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useDeleteConfirm } from '@/lib/use-delete-confirm';
+import { AiSettingsTab } from '../ai/ai-settings-tab';
 import { type SettingView, useIdentityMutations, useSettings } from './api';
 import { DateInput } from '@/components/date-input';
 
 type SettingEntry = SettingView['entries'][number];
 
-/** Effective-dated settings: VAT and city-tax rates, payer flags, session length (SPEC §5.1). */
+/**
+ * The system's settings: the effective-dated ones (VAT and city-tax rates, payer flags, session
+ * length, SPEC §5.1) and, for who manages it, the AI (ADR-0162). The open tab is in the URL.
+ */
 export function SettingsPage() {
   const { t } = useTranslation();
-  const settings = useSettings();
+  const mayManageAi = useHasPermission('ai.settings.manage');
+  const [search, setSearch] = useSearchParams();
+  const tab = mayManageAi && search.get('tab') === 'ai' ? 'ai' : 'general';
   return (
     <div>
-      <PageHeader title={t('settings.title')} description={t('settings.hint')} />
+      <PageHeader
+        title={t('settings.title')}
+        description={tab === 'general' ? t('settings.hint') : undefined}
+      />
+      {mayManageAi ? (
+        <Tabs
+          value={tab}
+          onValueChange={(next) => setSearch(next === 'ai' ? { tab: 'ai' } : {}, { replace: true })}
+        >
+          <TabsList aria-label={t('settings.tabs.label')} className="mb-4">
+            <TabsTrigger value="general">{t('settings.tabs.general')}</TabsTrigger>
+            <TabsTrigger value="ai">{t('settings.tabs.ai')}</TabsTrigger>
+          </TabsList>
+          <TabsContent value="general">
+            <GeneralSettings />
+          </TabsContent>
+          <TabsContent value="ai">
+            <AiSettingsTab />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <GeneralSettings />
+      )}
+    </div>
+  );
+}
+
+function GeneralSettings() {
+  const settings = useSettings();
+  return (
+    <>
       <ProblemAlert problem={problemFromError(settings.error)} onRetry={settings.refetch} />
       <div className="grid gap-4 lg:grid-cols-2">
         {(settings.data ?? []).map((view) => (
           <SettingCard key={view.key} view={view} />
         ))}
       </div>
-    </div>
+    </>
   );
 }
 

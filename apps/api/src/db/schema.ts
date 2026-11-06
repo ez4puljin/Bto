@@ -89,7 +89,7 @@ export {
   priceProfileVersions,
   productPrices,
 } from '../modules/pricing/schema';
-export { aiConversations, aiQuestions, aiReports } from '../modules/ai/schema';
+export { aiConversations, aiQuestions, aiReports, aiSettings, aiUsage } from '../modules/ai/schema';
 export { segmentProducts, segments } from '../modules/segments/schema';
 export {
   appSettings,

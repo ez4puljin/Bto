@@ -1,4 +1,5 @@
 import { parse } from 'libpg-query';
+import type { AiAccess } from '../semantic/data-groups';
 import { AI_DATASET_NAMES } from '../semantic/datasets';
 
 /**
@@ -23,6 +24,7 @@ export const GUARD_REASONS = [
   'NOT_SELECT',
   'CONSTRUCT',
   'RELATION',
+  'DATA_ACCESS',
   'FUNCTION',
   'OPERATOR',
   'TYPE',
@@ -306,6 +308,8 @@ function catalogName(parts: readonly string[]): string | null {
 
 /** Walks the parse tree once; the first refusal ends the walk. */
 class TreeCheck {
+  constructor(private readonly access: AiAccess) {}
+
   private nodes = 0;
   private concatenations = 0;
 
@@ -413,11 +417,12 @@ class TreeCheck {
     const schema = typeof body.schemaname === 'string' ? body.schemaname : undefined;
     if (body.catalogname) throw new Refusal('RELATION', `"${name}": no database names`);
     if (schema === undefined && scope.has(name)) return;
-    if ((schema === undefined || schema === 'ai') && AI_DATASET_NAMES.has(name)) return;
+    const isDataset = (schema === undefined || schema === 'ai') && AI_DATASET_NAMES.has(name);
+    if (isDataset && this.access.has(name)) return;
     const qualified = schema ? `${schema}.${name}` : name;
     throw new Refusal(
-      'RELATION',
-      `relation "${qualified}" is not available; use only the datasets ${[...AI_DATASET_NAMES].join(', ')}`,
+      isDataset ? 'DATA_ACCESS' : 'RELATION',
+      `relation "${qualified}" is not available; use only the datasets ${[...this.access].join(', ')}`,
     );
   }
 
@@ -473,7 +478,7 @@ class TreeCheck {
 }
 
 /** Checks one model-written query; on success returns its text without a trailing semicolon. */
-export async function guardSql(input: string): Promise<GuardResult> {
+export async function guardSql(input: string, access: AiAccess): Promise<GuardResult> {
   const sql = input.trim();
   if (!sql) return { ok: false, reason: 'EMPTY', detail: 'the query is empty' };
   if (sql.length > SQL_MAX_LENGTH) {
@@ -497,7 +502,7 @@ export async function guardSql(input: string): Promise<GuardResult> {
   const select = unwrap(raw.stmt, 'SelectStmt');
   if (!select) return { ok: false, reason: 'NOT_SELECT', detail: 'only a SELECT is allowed' };
   try {
-    new TreeCheck().select(select, new Set(), 0);
+    new TreeCheck(access).select(select, new Set(), 0);
   } catch (error: unknown) {
     if (error instanceof Refusal) return { ok: false, reason: error.reason, detail: error.detail };
     throw error;

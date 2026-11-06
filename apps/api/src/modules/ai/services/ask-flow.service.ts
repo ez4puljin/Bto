@@ -1,9 +1,10 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { AiAnswerKind, AiAnswerStatus } from '@tugeel/shared/ai';
+import { Injectable, Logger } from '@nestjs/common';
+import type { AiAnswerKind, AiAnswerStatus, AiBudgetState } from '@tugeel/shared/ai';
 import { businessDate } from '@tugeel/shared/time';
 import { AppError } from '../../../common/errors/app-error';
-import { LLM_CLIENT, type LlmClient, LlmError, type LlmMessage } from '../../../integrations/llm';
+import { type LlmClient, LlmError, LlmGateway, type LlmMessage } from '../../../integrations/llm';
 import type { AuthContext } from '../../identity';
+import { type AiAccess, accessOf } from '../semantic/data-groups';
 import {
   ANSWER_SCHEMA,
   buildInstructions,
@@ -14,6 +15,7 @@ import {
   parseAnswer,
 } from '../semantic/prompt';
 import { AiQueryError, AiReaderService, type AiResult } from '../sql/ai-reader.service';
+import { AiLimitsService } from './ai-limits.service';
 import { type AiQuestionView, ConversationsService } from './conversations.service';
 
 const GENERATE_TOKENS = 8_000;
@@ -26,6 +28,10 @@ export interface AiStatus {
   database: boolean;
   provider: string | null;
   model: string | null;
+  /** The month against its limit, without the amounts. */
+  budget: AiBudgetState;
+  /** The views this person may ask about. */
+  datasets: string[];
 }
 
 export interface AiAnswer {
@@ -63,17 +69,21 @@ export class AskFlowService {
   private readonly logger = new Logger(AskFlowService.name);
 
   constructor(
-    @Inject(LLM_CLIENT) private readonly llm: LlmClient | null,
+    private readonly gateway: LlmGateway,
     private readonly reader: AiReaderService,
     private readonly conversations: ConversationsService,
+    private readonly limits: AiLimitsService,
   ) {}
 
-  status(): AiStatus {
+  async status(actor: AuthContext): Promise<AiStatus> {
+    const llm = await this.gateway.current();
     return {
-      configured: this.llm !== null && this.reader.configured,
+      configured: llm !== null && this.reader.configured,
       database: this.reader.configured,
-      provider: this.llm?.provider ?? null,
-      model: this.llm?.model ?? null,
+      provider: llm?.provider ?? null,
+      model: llm?.model ?? null,
+      budget: await this.limits.budgetState(),
+      datasets: [...accessOf(actor.permissions)],
     };
   }
 
@@ -81,10 +91,15 @@ export class AskFlowService {
     actor: AuthContext,
     input: { conversationId?: number; question: string },
   ): Promise<AiAnswer> {
-    const llm = this.llm;
+    const access = accessOf(actor.permissions);
+    if (access.size === 0) {
+      throw new AppError('AI_DATA_FORBIDDEN', 'no data group is open to this person');
+    }
+    const llm = await this.gateway.forWork({ purpose: 'ASK', userId: actor.userId });
     if (!llm || !this.reader.configured) {
       throw new AppError('AI_NOT_CONFIGURED', 'the AI assistant is not configured');
     }
+    await this.limits.assertUserMayAsk(actor.userId);
     const started = Date.now();
     const question = input.question.trim();
     const history =
@@ -92,10 +107,10 @@ export class AskFlowService {
         ? []
         : await this.conversations.history(actor, input.conversationId);
     const usage = new Usage();
-    const instructions = buildInstructions(businessDate());
+    const instructions = buildInstructions(businessDate(), access);
     const turn: LlmMessage = { role: 'user', content: buildUserTurn(question, history) };
     const first = await this.generate(llm, instructions, [turn], usage);
-    const outcome = await this.outcomeOf(llm, instructions, turn, first, usage);
+    const outcome = await this.outcomeOf(llm, access, instructions, turn, first, usage);
     const summary =
       outcome.status === 'ANSWERED' && outcome.result && outcome.result.rows.length > 0
         ? await this.summarize(llm, question, outcome, usage)
@@ -128,6 +143,7 @@ export class AskFlowService {
   /** Runs the model's query; one repair after a guard refusal or a query mistake. */
   private async outcomeOf(
     llm: LlmClient,
+    access: AiAccess,
     instructions: string,
     turn: LlmMessage,
     first: ModelAnswer,
@@ -135,7 +151,12 @@ export class AskFlowService {
   ): Promise<Outcome> {
     if (first.kind !== 'query') return withoutQuery(first, false);
     try {
-      return answered(first.sql, first.explanation, await this.reader.run(first.sql), false);
+      return answered(
+        first.sql,
+        first.explanation,
+        await this.reader.run(first.sql, access),
+        false,
+      );
     } catch (error: unknown) {
       if (!(error instanceof AiQueryError)) throw error;
       if (!error.repairable) return failed(first, error, false);
@@ -157,7 +178,12 @@ export class AskFlowService {
       }
       if (second.kind !== 'query') return withoutQuery(second, true);
       try {
-        return answered(second.sql, second.explanation, await this.reader.run(second.sql), true);
+        return answered(
+          second.sql,
+          second.explanation,
+          await this.reader.run(second.sql, access),
+          true,
+        );
       } catch (again: unknown) {
         if (again instanceof AiQueryError) return failed(second, again, true);
         throw again;

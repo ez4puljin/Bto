@@ -2,6 +2,7 @@ import type { AiAnswerStatus } from '@tugeel/shared/ai';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { z } from 'zod';
 import type { LlmMessage, LlmOutputSchema } from '../../../integrations/llm';
+import type { AiAccess } from './data-groups';
 import { AI_DATASETS } from './datasets';
 
 /**
@@ -169,38 +170,56 @@ export function parseAnswer(text: string): ModelAnswer | null {
   return { kind, sql, explanation: parsed.data.explanation.trim().slice(0, EXPLANATION_MAX) };
 }
 
-function datasetsText(): string {
-  return AI_DATASETS.map((set) => {
-    const columns = set.columns
-      .map(
-        (column) =>
-          `${column.name} ${column.type}${column.description ? ` (${column.description})` : ''}`,
-      )
-      .join('; ');
-    return `ai.${set.name}: ${set.description}\n  ${columns}`;
-  }).join('\n');
+function datasetsText(access: AiAccess): string {
+  return AI_DATASETS.filter((set) => access.has(set.name))
+    .map((set) => {
+      const columns = set.columns
+        .map(
+          (column) =>
+            `${column.name} ${column.type}${column.description ? ` (${column.description})` : ''}`,
+        )
+        .join('; ');
+      return `ai.${set.name}: ${set.description}\n  ${columns}`;
+    })
+    .join('\n');
 }
 
-function glossaryText(): string {
+/** The dataset names a text mentions. */
+function datasetsIn(text: string): string[] {
+  return AI_DATASETS.map((set) => set.name).filter((name) =>
+    new RegExp(`\\b${name}\\b`).test(text),
+  );
+}
+
+function glossaryText(access: AiAccess): string {
   return (Object.keys(GLOSSARY) as GlossaryKey[])
+    .filter((key) => datasetsIn(GLOSSARY[key]).some((name) => access.has(name)))
     .map((key) => `- "${mn.ai.glossary[key]}" → ${GLOSSARY[key]}`)
     .join('\n');
 }
 
-function examplesText(): string {
+/** The relations of a worked example. */
+export function exampleDatasets(key: ExampleKey): string[] {
+  return [...EXAMPLES[key].matchAll(/\b(?:FROM|JOIN)\s+(\w+)/g)].flatMap((match) =>
+    match[1] ? [match[1]] : [],
+  );
+}
+
+function examplesText(access: AiAccess): string {
   return (Object.keys(EXAMPLES) as ExampleKey[])
+    .filter((key) => exampleDatasets(key).every((name) => access.has(name)))
     .map((key) => `Question: ${mn.ai.examples[key]}\nSQL:\n${EXAMPLES[key]}`)
     .join('\n\n');
 }
 
-/** The system prompt: rules, today's date, glossary, datasets and examples. */
-export function buildInstructions(today: string): string {
+/** The system prompt: rules, today's date, and the glossary, datasets and examples of the person. */
+export function buildInstructions(today: string, access: AiAccess): string {
   return [
     RULES,
     `Today is ${today} (Ulaanbaatar).`,
-    `Glossary (Mongolian words → datasets):\n${glossaryText()}`,
-    `Datasets:\n${datasetsText()}`,
-    `Examples:\n${examplesText()}`,
+    `Glossary (Mongolian words → datasets):\n${glossaryText(access)}`,
+    `Datasets:\n${datasetsText(access)}`,
+    `Examples:\n${examplesText(access)}`,
   ].join('\n\n');
 }
 

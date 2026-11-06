@@ -50,9 +50,19 @@ export const PERMISSIONS = [
   'imports.manage',
   'pricing.manage',
   'pricing.prices.manage',
-  // The AI assistant (ADR-0045): asking shows costs, credit and personal data to the holder.
+  // The AI assistant (ADR-0045): asking, within the data groups the holder's roles open (ADR-0162).
   'ai.ask',
   'ai.reports.manage',
+  // The connection, the limits and the usage of the AI (ADR-0162).
+  'ai.settings.manage',
+  // What the assistant may read for the holder (ADR-0162, AI_DATA_GROUPS in `@tugeel/shared/ai`).
+  'ai.data.catalog',
+  'ai.data.stock',
+  'ai.data.customers',
+  'ai.data.suppliers',
+  'ai.data.pricing',
+  'ai.data.sales',
+  'ai.data.finance',
   // Segments (ADR-0049): creating, changing and archiving them; everyone reads and uses them.
   'segments.manage',
   // Customer orders (ADR-0055): reading them, and entering, submitting and cancelling them.

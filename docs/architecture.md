@@ -825,7 +825,7 @@ Keyboard-wedge first everywhere (web global keydown detector; mobile hidden Text
   - **Anthropic**: `POST /v1/messages`, `x-api-key`, `anthropic-version: 2023-06-01`, `output_config.format` = JSON schema.
   - **Ollama** (local): `POST {LLM_BASE_URL or http://127.0.0.1:11434}/api/chat`, `format` = JSON schema, `stream: false`, no key.
 - Errors are `LlmError` with a reason (`TIMEOUT`, `NETWORK`, `HTTP` with the status and the provider's short error code such as `invalid_api_key`, `REFUSED`, `INCOMPLETE`, `INVALID_RESPONSE`); no automatic retry — the person asks again. Only the reason and the HTTP status are logged, never a request or response body.
-- `LlmModule` (global) provides `LLM_CLIENT`, or `null` when `LLM_PROVIDER` is empty; `app.module.ts` imports it, `AskFlowService` injects it. Tests replace it with a scripted fake; the harness removes every `LLM_*` variable, so a real key is never used by a test.
+- `LlmModule` (global) provides `LLM_CLIENT`, or `null` when `LLM_PROVIDER` is empty, and `LlmGateway` (ADR-0162), which flows inject: the connection saved on the settings screen, else `LLM_CLIENT`, read at every call and metered; `app.module.ts` imports it. Tests replace it with a scripted fake; the harness removes every `LLM_*` variable, so a real key is never used by a test.
 - Data that leaves the company: the question, the dataset descriptions, earlier steps of the conversation and up to 50 result rows (names, phones, TINs, addresses and amounts included, by the owner's decision; SPEC §6.14, §11 #24). Credentials, sessions, files and audit data never do.
 
 ---
@@ -867,6 +867,7 @@ Environment variables every process reads (validated by Zod at boot; the process
 | `STORAGE_LOCAL_DIR` | yes | yes | root of the local driver: `../../.data/storage` from `apps/api` locally; `/data/storage` in the stacks, a named volume (`storage`, `storage_staging`) shared by api and worker so the worker reads uploaded import sheets (ADR-0036) |
 | `SENTRY_DSN` | yes | yes | — |
 | `LLM_PROVIDER`, `LLM_MODEL`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_TIMEOUT_MS` | yes | — | the AI assistant (ADR-0045): provider `openai`, `anthropic` or `ollama`; empty = assistant off; the key is a secret like `JWT_SECRET`; the entrypoint removes `LLM_API_KEY` from the worker |
+| `AI_KEY_SECRET` | yes | — | seals the AI key saved on the settings screen (ADR-0162): 32 random bytes in base64, a secret like `JWT_SECRET`; empty = a key can come only from `LLM_API_KEY`; the entrypoint removes it from the worker |
 | `AI_DATABASE_URL`, `AI_POOL_MAX` | yes | — | role `ai_reader` (read-only, schema `ai` only); required when `LLM_PROVIDER` is set; the entrypoint removes `AI_DATABASE_URL` from the worker |
 | `ADMIN_DATABASE_URL` | one-off | — | only for `provision.js`; production: typed at the prompt, never stored |
 | `TEST_ADMIN_DATABASE_URL` | tests | — | Jest harness; local hosts only |

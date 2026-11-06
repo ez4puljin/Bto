@@ -1,12 +1,13 @@
-import type { LlmClient, LlmRequest, LlmResult } from '../../../integrations/llm';
+import type { LlmClient, LlmGateway, LlmRequest, LlmResult } from '../../../integrations/llm';
 import { LlmError } from '../../../integrations/llm';
 import type { AuthContext } from '../../identity';
 import type { AiReaderService, AiResult } from '../sql/ai-reader.service';
 import { AiQueryError } from '../sql/ai-reader.service';
+import type { AiLimitsService } from './ai-limits.service';
 import { AskFlowService } from './ask-flow.service';
 import type { ConversationsService, QuestionRecord } from './conversations.service';
 
-const actor = { userId: 7 } as AuthContext;
+const actor = { userId: 7, permissions: new Set(['ai.data.catalog']) } as unknown as AuthContext;
 const ROWS: AiResult = {
   columns: [{ name: 'n', kind: 'number' }],
   rows: [['1']],
@@ -56,7 +57,15 @@ describe('AskFlowService', () => {
         return Promise.resolve({ conversationId: 1, question: { id: 1, status: record.status } });
       },
     } as unknown as ConversationsService;
-    flow = new AskFlowService(llm, reader, conversations);
+    const gateway = {
+      current: () => Promise.resolve(llm),
+      forWork: () => Promise.resolve(llm),
+    } as unknown as LlmGateway;
+    const limits = {
+      assertUserMayAsk: () => Promise.resolve(),
+      budgetState: () => Promise.resolve('NONE'),
+    } as unknown as AiLimitsService;
+    flow = new AskFlowService(gateway, reader, conversations, limits);
   });
 
   const query = (sql: string) => JSON.stringify({ kind: 'query', sql, explanation: 'x' });

@@ -1133,7 +1133,8 @@ describe('purchase orders and receiving', () => {
       expect.arrayContaining(['LOAD_ADDED', 'LOADED', 'LOAD_REMOVED']),
     );
 
-    // The invoice check needs a configured model: none in tests, so it answers 503.
+    // The invoice check needs a configured model: none here, so it answers 503 (ADR-0162 meters it
+    // through the same gateway as the assistant, llm-gateway.spec.ts).
     await http()
       .post(`/api/v1/purchase-orders/${created.id}/suppliers/${supplierA}/invoice-checks`)
       .set(bearer(manager))

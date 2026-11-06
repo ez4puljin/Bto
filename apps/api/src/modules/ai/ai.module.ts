@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import { IdentityModule } from '../identity';
 import { AiController, AiReportsController } from './controllers/ai.controller';
+import { AiSettingsController } from './controllers/ai-settings.controller';
 import { AiExportService } from './services/ai-export.service';
+import { AiLimitsService } from './services/ai-limits.service';
+import { AiSettingsFlowService } from './services/ai-settings-flow.service';
 import { AskFlowService } from './services/ask-flow.service';
 import { ConversationsService } from './services/conversations.service';
 import { ReportsService } from './services/reports.service';
@@ -14,6 +17,8 @@ import { AiReaderService } from './sql/ai-reader.service';
  */
 const SERVICES = [
   AiReaderService,
+  AiLimitsService,
+  AiSettingsFlowService,
   AskFlowService,
   ConversationsService,
   ReportsService,
@@ -26,6 +31,6 @@ export class AiModule {}
 /** The HTTP side of the assistant. */
 @Module({
   imports: [AiModule],
-  controllers: [AiController, AiReportsController],
+  controllers: [AiController, AiReportsController, AiSettingsController],
 })
 export class AiHttpModule {}

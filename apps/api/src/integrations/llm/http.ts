@@ -2,6 +2,8 @@ import type { z } from 'zod';
 import { type FetchFn, LlmError } from './llm.types';
 
 const PROVIDER_CODE = /^[A-Za-z0-9_.-]{1,64}$/;
+/** Our code for an account out of credit (the message itself is never kept). */
+export const CREDIT_EXHAUSTED = 'credit_balance_too_low';
 
 /**
  * POSTs JSON and returns the parsed answer, or throws an `LlmError`. The timeout covers the whole
@@ -15,14 +17,40 @@ export async function postJson<T>(
   timeoutMs: number,
   answer: z.ZodType<T>,
 ): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetchFn(url, {
+  return exchange(
+    fetchFn,
+    url,
+    {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+    },
+    timeoutMs,
+    answer,
+  );
+}
+
+/** A GET with the same errors as `postJson`: the connection check (ADR-0162). */
+export function getJson<T>(
+  fetchFn: FetchFn,
+  url: string,
+  headers: Record<string, string>,
+  timeoutMs: number,
+  answer: z.ZodType<T>,
+): Promise<T> {
+  return exchange(fetchFn, url, { method: 'GET', headers }, timeoutMs, answer);
+}
+
+async function exchange<T>(
+  fetchFn: FetchFn,
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+  answer: z.ZodType<T>,
+): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetchFn(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
   } catch (error: unknown) {
     throw transportError(error, timeoutMs);
   }
@@ -63,7 +91,9 @@ function providerCodeOf(payload: unknown): string | undefined {
   if (typeof payload !== 'object' || payload === null) return undefined;
   const error = (payload as { error?: unknown }).error;
   if (typeof error !== 'object' || error === null) return undefined;
-  const { code, type } = error as { code?: unknown; type?: unknown };
+  const { code, type, message } = error as { code?: unknown; type?: unknown; message?: unknown };
+  // Anthropic has answered 400 invalid_request_error for an empty account: only its text tells.
+  if (typeof message === 'string' && /credit balance/i.test(message)) return CREDIT_EXHAUSTED;
   const candidate = typeof code === 'string' ? code : typeof type === 'string' ? type : undefined;
   return candidate !== undefined && PROVIDER_CODE.test(candidate) ? candidate : undefined;
 }

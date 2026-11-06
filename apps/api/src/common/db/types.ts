@@ -41,6 +41,8 @@ export const money = decimalColumn(14, 2);
 export const qty = decimalColumn(14, 3);
 /** Unit costs and avg_cost, NUMERIC(14,4). */
 export const cost = decimalColumn(14, 4);
+/** What an AI call cost in USD, NUMERIC(14,6): one call is a fraction of a cent (ADR-0162). */
+export const usdFine = decimalColumn(14, 6);
 /** Unit conversion factors, NUMERIC(18,6). */
 export const factor = decimalColumn(18, 6);
 /** Weights in kilograms, NUMERIC(12,4) (e.g. the net weight of one piece). */

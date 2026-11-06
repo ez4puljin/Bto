@@ -161,6 +161,16 @@ export function AiPage() {
           <AlertDescription>{t('ai.notConfigured.body')}</AlertDescription>
         </Alert>
       ) : null}
+      {configured && status.data?.datasets.length === 0 ? (
+        <Alert variant="destructive">
+          <AlertDescription>{t('errors.AI_DATA_FORBIDDEN')}</AlertDescription>
+        </Alert>
+      ) : null}
+      {status.data?.budget === 'WARN' || status.data?.budget === 'REACHED' ? (
+        <Alert variant={status.data.budget === 'REACHED' ? 'destructive' : 'default'}>
+          <AlertDescription>{t(`ai.budget.${status.data.budget}`)}</AlertDescription>
+        </Alert>
+      ) : null}
       {/* The conversation stops at 64rem: answers stay readable on a wide screen (ADR-0066). */}
       <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,64rem)]">
         <section aria-label={t('ai.conversations')} className="order-2 lg:order-1">
@@ -247,14 +257,16 @@ export function AiPage() {
                     {t('ai.datasetsTitle')}
                   </h3>
                   <ul className="flex flex-wrap gap-1.5">
-                    {DATASET_KEYS.map((dataset) => (
-                      <li key={dataset}>
-                        <Badge variant="outline">
-                          <Database aria-hidden />
-                          {t(`ai.datasets.${dataset}`)}
-                        </Badge>
-                      </li>
-                    ))}
+                    {DATASET_KEYS.filter((dataset) => status.data?.datasets.includes(dataset)).map(
+                      (dataset) => (
+                        <li key={dataset}>
+                          <Badge variant="outline">
+                            <Database aria-hidden />
+                            {t(`ai.datasets.${dataset}`)}
+                          </Badge>
+                        </li>
+                      ),
+                    )}
                   </ul>
                 </div>
               </CardContent>

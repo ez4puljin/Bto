@@ -2,10 +2,12 @@ import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
 import {
   AI_ANSWER_KINDS,
   AI_ANSWER_STATUSES,
+  AI_BUDGET_STATES,
   AI_QUESTION_MAX_LENGTH,
   AI_REPORT_NAME_MAX_LENGTH,
   type AiAnswerKind,
   type AiAnswerStatus,
+  type AiBudgetState,
 } from '@tugeel/shared/ai';
 import { Transform, Type } from 'class-transformer';
 import { IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator';
@@ -72,6 +74,10 @@ export class AiStatusDto {
   database: boolean;
   @ApiProperty({ type: String, nullable: true, example: 'openai' }) provider: string | null;
   @ApiProperty({ type: String, nullable: true }) model: string | null;
+  @ApiProperty({ enum: AI_BUDGET_STATES, description: 'The month against its limit (ADR-0162)' })
+  budget: AiBudgetState;
+  @ApiProperty({ type: String, isArray: true, description: 'The views this person may ask about' })
+  datasets: string[];
 }
 
 @ApiSchema({ name: 'AiColumn' })
