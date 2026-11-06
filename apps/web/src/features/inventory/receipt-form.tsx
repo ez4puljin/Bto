@@ -8,7 +8,6 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  LoaderCircle,
   Pencil,
   Printer,
   ScanBarcode,
@@ -28,7 +27,12 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { DENSE_FIELDS, DocumentWindow } from '@/components/document-layout';
+import {
+  DENSE_FIELDS,
+  DocumentWindow,
+  LINES_SCROLLER,
+  WINDOW_FOOT,
+} from '@/components/document-layout';
 import { FormField } from '@/components/form';
 import { LeaveGuard } from '@/components/leave-guard';
 import { EmptyState, ListTable, RowAction, RowActions } from '@/components/list';
@@ -71,7 +75,7 @@ import {
   useReceiptCosting,
   useReceiptCounterAccounts,
 } from './api';
-import { type CostEntry, parseMoney } from './helpers';
+import { type CostEntry, modalOpen, parseMoney } from './helpers';
 import { PriceCells, ReceiptTotals } from './receipt-costing';
 import { ReceiptDiscountsCard } from './receipt-discounts';
 import { type PanelLine, ReceiptLinePanel } from './receipt-line-panel';
@@ -86,6 +90,7 @@ import {
   focusNextPrice,
   usePostedCosts,
 } from './receipt-prices';
+import { SaveState } from './shared';
 import { DateInput } from '@/components/date-input';
 
 /** The header fields a refusal may name, with the message each shows under its field. */
@@ -154,9 +159,6 @@ const HEADER_GRID = 'grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid
  */
 const STRIP_GRID =
   'grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_9.5rem_10rem_minmax(0,1.7fr)_minmax(0,1.1fr)]';
-/** Only the lines scroll: the table's own box stops scrolling and its head stays in view. */
-const LINES_SCROLLER =
-  'min-h-0 flex-1 overflow-auto [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] [&_[data-slot=table-container]]:overflow-visible';
 
 /** «Үнэ НӨАТ-тэй (10%)…», for cost holders, when the supplier's prices carry VAT. */
 function VatNote({ detail }: { detail: ReceiptDetail | null }) {
@@ -250,7 +252,7 @@ function LinesTable(props: {
   // A draft's table: narrow enough for a 1366 window with the editor's fields in its columns; free
   // goods are listed apart, so it has no «Бонус» (ADR-0156). The last two columns hold «Хадгалах».
   const draftColumns: ColumnSpec[] = [
-    { key: 'lineNo', kind: 'count', width: 2.75 },
+    { key: 'lineNo', kind: 'count', width: 3.5 },
     { key: 'sku', kind: 'code', width: 5 },
     { key: 'product', kind: 'text', weight: 3, min: 13 },
     { key: 'warehouse', kind: 'text', weight: 1, min: 10 },
@@ -555,29 +557,6 @@ function SummaryPopover({ detail, count }: { detail: ReceiptDetail | null; count
   );
 }
 
-/** «Хадгалж байна» / «Хадгалсан» beside the title: a header field is saved when left. */
-function SaveState(props: { saving: boolean; saved: boolean }) {
-  const { t } = useTranslation();
-  return (
-    <span
-      aria-live="polite"
-      className="inline-flex items-center gap-1 text-[0.8125rem] whitespace-nowrap text-muted-foreground"
-    >
-      {props.saving ? (
-        <>
-          <LoaderCircle aria-hidden className="size-3.5 animate-spin" />
-          {t('inventory.receipt.form.saving')}
-        </>
-      ) : props.saved ? (
-        <>
-          <Check aria-hidden className="size-3.5 text-success" />
-          {t('inventory.receipt.form.saved')}
-        </>
-      ) : null}
-    </span>
-  );
-}
-
 /** «12 мөр · 340.5 кг», under every receipt. */
 function LinesSummary({ detail, count }: { detail: ReceiptDetail | null; count: number }) {
   const { t } = useTranslation();
@@ -778,15 +757,6 @@ function NoteAmountCheck(props: {
         </Badge>
       )}
     </div>
-  );
-}
-
-/** A dialog or sheet over the window; a popover (the search's list, the totals) is not one. */
-function modalOpen(): boolean {
-  return Array.from(document.querySelectorAll('[role="dialog"], [role="alertdialog"]')).some(
-    (open) =>
-      open.getAttribute('data-state') === 'open' &&
-      !open.parentElement?.hasAttribute('data-radix-popper-content-wrapper'),
   );
 }
 
@@ -1250,7 +1220,7 @@ function DraftEditor(props: {
               <EmptyState title={t('inventory.receipt.linesEmpty')} icon={ScanBarcode} />
             ) : null}
           </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border bg-card px-3 py-1.5 text-[0.8125rem]">
+          <div className={WINDOW_FOOT}>
             <SummaryPopover detail={detail} count={bought.length} />
             {detail ? <ReceiptNoteCard detail={detail} editable inline /> : null}
             <div className="ml-auto flex flex-wrap items-center gap-2">

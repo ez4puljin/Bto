@@ -17,8 +17,8 @@ import { useWedgeScanner } from '@/lib/scan/use-wedge-scanner';
  * the cursor in the box (a document just created from a dialog).
  */
 export function ScanBox(props: {
-  /** Takes the row, in a narrow part of a window (ADR-0155). */
-  fill?: boolean;
+  /** In a document window's entry row (ADR-0157): takes its cell, Enter checks, the camera an icon. */
+  compact?: boolean;
   onScan: (code: string) => void;
   letters?: boolean;
   disabled?: boolean;
@@ -42,10 +42,10 @@ export function ScanBox(props: {
 
   return (
     <div ref={root} className="flex flex-col gap-2">
-      <div className="flex gap-2">
+      <div className={props.compact ? 'flex gap-1.5' : 'flex gap-2'}>
         <Input
           aria-label={props.label ?? t('scan.label')}
-          className={props.fill ? 'font-mono' : 'max-w-sm font-mono'}
+          className={props.compact ? 'font-mono' : 'max-w-sm font-mono'}
           disabled={disabled}
           autoFocus={props.autoFocus}
           autoComplete="off"
@@ -63,17 +63,31 @@ export function ScanBox(props: {
             if (typed !== null) setDraft(typed);
           }}
         />
-        <Button type="button" variant="outline" onClick={() => submit(draft)}>
-          {t('scan.check')}
-        </Button>
-        {canUseCamera ? (
+        {props.compact ? null : (
+          <Button type="button" variant="outline" onClick={() => submit(draft)}>
+            {t('scan.check')}
+          </Button>
+        )}
+        {!canUseCamera ? null : props.compact ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            className="rounded-lg"
+            aria-label={t('scan.camera')}
+            title={t('scan.camera')}
+            onClick={() => setCameraOpen(true)}
+          >
+            <Camera />
+          </Button>
+        ) : (
           <Button type="button" variant="outline" onClick={() => setCameraOpen(true)}>
             <Camera />
             <span className="sr-only sm:not-sr-only">{t('scan.camera')}</span>
           </Button>
-        ) : null}
+        )}
       </div>
-      {insecure ? (
+      {insecure && !props.compact ? (
         <p className="text-xs text-muted-foreground">{t('scan.cameraNeedsHttps')}</p>
       ) : null}
       <CameraScanner

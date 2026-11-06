@@ -16,7 +16,13 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { useApiClient } from '@/app/api-client-context';
 import { useHasPermission } from '@/app/auth-context';
-import { DENSE_FIELDS } from '@/components/document-layout';
+import {
+  DENSE_FIELDS,
+  ENTRY_CELL,
+  ENTRY_ROW,
+  ENTRY_SLOT,
+  ENTRY_SLOT_CELL,
+} from '@/components/document-layout';
 import { MoneyInput } from '@/components/money-input';
 import { NativeSelect } from '@/components/native-select';
 import { Badge } from '@/components/ui/badge';
@@ -61,13 +67,6 @@ const LOOKUP_LIMIT = 20;
  */
 const LINE_GRID =
   'grid min-w-0 items-start gap-2 sm:grid-cols-[minmax(0,1.35fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,0.85fr)_minmax(0,1fr)]';
-/**
- * The entry row (ADR-0156): each field stands under its column, its text on the vertical of the
- * column's head and rows (the cell's 0.25rem and the field's 0.5rem make the rows' 0.75rem).
- */
-const ENTRY_ROW =
-  'data-[editing=true]:bg-secondary/50 [&_.native-select]:h-8.5 [&_.native-select]:pr-7 [&_.native-select]:pl-2 [&_.native-select]:focus-visible:ring-2 [&_[data-slot=input]]:h-8.5 [&_[data-slot=input]]:px-2 [&_[data-slot=input]]:text-ellipsis [&_[data-slot=input]]:focus-visible:ring-2';
-const ENTRY_CELL = 'h-auto px-1 py-1.5 first:pl-3 last:pr-3';
 /** What the product says, not a field to type in: its text alone, no box. */
 const PLAIN_FIELD = 'border-transparent bg-transparent shadow-none';
 
@@ -975,11 +974,8 @@ export function ReceiptLinePanel(props: {
         </TableCell>
       </TableRow>
       <TableRow>
-        <TableCell
-          colSpan={columnCount}
-          className="h-auto bg-muted/50 px-4 py-0.5 whitespace-normal first:pl-4"
-        >
-          <div className="flex min-h-6 items-center gap-x-4 gap-y-1 text-[0.8125rem] has-data-[slot=alert]:flex-wrap">
+        <TableCell colSpan={columnCount} className={ENTRY_SLOT_CELL}>
+          <div className={ENTRY_SLOT}>
             {editing ? (
               <Badge variant="secondary">{t('inventory.receipt.panel.editTitle')}</Badge>
             ) : null}

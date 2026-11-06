@@ -1,3 +1,4 @@
+import { Check, LoaderCircle } from 'lucide-react';
 import { Popover } from 'radix-ui';
 import { type ReactNode, useDeferredValue, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -81,6 +82,29 @@ export function DocStatusBadge({ status }: { status: DocStatus }) {
             ? 'secondary'
             : 'outline';
   return <Badge variant={variant}>{t(`inventory.docStatus.${status}`)}</Badge>;
+}
+
+/** «Хадгалж байна» / «Хадгалсан» beside a document's title: a header field is saved when left. */
+export function SaveState(props: { saving: boolean; saved: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <span
+      aria-live="polite"
+      className="inline-flex items-center gap-1 text-[0.8125rem] whitespace-nowrap text-muted-foreground"
+    >
+      {props.saving ? (
+        <>
+          <LoaderCircle aria-hidden className="size-3.5 animate-spin" />
+          {t('inventory.receipt.form.saving')}
+        </>
+      ) : props.saved ? (
+        <>
+          <Check aria-hidden className="size-3.5 text-success" />
+          {t('inventory.receipt.form.saved')}
+        </>
+      ) : null}
+    </span>
+  );
 }
 
 /**
@@ -272,7 +296,14 @@ export function QtyInput(props: {
 }
 
 /** The «Тоо» field beside a scan box; a scan that lands here goes to `onScan` instead. */
-export function ScanQtyField(props: { id: string; qty: ScanQty; onScan: (code: string) => void }) {
+export function ScanQtyField(props: {
+  id: string;
+  qty: ScanQty;
+  onScan: (code: string) => void;
+  /** Its name when no visible label stands beside it (a column's head names it). */
+  label?: string;
+  className?: string;
+}) {
   const guard = useScanGuard(props.onScan, { letters: true });
   const invalid = parseScanQty(props.qty.value) === null;
   return (
@@ -280,8 +311,9 @@ export function ScanQtyField(props: { id: string; qty: ScanQty; onScan: (code: s
       id={props.id}
       inputMode="decimal"
       autoComplete="off"
+      aria-label={props.label}
       aria-invalid={invalid}
-      className={cn('w-20 text-right font-mono', invalid && 'border-destructive')}
+      className={cn('w-20 text-right font-mono', invalid && 'border-destructive', props.className)}
       value={props.qty.value}
       onFocus={(event) => event.currentTarget.select()}
       onChange={(event) => props.qty.set(event.target.value)}
@@ -311,8 +343,6 @@ export function ScanQtyControl(props: {
  * scan did — so the first line of the document stays near the top of the window.
  */
 export function ScanToolbar(props: {
-  /** In a narrow part of a window (ADR-0155): the scan box, then the quantity and the search. */
-  stacked?: boolean;
   scanBox: ReactNode;
   qty?: ReactNode;
   search?: ReactNode;
@@ -321,23 +351,13 @@ export function ScanToolbar(props: {
   return (
     <div className="flex flex-col gap-2">
       {/* The scan box keeps room for its label and buttons; the search wraps below when tight. */}
-      {props.stacked ? (
-        <div className="flex flex-col gap-3">
-          {props.scanBox}
-          <div className="flex flex-wrap items-start gap-3">
-            {props.qty}
-            {props.search ? <div className="min-w-48 flex-1">{props.search}</div> : null}
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-start lg:gap-4">
-          <div className="min-w-0 lg:min-w-[26rem] lg:flex-1">{props.scanBox}</div>
-          {props.qty}
-          {props.search ? (
-            <div className="min-w-0 lg:w-64 xl:w-72 2xl:w-96">{props.search}</div>
-          ) : null}
-        </div>
-      )}
+      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-start lg:gap-4">
+        <div className="min-w-0 lg:min-w-[26rem] lg:flex-1">{props.scanBox}</div>
+        {props.qty}
+        {props.search ? (
+          <div className="min-w-0 lg:w-64 xl:w-72 2xl:w-96">{props.search}</div>
+        ) : null}
+      </div>
       {props.status ? (
         <div className="flex min-h-5 flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           {props.status}
