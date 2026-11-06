@@ -25,6 +25,7 @@ const category = (fields: Partial<Schemas['Category']>): Schemas['Category'] => 
   productCount: 3,
   childCount: 1,
   imageUrl: null,
+  iconKey: null,
   ...fields,
 });
 const DRINKS = category({});
@@ -104,5 +105,37 @@ describe('a top category’s picture in «Bto300» (ADR-0092 #6)', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(
       mn.catalog.categories.appPictureRemoved,
     );
+  });
+
+  it('follows the name by default and keeps the icon the office chooses (ADR-0163)', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      'GET /api/v1/categories': () => json({ data: [DRINKS, SODA], nextCursor: null }),
+      'PATCH /api/v1/categories/1': () => json({ ...DRINKS, iconKey: 'toy' }),
+    });
+    renderApp('/catalog/categories', fetchMock);
+    const user = userEvent.setup();
+    const texts = mn.catalog.categories;
+    await user.click(
+      await screen.findByRole('button', {
+        name: mn.common.editRecord.replace('{{name}}', 'Ус, ундаа'),
+      }),
+    );
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByText(texts.icons.water)).toBeInTheDocument();
+    expect(dialog.getByText(texts.iconAuto)).toBeInTheDocument();
+    // The name typed moves it.
+    const name = dialog.getByLabelText(texts.name);
+    await user.clear(name);
+    await user.type(name, 'Пиво');
+    expect(dialog.getByText(texts.icons.beer)).toBeInTheDocument();
+    await user.click(dialog.getByRole('button', { name: texts.iconChange }));
+    await user.click(dialog.getByRole('button', { name: texts.icons.toy }));
+    expect(dialog.getByText(texts.iconChosen)).toBeInTheDocument();
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    await waitFor(() => expect(calls(fetchMock, 'PATCH', '/api/v1/categories/1')).toHaveLength(1));
+    expect(await bodyOf(calls(fetchMock, 'PATCH', '/api/v1/categories/1')[0])).toMatchObject({
+      name: 'Пиво',
+      iconKey: 'toy',
+    });
   });
 });

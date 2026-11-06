@@ -87,6 +87,8 @@ export const categories = pgTable(
      * only a category without a parent has one (moving it under a parent drops the picture).
      */
     imageFileId: ref('image_file_id').references(() => files.id),
+    /** The drawing chosen for it (ADR-0163); null: the one its name asks for. */
+    iconKey: text('icon_key'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -106,6 +108,10 @@ export const categories = pgTable(
     ),
     unique('categories_image_file_key').on(t.imageFileId),
     check('categories_image_top_level', sql`${t.imageFileId} IS NULL OR ${t.parentId} IS NULL`),
+    check(
+      'categories_icon_key',
+      sql`${t.iconKey} IS NULL OR length(${t.iconKey}) BETWEEN 1 AND 40`,
+    ),
   ],
 );
 

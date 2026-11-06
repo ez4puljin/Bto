@@ -25,7 +25,7 @@ import {
   ProductQueryService,
   type ProductSegmentEntry,
 } from '../../catalog';
-import type { CustomerContext } from '../../identity';
+import type { AuthContext, CustomerContext } from '../../identity';
 import { StockQueryService } from '../../inventory';
 import { type DealBook, ProductDealsService, ProductPricesService } from '../../pricing';
 import { AppSettingsService, CustomerOrdersService, type RepShopProduct } from '../../sales';
@@ -55,8 +55,10 @@ export interface HomeSection<P = CustomerProduct> {
 export interface HomeCategory {
   id: number;
   name: string;
-  /** The category's own picture, else one of its products' (ADR-0092 #6). */
+  /** The category's own picture; without one the apps draw its icon (ADR-0163). */
   imageUrl: string | null;
+  /** The drawing chosen for it; null: the one its name asks for (ADR-0163). */
+  iconKey: string | null;
   /** Products «Бараа» sells in it, its subcategories included. */
   productCount: number;
 }
@@ -69,7 +71,13 @@ export interface CustomerHome<P = CustomerProduct> {
 }
 
 export interface CategoryPage<P = CustomerProduct> {
-  category: { id: number; parentId: number | null; name: string; imageUrl: string | null };
+  category: {
+    id: number;
+    parentId: number | null;
+    name: string;
+    imageUrl: string | null;
+    iconKey: string | null;
+  };
   productCount: number;
   banners: RunningBanner[];
   subcategories: HomeCategory[];
@@ -96,9 +104,6 @@ export interface SectionPage<P = CustomerProduct> {
   /** On the first page. */
   total: number | null;
 }
-
-/** Products a category tile looks through for a picture when the category has none. */
-const PICTURE_CANDIDATES = 20;
 
 /**
  * What one request knows (ADR-0093): the shop's universe in the NEW order, what is free at home,
@@ -135,6 +140,8 @@ interface Viewer<P> {
     recent: (today: string) => Promise<number[]>;
     favourites: () => Promise<number[]>;
   } | null;
+  /** The universe this viewer's shop lists, in the NEW order (ADR-0164: a rep's own). */
+  index: () => Promise<ProductIndexRow[]>;
   /** The cards of these listed products, in any order, priced with `book`'s programs. */
   cards: (ids: readonly number[], book: DealBook) => Promise<P[]>;
 }
@@ -175,10 +182,11 @@ export class CustomerHomeService {
 
   /**
    * The rep app's home (the owner, 2026-10-23): «Bto300»'s banners, category grid and sections
-   * PROMOTIONS, the shown segments, DISCOUNTS and NEW over the same universe, with the rep's cards.
+   * PROMOTIONS, the shown segments, DISCOUNTS and NEW over this rep's universe (ADR-0164), with the
+   * rep's cards.
    */
-  repHome(): Promise<CustomerHome<RepShopProduct>> {
-    return this.window(this.repViewer());
+  async repHome(ctx: AuthContext): Promise<CustomerHome<RepShopProduct>> {
+    return this.window(await this.repViewer(ctx));
   }
 
   /**
@@ -194,11 +202,12 @@ export class CustomerHomeService {
   }
 
   /** The rep home's section list: the same, RECENT and FAVOURITES not found. */
-  repSectionPage(
+  async repSectionPage(
+    ctx: AuthContext,
     key: HomeSectionKey,
     query: SectionPageQuery,
   ): Promise<SectionPage<RepShopProduct>> {
-    return this.list(this.repViewer(), key, query);
+    return this.list(await this.repViewer(ctx), key, query);
   }
 
   /**
@@ -210,8 +219,8 @@ export class CustomerHomeService {
   }
 
   /** The rep home's category page: the same, with the rep's cards. */
-  repCategoryPage(id: number): Promise<CategoryPage<RepShopProduct>> {
-    return this.category(this.repViewer(), id);
+  async repCategoryPage(ctx: AuthContext, id: number): Promise<CategoryPage<RepShopProduct>> {
+    return this.category(await this.repViewer(ctx), id);
   }
 
   /** A store's window: its orders, its ♡, its cards (stock words, ♡). */
@@ -222,17 +231,23 @@ export class CustomerHomeService {
           this.orders.recentProducts(ctx.customerId, addDays(today, 1 - RECENT_ORDER_DAYS)),
         favourites: () => this.shop.favouriteIds(ctx),
       },
+      index: () => this.shop.index(),
       cards: (ids, book) => this.shop.productsOf(ctx, ids, book),
     };
   }
 
   /** A rep's window: no store of its own, the rep app's cards (numbers, badges). */
-  private repViewer(): Viewer<RepShopProduct> {
-    return { store: null, cards: (ids, book) => this.shop.repProductsOf(ids, book) };
+  private async repViewer(ctx: AuthContext): Promise<Viewer<RepShopProduct>> {
+    const scope = await this.shop.repScope(ctx);
+    return {
+      store: null,
+      index: () => this.shop.repIndex(scope),
+      cards: (ids, book) => this.shop.repProductsOf(scope, ids, book),
+    };
   }
 
   private async window<P extends { id: number }>(viewer: Viewer<P>): Promise<CustomerHome<P>> {
-    const shop = await this.read();
+    const shop = await this.read(viewer);
     const listed = new Set(shop.rank.keys());
     const tree = await this.categories.list();
     const shown = await this.productQuery.productSegments({ shownInApp: true });
@@ -256,7 +271,7 @@ export class CustomerHomeService {
     return {
       today: shop.today,
       banners: await this.banners.running(shop.today, listed),
-      categories: await this.tiles(shop, tree, null),
+      categories: this.tiles(shop, tree, null),
       sections: await this.rows(viewer, shop, sections),
     };
   }
@@ -274,7 +289,7 @@ export class CustomerHomeService {
     const sort = query.sort ?? 'DEFAULT';
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const after = cursorOf(query.cursor, keyText, sort);
-    const shop = await this.read(after?.d);
+    const shop = await this.read(viewer, after?.d);
     let section: SectionIds;
     if (key.kind === 'SEGMENT') {
       const [segment] = await this.productQuery.productSegments({ ids: [key.segmentId] });
@@ -327,7 +342,7 @@ export class CustomerHomeService {
     const tree = await this.categories.list();
     const category = tree.find((own) => own.id === id);
     if (!category) throw notFound('category', id);
-    const shop = await this.read();
+    const shop = await this.read(viewer);
     const within = new Set(await this.categories.subtreeIds(id));
     const inside = (ids: readonly number[]) =>
       ids.filter((own) => within.has(shop.categoryOf.get(own) ?? -1));
@@ -345,18 +360,19 @@ export class CustomerHomeService {
         parentId: category.parentId,
         name: category.name,
         imageUrl: category.imageUrl,
+        iconKey: category.iconKey,
       },
       productCount: inside([...shop.rank.keys()]).length,
       banners,
-      subcategories: await this.tiles(shop, tree, id),
+      subcategories: this.tiles(shop, tree, id),
       sections: await this.rows(viewer, shop, sections),
     };
   }
 
   /** The request's view of the shop; `day` pins a later page to its first page's day. */
-  private async read(day?: string): Promise<Shop> {
+  private async read<P>(viewer: Viewer<P>, day?: string): Promise<Shop> {
     const today = day ?? businessDate();
-    const rows = await this.shop.index();
+    const rows = await viewer.index();
     return {
       today,
       rows,
@@ -519,13 +535,14 @@ export class CustomerHomeService {
 
   /**
    * Category tiles: the top categories (`parentId` null) or a category's children that hold
-   * listed products, by name, with their own picture or one of their newest products' thumbnail.
+   * listed products, by name, with their own picture if they have one; the apps draw the icon of
+   * the rest (ADR-0163, which took the place of a product's thumbnail).
    */
-  private async tiles(
+  private tiles(
     shop: Shop,
     tree: readonly CategoryView[],
     parentId: number | null,
-  ): Promise<HomeCategory[]> {
+  ): HomeCategory[] {
     const parentOf = new Map(tree.map((category) => [category.id, category.parentId]));
     const tileOf = (categoryId: number): number | null => {
       let current: number | null = categoryId;
@@ -547,20 +564,13 @@ export class CustomerHomeService {
     const tiles = tree
       .filter((category) => category.parentId === parentId && members.has(category.id))
       .sort((a, b) => a.name.localeCompare(b.name, 'mn') || a.id - b.id);
-    const candidates = tiles.flatMap((tile) =>
-      tile.imageUrl ? [] : (members.get(tile.id) ?? []).slice(0, PICTURE_CANDIDATES),
-    );
-    const thumbs = await this.productQuery.primaryThumbsOf(candidates);
-    return tiles.map((tile) => {
-      const own = members.get(tile.id) ?? [];
-      const sample = own.slice(0, PICTURE_CANDIDATES).find((id) => thumbs.has(id));
-      return {
-        id: tile.id,
-        name: tile.name,
-        imageUrl: tile.imageUrl ?? (sample === undefined ? null : (thumbs.get(sample) ?? null)),
-        productCount: own.length,
-      };
-    });
+    return tiles.map((tile) => ({
+      id: tile.id,
+      name: tile.name,
+      imageUrl: tile.imageUrl,
+      iconKey: tile.iconKey,
+      productCount: (members.get(tile.id) ?? []).length,
+    }));
   }
 }
 

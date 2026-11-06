@@ -204,8 +204,11 @@ export class SalesRepController {
   @Get('products')
   @RequirePermission(REP)
   @ApiOkResponse({ type: SalesRepProductPageDto })
-  async products(@Query() query: SalesRepProductQueryDto): Promise<SalesRepProductPageDto> {
-    const page = await this.shop.productPage({
+  async products(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: SalesRepProductQueryDto,
+  ): Promise<SalesRepProductPageDto> {
+    const page = await this.shop.productPage(await this.shop.staffScope(ctx), {
       ...(query.q ? { q: query.q } : {}),
       ...(query.categoryIds ? { categoryIds: query.categoryIds } : {}),
       ...(query.warehouseId === undefined ? {} : { warehouseId: query.warehouseId }),
@@ -225,25 +228,29 @@ export class SalesRepController {
   @Get('products/batch')
   @RequirePermission(REP)
   @ApiOkResponse({ type: [SalesRepProductDto] })
-  async productBatch(@Query() query: SalesRepProductBatchQueryDto): Promise<SalesRepProductDto[]> {
+  async productBatch(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: SalesRepProductBatchQueryDto,
+  ): Promise<SalesRepProductDto[]> {
     const ids = query.productIds.split(',').map((id) => Number.parseInt(id, 10));
-    return (await this.shop.withDeals(await this.shop.productsOf(ids, query.priceBefore))).map(
-      toRepProductDto,
-    );
+    const scope = await this.shop.staffScope(ctx);
+    return (
+      await this.shop.withDeals(await this.shop.productsOf(scope, ids, query.priceBefore))
+    ).map(toRepProductDto);
   }
 
   @Get('suppliers')
   @RequirePermission(REP)
   @ApiOkResponse({ type: [SalesRepSupplierDto] })
-  suppliers(): Promise<SalesRepSupplierDto[]> {
-    return this.shop.suppliers();
+  async suppliers(@CurrentUser() ctx: AuthContext): Promise<SalesRepSupplierDto[]> {
+    return this.shop.suppliers(await this.shop.staffScope(ctx));
   }
 
   @Get('thumbs')
   @RequirePermission(REP)
   @ApiOkResponse({ type: SalesRepThumbsDto })
-  async thumbs(): Promise<SalesRepThumbsDto> {
-    return { urls: await this.shop.thumbs() };
+  async thumbs(@CurrentUser() ctx: AuthContext): Promise<SalesRepThumbsDto> {
+    return { urls: await this.shop.thumbs(await this.shop.staffScope(ctx)) };
   }
 
   @Get('customers')

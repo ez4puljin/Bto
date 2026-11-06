@@ -5375,6 +5375,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app-settings/staff-assortments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StaffAppAssortments_list"];
+        put?: never;
+        post: operations["StaffAppAssortments_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app-settings/staff-assortments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["StaffAppAssortments_update"];
+        post?: never;
+        delete: operations["StaffAppAssortments_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sales-rep/context": {
         parameters: {
             query?: never;
@@ -9577,6 +9609,8 @@ export interface components {
             childCount: number;
             /** @description A top category’s picture in «Bto300» (ADR-0092 #6) */
             imageUrl: string | null;
+            /** @description The drawing chosen for it (ADR-0163); null: the one its name asks for */
+            iconKey: string | null;
         };
         CategoryList: {
             data: components["schemas"]["Category"][];
@@ -9590,6 +9624,11 @@ export interface components {
             /** @description First code of the block of the category (ADR-0044); both ends or neither */
             skuFrom?: string | null;
             skuTo?: string | null;
+            /**
+             * @description The drawing chosen for it (ADR-0163); null: the one its name asks for
+             * @enum {string|null}
+             */
+            iconKey?: "drinks" | "wine" | "vodka" | "beer" | "water" | "energy" | "soda" | "tetra" | "juice" | "sweets" | "gum" | "wafer" | "giftBox" | "cookie" | "lollipop" | "swissRoll" | "cake" | "candyBag" | "nuts" | "chips" | "chocolate" | "gummy" | "candyBox" | "candy" | "dairy" | "milk" | "yogurt" | "tarag" | "cheese" | "butter" | "condiment" | "salt" | "spice" | "mayo" | "pickles" | "oil" | "ketchup" | "jam" | "honey" | "compote" | "condensed" | "can" | "wheat" | "rice" | "flour" | "noodles" | "seaweed" | "teaCoffee" | "tea" | "coffee" | "sugarCube" | "meat" | "jerky" | "sausage" | "egg" | "chicken" | "dumpling" | "readyMeal" | "iceCream" | "bread" | "croissant" | "assorted" | "register" | "packing" | "pieces" | "cigarette" | "vape" | "slippers" | "electric" | "bagsTape" | "china" | "japan" | "babyFood" | "puree" | "toy" | "kidsGift" | "ger" | "stationery" | "baby" | "gloves" | "household" | "homeGoods" | "feminine" | "cleaner" | "detergent" | "soap" | "shoeCare" | "toiletPaper" | "diaper" | "tissue" | "shampoo" | "toothpaste" | "cosmetics" | "laundrySoap" | "bag" | "uncategorized" | null;
         };
         CategoryImageRequest: {
             /** @description An uploaded file of kind catalog.category_image */
@@ -9603,6 +9642,11 @@ export interface components {
             /** @description First code of the block of the category (ADR-0044); both ends or neither */
             skuFrom?: string | null;
             skuTo?: string | null;
+            /**
+             * @description The drawing chosen for it (ADR-0163); null: the one its name asks for
+             * @enum {string|null}
+             */
+            iconKey?: "drinks" | "wine" | "vodka" | "beer" | "water" | "energy" | "soda" | "tetra" | "juice" | "sweets" | "gum" | "wafer" | "giftBox" | "cookie" | "lollipop" | "swissRoll" | "cake" | "candyBag" | "nuts" | "chips" | "chocolate" | "gummy" | "candyBox" | "candy" | "dairy" | "milk" | "yogurt" | "tarag" | "cheese" | "butter" | "condiment" | "salt" | "spice" | "mayo" | "pickles" | "oil" | "ketchup" | "jam" | "honey" | "compote" | "condensed" | "can" | "wheat" | "rice" | "flour" | "noodles" | "seaweed" | "teaCoffee" | "tea" | "coffee" | "sugarCube" | "meat" | "jerky" | "sausage" | "egg" | "chicken" | "dumpling" | "readyMeal" | "iceCream" | "bread" | "croissant" | "assorted" | "register" | "packing" | "pieces" | "cigarette" | "vape" | "slippers" | "electric" | "bagsTape" | "china" | "japan" | "babyFood" | "puree" | "toy" | "kidsGift" | "ger" | "stationery" | "baby" | "gloves" | "household" | "homeGoods" | "feminine" | "cleaner" | "detergent" | "soap" | "shoeCare" | "toiletPaper" | "diaper" | "tissue" | "shampoo" | "toothpaste" | "cosmetics" | "laundrySoap" | "bag" | "uncategorized" | null;
         };
         ProductHistoryEntry: {
             id: number;
@@ -14697,6 +14741,39 @@ export interface components {
             appName: string | null;
             appColor: string | null;
         };
+        StaffAppAssortmentSegment: {
+            id: number;
+            name: string;
+        };
+        StaffAppAssortmentUser: {
+            id: number;
+            fullName: string;
+            /** @description False for a disabled account */
+            active: boolean;
+        };
+        StaffAppAssortment: {
+            id: number;
+            title: string;
+            /** @description The live segments it names */
+            segments: components["schemas"]["StaffAppAssortmentSegment"][];
+            /** @description Segments archived since: they narrow nothing, a save drops them */
+            goneSegmentCount: number;
+            users: components["schemas"]["StaffAppAssortmentUser"][];
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        StaffAppAssortmentList: {
+            data: components["schemas"]["StaffAppAssortment"][];
+            /** @description Always null: the whole list */
+            nextCursor: string | null;
+        };
+        StaffAppAssortmentRequest: {
+            title: string;
+            /** @description Live product segments, at least one */
+            segmentIds: number[];
+            /** @description Staff members, at least one */
+            userIds: number[];
+        };
         SalesRepStage: {
             id: number;
             name: string;
@@ -18658,8 +18735,10 @@ export interface components {
         CustomerAppHomeCategory: {
             id: number;
             name: string;
-            /** @description Its picture, else a product’s */
+            /** @description Its own picture, if any */
             imageUrl: string | null;
+            /** @description The drawing chosen for it; null: the one its name asks for (ADR-0163) */
+            iconKey: string | null;
             /** @description Products «Бараа» sells in it, subcategories included */
             productCount: number;
         };
@@ -18706,6 +18785,8 @@ export interface components {
             total: number | null;
         };
         CustomerAppCategoryHeader: {
+            /** @description The drawing chosen for it; null: the one its name asks for (ADR-0163) */
+            iconKey: string | null;
             id: number;
             parentId: number | null;
             name: string;
@@ -33376,6 +33457,131 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AppBranding"];
                 };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StaffAppAssortments_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffAppAssortmentList"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StaffAppAssortments_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StaffAppAssortmentRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffAppAssortment"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StaffAppAssortments_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StaffAppAssortmentRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffAppAssortment"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StaffAppAssortments_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description RFC 9457 problem details */
             default: {

@@ -409,6 +409,14 @@ export const HOME_TOGGLE_KINDS = ['PROMOTIONS', 'DISCOUNTS', 'NEW'] as const;
 export type HomeToggleKind = (typeof HOME_TOGGLE_KINDS)[number];
 
 /** The apps' settings (ADR-0127): the name and the colour the apps may show, the minimum order. */
+/** A setting of which products the staff app shows whom (ADR-0164). */
+export const STAFF_ASSORTMENT_LIMITS = {
+  maxTitle: 120,
+  /** More would not be a setting anyone could read. */
+  maxSegments: 50,
+  maxUsers: 500,
+} as const;
+
 export const APP_SETTINGS_LIMITS = {
   /** The app's display name. */
   maxAppName: 40,

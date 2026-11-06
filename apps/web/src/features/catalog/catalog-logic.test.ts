@@ -15,6 +15,7 @@ const category = (id: number, name: string, parentId: number | null = null): Cat
   productCount: 0,
   childCount: 0,
   imageUrl: null,
+  iconKey: null,
 });
 const CATEGORIES = [
   category(3, 'Ундаа'),

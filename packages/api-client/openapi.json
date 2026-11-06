@@ -22056,6 +22056,187 @@
         ]
       }
     },
+    "/api/v1/app-settings/staff-assortments": {
+      "get": {
+        "operationId": "StaffAppAssortments_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffAppAssortmentList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      },
+      "post": {
+        "operationId": "StaffAppAssortments_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffAppAssortmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffAppAssortment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/app-settings/staff-assortments/{id}": {
+      "put": {
+        "operationId": "StaffAppAssortments_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffAppAssortmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffAppAssortment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      },
+      "delete": {
+        "operationId": "StaffAppAssortments_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales-rep/context": {
       "get": {
         "operationId": "SalesRep_context",
@@ -39371,6 +39552,11 @@
             "type": "string",
             "nullable": true,
             "description": "A top category’s picture in «Bto300» (ADR-0092 #6)"
+          },
+          "iconKey": {
+            "type": "string",
+            "nullable": true,
+            "description": "The drawing chosen for it (ADR-0163); null: the one its name asks for"
           }
         },
         "required": [
@@ -39382,7 +39568,8 @@
           "skuTo",
           "productCount",
           "childCount",
-          "imageUrl"
+          "imageUrl",
+          "iconKey"
         ]
       },
       "CategoryList": {
@@ -39432,6 +39619,109 @@
             "type": "string",
             "nullable": true,
             "pattern": "^[0-9]{1,20}$"
+          },
+          "iconKey": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "drinks",
+              "wine",
+              "vodka",
+              "beer",
+              "water",
+              "energy",
+              "soda",
+              "tetra",
+              "juice",
+              "sweets",
+              "gum",
+              "wafer",
+              "giftBox",
+              "cookie",
+              "lollipop",
+              "swissRoll",
+              "cake",
+              "candyBag",
+              "nuts",
+              "chips",
+              "chocolate",
+              "gummy",
+              "candyBox",
+              "candy",
+              "dairy",
+              "milk",
+              "yogurt",
+              "tarag",
+              "cheese",
+              "butter",
+              "condiment",
+              "salt",
+              "spice",
+              "mayo",
+              "pickles",
+              "oil",
+              "ketchup",
+              "jam",
+              "honey",
+              "compote",
+              "condensed",
+              "can",
+              "wheat",
+              "rice",
+              "flour",
+              "noodles",
+              "seaweed",
+              "teaCoffee",
+              "tea",
+              "coffee",
+              "sugarCube",
+              "meat",
+              "jerky",
+              "sausage",
+              "egg",
+              "chicken",
+              "dumpling",
+              "readyMeal",
+              "iceCream",
+              "bread",
+              "croissant",
+              "assorted",
+              "register",
+              "packing",
+              "pieces",
+              "cigarette",
+              "vape",
+              "slippers",
+              "electric",
+              "bagsTape",
+              "china",
+              "japan",
+              "babyFood",
+              "puree",
+              "toy",
+              "kidsGift",
+              "ger",
+              "stationery",
+              "baby",
+              "gloves",
+              "household",
+              "homeGoods",
+              "feminine",
+              "cleaner",
+              "detergent",
+              "soap",
+              "shoeCare",
+              "toiletPaper",
+              "diaper",
+              "tissue",
+              "shampoo",
+              "toothpaste",
+              "cosmetics",
+              "laundrySoap",
+              "bag",
+              "uncategorized"
+            ],
+            "description": "The drawing chosen for it (ADR-0163); null: the one its name asks for"
           }
         },
         "required": [
@@ -39479,6 +39769,109 @@
             "type": "string",
             "nullable": true,
             "pattern": "^[0-9]{1,20}$"
+          },
+          "iconKey": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "drinks",
+              "wine",
+              "vodka",
+              "beer",
+              "water",
+              "energy",
+              "soda",
+              "tetra",
+              "juice",
+              "sweets",
+              "gum",
+              "wafer",
+              "giftBox",
+              "cookie",
+              "lollipop",
+              "swissRoll",
+              "cake",
+              "candyBag",
+              "nuts",
+              "chips",
+              "chocolate",
+              "gummy",
+              "candyBox",
+              "candy",
+              "dairy",
+              "milk",
+              "yogurt",
+              "tarag",
+              "cheese",
+              "butter",
+              "condiment",
+              "salt",
+              "spice",
+              "mayo",
+              "pickles",
+              "oil",
+              "ketchup",
+              "jam",
+              "honey",
+              "compote",
+              "condensed",
+              "can",
+              "wheat",
+              "rice",
+              "flour",
+              "noodles",
+              "seaweed",
+              "teaCoffee",
+              "tea",
+              "coffee",
+              "sugarCube",
+              "meat",
+              "jerky",
+              "sausage",
+              "egg",
+              "chicken",
+              "dumpling",
+              "readyMeal",
+              "iceCream",
+              "bread",
+              "croissant",
+              "assorted",
+              "register",
+              "packing",
+              "pieces",
+              "cigarette",
+              "vape",
+              "slippers",
+              "electric",
+              "bagsTape",
+              "china",
+              "japan",
+              "babyFood",
+              "puree",
+              "toy",
+              "kidsGift",
+              "ger",
+              "stationery",
+              "baby",
+              "gloves",
+              "household",
+              "homeGoods",
+              "feminine",
+              "cleaner",
+              "detergent",
+              "soap",
+              "shoeCare",
+              "toiletPaper",
+              "diaper",
+              "tissue",
+              "shampoo",
+              "toothpaste",
+              "cosmetics",
+              "laundrySoap",
+              "bag",
+              "uncategorized"
+            ],
+            "description": "The drawing chosen for it (ADR-0163); null: the one its name asks for"
           }
         }
       },
@@ -57339,6 +57732,135 @@
           "appColor"
         ]
       },
+      "StaffAppAssortmentSegment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "StaffAppAssortmentUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "False for a disabled account"
+          }
+        },
+        "required": [
+          "id",
+          "fullName",
+          "active"
+        ]
+      },
+      "StaffAppAssortment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "title": {
+            "type": "string"
+          },
+          "segments": {
+            "description": "The live segments it names",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaffAppAssortmentSegment"
+            }
+          },
+          "goneSegmentCount": {
+            "type": "number",
+            "description": "Segments archived since: they narrow nothing, a save drops them"
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaffAppAssortmentUser"
+            }
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "segments",
+          "goneSegmentCount",
+          "users",
+          "updatedAt"
+        ]
+      },
+      "StaffAppAssortmentList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaffAppAssortment"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Always null: the whole list"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "StaffAppAssortmentRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "segmentIds": {
+            "uniqueItems": true,
+            "minItems": 1,
+            "description": "Live product segments, at least one",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "userIds": {
+            "uniqueItems": true,
+            "minItems": 1,
+            "description": "Staff members, at least one",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "required": [
+          "title",
+          "segmentIds",
+          "userIds"
+        ]
+      },
       "SalesRepStage": {
         "type": "object",
         "properties": {
@@ -70955,7 +71477,12 @@
           "imageUrl": {
             "type": "string",
             "nullable": true,
-            "description": "Its picture, else a product’s"
+            "description": "Its own picture, if any"
+          },
+          "iconKey": {
+            "type": "string",
+            "nullable": true,
+            "description": "The drawing chosen for it; null: the one its name asks for (ADR-0163)"
           },
           "productCount": {
             "type": "number",
@@ -70966,6 +71493,7 @@
           "id",
           "name",
           "imageUrl",
+          "iconKey",
           "productCount"
         ]
       },
@@ -71123,6 +71651,11 @@
       "CustomerAppCategoryHeader": {
         "type": "object",
         "properties": {
+          "iconKey": {
+            "type": "string",
+            "nullable": true,
+            "description": "The drawing chosen for it; null: the one its name asks for (ADR-0163)"
+          },
           "id": {
             "type": "number"
           },
@@ -71139,6 +71672,7 @@
           }
         },
         "required": [
+          "iconKey",
           "id",
           "parentId",
           "name",

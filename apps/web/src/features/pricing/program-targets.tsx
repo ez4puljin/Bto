@@ -8,7 +8,7 @@ import { SupplierSelect } from '@/features/partners/party-select';
 import type { Choice } from './program-choices';
 
 /** What has been chosen, each with its ✕. */
-function Chips(props: { items: readonly Choice[]; onRemove: (id: number) => void }) {
+export function Chips(props: { items: readonly Choice[]; onRemove: (id: number) => void }) {
   const { t } = useTranslation();
   if (props.items.length === 0) return null;
   return (

@@ -15,7 +15,7 @@ export const APP_SETTINGS_MANAGE = 'customer.home.manage';
 
 /** The apps' settings as stored; `homeSections` is a map of the three fixed sections. */
 export interface AppSettings {
-  /** The PRODUCT segment both apps sell from; null = every sale-ready product. */
+  /** The PRODUCT segment «Bto300» sells from (ADR-0164 #1); null = every sale-ready product. */
   assortmentSegmentId: number | null;
   homeSections: Record<HomeToggleKind, boolean>;
   /** The customer app refuses an order under this amount; null = none. */
@@ -49,8 +49,8 @@ const DEFAULTS: AppSettings = {
 };
 
 /**
- * The apps' settings (ADR-0127): which products «Bto300» and the staff app show (a product
- * segment, ADR-0127 #1), which fixed home sections are on (#3), the customer app's minimum order
+ * The apps' settings (ADR-0127): which products «Bto300» shows (a product segment, ADR-0127 #1;
+ * the staff app has its own settings, ADR-0164), which fixed home sections are on (#3), the customer app's minimum order
  * (#4), the name and colour the apps may show. One row, read by the shop and the home on every
  * request; changed from «Апп» on the web with `customer.home.manage`. The segment is stored
  * without a foreign key (nobody imports segments) and re-checked through catalog's directory.

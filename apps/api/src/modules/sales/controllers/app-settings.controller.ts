@@ -67,7 +67,7 @@ export class AppSettingsController {
     return {
       assortmentSegmentId: settings.assortmentSegmentId,
       assortment,
-      shopProductCount: (await this.shop.index()).length,
+      shopProductCount: (await this.shop.index(await this.shop.customerScope())).length,
       homeSections: settings.homeSections,
       minOrderAmount: settings.minOrderAmount?.toFixed(0) ?? null,
       appName: settings.appName,

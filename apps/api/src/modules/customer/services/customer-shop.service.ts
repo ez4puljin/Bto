@@ -14,13 +14,14 @@ import {
   type ProductImageUrls,
   type ProductIndexRow,
 } from '../../catalog';
-import type { CustomerContext } from '../../identity';
+import type { AuthContext, CustomerContext } from '../../identity';
 import { type DealBook, PriceQuoteService, type ProductDeal, type Quote } from '../../pricing';
 import {
   type RepProduct,
   type RepShopProduct,
   SalesPipelinesService,
   SalesRepShopService,
+  type ShopScope,
 } from '../../sales';
 import { customerFavourites } from '../schema';
 
@@ -106,8 +107,18 @@ export class CustomerShopService {
   }
 
   /** The shop's universe in the NEW order (ADR-0093): every product «Bto300» lists. */
-  index(): Promise<ProductIndexRow[]> {
-    return this.shop.index();
+  async index(): Promise<ProductIndexRow[]> {
+    return this.shop.index(await this.shop.customerScope());
+  }
+
+  /** A staff member's shop on the rep home (ADR-0164). */
+  repScope(ctx: AuthContext): Promise<ShopScope> {
+    return this.shop.staffScope(ctx);
+  }
+
+  /** The same universe through a staff member's scope. */
+  repIndex(scope: ShopScope): Promise<ProductIndexRow[]> {
+    return this.shop.index(scope);
   }
 
   async productPage(
@@ -157,7 +168,7 @@ export class CustomerShopService {
         favouriteCount: first ? (await this.listed(favourites)).length : null,
       };
     }
-    const page = await this.shop.productPage({
+    const page = await this.shop.productPage(await this.shop.customerScope(), {
       ...(query.q ? { q: query.q } : {}),
       ...(query.categoryIds?.length ? { categoryIds: query.categoryIds } : {}),
       ...(only === undefined ? {} : { onlyIds: only }),
@@ -187,8 +198,12 @@ export class CustomerShopService {
 
   /** The shop's raw rows by id, home warehouse required (sale-ready and active already). */
   async listed(ids: readonly number[]): Promise<RepProduct[]> {
+    return this.listedIn(await this.shop.customerScope(), ids);
+  }
+
+  private async listedIn(scope: ShopScope, ids: readonly number[]): Promise<RepProduct[]> {
     if (ids.length === 0) return [];
-    return (await this.shop.productsOf([...new Set(ids)])).filter(
+    return (await this.shop.productsOf(scope, [...new Set(ids)])).filter(
       (product) => product.homeWarehouseId !== null,
     );
   }
@@ -197,8 +212,12 @@ export class CustomerShopService {
    * The rep app's cards of these products (the rep home, 2026-10-23): the shop's rows with their
    * badges and struck-through prices from `book`, in order; the rep sees numbers, so no words.
    */
-  async repProductsOf(ids: readonly number[], book: DealBook): Promise<RepShopProduct[]> {
-    return this.shop.withDeals(await this.listed(ids), book);
+  async repProductsOf(
+    scope: ShopScope,
+    ids: readonly number[],
+    book: DealBook,
+  ): Promise<RepShopProduct[]> {
+    return this.shop.withDeals(await this.listedIn(scope, ids), book);
   }
 
   /** The cards of these rows: stock words, ♡, badges and the struck-through price, in order. */
@@ -225,8 +244,8 @@ export class CustomerShopService {
     }));
   }
 
-  thumbs(): Promise<string[]> {
-    return this.shop.thumbs();
+  async thumbs(): Promise<string[]> {
+    return this.shop.thumbs(await this.shop.customerScope());
   }
 
   async categoryTree(): Promise<CustomerCategory[]> {

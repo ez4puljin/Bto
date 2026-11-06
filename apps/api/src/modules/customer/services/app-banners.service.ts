@@ -282,7 +282,8 @@ export class AppBannersService {
         throw invalid('linkId', 'exists', `no category ${id}`);
       }
     } else if (kind === 'PRODUCT') {
-      if ((await this.shop.productsOf([id])).every((product) => !product.sellable)) {
+      const scope = await this.shop.customerScope();
+      if ((await this.shop.productsOf(scope, [id])).every((product) => !product.sellable)) {
         throw invalid('linkId', 'sellable', `product ${id} is not on sale in the app`);
       }
     }
@@ -313,9 +314,10 @@ export class AppBannersService {
       ]),
     );
     const sellable = new Set(
-      (productIds.length ? await this.shop.productsOf(productIds) : []).flatMap((product) =>
-        product.sellable ? [product.id] : [],
-      ),
+      (productIds.length
+        ? await this.shop.productsOf(await this.shop.customerScope(), productIds)
+        : []
+      ).flatMap((product) => (product.sellable ? [product.id] : [])),
     );
     return { segments, categories, products, sellable };
   }

@@ -20,7 +20,7 @@ import {
   ProductQueryService,
   UnitConversionService,
 } from '../../catalog';
-import type { AuthContext } from '../../identity';
+import { type AuthContext, actorUserId } from '../../identity';
 import { ProductLocationsService, StockQueryService } from '../../inventory';
 import { CustomersService, ProductSuppliersService } from '../../partners';
 import {
@@ -33,6 +33,31 @@ import { overdueDto } from '../overdue';
 import { AppSettingsService } from './app-settings.service';
 import { SalesOrdersService } from './sales-orders.service';
 import { SalesPipelinesService } from './sales-pipelines.service';
+import { StaffAppAssortmentsService } from './staff-app-assortments.service';
+
+/**
+ * Whose shop a read is for: the product segments it narrows to, null for every sale-ready product.
+ * «Bto300» has one segment from «Апп → Бараа» (ADR-0127 #1); each staff member has what their
+ * settings name (ADR-0164). Required on every read, so none can forget it.
+ */
+export interface ShopScope {
+  segmentIds: readonly number[] | null;
+}
+
+/** What every given list holds; undefined when no list is given. */
+function common(lists: readonly (readonly number[] | null | undefined)[]): number[] | undefined {
+  let kept: number[] | undefined;
+  for (const list of lists) {
+    if (list === null || list === undefined) continue;
+    if (kept === undefined) {
+      kept = [...list];
+      continue;
+    }
+    const keep = new Set(list);
+    kept = kept.filter((id) => keep.has(id));
+  }
+  return kept;
+}
 
 /** A product as the rep's shop shows it: units with their wholesale price, and the stock. */
 export interface RepProduct {
@@ -209,9 +234,24 @@ export class SalesRepShopService {
     private readonly locations: ProductLocationsService,
     private readonly deals: ProductDealsService,
     private readonly settings: AppSettingsService,
+    private readonly staffAssortments: StaffAppAssortmentsService,
     private readonly units: UnitConversionService,
     private readonly pipelines: SalesPipelinesService,
   ) {}
+
+  /** «Bto300»'s shop: the one segment of «Апп → Бараа», or everything (ADR-0127 #1). */
+  async customerScope(): Promise<ShopScope> {
+    const segmentId = await this.settings.assortmentSegmentId();
+    return { segmentIds: segmentId === null ? null : [segmentId] };
+  }
+
+  /** A staff member's shop: what their settings name, or everything (ADR-0164). */
+  async staffScope(ctx: AuthContext): Promise<ShopScope> {
+    const userId = actorUserId(ctx);
+    return {
+      segmentIds: userId === null ? null : await this.staffAssortments.segmentIdsOf(userId),
+    };
+  }
 
   /** The WHOLESALE programs in force on `today` and the products they mark (one read per request). */
   async dealBook(
@@ -247,23 +287,19 @@ export class SalesRepShopService {
    * keeps the first page's day, so a page after midnight continues the same order.
    */
   async productPage(
+    scope: ShopScope,
     query: RepProductQuery,
   ): Promise<{ data: RepProduct[]; nextCursor: string | null; total: number | null }> {
     const today = businessDate();
     const where = shopWhere(query);
     const inStock = query.inStock ? await this.stock.productIdsAvailableAtHome() : undefined;
-    const onlyIds =
-      query.onlyIds && inStock
-        ? query.onlyIds.filter((id) => new Set(inStock).has(id))
-        : (query.onlyIds ?? inStock);
-    const segmentId = await this.settings.assortmentSegmentId();
+    const onlyIds = common([query.onlyIds, inStock, await this.scopeIds(scope)]);
     const base: ProductListQuery = {
       ...(query.q ? { q: query.q } : {}),
       status: 'ACTIVE',
       saleReady: true,
       ...(where ? { where } : {}),
       ...(onlyIds ? { onlyIds } : {}),
-      ...(segmentId === null ? {} : { segmentId }),
     };
     const sort = query.sort ?? 'NEW';
     if (sort === 'NEW') {
@@ -314,11 +350,15 @@ export class SalesRepShopService {
    * Products by id (a cart refreshed, a scanned barcode, a notice), only those the shop would
    * list; with `priceBefore`, also each base price on that day (a price-drop notice's old price).
    */
-  async productsOf(ids: readonly number[], priceBefore?: string): Promise<RepProduct[]> {
+  async productsOf(
+    scope: ShopScope,
+    ids: readonly number[],
+    priceBefore?: string,
+  ): Promise<RepProduct[]> {
     if (priceBefore !== undefined && !isIsoDate(priceBefore)) {
       throw invalid('priceBefore', 'isDate', 'priceBefore must be a date');
     }
-    const rows = await this.products.listItemsOf(await this.inAssortment(ids));
+    const rows = await this.products.listItemsOf(await this.inScope(scope, ids));
     return this.enrich(
       rows.filter((row) => row.status === 'ACTIVE' && row.saleReadyAt !== null),
       businessDate(),
@@ -330,26 +370,26 @@ export class SalesRepShopService {
    * «Bto300»'s shop index (ADR-0093): every product the customer app lists — active, sale-ready,
    * with a home warehouse — in the NEW order, with its category and sale-ready moment.
    */
-  async index(): Promise<ProductIndexRow[]> {
-    const segmentId = await this.settings.assortmentSegmentId();
+  async index(scope: ShopScope): Promise<ProductIndexRow[]> {
+    const onlyIds = await this.scopeIds(scope);
     return this.products.index(
       {
         status: 'ACTIVE',
         saleReady: true,
         sort: 'NEW',
         where: { match: 'ALL', groups: [{ match: 'ALL', conditions: [HOME_ANY] }] },
-        ...(segmentId === null ? {} : { segmentId }),
+        ...(onlyIds === null ? {} : { onlyIds }),
       },
       REP_PRICE_SORT_MAX,
     );
   }
 
   /**
-   * An app order carries only products the apps sell (ADR-0127 #1): every id must be in the
-   * assortment segment while one is set; 409 PRODUCT_NOT_IN_APP names the others.
+   * An app order carries only products its shop lists (ADR-0127 #1, ADR-0164): every id must be
+   * in the scope; 409 PRODUCT_NOT_IN_APP names the others.
    */
-  async assertListed(ids: readonly number[]): Promise<void> {
-    const kept = new Set(await this.inAssortment(ids));
+  async assertListed(scope: ShopScope, ids: readonly number[]): Promise<void> {
+    const kept = new Set(await this.inScope(scope, ids));
     const outside = [...new Set(ids)].filter((id) => !kept.has(id));
     if (outside.length > 0) {
       throw new AppError(
@@ -360,22 +400,33 @@ export class SalesRepShopService {
     }
   }
 
-  /** The same for order lines: the units' products must be in the assortment. */
-  async assertUnitsListed(unitIds: readonly number[]): Promise<void> {
+  /** The same for order lines: the units' products must be in the scope. */
+  async assertUnitsListed(scope: ShopScope, unitIds: readonly number[]): Promise<void> {
     const units = await this.units.describe(unitIds);
-    await this.assertListed([...units.values()].map((unit) => unit.productId));
+    await this.assertListed(
+      scope,
+      [...units.values()].map((unit) => unit.productId),
+    );
   }
 
-  /** `ids` narrowed to the assortment segment when one is set (ADR-0127 #1), else as given. */
-  private async inAssortment(ids: readonly number[]): Promise<number[]> {
-    const segmentId = await this.settings.assortmentSegmentId();
-    if (segmentId === null) return [...ids];
-    return (await this.products.within({ segmentId, onlyIds: ids })) ?? [...ids];
+  /** What a scope's segments hold together; null when it narrows nothing. */
+  private async scopeIds(scope: ShopScope): Promise<number[] | null> {
+    if (scope.segmentIds === null) return null;
+    const kept = new Set<number>();
+    for (const segmentId of scope.segmentIds) {
+      for (const id of (await this.products.within({ segmentId })) ?? []) kept.add(id);
+    }
+    return [...kept];
+  }
+
+  /** `ids` narrowed to a scope, else as given. */
+  private async inScope(scope: ShopScope, ids: readonly number[]): Promise<number[]> {
+    return common([ids, await this.scopeIds(scope)]) ?? [];
   }
 
   /** The main suppliers of the shop's products, with how many each has, the most first. */
-  async suppliers(): Promise<RepSupplier[]> {
-    const counts = await this.productSuppliers.mainSupplierCounts(await this.shopIds());
+  async suppliers(scope: ShopScope): Promise<RepSupplier[]> {
+    const counts = await this.productSuppliers.mainSupplierCounts(await this.shopIds(scope));
     return counts.map((row) => ({
       id: row.supplierId,
       name: row.name,
@@ -387,8 +438,8 @@ export class SalesRepShopService {
    * The primary picture's thumbnail of every product the shop lists: the phone downloads each one
    * once and keeps it (ADR-0068). The URLs never change; a new picture has a new URL.
    */
-  async thumbs(): Promise<string[]> {
-    return [...(await this.products.primaryThumbsOf(await this.shopIds())).values()];
+  async thumbs(scope: ShopScope): Promise<string[]> {
+    return [...(await this.products.primaryThumbsOf(await this.shopIds(scope))).values()];
   }
 
   async customerPage(
@@ -433,11 +484,11 @@ export class SalesRepShopService {
   }
 
   /**
-   * Every product the shop can list: active and sale-ready (the ACTIVE stage), within the
-   * assortment segment when one is set (ADR-0127 #1).
+   * Every product the shop can list: active and sale-ready (the ACTIVE stage), within the scope.
    */
-  private async shopIds(): Promise<number[]> {
-    return this.inAssortment(
+  private async shopIds(scope: ShopScope): Promise<number[]> {
+    return this.inScope(
+      scope,
       await this.productFilters.idsWhere({ field: 'stage', op: 'IN', values: ['ACTIVE'] }),
     );
   }

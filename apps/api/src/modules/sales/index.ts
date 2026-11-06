@@ -57,6 +57,7 @@ export {
   type RepProductQuery,
   type RepShopProduct,
   SalesRepShopService,
+  type ShopScope,
 } from './services/sales-rep-shop.service';
 // The rep product's wire shape, reused by the rep home's routes (customer module, 2026-10-23).
 export { toRepDealDto, toRepProductDto } from './controllers/rep-mappers';

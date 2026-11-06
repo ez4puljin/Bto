@@ -224,6 +224,12 @@ export class CustomerAppSectionPageDto {
 
 @ApiSchema({ name: 'CustomerAppCategoryHeader' })
 export class CustomerAppCategoryHeaderDto {
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'The drawing chosen for it; null: the one its name asks for (ADR-0163)',
+  })
+  iconKey: string | null;
   @ApiProperty() id: number;
   @ApiProperty({ type: Number, nullable: true }) parentId: number | null;
   @ApiProperty() name: string;

@@ -73,6 +73,7 @@ const CATEGORIES: Schemas['Category'][] = [
     productCount: 3,
     childCount: 0,
     imageUrl: null,
+    iconKey: null,
   },
 ];
 const KEEPER: Me = {

@@ -1,8 +1,10 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
 import { SKU_PATTERN } from '@tugeel/shared/catalog';
+import { CATEGORY_ICON_KEYS } from '@tugeel/shared/category-icons';
 import { Transform } from 'class-transformer';
 import {
   IsBoolean,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -100,6 +102,12 @@ export class CategoryDto {
     description: 'A top category’s picture in «Bto300» (ADR-0092 #6)',
   })
   imageUrl: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'The drawing chosen for it (ADR-0163); null: the one its name asks for',
+  })
+  iconKey: string | null;
 }
 
 @ApiSchema({ name: 'CategoryImageRequest' })
@@ -151,6 +159,15 @@ export class CreateCategoryDto {
   @IsOptional()
   @Matches(SKU_PATTERN)
   skuTo?: string | null;
+
+  @ApiPropertyOptional({
+    enum: CATEGORY_ICON_KEYS,
+    nullable: true,
+    description: 'The drawing chosen for it (ADR-0163); null: the one its name asks for',
+  })
+  @IsOptional()
+  @IsIn(CATEGORY_ICON_KEYS)
+  iconKey?: string | null;
 }
 
 @ApiSchema({ name: 'CategoryUpdateRequest' })
@@ -188,4 +205,13 @@ export class UpdateCategoryDto {
   @IsOptional()
   @Matches(SKU_PATTERN)
   skuTo?: string | null;
+
+  @ApiPropertyOptional({
+    enum: CATEGORY_ICON_KEYS,
+    nullable: true,
+    description: 'The drawing chosen for it (ADR-0163); null: the one its name asks for',
+  })
+  @IsOptional()
+  @IsIn(CATEGORY_ICON_KEYS)
+  iconKey?: string | null;
 }

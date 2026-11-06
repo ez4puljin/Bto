@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { components } from '@tugeel/api-client';
+import { type components, idempotencyKey } from '@tugeel/api-client';
 import { useApiClient } from '@/app/api-client-context';
 import { KEYS as SEGMENT_KEYS } from '@/features/segments/api';
 import { unwrap } from '@/lib/problem';
@@ -8,6 +8,8 @@ type Schemas = components['schemas'];
 export type AppSettings = Schemas['AppSettings'];
 export type AppSettingsRequest = Schemas['AppSettingsRequest'];
 export type AppHomeSections = Schemas['AppHomeSections'];
+export type StaffAssortment = Schemas['StaffAppAssortment'];
+export type StaffAssortmentRequest = Schemas['StaffAppAssortmentRequest'];
 
 /** The home's sections in the order the app shows them (the fixed order, ADR-0092 #2). */
 export const HOME_SECTIONS = [
@@ -53,4 +55,54 @@ export function useSaveAppSettings() {
       void queryClient.invalidateQueries({ queryKey: SEGMENT_KEYS.segments });
     },
   });
+}
+
+const STAFF_ASSORTMENTS_KEY = ['app-settings', 'staff-assortments'] as const;
+
+/** Which products the staff app shows whom (ADR-0164). */
+export function useStaffAssortments() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: STAFF_ASSORTMENTS_KEY,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/app-settings/staff-assortments', { signal })),
+    select: (page) => page.data,
+  });
+}
+
+export function useStaffAssortmentMutations() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  const changed = () => void queryClient.invalidateQueries({ queryKey: STAFF_ASSORTMENTS_KEY });
+  return {
+    create: useMutation({
+      mutationFn: async ({ key, body }: { key: string; body: StaffAssortmentRequest }) =>
+        unwrap(
+          await api.POST('/api/v1/app-settings/staff-assortments', {
+            params: { header: idempotencyKey(key) },
+            body,
+          }),
+        ),
+      onSuccess: changed,
+    }),
+    update: useMutation({
+      mutationFn: async ({ id, body }: { id: number; body: StaffAssortmentRequest }) =>
+        unwrap(
+          await api.PUT('/api/v1/app-settings/staff-assortments/{id}', {
+            params: { path: { id } },
+            body,
+          }),
+        ),
+      onSuccess: changed,
+    }),
+    remove: useMutation({
+      mutationFn: async (id: number) =>
+        unwrap(
+          await api.DELETE('/api/v1/app-settings/staff-assortments/{id}', {
+            params: { path: { id } },
+          }),
+        ),
+      onSuccess: changed,
+    }),
+  };
 }

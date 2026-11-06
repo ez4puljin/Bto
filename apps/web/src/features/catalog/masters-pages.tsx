@@ -1,9 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { rangeOwner, SKU_PATTERN } from '@tugeel/shared/catalog';
+import { isCategoryIconKey } from '@tugeel/shared/category-icons';
 import {
   Check,
-  Folder,
-  FolderOpen,
   FolderPlus,
   FolderTree,
   ImageIcon,
@@ -59,6 +58,7 @@ import { uploadFile } from '@/lib/upload';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
 import { useDeleteConfirm } from '@/lib/use-delete-confirm';
+import { CategoryIcon, CategoryIconField } from './category-icon';
 import { type Category, type Uom, useCatalogMutations, useCategories, useUoms } from './api';
 import { categoryTree, subtreeIds } from './category-tree';
 import { CLASSIFICATION_CODE } from './product-schema';
@@ -164,7 +164,6 @@ export function CategoriesPage() {
           <TableBody>
             {categories.isPending ? <SkeletonRows columns={withActions ? 7 : 6} /> : null}
             {tree.map(({ category, depth }) => {
-              const Icon = category.childCount > 0 ? FolderOpen : Folder;
               return (
                 <TableRow key={category.id}>
                   <TableCell>
@@ -172,14 +171,7 @@ export function CategoriesPage() {
                       className="flex items-center gap-2"
                       style={{ paddingLeft: `${depth * 1.5}rem` }}
                     >
-                      <Icon
-                        aria-hidden
-                        className={
-                          depth === 0
-                            ? 'size-4 shrink-0 text-primary'
-                            : 'size-4 shrink-0 text-muted-foreground'
-                        }
-                      />
+                      <CategoryIcon category={category} />
                       <span className={depth === 0 ? 'font-medium' : undefined}>
                         {category.name}
                       </span>
@@ -303,7 +295,7 @@ const ACCEPT = 'image/jpeg,image/png,image/webp';
 /**
  * «Апп-ын зураг» (ADR-0092 #6, customer.home.manage): a top category's picture on «Bto300»'s
  * category grid, cut square (512×512) in the browser and saved at once (the tree then shows it);
- * «Зураг устгах» takes it away (the app then shows one of the category's products).
+ * «Зураг устгах» takes it away (the app then shows the category's icon, ADR-0163).
  */
 function CategoryPictureDialog(props: { category: Category; onClose: () => void }) {
   const { t } = useTranslation();
@@ -442,6 +434,7 @@ const categorySchema = z
     defaultClassificationCode: optionalCode,
     skuFrom: optionalSku,
     skuTo: optionalSku,
+    iconKey: z.string(),
   })
   .superRefine((values, context) => {
     if ((values.skuFrom === '') !== (values.skuTo === '')) {
@@ -484,6 +477,7 @@ function CategoryDialog(props: {
       defaultClassificationCode: existing?.defaultClassificationCode ?? '',
       skuFrom: existing?.skuFrom ?? '',
       skuTo: existing?.skuTo ?? '',
+      iconKey: existing?.iconKey ?? '',
     },
   });
   const submit = form.handleSubmit(async (values) => {
@@ -493,6 +487,7 @@ function CategoryDialog(props: {
       defaultClassificationCode: values.defaultClassificationCode || null,
       skuFrom: values.skuFrom || null,
       skuTo: values.skuTo || null,
+      iconKey: isCategoryIconKey(values.iconKey) ? values.iconKey : null,
     };
     const ok = await action.run(() =>
       existing
@@ -502,6 +497,8 @@ function CategoryDialog(props: {
     if (ok) props.onClose();
   });
   const { errors, isSubmitting } = form.formState;
+  const categoryName = form.watch('name');
+  const iconKey = form.watch('iconKey');
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
@@ -519,6 +516,14 @@ function CategoryDialog(props: {
             error={errors.name?.message}
           >
             <Input id="category-name" autoComplete="off" {...form.register('name')} />
+          </FormField>
+          <FormField label={t('catalog.categories.icon')} htmlFor="category-icon">
+            <CategoryIconField
+              id="category-icon"
+              name={categoryName}
+              value={iconKey}
+              onChange={(value) => form.setValue('iconKey', value, { shouldDirty: true })}
+            />
           </FormField>
           <FormField label={t('catalog.categories.parent')} htmlFor="category-parent">
             <NativeSelect id="category-parent" {...form.register('parentId')}>

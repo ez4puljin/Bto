@@ -28,6 +28,8 @@ export interface CategoryInput {
   /** The category's block of product codes, both ends or neither (ADR-0044 #1). */
   skuFrom?: string | null;
   skuTo?: string | null;
+  /** The drawing chosen for it (ADR-0163); null: the one its name asks for. */
+  iconKey?: string | null;
 }
 
 export type CategoryPatch = Partial<CategoryInput>;
@@ -146,6 +148,7 @@ export class CategoriesService {
           defaultClassificationCode: input.defaultClassificationCode ?? null,
           skuFrom: range.skuFrom,
           skuTo: range.skuTo,
+          iconKey: input.iconKey ?? null,
         })
         .returning();
       if (!row) throw new Error('category insert returned no row');
@@ -179,6 +182,7 @@ export class CategoriesService {
             ? {}
             : { defaultClassificationCode: patch.defaultClassificationCode }),
           ...(range ? { skuFrom: range.skuFrom, skuTo: range.skuTo } : {}),
+          ...(patch.iconKey === undefined ? {} : { iconKey: patch.iconKey }),
           // Only a top category has a picture (ADR-0092 #6): moving it under a parent drops it.
           ...(moving && patch.parentId != null && before.imageFileId !== null
             ? { imageFileId: null }

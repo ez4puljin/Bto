@@ -181,7 +181,7 @@ describe('sales rep shop', () => {
     await http().get('/api/v1/sales-rep/customers').set(bearer(office)).expect(403);
   });
 
-  it('follows the assortment segment and carries the office’s name and colour (ADR-0127)', async () => {
+  it('ignores «Bto300»’s segment and carries the office’s name and colour (ADR-0127, ADR-0164)', async () => {
     const save = (body: Record<string, unknown>, token = admin) =>
       http()
         .put('/api/v1/app-settings')
@@ -214,16 +214,7 @@ describe('sales rep shop', () => {
       appName: 'Bto ХТ',
       appColor: '#FF3B30',
     }).expect(200);
-    expect(await ids()).toEqual([water.id]);
-    const batch = await http()
-      .get('/api/v1/sales-rep/products/batch')
-      .query({ productIds: `${cola.id},${water.id}` })
-      .set(bearer(rep))
-      .expect(200);
-    expect((batch.body as { id: number }[]).map((product) => product.id)).toEqual([water.id]);
-    const suppliers = (await http().get('/api/v1/sales-rep/suppliers').set(bearer(rep)).expect(200))
-      .body as { productCount: number }[];
-    expect(suppliers.every((row) => row.productCount <= 1)).toBe(true);
+    expect((await ids()).sort()).toEqual([cola.id, water.id].sort());
     expect(
       (await http().get('/api/v1/sales-rep/context').set(bearer(rep)).expect(200)).body,
     ).toMatchObject({ appName: 'Bto ХТ', appColor: '#FF3B30' });

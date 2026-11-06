@@ -528,6 +528,52 @@ export const appSettings = pgTable(
   ],
 );
 
+/**
+ * A setting of which products the staff app shows whom (ADR-0164): a title with any number of product
+ * segments and staff. A staff member sees what all their settings hold, everything when none names
+ * them. Taken away softly, so the audit rows keep naming something.
+ */
+export const staffAppAssortments = pgTable(
+  'staff_app_assortments',
+  {
+    id: id(),
+    title: text('title').notNull(),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+    updatedBy: userRef('updated_by'),
+    updatedAt: updatedAt(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => [check('staff_app_assortments_title', sql`length(${t.title}) BETWEEN 1 AND 120`)],
+);
+
+/** The product segments a setting names; no foreign key, re-checked on read (ADR-0127 #1). */
+export const staffAppAssortmentSegments = pgTable(
+  'staff_app_assortment_segments',
+  {
+    assortmentId: ref('assortment_id')
+      .notNull()
+      .references(() => staffAppAssortments.id),
+    segmentId: ref('segment_id').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.assortmentId, t.segmentId] })],
+);
+
+/** The staff a setting is for. */
+export const staffAppAssortmentUsers = pgTable(
+  'staff_app_assortment_users',
+  {
+    assortmentId: ref('assortment_id')
+      .notNull()
+      .references(() => staffAppAssortments.id),
+    userId: userRef('user_id').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.assortmentId, t.userId] }),
+    index('staff_app_assortment_users_user_idx').on(t.userId),
+  ],
+);
+
 /** A stage of a pipeline: a column of cards, with what arriving there does (ADR-0056 #1, #3). */
 export const salesStages = pgTable(
   'sales_stages',

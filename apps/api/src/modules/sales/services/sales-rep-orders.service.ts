@@ -289,8 +289,11 @@ export class SalesRepOrdersService {
    * the rest backordered), the number drawn last. A refusal leaves nothing behind.
    */
   async create(ctx: AuthContext, input: RepOrderInput): Promise<RepOrderDetail> {
-    // The app sells only the assortment (ADR-0127 #1); checked before the stage is locked.
-    await this.shop.assertUnitsListed(input.lines.map((line) => line.productUnitId));
+    // The app sells only what this staff member's shop lists (ADR-0164); checked before the lock.
+    await this.shop.assertUnitsListed(
+      await this.shop.staffScope(ctx),
+      input.lines.map((line) => line.productUnitId),
+    );
     const id = await inTransaction(this.db, async (tx) => {
       const pipelineId = await this.pipelines.lockStage(tx, input.stageId);
       const access = await this.access.load(ctx, tx);

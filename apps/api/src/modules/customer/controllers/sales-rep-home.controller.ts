@@ -2,7 +2,7 @@ import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { type HomeSectionKind, parseHomeSectionKey } from '@tugeel/shared/sales';
 import { AppError } from '../../../common/errors/app-error';
-import { RequirePermission } from '../../identity';
+import { type AuthContext, CurrentUser, RequirePermission } from '../../identity';
 import { type RepShopProduct, toRepProductDto } from '../../sales';
 import { CustomerAppSectionQueryDto } from '../dto/customer-home.dto';
 import {
@@ -49,8 +49,8 @@ export class SalesRepHomeController {
   @Get('home')
   @RequirePermission(REP)
   @ApiOkResponse({ type: SalesRepHomeDto })
-  async homePage(): Promise<SalesRepHomeDto> {
-    const home = await this.home.repHome();
+  async homePage(@CurrentUser() ctx: AuthContext): Promise<SalesRepHomeDto> {
+    const home = await this.home.repHome(ctx);
     return {
       today: home.today,
       banners: home.banners,
@@ -64,12 +64,13 @@ export class SalesRepHomeController {
   @RequirePermission(REP)
   @ApiOkResponse({ type: SalesRepSectionPageDto })
   async section(
+    @CurrentUser() ctx: AuthContext,
     @Param('key') key: string,
     @Query() query: CustomerAppSectionQueryDto,
   ): Promise<SalesRepSectionPageDto> {
     const parsed = parseHomeSectionKey(key.slice(0, 40));
     if (!parsed) throw new AppError('NOT_FOUND', 'no such section', { key: key.slice(0, 40) });
-    const page = await this.home.repSectionPage(parsed, query);
+    const page = await this.home.repSectionPage(ctx, parsed, query);
     return { ...page, kind: repKindOf(page.kind), data: page.data.map(toRepProductDto) };
   }
 
@@ -77,8 +78,11 @@ export class SalesRepHomeController {
   @Get('categories/:id/page')
   @RequirePermission(REP)
   @ApiOkResponse({ type: SalesRepCategoryPageDto })
-  async categoryPage(@Param('id', ParseIntPipe) id: number): Promise<SalesRepCategoryPageDto> {
-    const page = await this.home.repCategoryPage(id);
+  async categoryPage(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<SalesRepCategoryPageDto> {
+    const page = await this.home.repCategoryPage(ctx, id);
     return { ...page, sections: page.sections.map(sectionDto) };
   }
 }

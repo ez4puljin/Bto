@@ -325,3 +325,108 @@ describe('«Дэлгүүрүүд»', () => {
     );
   });
 });
+
+describe('«Аппын бараа»: the staff app (ADR-0164)', () => {
+  const ROW: Schemas['StaffAppAssortment'] = {
+    id: 3,
+    title: 'Заалны худалдагч',
+    segments: [{ id: 4, name: 'Ундаа' }],
+    goneSegmentCount: 0,
+    users: [{ id: 21, fullName: 'Бат Болд', active: true }],
+    updatedAt: STAMP,
+  };
+  const staffRoutes = (rows: Schemas['StaffAppAssortment'][]) =>
+    routes(settings(), {
+      'GET /api/v1/app-settings/staff-assortments': () => json({ data: rows, nextCursor: null }),
+      'POST /api/v1/app-settings/staff-assortments': () => json({ ...ROW, id: 9 }, 201),
+      'PUT /api/v1/app-settings/staff-assortments/3': () => json(ROW),
+      'DELETE /api/v1/app-settings/staff-assortments/3': () => new Response(null, { status: 204 }),
+      'GET /api/v1/users/lookup': () => json([{ id: 30, fullName: 'Нярав Сараа' }]),
+    });
+  const texts = mn.appSettings.staffProducts;
+
+  it('keeps the setting of Bto300 on its own tab', async () => {
+    renderApp('/app/products', signedIn(KEEPER, staffRoutes([])));
+    expect(
+      await screen.findByRole('tab', { name: mn.appSettings.products.tabs.bto300 }),
+    ).toHaveAttribute('aria-selected', 'true');
+    expect(await region(mn.appSettings.products.assortment)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: texts.add })).toBeNull();
+  });
+
+  it('adds a setting of several segments and staff, refusing an empty one', async () => {
+    const fetchMock = signedIn(KEEPER, staffRoutes([]));
+    renderApp('/app/products?tab=staff', fetchMock);
+    const user = userEvent.setup();
+    expect(await screen.findByText(texts.empty)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: texts.add }));
+    const card = await region(texts.newTitle);
+    await user.click(card.getByRole('button', { name: mn.common.save }));
+    expect(calls(fetchMock, 'POST', '/api/v1/app-settings/staff-assortments')).toHaveLength(0);
+    expect(card.getAllByText(mn.validation.required)).toHaveLength(3);
+
+    await user.type(card.getByLabelText(texts.name), 'Заал');
+    const segments = card.getByLabelText(texts.segments);
+    await user.type(segments, 'Унд{Enter}');
+    await user.type(segments, 'Чих{Enter}');
+    const staff = card.getByLabelText(texts.staff);
+    await user.type(staff, 'Няр');
+    await screen.findByRole('option', { name: 'Нярав Сараа' });
+    await user.keyboard('{Enter}');
+    await user.click(card.getByRole('button', { name: mn.common.save }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'POST', '/api/v1/app-settings/staff-assortments')).toHaveLength(1),
+    );
+    expect(
+      await bodyOf(calls(fetchMock, 'POST', '/api/v1/app-settings/staff-assortments')[0]),
+    ).toEqual({
+      title: 'Заал',
+      segmentIds: [4, 6],
+      userIds: [30],
+    });
+  });
+
+  it('folds a setting, changes it and takes it away', async () => {
+    const fetchMock = signedIn(KEEPER, staffRoutes([ROW]));
+    renderApp('/app/products?tab=staff', fetchMock);
+    const user = userEvent.setup();
+    const card = await region(ROW.title);
+    expect(card.getByText('1 сегмент · 1 ажилтан')).toBeInTheDocument();
+    expect(card.queryByRole('button', { name: mn.common.save })).toBeNull();
+    await user.click(card.getByRole('button', { name: new RegExp(ROW.title) }));
+    // Nothing changed yet: nothing to save.
+    expect(card.getByRole('button', { name: mn.common.save })).toBeDisabled();
+    await user.type(card.getByLabelText(texts.segments), 'Чих{Enter}');
+    await user.click(card.getByRole('button', { name: mn.common.save }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'PUT', '/api/v1/app-settings/staff-assortments/3')).toHaveLength(1),
+    );
+    expect(
+      await bodyOf(calls(fetchMock, 'PUT', '/api/v1/app-settings/staff-assortments/3')[0]),
+    ).toEqual({
+      title: ROW.title,
+      segmentIds: [4, 6],
+      userIds: [21],
+    });
+
+    await user.click(card.getByRole('button', { name: mn.common.delete }));
+    const dialog = within(await screen.findByRole('dialog'));
+    await user.click(dialog.getByRole('button', { name: mn.common.delete }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'DELETE', '/api/v1/app-settings/staff-assortments/3')).toHaveLength(
+        1,
+      ),
+    );
+  });
+
+  it('says when a setting names an archived segment', async () => {
+    renderApp(
+      '/app/products?tab=staff',
+      signedIn(KEEPER, staffRoutes([{ ...ROW, goneSegmentCount: 2 }])),
+    );
+    const user = userEvent.setup();
+    const card = await region(ROW.title);
+    await user.click(card.getByRole('button', { name: new RegExp(ROW.title) }));
+    expect(card.getByText(texts.gone.replace('{{n}}', '2'))).toBeInTheDocument();
+  });
+});

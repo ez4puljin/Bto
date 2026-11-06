@@ -110,8 +110,14 @@ export class CustomerAppBannerDto {
 export class CustomerAppHomeCategoryDto {
   @ApiProperty() id: number;
   @ApiProperty() name: string;
-  @ApiProperty({ type: String, nullable: true, description: 'Its picture, else a product’s' })
+  @ApiProperty({ type: String, nullable: true, description: 'Its own picture, if any' })
   imageUrl: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'The drawing chosen for it; null: the one its name asks for (ADR-0163)',
+  })
+  iconKey: string | null;
   @ApiProperty({ description: 'Products «Бараа» sells in it, subcategories included' })
   productCount: number;
 }

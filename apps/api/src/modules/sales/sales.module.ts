@@ -24,6 +24,8 @@ import { SalesDocumentTemplatesService } from './services/sales-document-templat
 import { SalesPipelinesService } from './services/sales-pipelines.service';
 import { SalesRepOrdersService } from './services/sales-rep-orders.service';
 import { SalesRepShopService } from './services/sales-rep-shop.service';
+import { StaffAppAssortmentsController } from './controllers/staff-app-assortments.controller';
+import { StaffAppAssortmentsService } from './services/staff-app-assortments.service';
 import { CustomerOrdersService } from './services/customer-orders.service';
 import { SalesSettingsService } from './services/sales-settings.service';
 import { AppSettingsService } from './services/app-settings.service';
@@ -43,6 +45,7 @@ import { AppSettingsController } from './controllers/app-settings.controller';
     SalesPipelinesService,
     SalesSettingsService,
     AppSettingsService,
+    StaffAppAssortmentsService,
     SalesOrderQueryService,
     SalesOrderExportService,
     SalesOrdersService,
@@ -58,6 +61,7 @@ import { AppSettingsController } from './controllers/app-settings.controller';
     SalesPipelinesService,
     SalesSettingsService,
     AppSettingsService,
+    StaffAppAssortmentsService,
     SalesOrderQueryService,
     SalesOrderExportService,
     SalesOrdersService,
@@ -80,6 +84,7 @@ export class SalesModule {}
     SalesStagesController,
     SalesSettingsController,
     AppSettingsController,
+    StaffAppAssortmentsController,
     SalesRepController,
     SalesPicksController,
   ],

@@ -1,10 +1,15 @@
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
-import { APP_SETTINGS_LIMITS } from '@tugeel/shared/sales';
+import { APP_SETTINGS_LIMITS, STAFF_ASSORTMENT_LIMITS } from '@tugeel/shared/sales';
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
   IsBoolean,
   IsInt,
   IsOptional,
+  IsNotEmpty,
   IsString,
   Matches,
   MaxLength,
@@ -83,6 +88,67 @@ export class AppSettingsRequestDto {
   @IsString()
   @Matches(APP_SETTINGS_LIMITS.colorPattern)
   appColor: string | null;
+}
+
+/** A setting of which products the staff app shows whom (ADR-0164), whole on every save. */
+@ApiSchema({ name: 'StaffAppAssortmentRequest' })
+export class StaffAppAssortmentRequestDto {
+  @ApiProperty({ maxLength: STAFF_ASSORTMENT_LIMITS.maxTitle })
+  @Transform(trimmed)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(STAFF_ASSORTMENT_LIMITS.maxTitle)
+  title: string;
+
+  @ApiProperty({ type: [Number], description: 'Live product segments, at least one' })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(STAFF_ASSORTMENT_LIMITS.maxSegments)
+  @ArrayUnique()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  segmentIds: number[];
+
+  @ApiProperty({ type: [Number], description: 'Staff members, at least one' })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(STAFF_ASSORTMENT_LIMITS.maxUsers)
+  @ArrayUnique()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  userIds: number[];
+}
+
+@ApiSchema({ name: 'StaffAppAssortmentSegment' })
+export class StaffAppAssortmentSegmentDto {
+  @ApiProperty() id: number;
+  @ApiProperty() name: string;
+}
+
+@ApiSchema({ name: 'StaffAppAssortmentUser' })
+export class StaffAppAssortmentUserDto {
+  @ApiProperty() id: number;
+  @ApiProperty() fullName: string;
+  @ApiProperty({ description: 'False for a disabled account' }) active: boolean;
+}
+
+@ApiSchema({ name: 'StaffAppAssortment' })
+export class StaffAppAssortmentDto {
+  @ApiProperty() id: number;
+  @ApiProperty() title: string;
+  @ApiProperty({ type: [StaffAppAssortmentSegmentDto], description: 'The live segments it names' })
+  segments: StaffAppAssortmentSegmentDto[];
+  @ApiProperty({ description: 'Segments archived since: they narrow nothing, a save drops them' })
+  goneSegmentCount: number;
+  @ApiProperty({ type: [StaffAppAssortmentUserDto] }) users: StaffAppAssortmentUserDto[];
+  @ApiProperty({ format: 'date-time' }) updatedAt: string;
+}
+
+@ApiSchema({ name: 'StaffAppAssortmentList' })
+export class StaffAppAssortmentListDto {
+  @ApiProperty({ type: [StaffAppAssortmentDto] }) data: StaffAppAssortmentDto[];
+  @ApiProperty({ type: String, nullable: true, description: 'Always null: the whole list' })
+  nextCursor: null;
 }
 
 /** What the apps read before a sign-in (ADR-0127 #4): the name and colour the office set. */

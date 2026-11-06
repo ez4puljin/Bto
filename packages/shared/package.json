@@ -47,6 +47,11 @@
       "types": "./dist/text/index.d.ts",
       "default": "./dist/text/index.js"
     },
+    "./category-icons": {
+      "@tugeel/source": "./src/category-icons/index.ts",
+      "types": "./dist/category-icons/index.d.ts",
+      "default": "./dist/category-icons/index.js"
+    },
     "./gtin": {
       "@tugeel/source": "./src/gtin/index.ts",
       "types": "./dist/gtin/index.d.ts",

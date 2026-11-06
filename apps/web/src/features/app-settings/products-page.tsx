@@ -1,6 +1,6 @@
 import { ChevronRight, Plus, TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { FormRow, FormSection } from '@/components/form';
 import { NativeSelect } from '@/components/native-select';
@@ -9,19 +9,56 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCount } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useSegments } from '@/features/segments/api';
 import { requestOf, useAppSettings, useSaveAppSettings } from './api';
+import { StaffAssortments } from './staff-assortments';
 
 /**
- * «Апп» → «Аппын бараа» (ADR-0127, customer.home.manage): the assortment — the one PRODUCT
- * segment both apps («Bto300» and the staff app) sell from, or every sale-ready product. Saved on
- * change; a segment that was archived since is flagged and the apps show everything meanwhile.
+ * «Апп» → «Аппын бараа», two tabs (ADR-0164, customer.home.manage): what «Bto300» sells, and which
+ * products the staff app shows whom.
  */
 export function AppProductsPage() {
+  const { t } = useTranslation();
+  const [search, setSearch] = useSearchParams();
+  const tab = search.get('tab') === 'staff' ? 'staff' : 'bto300';
+  return (
+    <div>
+      <PageHeader
+        title={t('appSettings.products.title')}
+        description={t('appSettings.products.description')}
+      />
+      <Tabs
+        value={tab}
+        onValueChange={(value) =>
+          setSearch(value === 'staff' ? { tab: 'staff' } : {}, { replace: true })
+        }
+      >
+        <TabsList aria-label={t('appSettings.products.tabs.label')} className="mb-4">
+          <TabsTrigger value="bto300">{t('appSettings.products.tabs.bto300')}</TabsTrigger>
+          <TabsTrigger value="staff">{t('appSettings.products.tabs.staff')}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="bto300">
+          <CustomerAssortment />
+        </TabsContent>
+        <TabsContent value="staff">
+          <StaffAssortments />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+/**
+ * The assortment of «Bto300» (ADR-0127 #1, ADR-0164 #1): one PRODUCT segment, or every sale-ready
+ * product. Saved on change; a segment that was archived since is flagged and the app shows
+ * everything meanwhile.
+ */
+function CustomerAssortment() {
   const { t } = useTranslation();
   const canManage = useHasPermission('customer.home.manage');
   const settings = useAppSettings();
@@ -50,81 +87,75 @@ export function AppProductsPage() {
   };
 
   return (
-    <div>
-      <PageHeader
-        title={t('appSettings.products.title')}
-        description={t('appSettings.products.description')}
-      />
-      <Card role="region" aria-label={t('appSettings.products.assortment')}>
-        <CardHeader>
-          <CardTitle>{t('appSettings.products.assortment')}</CardTitle>
-          <CardDescription>{t('appSettings.products.assortmentHint')}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <ProblemAlert problem={problemFromError(settings.error)} onRetry={settings.refetch} />
-          <ProblemAlert problem={problemFromError(segments.error)} onRetry={segments.refetch} />
-          <ProblemAlert problem={action.problem} />
-          {settings.isPending ? (
-            <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
-          ) : null}
-          {data?.assortment.broken ? (
-            <Alert className="border-transparent bg-warning-soft shadow-none!">
-              <TriangleAlert aria-hidden className="text-warning" />
-              <AlertTitle className="text-warning">{t('appSettings.products.broken')}</AlertTitle>
-              <AlertDescription className="text-warning">
-                {t('appSettings.products.brokenHint')}
-              </AlertDescription>
-            </Alert>
-          ) : null}
-          {data ? (
-            <FormSection>
-              <FormRow label={t('appSettings.products.assortment')} htmlFor="app-assortment">
-                <NativeSelect
-                  id="app-assortment"
-                  className="sm:w-80"
-                  value={chosen === null ? '' : String(chosen)}
-                  disabled={!canManage || save.isPending || !segments.isSuccess}
-                  onChange={(event) => void choose(event.target.value)}
-                >
-                  <option value="">{t('appSettings.products.all')}</option>
-                  {brokenChoice ? (
-                    <option value={String(brokenChoice.id)}>{brokenChoice.name}</option>
-                  ) : null}
-                  {live.map((segment) => (
-                    <option key={segment.id} value={String(segment.id)}>
-                      {segment.name}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </FormRow>
-            </FormSection>
-          ) : null}
-          {data ? (
-            <p className="text-sm">
-              {t('appSettings.products.count', { n: formatCount(data.shopProductCount) })}
-            </p>
-          ) : null}
-          {!canManage ? (
-            <p className="text-[0.8125rem] text-muted-foreground">{t('appSettings.readOnly')}</p>
-          ) : null}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            {chosen !== null && !data?.assortment.broken ? (
-              <Button asChild variant="link" size="sm" className="px-0">
-                <Link to={`/segments/${chosen}`}>
-                  {t('appSettings.products.openSegment')}
-                  <ChevronRight />
-                </Link>
-              </Button>
-            ) : null}
+    <Card role="region" aria-label={t('appSettings.products.assortment')}>
+      <CardHeader>
+        <CardTitle>{t('appSettings.products.assortment')}</CardTitle>
+        <CardDescription>{t('appSettings.products.assortmentHint')}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <ProblemAlert problem={problemFromError(settings.error)} onRetry={settings.refetch} />
+        <ProblemAlert problem={problemFromError(segments.error)} onRetry={segments.refetch} />
+        <ProblemAlert problem={action.problem} />
+        {settings.isPending ? (
+          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+        ) : null}
+        {data?.assortment.broken ? (
+          <Alert className="border-transparent bg-warning-soft shadow-none!">
+            <TriangleAlert aria-hidden className="text-warning" />
+            <AlertTitle className="text-warning">{t('appSettings.products.broken')}</AlertTitle>
+            <AlertDescription className="text-warning">
+              {t('appSettings.products.brokenHint')}
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {data ? (
+          <FormSection>
+            <FormRow label={t('appSettings.products.assortment')} htmlFor="app-assortment">
+              <NativeSelect
+                id="app-assortment"
+                className="sm:w-80"
+                value={chosen === null ? '' : String(chosen)}
+                disabled={!canManage || save.isPending || !segments.isSuccess}
+                onChange={(event) => void choose(event.target.value)}
+              >
+                <option value="">{t('appSettings.products.all')}</option>
+                {brokenChoice ? (
+                  <option value={String(brokenChoice.id)}>{brokenChoice.name}</option>
+                ) : null}
+                {live.map((segment) => (
+                  <option key={segment.id} value={String(segment.id)}>
+                    {segment.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </FormRow>
+          </FormSection>
+        ) : null}
+        {data ? (
+          <p className="text-sm">
+            {t('appSettings.products.count', { n: formatCount(data.shopProductCount) })}
+          </p>
+        ) : null}
+        {!canManage ? (
+          <p className="text-[0.8125rem] text-muted-foreground">{t('appSettings.readOnly')}</p>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          {chosen !== null && !data?.assortment.broken ? (
             <Button asChild variant="link" size="sm" className="px-0">
-              <Link to="/segments/new?entity=PRODUCT">
-                <Plus />
-                {t('appSettings.products.newSegment')}
+              <Link to={`/segments/${chosen}`}>
+                {t('appSettings.products.openSegment')}
+                <ChevronRight />
               </Link>
             </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          ) : null}
+          <Button asChild variant="link" size="sm" className="px-0">
+            <Link to="/segments/new?entity=PRODUCT">
+              <Plus />
+              {t('appSettings.products.newSegment')}
+            </Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

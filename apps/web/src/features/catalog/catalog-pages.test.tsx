@@ -47,6 +47,7 @@ const CATEGORIES: Schemas['Category'][] = [
     productCount: 0,
     childCount: 1,
     imageUrl: null,
+    iconKey: null,
   },
   {
     id: 11,
@@ -58,6 +59,7 @@ const CATEGORIES: Schemas['Category'][] = [
     productCount: 2,
     childCount: 0,
     imageUrl: null,
+    iconKey: null,
   },
   {
     id: 12,
@@ -69,6 +71,7 @@ const CATEGORIES: Schemas['Category'][] = [
     productCount: 1,
     childCount: 0,
     imageUrl: null,
+    iconKey: null,
   },
 ];
 const MASTER_ROUTES = {
@@ -1688,6 +1691,7 @@ describe('categories', () => {
         defaultClassificationCode: null,
         skuFrom: null,
         skuTo: null,
+        iconKey: null,
       }),
     );
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
@@ -1717,6 +1721,7 @@ describe('category delete', () => {
       productCount: 0,
       childCount: 0,
       imageUrl: null,
+      iconKey: null,
     };
     const fetchMock = signedIn(ADMIN_ME, {
       ...MASTER_ROUTES,
@@ -1787,6 +1792,7 @@ describe('category code ranges', () => {
         defaultClassificationCode: null,
         skuFrom: '10000',
         skuTo: '19999',
+        iconKey: null,
       }),
     );
   });

@@ -1,14 +1,7 @@
+import { categoryIconOf, categoryIconSvg } from '@tugeel/shared/category-icons';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
-import {
-  ChevronRight,
-  Heart,
-  History,
-  Megaphone,
-  Package,
-  Sparkles,
-  Tag,
-} from 'lucide-react-native';
+import { ChevronRight, Heart, History, Megaphone, Sparkles, Tag } from 'lucide-react-native';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -19,6 +12,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { SvgXml } from 'react-native-svg';
 import {
   type StoreBanner,
   type StoreHomeCategory,
@@ -362,28 +356,26 @@ export function BannerCarousel({
   );
 }
 
-/** A category's picture: its own, or one of its products', or a box. */
+/** A category's picture: its own if it has one, else its colourful icon (ADR-0163). */
 function CategoryPicture({
   category,
   server,
-  width,
-  height,
+  size,
 }: {
-  category: Pick<StoreHomeCategory, 'imageUrl'>;
+  category: Pick<StoreHomeCategory, 'imageUrl' | 'iconKey' | 'name'>;
   server: string;
-  width: number;
-  height: number;
+  size: number;
 }) {
   return category.imageUrl ? (
     <Image
       source={{ uri: `${server}${category.imageUrl}` }}
-      style={{ width, height }}
+      style={{ width: size, height: size }}
       contentFit="contain"
       cachePolicy="memory-disk"
       recyclingKey={category.imageUrl}
     />
   ) : (
-    <Package size={height * 0.7} strokeWidth={1.3} color={colors.input} />
+    <SvgXml xml={categoryIconSvg(categoryIconOf(category))} width={size} height={size} />
   );
 }
 
@@ -404,7 +396,7 @@ export function CategoryTile({
       style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
     >
       <View style={styles.tilePicture}>
-        <CategoryPicture category={category} server={server} width={56} height={48} />
+        <CategoryPicture category={category} server={server} size={56} />
       </View>
       <Text style={[storeType.tile, styles.center]} numberOfLines={2}>
         {category.name}
@@ -430,7 +422,7 @@ export function SubcategoryTile({
       style={({ pressed }) => [styles.sub, pressed && styles.pressed]}
     >
       <View style={styles.subPicture}>
-        <CategoryPicture category={category} server={server} width={80} height={72} />
+        <CategoryPicture category={category} server={server} size={72} />
       </View>
       <Text style={[storeType.tile, styles.center]} numberOfLines={2}>
         {category.name}
@@ -470,7 +462,7 @@ const styles = StyleSheet.create({
   dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.input },
   dotOn: { backgroundColor: colors.label2 },
   tile: { flex: 1, alignItems: 'center', gap: 6 },
-  tilePicture: { width: 64, height: 50, alignItems: 'center', justifyContent: 'center' },
+  tilePicture: { width: 64, height: 58, alignItems: 'center', justifyContent: 'center' },
   sub: { width: 88, alignItems: 'center', gap: 6 },
   subPicture: { width: 88, height: 76, alignItems: 'center', justifyContent: 'center' },
 });

@@ -67,7 +67,10 @@ export class CustomerAppOrdersService {
     }
     // The apps' rules (ADR-0127 #1, #4): only the assortment's products, and the order quoted
     // today — as the office will price it — at least the minimum amount; both before the transaction.
-    await this.repShop.assertUnitsListed(input.lines.map((line) => line.productUnitId));
+    await this.repShop.assertUnitsListed(
+      await this.repShop.customerScope(),
+      input.lines.map((line) => line.productUnitId),
+    );
     const minimum = (await this.settings.current()).minOrderAmount;
     if (minimum !== null && minimum.gt(0)) {
       const { quote } = await this.shop.quote(input.lines);

@@ -561,6 +561,13 @@
       "when": 1793974489400,
       "tag": "0081_role_permission_overrides",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1793978696825,
+      "tag": "0082_category_icons_staff_products",
+      "breakpoints": true
     }
   ]
 }
