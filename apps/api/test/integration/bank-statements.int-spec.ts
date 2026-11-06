@@ -616,7 +616,8 @@ describe('bank statements, «Тооцоо хаах»', () => {
         })
         .expect(200);
       const book = new ExcelJS.Workbook();
-      await book.xlsx.load(response.body as unknown as ArrayBuffer);
+      const bytes: unknown = response.body;
+      await book.xlsx.load(bytes as ArrayBuffer);
       const sheet = book.worksheets[0];
       if (!sheet) throw new Error('no sheet');
       return sheet;
