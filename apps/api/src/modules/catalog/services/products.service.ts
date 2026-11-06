@@ -160,7 +160,7 @@ export interface ProductQuery {
   limit?: number;
 }
 
-export type ProductSort = 'NAME' | 'NEW';
+export type ProductSort = 'NAME' | 'NEW' | 'CATEGORY';
 
 /** A cell of a product's image list: the picture and its thumbnail, relative to the server. */
 export interface ProductImageUrls {
@@ -181,6 +181,14 @@ export interface ProductIndexRow {
   categoryId: number;
   saleReadyAt: Date | null;
 }
+
+/**
+ * A product's place by its category (owner 2026-11-06): the category's block of product codes, so
+ * «101 …» comes before «102 …» and a parent before its children, then the category's id; a category
+ * without a block last. Digits only, so the database's collation does not enter into it.
+ */
+const categoryOrderKey = () =>
+  sql<string>`(SELECT lpad(coalesce(c.sku_from::text, '99999999999999999999'), 20, '0') || lpad(c.id::text, 12, '0') FROM categories c WHERE c.id = ${products.categoryId})`;
 
 @Injectable()
 export class ProductsService {
@@ -679,6 +687,40 @@ export class ProductsService {
       }));
       return { data: page.data.map((row) => row.product), nextCursor: page.nextCursor };
     }
+    if (query.sort === 'CATEGORY') {
+      if (after) {
+        if (
+          after.s !== 'CATEGORY' ||
+          typeof after.id !== 'number' ||
+          typeof after.rank !== 'number' ||
+          typeof after.k !== 'string' ||
+          typeof after.sku !== 'string'
+        ) {
+          throw invalidCursor();
+        }
+        filters.push(
+          sql`(${rank}, ${categoryOrderKey()}, ${products.sku}, ${products.id}) > (${after.rank}, ${after.k}, ${after.sku}, ${after.id})`,
+        );
+      }
+      const rows = await this.db
+        .select({
+          product: products,
+          rank: sql<number>`${rank}`,
+          key: sql<string>`${categoryOrderKey()}`,
+        })
+        .from(products)
+        .where(and(...filters))
+        .orderBy(...this.orderOf(query, searched))
+        .limit(limit + 1);
+      const page = toPage(rows, limit, (row) => ({
+        s: 'CATEGORY',
+        rank: row.rank,
+        k: row.key,
+        sku: row.product.sku,
+        id: row.product.id,
+      }));
+      return { data: page.data.map((row) => row.product), nextCursor: page.nextCursor };
+    }
     if (after?.s !== undefined) throw invalidCursor();
     if (typeof after?.id === 'number' && typeof after.rank === 'number') {
       filters.push(
@@ -700,7 +742,9 @@ export class ProductsService {
     const keys =
       query.sort === 'NEW'
         ? [desc(products.saleReadyAt), desc(products.id)]
-        : [asc(products.name), asc(products.id)];
+        : query.sort === 'CATEGORY'
+          ? [categoryOrderKey(), asc(products.sku), asc(products.id)]
+          : [asc(products.name), asc(products.id)];
     return [...(searched ? [searched] : []), ...keys];
   }
 

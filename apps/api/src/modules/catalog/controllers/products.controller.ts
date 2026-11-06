@@ -36,6 +36,7 @@ import {
   ProductLookupQueryDto,
   ProductPageDto,
   ProductQueryPageDto,
+  ProductHistoryPageDto,
   ProductQueryRequestDto,
   ProductUnitDto,
   SupersedeUnitDto,
@@ -46,6 +47,8 @@ import {
 import { BarcodeService } from '../services/barcode.service';
 import { ProductBulkService } from '../services/product-bulk.service';
 import { ProductEbarimtService } from '../services/product-ebarimt.service';
+import { PageQueryDto } from '../../../common/pagination/page';
+import { ProductHistoryService } from '../services/product-history.service';
 import { ProductQueryService } from '../services/product-query.service';
 import { SkuRangesService } from '../services/sku-ranges.service';
 import {
@@ -75,7 +78,33 @@ export class ProductsController {
     private readonly ranges: SkuRangesService,
     private readonly productQuery: ProductQueryService,
     private readonly bulk: ProductBulkService,
+    private readonly history: ProductHistoryService,
   ) {}
+
+  /** Who changed what on a product, newest first (owner 2026-11-06). */
+  @Get(':id/history')
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: ProductHistoryPageDto })
+  async productHistory(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: PageQueryDto,
+  ): Promise<ProductHistoryPageDto> {
+    const page = await this.history.list(id, query);
+    return {
+      data: page.data.map((row) => ({
+        id: row.id,
+        occurredAt: row.occurredAt.toISOString(),
+        actorName: row.actorName,
+        actorUsername: row.actorUsername,
+        actorLabel: row.actorLabel,
+        action: row.action,
+        entity: row.entity,
+        before: row.before,
+        after: row.after,
+      })),
+      nextCursor: page.nextCursor,
+    };
+  }
 
   @Get()
   @Authenticated()

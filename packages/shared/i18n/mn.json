@@ -1334,6 +1334,17 @@
         "noTerms": "{{count}} бараанд үнийн нөхцөл байхгүй тул алгаслаа",
         "more": "+{{count}}",
         "tooMany": "Нэг удаад {{limit}} хүртэл барааг өөрчилнө. Одоо {{total}} бараа сонгосон байна; сонголтоо багасгана уу."
+      },
+      "panel": {
+        "label": "Шүүлтүүр",
+        "all": "Бүх бараа",
+        "expand": "Дэлгэх: {{name}}",
+        "collapse": "Хураах: {{name}}",
+        "manageSegments": "Сегмент удирдах",
+        "chooseSuppliers": "Нийлүүлэгч сонгох",
+        "choosePrice": "Үнийн хязгаар оруулах",
+        "chooseWarehouse": "Агуулахаар сонгох",
+        "chooseDates": "Хугацаа сонгох"
       }
     },
     "product": {
@@ -1344,7 +1355,9 @@
         "price": "Агуулахын үнэ",
         "noPrice": "Үнэ тогтоогоогүй",
         "onHand": "Нийт үлдэгдэл",
-        "home": "Харьяа агуулах"
+        "home": "Харьяа агуулах",
+        "onHandNow": "Одоогийн үлдэгдэл",
+        "noStock": "Үлдэгдэлгүй"
       },
       "boxFactor": "Хайрцагны тоо",
       "boxOf": "{{factor}} {{unit}}",
@@ -1392,7 +1405,55 @@
       "viewMovements": "Хөдөлгөөн харах",
       "sectionGeneral": "Ерөнхий",
       "noExtraUnits": "Нэмэлт нэгж алга",
-      "chooseUnit": "Нэгж сонгоно уу"
+      "chooseUnit": "Нэгж сонгоно уу",
+      "reports": "Тайлан авах",
+      "history": {
+        "title": "Өөрчлөлтийн түүх",
+        "empty": "Өөрчлөлт бүртгэгдээгүй",
+        "changed": "Өөрчилсөн",
+        "actions": {
+          "products": {
+            "CREATE": "Бараа бүртгэсэн",
+            "UPDATE": "Мэдээлэл өөрчилсөн",
+            "COMPLETE": "Борлуулахад бэлэн болсон",
+            "UNCOMPLETE": "Үнэ хүлээгдэж буй болсон"
+          },
+          "product_units": {
+            "CREATE": "Нэгж нэмсэн",
+            "UPDATE": "Нэгж өөрчилсөн",
+            "RETIRE": "Нэгж хассан",
+            "SUPERSEDE": "Нэгжийн харьцаа сольсон"
+          },
+          "product_barcodes": {
+            "CREATE": "Баркод нэмсэн",
+            "UPDATE": "Баркод өөрчилсөн",
+            "DELETE": "Баркод хассан"
+          },
+          "product_images": {
+            "CREATE": "Зураг нэмсэн",
+            "UPDATE": "Зураг өөрчилсөн",
+            "DELETE": "Зураг хассан"
+          },
+          "product_prices": {
+            "UPDATE": "Үнэ өөрчилсөн"
+          },
+          "product_locations": {
+            "CREATE": "Байршил нэмсэн",
+            "UPDATE": "Байршил өөрчилсөн",
+            "DELETE": "Байршил хассан"
+          },
+          "product_suppliers": {
+            "CREATE": "Нийлүүлэгч нэмсэн",
+            "UPDATE": "Нийлүүлэгч өөрчилсөн",
+            "DELETE": "Нийлүүлэгч хассан"
+          }
+        },
+        "validFrom": "Хүчинтэй огноо",
+        "minQty": "Доод хэмжээ",
+        "maxQty": "Дээд хэмжээ",
+        "madeMain": "Үндсэн нийлүүлэгч болгосон",
+        "notMain": "Үндсэн нийлүүлэгчээс хассан"
+      }
     },
     "units": {
       "title": "Нэгж ба баркод",
@@ -10385,6 +10446,21 @@
         "price": "Нэгж үнэ",
         "amount": "Дүн",
         "note": "Тайлбар"
+      },
+      "groupCount": "{{count}} нийлүүлэгч",
+      "amountShort": "Дүн",
+      "columnStatus": "Төлөв",
+      "shippedShort": "Ачигдсан",
+      "searchSuppliers": "Нийлүүлэгч хайх…",
+      "noMatch": "Таарах нийлүүлэгч алга",
+      "showMore": "Дахин {{count}} харуулах · {{left}} үлдсэн",
+      "moreNamed": "Бусад үйлдэл: {{name}}",
+      "showLinesNamed": "Бараа харах: {{name}}",
+      "noGoods": "Бараа захиалаагүй",
+      "tabs": {
+        "with": "Бараатай",
+        "empty": "Бараагүй",
+        "all": "Бүгд"
       }
     },
     "trucks": {

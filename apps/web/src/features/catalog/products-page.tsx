@@ -42,6 +42,7 @@ import {
   WIDE_DEFAULT_HIDDEN_PRODUCT_COLUMNS,
 } from './product-columns';
 import { ProductFilterMenu } from './product-filter-menu';
+import { ProductFilterPanel } from './product-filter-panel';
 import {
   activeFilterFields,
   filterParam,
@@ -147,9 +148,18 @@ export function ProductsPage() {
     WIDE_DEFAULT_HIDDEN_PRODUCT_COLUMNS,
   );
   const { hidden } = columnState;
+  // In the categories' order each category heads its rows: a column would only repeat it.
+  const grouped = !q;
   const columns = useMemo(
-    () => PRODUCT_COLUMNS.filter((column) => !hidden.has(column.key)),
-    [hidden],
+    () =>
+      PRODUCT_COLUMNS.filter(
+        (column) => !hidden.has(column.key) && !(grouped && column.key === 'category'),
+      ),
+    [hidden, grouped],
+  );
+  const categoryById = useMemo(
+    () => new Map((categories.data ?? []).map((category) => [category.id, category])),
+    [categories.data],
   );
   const context = useMemo<ProductTableContext>(
     () => ({
@@ -280,91 +290,111 @@ export function ProductsPage() {
           ) : null
         }
       />
-      <FilterBar
-        end={
-          <>
-            {canExport && selected.size === 0 ? exportButton : null}
-            <ColumnChooser
-              keys={PRODUCT_LIST_COLUMNS}
-              locked={LOCKED_PRODUCT_COLUMNS}
-              label={(key) => t(`catalog.products.columns.${key}`)}
-              hidden={hidden}
-              toggle={columnState.toggle}
-              showAll={columnState.showAll}
+      <div className="flex items-start gap-4">
+        <ProductFilterPanel
+          categories={categories.data ?? []}
+          categoryId={categoryId}
+          onCategory={(id) => setParam('category', id === undefined ? '' : String(id))}
+          stages={STAGES}
+          stage={stage}
+          onStage={(value) => setParam('status', value ?? '')}
+          filters={filters}
+          onChange={applyFilters}
+        />
+        <div className="min-w-0 flex-1">
+          <FilterBar
+            end={
+              <>
+                {canExport && selected.size === 0 ? exportButton : null}
+                <ColumnChooser
+                  keys={PRODUCT_LIST_COLUMNS}
+                  locked={LOCKED_PRODUCT_COLUMNS}
+                  label={(key) => t(`catalog.products.columns.${key}`)}
+                  hidden={hidden}
+                  toggle={columnState.toggle}
+                  showAll={columnState.showAll}
+                />
+              </>
+            }
+          >
+            <SearchField
+              // One search width across the lists (15rem): the filters keep one row at 1366px.
+              className="sm:w-60"
+              aria-label={t('common.search')}
+              placeholder={t('catalog.products.searchPlaceholder')}
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setParam('q', event.target.value.trim());
+              }}
             />
-          </>
-        }
-      >
-        <SearchField
-          // One search width across the lists (15rem): the filters keep one row at 1366px.
-          className="sm:w-60"
-          aria-label={t('common.search')}
-          placeholder={t('catalog.products.searchPlaceholder')}
-          value={search}
-          onChange={(event) => {
-            setSearch(event.target.value);
-            setParam('q', event.target.value.trim());
-          }}
-        />
-        <NativeSelect
-          variant="filter"
-          aria-label={t('catalog.product.category')}
-          value={categoryId === undefined ? '' : String(categoryId)}
-          onChange={(event) => setParam('category', event.target.value)}
-        >
-          <option value="">{t('catalog.products.allCategories')}</option>
-          {tree.map((node) => (
-            <option key={node.category.id} value={String(node.category.id)}>
-              {node.path}
-            </option>
-          ))}
-        </NativeSelect>
-        <NativeSelect
-          variant="filter"
-          aria-label={t('catalog.product.status')}
-          value={stage ?? ''}
-          onChange={(event) => setParam('status', event.target.value)}
-        >
-          <option value="">{t('catalog.products.allStatuses')}</option>
-          {STAGES.map((value) => (
-            <option key={value} value={value}>
-              {t(`catalog.products.status.${value}`)}
-            </option>
-          ))}
-        </NativeSelect>
-        <ProductFilterMenu filters={filters} onChange={applyFilters} />
-        {canManageSegments &&
-        (q ||
-          categoryId ||
-          stage ||
-          activeFilterFields(filters).some((field) => field !== 'segment')) ? (
-          <Button asChild variant="ghost" size="sm" className="text-link">
-            <Link to={`/segments/new?entity=PRODUCT&from=${encodeURIComponent(params.toString())}`}>
-              <Shapes />
-              {t('segments.fromFilters')}
-            </Link>
-          </Button>
-        ) : null}
-      </FilterBar>
-      <ProblemAlert
-        problem={exporting.problem ?? selecting.problem ?? problemFromError(products.error)}
-      />
-      <ListCard scroll>
-        <ProductTable
-          pages={pages}
-          columns={columns}
-          context={context}
-          {...(canSelect ? { selection } : {})}
-        />
-        {empty ? (
-          <EmptyState
-            icon={Package}
-            title={t('catalog.products.empty')}
-            {...(filtered ? { onClearFilters: clearFilters } : {})}
+            {/* The left side holds these from `lg`; a narrow window keeps them here. */}
+            <NativeSelect
+              className="lg:hidden"
+              variant="filter"
+              aria-label={t('catalog.product.category')}
+              value={categoryId === undefined ? '' : String(categoryId)}
+              onChange={(event) => setParam('category', event.target.value)}
+            >
+              <option value="">{t('catalog.products.allCategories')}</option>
+              {tree.map((node) => (
+                <option key={node.category.id} value={String(node.category.id)}>
+                  {node.path}
+                </option>
+              ))}
+            </NativeSelect>
+            <NativeSelect
+              className="lg:hidden"
+              variant="filter"
+              aria-label={t('catalog.product.status')}
+              value={stage ?? ''}
+              onChange={(event) => setParam('status', event.target.value)}
+            >
+              <option value="">{t('catalog.products.allStatuses')}</option>
+              {STAGES.map((value) => (
+                <option key={value} value={value}>
+                  {t(`catalog.products.status.${value}`)}
+                </option>
+              ))}
+            </NativeSelect>
+            <ProductFilterMenu filters={filters} onChange={applyFilters} />
+            {canManageSegments &&
+            (q ||
+              categoryId ||
+              stage ||
+              activeFilterFields(filters).some((field) => field !== 'segment')) ? (
+              <Button asChild variant="ghost" size="sm" className="text-link">
+                <Link
+                  to={`/segments/new?entity=PRODUCT&from=${encodeURIComponent(params.toString())}`}
+                >
+                  <Shapes />
+                  {t('segments.fromFilters')}
+                </Link>
+              </Button>
+            ) : null}
+          </FilterBar>
+          <ProblemAlert
+            problem={exporting.problem ?? selecting.problem ?? problemFromError(products.error)}
           />
-        ) : null}
-        <LoadMore query={products} />
-      </ListCard>
+          <ListCard scroll beside>
+            <ProductTable
+              pages={pages}
+              columns={columns}
+              context={context}
+              {...(q ? {} : { categoryOf: (id: number) => categoryById.get(id) })}
+              {...(canSelect ? { selection } : {})}
+            />
+            {empty ? (
+              <EmptyState
+                icon={Package}
+                title={t('catalog.products.empty')}
+                {...(filtered ? { onClearFilters: clearFilters } : {})}
+              />
+            ) : null}
+            <LoadMore query={products} />
+          </ListCard>
+        </div>
+      </div>
       <SelectionBar count={selected.size} onClear={ticks.clear}>
         {matchingNote}
         {canExport ? exportButton : null}

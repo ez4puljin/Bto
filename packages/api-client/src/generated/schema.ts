@@ -664,6 +664,23 @@ export interface paths {
         patch: operations["Categories_update"];
         trace?: never;
     };
+    "/api/v1/products/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Who changed what on a product, newest first (owner 2026-11-06). */
+        get: operations["Products_productHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/products": {
         parameters: {
             query?: never;
@@ -9453,6 +9470,26 @@ export interface components {
             skuFrom?: string | null;
             skuTo?: string | null;
         };
+        ProductHistoryEntry: {
+            id: number;
+            /** Format: date-time */
+            occurredAt: string;
+            actorName: string | null;
+            actorUsername: string | null;
+            actorLabel: string | null;
+            action: string;
+            entity: string;
+            before: {
+                [key: string]: unknown;
+            } | null;
+            after: {
+                [key: string]: unknown;
+            } | null;
+        };
+        ProductHistoryPage: {
+            data: components["schemas"]["ProductHistoryEntry"][];
+            nextCursor: string | null;
+        };
         ProductBaseUnit: {
             id: number;
             uomId: number;
@@ -9575,6 +9612,11 @@ export interface components {
             status?: "ACTIVE" | "INACTIVE";
             /** @description true: complete products; false: those waiting for prices (ADR-0044) */
             saleReady?: boolean;
+            /**
+             * @description NAME by default; CATEGORY: by the category's block of codes, then the code
+             * @enum {string}
+             */
+            sort?: "NAME" | "CATEGORY";
             /** @description Conditions not saved as a segment */
             where?: components["schemas"]["SegmentDefinition"];
             /** @description A saved product segment; with where, both apply */
@@ -9595,6 +9637,11 @@ export interface components {
             status?: "ACTIVE" | "INACTIVE";
             /** @description true: complete products; false: those waiting for prices (ADR-0044) */
             saleReady?: boolean;
+            /**
+             * @description NAME by default; CATEGORY: by the category's block of codes, then the code
+             * @enum {string}
+             */
+            sort?: "NAME" | "CATEGORY";
             /** @description Conditions not saved as a segment */
             where?: components["schemas"]["SegmentDefinition"];
             /** @description A saved product segment; with where, both apply */
@@ -21190,6 +21237,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Category"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Products_productHistory: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductHistoryPage"];
                 };
             };
             /** @description RFC 9457 problem details */

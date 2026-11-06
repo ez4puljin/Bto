@@ -1,19 +1,26 @@
-import { Boxes, Copy, History, Package } from 'lucide-react';
-import { useMemo } from 'react';
+import { Boxes, ChevronDown, Copy, FileBarChart, Pencil } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
+import { Decimal } from '@tugeel/shared/money';
 import { useHasPermission } from '@/app/auth-context';
-import { DetailCard, FieldList } from '@/components/detail';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useProductLocations, useProductStock } from '@/features/inventory/api';
 import { useWarehouseName } from '@/features/inventory/helpers';
 import { ProductLocationCard } from '@/features/inventory/product-location-card';
 import { ProductSuppliersCard } from '@/features/partners/product-suppliers-card';
 import { useProductPrices } from '@/features/pricing/api';
 import { ProductPricesCard } from '@/features/pricing/product-prices-card';
-import { EBARIMT_PER_PRODUCT } from '@/lib/features';
+import { BINS_SOON, EBARIMT_PER_PRODUCT } from '@/lib/features';
 import { formatMnt, formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
@@ -23,17 +30,18 @@ import { categoryPaths } from './category-tree';
 import { EbarimtCard } from './ebarimt-card';
 import { ImagesCard } from './images-card';
 import { ProductForm } from './product-form';
+import { ProductHistoryCard } from './product-history-card';
 import { type ProductFormValues, productValues, updateBody } from './product-schema';
 import { productStage } from './product-stage';
 import { ProductStageBadge } from './product-stage-badge';
 import { UnitsCard } from './units-card';
 
 /**
- * One product (ADR-0042; relaid 2026-10-31 after a UI/UX review): the header names it (code,
- * category, stage) and a strip of key figures answers what people open it for — the primary
- * barcode, the warehouse price, what is on hand, the home warehouse. The left column then holds
- * the units with their barcodes, the prices and the card of the remaining facts («Засах» opens
- * the form); the right column the photos, the location and the suppliers.
+ * One product (ADR-0042; relaid 2026-10-31, 2026-11-06): the header names it (code, category,
+ * stage) with a pencil for the form and «Тайлан авах»; a strip of tiles holds its facts — the
+ * primary barcode, the warehouse price, the home warehouse, the unit, the box, the weight — and
+ * where it stands now. The left column then holds the units with their barcodes, the prices and
+ * who changed what; the right column the photos, the location and the suppliers.
  */
 export function ProductPage() {
   const { t } = useTranslation();
@@ -42,6 +50,7 @@ export function ProductPage() {
   const product = useProduct(id);
   const categories = useCategories();
   const mutations = useCatalogMutations();
+  const [editing, setEditing] = useState(false);
   const paths = useMemo(() => categoryPaths(categories.data ?? []), [categories.data]);
 
   const loadProblem = problemFromError(product.error ?? categories.error);
@@ -50,7 +59,6 @@ export function ProductPage() {
     return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>;
   }
   const detail = product.data;
-  const loadedCategories = categories.data;
   const categoryPath = paths.get(detail.categoryId);
 
   const save = async (values: ProductFormValues, close: () => void) => {
@@ -68,7 +76,20 @@ export function ProductPage() {
     <div>
       <PageHeader
         title={detail.name}
-        media={<ProductThumb detail={detail} />}
+        titleAction={
+          canManage ? (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="text-muted-foreground"
+              aria-label={`${t('common.edit')}: ${t('catalog.product.info')}`}
+              title={t('common.edit')}
+              onClick={() => setEditing(true)}
+            >
+              <Pencil />
+            </Button>
+          ) : null
+        }
         meta={
           <>
             <span className="font-mono">{detail.sku}</span>
@@ -85,12 +106,7 @@ export function ProductPage() {
         }
         actions={
           <>
-            <Button variant="outline" asChild>
-              <Link to={`/inventory/movements?product=${detail.id}`}>
-                <History />
-                {t('catalog.product.viewMovements')}
-              </Link>
-            </Button>
+            <ReportMenu detail={detail} />
             <Button asChild>
               <Link to={`/inventory/stock/${detail.id}`}>
                 <Boxes />
@@ -105,35 +121,84 @@ export function ProductPage() {
         <div className="flex min-w-0 flex-col gap-4">
           <UnitsCard product={detail} canManage={canManage} />
           <ProductPricesCard productId={detail.id} pending={productStage(detail) === 'PENDING'} />
-          <DetailCard
-            title={t('catalog.product.info')}
-            canEdit={canManage}
-            view={<ProductFacts detail={detail} />}
-            edit={(close) => (
-              <ProductForm
-                defaultValues={productValues(detail)}
-                categories={loadedCategories}
-                submitLabel={t('common.save')}
-                onCancel={close}
-                onSubmit={(values) => save(values, close)}
-              />
-            )}
-          />
           {EBARIMT_PER_PRODUCT ? <EbarimtCard product={detail} /> : null}
         </div>
         <div className="flex min-w-0 flex-col gap-4">
           <ImagesCard product={detail} canManage={canManage} />
           <ProductLocationCard productId={detail.id} stockLink={false} />
           <ProductSuppliersCard productId={detail.id} />
+          {canManage ? (
+            <ProductHistoryCard productId={detail.id} categoryPath={(value) => paths.get(value)} />
+          ) : null}
         </div>
       </div>
+      <Dialog open={editing} onOpenChange={setEditing}>
+        {editing ? (
+          <DialogContent closeLabel={t('common.close')} size="lg">
+            <DialogHeader>
+              <DialogTitle>{detail.name}</DialogTitle>
+            </DialogHeader>
+            <ProductForm
+              defaultValues={productValues(detail)}
+              categories={categories.data}
+              submitLabel={t('common.save')}
+              onCancel={() => setEditing(false)}
+              onSubmit={(values) => save(values, () => setEditing(false))}
+            />
+          </DialogContent>
+        ) : null}
+      </Dialog>
     </div>
   );
 }
 
 /**
- * The strip under the header: the primary barcode (copied with one click), the warehouse price
- * when the reader may see prices, what is on hand over every warehouse, the home warehouse.
+ * «Тайлан авах» (owner 2026-11-06): the kinds of report on this product. Each opens in a new tab
+ * with the product already chosen in its prompt, where the reader sets the rest.
+ */
+function ReportMenu({ detail }: { detail: ProductDetail }) {
+  const { t } = useTranslation();
+  const canReports = useHasPermission('reports.view');
+  const chosen = new URLSearchParams({
+    pr: String(detail.id),
+    prn: `${detail.sku} - ${detail.name}`,
+  }).toString();
+  const reports = [
+    ...(canReports
+      ? [
+          { to: `/reports/stock-balance?${chosen}`, label: t('nav.reportsStockBalance') },
+          { to: `/reports/stock-documents?${chosen}`, label: t('nav.reportsStockDocuments') },
+          { to: `/reports/product-sales?${chosen}`, label: t('nav.reportsProductSales') },
+        ]
+      : []),
+    { to: `/inventory/movements?product=${detail.id}`, label: t('nav.movements') },
+  ];
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline">
+          <FileBarChart />
+          {t('catalog.product.reports')}
+          <ChevronDown aria-hidden className="size-4 opacity-60" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {reports.map((report) => (
+          <DropdownMenuItem key={report.to} asChild>
+            <Link to={report.to} target="_blank">
+              {report.label}
+            </Link>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/**
+ * The strip under the header: the primary barcode (copied with one click), the warehouse price when
+ * the reader may see prices, the home warehouse, the unit, the box and the weight, and beside them
+ * every place the product stands now. The stock comes from the balances' cache in one read.
  */
 function KeyFigures({ detail }: { detail: ProductDetail }) {
   const { t } = useTranslation();
@@ -148,7 +213,15 @@ function KeyFigures({ detail }: { detail: ProductDetail }) {
     null;
   const home = (locations.data ?? []).find((row) => row.isHome) ?? null;
   const current = prices.data?.current ?? null;
-  const onHand = stock.data?.onHand ?? null;
+  const box = detail.units.find((unit) => !unit.isBase && unit.uomCode === 'BOX');
+  const unitName = stock.data?.product.baseUnitName ?? base?.uomName ?? '';
+  const places = (stock.data?.warehouses ?? []).filter((row) => new Decimal(row.onHand).gt(0));
+  const shelvesOf = (warehouseId: number) =>
+    BINS_SOON
+      ? []
+      : (stock.data?.bins ?? [])
+          .filter((bin) => bin.warehouseId === warehouseId)
+          .map((bin) => bin.binCode);
   const copy = () => {
     if (!primary) return;
     void navigator.clipboard?.writeText(primary.code).then(
@@ -158,6 +231,43 @@ function KeyFigures({ detail }: { detail: ProductDetail }) {
   };
   return (
     <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section
+        aria-label={t('catalog.product.key.onHandNow')}
+        className="flex min-w-0 flex-col gap-1 rounded-xl bg-card px-4 py-3 shadow-card ring-1 ring-black/[0.06] xl:col-start-4 xl:row-span-2 xl:row-start-1"
+      >
+        <span className="text-[0.75rem] font-medium tracking-wide text-muted-foreground uppercase">
+          {t('catalog.product.key.onHandNow')}
+        </span>
+        {stock.isPending ? (
+          <Muted>{t('common.loading')}</Muted>
+        ) : places.length === 0 ? (
+          <Muted>{t('catalog.product.key.noStock')}</Muted>
+        ) : (
+          <ul className="flex max-h-32 flex-col gap-1 overflow-y-auto">
+            {places.map((place) => {
+              const shelves = shelvesOf(place.warehouseId);
+              return (
+                <li key={place.warehouseId} className="flex items-baseline justify-between gap-3">
+                  <span className="min-w-0 truncate text-[0.9375rem]">
+                    {warehouseName(place.warehouseId)}
+                    {shelves.length > 0 ? (
+                      <span className="ml-1.5 font-mono text-xs text-muted-foreground">
+                        {shelves.join(', ')}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="shrink-0 font-mono text-[0.9375rem] font-semibold tabular-nums">
+                    {t('inventory.qtyWithUnit', {
+                      qty: formatQty(place.onHand),
+                      unit: unitName,
+                    })}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
       <Figure label={t('catalog.product.key.barcode')}>
         {primary ? (
           <span className="flex items-center gap-1.5">
@@ -189,23 +299,30 @@ function KeyFigures({ detail }: { detail: ProductDetail }) {
           <Muted>{t('catalog.product.key.noPrice')}</Muted>
         )}
       </Figure>
-      <Figure label={t('catalog.product.key.onHand')}>
-        {onHand !== null ? (
-          <span className="font-mono tabular-nums">
-            {t('inventory.qtyWithUnit', {
-              qty: formatQty(onHand),
-              unit: stock.data?.product.baseUnitName ?? base?.uomName ?? '',
-            })}
-          </span>
-        ) : (
-          <Muted>{t('common.none')}</Muted>
-        )}
-      </Figure>
       <Figure label={t('catalog.product.key.home')}>
         {home ? (
           <span className="truncate">{warehouseName(home.warehouseId)}</span>
         ) : (
           <Muted>{t('inventory.location.noHome')}</Muted>
+        )}
+      </Figure>
+      <Figure label={t('catalog.product.baseUnit')}>
+        {base?.uomName ?? <Muted>{t('common.none')}</Muted>}
+      </Figure>
+      <Figure label={t('catalog.product.boxFactor')}>
+        {box ? (
+          <span className="font-mono tabular-nums">
+            {t('catalog.product.boxOf', { factor: box.factorToBase, unit: base?.uomName ?? '' })}
+          </span>
+        ) : (
+          <Muted>{t('common.none')}</Muted>
+        )}
+      </Figure>
+      <Figure label={t('catalog.products.columns.weight')}>
+        {detail.weightKg ? (
+          <span className="font-mono tabular-nums">{detail.weightKg}</span>
+        ) : (
+          <Muted>{t('common.none')}</Muted>
         )}
       </Figure>
     </div>
@@ -229,62 +346,5 @@ function Figure({ label, children }: { label: string; children: React.ReactNode 
 function Muted({ children }: { children: React.ReactNode }) {
   return (
     <span className={cn('text-[0.9375rem] font-normal text-muted-foreground')}>{children}</span>
-  );
-}
-
-/** The reading side of the product's card: what the header does not already show. */
-function ProductFacts({ detail }: { detail: ProductDetail }) {
-  const { t } = useTranslation();
-  const base = detail.units.find((unit) => unit.isBase);
-  const box = detail.units.find((unit) => !unit.isBase && unit.uomCode === 'BOX');
-  return (
-    <FieldList
-      items={[
-        {
-          label: t('catalog.product.name'),
-          value: detail.name,
-        },
-        {
-          label: t('catalog.product.baseUnit'),
-          value: base?.uomName ?? null,
-        },
-        {
-          label: t('catalog.product.boxFactor'),
-          value: box ? (
-            <span className="font-mono">
-              {t('catalog.product.boxOf', { factor: box.factorToBase, unit: base?.uomName ?? '' })}
-            </span>
-          ) : null,
-        },
-        {
-          label: t('catalog.product.weight'),
-          value: detail.weightKg ? (
-            <span className="font-mono">{t('catalog.product.kg', { kg: detail.weightKg })}</span>
-          ) : null,
-        },
-        {
-          label: t('catalog.product.status'),
-          value: t(`catalog.products.status.${productStage(detail)}`),
-        },
-      ]}
-    />
-  );
-}
-
-/** The product's primary photo beside its name, or a quiet placeholder. */
-function ProductThumb({ detail }: { detail: ProductDetail }) {
-  const { t } = useTranslation();
-  const primary = detail.images.find((image) => image.isPrimary) ?? detail.images[0];
-  const src = primary?.thumbUrl ?? primary?.url;
-  return src ? (
-    <img
-      src={src}
-      alt={t('catalog.images.alt', { name: detail.name })}
-      className="size-14 rounded-xl object-cover shadow-card ring-1 ring-black/[0.06]"
-    />
-  ) : (
-    <span className="grid size-14 place-items-center rounded-xl bg-fill text-muted-foreground">
-      <Package aria-hidden className="size-6" />
-    </span>
   );
 }

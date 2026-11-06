@@ -1,15 +1,20 @@
 import { Decimal } from '@tugeel/shared/money';
 import { nextPoStatus, previousPoStatus } from '@tugeel/shared/procurement';
+import { matchesQuery, queryTerms, searchKeys } from '@tugeel/shared/text';
 import {
+  ArrowRight,
   ChevronDown,
+  Ellipsis,
   History,
   PackagePlus,
   RefreshCw,
   ScanSearch,
+  Search,
   Table2,
   Truck as TruckIcon,
+  UserRound,
 } from 'lucide-react';
-import { useState } from 'react';
+import { type CSSProperties, useDeferredValue, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
@@ -21,6 +26,12 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Table,
   TableBody,
@@ -50,7 +61,6 @@ import {
 } from './api';
 import { InvoiceCheckPanel } from './invoice-check-panel';
 import { LoadsPanel } from './order-loads-panel';
-import { PoStatusBadge, StatusCountBadge } from './parts';
 
 const idOf = (value: string | undefined) => {
   const id = value === undefined ? NaN : Number.parseInt(value, 10);
@@ -313,7 +323,55 @@ function Tile({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** One orderer's suppliers: the header with the group's totals, the rows under it when opened. */
+/** A status's colours, here only: this board has its own look (owner 2026-11-06). */
+const STATUS_TONE: Record<PoStatus, { pill: string; dot: string }> = {
+  PREPARING: { pill: 'bg-slate-100 text-slate-600', dot: 'bg-slate-300' },
+  SENT: { pill: 'bg-sky-50 text-sky-700', dot: 'bg-sky-500' },
+  SHIPPING: { pill: 'bg-indigo-50 text-indigo-700', dot: 'bg-indigo-500' },
+  IN_TRANSIT: { pill: 'bg-violet-50 text-violet-700', dot: 'bg-violet-500' },
+  ARRIVED: { pill: 'bg-amber-50 text-amber-700', dot: 'bg-amber-500' },
+  ACCOUNTING: { pill: 'bg-orange-50 text-orange-700', dot: 'bg-orange-500' },
+  RECEIVED: { pill: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' },
+};
+
+function StatusPill({ status, count }: { status: PoStatus; count?: number }) {
+  const { t } = useTranslation();
+  const tone = STATUS_TONE[status];
+  return (
+    <span
+      className={cn(
+        'inline-flex w-fit items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium whitespace-nowrap',
+        tone.pill,
+      )}
+    >
+      <span aria-hidden className={cn('size-1.5 rounded-full', tone.dot)} />
+      {t(`procurement.status.${status}`)}
+      {count === undefined ? null : <span className="font-mono">{formatCount(count)}</span>}
+    </span>
+  );
+}
+
+/** Rows drawn at once; a group can hold every supplier of the company. */
+const PAGE_ROWS = 30;
+type RowTab = 'with' | 'empty' | 'all';
+
+/** A zero says nothing in a long list: it recedes to a dash. */
+const orDash = (value: Decimal, text: string) => (value.isZero() ? '—' : text);
+
+function GroupStat({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="flex flex-col items-end leading-tight">
+      <span className="text-[0.6875rem] text-slate-500">{label}</span>
+      <span className="font-mono text-[0.875rem] font-semibold text-slate-900">{value}</span>
+    </span>
+  );
+}
+
+/**
+ * One orderer's suppliers (owner 2026-11-06: its own look, not the system's): a header that opens
+ * and closes with the group's totals; inside, a search and «Бараатай / Бараагүй», then aligned rows
+ * under one header. Suppliers with goods come first; a long list draws by the page.
+ */
 function OrdererGroup(props: {
   base: string;
   orderId: number;
@@ -327,6 +385,10 @@ function OrdererGroup(props: {
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(props.open);
+  const [tab, setTab] = useState<RowTab>('with');
+  const [search, setSearch] = useState('');
+  const [shownRows, setShownRows] = useState(PAGE_ROWS);
+  const q = useDeferredValue(search.trim());
   const totals = sumOf(props.suppliers);
   const name = props.name ?? t('procurement.supplier.noOrderer');
   const onLoad = props.suppliers.filter((supplier) => supplier.loadIds.length > 0).length;
@@ -335,83 +397,225 @@ function OrdererGroup(props: {
     count: props.suppliers.filter((supplier) => supplier.status === value).length,
   })).filter((entry) => entry.count > 0);
 
+  const withLines = props.suppliers.filter((supplier) => supplier.lineCount > 0);
+  const withoutLines = props.suppliers.filter((supplier) => supplier.lineCount === 0);
+  // A tab with nothing in it is not a place to stay.
+  const current: RowTab =
+    (tab === 'with' && withLines.length === 0) || (tab === 'empty' && withoutLines.length === 0)
+      ? 'all'
+      : tab;
+  const inTab =
+    current === 'with'
+      ? withLines
+      : current === 'empty'
+        ? withoutLines
+        : [...withLines, ...withoutLines];
+  const terms = queryTerms(q);
+  const matches =
+    terms.length === 0
+      ? inTab
+      : inTab.filter((supplier) =>
+          matchesQuery(searchKeys(supplier.supplierName, [supplier.supplierCode]), terms),
+        );
+  const rows = matches.slice(0, shownRows);
+  const columns = props.canPrices
+    ? 'minmax(11rem,1fr) 6.5rem 8.5rem 3rem 4rem 4.5rem 6rem 5.5rem 11.5rem'
+    : 'minmax(11rem,1fr) 6.5rem 8.5rem 3rem 4rem 4.5rem 5.5rem 11.5rem';
+
   return (
-    <section aria-label={name} className="rounded-xl bg-card shadow-card ring-1 ring-black/[0.06]">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
+    <section
+      aria-label={name}
+      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.05)]"
+    >
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3">
         <button
           type="button"
-          className="flex min-w-0 items-center gap-2 text-left"
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
           aria-expanded={open}
           onClick={() => setOpen((value) => !value)}
         >
           <ChevronDown
             aria-hidden
             className={cn(
-              'size-4 shrink-0 text-muted-foreground transition-transform',
+              'size-4 shrink-0 text-slate-400 transition-transform',
               !open && '-rotate-90',
             )}
           />
-          <span className="truncate text-[0.9375rem] font-semibold">{name}</span>
-        </button>
-        <span className="text-[0.8125rem] text-muted-foreground">
-          {t('procurement.overview.groupSummary', {
-            suppliers: formatCount(totals.suppliers),
-            boxes: formatQty(totals.boxes.toFixed()),
-            pieces: formatQty(totals.pieces.toFixed()),
-            kg: formatQty(totals.kg.toDecimalPlaces(1).toString()),
-          })}
-        </span>
-        <span className="text-[0.8125rem] text-muted-foreground">
-          {t('procurement.overview.onLoad', {
-            on: formatCount(onLoad),
-            off: formatCount(props.suppliers.length - onLoad),
-          })}
-        </span>
-        {props.canPrices ? (
-          <span className="font-mono text-[0.8125rem]">
-            {formatTugrik(totals.estimated.toFixed(2))}
+          <span
+            aria-hidden
+            className={cn(
+              'flex size-9 shrink-0 items-center justify-center rounded-full text-[0.8125rem] font-semibold',
+              props.ordererId === null
+                ? 'bg-slate-100 text-slate-500'
+                : 'bg-indigo-100 text-indigo-700',
+            )}
+          >
+            {props.ordererId === null ? <UserRound className="size-4" /> : name.slice(0, 1)}
           </span>
-        ) : null}
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate text-[0.9375rem] font-semibold text-slate-900">{name}</span>
+            <span className="truncate text-xs text-slate-500">
+              {t('procurement.overview.groupCount', { count: formatCount(totals.suppliers) })}
+              {' · '}
+              {t('procurement.overview.onLoad', {
+                on: formatCount(onLoad),
+                off: formatCount(props.suppliers.length - onLoad),
+              })}
+            </span>
+          </span>
+        </button>
         <span className="flex flex-wrap items-center gap-1.5">
           {counts.map((entry) => (
-            <StatusCountBadge key={entry.status} status={entry.status} count={entry.count} />
+            <StatusPill key={entry.status} status={entry.status} count={entry.count} />
           ))}
         </span>
+        <span className="flex items-center gap-5">
+          <GroupStat
+            label={t('procurement.overview.boxes')}
+            value={orDash(totals.boxes, formatQty(totals.boxes.toFixed()))}
+          />
+          <GroupStat
+            label={t('procurement.overview.kg')}
+            value={orDash(totals.kg, formatQty(totals.kg.toDecimalPlaces(1).toString()))}
+          />
+          {props.canPrices ? (
+            <GroupStat
+              label={t('procurement.overview.amountShort')}
+              value={orDash(totals.estimated, formatTugrik(totals.estimated.toFixed(2)))}
+            />
+          ) : null}
+        </span>
         {props.ordererId !== null ? (
-          <Button variant="ghost" size="sm" className="ml-auto text-link" asChild>
-            <Link
-              to={`${props.base}/detail?orderer=${props.ordererId}`}
-              aria-label={t('procurement.overview.openOrderer', { name })}
-            >
-              {t('procurement.overview.detail')}
-            </Link>
-          </Button>
+          <Link
+            to={`${props.base}/detail?orderer=${props.ordererId}`}
+            aria-label={t('procurement.overview.openOrderer', { name })}
+            className="inline-flex items-center gap-1 text-[0.8125rem] font-medium text-indigo-600 hover:text-indigo-800"
+          >
+            {t('procurement.overview.detail')}
+            <ArrowRight aria-hidden className="size-3.5" />
+          </Link>
         ) : null}
       </div>
       {open ? (
-        <div className="flex flex-col gap-2 border-t border-border/80 p-3">
-          {props.suppliers.map((supplier) => (
-            <SupplierCard
-              key={supplier.supplierId}
-              base={props.base}
-              orderId={props.orderId}
-              supplier={supplier}
-              canPrices={props.canPrices}
-              onStep={props.onStep}
-              truckNames={supplier.loadIds.flatMap((id) => {
-                const name = props.truckOfLoad.get(id);
-                return name === undefined ? [] : [name];
-              })}
-            />
-          ))}
+        <div className="border-t border-slate-200">
+          {(withLines.length > 0 && withoutLines.length > 0) || props.suppliers.length > 8 ? (
+            <div className="flex flex-wrap items-center gap-3 bg-slate-50/70 px-4 py-2">
+              {withLines.length > 0 && withoutLines.length > 0 ? (
+                <div
+                  role="tablist"
+                  aria-label={name}
+                  className="inline-flex rounded-lg bg-slate-200/60 p-0.5"
+                >
+                  {(
+                    [
+                      ['with', withLines.length],
+                      ['empty', withoutLines.length],
+                      ['all', props.suppliers.length],
+                    ] as const
+                  ).map(([value, count]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="tab"
+                      aria-selected={current === value}
+                      className={cn(
+                        'rounded-md px-3 py-1 text-[0.8125rem] font-medium',
+                        current === value
+                          ? 'bg-white text-slate-900 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900',
+                      )}
+                      onClick={() => {
+                        setTab(value);
+                        setShownRows(PAGE_ROWS);
+                      }}
+                    >
+                      {t(`procurement.overview.tabs.${value}`)}
+                      <span className="ml-1.5 font-mono text-xs text-slate-500">
+                        {formatCount(count)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {props.suppliers.length > 8 ? (
+                <label className="relative ml-auto w-full max-w-72">
+                  <span className="sr-only">{t('procurement.overview.searchSuppliers')}</span>
+                  <Search
+                    aria-hidden
+                    className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
+                    type="search"
+                    value={search}
+                    placeholder={t('procurement.overview.searchSuppliers')}
+                    className="h-8 w-full rounded-lg border border-slate-200 bg-white pr-2 pl-8 text-[0.8125rem] outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    onChange={(event) => {
+                      setSearch(event.target.value);
+                      setShownRows(PAGE_ROWS);
+                    }}
+                  />
+                </label>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="@container" style={{ '--po-columns': columns } as CSSProperties}>
+            <div className="hidden items-center gap-x-3 border-y border-slate-100 py-1.5 pr-3 pl-4 text-[0.6875rem] font-medium tracking-wide text-slate-500 uppercase @[68rem]:grid @[68rem]:[grid-template-columns:var(--po-columns)]">
+              <span className="pl-6">{t('procurement.overview.suppliers')}</span>
+              <span>{t('procurement.overview.columnStatus')}</span>
+              <span>{t('procurement.orderer.field')}</span>
+              <span className="text-right">{t('procurement.overview.lines')}</span>
+              <span className="text-right">{t('procurement.overview.boxes')}</span>
+              <span className="text-right">{t('procurement.overview.kg')}</span>
+              {props.canPrices ? (
+                <span className="text-right">{t('procurement.overview.amountShort')}</span>
+              ) : null}
+              <span className="pl-2">{t('procurement.overview.shippedShort')}</span>
+              <span className="sr-only">{t('common.actions')}</span>
+            </div>
+            {rows.map((supplier) => (
+              <SupplierRow
+                key={supplier.supplierId}
+                base={props.base}
+                orderId={props.orderId}
+                supplier={supplier}
+                canPrices={props.canPrices}
+                onStep={props.onStep}
+                truckNames={supplier.loadIds.flatMap((id) => {
+                  const truck = props.truckOfLoad.get(id);
+                  return truck === undefined ? [] : [truck];
+                })}
+              />
+            ))}
+            {rows.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-slate-500">
+                {t('procurement.overview.noMatch')}
+              </p>
+            ) : null}
+            {matches.length > rows.length ? (
+              <button
+                type="button"
+                className="w-full border-t border-slate-100 py-2.5 text-[0.8125rem] font-medium text-indigo-600 hover:bg-slate-50"
+                onClick={() => setShownRows((value) => value + PAGE_ROWS)}
+              >
+                {t('procurement.overview.showMore', {
+                  count: formatCount(Math.min(PAGE_ROWS, matches.length - rows.length)),
+                  left: formatCount(matches.length - rows.length),
+                })}
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
     </section>
   );
 }
 
-/** A supplier as a card: its status, orderer and totals; «Бараа харах» unfolds its ordered lines. */
-function SupplierCard(props: {
+/**
+ * A supplier in one aligned row: a coloured edge for its status, a chevron that unfolds its lines,
+ * the numbers in their columns, one main action (the next status, or «Бараа нэмэх» while it has no
+ * goods) and the rest behind «⋯».
+ */
+function SupplierRow(props: {
   base: string;
   orderId: number;
   supplier: PurchaseOrderSupplier;
@@ -427,128 +631,206 @@ function SupplierCard(props: {
   const [checking, setChecking] = useState(false);
   const { supplier } = props;
   const loaded = new Decimal(supplier.loadedBoxes);
-  const partlyLoaded = loaded.gt(0) && loaded.lt(supplier.boxes);
+  const boxes = new Decimal(supplier.boxes);
+  const kg = new Decimal(supplier.weightKg);
+  const partlyLoaded = loaded.gt(0) && loaded.lt(boxes);
   const to = `${props.base}/detail?supplier=${supplier.supplierId}`;
   const next = nextPoStatus(supplier.status);
   const previous = previousPoStatus(supplier.status);
   const ordered = new Decimal(supplier.qtyBase);
+  const empty = supplier.lineCount === 0;
   const percent = ordered.isZero()
     ? '0'
     : Decimal.min(new Decimal(supplier.shippedBase).div(ordered).times(100).floor(), 100).toFixed();
+  const mainIsNext = !empty && supplier.canMoveNext && next !== null;
+  const mainIsAdd = !mainIsNext && supplier.canEdit;
+  const nextLabel = next
+    ? t('procurement.supplier.nextTo', { status: t(`procurement.status.${next}`) })
+    : '';
+
   return (
     <section
       aria-label={supplier.supplierName}
-      className="rounded-lg border border-border/80 bg-background"
+      className="relative border-b border-slate-100 last:border-b-0"
     >
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
-        <Link to={to} className="text-[0.875rem] font-semibold underline-offset-4 hover:underline">
-          {supplier.supplierName}
-        </Link>
-        <PoStatusBadge status={supplier.status} />
-        {props.truckNames.map((name) => (
-          <Badge key={name} variant="outline" className="gap-1">
-            <TruckIcon aria-hidden className="size-3" />
-            {name}
-          </Badge>
-        ))}
-        {partlyLoaded ? (
-          <Badge variant="warning">
-            {t('procurement.overview.loadedOf', {
-              loaded: formatQty(loaded.toFixed()),
-              boxes: formatQty(supplier.boxes),
-            })}
-          </Badge>
-        ) : null}
-        {canManage ? (
-          <OrdererSelect supplierId={supplier.supplierId} current={supplier.ordererId} />
-        ) : supplier.ordererName ? (
-          <span className="text-[0.8125rem] text-muted-foreground">{supplier.ordererName}</span>
-        ) : null}
-        <span className="text-[0.8125rem] text-muted-foreground">
-          {t('procurement.overview.supplierSummary', {
-            lines: formatCount(supplier.lineCount),
-            boxes: formatQty(supplier.boxes),
-            kg: formatQty(new Decimal(supplier.weightKg).toDecimalPlaces(1).toString()),
-          })}
-        </span>
-        {props.canPrices && supplier.estimatedCost ? (
-          <span className="font-mono text-[0.8125rem]">{formatTugrik(supplier.estimatedCost)}</span>
-        ) : null}
-        <span
-          className="ml-auto flex items-center gap-1.5"
-          aria-label={t('procurement.overview.shippedShare')}
-        >
-          <span className="h-1.5 w-16 overflow-hidden rounded-full bg-fill">
-            <span className="block h-full bg-success" style={{ width: `${percent}%` }} />
-          </span>
-          <span className="font-mono text-[0.75rem] text-muted-foreground">{percent}%</span>
-        </span>
-        <span className="flex items-center gap-1">
-          {supplier.canMoveBack && previous ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={t('procurement.supplier.backNamed', { name: supplier.supplierName })}
-              onClick={() => props.onStep(supplier, -1)}
-            >
-              {t('procurement.supplier.backTo', { status: t(`procurement.status.${previous}`) })}
-            </Button>
-          ) : null}
-          {supplier.canMoveNext && next ? (
-            <Button
-              variant="outline"
-              size="sm"
-              aria-label={t('procurement.supplier.nextNamed', { name: supplier.supplierName })}
-              onClick={() => props.onStep(supplier, 1)}
-            >
-              {t('procurement.supplier.nextTo', { status: t(`procurement.status.${next}`) })}
-            </Button>
-          ) : null}
-          {supplier.canEdit ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={t('procurement.overview.addProductNamed', {
+      <span
+        aria-hidden
+        className={cn(
+          'absolute inset-y-0 left-0 w-[3px]',
+          empty ? 'bg-slate-200' : STATUS_TONE[supplier.status].dot,
+        )}
+      />
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2 pr-3 pl-4 transition-colors hover:bg-slate-50 @[68rem]:grid @[68rem]:[grid-template-columns:var(--po-columns)]">
+        <div className="flex w-full min-w-0 items-center gap-1 @[68rem]:w-auto">
+          {empty ? (
+            <span aria-hidden className="size-5 shrink-0" />
+          ) : (
+            <button
+              type="button"
+              aria-expanded={open}
+              aria-label={t('procurement.overview.showLinesNamed', {
                 name: supplier.supplierName,
               })}
-              onClick={() => setAdding(true)}
-            >
-              <PackagePlus aria-hidden className="size-4" />
-              {t('procurement.overview.addProduct')}
-            </Button>
-          ) : null}
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-expanded={checking}
-            aria-label={t('procurement.overview.invoiceNamed', { name: supplier.supplierName })}
-            onClick={() => setChecking((value) => !value)}
-          >
-            <ScanSearch aria-hidden className="size-4" />
-            {t('procurement.overview.invoice')}
-          </Button>
-          {supplier.lineCount > 0 ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-expanded={open}
+              className="flex size-5 shrink-0 items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700"
               onClick={() => setOpen((value) => !value)}
             >
               <ChevronDown
                 aria-hidden
                 className={cn('size-4 transition-transform', !open && '-rotate-90')}
               />
-              {t(open ? 'common.close' : 'procurement.overview.showLines')}
-            </Button>
-          ) : null}
-          <Button variant="outline" size="sm" asChild>
+            </button>
+          )}
+          <div className="flex min-w-0 flex-col gap-0.5">
             <Link
               to={to}
-              aria-label={t('procurement.overview.openSupplier', { name: supplier.supplierName })}
+              title={supplier.supplierName}
+              className={cn(
+                'line-clamp-2 text-[0.875rem] leading-snug underline-offset-4 hover:underline',
+                empty ? 'text-slate-600' : 'font-semibold text-slate-900',
+              )}
             >
-              {t('procurement.overview.detail')}
+              {supplier.supplierName}
             </Link>
-          </Button>
+            {props.truckNames.length > 0 || partlyLoaded ? (
+              <span className="flex flex-wrap items-center gap-1">
+                {props.truckNames.map((name) => (
+                  <span
+                    key={name}
+                    className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[0.6875rem] text-slate-600"
+                  >
+                    <TruckIcon aria-hidden className="size-3" />
+                    {name}
+                  </span>
+                ))}
+                {partlyLoaded ? (
+                  <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[0.6875rem] text-amber-700">
+                    {t('procurement.overview.loadedOf', {
+                      loaded: formatQty(loaded.toFixed()),
+                      boxes: formatQty(supplier.boxes),
+                    })}
+                  </span>
+                ) : null}
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <StatusPill status={supplier.status} />
+        <div className="w-40 max-w-full min-w-0 @[68rem]:w-auto">
+          {canManage ? (
+            <OrdererSelect supplierId={supplier.supplierId} current={supplier.ordererId} />
+          ) : (
+            <span className="truncate text-[0.8125rem] text-slate-500">
+              {supplier.ordererName ?? '—'}
+            </span>
+          )}
+        </div>
+        {/* A narrow window has no columns: the numbers read as one line. */}
+        {empty ? (
+          <span
+            className={cn(
+              'text-xs text-slate-400',
+              props.canPrices ? '@[68rem]:col-span-5' : '@[68rem]:col-span-4',
+            )}
+          >
+            {t('procurement.overview.noGoods')}
+          </span>
+        ) : (
+          <>
+            <span className="text-xs text-slate-500 @[68rem]:hidden">
+              {t('procurement.overview.supplierSummary', {
+                lines: formatCount(supplier.lineCount),
+                boxes: formatQty(supplier.boxes),
+                kg: formatQty(kg.toDecimalPlaces(1).toString()),
+              })}
+            </span>
+            <NumberCell text={formatCount(supplier.lineCount)} />
+            <NumberCell text={orDash(boxes, formatQty(supplier.boxes))} />
+            <NumberCell text={orDash(kg, formatQty(kg.toDecimalPlaces(1).toString()))} />
+            {props.canPrices ? (
+              <NumberCell
+                text={
+                  supplier.estimatedCost && !new Decimal(supplier.estimatedCost).isZero()
+                    ? formatTugrik(supplier.estimatedCost)
+                    : '—'
+                }
+              />
+            ) : null}
+            <span
+              className="hidden items-center gap-1.5 pl-2 @[68rem]:flex"
+              aria-label={t('procurement.overview.shippedShare')}
+            >
+              <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                <span className="block h-full bg-emerald-500" style={{ width: `${percent}%` }} />
+              </span>
+              <span className="w-8 text-right font-mono text-[0.6875rem] text-slate-500">
+                {percent}%
+              </span>
+            </span>
+          </>
+        )}
+        <span className="ml-auto flex items-center justify-end gap-1">
+          {mainIsNext ? (
+            <button
+              type="button"
+              aria-label={t('procurement.supplier.nextNamed', { name: supplier.supplierName })}
+              title={nextLabel}
+              className="inline-flex h-8 items-center gap-1 rounded-lg bg-indigo-600 px-2.5 text-[0.8125rem] font-medium whitespace-nowrap text-white hover:bg-indigo-700"
+              onClick={() => props.onStep(supplier, 1)}
+            >
+              <ArrowRight aria-hidden className="size-3.5" />
+              {next ? t(`procurement.status.${next}`) : null}
+            </button>
+          ) : mainIsAdd ? (
+            <button
+              type="button"
+              aria-label={t('procurement.overview.addProductNamed', {
+                name: supplier.supplierName,
+              })}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[0.8125rem] font-medium whitespace-nowrap text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
+              onClick={() => setAdding(true)}
+            >
+              <PackagePlus aria-hidden className="size-4" />
+              {t('procurement.overview.addProduct')}
+            </button>
+          ) : null}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label={t('procurement.overview.moreNamed', { name: supplier.supplierName })}
+              className="flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200 hover:text-slate-800"
+            >
+              <Ellipsis aria-hidden className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {!mainIsNext && supplier.canMoveNext && next ? (
+                <DropdownMenuItem onSelect={() => props.onStep(supplier, 1)}>
+                  {nextLabel}
+                </DropdownMenuItem>
+              ) : null}
+              {supplier.canMoveBack && previous ? (
+                <DropdownMenuItem onSelect={() => props.onStep(supplier, -1)}>
+                  {t('procurement.supplier.backTo', {
+                    status: t(`procurement.status.${previous}`),
+                  })}
+                </DropdownMenuItem>
+              ) : null}
+              {!mainIsAdd && supplier.canEdit ? (
+                <DropdownMenuItem onSelect={() => setAdding(true)}>
+                  <PackagePlus aria-hidden className="size-4" />
+                  {t('procurement.overview.addProduct')}
+                </DropdownMenuItem>
+              ) : null}
+              <DropdownMenuItem onSelect={() => setChecking((value) => !value)}>
+                <ScanSearch aria-hidden className="size-4" />
+                {t('procurement.overview.invoice')}
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to={to}>
+                  <Table2 aria-hidden className="size-4" />
+                  {t('procurement.overview.detail')}
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </span>
       </div>
       {open ? <SupplierLines orderId={props.orderId} supplierId={supplier.supplierId} /> : null}
@@ -575,6 +857,19 @@ function SupplierCard(props: {
   );
 }
 
+function NumberCell({ text }: { text: string }) {
+  return (
+    <span
+      className={cn(
+        'hidden text-right font-mono text-[0.8125rem] @[68rem]:block',
+        text === '—' ? 'text-slate-300' : 'text-slate-800',
+      )}
+    >
+      {text}
+    </span>
+  );
+}
+
 /** The supplier's orderer, changed in place by a manager (the supplier's setting, not the order's). */
 function OrdererSelect({ supplierId, current }: { supplierId: number; current: number | null }) {
   const { t } = useTranslation();
@@ -582,9 +877,15 @@ function OrdererSelect({ supplierId, current }: { supplierId: number; current: n
   const save = useSetSupplierOrderer(supplierId);
   const action = useAction();
   return (
-    <span className="flex items-center gap-2">
+    <span className="flex min-w-0 items-center gap-2">
       <NativeSelect
         variant="filter"
+        active={false}
+        className={cn(
+          'h-8 w-full max-w-full',
+          current === null &&
+            'border-transparent bg-transparent text-slate-500 shadow-none hover:border-slate-200',
+        )}
         aria-label={t('procurement.orderer.field')}
         value={current === null ? '' : String(current)}
         disabled={save.isPending}

@@ -135,7 +135,13 @@ export function useProductQuery(filter: ProductQueryFilter, options: ListReadOpt
     queryFn: async ({ pageParam, signal }) =>
       unwrap(
         await api.POST('/api/v1/products/query', {
-          body: { ...productQueryBody(filter), cursor: pageParam, limit },
+          // Without a search the list stands in the categories' order; a search ranks by match.
+          body: {
+            ...productQueryBody(filter),
+            ...(filter.q ? {} : { sort: 'CATEGORY' as const }),
+            cursor: pageParam,
+            limit,
+          },
           signal,
         }),
       ),

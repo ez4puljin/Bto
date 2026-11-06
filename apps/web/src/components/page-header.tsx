@@ -30,6 +30,7 @@ export function PageHeader({
   meta,
   actions,
   media,
+  titleAction,
   description,
   crumbs = [],
   compact = false,
@@ -42,6 +43,8 @@ export function PageHeader({
   actions?: ReactNode;
   /** A picture beside the title (a product's photo). */
   media?: ReactNode;
+  /** A small control right after the title (a product's edit pencil). */
+  titleAction?: ReactNode;
   crumbs?: readonly Crumb[];
   /** The breadcrumb and the actions on one row, no visible title (the page shows its own). */
   compact?: boolean;
@@ -161,6 +164,7 @@ export function PageHeader({
               <h1 className="text-[1.75rem] leading-tight font-semibold tracking-tight text-balance">
                 {title}
               </h1>
+              {titleAction}
               {trail?.exact ? <FavoriteToggle path={trail.item.to} /> : null}
             </div>
             {meta ? (

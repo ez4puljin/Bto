@@ -1041,7 +1041,7 @@ describe('products list', () => {
 
   it('shows a default set of columns that fits a laptop, and every other one on request', async () => {
     renderApp(
-      '/catalog/products',
+      '/catalog/products?q=c',
       signedIn(ADMIN_ME, {
         ...LIST_ROUTES,
         'POST /api/v1/products/query': () => queryPage([COLA_ROW]),
@@ -1110,7 +1110,7 @@ describe('products list', () => {
 
   it('hides a column, remembers it, and shows every column again', async () => {
     const routes = { ...LIST_ROUTES, 'POST /api/v1/products/query': () => queryPage([COLA_ROW]) };
-    renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
+    renderApp('/catalog/products?q=c', signedIn(ADMIN_ME, routes));
     const user = userEvent.setup();
     await screen.findByRole('link', { name: 'Кока кола' });
     await user.click(screen.getByRole('button', { name: mn.common.columns }));
@@ -1129,7 +1129,7 @@ describe('products list', () => {
 
     // A new visit keeps the choice until every column is shown again.
     cleanup();
-    renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
+    renderApp('/catalog/products?q=c', signedIn(ADMIN_ME, routes));
     await screen.findByRole('link', { name: 'Кока кола' });
     expect(columnHeader('category')).toBeNull();
     await user.click(screen.getByRole('button', { name: mn.common.columns }));
@@ -1174,7 +1174,7 @@ describe('products list', () => {
       ...LIST_ROUTES,
       'POST /api/v1/products/query': () => queryPage([COLA_ROW]),
     });
-    renderApp('/catalog/products', fetchMock);
+    renderApp('/catalog/products?q=c', fetchMock);
     await screen.findByRole('link', { name: 'Кока кола' });
     expect(columnHeader('supplier')).toBeNull();
     expect(columnHeader('category')).toBeInTheDocument();
@@ -1186,13 +1186,13 @@ describe('products list', () => {
   it('ignores a broken or foreign stored choice and still hides when storage refuses', async () => {
     const routes = { ...LIST_ROUTES, 'POST /api/v1/products/query': () => queryPage([COLA_ROW]) };
     localStorage.setItem(HIDDEN_COLUMNS_KEY, '{not json');
-    renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
+    renderApp('/catalog/products?q=c', signedIn(ADMIN_ME, routes));
     await screen.findByRole('link', { name: 'Кока кола' });
     expect(columnHeader('category')).toBeInTheDocument();
 
     cleanup();
     localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify(['sku', 'name', 'price', 'category']));
-    renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
+    renderApp('/catalog/products?q=c', signedIn(ADMIN_ME, routes));
     await screen.findByRole('link', { name: 'Кока кола' });
     expect(columnHeader('sku')).toBeInTheDocument();
     expect(columnHeader('name')).toBeInTheDocument();
@@ -1211,6 +1211,33 @@ describe('products list', () => {
     setItem.mockRestore();
   });
 
+  it("stands in the categories' order under their heads, the left side filtering (owner 2026-11-06)", async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...LIST_ROUTES,
+      'POST /api/v1/products/query': () => queryPage([COLA_ROW]),
+    });
+    const { router } = renderApp('/catalog/products', fetchMock);
+    const user = userEvent.setup();
+    const table = await screen.findByRole('table');
+    await within(table).findByRole('link', { name: 'Кока кола' });
+    const bodies = await Promise.all(calls(fetchMock, 'POST', '/api/v1/products/query').map(sent));
+    expect(bodies[0]).toMatchObject({ sort: 'CATEGORY' });
+    // The head names the category; its column would only repeat it.
+    expect(within(table).getByText('Ундаа')).toBeInTheDocument();
+    expect(columnHeader('category')).toBeNull();
+
+    const panel = within(
+      screen.getByRole('complementary', { name: mn.catalog.products.panel.label }),
+    );
+    await user.click(panel.getByRole('button', { name: /Ундаа/ }));
+    await waitFor(() => expect(router.state.location.search).toMatch(/category=\d+/));
+    await user.click(panel.getByRole('button', { name: mn.catalog.products.status.PENDING }));
+    await waitFor(() => expect(router.state.location.search).toContain('status=PENDING'));
+    // A search ranks by match: no heads, and the column is back.
+    await user.type(screen.getByRole('searchbox', { name: mn.common.search }), 'coca');
+    await waitFor(() => expect(columnHeader('category')).not.toBeNull());
+  });
+
   it('opens a product from its name or anywhere on its row', async () => {
     const routes = { ...LIST_ROUTES, 'POST /api/v1/products/query': () => queryPage([COLA_ROW]) };
     const first = renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
@@ -1221,7 +1248,9 @@ describe('products list', () => {
     cleanup();
     const second = renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
     const table = await screen.findByRole('table');
-    await user.click(await within(table).findByText('Ундаа'));
+    // The category's own row heads the list and opens nothing; the product's row opens it.
+    const row = await within(table).findByRole('row', { name: /Кока кола/ });
+    await user.click(within(row).getByText('10001'));
     await waitFor(() => expect(second.router.state.location.pathname).toBe('/catalog/products/1'));
 
     cleanup();
@@ -1392,10 +1421,9 @@ describe('product page', () => {
 
   it('keeps the product read-only for a worker', async () => {
     renderApp('/catalog/products/7', signedIn(WORKER_ME, productRoutes()));
-    // The card is read first (ADR-0042); a worker gets no «Засах» and no form.
-    const info = within(await screen.findByRole('region', { name: mn.catalog.product.info }));
-    expect(screen.getByRole('heading', { name: COLA.name })).toBeInTheDocument();
-    expect(info.queryByRole('textbox')).toBeNull();
+    // A worker gets no pencil, no form and no history.
+    expect(await screen.findByRole('heading', { name: COLA.name })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: mn.catalog.product.history.title })).toBeNull();
     expect(
       screen.queryByRole('button', { name: `${mn.common.edit}: ${mn.catalog.product.info}` }),
     ).toBeNull();
@@ -1406,6 +1434,107 @@ describe('product page', () => {
     expect(screen.queryByRole('button', { name: mn.catalog.units.addBarcode })).toBeNull();
     expect(screen.queryByRole('button', { name: mn.catalog.units.deleteBarcode })).toBeNull();
     expect(screen.getAllByText(COLA_CODE).length).toBeGreaterThan(0);
+  });
+
+  it('shows where it stands, each place by name, and reports with the product chosen (owner 2026-11-06)', async () => {
+    renderApp(
+      '/catalog/products/7',
+      signedIn(
+        ADMIN_ME,
+        productRoutes({
+          'GET /api/v1/warehouses': () => list([WH]),
+          'GET /api/v1/stock/products/7': () =>
+            json({
+              product: { id: 7, sku: COLA.sku, name: COLA.name, baseUnitName: 'ш' },
+              onHand: '15',
+              available: '15',
+              warehouses: [
+                { warehouseId: WH.id, onHand: '15', available: '15' },
+                { warehouseId: 999, onHand: '0', available: '0' },
+              ],
+              bins: [],
+            }),
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    const stock = within(
+      await screen.findByRole('region', { name: mn.catalog.product.key.onHandNow }),
+    );
+    expect(await stock.findByText(WH.name)).toBeInTheDocument();
+    expect(stock.getAllByRole('listitem')).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: mn.catalog.product.reports }));
+    const item = await screen.findByRole('menuitem', { name: mn.nav.reportsStockBalance });
+    const url = new URL(item.getAttribute('href') ?? '', 'http://x');
+    expect(url.pathname).toBe('/reports/stock-balance');
+    expect(url.searchParams.get('pr')).toBe('7');
+    expect(url.searchParams.get('prn')).toContain(COLA.name);
+    expect(item).toHaveAttribute('target', '_blank');
+  });
+
+  it('reads who changed what only once opened', async () => {
+    const fetchMock = signedIn(
+      ADMIN_ME,
+      productRoutes({
+        'GET /api/v1/warehouses': () => list([WH]),
+        'GET /api/v1/products/7/history': () =>
+          json({
+            data: [
+              {
+                id: 1,
+                occurredAt: '2026-11-06T02:00:00.000Z',
+                actorName: 'Болд Бат',
+                actorUsername: 'bold',
+                actorLabel: null,
+                action: 'UPDATE',
+                entity: 'products',
+                before: { name: 'Хуучин', weightKg: '0.5', updatedAt: 'a' },
+                after: { name: 'Шинэ', weightKg: '0.5', updatedAt: 'b' },
+              },
+              {
+                id: 2,
+                occurredAt: '2026-11-06T01:00:00.000Z',
+                actorName: 'Болд Бат',
+                actorUsername: 'bold',
+                actorLabel: null,
+                action: 'UPDATE',
+                entity: 'product_prices',
+                before: { warehousePrice: '1000', profileId: 1, validFrom: '2026-10-01' },
+                after: { warehousePrice: '1200', profileId: 1, validFrom: '2026-11-06' },
+              },
+              {
+                id: 3,
+                occurredAt: '2026-11-06T00:00:00.000Z',
+                actorName: 'Болд Бат',
+                actorUsername: 'bold',
+                actorLabel: null,
+                action: 'UPDATE',
+                entity: 'product_locations',
+                before: { productId: 7, home: null },
+                after: { productId: 7, home: WH.id },
+              },
+            ],
+            nextCursor: null,
+          }),
+      }),
+    );
+    renderApp('/catalog/products/7', fetchMock);
+    const user = userEvent.setup();
+    const card = within(
+      await screen.findByRole('region', { name: mn.catalog.product.history.title }),
+    );
+    expect(calls(fetchMock, 'GET', '/api/v1/products/7/history')).toHaveLength(0);
+    await user.click(card.getByRole('button', { name: mn.catalog.product.history.title }));
+    expect(await card.findByText('Хуучин')).toBeInTheDocument();
+    expect(card.getByText('Шинэ')).toBeInTheDocument();
+    expect(card.getAllByText(/Болд Бат/).length).toBeGreaterThan(0);
+    // An unchanged field and a timestamp say nothing.
+    expect(card.queryByText('0.5')).toBeNull();
+    // Prices and locations read as words, not ids.
+    expect(card.getByText(mn.catalog.product.history.actions.product_prices.UPDATE)).toBeVisible();
+    expect(card.getByText('1,000₮')).toBeInTheDocument();
+    expect(card.getByText('1,200₮')).toBeInTheDocument();
+    expect(await card.findByText(WH.name)).toBeInTheDocument();
   });
 
   it('sends the edited product and shows that it was saved', async () => {

@@ -162,9 +162,15 @@ export function SegmentedControl<T extends string>(props: {
  * header row stays in view and so does the sideways scrollbar of a wide table. Printing shows
  * every row.
  */
-export function ListCard(props: { children: ReactNode; className?: string; scroll?: boolean }) {
+export function ListCard(props: {
+  children: ReactNode;
+  className?: string;
+  scroll?: boolean;
+  /** One of two columns side by side: it fits the window whatever the other one's height. */
+  beside?: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
-  const maxHeight = useFittedHeight(ref, props.scroll === true);
+  const maxHeight = useFittedHeight(ref, props.scroll === true, props.beside === true);
   return (
     <div
       ref={ref}
@@ -285,7 +291,12 @@ const MIN_FITTED = 288;
  * The height a scrolling card may take: what the window leaves between its top and what follows it
  * on the page (later cards, the page's bottom padding), when that is enough.
  */
-function useFittedHeight(ref: RefObject<HTMLElement | null>, enabled: boolean): number | null {
+function useFittedHeight(
+  ref: RefObject<HTMLElement | null>,
+  enabled: boolean,
+  /** Beside another column: what follows on the page is that column's, not under this card. */
+  beside = false,
+): number | null {
   const [height, setHeight] = useState<number | null>(null);
   useLayoutEffect(() => {
     const element = ref.current;
@@ -293,7 +304,8 @@ function useFittedHeight(ref: RefObject<HTMLElement | null>, enabled: boolean): 
     const measure = () => {
       const box = element.getBoundingClientRect();
       const frame = element.closest('main')?.firstElementChild;
-      const after = frame ? Math.max(0, frame.getBoundingClientRect().bottom - box.bottom) : 0;
+      const after =
+        frame && !beside ? Math.max(0, frame.getBoundingClientRect().bottom - box.bottom) : 0;
       const room = Math.floor(window.innerHeight - (box.top + window.scrollY) - after - BELOW_CARD);
       const next = room >= MIN_FITTED ? room : null;
       setHeight((previous) => (previous === next ? previous : next));
@@ -309,7 +321,7 @@ function useFittedHeight(ref: RefObject<HTMLElement | null>, enabled: boolean): 
       window.removeEventListener('resize', measure);
       observer?.disconnect();
     };
-  }, [enabled, ref]);
+  }, [beside, enabled, ref]);
   return enabled ? height : null;
 }
 

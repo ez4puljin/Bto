@@ -2408,6 +2408,72 @@
         ]
       }
     },
+    "/api/v1/products/{id}/history": {
+      "get": {
+        "operationId": "Products_productHistory",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductHistoryPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Who changed what on a product, newest first (owner 2026-11-06).",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
     "/api/v1/products": {
       "get": {
         "operationId": "Products_list",
@@ -38681,6 +38747,76 @@
           }
         }
       },
+      "ProductHistoryEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "actorUsername": {
+            "type": "string",
+            "nullable": true
+          },
+          "actorLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "action": {
+            "type": "string"
+          },
+          "entity": {
+            "type": "string"
+          },
+          "before": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "after": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "occurredAt",
+          "actorName",
+          "actorUsername",
+          "actorLabel",
+          "action",
+          "entity",
+          "before",
+          "after"
+        ]
+      },
+      "ProductHistoryPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductHistoryEntry"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
       "ProductBaseUnit": {
         "type": "object",
         "properties": {
@@ -39018,6 +39154,14 @@
             "type": "boolean",
             "description": "true: complete products; false: those waiting for prices (ADR-0044)"
           },
+          "sort": {
+            "enum": [
+              "NAME",
+              "CATEGORY"
+            ],
+            "type": "string",
+            "description": "NAME by default; CATEGORY: by the category's block of codes, then the code"
+          },
           "where": {
             "description": "Conditions not saved as a segment",
             "allOf": [
@@ -39081,6 +39225,14 @@
           "saleReady": {
             "type": "boolean",
             "description": "true: complete products; false: those waiting for prices (ADR-0044)"
+          },
+          "sort": {
+            "enum": [
+              "NAME",
+              "CATEGORY"
+            ],
+            "type": "string",
+            "description": "NAME by default; CATEGORY: by the category's block of codes, then the code"
           },
           "where": {
             "description": "Conditions not saved as a segment",

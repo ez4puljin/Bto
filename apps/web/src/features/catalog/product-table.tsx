@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react';
+import { Fragment, memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronHead, LinkRow, ListTable, TruncateCell } from '@/components/list';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -10,7 +10,8 @@ import { useCurrentPricesOf } from '@/features/pricing/api';
 import type { ColumnSpec } from '@/lib/column-layout';
 import { problemFromError } from '@/lib/problem';
 import { cn } from '@/lib/utils';
-import type { ProductListItem } from './api';
+import type { Category, ProductListItem } from './api';
+import { categoryCode } from './category-code';
 import type { ProductCellContext, ProductColumn } from './product-columns';
 
 /** What every page of rows shares; suppliers, locations and prices are read per page. */
@@ -51,6 +52,8 @@ export const ProductTable = memo(function ProductTable(props: {
   columns: readonly ProductColumn[];
   context: ProductTableContext;
   selection?: ProductSelection;
+  /** The list stands in the categories' order: each category heads its rows with its code. */
+  categoryOf?: (id: number) => Category | undefined;
 }) {
   const { t } = useTranslation();
   const { selection } = props;
@@ -96,6 +99,8 @@ export const ProductTable = memo(function ProductTable(props: {
           <ProductPageRows
             // Pages only grow at the end, so their position is a stable key.
             key={index}
+            previousCategory={props.pages[index - 1]?.data.at(-1)?.categoryId}
+            categoryOf={props.categoryOf}
             rows={page.data}
             columns={props.columns}
             context={props.context}
@@ -107,7 +112,35 @@ export const ProductTable = memo(function ProductTable(props: {
   );
 });
 
+/** A category's row over its products: its code, its name and the parent it stands under. */
+function CategoryHead(props: {
+  categoryId: number;
+  categoryOf: (id: number) => Category | undefined;
+  colSpan: number;
+}) {
+  const category = props.categoryOf(props.categoryId);
+  const parent = category?.parentId ? props.categoryOf(category.parentId) : undefined;
+  const coded = category ? categoryCode(category) : null;
+  return (
+    <TableRow className="bg-muted/60 hover:bg-muted/60">
+      <TableCell colSpan={props.colSpan} className="py-1.5 whitespace-normal">
+        <span className="flex items-baseline gap-2 text-[0.8125rem]">
+          {coded?.code ? (
+            <span className="rounded bg-secondary px-1.5 font-mono text-xs font-semibold text-secondary-foreground">
+              {coded.code}
+            </span>
+          ) : null}
+          <span className="font-semibold">{coded?.title}</span>
+          {parent ? <span className="text-xs text-muted-foreground">{parent.name}</span> : null}
+        </span>
+      </TableCell>
+    </TableRow>
+  );
+}
+
 const ProductPageRows = memo(function ProductPageRows(props: {
+  previousCategory: number | undefined;
+  categoryOf: ((id: number) => Category | undefined) | undefined;
   rows: ProductListItem[];
   columns: readonly ProductColumn[];
   context: ProductTableContext;
@@ -151,44 +184,54 @@ const ProductPageRows = memo(function ProductPageRows(props: {
           </TableCell>
         </TableRow>
       ) : null}
-      {rows.map((row) => (
-        <LinkRow
-          key={row.id}
-          to={`/catalog/products/${row.id}`}
-          selected={selection?.selected.has(row.id) ?? false}
-        >
-          {selection ? (
-            <TableCell className="p-0 first:pl-0">
-              {/* The whole cell ticks the row, its box in line with the header's. */}
-              <label className="flex cursor-pointer items-center py-2.5 pr-3 pl-4">
-                <Checkbox
-                  aria-label={t('common.selectRow', { name: row.sku })}
-                  checked={selection.selected.has(row.id)}
-                  onCheckedChange={(checked) => selection.toggle(row.id, checked === true)}
-                />
-              </label>
-            </TableCell>
+      {rows.map((row, index) => (
+        <Fragment key={row.id}>
+          {props.categoryOf &&
+          row.categoryId !==
+            (index === 0 ? props.previousCategory : rows[index - 1]?.categoryId) ? (
+            <CategoryHead
+              categoryId={row.categoryId}
+              categoryOf={props.categoryOf}
+              colSpan={columns.length + (selection ? 2 : 1)}
+            />
           ) : null}
-          {columns.map((column) =>
-            column.truncate ? (
-              <TruncateCell
-                key={column.key}
-                text={column.truncate.text(row, cellContext) ?? ''}
-                fill={column.truncate.fill}
-                className={column.className}
-              >
-                {column.cell(row, cellContext)}
-              </TruncateCell>
-            ) : (
-              <TableCell
-                key={column.key}
-                className={cn(column.numeric && 'text-right font-mono', column.className)}
-              >
-                {column.cell(row, cellContext)}
+          <LinkRow
+            to={`/catalog/products/${row.id}`}
+            selected={selection?.selected.has(row.id) ?? false}
+          >
+            {selection ? (
+              <TableCell className="p-0 first:pl-0">
+                {/* The whole cell ticks the row, its box in line with the header's. */}
+                <label className="flex cursor-pointer items-center py-2.5 pr-3 pl-4">
+                  <Checkbox
+                    aria-label={t('common.selectRow', { name: row.sku })}
+                    checked={selection.selected.has(row.id)}
+                    onCheckedChange={(checked) => selection.toggle(row.id, checked === true)}
+                  />
+                </label>
               </TableCell>
-            ),
-          )}
-        </LinkRow>
+            ) : null}
+            {columns.map((column) =>
+              column.truncate ? (
+                <TruncateCell
+                  key={column.key}
+                  text={column.truncate.text(row, cellContext) ?? ''}
+                  fill={column.truncate.fill}
+                  className={column.className}
+                >
+                  {column.cell(row, cellContext)}
+                </TruncateCell>
+              ) : (
+                <TableCell
+                  key={column.key}
+                  className={cn(column.numeric && 'text-right font-mono', column.className)}
+                >
+                  {column.cell(row, cellContext)}
+                </TableCell>
+              ),
+            )}
+          </LinkRow>
+        </Fragment>
       ))}
     </>
   );

@@ -408,8 +408,35 @@ export class ProductPageDto {
  * The product list's read (ADR-0049 #4): today's filters plus a condition tree and/or a saved
  * segment, which other modules' data answer. A POST because the conditions are a tree.
  */
+@ApiSchema({ name: 'ProductHistoryEntry' })
+export class ProductHistoryEntryDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ format: 'date-time' }) occurredAt: string;
+  @ApiProperty({ type: String, nullable: true }) actorName: string | null;
+  @ApiProperty({ type: String, nullable: true }) actorUsername: string | null;
+  @ApiProperty({ type: String, nullable: true }) actorLabel: string | null;
+  @ApiProperty() action: string;
+  @ApiProperty() entity: string;
+  @ApiProperty({ type: 'object', additionalProperties: true, nullable: true }) before: unknown;
+  @ApiProperty({ type: 'object', additionalProperties: true, nullable: true }) after: unknown;
+}
+
+@ApiSchema({ name: 'ProductHistoryPage' })
+export class ProductHistoryPageDto {
+  @ApiProperty({ type: [ProductHistoryEntryDto] }) data: ProductHistoryEntryDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
+}
+
 @ApiSchema({ name: 'ProductQueryRequest' })
 export class ProductQueryRequestDto extends ProductListQueryDto {
+  @ApiPropertyOptional({
+    enum: ['NAME', 'CATEGORY'],
+    description: "NAME by default; CATEGORY: by the category's block of codes, then the code",
+  })
+  @IsOptional()
+  @IsIn(['NAME', 'CATEGORY'])
+  sort?: 'NAME' | 'CATEGORY';
+
   @ApiPropertyOptional({
     type: SegmentDefinitionDto,
     description: 'Conditions not saved as a segment',

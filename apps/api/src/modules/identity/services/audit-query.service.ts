@@ -38,6 +38,8 @@ export interface AuditRow {
 /** The rows of several records at once (ADR-0118: a purchase order's history). */
 export interface AuditTargets {
   targets: readonly { entity: string; ids: readonly (string | number)[] }[];
+  /** Also the rows of an entity whose before or after holds one of these values in a field. */
+  naming?: readonly { entity: string; field: string; values: readonly (string | number)[] }[];
   actorId?: number;
   /** Rows whose before or after names this product (`productId`, or a `lines[].productId`). */
   productId?: number;
@@ -61,15 +63,27 @@ export class AuditQueryService {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const targets = query.targets.filter((target) => target.ids.length > 0);
     if (targets.length === 0) return { data: [], nextCursor: null };
+    const naming = (query.naming ?? [])
+      .filter((entry) => entry.values.length > 0)
+      .map((entry) => {
+        const values = sql.join(
+          entry.values.map((value) => sql`${String(value)}`),
+          sql`, `,
+        );
+        return sql`(${auditLog.entity} = ${entry.entity} AND (${auditLog.before} ->> ${entry.field} IN (${values}) OR ${auditLog.after} ->> ${entry.field} IN (${values})))`;
+      });
     const conditions: SQL[] = [
       sql.join(
-        targets.map(
-          (target) =>
-            sql`(${auditLog.entity} = ${target.entity} AND ${auditLog.entityId} IN (${sql.join(
-              target.ids.map((id) => sql`${String(id)}`),
-              sql`, `,
-            )}))`,
-        ),
+        [
+          ...targets.map(
+            (target) =>
+              sql`(${auditLog.entity} = ${target.entity} AND ${auditLog.entityId} IN (${sql.join(
+                target.ids.map((id) => sql`${String(id)}`),
+                sql`, `,
+              )}))`,
+          ),
+          ...naming,
+        ],
         sql` OR `,
       ),
     ];
