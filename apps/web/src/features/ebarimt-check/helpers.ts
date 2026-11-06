@@ -20,9 +20,14 @@ export function amountText(value: string): string {
   return amount.isZero() ? '—' : formatMnt(amount.toDecimalPlaces(0).toFixed(0));
 }
 
-/** More than the tolerance reads as an amount, as the differences do. */
+/** More than the tolerance either way reads as an amount, as the differences do. */
 export function hasAmount(value: string): boolean {
   return new Decimal(value).abs().greaterThan(TOLERANCE);
+}
+
+/** An amount above nothing: a negative total is not «> 0». */
+export function isPositiveAmount(value: string): boolean {
+  return new Decimal(value).greaterThan(TOLERANCE);
 }
 
 export type DiffState = 'missing' | 'ok' | 'over';

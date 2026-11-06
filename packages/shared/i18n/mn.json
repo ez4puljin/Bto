@@ -11925,6 +11925,10 @@
     },
     "emptySearch": "Илэрц олдсонгүй",
     "emptyRange": "Нэгтгэх саруудаа сонгоно уу.",
-    "accountsMeta": "Тооцох данс: {{codes}}"
+    "accountsMeta": "Тооцох данс: {{codes}}",
+    "staleTitle": "Өөр хэрэглэгч энэ хуудасны мэдээллийг шинэчиллээ",
+    "staleReload": "Дахин ачаалах",
+    "noFileShort": "Файл алга",
+    "noFileShortRange": "{{count}} сард файл алга"
   }
 }

@@ -38779,6 +38779,54 @@
         ]
       }
     },
+    "/api/v1/ebarimt-check/version": {
+      "get": {
+        "operationId": "EbarimtCheck_version",
+        "parameters": [
+          {
+            "name": "periods",
+            "required": true,
+            "in": "query",
+            "description": "Months, comma separated",
+            "schema": {
+              "minItems": 1,
+              "example": "202610,202609",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtVersionDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
     "/api/v1/ebarimt-check/files": {
       "get": {
         "operationId": "EbarimtCheck_overview",
@@ -79217,6 +79265,10 @@
               "type": "number"
             }
           },
+          "stamp": {
+            "type": "string",
+            "description": "What was written when the rows were read; see version"
+          },
           "noFile": {
             "type": "array",
             "items": {
@@ -79250,6 +79302,7 @@
         },
         "required": [
           "periods",
+          "stamp",
           "noFile",
           "rows",
           "unregistered",
@@ -79465,6 +79518,18 @@
           "registers",
           "noFile",
           "rows"
+        ]
+      },
+      "EbarimtVersionDto": {
+        "type": "object",
+        "properties": {
+          "stamp": {
+            "type": "string",
+            "description": "Differs once someone wrote on the page; compared, never read"
+          }
+        },
+        "required": [
+          "stamp"
         ]
       },
       "EbarimtMonthFileDto": {

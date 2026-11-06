@@ -47,6 +47,7 @@ interface RowJson {
 }
 interface ReportJson {
   periods: number[];
+  stamp: string;
   noFile: number[];
   rows: RowJson[];
   unregistered: { ttd: string; name: string; amount: string; count: number }[];
@@ -1013,6 +1014,44 @@ describe('ebarimt check', () => {
     await profile({ phone: '1' }).expect(422);
     await profile({ remark: 'x' }).expect(422);
     await profile({ registers: '1' }).expect(422);
+  });
+
+  it('stamps what people write here, so an open page can offer a reload', async () => {
+    const stamp = async (periods: string) =>
+      (
+        (
+          await http()
+            .get('/api/v1/ebarimt-check/version')
+            .query({ periods })
+            .set(bearer(admin))
+            .expect(200)
+        ).body as { stamp: string }
+      ).stamp;
+    const before = await stamp('202610');
+    expect(await stamp('202610')).toBe(before);
+    // The rows say which stamp they were read under.
+    expect((await report([202610])).stamp).toBe(before);
+    // Another month's note is not this month's change.
+    await http()
+      .put('/api/v1/ebarimt-check/month-values')
+      .set(bearer(accountant))
+      .send({ period: 202611, supplierId: beta, note: 'Өөр сар', previousNote: null })
+      .expect(204);
+    expect(await stamp('202610')).toBe(before);
+    await http()
+      .put('/api/v1/ebarimt-check/month-values')
+      .set(bearer(accountant))
+      .send({ period: 202610, supplierId: beta, note: 'Энэ сар', previousNote: null })
+      .expect(204);
+    const after = await stamp('202610');
+    expect(after).not.toBe(before);
+    // A supplier's own values stand in every month.
+    await http()
+      .put(`/api/v1/ebarimt-check/suppliers/${beta}/profile`)
+      .set(bearer(accountant))
+      .send({ remark: 'Шинэ', previousRemark: '' })
+      .expect(204);
+    expect(await stamp('202610')).not.toBe(after);
   });
 
   it('wants the value a write is about', async () => {

@@ -555,7 +555,7 @@ export function HistoryDialog(props: { row: EbarimtRow; baseYear: number; onClos
     event.field === 'EMPLOYEE' ? (event.userName ?? '—') : formatMnt(event.amount ?? '0');
   return (
     <Dialog open onOpenChange={(open) => !open && props.onClose()}>
-      <DialogContent size="lg" guard={false} className="flex max-h-[85vh] flex-col">
+      <DialogContent size="xl" guard={false} className="flex max-h-[85vh] flex-col">
         <DialogHeader>
           <DialogTitle>
             {props.row.name} · {t('ebarimtCheck.history.title')}

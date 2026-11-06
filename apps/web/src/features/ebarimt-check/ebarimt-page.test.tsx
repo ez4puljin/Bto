@@ -1,5 +1,6 @@
 import mn from '@tugeel/shared/i18n/mn.json';
-import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { focusManager } from '@tanstack/react-query';
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { bodyOf, calls } from '@/test/inventory-fixtures';
@@ -47,6 +48,7 @@ const row = (over: Record<string, unknown>) => ({
 
 const REPORT = {
   periods: [202610],
+  stamp: 'a',
   noFile: [],
   accountCodes: ['310101'],
   unregistered: [
@@ -86,6 +88,7 @@ const PAGE = '/finance/ebarimt?period=202610';
 const REPORT_ROUTES = {
   'GET /api/v1/ebarimt-check/report': () => json(REPORT),
   'GET /api/v1/ebarimt-check/files': () => json(FILES),
+  'GET /api/v1/ebarimt-check/version': () => json({ stamp: 'a' }),
 };
 
 describe('EbarimtPage', () => {
@@ -433,6 +436,66 @@ describe('EbarimtPage', () => {
     expect(screen.queryByRole('textbox', { name: 'Бета: НӨАТ чөлөөлөгдөх дүн' })).toBeNull();
   });
 
+  it('offers a reload when a colleague has changed something, moving no row', async () => {
+    let stamp = 'a';
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...REPORT_ROUTES,
+      'GET /api/v1/ebarimt-check/report': () => json({ ...REPORT, stamp }),
+      'GET /api/v1/ebarimt-check/version': () => json({ stamp }),
+    });
+    renderApp(PAGE, fetchMock);
+    const user = userEvent.setup();
+    await screen.findByRole('link', { name: 'Альфа' });
+    await waitFor(() =>
+      expect(calls(fetchMock, 'GET', '/api/v1/ebarimt-check/version').length).toBe(1),
+    );
+    expect(screen.queryByText(mn.ebarimtCheck.staleTitle)).toBeNull();
+    const reads = calls(fetchMock, 'GET', '/api/v1/ebarimt-check/report').length;
+
+    // The poll is newer than the rows; a stamp read in the same instant counts as well.
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    stamp = 'b';
+    act(() => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+    expect(await screen.findByText(mn.ebarimtCheck.staleTitle)).toBeInTheDocument();
+    expect(calls(fetchMock, 'GET', '/api/v1/ebarimt-check/report')).toHaveLength(reads);
+
+    await user.click(screen.getByRole('button', { name: mn.ebarimtCheck.staleReload }));
+    await waitFor(() => expect(screen.queryByText(mn.ebarimtCheck.staleTitle)).toBeNull());
+    expect(calls(fetchMock, 'GET', '/api/v1/ebarimt-check/report').length).toBeGreaterThan(reads);
+    focusManager.setFocused(undefined);
+  });
+
+  it('says no tick is hidden while the rows are still to come', async () => {
+    sessionStorage.setItem(
+      `tugeel.ebarimt.ticks.v1:${ADMIN_ME.id}`,
+      JSON.stringify({ period: 202610, ids: [1] }),
+    );
+    renderApp(
+      PAGE,
+      signedIn(ADMIN_ME, {
+        ...REPORT_ROUTES,
+        'GET /api/v1/ebarimt-check/report': () => new Promise<Response>(() => undefined),
+      }),
+    );
+    expect(await screen.findByRole('heading', { name: mn.ebarimtCheck.title })).toBeInTheDocument();
+    expect(screen.queryByText(/шүүлтээс гадуур/)).toBeNull();
+  });
+
+  it('lists a negative total under «zero or less», not «> 0»', async () => {
+    renderApp(
+      `${PAGE}&c_ebarimt=positive`,
+      signedIn(ADMIN_ME, {
+        ...REPORT_ROUTES,
+        'GET /api/v1/ebarimt-check/report': () =>
+          json({ ...REPORT, rows: [row({ ebarimtAmount: '-400.00', diffAmount: '1400.00' })] }),
+      }),
+    );
+    expect(await screen.findByText(mn.ebarimtCheck.emptySearch)).toBeInTheDocument();
+  });
+
   it('marks a purchase still waiting for its price check', async () => {
     renderApp(
       PAGE,
@@ -491,8 +554,9 @@ describe('EbarimtPage', () => {
         'GET /api/v1/ebarimt-check/report': () => json({ ...REPORT, noFile: [202610] }),
       }),
     );
-    expect(await screen.findByText(/e-Barimt файл оруулаагүй байна/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: mn.ebarimtCheck.uploadNow })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: /e-Barimt файл оруулаагүй байна.*Файл оруулах/ }),
+    ).toHaveTextContent(mn.ebarimtCheck.noFileShort);
   });
 
   it('asks which accounts count, inside the page', async () => {

@@ -631,7 +631,10 @@ describe('a new order with every supplier', () => {
     await waitFor(() => expect(posted).toHaveLength(1));
     expect(posted[0]?.body).toMatchObject({ note: null, supplierIds: [31, 32] });
     expect(posted[0]?.key).toMatch(/[0-9a-f-]{36}/);
-    expect(await screen.findByRole('status')).toHaveTextContent('PO-2026-000007 захиалга үүслээ');
+    // The toast comes once the order's own page has loaded, slow on a machine under load.
+    expect(await screen.findByRole('status', {}, { timeout: 5_000 })).toHaveTextContent(
+      'PO-2026-000007 захиалга үүслээ',
+    );
   }, 20_000);
 
   it('keeps the groups of a large order closed until one is opened or filtered', async () => {

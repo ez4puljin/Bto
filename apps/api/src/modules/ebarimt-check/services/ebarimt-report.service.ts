@@ -7,14 +7,21 @@ import {
   periodOfDate,
 } from '@tugeel/shared/ebarimt-check';
 import { Decimal } from '@tugeel/shared/money';
-import { and, asc, inArray, lte } from 'drizzle-orm';
+import { and, asc, inArray, lte, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import { notFound } from '../../../common/errors/app-error';
 import { UserNamesService } from '../../identity';
 import { ReceiptsService } from '../../inventory';
 import { SupplierOrderersService } from '../../procurement';
-import { ebarimtCheckAssignments, ebarimtCheckMonthValues } from '../schema';
+import {
+  ebarimtCheckAccounts,
+  ebarimtCheckAssignments,
+  ebarimtCheckFiles,
+  ebarimtCheckMonthValues,
+  ebarimtCheckReceiptLinks,
+  ebarimtCheckSupplierProfiles,
+} from '../schema';
 import {
   allocateEntries,
   type EbarimtEntryRow,
@@ -119,6 +126,8 @@ export interface EbarimtLinkView {
 
 export interface EbarimtReport {
   periods: number[];
+  /** What was written here when the rows were read: `version` tells an open page it has moved on. */
+  stamp: string;
   /** Asked for but holding no file: e-Barimt is simply unknown there. */
   noFile: number[];
   rows: EbarimtReportRow[];
@@ -193,8 +202,18 @@ export class EbarimtReportService {
     const first = periods[0];
     const last = periods[periods.length - 1];
     if (first === undefined || last === undefined) {
-      return { periods, noFile: [], rows: [], unregistered: [], links: [], accountCodes: [] };
+      return {
+        periods,
+        stamp: '',
+        noFile: [],
+        rows: [],
+        unregistered: [],
+        links: [],
+        accountCodes: [],
+      };
     }
+    // First: a write landing during the reads then shows as a change, never hides as none.
+    const stamp = await this.version(periods);
     const asked = new Set(periods);
     const [counted, suppliers, files, links, monthValues, assignments, changes, history, posted] =
       await Promise.all([
@@ -428,6 +447,7 @@ export class EbarimtReportService {
 
     return {
       periods,
+      stamp,
       noFile: periods.filter((period) => !files.has(period)),
       rows,
       unregistered: [...unregistered.values()].sort((a, b) => b.amount.comparedTo(a.amount)),
@@ -507,6 +527,39 @@ export class EbarimtReportService {
   }
 
   /** e-Barimt's lines behind a figure: a supplier's (registers and links), or one register's. */
+  /**
+   * A light stamp of what people write on this page for these months (ADR-0170): an open page polls
+   * it and offers a reload, instead of moving rows under a typing hand. Compared, never read. One
+   * statement, since every open page polls. Not the receipts: those are another screen's.
+   */
+  async version(periods: readonly number[]): Promise<string> {
+    const list = [...periods];
+    const monthValues = ebarimtCheckMonthValues;
+    const profiles = ebarimtCheckSupplierProfiles;
+    const assignments = ebarimtCheckAssignments;
+    const links = ebarimtCheckReceiptLinks;
+    const files = ebarimtCheckFiles;
+    const accounts = ebarimtCheckAccounts;
+    const result = await this.db.execute<{ stamp: string }>(sql`
+      SELECT concat_ws('|',
+        coalesce((SELECT max(${monthValues.updatedAt}) FROM ${monthValues}
+                  WHERE ${inArray(monthValues.period, list)})::text, ''),
+        coalesce((SELECT max(${profiles.updatedAt}) FROM ${profiles})::text, ''),
+        coalesce((SELECT max(${assignments.updatedAt}) FROM ${assignments})::text, ''),
+        coalesce((SELECT max(${links.createdAt}) FROM ${links}
+                  WHERE ${inArray(links.period, list)})::text, ''),
+        coalesce((SELECT max(${links.removedAt}) FROM ${links}
+                  WHERE ${inArray(links.period, list)})::text, ''),
+        coalesce((SELECT max(${files.uploadedAt}) FROM ${files}
+                  WHERE ${inArray(files.period, list)})::text, ''),
+        coalesce((SELECT max(${files.closedAt}) FROM ${files}
+                  WHERE ${inArray(files.period, list)})::text, ''),
+        coalesce((SELECT string_agg(${accounts.accountCode}, ',' ORDER BY ${accounts.accountCode})
+                  FROM ${accounts}), '')
+      ) AS stamp`);
+    return result.rows[0]?.stamp ?? '';
+  }
+
   async entriesOf(
     periodsAsked: readonly number[],
     target: { supplierId?: number; ttd?: string },

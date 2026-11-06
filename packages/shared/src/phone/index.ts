@@ -4,6 +4,11 @@
  */
 export const MN_PHONE_E164 = /^\+976\d{8}$/;
 
+/** A stored number's eight local digits; anything else as it stands. */
+export function localMnPhone(stored: string): string {
+  return stored.replace(/^\+976(?=\d{8}$)/, '');
+}
+
 export function normalizeMnPhone(input: string): string | null {
   const compact = input.replace(/[\s()-]/g, '');
   const local = compact.replace(/^(\+976|00976|976)(?=\d{8}$)/, '');

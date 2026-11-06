@@ -5,6 +5,8 @@
  * A period is a month as one number, year × 100 + month (202510 is October 2025), and every value on
  * the page hangs on it.
  */
+import { normalizeRegNo } from '../taxpayer';
+
 export const EBARIMT_LIMITS = {
   /** Periods in one consolidated report. */
   maxPeriods: 60,
@@ -91,16 +93,20 @@ export function periodDays(period: number): { from: string; to: string } {
 
 /**
  * A taxpayer number as e-Barimt's file and a typed register are compared: «71000.0» is 71000, «011»
- * is 11, letters in upper case.
+ * is 11; a citizen's by the shared rule for registration numbers (`@tugeel/shared/taxpayer`): upper
+ * case, Latin look-alikes as Cyrillic, no spaces.
  */
 export function normalizeTaxId(value: string | number | null | undefined): string {
   let text = value === null || value === undefined ? '' : String(value).trim();
   if (text.endsWith('.0')) text = text.slice(0, -2);
   if (/^\d+$/.test(text)) return text.replace(/^0+(?=\d)/, '');
-  return text.toUpperCase();
+  return normalizeRegNo(text);
 }
 
 const REGISTER_SEPARATORS = /[;,／/\\.\s]+/;
+
+/** A citizen's number written with a space after its two letters is still one number. */
+const CITIZEN_WITH_SPACE = /(?<![\p{L}\d])(\p{L}{2})\s+(\d{8})(?!\d)/gu;
 
 /**
  * A supplier's registers typed in one field: «7100001;7100002», «7100003 .7100004», «7100005,
@@ -109,6 +115,7 @@ const REGISTER_SEPARATORS = /[;,／/\\.\s]+/;
 export function splitRegisters(value: string | null | undefined): string[] {
   if (!value) return [];
   const registers = value
+    .replace(CITIZEN_WITH_SPACE, '$1$2')
     .split(REGISTER_SEPARATORS)
     .map((part) => normalizeTaxId(part))
     .filter((part) => part !== '' && part !== '0');

@@ -55,6 +55,7 @@ import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { SelectionBar } from '@/components/selection-bar';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -79,6 +80,7 @@ import {
   useEbarimtMutations,
   useEbarimtRefresh,
   useEbarimtReport,
+  useEbarimtVersion,
 } from './api';
 import { EntriesDialog, HistoryDialog, ReceiptsDialog } from './detail-dialogs';
 import {
@@ -86,6 +88,7 @@ import {
   diffStateOf,
   FOCUS_RING,
   hasAmount,
+  isPositiveAmount,
   shortName,
   usePeriodLabels,
 } from './helpers';
@@ -109,7 +112,7 @@ const MODES: readonly Mode[] = ['month', 'range'];
 const COLUMNS: readonly ColumnSpec[] = [
   { key: 'check', kind: 'check', width: 3.75 },
   { key: 'employee', kind: 'text', weight: 1.2, min: 8 },
-  { key: 'code', kind: 'code', width: 3.5 },
+  { key: 'code', kind: 'code', width: 4 },
   { key: 'supplier', kind: 'text', weight: 2.4, min: 10.5 },
   { key: 'registers', kind: 'text', weight: 1, min: 5 },
   { key: 'phone', kind: 'text', weight: 0.8, min: 6.25 },
@@ -117,7 +120,7 @@ const COLUMNS: readonly ColumnSpec[] = [
   { key: 'ebarimt', kind: 'money', width: 8 },
   { key: 'exempt', kind: 'money', width: 7 },
   { key: 'diff', kind: 'money', width: 8 },
-  { key: 'note', kind: 'text', weight: 1.4, min: 6.5 },
+  { key: 'note', kind: 'text', weight: 1.4, min: 6 },
 ];
 const COMPACT_CELLS = '[&_td]:px-2 [&_th]:px-2';
 
@@ -200,7 +203,7 @@ const wordsOk = (keys: ReturnType<typeof searchKeys>, filter: string) =>
   !filter.trim() || matchesQuery(keys, queryTerms(filter));
 
 const amountOk = (value: string, filter: string) =>
-  !filter || (filter === 'positive' ? hasAmount(value) : !hasAmount(value));
+  !filter || (filter === 'positive' ? isPositiveAmount(value) : !hasAmount(value));
 
 const diffOk = (value: string, filter: string) => !filter || diffStateOf(value) === filter;
 
@@ -339,6 +342,16 @@ export function EbarimtPage() {
     return settledKey === '' ? [] : settledKey.split(',').map((part) => Number.parseInt(part, 10));
   }, [hasPeriod, monthMode, period, settledKey]);
   const report = useEbarimtReport(periods, year);
+  // The stale check: the stamp the rows were read under against the poll's, once the poll is the
+  // newer of the two (ADR-0118 #3). Rows being read, or standing in for others, say nothing.
+  const version = useEbarimtVersion(periods);
+  const othersChanged =
+    report.data !== undefined &&
+    version.data !== undefined &&
+    !report.isFetching &&
+    !report.isPlaceholderData &&
+    version.dataUpdatedAt >= report.dataUpdatedAt &&
+    report.data.stamp !== version.data.stamp;
   const mutations = useEbarimtMutations();
   // A cell open for typing keeps its row on the list, whatever the row's figures do meanwhile.
   const [holding, setHolding] = useState<number | null>(null);
@@ -478,7 +491,8 @@ export function EbarimtPage() {
   );
 
   const shownIds = useMemo(() => new Set(filtered.map((row) => row.supplierId)), [filtered]);
-  const hiddenTicked = [...ticked].filter((id) => !shownIds.has(id)).length;
+  // Nothing is hidden by a filter before the rows have come.
+  const hiddenTicked = report.data ? [...ticked].filter((id) => !shownIds.has(id)).length : 0;
   const allTicked = filtered.length > 0 && filtered.every((row) => ticked.has(row.supplierId));
   const someTicked = filtered.some((row) => ticked.has(row.supplierId));
   const tick = (id: number, event: MouseEvent) => {
@@ -742,6 +756,21 @@ export function EbarimtPage() {
             <ChevronRight />
           </Button>
         </div>
+        {noFile.length > 0 ? (
+          <NoFileMark
+            long={
+              monthMode
+                ? t('ebarimtCheck.noFileMonth', { month: labels.name(period) })
+                : t('ebarimtCheck.noFileRange', { months: labels.many(noFile) })
+            }
+            short={
+              monthMode
+                ? t('ebarimtCheck.noFileShort')
+                : t('ebarimtCheck.noFileShortRange', { count: noFile.length })
+            }
+            onUpload={canEdit ? () => setFilesOpen(true) : undefined}
+          />
+        ) : null}
       </FilterBar>
 
       {!monthMode ? (
@@ -840,24 +869,19 @@ export function EbarimtPage() {
           </Button>
         </div>
       ))}
+      {othersChanged ? (
+        <Alert className="mb-3 border-transparent bg-warning-soft shadow-none!">
+          <TriangleAlert aria-hidden />
+          <AlertTitle>{t('ebarimtCheck.staleTitle')}</AlertTitle>
+          <AlertDescription>
+            <Button size="sm" variant="outline" onClick={refresh}>
+              {t('ebarimtCheck.staleReload')}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
       <ProblemAlert problem={problemFromError(overview.error)} onRetry={overview.refetch} />
       <ProblemAlert problem={problemFromError(report.error)} onRetry={report.refetch} />
-
-      {noFile.length > 0 ? (
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-warning-soft px-3 py-2 text-[0.8125rem]">
-          <TriangleAlert aria-hidden className="size-4 shrink-0 text-warning" />
-          <span>
-            {monthMode
-              ? t('ebarimtCheck.noFileMonth', { month: labels.name(period) })
-              : t('ebarimtCheck.noFileRange', { months: labels.many(noFile) })}
-          </span>
-          {canEdit ? (
-            <Button size="sm" variant="outline" onClick={() => setFilesOpen(true)}>
-              {t('ebarimtCheck.uploadNow')}
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
 
       <ListCard scroll className={cn(lagging && 'opacity-60')}>
         <ListTable columns={columns} className={cn('text-[0.8125rem]', COMPACT_CELLS)}>
@@ -997,7 +1021,7 @@ export function EbarimtPage() {
                       <EmployeeMonths row={row} onHistory={() => setHistoryOf(row.supplierId)} />
                     )}
                   </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
+                  <TableCell title={row.code} className="font-mono text-xs text-muted-foreground">
                     {row.code}
                   </TableCell>
                   <TableCell>
@@ -1307,6 +1331,35 @@ export function EbarimtPage() {
         />
       ) : null}
     </div>
+  );
+}
+
+/** A month without its file: said in the filter row, so the list keeps the room it fits in. */
+function NoFileMark(props: { long: string; short: string; onUpload?: () => void }) {
+  const { t } = useTranslation();
+  if (!props.onUpload) {
+    return (
+      <span
+        title={props.long}
+        className="inline-flex items-center gap-1 text-[0.8125rem] font-medium text-warning"
+      >
+        <TriangleAlert aria-hidden className="size-3.5" />
+        {props.short}
+        <span className="sr-only">{props.long}</span>
+      </span>
+    );
+  }
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      aria-label={`${props.long} ${t('ebarimtCheck.uploadNow')}`}
+      title={`${props.long} ${t('ebarimtCheck.uploadNow')}`}
+      onClick={props.onUpload}
+    >
+      <TriangleAlert className="text-warning" />
+      {props.short}
+    </Button>
   );
 }
 

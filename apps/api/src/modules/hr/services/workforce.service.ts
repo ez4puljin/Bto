@@ -148,7 +148,7 @@ const clean = (value: string | null | undefined): string | null => {
   return text === '' ? null : text;
 };
 
-/** «Ганболд Бат-Эрдэнэ»: the family name, then the given name, as Mongolian lists read. */
+/** «Тестийн Болд»: the family name, then the given name, as Mongolian lists read. */
 export const employeeFullName = (firstName: string, lastName: string): string =>
   `${lastName} ${firstName}`.trim();
 

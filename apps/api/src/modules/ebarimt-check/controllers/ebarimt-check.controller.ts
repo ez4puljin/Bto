@@ -43,6 +43,7 @@ import {
   EbarimtReceiptListDto,
   EbarimtReceiptsQueryDto,
   EbarimtReportDto,
+  EbarimtVersionDto,
   EbarimtSettingsDto,
   EbarimtSettingsRequestDto,
 } from '../dto/ebarimt-check.dto';
@@ -150,6 +151,13 @@ export class EbarimtCheckController {
         link: row.link ? { ...row.link, createdAt: row.link.createdAt.toISOString() } : null,
       })),
     };
+  }
+
+  @Get('version')
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: EbarimtVersionDto })
+  async version(@Query() query: EbarimtPeriodsQueryDto): Promise<EbarimtVersionDto> {
+    return { stamp: await this.report.version(query.periods) };
   }
 
   @Get('files')

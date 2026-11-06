@@ -81,6 +81,11 @@ export class EbarimtFilesQueryDto {
   @ApiProperty({ example: 2026 }) @Type(() => Number) @IsInt() @Min(2000) @Max(2100) year!: number;
 }
 
+export class EbarimtVersionDto {
+  @ApiProperty({ description: 'Differs once someone wrote on the page; compared, never read' })
+  stamp!: string;
+}
+
 export class EbarimtFileRemoveQueryDto {
   @ApiProperty({ description: 'The file the person saw: a newer one in the month is a conflict' })
   @Type(() => Number)
@@ -232,6 +237,8 @@ export class EbarimtLinkViewDto {
 
 export class EbarimtReportDto {
   @ApiProperty({ type: [Number] }) periods!: number[];
+  @ApiProperty({ description: 'What was written when the rows were read; see version' })
+  stamp!: string;
   @ApiProperty({ type: [Number] }) noFile!: number[];
   @ApiProperty({ type: [EbarimtReportRowDto] }) rows!: EbarimtReportRowDto[];
   @ApiProperty({ type: [EbarimtUnregisteredRowDto] }) unregistered!: EbarimtUnregisteredRowDto[];

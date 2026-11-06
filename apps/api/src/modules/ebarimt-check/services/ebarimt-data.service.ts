@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { periodDays, splitRegisters } from '@tugeel/shared/ebarimt-check';
 import { Decimal } from '@tugeel/shared/money';
+import { localMnPhone } from '@tugeel/shared/phone';
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -165,7 +166,7 @@ export class EbarimtDataService {
     return rows.map((row) => {
       const profile = profileOf.get(row.id);
       const recordRegisters = [row.regNo, row.tin].filter(Boolean).join(';');
-      const recordPhone = row.phone ?? '';
+      const recordPhone = localMnPhone(row.phone ?? '');
       const registers = profile?.registers ?? recordRegisters;
       const phone = profile?.phone ?? recordPhone;
       return {

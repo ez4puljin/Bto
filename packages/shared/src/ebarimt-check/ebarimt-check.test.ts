@@ -53,6 +53,9 @@ describe('taxpayer numbers', () => {
     expect(normalizeTaxId(7100010)).toBe('7100010');
     expect(normalizeTaxId('аа12345678')).toBe('АА12345678');
     expect(normalizeTaxId(null)).toBe('');
+    // Latin look-alikes and spaces make no other number.
+    expect(normalizeTaxId('AA12345678')).toBe('АА12345678');
+    expect(normalizeTaxId('АА 12345678')).toBe('АА12345678');
   });
 
   it('splits every way the registers were typed', () => {
@@ -63,6 +66,8 @@ describe('taxpayer numbers', () => {
   });
 
   it('drops the empty, a bare zero and repeats', () => {
+    expect(splitRegisters('АА 12345678; 7100001')).toEqual(['АА12345678', '7100001']);
+    expect(splitRegisters('aa 12345678')).toEqual(['АА12345678']);
     expect(splitRegisters('')).toEqual([]);
     expect(splitRegisters(null)).toEqual([]);
     expect(splitRegisters('0')).toEqual([]);

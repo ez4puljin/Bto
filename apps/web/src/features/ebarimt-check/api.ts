@@ -43,6 +43,8 @@ export function useEbarimtReport(periods: readonly number[], year: number) {
   return useQuery<EbarimtReport>({
     queryKey: KEYS.report(periods),
     enabled: periods.length > 0,
+    // Rows move only on a save or when asked: a colleague's change is offered by the version's poll.
+    refetchOnWindowFocus: false,
     placeholderData: (previous) =>
       periods.length > 1 &&
       previous &&
@@ -53,6 +55,25 @@ export function useEbarimtReport(periods: readonly number[], year: number) {
     queryFn: async ({ signal }) =>
       unwrap(
         await api.GET('/api/v1/ebarimt-check/report', {
+          params: { query: { periods: periods.join(',') } },
+          signal,
+        }),
+      ),
+  });
+}
+
+/** A colleague's change under an open page: a light stamp polled, rows never moved by it. */
+export function useEbarimtVersion(periods: readonly number[]) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['ebarimt-check', 'version', periods.join(',')],
+    enabled: periods.length > 0,
+    staleTime: 0,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/ebarimt-check/version', {
           params: { query: { periods: periods.join(',') } },
           signal,
         }),

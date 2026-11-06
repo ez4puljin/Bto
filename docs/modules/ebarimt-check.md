@@ -31,6 +31,7 @@ A **period** is year × 100 + month (202610). Helpers in `@tugeel/shared/ebarimt
 | `GET report?periods=202610,202609` | read | Rows, unregistered registers, links, months with no file |
 | `GET receipts?periods&supplierId` | read | The supplier's posted receipts in brief, those not counted marked |
 | `GET entries?periods&supplierId` or `&ttd` | read | e-Barimt's lines behind a figure |
+| `GET version?periods` | read | A stamp of what people write on the page for these months; the page polls it every 30 s and offers a reload |
 | `GET files?year` | read | Last December and the year's months with their files, and the latest month holding one |
 | `POST files` (idempotent) | edit | Reads an uploaded `ebarimt.source` file into the month of its dates |
 | `DELETE files/:period?fileId` | settings | Takes the month's file out of force, if it is still the file named |
@@ -51,7 +52,7 @@ Rights: `ebarimt.check.read`, `.edit`, `.assign`, `.settings` (ADMIN all; ACCOUN
 - A link whose receipt left the month's file counts for nothing, is shown as such, and counts again when a file brings the receipt back.
 - A month's employee is the latest assignment on or before it, else the orderer the supplier had at that month's end (before its first orderer, that first one; `OrdererTimeline`, ADR-0170 #2). `supplier_orderers` is never written here.
 - A month's first file ever is each supplier's first reading (`INIT`, hidden while alone); a total rising from nothing after it is a change. A link notes only the suppliers it can move. A register changed on the supplier's own record is noted only at the month's next file.
-- Registers, phone and remark typed here never reach `suppliers`.
+- Registers, phone and remark typed here never reach `suppliers`. A register is compared by `normalizeTaxId`, a citizen's through `normalizeRegNo`; a record's phone reads in its local digits, so a typed copy of it is no difference.
 - A value written names what its cell showed; a difference under the row's lock answers 409 `EBARIMT_CELL_CONFLICT` (`value`) and writes nothing (ADR-0170 #8).
 - Nothing is deleted but the rows of `ebarimt_check_accounts` when the setting is saved (audited).
 
@@ -63,7 +64,7 @@ Errors: `EBARIMT_FILE_UNREADABLE`, `EBARIMT_FILE_COLUMNS`, `EBARIMT_FILE_EMPTY`,
 
 ## Screen
 
-The month, mode, chosen months, employee, «Дутуутай», filters and the open brief of receipts stay in the address (`period`, `mode`, `months`, `emp`, `missing`, `q`, `c_<column>`, `receipts`), so a receipt opened from the brief comes back to it. Months chosen one by one make one read after 250 ms, the last rows staying dimmed; a month's rows never stand in for another's. Wide tables use `DialogContent size="2xl"`. A cell open for typing holds its row on the list and saves only on Enter or leaving it; rows are keyed by month, so an open cell never carries to another month. A refused cell is listed by name above the table until it saves, is dismissed or the month changes.
+The month, mode, chosen months, employee, «Дутуутай», filters and the open brief of receipts stay in the address (`period`, `mode`, `months`, `emp`, `missing`, `q`, `c_<column>`, `receipts`), so a receipt opened from the brief comes back to it. Months chosen one by one make one read after 250 ms, the last rows staying dimmed; a month's rows never stand in for another's. A colleague's change shows as the yellow alert with «Дахин ачаалах» (`GET version`, 30 s), never by moving rows. A month without its file is said in the filter row, so the list keeps the room it fits in. Wide tables use `DialogContent size="2xl"`. A cell open for typing holds its row on the list and saves only on Enter or leaving it; rows are keyed by month, so an open cell never carries to another month. A refused cell is listed by name above the table until it saves, is dismissed or the month changes.
 
 ## Tests
 

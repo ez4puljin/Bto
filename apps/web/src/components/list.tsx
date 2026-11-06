@@ -278,8 +278,8 @@ function remPx(): number {
 const SCROLLING_CARD =
   'overflow-auto [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] print:max-h-none! print:overflow-visible [&_[data-slot=table-container]]:overflow-visible [&_[data-slot=table-head]]:sticky [&_[data-slot=table-head]]:top-0 [&_[data-slot=table-head]]:z-10 [&_[data-slot=table-head]]:bg-card [&_[data-slot=table-head]]:shadow-[inset_0_-1px_0_var(--color-border)]';
 
-/** Space kept under a scrolling card: the page's bottom padding (`pb-10`). */
-const BELOW_CARD = 40;
+/** Space kept under a scrolling card, in rem as the page's bottom padding is (`pb-10`). */
+const BELOW_CARD_REM = 2.5;
 
 /**
  * Below this much room (a card low on the page, under a form or tiles) the card does not scroll
@@ -306,7 +306,10 @@ function useFittedHeight(
       const frame = element.closest('main')?.firstElementChild;
       const after =
         frame && !beside ? Math.max(0, frame.getBoundingClientRect().bottom - box.bottom) : 0;
-      const room = Math.floor(window.innerHeight - (box.top + window.scrollY) - after - BELOW_CARD);
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      const room = Math.floor(
+        window.innerHeight - (box.top + window.scrollY) - after - BELOW_CARD_REM * rem,
+      );
       const next = room >= MIN_FITTED ? room : null;
       setHeight((previous) => (previous === next ? previous : next));
     };
