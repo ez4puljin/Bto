@@ -22,12 +22,13 @@ describe('page widths (ADR-0066)', () => {
   });
 });
 
-describe('page widths (ADR-0119)', () => {
-  it('lets every width take the whole frame (reading lost its 1400px cap on 2026-10-30)', () => {
+describe('page widths (ADR-0119, ADR-0158)', () => {
+  it('lets lists and work pages take the whole frame, at the left', () => {
     expect(PAGE_WIDTHS.wide).toBe('max-w-none');
     expect(PAGE_WIDTHS.full).toBe('max-w-none');
-    expect(PAGE_WIDTHS.reading).toBe('max-w-none');
-    // Pages sit at the left: no page is centred by its width class.
-    for (const value of Object.values(PAGE_WIDTHS)) expect(value).not.toContain('mx-auto');
+  });
+
+  it('keeps short pages in one centred column, with equal margins', () => {
+    expect(PAGE_WIDTHS.reading).toBe('mx-auto max-w-[60rem]');
   });
 });

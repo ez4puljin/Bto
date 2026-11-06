@@ -90,7 +90,9 @@ export interface Field {
  * The reading side of a DetailCard: rows of label and value inside a hairline box, like the
  * form's `FormSection` / `FormRow`, so the card does not jump when «Засах» opens the form. In a
  * box 80rem wide or more (the main column of a record on a 1920px screen, ADR-0119) the rows run
- * two to a line; `columns={1}` keeps one for values that run long.
+ * two to a line; `columns={1}` keeps one for values that run long, and `columns={2}` asks for two
+ * from 44rem, for short values inside the reading column (ADR-0158): the caller's `@container`
+ * box decides, since the list's own box only measures its rows.
  */
 export function FieldList(props: {
   items: readonly Field[];
@@ -117,7 +119,8 @@ export function FieldList(props: {
       <dl
         className={cn(
           '@container grid overflow-hidden rounded-xl border border-border/90',
-          props.columns !== 1 && '@min-[80rem]:grid-cols-2',
+          props.columns === undefined && '@min-[80rem]:grid-cols-2',
+          props.columns === 2 && '@min-[44rem]:grid-cols-2',
         )}
       >
         {props.items.map((item) => (
@@ -125,8 +128,10 @@ export function FieldList(props: {
             key={item.label}
             className={cn(
               'grid gap-1 border-b border-border/80 px-3.5 py-2.5 last:border-b-0 @md:grid-cols-[11rem_minmax(0,1fr)] @md:gap-4',
-              props.columns !== 1 &&
+              props.columns === undefined &&
                 '@min-[80rem]:nth-last-[2]:border-b-0 @min-[80rem]:even:border-l @min-[80rem]:even:border-border/80',
+              props.columns === 2 &&
+                '@min-[44rem]:nth-last-[2]:border-b-0 @min-[44rem]:even:border-l @min-[44rem]:even:border-border/80',
             )}
           >
             <dt className="text-[0.8125rem] leading-snug text-muted-foreground">{item.label}</dt>

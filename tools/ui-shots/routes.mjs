@@ -299,4 +299,16 @@ export const ROUTES = [
   },
   { area: 'system', name: 'account', path: '/account' },
   { area: 'system', name: 'not-found', path: '/no-such-page' },
+  // The `reading` pages the list above lacked (ADR-0158).
+  { area: 'partners', name: 'customer-categories', path: '/partners/customer-categories' },
+  { area: 'procurement', name: 'trucks', path: '/procurement/trucks' },
+  { area: 'pricing', name: 'discount-edit', path: '/pricing/discounts/{discount}/edit' },
+  { area: 'segments', name: 'segment-edit', path: '/segments/{segment}/edit' },
+  { area: 'system', name: 'company', path: '/company' },
+  { area: 'app', name: 'app-products', path: '/app/products' },
+  { area: 'app', name: 'app-orders', path: '/app/orders' },
+  { area: 'app', name: 'app-contacts', path: '/app/contacts' },
+  { area: 'app', name: 'app-stores', path: '/app/stores' },
+  { area: 'app', name: 'app-general', path: '/app/general' },
+  { area: 'hr', name: 'hr-setup', path: '/hr/setup' },
 ];

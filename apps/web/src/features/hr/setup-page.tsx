@@ -826,7 +826,8 @@ export function AttendanceSetupPage() {
       {canManage ? null : (
         <p className="text-[0.8125rem] text-muted-foreground">{t('hr.readOnly')}</p>
       )}
-      <div className="grid items-start gap-4 xl:grid-cols-2">
+      {/* The sites' table takes the room it needs inside the reading column (ADR-0158). */}
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,3fr)]">
         <SitesCard canManage={canManage} />
         <ScheduleCard canManage={canManage} />
       </div>

@@ -31,7 +31,7 @@ export function PosSettingsPage() {
       <PageHeader title={t('pos.settings.title')} description={t('pos.settings.description')} />
       <ProblemAlert problem={problemFromError(settings.error)} onRetry={settings.refetch} />
       {/* The three cards side by side from xl (owner 2026-10-30: the page hugged the left). */}
-      <div className="grid items-start gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid items-start gap-4 xl:grid-cols-2">
         {settings.data ? (
           <DetailCard
             title={t('pos.settings.section')}

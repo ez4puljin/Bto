@@ -86,33 +86,50 @@ export function AccountPage() {
   return (
     <div className="space-y-4">
       <PageHeader title={t('auth.account.title')} />
-      <div className="grid max-w-3xl gap-5 xl:max-w-none xl:grid-cols-2 xl:items-start">
-        <FieldList
-          title={t('auth.account.profile')}
-          items={[
-            { label: t('auth.account.fullName'), value: me.fullName },
-            {
-              label: t('auth.account.phone'),
-              value: me.phone ? <span className="font-mono">{localPhone(me.phone)}</span> : null,
-            },
-            {
-              label: t('auth.account.roles'),
-              value: me.roles.map((role, index) => (
-                <span key={role.id}>
-                  {index > 0 ? ', ' : ''}
-                  <RoleName role={role} />
-                </span>
-              )),
-            },
-            {
-              label: t('auth.account.session'),
-              value: t('auth.account.sessionEnds', {
-                time: formatUbDateTime(Date.parse(me.sessionExpiresAt)),
-              }),
-            },
-          ]}
-        />
-        <form className="flex flex-col gap-5" noValidate onSubmit={(event) => void submit(event)}>
+      {/* Two stacks, not a grid of cards: a card's height never opens a hole in the other column. */}
+      <div className="grid items-start gap-5 lg:grid-cols-2">
+        <div className="flex min-w-0 flex-col gap-5">
+          <FieldList
+            title={t('auth.account.profile')}
+            items={[
+              { label: t('auth.account.fullName'), value: me.fullName },
+              {
+                label: t('auth.account.phone'),
+                value: me.phone ? <span className="font-mono">{localPhone(me.phone)}</span> : null,
+              },
+              {
+                label: t('auth.account.roles'),
+                value: me.roles.map((role, index) => (
+                  <span key={role.id}>
+                    {index > 0 ? ', ' : ''}
+                    <RoleName role={role} />
+                  </span>
+                )),
+              },
+              {
+                label: t('auth.account.session'),
+                value: t('auth.account.sessionEnds', {
+                  time: formatUbDateTime(Date.parse(me.sessionExpiresAt)),
+                }),
+              },
+            ]}
+          />
+          <FormSection
+            title={t('auth.account.logoutAll')}
+            description={t('auth.account.logoutAllHint')}
+          >
+            <div className="px-3.5 py-3">
+              <Button variant="outline" onClick={() => setLeaving(true)}>
+                {t('auth.account.logoutAll')}
+              </Button>
+            </div>
+          </FormSection>
+        </div>
+        <form
+          className="flex min-w-0 flex-col gap-5"
+          noValidate
+          onSubmit={(event) => void submit(event)}
+        >
           <ProblemAlert problem={problem} />
           <FormSection title={t('auth.account.changePassword')}>
             <FormRow
@@ -124,7 +141,6 @@ export function AccountPage() {
                 id="currentPassword"
                 type="password"
                 autoComplete="current-password"
-                className="sm:w-72"
                 {...form.register('currentPassword')}
               />
             </FormRow>
@@ -137,7 +153,6 @@ export function AccountPage() {
                 id="newPassword"
                 type="password"
                 autoComplete="new-password"
-                className="sm:w-72"
                 {...form.register('newPassword')}
               />
             </FormRow>
@@ -150,7 +165,6 @@ export function AccountPage() {
                 id="confirmPassword"
                 type="password"
                 autoComplete="new-password"
-                className="sm:w-72"
                 {...form.register('confirmPassword')}
               />
             </FormRow>
@@ -161,16 +175,6 @@ export function AccountPage() {
             </Button>
           </FormFooter>
         </form>
-        <FormSection
-          title={t('auth.account.logoutAll')}
-          description={t('auth.account.logoutAllHint')}
-        >
-          <div className="px-3.5 py-3">
-            <Button variant="outline" onClick={() => setLeaving(true)}>
-              {t('auth.account.logoutAll')}
-            </Button>
-          </div>
-        </FormSection>
       </div>
       <ConfirmDialog
         open={leaving}
