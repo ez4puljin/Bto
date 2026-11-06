@@ -1,4 +1,5 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { DEFAULT_SCHEDULE, isWorkday } from '@tugeel/shared/hr';
 import { businessDate } from '@tugeel/shared/time';
 import type { Client } from 'pg';
 import request from 'supertest';
@@ -20,6 +21,12 @@ describe('attendance', () => {
   let rep: SeededUser;
   let repToken: string;
   const today = businessDate();
+  /**
+   * The hours the routes answer for today (ADR-0144, `scheduleOnDate`): the given ones on a workday
+   * of `workdays`, the open day on a day off. The suite runs on every day of the week.
+   */
+  const hoursToday = (workdays: string, workStart: string, workEnd: string) =>
+    isWorkday(workdays, today) ? { workStart, workEnd } : { workStart: '00:00', workEnd: '23:59' };
   const http = () => request(app.getHttpServer());
   // Mörön: the main site and a second one a few kilometres away.
   const MAIN = { lat: '49.634500', lng: '100.162300' };
@@ -188,10 +195,12 @@ describe('attendance', () => {
         siteIds: [farSiteId],
       })
       .expect(200);
+    // The rep's own hours on the company's workdays, which nobody has changed yet.
+    const repHours = hoursToday(DEFAULT_SCHEDULE.workdays, '10:00', '19:00');
     expect(terms.body).toMatchObject({
       userId: rep.id,
       siteIds: [farSiteId],
-      schedule: { workStart: '10:00', workEnd: '19:00', graceMinutes: 10 },
+      schedule: { ...repHours, graceMinutes: 10 },
     });
     const refused = await punch(repToken, 'IN', MAIN).expect(409);
     expect(refused.body).toMatchObject({
@@ -202,7 +211,7 @@ describe('attendance', () => {
     const me = (await http().get('/api/v1/hr/attendance/me').set(bearer(repToken)).expect(200))
       .body as { sites: { id: number }[]; schedule: { workStart: string } };
     expect(me.sites.map((site) => site.id)).toEqual([farSiteId]);
-    expect(me.schedule.workStart).toBe('10:00');
+    expect(me.schedule.workStart).toBe(repHours.workStart);
     // The end must follow the start; the grace has a ceiling.
     await http()
       .put(`/api/v1/hr/employees/${rep.id}`)
@@ -254,18 +263,18 @@ describe('attendance', () => {
       .expect(200);
     expect(saved.body).toMatchObject({ workStart: '08:30', graceMinutes: 15, workdays: '1111100' });
     expect((saved.body as { updatedAt: string | null }).updatedAt).not.toBeNull();
-    // The keeper follows the company; the rep keeps their own hours.
+    // The keeper follows the company; the rep keeps their own hours, on the company's workdays.
     const employees = (await http().get('/api/v1/hr/employees').set(bearer(hr)).expect(200))
       .body as {
       userId: number;
       schedule: { workStart: string; graceMinutes: number };
     }[];
     expect(employees.find((row) => row.userId === keeper.id)?.schedule).toMatchObject({
-      workStart: '08:30',
+      workStart: hoursToday('1111100', '08:30', '17:30').workStart,
       graceMinutes: 15,
     });
     expect(employees.find((row) => row.userId === rep.id)?.schedule).toMatchObject({
-      workStart: '10:00',
+      workStart: hoursToday('1111100', '10:00', '19:00').workStart,
       graceMinutes: 15,
     });
   });
