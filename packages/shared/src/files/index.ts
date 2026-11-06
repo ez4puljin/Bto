@@ -82,6 +82,13 @@ export const FILE_KINDS = {
     visibility: 'public',
     permissions: ['hr.attendance.manage'],
   },
+  /** A bank's statement in Excel for «Тооцоо хаах» (ADR-0169): kept privately as what came in. */
+  'finance.bank_statement': {
+    contentTypes: [XLSX_CONTENT_TYPE],
+    maxBytes: 5 * 1024 * 1024,
+    visibility: 'private',
+    permissions: ['finance.journal.manage'],
+  },
   /** A month's e-Barimt export for «Ebarimt» (ADR-0168): kept privately, every version. */
   'ebarimt.source': {
     contentTypes: [XLSX_CONTENT_TYPE],

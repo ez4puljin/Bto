@@ -87,6 +87,7 @@ import {
 import { EbarimtPage } from '@/features/ebarimt-check/ebarimt-page';
 import { FinanceSettingsPage } from '@/features/finance/finance-settings-page';
 import { InvoicesPage } from '@/features/finance/invoices-page';
+import { BankStatementsPage } from '@/features/finance/bank-statements-page';
 import { TransactionsPage } from '@/features/finance/transactions-page';
 import { JournalPage } from '@/features/finance/journal-page';
 import { PaymentsPage } from '@/features/finance/payments-page';
@@ -985,6 +986,11 @@ function financeRoutes(): RouteObject[] {
       path: 'finance/transactions',
       handle: { width: 'wide' },
       element: read(<TransactionsPage />),
+    },
+    {
+      path: 'finance/bank-statements',
+      handle: { width: 'full' },
+      element: read(<BankStatementsPage />),
     },
     { path: 'finance/journal', handle: { width: 'wide' }, element: read(<JournalPage />) },
     { path: 'finance/accounts', handle: { width: 'wide' }, element: read(<AccountsPage />) },

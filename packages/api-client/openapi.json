@@ -25948,6 +25948,887 @@
         ]
       }
     },
+    "/api/v1/finance/bank-statements/calendar": {
+      "get": {
+        "operationId": "BankStatements_calendar",
+        "parameters": [
+          {
+            "name": "month",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "example": "2026-11",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BankCalendarDay"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/rules": {
+      "get": {
+        "operationId": "BankStatements_rules",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankStatementRules"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      },
+      "put": {
+        "operationId": "BankStatements_saveRules",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankStatementRulesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankStatementRules"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/export-manifest": {
+      "get": {
+        "operationId": "BankStatements_manifest",
+        "parameters": [
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-05",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankExportManifest"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/export-by-date.xlsx": {
+      "get": {
+        "operationId": "BankStatements_exportByDate",
+        "parameters": [
+          {
+            "name": "file",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/BankExportFile"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-05",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/export-fees.xlsx": {
+      "get": {
+        "operationId": "BankStatements_exportFees",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-30",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements": {
+      "get": {
+        "operationId": "BankStatements_byDate",
+        "parameters": [
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-05",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BankStatement"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      },
+      "post": {
+        "operationId": "BankStatements_upload",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankStatementUploadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankStatementUpload"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The file came through `POST /files/presign`; its lines are read here, at once.",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/{id}": {
+      "get": {
+        "operationId": "BankStatements_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankStatementDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      },
+      "delete": {
+        "operationId": "BankStatements_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/{id}/money-account": {
+      "put": {
+        "operationId": "BankStatements_link",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankStatementLinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankStatement"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/{id}/swap": {
+      "post": {
+        "operationId": "BankStatements_swap",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankStatementDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/{id}/lines/{lineId}": {
+      "patch": {
+        "operationId": "BankStatements_updateLine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lineId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankLinePatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankStatementLine"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/{id}/lines/bulk": {
+      "post": {
+        "operationId": "BankStatements_updateLines",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankLinesBulkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankLinesBulkResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/{id}/post": {
+      "post": {
+        "operationId": "BankStatements_post",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankStatementPostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankStatementPostResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Each line's posting is keyed by the line itself, so a resend finds them in the books already.",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/{id}/lines/{lineId}/reverse": {
+      "post": {
+        "operationId": "BankStatements_reverse",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lineId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankLineReverseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankStatementDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/{id}/export.xlsx": {
+      "get": {
+        "operationId": "BankStatements_exportStatement",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "file",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/BankExportFile"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
     "/api/v1/supplier-balances": {
       "get": {
         "operationId": "SupplierBalances_list",
@@ -40067,6 +40948,7 @@
               "procurement.invoice_image",
               "hr.employee_photo",
               "hr.message_image",
+              "finance.bank_statement",
               "ebarimt.source",
               "imports.source"
             ],
@@ -64010,6 +64892,800 @@
           "number"
         ]
       },
+      "BankCalendarDay": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "example": "2026-11-05"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "date",
+          "count"
+        ]
+      },
+      "BankLineAction": {
+        "type": "string",
+        "enum": [
+          "CLOSE",
+          "CREATE",
+          "CLOSE_CREATE"
+        ]
+      },
+      "BankExportType": {
+        "type": "string",
+        "enum": [
+          "BANK",
+          "CASH"
+        ]
+      },
+      "BankStatementRules": {
+        "type": "object",
+        "properties": {
+          "settlementAccountId": {
+            "type": "number",
+            "nullable": true
+          },
+          "settlementDescription": {
+            "type": "string"
+          },
+          "settlementAction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankLineAction"
+              }
+            ]
+          },
+          "feeAccountId": {
+            "type": "number",
+            "nullable": true
+          },
+          "feeDescription": {
+            "type": "string"
+          },
+          "feeAction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankLineAction"
+              }
+            ]
+          },
+          "feeExportType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankExportType"
+              }
+            ]
+          },
+          "partyCode": {
+            "type": "string",
+            "example": "30000"
+          },
+          "counterAccountIds": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "settlementAccountId",
+          "settlementDescription",
+          "settlementAction",
+          "feeAccountId",
+          "feeDescription",
+          "feeAction",
+          "feeExportType",
+          "partyCode",
+          "counterAccountIds"
+        ]
+      },
+      "BankStatementRulesRequest": {
+        "type": "object",
+        "properties": {
+          "settlementAccountId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "settlementDescription": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "settlementAction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankLineAction"
+              }
+            ]
+          },
+          "feeAccountId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "feeDescription": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "feeAction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankLineAction"
+              }
+            ]
+          },
+          "feeExportType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankExportType"
+              }
+            ]
+          },
+          "partyCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "counterAccountIds": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "required": [
+          "settlementAccountId",
+          "settlementDescription",
+          "settlementAction",
+          "feeAccountId",
+          "feeDescription",
+          "feeAction",
+          "feeExportType",
+          "partyCode",
+          "counterAccountIds"
+        ]
+      },
+      "BankExportManifest": {
+        "type": "object",
+        "properties": {
+          "RECEIVABLE": {
+            "type": "number"
+          },
+          "CASH": {
+            "type": "number"
+          },
+          "BANK": {
+            "type": "number"
+          },
+          "fees": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "RECEIVABLE",
+          "CASH",
+          "BANK",
+          "fees"
+        ]
+      },
+      "BankExportFile": {
+        "type": "string",
+        "enum": [
+          "RECEIVABLE",
+          "CASH",
+          "BANK"
+        ]
+      },
+      "BankStatementMissing": {
+        "type": "object",
+        "properties": {
+          "party": {
+            "type": "number"
+          },
+          "account": {
+            "type": "number"
+          },
+          "description": {
+            "type": "number"
+          },
+          "action": {
+            "type": "number"
+          },
+          "export": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "party",
+          "account",
+          "description",
+          "action",
+          "export"
+        ]
+      },
+      "BankStatement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "accountNumber": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "example": "MNT"
+          },
+          "statementDate": {
+            "type": "string",
+            "example": "2026-11-05"
+          },
+          "dateTo": {
+            "type": "string",
+            "example": "2026-11-05"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "uploadedAt": {
+            "type": "string"
+          },
+          "moneyAccountId": {
+            "type": "number",
+            "nullable": true
+          },
+          "moneyAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "accountCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "The chart code of the bank account"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "feeCount": {
+            "type": "number"
+          },
+          "totalCredit": {
+            "type": "string",
+            "example": "12006380.00"
+          },
+          "totalDebit": {
+            "type": "string",
+            "example": "2180000.00"
+          },
+          "filledCount": {
+            "type": "number"
+          },
+          "postedCount": {
+            "type": "number"
+          },
+          "missing": {
+            "$ref": "#/components/schemas/BankStatementMissing"
+          }
+        },
+        "required": [
+          "id",
+          "accountNumber",
+          "currency",
+          "statementDate",
+          "dateTo",
+          "fileName",
+          "uploadedAt",
+          "moneyAccountId",
+          "moneyAccountName",
+          "accountCode",
+          "lineCount",
+          "feeCount",
+          "totalCredit",
+          "totalDebit",
+          "filledCount",
+          "postedCount",
+          "missing"
+        ]
+      },
+      "BankStatementUploadRequest": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Khan Bank's own name, `Statement_MNT_<number>.xlsx`: it holds the account and the currency.",
+            "minLength": 1,
+            "maxLength": 300,
+            "example": "Statement_MNT_5000000001.xlsx"
+          }
+        },
+        "required": [
+          "fileId",
+          "fileName"
+        ]
+      },
+      "BankStatementUpload": {
+        "type": "object",
+        "properties": {
+          "statement": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankStatement"
+              }
+            ]
+          },
+          "newLines": {
+            "type": "number"
+          },
+          "duplicateLines": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "statement",
+          "newLines",
+          "duplicateLines"
+        ]
+      },
+      "BankLineKind": {
+        "type": "string",
+        "enum": [
+          "NORMAL",
+          "FEE",
+          "SETTLEMENT"
+        ]
+      },
+      "BankLineMissing": {
+        "type": "string",
+        "enum": [
+          "party",
+          "account",
+          "description",
+          "action",
+          "export"
+        ]
+      },
+      "BankStatementLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "lineNo": {
+            "type": "number"
+          },
+          "txnAt": {
+            "type": "string"
+          },
+          "businessDate": {
+            "type": "string",
+            "example": "2026-11-05"
+          },
+          "debit": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "credit": {
+            "type": "string",
+            "example": "168980.00"
+          },
+          "bankDescription": {
+            "type": "string"
+          },
+          "bankCounterpart": {
+            "type": "string"
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankLineKind"
+              }
+            ]
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "supplierId": {
+            "type": "number",
+            "nullable": true
+          },
+          "supplierName": {
+            "type": "string",
+            "nullable": true
+          },
+          "supplierCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "counterAccountId": {
+            "type": "number",
+            "nullable": true
+          },
+          "counterAccountCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "counterAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string"
+          },
+          "action": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankLineAction"
+              }
+            ]
+          },
+          "exportType": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankExportType"
+              }
+            ]
+          },
+          "paymentId": {
+            "type": "number",
+            "nullable": true
+          },
+          "journalEntryId": {
+            "type": "number",
+            "nullable": true
+          },
+          "postedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankLineMissing"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "lineNo",
+          "txnAt",
+          "businessDate",
+          "debit",
+          "credit",
+          "bankDescription",
+          "bankCounterpart",
+          "kind",
+          "customerId",
+          "customerName",
+          "customerCode",
+          "supplierId",
+          "supplierName",
+          "supplierCode",
+          "counterAccountId",
+          "counterAccountCode",
+          "counterAccountName",
+          "description",
+          "action",
+          "exportType",
+          "paymentId",
+          "journalEntryId",
+          "postedAt",
+          "missing"
+        ]
+      },
+      "BankStatementDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "accountNumber": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "example": "MNT"
+          },
+          "statementDate": {
+            "type": "string",
+            "example": "2026-11-05"
+          },
+          "dateTo": {
+            "type": "string",
+            "example": "2026-11-05"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "uploadedAt": {
+            "type": "string"
+          },
+          "moneyAccountId": {
+            "type": "number",
+            "nullable": true
+          },
+          "moneyAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "accountCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "The chart code of the bank account"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "feeCount": {
+            "type": "number"
+          },
+          "totalCredit": {
+            "type": "string",
+            "example": "12006380.00"
+          },
+          "totalDebit": {
+            "type": "string",
+            "example": "2180000.00"
+          },
+          "filledCount": {
+            "type": "number"
+          },
+          "postedCount": {
+            "type": "number"
+          },
+          "missing": {
+            "$ref": "#/components/schemas/BankStatementMissing"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankStatementLine"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "accountNumber",
+          "currency",
+          "statementDate",
+          "dateTo",
+          "fileName",
+          "uploadedAt",
+          "moneyAccountId",
+          "moneyAccountName",
+          "accountCode",
+          "lineCount",
+          "feeCount",
+          "totalCredit",
+          "totalDebit",
+          "filledCount",
+          "postedCount",
+          "missing",
+          "lines"
+        ]
+      },
+      "BankStatementLinkRequest": {
+        "type": "object",
+        "properties": {
+          "moneyAccountId": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "moneyAccountId"
+        ]
+      },
+      "BankLinePatch": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "supplierId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "counterAccountId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "action": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankLineAction"
+              }
+            ]
+          },
+          "exportType": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankExportType"
+              }
+            ]
+          }
+        }
+      },
+      "BankLinesBulkRequest": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "supplierId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "counterAccountId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "action": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankLineAction"
+              }
+            ]
+          },
+          "exportType": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankExportType"
+              }
+            ]
+          },
+          "lineIds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "descriptionFromBank": {
+            "type": "boolean",
+            "description": "Each line's text made from its own bank text: «Дансаар - <банкны утга>»."
+          }
+        },
+        "required": [
+          "lineIds"
+        ]
+      },
+      "BankLinesBulkResult": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "number"
+          },
+          "statement": {
+            "$ref": "#/components/schemas/BankStatementDetail"
+          }
+        },
+        "required": [
+          "updated",
+          "statement"
+        ]
+      },
+      "BankStatementPostRequest": {
+        "type": "object",
+        "properties": {
+          "lineIds": {
+            "description": "Left out: every ready line of the statement.",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        }
+      },
+      "BankPostFailure": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number"
+          },
+          "lineNo": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "example": "FIN_PERIOD_CLOSED"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "lineId",
+          "lineNo",
+          "code",
+          "detail"
+        ]
+      },
+      "BankStatementPostResult": {
+        "type": "object",
+        "properties": {
+          "posted": {
+            "type": "number"
+          },
+          "skipped": {
+            "type": "number",
+            "description": "Lines still lacking something"
+          },
+          "failures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankPostFailure"
+            }
+          },
+          "statement": {
+            "$ref": "#/components/schemas/BankStatementDetail"
+          }
+        },
+        "required": [
+          "posted",
+          "skipped",
+          "failures",
+          "statement"
+        ]
+      },
+      "BankLineReverseRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
       "SupplierBalance": {
         "type": "object",
         "properties": {
@@ -78255,6 +79931,15 @@
           "JOURNAL_UNBALANCED",
           "ACCOUNT_ROLE_TAKEN",
           "ACCOUNT_ROLE_MISSING",
+          "BANK_STATEMENT_UNREADABLE",
+          "BANK_STATEMENT_NO_ACCOUNT",
+          "BANK_STATEMENT_EMPTY",
+          "BANK_STATEMENT_POSTED",
+          "BANK_STATEMENT_UNLINKED",
+          "BANK_STATEMENT_CURRENCY",
+          "BANK_LINE_LOCKED",
+          "BANK_LINE_POSTED",
+          "BANK_LINE_INCOMPLETE",
           "POS_NOT_CONFIGURED",
           "POS_TOTALS_MISMATCH",
           "POS_TAX_MISMATCH",

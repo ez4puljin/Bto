@@ -26,6 +26,11 @@ export function businessDateTime(at: Date): string {
   return dayjs(at).tz(BUSINESS_TZ).format('YYYY-MM-DD HH:mm');
 }
 
+/** The instant of an Ulaanbaatar wall-clock `YYYY-MM-DD HH:mm:ss`, as a bank statement writes it. */
+export function businessInstant(wall: string): Date {
+  return dayjs.tz(wall, BUSINESS_TZ).toDate();
+}
+
 /** The Ulaanbaatar calendar year of an instant, e.g. the `period` of yearly document numbers. */
 export function businessYear(at: Date = new Date()): string {
   return dayjs(at).tz(BUSINESS_TZ).format('YYYY');
@@ -39,6 +44,11 @@ export function isIsoDate(value: string): boolean {
 /** A plain `YYYY-MM-DD` date moved by whole calendar days. */
 export function addDays(date: string, days: number): string {
   return dayjs.utc(date).add(days, 'day').format('YYYY-MM-DD');
+}
+
+/** The number of days in a `YYYY-MM` month. */
+export function daysInMonth(month: string): number {
+  return dayjs.utc(`${month}-01`).daysInMonth();
 }
 
 /** The first day of the Ulaanbaatar month of an instant, e.g. the date of a monthly snapshot. */

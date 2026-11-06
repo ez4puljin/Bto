@@ -30,6 +30,7 @@ import {
   FinanceSettingsController,
 } from './controllers/receivables.controller';
 import { AllocationsController } from './controllers/allocations.controller';
+import { BankStatementsController } from './controllers/bank-statements.controller';
 import { SupplierBalancesController } from './controllers/payables.controller';
 import { PeriodsController } from './controllers/periods.controller';
 import { IssueExpenseAccountsController } from './controllers/issue-expense-accounts.controller';
@@ -44,6 +45,7 @@ import { LedgerReportsController } from './controllers/ledger-reports.controller
 import { LedgerReportsService } from './services/ledger-reports.service';
 import { ReportsService } from './services/reports.service';
 import { ArLedgerService } from './services/ar-ledger.service';
+import { BankStatementsService } from './services/bank-statements.service';
 import { CreditControlService } from './services/credit-control.service';
 import { CreditNotesService } from './services/credit-notes.service';
 import { PosCreditService } from './services/pos-credit.service';
@@ -94,6 +96,7 @@ const SERVICES = [
   ReportsService,
   LedgerReportsService,
   IssueExpenseAccountsService,
+  BankStatementsService,
 ];
 
 /**
@@ -156,6 +159,7 @@ export class FinanceModule {}
     FinanceAttentionController,
     FinanceSettingsController,
     AllocationsController,
+    BankStatementsController,
     SupplierBalancesController,
     PeriodsController,
     ReportsController,

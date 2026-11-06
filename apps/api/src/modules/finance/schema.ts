@@ -1,4 +1,10 @@
-import { FINANCE_LIMITS, INVOICE_STATUSES } from '@tugeel/shared/finance';
+import {
+  BANK_EXPORT_TYPES,
+  BANK_LINE_ACTIONS,
+  BANK_LINE_KINDS,
+  FINANCE_LIMITS,
+  INVOICE_STATUSES,
+} from '@tugeel/shared/finance';
 import { PRICE_BASES } from '@tugeel/shared/pricing';
 import { PAYMENT_METHODS } from '@tugeel/shared/sales';
 import { type SQL, sql } from 'drizzle-orm';
@@ -17,9 +23,9 @@ import {
 } from 'drizzle-orm/pg-core';
 import { factor, jsonValue, money, percent, qty } from '../../common/db/types';
 import { productUnits, products, VAT_TYPES } from '../catalog/schema';
-import { branches, users, warehouses } from '../identity/schema';
+import { branches, files, users, warehouses } from '../identity/schema';
 import { bins } from '../inventory/schema';
-import { customers } from '../partners/schema';
+import { customers, suppliers } from '../partners/schema';
 import { salesOrders } from '../sales/schema';
 
 // The tables owned by the finance module (docs/modules/finance.md, ADR-0060). Migration
@@ -283,4 +289,122 @@ export const financeReconcileRuns = pgTable(
     check('finance_reconcile_runs_kind', sql`${t.kind} IN ('NIGHTLY', 'MANUAL')`),
     check('finance_reconcile_runs_status', sql`${t.status} IN ('OK', 'DRIFT')`),
   ],
+);
+
+/**
+ * «Тооцоо хаах» (ADR-0169): one uploaded bank statement, its account as the bank wrote it. The money
+ * account is worked out from the number; `money_account_id` holds the accountant's own link when the
+ * number could not be recognised. Deleted (with its lines) only while nothing of it is in the books.
+ */
+export const bankStatements = pgTable(
+  'bank_statements',
+  {
+    id: id(),
+    accountNumber: text('account_number').notNull(),
+    currency: text('currency').notNull(),
+    statementDate: date('statement_date', { mode: 'string' }).notNull(),
+    dateTo: date('date_to', { mode: 'string' }).notNull(),
+    fileName: text('file_name').notNull(),
+    fileId: ref('file_id').references(() => files.id),
+    moneyAccountId: ref('money_account_id'),
+    uploadedBy: userRef('uploaded_by').notNull(),
+    uploadedAt: timestamp('uploaded_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check('bank_statements_account', sql`length(${t.accountNumber}) BETWEEN 1 AND 40`),
+    check('bank_statements_dates', sql`${t.dateTo} >= ${t.statementDate}`),
+    index('bank_statements_date_idx').on(t.statementDate),
+    index('bank_statements_account_idx').on(t.accountNumber),
+  ],
+);
+
+/**
+ * A statement's line: what the bank wrote, what the accountant adds, and the document it became.
+ * `dedupe_key` makes a re-upload of the same lines harmless. Exactly one of debit and credit is
+ * positive: debit is money out of the account, credit money in. A posted line has its document
+ * (`payment_id` for a customer's voucher, `journal_entry_id` for an entry), and `post_attempt`
+ * gives each posting after a reversal a source key of its own in the Finance Core.
+ */
+export const bankStatementLines = pgTable(
+  'bank_statement_lines',
+  {
+    id: id(),
+    statementId: ref('statement_id')
+      .notNull()
+      .references(() => bankStatements.id, { onDelete: 'cascade' }),
+    lineNo: integer('line_no').notNull(),
+    txnAt: timestamp('txn_at', { withTimezone: true }).notNull(),
+    businessDate: date('business_date', { mode: 'string' }).notNull(),
+    debit: money('debit').notNull(),
+    credit: money('credit').notNull(),
+    bankDescription: text('bank_description').notNull(),
+    bankCounterpart: text('bank_counterpart').notNull(),
+    kind: text('kind', { enum: BANK_LINE_KINDS }).notNull(),
+    dedupeKey: text('dedupe_key').notNull(),
+    customerId: ref('customer_id').references(() => customers.id),
+    supplierId: ref('supplier_id').references(() => suppliers.id),
+    counterAccountId: ref('counter_account_id'),
+    description: text('description').notNull(),
+    action: text('action', { enum: BANK_LINE_ACTIONS }),
+    exportType: text('export_type', { enum: BANK_EXPORT_TYPES }),
+    paymentId: ref('payment_id'),
+    journalEntryId: ref('journal_entry_id'),
+    postedAt: timestamp('posted_at', { withTimezone: true }),
+    postedBy: userRef('posted_by'),
+    postAttempt: integer('post_attempt').notNull().default(0),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('bank_statement_lines_dedupe_uq').on(t.dedupeKey),
+    uniqueIndex('bank_statement_lines_no_uq').on(t.statementId, t.lineNo),
+    index('bank_statement_lines_counterpart_idx').on(t.bankCounterpart, t.id),
+    index('bank_statement_lines_date_idx').on(t.businessDate),
+    check('bank_statement_lines_kind', inList(t.kind, BANK_LINE_KINDS)),
+    check(
+      'bank_statement_lines_action',
+      sql`${t.action} IS NULL OR ${inList(t.action, BANK_LINE_ACTIONS)}`,
+    ),
+    check(
+      'bank_statement_lines_export',
+      sql`${t.exportType} IS NULL OR ${inList(t.exportType, BANK_EXPORT_TYPES)}`,
+    ),
+    check(
+      'bank_statement_lines_side',
+      sql`(${t.debit} > 0 AND ${t.credit} = 0) OR (${t.credit} > 0 AND ${t.debit} = 0)`,
+    ),
+    check(
+      'bank_statement_lines_one_party',
+      sql`${t.customerId} IS NULL OR ${t.supplierId} IS NULL`,
+    ),
+    check(
+      'bank_statement_lines_posted',
+      sql`(${t.postedAt} IS NULL) = (${t.postedBy} IS NULL) AND (${t.postedAt} IS NULL OR ${t.paymentId} IS NOT NULL OR ${t.journalEntryId} IS NOT NULL)`,
+    ),
+  ],
+);
+
+/**
+ * «Тооцоо хаах»'s rules, one row, absent until saved (ADR-0169 #5): what a card settlement and a bank
+ * fee are filled with, the accounts offered first, and the Erkhet party code of a line without a party.
+ */
+export const bankStatementSettings = pgTable(
+  'bank_statement_settings',
+  {
+    id: smallint('id').primaryKey(),
+    settlementAccountId: ref('settlement_account_id'),
+    settlementDescription: text('settlement_description').notNull(),
+    settlementAction: text('settlement_action', { enum: BANK_LINE_ACTIONS }).notNull(),
+    feeAccountId: ref('fee_account_id'),
+    feeDescription: text('fee_description').notNull(),
+    feeAction: text('fee_action', { enum: BANK_LINE_ACTIONS }).notNull(),
+    feeExportType: text('fee_export_type', { enum: BANK_EXPORT_TYPES }).notNull(),
+    partyCode: text('party_code').notNull(),
+    counterAccountIds: bigint('counter_account_ids', { mode: 'number' })
+      .array()
+      .notNull()
+      .default(sql`'{}'::bigint[]`),
+    updatedBy: userRef('updated_by'),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check('bank_statement_settings_single', sql`${t.id} = 1`)],
 );

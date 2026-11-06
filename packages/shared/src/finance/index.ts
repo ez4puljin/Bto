@@ -150,6 +150,40 @@ export const FINANCE_LIMITS = {
   maxCreditNoteLines: 200,
 } as const;
 
+/**
+ * «Тооцоо хаах» (ADR-0169): a bank statement's line is an ordinary one, a bank fee or a card
+ * settlement; the last two are filled from the settings and stay locked on the line.
+ */
+export const BANK_LINE_KINDS = ['NORMAL', 'FEE', 'SETTLEMENT'] as const;
+export type BankLineKind = (typeof BANK_LINE_KINDS)[number];
+
+/** «Хаах», «Үүсгэх», «Хаах Үүсгэх» of a statement line. */
+export const BANK_LINE_ACTIONS = ['CLOSE', 'CREATE', 'CLOSE_CREATE'] as const;
+export type BankLineAction = (typeof BANK_LINE_ACTIONS)[number];
+
+/** The Erkhet file a money-out line goes to: «Харилцах» or «Касс». */
+export const BANK_EXPORT_TYPES = ['BANK', 'CASH'] as const;
+export type BankExportType = (typeof BANK_EXPORT_TYPES)[number];
+
+/** The three Erkhet import files a statement makes (ADR-0169 #6). */
+export const BANK_EXPORT_FILES = ['RECEIVABLE', 'CASH', 'BANK'] as const;
+export type BankExportFile = (typeof BANK_EXPORT_FILES)[number];
+
+/** What a line still lacks before it can be written to the books. */
+export const BANK_LINE_MISSING = ['party', 'account', 'description', 'action', 'export'] as const;
+export type BankLineMissing = (typeof BANK_LINE_MISSING)[number];
+
+export const BANK_STATEMENT_LIMITS = {
+  /** Lines of one uploaded statement. */
+  maxLines: 5000,
+  maxDescription: FINANCE_LIMITS.maxDescription,
+  /** Lines one bulk edit or one posting names. */
+  maxBatch: 1000,
+  maxPartyCode: 30,
+  /** Accounts offered first in «Харьц. данс». */
+  maxCounterAccounts: 50,
+} as const;
+
 /** Days past due an open invoice is: not due yet, 1–30, 31–60, 61–90, over 90 (ADR-0060 #4). */
 export const AGING_BUCKETS = ['NOT_DUE', 'D1_30', 'D31_60', 'D61_90', 'D90_PLUS'] as const;
 export type AgingBucket = (typeof AGING_BUCKETS)[number];
