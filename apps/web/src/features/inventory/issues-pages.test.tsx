@@ -182,7 +182,10 @@ describe('a new issue (one window like the receipt)', () => {
     expect(calls(fetchMock, 'POST', '/api/v1/issues')).toHaveLength(0);
 
     await user.selectOptions(card.getByLabelText(issues.expenseType), 'Дотоод хэрэглээ');
-    await user.click(card.getByRole('tab', { name: issues.recipientKinds.OTHER }));
+    await user.selectOptions(
+      card.getByLabelText(issues.recipientKind),
+      issues.recipientKinds.OTHER,
+    );
     await user.type(card.getByLabelText(issues.recipient), 'Бат');
     await user.type(card.getByLabelText(issues.note), 'Оффисын хэрэгцээ');
     await user.type(scanBox(), '4006381333931{Enter}');
@@ -238,11 +241,8 @@ describe('a new issue (one window like the receipt)', () => {
     const user = userEvent.setup();
     const card = await header();
     expect(card.getByLabelText(issues.recipient)).toHaveValue('Бат');
-    expect(card.getByRole('tab', { name: issues.recipientKinds.OTHER })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
-    await user.click(card.getByRole('tab', { name: issues.recipientKinds.USER }));
+    expect(card.getByLabelText(issues.recipientKind)).toHaveValue('OTHER');
+    await user.selectOptions(card.getByLabelText(issues.recipientKind), issues.recipientKinds.USER);
     // Switching the kind alone changes nothing on the draft.
     expect(calls(fetchMock, 'PATCH', '/api/v1/issues/7')).toHaveLength(0);
     await user.type(card.getByLabelText(issues.recipient), 'Бат');
@@ -278,8 +278,22 @@ describe('a new issue (one window like the receipt)', () => {
           ]),
       }),
     );
-    const card = await header();
-    expect(await card.findByText('730201 · Дотоод хэрэгцээний бараа')).toBeInTheDocument();
+    // Beside the title, so the strip keeps its height whatever the type.
+    expect(await screen.findByText('730201 · Дотоод хэрэгцээний бараа')).toBeInTheDocument();
+  });
+
+  it('takes the keys of the window: F2 to the search, Ctrl+Enter to the sending dialog', async () => {
+    renderApp(
+      '/inventory/issues/7',
+      signedIn(ACCOUNTANT_ME, { ...editorRoutes, 'GET /api/v1/issues/7': () => json(DRAFT) }),
+    );
+    const user = userEvent.setup();
+    await screen.findByRole('region', { name: issues.linesTitle });
+    await user.keyboard('{F2}');
+    expect(screen.getByRole('searchbox', { name: mn.inventory.productSearch })).toHaveFocus();
+    await user.keyboard('{Control>}{Enter}{/Control}');
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByRole('button', { name: issues.send })).toBeInTheDocument();
   });
 });
 

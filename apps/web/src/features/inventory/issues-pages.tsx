@@ -1,5 +1,5 @@
 import { Archive, ArchiveRestore, Check, PackageOpen, Pencil, Plus, Tags, X } from 'lucide-react';
-import { type FormEvent, useDeferredValue, useRef, useState } from 'react';
+import { type FormEvent, type ReactNode, useDeferredValue, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useLocation, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
@@ -452,11 +452,23 @@ export function IssuePage() {
   if (loadProblem || !issue.data) {
     return (
       <div>
-        <PageHeader title={t('inventory.issues.title')} />
+        <PageHeader dense title={t('inventory.issues.title')} />
         {loadProblem ? (
           <ProblemAlert problem={loadProblem} />
         ) : (
-          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+          <>
+            <p className="sr-only">{t('common.loading')}</p>
+            <div aria-hidden className="flex flex-col gap-2">
+              <div className="h-19 animate-pulse rounded-xl bg-card shadow-card" />
+              <ListCard>
+                <table className="w-full">
+                  <tbody>
+                    <SkeletonRows columns={6} rows={7} />
+                  </tbody>
+                </table>
+              </ListCard>
+            </div>
+          </>
         )}
       </div>
     );
@@ -478,32 +490,41 @@ function IssueScreen(props: {
 }) {
   const { t } = useTranslation();
   const { detail } = props;
+  /** The form places the title: a draft's window holds it, with what only the draft knows. */
+  const head = (extra?: { meta?: ReactNode; actions?: ReactNode }) => (
+    <PageHeader
+      dense
+      title={
+        detail === null
+          ? t('inventory.issues.newTitle')
+          : (detail.number ?? t('inventory.draftNo', { id: detail.id }))
+      }
+      actions={extra?.actions}
+      meta={
+        detail ? (
+          <>
+            <DocStatusBadge status={detail.status} />
+            {detail.postedAt ? (
+              <span>
+                {t('inventory.issues.postedAt', {
+                  time: formatUbDateTime(Date.parse(detail.postedAt)),
+                })}
+              </span>
+            ) : detail.effectiveDate ? (
+              <span>{t('inventory.postedOn', { date: detail.effectiveDate })}</span>
+            ) : null}
+            {extra?.meta}
+          </>
+        ) : undefined
+      }
+    />
+  );
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title={
-          detail === null
-            ? t('inventory.issues.newTitle')
-            : (detail.number ?? t('inventory.draftNo', { id: detail.id }))
-        }
-        meta={
-          detail ? (
-            <>
-              <DocStatusBadge status={detail.status} />
-              {detail.postedAt ? (
-                <span>
-                  {t('inventory.issues.postedAt', {
-                    time: formatUbDateTime(Date.parse(detail.postedAt)),
-                  })}
-                </span>
-              ) : detail.effectiveDate ? (
-                <span>{t('inventory.postedOn', { date: detail.effectiveDate })}</span>
-              ) : null}
-            </>
-          ) : undefined
-        }
-      />
-      <IssueForm detail={detail} focusScan={props.focusScan} onCreated={props.onCreated} />
-    </div>
+    <IssueForm
+      detail={detail}
+      focusScan={props.focusScan}
+      onCreated={props.onCreated}
+      head={head}
+    />
   );
 }

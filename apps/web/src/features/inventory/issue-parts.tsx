@@ -10,17 +10,25 @@ import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/compon
 import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatTugrik } from '@/lib/money';
+import { cn } from '@/lib/utils';
 import type { IssueDetail, IssueLine } from './api';
 import { hasCosts, isDamageCharge, postedWarehouses } from './issue-helpers';
 
 /**
  * The lines table: №, product, warehouse, unit, shelf, quantity, the sale price and charge of a
- * «Хүнд тооцох» issue, then the costs when the API sent them.
+ * «Хүнд тооцох» issue, then the costs when the API sent them. In the work window (`entry`, ADR-0157)
+ * the code has its own column, the rows keep one height and the entry stands under the heads.
  */
 export function LinesTable(props: {
   detail: IssueDetail | null;
   lines: readonly IssueLine[];
   actions: boolean;
+  /** The entry under the column heads, with its name; `before` and `after` place «Тоо». */
+  entry?: { label: string; rows: (span: { before: number; after: number }) => ReactNode };
+  /** The line just added: it flashes where it landed. */
+  landedId?: number | null;
+  /** The line being removed: dimmed until the server answers. */
+  removingId?: number | null;
   cells: (
     line: IssueLine,
     name: string,
@@ -31,13 +39,17 @@ export function LinesTable(props: {
   const costs = hasCosts(props.detail);
   const sale = isDamageCharge(props.detail);
   const frozen = postedWarehouses(props.detail);
+  const { entry } = props;
   // One entry per cell, under the same conditions as the header cells (ADR-0119). While the lines
   // are edited the warehouse is a select and the quantity a box.
   const columns: ColumnSpec[] = [
-    { key: 'lineNo', kind: 'count', width: 3 },
-    { key: 'product', kind: 'text', weight: 3, min: 14 },
+    { key: 'lineNo', kind: 'count', width: entry ? 3.5 : 3 },
+    ...(entry ? [{ key: 'sku', kind: 'code', width: 5 } as const] : []),
+    { key: 'product', kind: 'text', weight: 3, min: entry ? 13 : 14 },
     { key: 'warehouse', kind: 'text', weight: 1, min: props.actions ? 10.5 : 8 },
-    { key: 'unit', kind: 'text', weight: 1, min: 4 },
+    entry
+      ? ({ key: 'unit', kind: 'code', width: 5 } as const)
+      : ({ key: 'unit', kind: 'text', weight: 1, min: 4 } as const),
     // The shelf, or «Нярав батлахад тогтоно» until the keeper confirms.
     ...(BINS_SOON ? [] : [{ key: 'bin', kind: 'code', width: 11 } as const]),
     { key: 'qty', kind: 'qty', width: props.actions ? 8 : 6.5 },
@@ -52,11 +64,20 @@ export function LinesTable(props: {
       : []),
     ...(props.actions ? [{ key: 'actions', kind: 'actions', actions: 1 } as const] : []),
   ];
+  // The columns on either side of «Тоо», for the entry's cells.
+  const before = (entry ? 5 : 4) + (BINS_SOON ? 0 : 1);
+  const after = (sale ? 2 : 0) + (costs ? 2 : 0) + (props.actions ? 1 : 0);
   return (
     <ListTable columns={columns}>
-      <TableHeader>
+      <TableHeader
+        aria-label={entry?.label}
+        className={
+          entry ? 'sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--color-border)]' : undefined
+        }
+      >
         <TableRow>
           <TableHead className="text-right">{t('inventory.receipt.form.lineNo')}</TableHead>
+          {entry ? <TableHead>{t('inventory.sku')}</TableHead> : null}
           <TableHead>{t('inventory.product')}</TableHead>
           <TableHead>{t('inventory.issues.lineWarehouse')}</TableHead>
           <TableHead>{t('inventory.unit')}</TableHead>
@@ -80,6 +101,7 @@ export function LinesTable(props: {
             </TableHead>
           ) : null}
         </TableRow>
+        {entry?.rows({ before, after })}
       </TableHeader>
       <TableBody>
         {props.lines.map((line, index) => {
@@ -89,16 +111,31 @@ export function LinesTable(props: {
           );
           const locked = frozen.has(line.warehouseId);
           return (
-            <TableRow key={line.id} data-state={locked ? 'locked' : undefined}>
+            <TableRow
+              key={line.id}
+              data-state={locked ? 'locked' : undefined}
+              className={cn(
+                props.landedId === line.id && 'row-landed motion-reduce:animate-none',
+                props.removingId === line.id && 'opacity-50',
+              )}
+            >
               <TableCell className="text-right font-mono text-muted-foreground">
                 {index + 1}
               </TableCell>
-              <TableCell className="whitespace-normal">
-                {line.productName}{' '}
-                <span className="font-mono text-[0.8125rem] text-muted-foreground">
-                  {line.productSku}
-                </span>
-              </TableCell>
+              {entry ? (
+                <>
+                  <TableCell className="font-mono text-[0.8125rem]">{line.productSku}</TableCell>
+                  {/* The rows keep one height: the whole name on hover. */}
+                  <TableCell title={line.productName}>{line.productName}</TableCell>
+                </>
+              ) : (
+                <TableCell className="whitespace-normal">
+                  {line.productName}{' '}
+                  <span className="font-mono text-[0.8125rem] text-muted-foreground">
+                    {line.productSku}
+                  </span>
+                </TableCell>
+              )}
               <TableCell>
                 {cells.warehouse ?? (
                   <span className="flex items-center gap-1">
@@ -155,11 +192,17 @@ export function LinesTable(props: {
 }
 
 /** «Нийт өртөг» for cost holders once a part left; «Нийт тооцох дүн» for a «Хүнд тооцох» issue. */
-export function IssueTotals({ detail }: { detail: IssueDetail }) {
+export function IssueTotals({ detail, inline }: { detail: IssueDetail; inline?: boolean }) {
   const { t } = useTranslation();
   const sale = isDamageCharge(detail);
   return (
-    <div className="flex flex-col items-end gap-1 text-sm">
+    <div
+      className={
+        inline
+          ? 'flex flex-wrap items-center gap-x-4 gap-y-1'
+          : 'flex flex-col items-end gap-1 text-sm'
+      }
+    >
       {sale ? (
         detail.saleTotal ? (
           <p>

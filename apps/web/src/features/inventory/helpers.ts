@@ -56,6 +56,15 @@ export function looksLikeLabel(code: string): boolean {
 /** A positive quantity with at most three decimals (NUMERIC(14,3)). */
 const QTY = /^\d{1,11}(\.\d{1,3})?$/;
 
+/** A dialog or sheet over the window; a popover (a search's list, the totals) is not one. */
+export function modalOpen(): boolean {
+  return Array.from(document.querySelectorAll('[role="dialog"], [role="alertdialog"]')).some(
+    (open) =>
+      open.getAttribute('data-state') === 'open' &&
+      !open.parentElement?.hasAttribute('data-radix-popper-content-wrapper'),
+  );
+}
+
 export function isQty(value: string): boolean {
   return QTY.test(value) && new Decimal(value).gt(0);
 }
