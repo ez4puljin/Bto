@@ -121,3 +121,24 @@ describe('dealPercent', () => {
     expect(dealPercent(product({ effect: 'AMOUNT', steps: [step('0', '200')] }), null)).toBeNull();
   });
 });
+
+describe('N+M badges (ADR-0159 #3)', () => {
+  const bonus = (fields: Partial<DealProgram>) =>
+    product({ effect: 'BONUS', steps: [step('1', '1')], ...fields });
+
+  it('reads 1+1 and needs no price', () => {
+    expect(label(bonus({}))).toBe('1+1');
+    expect(dealPercent(bonus({}), null)?.toFixed()).toBe('50');
+    expect(dealPercent(bonus({ steps: [step('3', '1')] }), null)?.toFixed()).toBe('25');
+  });
+
+  it('reads in the threshold unit when both are whole numbers of it', () => {
+    const boxes = { name: 'хайрцаг', factor: d('24') };
+    expect(label(bonus({ steps: [step('48', '24')], thresholdUnit: boxes }))).toBe('2+1 хайрцаг');
+    expect(label(bonus({ steps: [step('24', '12')], thresholdUnit: boxes }))).toBe('24+12');
+  });
+
+  it('says the last day of a promotion', () => {
+    expect(label(bonus({ validTo: '2026-11-01' }))).toBe('1+1 · 10/31');
+  });
+});

@@ -9,23 +9,21 @@ import {
   priceProfileIssue,
 } from '@tugeel/shared/pricing';
 import { businessDate } from '@tugeel/shared/time';
+import { ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { z } from 'zod';
-import { DialogFormFooter, FormField } from '@/components/form';
+import { DateInput } from '@/components/date-input';
+import { FormRow, FormSection } from '@/components/form';
 import { NativeSelect } from '@/components/native-select';
+import { type Crumb, PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { StickyActions } from '@/components/sticky-actions';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import {
   Table,
@@ -36,12 +34,16 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { ValidationMessage } from '@/lib/forms';
-import { formatMnt, plainDecimal } from '@/lib/money';
+import { formatCount, formatMnt, plainDecimal } from '@/lib/money';
 import { problemFromError, settle } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { randomUuid } from '@/lib/uuid';
-import { type PriceProfile, type PriceProfileVersion, usePricingMutations } from './api';
-import { DateInput } from '@/components/date-input';
+import {
+  type PriceProfile,
+  type PriceProfileVersion,
+  usePriceProfile,
+  usePricingMutations,
+} from './api';
 
 /** The NUMERIC(5,2) markups and the NUMERIC(14,3) bulk quantity, as typed. */
 const MARKUP = /^\d{1,3}(\.\d{1,2})?$/;
@@ -86,51 +88,46 @@ function typedProfileValues(values: TypedValues): ProfileValues | null {
 }
 
 /**
- * The profile's values (ADR-0048 #3): each number's shape here, the rules between them by the
- * shared `priceProfileIssue` — the api and the database check the same.
+ * The profile as typed (ADR-0048 #3, ADR-0160): each number's shape here, the rules between them by
+ * the shared `priceProfileIssue` — the api and the database check the same.
  */
-const profileSchema = (creating: boolean) =>
-  z
-    .object({
-      name: creating
-        ? z
-            .string()
-            .trim()
-            .min(1, 'validation.required')
-            .max(MAX_PRICE_PROFILE_NAME, 'validation.tooLong')
-        : z.string(),
-      looseMarkupPct: z.string().trim().regex(MARKUP, 'validation.markup'),
-      retailMarkupPct: z.string().trim().regex(MARKUP, 'validation.markup'),
-      bulk: z.boolean(),
-      retailBulkMinQty: z.string().trim(),
-      retailBulkMarkupPct: z.string().trim(),
-      rounding: z.enum(PRICE_ROUNDINGS),
-      validFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'validation.date'),
-    })
-    .superRefine((values, ctx) => {
-      if (values.bulk && !BULK_QTY.test(values.retailBulkMinQty)) {
-        ctx.addIssue({ code: 'custom', path: ['retailBulkMinQty'], message: 'validation.bulkQty' });
-      }
-      if (values.bulk && !MARKUP.test(values.retailBulkMarkupPct)) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['retailBulkMarkupPct'],
-          message: 'validation.markup',
-        });
-      }
-      const typed = typedProfileValues(values);
-      const problem = typed ? priceProfileIssue(typed) : null;
-      if (problem) {
-        ctx.addIssue({
-          code: 'custom',
-          path: [problem.field],
-          message: ISSUE_MESSAGES[problem.issue],
-        });
-      }
-    });
-const CREATE_SCHEMA = profileSchema(true);
-const VERSION_SCHEMA = profileSchema(false);
-type ProfileFormValues = z.infer<typeof CREATE_SCHEMA>;
+const PROFILE_SCHEMA = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, 'validation.required')
+      .max(MAX_PRICE_PROFILE_NAME, 'validation.tooLong'),
+    looseMarkupPct: z.string().trim().regex(MARKUP, 'validation.markup'),
+    retailMarkupPct: z.string().trim().regex(MARKUP, 'validation.markup'),
+    bulk: z.boolean(),
+    retailBulkMinQty: z.string().trim(),
+    retailBulkMarkupPct: z.string().trim(),
+    rounding: z.enum(PRICE_ROUNDINGS),
+    validFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'validation.date'),
+  })
+  .superRefine((values, ctx) => {
+    if (values.bulk && !BULK_QTY.test(values.retailBulkMinQty)) {
+      ctx.addIssue({ code: 'custom', path: ['retailBulkMinQty'], message: 'validation.bulkQty' });
+    }
+    if (values.bulk && !MARKUP.test(values.retailBulkMarkupPct)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['retailBulkMarkupPct'],
+        message: 'validation.markup',
+      });
+    }
+    const typed = typedProfileValues(values);
+    const problem = typed ? priceProfileIssue(typed) : null;
+    if (problem) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [problem.field],
+        message: ISSUE_MESSAGES[problem.issue],
+      });
+    }
+  });
+type ProfileFormValues = z.infer<typeof PROFILE_SCHEMA>;
 
 /** The values a new version starts from: the latest planned ones, else today's, else the last. */
 function latestValues(profile: PriceProfile): PriceProfileVersion | null {
@@ -141,7 +138,8 @@ function defaultsOf(profile: PriceProfile | null, today: string): ProfileFormVal
   const latest = profile ? latestValues(profile) : null;
   return {
     name: profile?.name ?? '',
-    looseMarkupPct: latest ? plainDecimal(latest.looseMarkupPct) : '',
+    // Whole packs and loose pieces alike at the warehouse price until someone says otherwise.
+    looseMarkupPct: latest ? plainDecimal(latest.looseMarkupPct) : '0',
     retailMarkupPct: latest ? plainDecimal(latest.retailMarkupPct) : '',
     bulk: latest ? latest.retailBulkMinQty !== null : false,
     retailBulkMinQty: latest?.retailBulkMinQty ? plainDecimal(latest.retailBulkMinQty) : '',
@@ -154,20 +152,60 @@ function defaultsOf(profile: PriceProfile | null, today: string): ProfileFormVal
 }
 
 /**
- * «Шинэ тохиргоо» (profile null) or «Шинэ утга оруулах» of a profile (ADR-0048 #3, pricing.manage):
- * the markups, the supermarket's bulk price behind a switch, the rounding and the day the values
- * start, with an example worked out as the values are typed. One Idempotency-Key per dialog.
+ * The products that have this profile, as the product list shows them with its filter on, in a new
+ * tab so the form or page behind it stays as it was.
  */
-export function ProfileValuesDialog(props: { profile: PriceProfile | null; onClose: () => void }) {
+export function ProfileProductsLink(props: { profile: PriceProfile }) {
+  const { t } = useTranslation();
+  return (
+    <Link
+      to={`/catalog/products?profile=${props.profile.id}`}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1.5 text-[0.8125rem] text-link underline-offset-4 hover:underline"
+    >
+      <ExternalLink aria-hidden className="size-3.5 shrink-0" />
+      {t('pricing.profiles.viewProducts', { count: formatCount(props.profile.productsToday) })}
+    </Link>
+  );
+}
+
+/** «Шинэ тохиргоо» (pricing.manage). */
+export function PriceProfileCreatePage() {
+  return <ProfileForm profile={null} />;
+}
+
+/** «Засах»: its name, and new values from a day on for every product using it (ADR-0160). */
+export function PriceProfileEditPage() {
+  const { t } = useTranslation();
+  const id = Number.parseInt(useParams().id ?? '', 10);
+  const profile = usePriceProfile(id);
+  const loadProblem = problemFromError(profile.error);
+  if (loadProblem) return <ProblemAlert problem={loadProblem} />;
+  if (!profile.data) return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>;
+  return (
+    <ProfileForm
+      profile={profile.data}
+      crumbs={[{ label: profile.data.name, to: `/pricing/profiles/${id}` }]}
+    />
+  );
+}
+
+/**
+ * The profile's page form: its name, the markups, the supermarket's bulk price behind a switch, the
+ * rounding and the day the values start, with an example worked out as the values are typed. One
+ * Idempotency-Key per page.
+ */
+function ProfileForm(props: { profile: PriceProfile | null; crumbs?: readonly Crumb[] }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const mutations = usePricingMutations();
-  const creating = props.profile === null;
+  const { profile } = props;
   const [today] = useState(businessDate);
   const [key] = useState(randomUuid);
   const form = useForm<ProfileFormValues>({
-    resolver: zodResolver(creating ? CREATE_SCHEMA : VERSION_SCHEMA),
-    defaultValues: defaultsOf(props.profile, today),
+    resolver: zodResolver(PROFILE_SCHEMA),
+    defaultValues: defaultsOf(profile, today),
   });
   const watched = useWatch({ control: form.control });
   const bulk = watched.bulk ?? false;
@@ -182,11 +220,12 @@ export function ProfileValuesDialog(props: { profile: PriceProfile | null; onClo
   // While the bulk fields are being typed the example keeps its other rows.
   const typed = typedProfileValues(typing) ?? typedProfileValues({ ...typing, bulk: false });
   const example = typed && !priceProfileIssue(typed) ? typed : null;
-  const mutation = creating ? mutations.createProfile : mutations.setProfileVersion;
+  const mutation = profile ? mutations.updateProfile : mutations.createProfile;
   const { errors, isSubmitting } = form.formState;
 
   const submit = form.handleSubmit(async (values) => {
     const body = {
+      name: values.name,
       looseMarkupPct: values.looseMarkupPct,
       retailMarkupPct: values.retailMarkupPct,
       retailBulkMinQty: values.bulk ? values.retailBulkMinQty : null,
@@ -194,51 +233,66 @@ export function ProfileValuesDialog(props: { profile: PriceProfile | null; onClo
       rounding: values.rounding,
       validFrom: values.validFrom,
     };
-    if (props.profile === null) {
-      const created = await settle(
-        mutations.createProfile.mutateAsync({ key, name: values.name, ...body }),
-      );
-      if (!created) return;
-      toast.success(t('pricing.profiles.created'));
-      void navigate(`/pricing/profiles/${created.id}`, { replace: true });
-      return;
-    }
     const saved = await settle(
-      mutations.setProfileVersion.mutateAsync({ key, id: props.profile.id, ...body }),
+      profile
+        ? mutations.updateProfile.mutateAsync({ id: profile.id, body })
+        : mutations.createProfile.mutateAsync({ key, ...body }),
     );
     if (!saved) return;
-    toast.success(t('pricing.profiles.saved'));
-    props.onClose();
+    toast.success(t(profile ? 'pricing.profiles.saved' : 'pricing.profiles.created'));
+    void navigate(`/pricing/profiles/${saved.id}`, { replace: true });
   });
 
   return (
-    <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
-      <DialogContent closeLabel={t('common.close')} size="xl">
-        <form className="space-y-4" noValidate onSubmit={(event) => void submit(event)}>
-          <DialogHeader>
-            <DialogTitle>
-              {creating ? t('pricing.profiles.new') : t('pricing.profiles.setValues')}
-            </DialogTitle>
-            <DialogDescription>
-              {props.profile === null
-                ? t('pricing.profiles.newHint')
-                : t('pricing.profiles.setValuesHint', { name: props.profile.name })}
-            </DialogDescription>
-          </DialogHeader>
-          <ProblemAlert problem={problemFromError(mutation.error)} />
-          <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_18rem] md:items-start">
-            <div className="flex min-w-0 flex-col gap-4">
-              {creating ? (
-                <FormField
+    <div>
+      <PageHeader
+        title={t(profile ? 'pricing.profiles.edit' : 'pricing.profiles.new')}
+        crumbs={props.crumbs}
+      />
+      <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
+        <ProblemAlert problem={problemFromError(mutation.error)} />
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+          <Card>
+            <CardContent className="flex flex-col gap-5">
+              <FormSection title={t('pricing.profiles.sectionGeneral')}>
+                <FormRow
                   label={t('pricing.profiles.fields.name')}
                   htmlFor="profile-name"
                   error={errors.name?.message}
                 >
                   <Input id="profile-name" autoComplete="off" {...form.register('name')} />
-                </FormField>
-              ) : null}
-              <div className="grid gap-3 sm:grid-cols-2">
-                <FormField
+                </FormRow>
+                <FormRow
+                  label={t('pricing.profiles.fields.validFrom')}
+                  htmlFor="profile-valid-from"
+                  hint={
+                    profile
+                      ? t('pricing.profiles.setValuesHint', { name: profile.name })
+                      : t('pricing.profiles.newHint')
+                  }
+                  error={errors.validFrom?.message}
+                >
+                  <Controller
+                    control={form.control}
+                    name="validFrom"
+                    render={({ field }) => (
+                      <DateInput
+                        id="profile-valid-from"
+                        className="sm:w-44"
+                        min={today}
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                      />
+                    )}
+                  />
+                </FormRow>
+              </FormSection>
+              <FormSection
+                title={t('pricing.profiles.sectionSales')}
+                description={t('pricing.profiles.sectionSalesHint')}
+              >
+                <FormRow
                   label={t('pricing.profiles.fields.loose')}
                   htmlFor="profile-loose"
                   hint={t('pricing.profiles.fields.looseHint')}
@@ -248,11 +302,16 @@ export function ProfileValuesDialog(props: { profile: PriceProfile | null; onClo
                     id="profile-loose"
                     inputMode="decimal"
                     autoComplete="off"
-                    className="font-mono"
+                    className="w-40 font-mono"
                     {...form.register('looseMarkupPct')}
                   />
-                </FormField>
-                <FormField
+                </FormRow>
+              </FormSection>
+              <FormSection
+                title={t('pricing.profiles.sectionRetail')}
+                description={t('pricing.profiles.sectionRetailHint')}
+              >
+                <FormRow
                   label={t('pricing.profiles.fields.retail')}
                   htmlFor="profile-retail"
                   hint={t('pricing.profiles.fields.retailHint')}
@@ -262,88 +321,75 @@ export function ProfileValuesDialog(props: { profile: PriceProfile | null; onClo
                     id="profile-retail"
                     inputMode="decimal"
                     autoComplete="off"
-                    className="font-mono"
+                    className="w-40 font-mono"
                     {...form.register('retailMarkupPct')}
                   />
-                </FormField>
-              </div>
-              <Controller
-                control={form.control}
-                name="bulk"
-                render={({ field }) => (
-                  <div className="flex items-center justify-between gap-3">
-                    <Label htmlFor="profile-bulk">{t('pricing.profiles.fields.bulk')}</Label>
-                    <Switch
-                      id="profile-bulk"
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </div>
-                )}
-              />
-              {bulk ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <FormField
-                    label={t('pricing.profiles.fields.bulkQty')}
-                    htmlFor="profile-bulk-qty"
-                    hint={t('pricing.profiles.fields.bulkQtyHint')}
-                    error={errors.retailBulkMinQty?.message}
+                </FormRow>
+                <FormRow label={t('pricing.profiles.fields.bulk')} htmlFor="profile-bulk">
+                  <Controller
+                    control={form.control}
+                    name="bulk"
+                    render={({ field }) => (
+                      <Switch
+                        id="profile-bulk"
+                        className="sm:mt-2"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
+                </FormRow>
+                {bulk ? (
+                  <>
+                    <FormRow
+                      label={t('pricing.profiles.fields.bulkQty')}
+                      htmlFor="profile-bulk-qty"
+                      hint={t('pricing.profiles.fields.bulkQtyHint')}
+                      error={errors.retailBulkMinQty?.message}
+                    >
+                      <Input
+                        id="profile-bulk-qty"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        className="w-40 font-mono"
+                        {...form.register('retailBulkMinQty')}
+                      />
+                    </FormRow>
+                    <FormRow
+                      label={t('pricing.profiles.fields.bulkPct')}
+                      htmlFor="profile-bulk-pct"
+                      error={errors.retailBulkMarkupPct?.message}
+                    >
+                      <Input
+                        id="profile-bulk-pct"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        className="w-40 font-mono"
+                        {...form.register('retailBulkMarkupPct')}
+                      />
+                    </FormRow>
+                  </>
+                ) : null}
+              </FormSection>
+              <FormSection title={t('pricing.profiles.sectionRounding')}>
+                <FormRow label={t('pricing.profiles.fields.rounding')} htmlFor="profile-rounding">
+                  <NativeSelect
+                    id="profile-rounding"
+                    className="sm:w-56"
+                    {...form.register('rounding')}
                   >
-                    <Input
-                      id="profile-bulk-qty"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      className="font-mono"
-                      {...form.register('retailBulkMinQty')}
-                    />
-                  </FormField>
-                  <FormField
-                    label={t('pricing.profiles.fields.bulkPct')}
-                    htmlFor="profile-bulk-pct"
-                    error={errors.retailBulkMarkupPct?.message}
-                  >
-                    <Input
-                      id="profile-bulk-pct"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      className="font-mono"
-                      {...form.register('retailBulkMarkupPct')}
-                    />
-                  </FormField>
-                </div>
-              ) : null}
-              <div className="grid gap-3 sm:grid-cols-2">
-                <FormField label={t('pricing.profiles.fields.rounding')} htmlFor="profile-rounding">
-                  <NativeSelect id="profile-rounding" {...form.register('rounding')}>
                     {PRICE_ROUNDINGS.map((rounding) => (
                       <option key={rounding} value={rounding}>
                         {t(`pricing.roundings.${rounding}`)}
                       </option>
                     ))}
                   </NativeSelect>
-                </FormField>
-                <FormField
-                  label={t('pricing.profiles.fields.validFrom')}
-                  htmlFor="profile-valid-from"
-                  error={errors.validFrom?.message}
-                >
-                  <Controller
-                    control={form.control}
-                    name="validFrom"
-                    render={({ field }) => (
-                      <DateInput
-                        id="profile-valid-from"
-                        min={today}
-                        value={field.value ?? ''}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                      />
-                    )}
-                  />
-                </FormField>
-              </div>
-            </div>
-            <div className="rounded-xl bg-muted/70 p-3">
+                </FormRow>
+              </FormSection>
+            </CardContent>
+          </Card>
+          <Card className="lg:sticky lg:top-20">
+            <CardContent className="flex flex-col gap-3">
               {example ? (
                 <ProfileExample values={example} layout="list" />
               ) : (
@@ -356,61 +402,26 @@ export function ProfileValuesDialog(props: { profile: PriceProfile | null; onClo
                   </p>
                 </div>
               )}
-            </div>
-          </div>
-          <DialogFormFooter pending={isSubmitting} onCancel={props.onClose} />
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-const renameSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, 'validation.required')
-    .max(MAX_PRICE_PROFILE_NAME, 'validation.tooLong'),
-});
-type RenameValues = z.infer<typeof renameSchema>;
-
-/** «Нэр солих»: products keep their profile; every page shows the new name. */
-export function RenameProfileDialog(props: { profile: PriceProfile; onClose: () => void }) {
-  const { t } = useTranslation();
-  const mutations = usePricingMutations();
-  const form = useForm<RenameValues>({
-    resolver: zodResolver(renameSchema),
-    defaultValues: { name: props.profile.name },
-  });
-  const submit = form.handleSubmit(async ({ name }) => {
-    const renamed = await settle(
-      mutations.renameProfile.mutateAsync({ id: props.profile.id, name }),
-    );
-    if (!renamed) return;
-    toast.success(t('pricing.profiles.renamed'));
-    props.onClose();
-  });
-  const { errors, isSubmitting } = form.formState;
-
-  return (
-    <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
-      <DialogContent closeLabel={t('common.close')}>
-        <form className="space-y-4" noValidate onSubmit={(event) => void submit(event)}>
-          <DialogHeader>
-            <DialogTitle>{t('pricing.profiles.rename')}</DialogTitle>
-          </DialogHeader>
-          <ProblemAlert problem={problemFromError(mutations.renameProfile.error)} />
-          <FormField
-            label={t('pricing.profiles.fields.name')}
-            htmlFor="profile-rename"
-            error={errors.name?.message}
+              {profile ? <ProfileProductsLink profile={profile} /> : null}
+            </CardContent>
+          </Card>
+        </div>
+        <StickyActions>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() =>
+              void navigate(profile ? `/pricing/profiles/${profile.id}` : '/pricing/profiles')
+            }
           >
-            <Input id="profile-rename" autoComplete="off" {...form.register('name')} />
-          </FormField>
-          <DialogFormFooter pending={isSubmitting} onCancel={props.onClose} />
-        </form>
-      </DialogContent>
-    </Dialog>
+            {t('common.cancel')}
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {t('common.save')}
+          </Button>
+        </StickyActions>
+      </form>
+    </div>
   );
 }
 
@@ -434,7 +445,7 @@ export function ProfileExample({
   const money = (amount: Decimal) => t('pricing.money', { amount: formatMnt(amount.toFixed(0)) });
   const markup = (pct: Decimal) =>
     t('pricing.profiles.markup', { pct: plainDecimal(pct.toString()) });
-  const rows = [
+  const sales = [
     {
       key: 'WAREHOUSE',
       basis: t('pricing.bases.WAREHOUSE'),
@@ -447,6 +458,8 @@ export function ProfileExample({
       markup: markup(values.looseMarkupPct),
       price: prices.loose,
     },
+  ];
+  const retail = [
     {
       key: 'RETAIL',
       basis: t('pricing.bases.RETAIL'),
@@ -466,6 +479,10 @@ export function ProfileExample({
         ]
       : []),
   ];
+  const groups = [
+    { key: 'SALES', title: t('pricing.profiles.sectionSales'), rows: sales },
+    { key: 'RETAIL', title: t('pricing.profiles.sectionRetail'), rows: retail },
+  ];
   const title = t('pricing.profiles.example', { price: formatMnt(EXAMPLE_PRICE.toFixed(0)) });
   const roundingNote = (
     <p className="text-xs text-muted-foreground">
@@ -481,19 +498,24 @@ export function ProfileExample({
         <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
           {title}
         </h3>
-        <ul className="divide-y divide-border/80 rounded-lg bg-background shadow-control ring-1 ring-black/[0.04]">
-          {rows.map((row) => (
-            <li key={row.key} className="flex items-baseline justify-between gap-3 px-3 py-1.5">
-              <span className="min-w-0 text-[0.8125rem]">
-                <span>{row.basis}</span>
-                {row.markup ? (
-                  <span className="ml-1.5 font-mono text-muted-foreground">{row.markup}</span>
-                ) : null}
-              </span>
-              <span className="font-mono text-[0.8125rem] font-medium">{money(row.price)}</span>
-            </li>
-          ))}
-        </ul>
+        {groups.map((group) => (
+          <div key={group.key} className="flex flex-col gap-1">
+            <h4 className="text-xs font-medium text-muted-foreground">{group.title}</h4>
+            <ul className="divide-y divide-border/80 rounded-lg bg-background shadow-control ring-1 ring-black/[0.04]">
+              {group.rows.map((row) => (
+                <li key={row.key} className="flex items-baseline justify-between gap-3 px-3 py-1.5">
+                  <span className="min-w-0 text-[0.8125rem]">
+                    <span>{row.basis}</span>
+                    {row.markup ? (
+                      <span className="ml-1.5 font-mono text-muted-foreground">{row.markup}</span>
+                    ) : null}
+                  </span>
+                  <span className="font-mono text-[0.8125rem] font-medium">{money(row.price)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
         {roundingNote}
       </section>
     );
@@ -516,17 +538,27 @@ export function ProfileExample({
             </TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.key}>
-              <TableCell className="whitespace-normal">{row.basis}</TableCell>
-              <TableCell className="text-right font-mono">
-                {row.markup ?? t('common.none')}
+        {groups.map((group) => (
+          <TableBody key={group.key}>
+            <TableRow className="hover:bg-transparent">
+              <TableCell
+                colSpan={3}
+                className="pt-3 pb-1 text-xs font-medium text-muted-foreground"
+              >
+                {group.title}
               </TableCell>
-              <TableCell className="text-right font-mono">{money(row.price)}</TableCell>
             </TableRow>
-          ))}
-        </TableBody>
+            {group.rows.map((row) => (
+              <TableRow key={row.key}>
+                <TableCell className="whitespace-normal">{row.basis}</TableCell>
+                <TableCell className="text-right font-mono">
+                  {row.markup ?? t('common.none')}
+                </TableCell>
+                <TableCell className="text-right font-mono">{money(row.price)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        ))}
       </Table>
       {roundingNote}
     </section>

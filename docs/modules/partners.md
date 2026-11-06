@@ -1,5 +1,12 @@
 # Module `partners` — contract
 
+**Supplier categories (2026-11-06, ADR-0161, migration `0078_supplier_categories`).**
+- **Table.** `supplier_categories` (a tree by `parent_id`; name 1–80, `name_key` unique among siblings, `supplier_categories_parent_name_key`; `active`, `sort_order`; never deleted); `suppliers.category_id` optional.
+- **Service.** `SupplierCategoriesService` (exported): `list` (tree order, retired too, with `path`, `depth`, `supplierCount` of the whole branch), `get`, `pathsOf`, `assertActive`, `create`, `update` (no circle; retires only with nothing active below; a live parent for a move or a return).
+- **REST.** `GET /supplier-categories` (authenticated), `POST`, `PATCH /:id` (`partners.suppliers.manage`); suppliers take `categoryId`, return `categoryId` and `categoryPath`; `GET /suppliers?categoryId` takes the whole branch. Errors `SUPPLIER_CATEGORY_INACTIVE`, `SUPPLIER_CATEGORY_HAS_CHILDREN` (409).
+- **By a product's category (#7).** `GET /suppliers?productCategoryId` and `GET /suppliers/:id/products?productCategoryId` (the catalog's subtree, through `ProductFiltersService`); with it on, `productCount` counts that category's products.
+- **Screens.** `/partners/supplier-categories`; the supplier list's left side (`supplier-filter-panel.tsx`, the same `FilterTree` as the product list): «Барааны ангилал» with a box that finds one, its own categories, status, segments; the «Ангилал» column; a click on «Барааны тоо» for the products in brief; a choice in the supplier form. Test: `supplier-categories.int-spec.ts`.
+
 **Customer categories (2026-10-24, ADR-0107, migration `0045_customer_categories`).**
 - **Table.** `customer_categories` (name 1–80, `name_key` unique `customer_categories_name_key_key`, `sort_order`, `active`, `REVOKE DELETE, TRUNCATE`) and `customers.category_id` (optional FK, index `(category_id, id)`).
 - **Service.** `CustomerCategoriesService` (exported): `list` (retired ones too, by order then name), `get`, `findByNames` (by search key), `assertActive(tx, id)` (FOR SHARE; 422 `categoryId` `exists`, 409 `CUSTOMER_CATEGORY_INACTIVE`), `create`, `update {name, sortOrder, active}`; audit entity `customer_categories`.

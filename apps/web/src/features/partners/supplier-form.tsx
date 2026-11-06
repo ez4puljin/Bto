@@ -5,17 +5,18 @@ import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FieldList } from '@/components/detail';
 import { FormRow, FormSection } from '@/components/form';
+import { NativeSelect } from '@/components/native-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import type { SupplierDetail } from './api';
+import { type SupplierDetail, useSupplierCategories } from './api';
 import { PartnerFormFrame } from './form-frame';
 import { fieldOfDuplicate, type SupplierFormValues, supplierSchema } from './partner-schema';
 import { localPhone } from './phone';
 
-type TextField = Exclude<keyof SupplierFormValues, 'status' | 'note' | 'vatPayer'>;
+type TextField = Exclude<keyof SupplierFormValues, 'status' | 'note' | 'vatPayer' | 'categoryId'>;
 interface FieldSpec {
   name: TextField;
   inputMode?: 'numeric' | 'tel' | 'email';
@@ -75,6 +76,11 @@ export function SupplierForm(props: {
   });
   const [problem, setProblem] = useState<ProblemDetails | null>(null);
   const { errors, isSubmitting } = form.formState;
+  const categories = useSupplierCategories();
+  // A retired category stays offered only on the supplier that already has it.
+  const categoryOptions = (categories.data ?? []).filter(
+    (category) => category.active || String(category.id) === props.defaultValues.categoryId,
+  );
 
   const submit = form.handleSubmit(async (values) => {
     const result = await props.onSubmit(values);
@@ -121,6 +127,16 @@ export function SupplierForm(props: {
     <fieldset disabled={props.readOnly} className="flex min-w-0 flex-col gap-5">
       <FormSection title={t('partners.supplier.sectionGeneral')}>
         {GENERAL.map(row)}
+        <FormRow label={t('partners.supplier.category')} htmlFor="supplier-category">
+          <NativeSelect id="supplier-category" className="sm:w-80" {...form.register('categoryId')}>
+            <option value="">{t('partners.supplier.noCategory')}</option>
+            {categoryOptions.map((category) => (
+              <option key={category.id} value={String(category.id)}>
+                {category.path}
+              </option>
+            ))}
+          </NativeSelect>
+        </FormRow>
         {props.mode === 'edit' ? (
           <FormRow label={t('partners.supplier.status')} htmlFor="supplier-status" align="center">
             <Controller
@@ -236,6 +252,7 @@ export function SupplierFacts({ detail }: { detail: SupplierDetail }) {
         title={t('partners.supplier.sectionGeneral')}
         items={[
           ...items(GENERAL),
+          { label: t('partners.supplier.category'), value: detail.categoryPath },
           { label: t('partners.supplier.status'), value: t(`partners.status.${detail.status}`) },
           { label: t('partners.supplier.note'), value: detail.note },
         ]}

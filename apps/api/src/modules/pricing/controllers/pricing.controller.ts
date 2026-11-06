@@ -30,6 +30,7 @@ import {
   PriceProfileQueryDto,
   PriceProfileVersionInputDto,
   RenamePriceProfileDto,
+  UpdatePriceProfileDto,
 } from '../dto/price-profiles.dto';
 import {
   DiscountProgramDto,
@@ -202,6 +203,46 @@ export class PriceProfilesController {
     return toPriceProfileDto(await this.profiles.rename(ctx, id, body.name));
   }
 
+  /** Its name and new values from a day on, in one transaction (ADR-0160). */
+  @Put(':id')
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: PriceProfileDto })
+  async update(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdatePriceProfileDto,
+  ): Promise<PriceProfileDto> {
+    const profile = await this.profiles.update(ctx, id, {
+      name: body.name,
+      validFrom: body.validFrom,
+      values: toValuesInput(body),
+    });
+    return toPriceProfileDto(profile);
+  }
+
+  @Post(':id/restore')
+  @RequirePermission(MANAGE)
+  @HttpCode(200)
+  @ApiOkResponse({ type: PriceProfileDto })
+  async restore(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<PriceProfileDto> {
+    return toPriceProfileDto(await this.profiles.restore(ctx, id));
+  }
+
+  /** Out of every list; refused while products use it; the row stays (ADR-0160). */
+  @Delete(':id')
+  @RequirePermission(MANAGE)
+  @HttpCode(204)
+  @ApiNoContentResponse()
+  async remove(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<void> {
+    await this.profiles.remove(ctx, id);
+  }
+
   /** Refused while products use the profile today or later (PRICE_PROFILE_IN_USE). */
   @Post(':id/archive')
   @RequirePermission(MANAGE)
@@ -247,7 +288,7 @@ export class DiscountProgramsController {
     return toProgramDto(await this.programs.create(ctx, toProgramInput(body)));
   }
 
-  /** Only before the program starts. */
+  /** At any time: the audit keeps what it was, orders keep what they froze (ADR-0159 #1). */
   @Put(':id')
   @RequirePermission(MANAGE)
   @ApiOkResponse({ type: DiscountProgramDto })
@@ -270,7 +311,29 @@ export class DiscountProgramsController {
     return toProgramDto(await this.programs.stop(ctx, id));
   }
 
-  /** Only before the program starts. */
+  @Post(':id/archive')
+  @RequirePermission(MANAGE)
+  @HttpCode(200)
+  @ApiOkResponse({ type: DiscountProgramDto })
+  async archive(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<DiscountProgramDto> {
+    return toProgramDto(await this.programs.setState(ctx, id, 'ARCHIVED'));
+  }
+
+  @Post(':id/restore')
+  @RequirePermission(MANAGE)
+  @HttpCode(200)
+  @ApiOkResponse({ type: DiscountProgramDto })
+  async restore(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<DiscountProgramDto> {
+    return toProgramDto(await this.programs.setState(ctx, id, 'ACTIVE'));
+  }
+
+  /** Out of every list and quote; the row stays (ADR-0159 #1). */
   @Delete(':id')
   @RequirePermission(MANAGE)
   @HttpCode(204)
@@ -326,6 +389,8 @@ export class PricingController {
     const quote = await this.quotes.quote({
       list: body.list ?? 'WHOLESALE',
       date,
+      pipelineId: body.pipelineId ?? null,
+      tillId: body.tillId ?? null,
       lines: body.lines.map((line) => ({
         productUnitId: line.productUnitId,
         qty: new Decimal(line.qty),

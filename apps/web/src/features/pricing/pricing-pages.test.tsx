@@ -4,6 +4,7 @@ import type { components } from '@tugeel/api-client';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { businessDate } from '@tugeel/shared/time';
 import { describe, expect, it } from 'vitest';
+import { choose } from '@/test/choose';
 import { ADMIN_ME, findSidebar, json, renderApp, signedIn, WORKER_ME } from '@/test/render-app';
 
 type Schemas = components['schemas'];
@@ -32,6 +33,9 @@ const CATEGORIES: Schemas['Category'][] = [
 const MASTERS = {
   'GET /api/v1/uoms': () => list(UOMS),
   'GET /api/v1/categories': () => list(CATEGORIES),
+  'GET /api/v1/segments': () => list([]),
+  'GET /api/v1/sales-boards': () => json([]),
+  'GET /api/v1/pos/tills': () => json([]),
 };
 
 const unit = (
@@ -119,6 +123,8 @@ const priceProfile = (
   id,
   name,
   archivedAt: null,
+  status: 'ACTIVE',
+  createdByName: null,
   current: { ...values, id: id * 10, validFrom: '2026-10-01', validTo: null },
   scheduled: [],
   history: [],
@@ -205,10 +211,22 @@ const program = (fields: Partial<Schemas['DiscountProgram']>): Schemas['Discount
   thresholdUnit: null,
   categoryId: null,
   countUomId: null,
+  state: 'ACTIVE',
+  priority: false,
+  targetKind: null,
+  targetIds: [],
+  excludeTargetIds: [],
+  excludeProductIds: [],
+  namedProducts: [],
+  adjustKind: 'NONE',
+  adjustFactor: 1,
+  pipelineIds: [],
+  tillIds: [],
   validFrom: TODAY,
   validTo: null,
   status: 'ACTIVE',
   steps: [],
+  createdByName: null,
   createdAt: STAMP,
   updatedAt: STAMP,
   ...fields,
@@ -362,12 +380,12 @@ describe('product prices card', () => {
 });
 
 describe('discount programs', () => {
-  it('lists programs with their targets, steps and dates', async () => {
+  it('lists every plan with who made it and when, and its row actions', async () => {
     const fetchMock = signedIn(ADMIN_ME, {
       ...MASTERS,
       'GET /api/v1/discount-programs': () =>
         list([
-          BOX_PRICE,
+          { ...BOX_PRICE, priority: true, createdByName: 'Болд Бат' },
           program({
             id: 2,
             name: 'Ундааны хямдрал',
@@ -375,8 +393,6 @@ describe('discount programs', () => {
             measure: 'QTY',
             categoryId: 12,
             countUomId: 3,
-            validFrom: '2026-11-01',
-            validTo: '2026-12-01',
             status: 'SCHEDULED',
             steps: [{ threshold: '50', value: '2' }],
           }),
@@ -385,6 +401,26 @@ describe('discount programs', () => {
             name: 'Их захиалга',
             effect: 'AMOUNT',
             steps: [{ threshold: '1000000', value: '20000' }],
+          }),
+          program({
+            id: 4,
+            name: 'Нийлүүлэгчийн',
+            scope: 'PRODUCT',
+            measure: 'QTY',
+            targetKind: 'SUPPLIER',
+            targetIds: [5, 6],
+            steps: [{ threshold: '0', value: '10' }],
+          }),
+          program({
+            id: 5,
+            name: 'Нэгийг авбал нэг',
+            scope: 'PRODUCT',
+            measure: 'QTY',
+            effect: 'BONUS',
+            targetKind: 'SEGMENT',
+            targetIds: [8],
+            status: 'DRAFT',
+            steps: [{ threshold: '1', value: '1' }],
           }),
         ]),
     });
@@ -396,14 +432,70 @@ describe('discount programs', () => {
       '20 хайрцаг+ → 22,000₮',
       '«Ундаа» ангилал',
       '50 хайрцаг+ → 2%',
-      '2026-11-01 – 2026-11-30',
       'Захиалгын нийт дүн',
       '1,000,000₮+ → −20,000₮',
+      'Нийлүүлэгч (2)',
+      'Үргэлж → 10%',
+      'Сегмент (1)',
+      '1+1',
+      'Болд Бат',
     ]) {
       expect(within(table).getByText(text)).toBeInTheDocument();
     }
+    expect(within(table).getByText(mn.pricing.programs.status.DRAFT)).toBeInTheDocument();
+    const row = within(within(table).getByText('Ундааны хямдрал').closest('tr') as HTMLElement);
+    expect(row.getByRole('button', { name: mn.common.edit })).toBeInTheDocument();
+    expect(row.getByRole('button', { name: mn.pricing.programs.archive })).toBeInTheDocument();
+    expect(row.getByRole('button', { name: mn.pricing.programs.delete })).toBeInTheDocument();
+    // Every plan but the archived ones, unless a filter says otherwise.
     const [request] = calls(fetchMock, 'GET', '/api/v1/discount-programs');
-    expect(new URL(request?.url ?? '').searchParams.get('status')).toBe('ACTIVE');
+    expect(new URL(request?.url ?? '').searchParams.get('status')).toBeNull();
+  });
+
+  it('filters from the side panel', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...MASTERS,
+      'GET /api/v1/discount-programs': () => list([]),
+    });
+    renderApp('/pricing/discounts', fetchMock);
+    const user = userEvent.setup();
+    const panel = within(
+      await screen.findByRole('complementary', { name: mn.pricing.programs.panel.label }),
+    );
+    await user.click(panel.getByRole('button', { name: mn.pricing.programs.status.ARCHIVED }));
+    await user.click(panel.getByRole('button', { name: mn.pricing.programs.applyTypes.SUPPLIER }));
+    await user.click(panel.getByRole('button', { name: mn.pricing.programs.fields.priority }));
+    await user.click(panel.getByRole('button', { name: mn.pricing.programs.priorities.ONLY }));
+    await waitFor(() => {
+      const last = calls(fetchMock, 'GET', '/api/v1/discount-programs').at(-1);
+      const query = new URL(last?.url ?? '').searchParams;
+      expect(query.get('status')).toBe('ARCHIVED');
+      expect(query.get('applyType')).toBe('SUPPLIER');
+      expect(query.get('priority')).toBe('ONLY');
+    });
+  });
+
+  it('asks before archiving and deleting, and sends them', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...MASTERS,
+      'GET /api/v1/discount-programs': () => list([BOX_PRICE]),
+      'POST /api/v1/discount-programs/9/archive': () => json({ ...BOX_PRICE, status: 'ARCHIVED' }),
+      'DELETE /api/v1/discount-programs/9': () => new Response(null, { status: 204 }),
+    });
+    renderApp('/pricing/discounts', fetchMock);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: mn.pricing.programs.archive }));
+    const asked = within(await screen.findByRole('dialog'));
+    await user.click(asked.getByRole('button', { name: mn.pricing.programs.archive }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'POST', '/api/v1/discount-programs/9/archive')).toHaveLength(1),
+    );
+    await user.click(await screen.findByRole('button', { name: mn.pricing.programs.delete }));
+    const deleting = within(await screen.findByRole('dialog'));
+    await user.click(deleting.getByRole('button', { name: mn.pricing.programs.delete }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'DELETE', '/api/v1/discount-programs/9')).toHaveLength(1),
+    );
   });
 
   it('creates a product program: thresholds typed in boxes, sent in pieces', async () => {
@@ -443,7 +535,11 @@ describe('discount programs', () => {
       within(thresholdUnit).getByRole('option', { name: '1 хайрцаг = 24 ш' }),
     );
     await user.selectOptions(screen.getByLabelText(mn.pricing.programs.fields.effect), 'PRICE');
-    await user.type(screen.getByLabelText('Хэдээс (хайрцаг)'), '10');
+    await user.click(
+      screen.getByRole('button', { name: new RegExp(mn.pricing.programs.steps.CONDITIONS) }),
+    );
+    await user.click(screen.getByLabelText(mn.pricing.programs.fields.conditioned));
+    await user.type(screen.getByLabelText('Хэд (хайрцаг)'), '10');
     await user.type(screen.getByLabelText(mn.pricing.programs.stepHeads.PRICE), '22800');
     await user.click(screen.getByRole('button', { name: mn.common.save }));
 
@@ -452,6 +548,8 @@ describe('discount programs', () => {
     expect(await posted?.clone().json()).toEqual({
       name: 'Кока бөөний',
       list: 'WHOLESALE',
+      state: 'ACTIVE',
+      priority: false,
       scope: 'PRODUCT',
       measure: 'QTY',
       effect: 'PRICE',
@@ -460,11 +558,118 @@ describe('discount programs', () => {
       thresholdUnitId: 72,
       categoryId: null,
       countUomId: null,
+      targetKind: null,
+      targetIds: [],
+      excludeTargetIds: [],
+      excludeProductIds: [],
+      adjustKind: 'NONE',
+      adjustFactor: 1,
+      pipelineIds: [],
+      tillIds: [],
       validFrom: TODAY,
       validTo: null,
       steps: [{ threshold: '240', value: '22800' }],
     });
     expect(posted?.headers.get('Idempotency-Key')).toMatch(UUID);
+  });
+
+  it('creates 1+1 on a category with an exclusion, on both channels', async () => {
+    const created = program({ id: 11, name: '1+1' });
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...MASTERS,
+      'POST /api/v1/discount-programs': () => json(created, 201),
+      'GET /api/v1/discount-programs/11': () => json(created),
+    });
+    const { router } = renderApp('/pricing/discounts/new', fetchMock);
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText(mn.pricing.programs.fields.name), '1+1');
+    await user.selectOptions(screen.getByLabelText(mn.pricing.programs.fields.apply), 'CATEGORY');
+    await choose(user, screen.getByLabelText(mn.pricing.programs.fields.targets.CATEGORY), /Ундаа/);
+    await user.selectOptions(screen.getByLabelText(mn.pricing.programs.fields.effect), 'BONUS');
+    // A rounding has no unit price to work on here.
+    expect(screen.queryByLabelText(mn.pricing.programs.fields.adjust)).toBeNull();
+    await user.click(screen.getByRole('button', { name: mn.pricing.programs.steps.next }));
+    await user.click(screen.getByLabelText(mn.pricing.programs.fields.retail));
+    await user.click(screen.getByRole('button', { name: mn.common.save }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/pricing/discounts/11'));
+    const [posted] = calls(fetchMock, 'POST', '/api/v1/discount-programs');
+    expect(await posted?.clone().json()).toMatchObject({
+      list: 'ALL',
+      scope: 'PRODUCT',
+      measure: 'QTY',
+      effect: 'BONUS',
+      productId: null,
+      targetKind: 'CATEGORY',
+      targetIds: [12],
+      steps: [{ threshold: '1', value: '1' }],
+    });
+  });
+
+  it('rounds a percentage and keeps one value without conditions', async () => {
+    const created = program({ id: 12, name: 'Тоймтой' });
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...MASTERS,
+      'GET /api/v1/products': () => list([COLA_ROW]),
+      'POST /api/v1/discount-programs': () => json(created, 201),
+      'GET /api/v1/discount-programs/12': () => json(created),
+      'GET /api/v1/products/7': () => json(COLA),
+    });
+    const { router } = renderApp('/pricing/discounts/new', fetchMock);
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText(mn.pricing.programs.fields.name), 'Тоймтой');
+    await user.type(
+      screen.getByRole('searchbox', { name: mn.pricing.programs.fields.product }),
+      'кока',
+    );
+    await user.click(
+      await screen.findByRole('button', { name: `${mn.pricing.programs.pickProduct}: Кока кола` }),
+    );
+    await user.type(screen.getByLabelText(mn.pricing.programs.stepHeads.PERCENT), '7');
+    await user.selectOptions(screen.getByLabelText(mn.pricing.programs.fields.adjust), 'ENDS_9');
+    await user.selectOptions(screen.getByLabelText(mn.pricing.programs.fields.adjustFactor), '100');
+    await user.click(screen.getByLabelText(mn.pricing.programs.fields.priority));
+    await user.click(screen.getByRole('button', { name: mn.common.save }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/pricing/discounts/12'));
+    const [posted] = calls(fetchMock, 'POST', '/api/v1/discount-programs');
+    expect(await posted?.clone().json()).toMatchObject({
+      scope: 'PRODUCT',
+      productId: 7,
+      priority: true,
+      adjustKind: 'ENDS_9',
+      adjustFactor: 100,
+      steps: [{ threshold: '0', value: '7' }],
+    });
+  });
+
+  it('opens a running plan for editing with what it was', async () => {
+    const running = program({
+      id: 13,
+      name: 'Нийлүүлэгчийн',
+      scope: 'PRODUCT',
+      measure: 'QTY',
+      targetKind: 'SUPPLIER',
+      targetIds: [5],
+      excludeProductIds: [7],
+      namedProducts: [{ id: 7, sku: '10023', name: 'Кока кола' }],
+      steps: [{ threshold: '0', value: '10' }],
+      adjustKind: 'ROUND',
+      adjustFactor: 50,
+    });
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...MASTERS,
+      'GET /api/v1/discount-programs/13': () => json(running),
+      'GET /api/v1/suppliers': () => list([{ id: 5, code: 'S1', name: 'Нийлүүлэгч А' }]),
+    });
+    renderApp('/pricing/discounts/13/edit', fetchMock);
+    expect(await screen.findByLabelText(mn.pricing.programs.fields.name)).toHaveValue(
+      'Нийлүүлэгчийн',
+    );
+    expect(screen.getByLabelText(mn.pricing.programs.fields.apply)).toHaveValue('SUPPLIER');
+    expect(screen.getByText('10023 Кока кола')).toBeInTheDocument();
+    expect(screen.getByLabelText(mn.pricing.programs.stepHeads.PERCENT)).toHaveValue('10');
+    expect(screen.getByLabelText(mn.pricing.programs.fields.adjust)).toHaveValue('ROUND');
+    expect(screen.getByLabelText(mn.pricing.programs.fields.adjustFactor)).toHaveValue('50');
   });
 });
 

@@ -36,6 +36,8 @@ export function SearchSelect(props: {
   chosenLabel?: string;
   /** Offers ✕ once something is chosen. */
   onClear?: () => void;
+  /** `filter`: a pill in a list's filter bar, like `SearchField`. */
+  variant?: 'default' | 'filter';
 }) {
   const { t } = useTranslation();
   const ids = useId();
@@ -132,7 +134,10 @@ export function SearchSelect(props: {
             }
             aria-invalid={props.invalid ? true : undefined}
             autoComplete="off"
-            className="pr-9"
+            className={cn(
+              'pr-9',
+              props.variant === 'filter' && 'h-8.5 rounded-full md:text-[0.8125rem]',
+            )}
             // A choice cut by a narrow field reads whole on hover.
             title={!open && chosenLabel ? chosenLabel : undefined}
             placeholder={open ? chosenLabel || props.placeholder : props.placeholder}

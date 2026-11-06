@@ -191,7 +191,7 @@ export function OrderProducts({
     () => askedLines.map(({ productUnitId, qty }) => ({ productUnitId, qty })),
     [askedLines],
   );
-  const quote = useLinesQuote(request, !frozen);
+  const quote = useLinesQuote(request, !frozen, order.pipelineId);
   const priceOf = (line: EditLine): Price | null => {
     if (frozen) {
       const stored = savedById.get(line.key);

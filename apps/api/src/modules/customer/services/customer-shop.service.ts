@@ -16,7 +16,12 @@ import {
 } from '../../catalog';
 import type { CustomerContext } from '../../identity';
 import { type DealBook, PriceQuoteService, type ProductDeal, type Quote } from '../../pricing';
-import { type RepProduct, type RepShopProduct, SalesRepShopService } from '../../sales';
+import {
+  type RepProduct,
+  type RepShopProduct,
+  SalesPipelinesService,
+  SalesRepShopService,
+} from '../../sales';
 import { customerFavourites } from '../schema';
 
 /**
@@ -89,6 +94,7 @@ export class CustomerShopService {
     private readonly categories: CategoriesService,
     private readonly barcodes: BarcodeService,
     private readonly quotes: PriceQuoteService,
+    private readonly pipelines: SalesPipelinesService,
   ) {}
 
   /**
@@ -96,7 +102,7 @@ export class CustomerShopService {
    * rep shop's book, so both apps' cards read one rule (ADR-0093, ADR-0100 #10).
    */
   dealBook(today = businessDate()): Promise<DealBook> {
-    return this.shop.dealBook(today);
+    return this.shop.dealBook(today, 'CUSTOMER_APP');
   }
 
   /** The shop's universe in the NEW order (ADR-0093): every product «Bto300» lists. */
@@ -291,7 +297,12 @@ export class CustomerShopService {
    */
   async quote(lines: readonly { productUnitId: number; qty: Decimal }[]): Promise<CustomerQuote> {
     const today = businessDate();
-    const quote = await this.quotes.quote({ list: 'WHOLESALE', date: today, lines: [...lines] });
+    const quote = await this.quotes.quote({
+      list: 'WHOLESALE',
+      date: today,
+      pipelineId: await this.pipelines.channelPipeline('CUSTOMER_APP'),
+      lines: [...lines],
+    });
     const products = new Map(
       (await this.listed(quote.lines.map((line) => line.productId))).map((product) => [
         product.id,

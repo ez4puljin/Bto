@@ -17,6 +17,9 @@ import {
   SkeletonRows,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
+import { SearchSelect } from '@/components/search-select';
+import { useCategories } from '@/features/catalog/api';
+import { categoryTree } from '@/features/catalog/category-tree';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +37,7 @@ import {
   useNextSupplierCode,
   usePartnersMutations,
   useSupplier,
+  useSupplierCategories,
   useSupplierProducts,
   useSuppliers,
 } from './api';
@@ -58,6 +62,8 @@ import {
   SUPPLIER_COLUMNS,
   WIDE_DEFAULT_HIDDEN_SUPPLIER_COLUMNS,
 } from './supplier-columns';
+import { PRODUCT_CATEGORY_PARAM, productCategoryOf } from './supplier-filters';
+import { SupplierFilterPanel } from './supplier-filter-panel';
 import { SupplierFacts, SupplierForm } from './supplier-form';
 
 /** The list's name in the column-choice key (ADR-0050). */
@@ -81,7 +87,20 @@ export function SuppliersPage() {
   const statusParam = params.get('status');
   const status = isStatus(statusParam) ? statusParam : undefined;
   const segmentId = segmentParam(params);
-  const suppliers = useSuppliers({ q, status, segmentId });
+  const categories = useSupplierCategories();
+  const categoryParam = Number.parseInt(params.get('category') ?? '', 10);
+  const categoryId = categoryParam > 0 ? categoryParam : undefined;
+  const productCategories = useCategories();
+  const productCategoryOptions = useMemo(
+    () =>
+      categoryTree(productCategories.data ?? []).map((node) => ({
+        value: String(node.category.id),
+        label: node.path,
+      })),
+    [productCategories.data],
+  );
+  const productCategoryId = productCategoryOf(params);
+  const suppliers = useSuppliers({ q, status, segmentId, categoryId, productCategoryId });
   const rows = suppliers.data?.pages.flatMap((page) => page.data) ?? [];
   const columnState = useHiddenColumns(
     COLUMNS_LIST,
@@ -97,7 +116,7 @@ export function SuppliersPage() {
   );
   // The layout of the shown columns and the chevron (ADR-0119).
   const specs = useMemo(() => [...columnSpecs(columns), CHEVRON_COLUMN], [columns]);
-  const filtered = Boolean(q || status || segmentId);
+  const filtered = Boolean(q || status || segmentId || categoryId || productCategoryId);
   const clearFilters = () => {
     setSearch('');
     setParams(new URLSearchParams(), { replace: true });
@@ -118,80 +137,122 @@ export function SuppliersPage() {
           ) : null
         }
       />
-      <FilterBar
-        end={
-          <ColumnChooser
-            keys={SUPPLIER_COLUMN_KEYS}
-            locked={LOCKED_SUPPLIER_COLUMNS}
-            label={(key) => t(`partners.suppliers.columns.${key}`)}
-            hidden={hidden}
-            toggle={columnState.toggle}
-            showAll={columnState.showAll}
-          />
-        }
-      >
-        <SearchField
-          className="sm:w-60"
-          aria-label={t('common.search')}
-          placeholder={t('partners.suppliers.searchPlaceholder')}
-          value={search}
-          onChange={(event) => {
-            setSearch(event.target.value);
-            setParam('q', event.target.value.trim());
-          }}
+      <div className="flex items-start gap-4">
+        <SupplierFilterPanel
+          productCategoryId={productCategoryId}
+          onProductCategory={(id) => setParam(PRODUCT_CATEGORY_PARAM, id ? String(id) : '')}
+          categoryId={categoryId}
+          onCategory={(id) => setParam('category', id ? String(id) : '')}
+          status={status}
+          onStatus={(value) => setParam('status', value ?? '')}
+          segmentId={segmentId}
+          onSegment={(id) => setParam('segment', id ? String(id) : '')}
         />
-        <NativeSelect
-          variant="filter"
-          aria-label={t('partners.supplier.status')}
-          value={status ?? ''}
-          onChange={(event) => setParam('status', event.target.value)}
-        >
-          <option value="">{t('partners.customers.allStatuses')}</option>
-          {PARTNER_STATUSES.map((value) => (
-            <option key={value} value={value}>
-              {t(`partners.status.${value}`)}
-            </option>
-          ))}
-        </NativeSelect>
-        <SegmentFilter
-          entity="SUPPLIER"
-          value={segmentId}
-          onChange={(id) => setParam('segment', id ? String(id) : '')}
-        />
-      </FilterBar>
-      <ProblemAlert problem={problemFromError(suppliers.error)} onRetry={suppliers.refetch} />
-      <ListCard scroll>
-        <ListTable columns={specs}>
-          <TableHeader>
-            <TableRow>
-              {columns.map((column) => (
-                <ListColumnHead key={column.key} numeric={column.numeric}>
-                  {t(`partners.suppliers.columns.${column.key}`)}
-                </ListColumnHead>
+        <div className="min-w-0 flex-1">
+          <FilterBar
+            end={
+              <ColumnChooser
+                keys={SUPPLIER_COLUMN_KEYS}
+                locked={LOCKED_SUPPLIER_COLUMNS}
+                label={(key) => t(`partners.suppliers.columns.${key}`)}
+                hidden={hidden}
+                toggle={columnState.toggle}
+                showAll={columnState.showAll}
+              />
+            }
+          >
+            <SearchField
+              className="sm:w-60"
+              aria-label={t('common.search')}
+              placeholder={t('partners.suppliers.searchPlaceholder')}
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setParam('q', event.target.value.trim());
+              }}
+            />
+            {/* The left side holds these from `lg`; a narrow window keeps them here. */}
+            <NativeSelect
+              className="lg:hidden"
+              variant="filter"
+              aria-label={t('partners.supplier.status')}
+              value={status ?? ''}
+              onChange={(event) => setParam('status', event.target.value)}
+            >
+              <option value="">{t('partners.customers.allStatuses')}</option>
+              {PARTNER_STATUSES.map((value) => (
+                <option key={value} value={value}>
+                  {t(`partners.status.${value}`)}
+                </option>
               ))}
-              <ChevronHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {suppliers.isPending ? <SkeletonRows columns={columns.length + 1} /> : null}
-            {rows.map((supplier) => (
-              <LinkRow key={supplier.id} to={`/partners/suppliers/${supplier.id}`}>
-                {columns.map((column) => (
-                  <ListColumnCell key={column.key} column={column} row={supplier} t={t} />
+            </NativeSelect>
+            <NativeSelect
+              className="lg:hidden"
+              variant="filter"
+              aria-label={t('partners.supplier.category')}
+              value={categoryId ?? ''}
+              onChange={(event) => setParam('category', event.target.value)}
+            >
+              <option value="">{t('partners.suppliers.allCategories')}</option>
+              {(categories.data ?? []).map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.path}
+                </option>
+              ))}
+            </NativeSelect>
+            <SearchSelect
+              variant="filter"
+              className="sm:w-60 lg:hidden"
+              aria-label={t('partners.suppliers.productCategory')}
+              placeholder={t('partners.suppliers.productCategory')}
+              value={productCategoryId === undefined ? '' : String(productCategoryId)}
+              options={productCategoryOptions}
+              onChange={(value) => setParam(PRODUCT_CATEGORY_PARAM, value)}
+              onClear={() => setParam(PRODUCT_CATEGORY_PARAM, '')}
+            />
+            <div className="contents lg:hidden">
+              <SegmentFilter
+                entity="SUPPLIER"
+                value={segmentId}
+                onChange={(id) => setParam('segment', id ? String(id) : '')}
+              />
+            </div>
+          </FilterBar>
+          <ProblemAlert problem={problemFromError(suppliers.error)} onRetry={suppliers.refetch} />
+          <ListCard scroll beside>
+            <ListTable columns={specs}>
+              <TableHeader>
+                <TableRow>
+                  {columns.map((column) => (
+                    <ListColumnHead key={column.key} numeric={column.numeric}>
+                      {t(`partners.suppliers.columns.${column.key}`)}
+                    </ListColumnHead>
+                  ))}
+                  <ChevronHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {suppliers.isPending ? <SkeletonRows columns={columns.length + 1} /> : null}
+                {rows.map((supplier) => (
+                  <LinkRow key={supplier.id} to={`/partners/suppliers/${supplier.id}`}>
+                    {columns.map((column) => (
+                      <ListColumnCell key={column.key} column={column} row={supplier} t={t} />
+                    ))}
+                  </LinkRow>
                 ))}
-              </LinkRow>
-            ))}
-          </TableBody>
-        </ListTable>
-        {!suppliers.isPending && rows.length === 0 ? (
-          <EmptyState
-            icon={Factory}
-            title={t('partners.suppliers.empty')}
-            {...(filtered ? { onClearFilters: clearFilters } : {})}
-          />
-        ) : null}
-        <LoadMore query={suppliers} />
-      </ListCard>
+              </TableBody>
+            </ListTable>
+            {!suppliers.isPending && rows.length === 0 ? (
+              <EmptyState
+                icon={Factory}
+                title={t('partners.suppliers.empty')}
+                {...(filtered ? { onClearFilters: clearFilters } : {})}
+              />
+            ) : null}
+            <LoadMore query={suppliers} />
+          </ListCard>
+        </div>
+      </div>
     </div>
   );
 }

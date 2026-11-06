@@ -13,10 +13,12 @@ import {
   SupplierContactsController,
   SuppliersController,
 } from './controllers/suppliers.controller';
+import { SupplierCategoriesController } from './controllers/supplier-categories.controller';
 import { PartnerSegmentsService } from './services/partner-segments.service';
 import { CustomerContactsService, SupplierContactsService } from './services/contacts.service';
 import { CustomerAddressesService } from './services/customer-addresses.service';
 import { CustomerCategoriesService } from './services/customer-categories.service';
+import { SupplierCategoriesService } from './services/supplier-categories.service';
 import {
   CustomerAccountGateService,
   CustomerAppAccountsService,
@@ -30,6 +32,7 @@ const CORE_SERVICES = [
   CustomerAddressesService,
   CustomerAppAccountsService,
   CustomerCategoriesService,
+  SupplierCategoriesService,
   CustomerContactsService,
   CustomersService,
   PartnerSegmentsService,
@@ -63,6 +66,7 @@ export class PartnersModule {}
     CustomerAddressesController,
     CustomerContactsController,
     SuppliersController,
+    SupplierCategoriesController,
     SupplierContactsController,
     ProductSuppliersController,
   ],

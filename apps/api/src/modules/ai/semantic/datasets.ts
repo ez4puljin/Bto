@@ -405,18 +405,22 @@ export const AI_DATASETS: readonly AiDataset[] = [
   {
     name: 'discount_programs',
     description:
-      'Discount programs; every program in force applies, in the order product, category, order.',
+      'Discount programs; every ACTIVE program in force applies, in the order product, category, order; one with priority applies alone on its product.',
     columns: [
       col('id', 'bigint'),
       col('name', 'text'),
       col(
         'list',
         'text',
-        "the channel: 'WHOLESALE' (every customer) or 'RETAIL' (the supermarket)",
+        "the channel: 'WHOLESALE' (every customer), 'RETAIL' (the supermarket) or 'ALL' (both)",
       ),
       col('scope', 'text', "'PRODUCT', 'CATEGORY' or 'ORDER'"),
       col('measure', 'text', "'QTY' (a quantity) or 'AMOUNT' (MNT) — what the steps count"),
-      col('effect', 'text', "'PRICE' (new unit price), 'PERCENT' (% off) or 'AMOUNT' (MNT off)"),
+      col(
+        'effect',
+        'text',
+        "'PRICE' (new unit price), 'PERCENT' (% off), 'AMOUNT' (MNT off) or 'BONUS' (N+M: of every N+M bought, M are free)",
+      ),
       col('product_id', 'bigint'),
       col('product_name', 'text'),
       col('unit_name', 'text', 'PRODUCT: the unit it applies to; NULL = every unit'),
@@ -426,8 +430,14 @@ export const AI_DATASETS: readonly AiDataset[] = [
       col('count_unit_name', 'text', 'CATEGORY QTY: the unit counted'),
       col('valid_from', 'date'),
       col('valid_to', 'date', 'end (exclusive); NULL = open'),
-      col('status', 'text', "'SCHEDULED', 'ACTIVE' or 'ENDED' as of today"),
-      col('steps', 'text', "'threshold => value; …'"),
+      col('status', 'text', "'DRAFT', 'SCHEDULED', 'ACTIVE', 'ENDED' or 'ARCHIVED' as of today"),
+      col('steps', 'text', "'threshold => value; …'; BONUS: 'N => M'"),
+      col('priority', 'boolean', 'applies alone on its product'),
+      col(
+        'target_kind',
+        'text',
+        "a set of products instead of one product or category: 'PRODUCT', 'CATEGORY', 'SUPPLIER' or 'SEGMENT'",
+      ),
       col('created_at', 'timestamptz'),
       col('created_by_name', 'text'),
     ],

@@ -33,6 +33,7 @@ export {
 export {
   customerAddresses,
   customerCategories,
+  supplierCategories,
   customerContacts,
   customers,
   productSuppliers,
@@ -81,6 +82,7 @@ export {
   trucks,
 } from '../modules/procurement/schema';
 export {
+  discountProgramLinks,
   discountPrograms,
   discountSteps,
   priceProfiles,

@@ -1433,6 +1433,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/supplier-categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SupplierCategories_list"];
+        put?: never;
+        post: operations["SupplierCategories_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/supplier-categories/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["SupplierCategories_update"];
+        trace?: never;
+    };
     "/api/v1/supplier-contacts/{id}": {
         parameters: {
             query?: never;
@@ -3170,9 +3202,11 @@ export interface paths {
             cookie?: never;
         };
         get: operations["PriceProfiles_get"];
-        put?: never;
+        /** Its name and new values from a day on, in one transaction (ADR-0160). */
+        put: operations["PriceProfiles_update"];
         post?: never;
-        delete?: never;
+        /** Out of every list; refused while products use it; the row stays (ADR-0160). */
+        delete: operations["PriceProfiles_remove"];
         options?: never;
         head?: never;
         patch: operations["PriceProfiles_rename"];
@@ -3189,6 +3223,22 @@ export interface paths {
         put?: never;
         /** New values from a day on (today or later); idempotent like every dated change. */
         post: operations["PriceProfiles_setVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/price-profiles/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PriceProfiles_restore"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3236,10 +3286,10 @@ export interface paths {
             cookie?: never;
         };
         get: operations["DiscountPrograms_get"];
-        /** Only before the program starts. */
+        /** At any time: the audit keeps what it was, orders keep what they froze (ADR-0159 #1). */
         put: operations["DiscountPrograms_update"];
         post?: never;
-        /** Only before the program starts. */
+        /** Out of every list and quote; the row stays (ADR-0159 #1). */
         delete: operations["DiscountPrograms_remove"];
         options?: never;
         head?: never;
@@ -3256,6 +3306,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["DiscountPrograms_stop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/discount-programs/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DiscountPrograms_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/discount-programs/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DiscountPrograms_restore"];
         delete?: never;
         options?: never;
         head?: never;
@@ -10215,8 +10297,12 @@ export interface components {
             note: string | null;
             /** @description The first contact */
             contact: components["schemas"]["ListContact"] | null;
-            /** @description Products linked to the supplier */
+            /** @description Products linked to the supplier; within productCategoryId when it was asked for */
             productCount: number;
+            /** @description Its category (ADR-0161) */
+            categoryId: number | null;
+            /** @description From the top: Хүнс / Сүү */
+            categoryPath: string | null;
         };
         SupplierPage: {
             data: components["schemas"]["SupplierListItem"][];
@@ -10239,6 +10325,10 @@ export interface components {
             bankAccount: string | null;
             paymentTermDays: number | null;
             note: string | null;
+            /** @description Its category (ADR-0161) */
+            categoryId: number | null;
+            /** @description From the top: Хүнс / Сүү */
+            categoryPath: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -10261,6 +10351,8 @@ export interface components {
             paymentTermDays?: number | null;
             /** @description A VAT payer (ADR-0078); omitted on create: no */
             vatPayer?: boolean;
+            /** @description An active category; null: none */
+            categoryId?: number | null;
             note?: string | null;
             /** @description Omitted: the next free number */
             code?: string;
@@ -10282,6 +10374,8 @@ export interface components {
             paymentTermDays?: number | null;
             /** @description A VAT payer (ADR-0078); omitted on create: no */
             vatPayer?: boolean;
+            /** @description An active category; null: none */
+            categoryId?: number | null;
             note?: string | null;
             code?: string;
             name?: string;
@@ -10292,6 +10386,7 @@ export interface components {
             id: number;
             sku: string;
             name: string;
+            categoryId: number;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
             thumbUrl: string | null;
@@ -10306,6 +10401,34 @@ export interface components {
         SupplierProductPage: {
             data: components["schemas"]["SupplierProduct"][];
             nextCursor: string | null;
+        };
+        SupplierCategory: {
+            id: number;
+            parentId: number | null;
+            name: string;
+            /** @description From the top: Хүнс / Сүү */
+            path: string;
+            /** @description 0 at the top */
+            depth: number;
+            active: boolean;
+            sortOrder: number;
+            /** @description Suppliers in it and everything below it */
+            supplierCount: number;
+        };
+        SupplierCategoryCreateRequest: {
+            name: string;
+            /** @description Null or absent: at the top */
+            parentId?: number | null;
+            /** @description Absent: after its siblings */
+            sortOrder?: number;
+        };
+        SupplierCategoryUpdateRequest: {
+            name?: string;
+            /** @description Null: to the top */
+            parentId?: number | null;
+            sortOrder?: number;
+            /** @description False: retired; refused while anything active sits below */
+            active?: boolean;
         };
         LinkedSupplier: {
             id: number;
@@ -12323,6 +12446,8 @@ export interface components {
             name: string;
             /** Format: date-time */
             archivedAt: string | null;
+            /** @enum {string} */
+            status: "ACTIVE" | "SCHEDULED" | "ARCHIVED";
             /** @description In force today; null when the first values start later */
             current: components["schemas"]["PriceProfileVersion"] | null;
             /** @description Starting after today, earliest first */
@@ -12331,6 +12456,7 @@ export interface components {
             history: components["schemas"]["PriceProfileVersion"][];
             /** @description Products whose price terms in force today use the profile */
             productsToday: number;
+            createdByName: string | null;
             createdAt: string;
             updatedAt: string;
         };
@@ -12400,6 +12526,36 @@ export interface components {
         RenamePriceProfileRequest: {
             name: string;
         };
+        PriceProfileUpdateRequest: {
+            /**
+             * @description Loose pieces: % added to the warehouse price
+             * @example 15
+             */
+            looseMarkupPct: string;
+            /**
+             * @description Supermarket: % added to the warehouse price
+             * @example 30
+             */
+            retailMarkupPct: string;
+            /**
+             * @description Supermarket bulk price from this many base units of a product in the cart
+             * @example 24
+             */
+            retailBulkMinQty?: string | null;
+            /**
+             * @description Supermarket bulk: % added to the warehouse price; below the supermarket %
+             * @example 20
+             */
+            retailBulkMarkupPct?: string | null;
+            /** @enum {string} */
+            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100";
+            name: string;
+            /**
+             * @description The first values start this day
+             * @example 2026-10-14
+             */
+            validFrom: string;
+        };
         ProgramProduct: {
             id: number;
             sku: string;
@@ -12422,28 +12578,49 @@ export interface components {
              * @example 22800
              */
             value: string;
+            /**
+             * @description Absent: MINIMUM
+             * @enum {string}
+             */
+            rule?: "MINIMUM" | "EXACT" | "EVERY";
         };
         DiscountProgram: {
             id: number;
             name: string;
             /** @enum {string} */
-            list: "WHOLESALE" | "RETAIL";
+            list: "WHOLESALE" | "RETAIL" | "ALL";
+            /** @enum {string} */
+            state: "DRAFT" | "ACTIVE" | "ARCHIVED";
+            priority: boolean;
             /** @enum {string} */
             scope: "PRODUCT" | "CATEGORY" | "ORDER";
             /** @enum {string} */
             measure: "QTY" | "AMOUNT";
             /** @enum {string} */
-            effect: "PRICE" | "PERCENT" | "AMOUNT";
+            effect: "PRICE" | "PERCENT" | "AMOUNT" | "BONUS";
             product: components["schemas"]["ProgramProduct"] | null;
             productUnit: components["schemas"]["ProgramUnit"] | null;
             thresholdUnit: components["schemas"]["ProgramUnit"] | null;
             categoryId: number | null;
             countUomId: number | null;
+            /** @enum {string|null} */
+            targetKind: "PRODUCT" | "CATEGORY" | "SUPPLIER" | "SEGMENT" | null;
+            targetIds: number[];
+            excludeTargetIds: number[];
+            excludeProductIds: number[];
+            /** @description The chosen and excluded products */
+            namedProducts: components["schemas"]["ProgramProduct"][];
+            /** @enum {string} */
+            adjustKind: "NONE" | "ROUND" | "FLOOR" | "CEIL" | "ENDS_9";
+            adjustFactor: number;
+            pipelineIds: number[];
+            tillIds: number[];
             validFrom: string;
             validTo: string | null;
             /** @enum {string} */
-            status: "SCHEDULED" | "ACTIVE" | "ENDED";
+            status: "DRAFT" | "SCHEDULED" | "ACTIVE" | "ENDED" | "ARCHIVED";
             steps: components["schemas"]["DiscountStep"][];
+            createdByName: string | null;
             createdAt: string;
             updatedAt: string;
         };
@@ -12454,18 +12631,43 @@ export interface components {
         DiscountProgramRequest: {
             name: string;
             /** @enum {string} */
-            list: "WHOLESALE" | "RETAIL";
+            list: "WHOLESALE" | "RETAIL" | "ALL";
+            /**
+             * @description Absent: ACTIVE
+             * @enum {string}
+             */
+            state?: "DRAFT" | "ACTIVE" | "ARCHIVED";
+            /** @description Applies alone on a product */
+            priority?: boolean;
             /** @enum {string} */
             scope: "PRODUCT" | "CATEGORY" | "ORDER";
             /** @enum {string} */
             measure: "QTY" | "AMOUNT";
             /** @enum {string} */
-            effect: "PRICE" | "PERCENT" | "AMOUNT";
+            effect: "PRICE" | "PERCENT" | "AMOUNT" | "BONUS";
             productId?: number | null;
             productUnitId?: number | null;
             thresholdUnitId?: number | null;
             categoryId?: number | null;
             countUomId?: number | null;
+            /** @enum {string|null} */
+            targetKind?: "PRODUCT" | "CATEGORY" | "SUPPLIER" | "SEGMENT" | null;
+            /** @description Of targetKind */
+            targetIds?: number[];
+            /** @description Of targetKind */
+            excludeTargetIds?: number[];
+            excludeProductIds?: number[];
+            /**
+             * @description Absent: NONE
+             * @enum {string}
+             */
+            adjustKind?: "NONE" | "ROUND" | "FLOOR" | "CEIL" | "ENDS_9";
+            /** @description Rounds to a multiple of this */
+            adjustFactor?: number;
+            /** @description Empty: every pipeline */
+            pipelineIds?: number[];
+            /** @description Empty: every till */
+            tillIds?: number[];
             /** @example 2026-11-01 */
             validFrom: string;
             /** @description Up to, not including */
@@ -12505,6 +12707,10 @@ export interface components {
             list: "WHOLESALE" | "RETAIL";
             /** @description Ulaanbaatar business date; default today */
             date?: string;
+            /** @description Where the order is: plans naming other pipelines stay out */
+            pipelineId?: number;
+            /** @description The till of a RETAIL quote */
+            tillId?: number;
             lines: components["schemas"]["QuoteLineRequest"][];
         };
         AppliedDiscount: {
@@ -12513,7 +12719,7 @@ export interface components {
             /** @enum {string} */
             scope: "PRODUCT" | "CATEGORY" | "ORDER";
             /** @enum {string} */
-            effect: "PRICE" | "PERCENT" | "AMOUNT";
+            effect: "PRICE" | "PERCENT" | "AMOUNT" | "BONUS";
             /** @description The step reached */
             threshold: string;
             value: string;
@@ -14548,7 +14754,7 @@ export interface components {
             /** @enum {string} */
             scope: "PRODUCT" | "CATEGORY" | "ORDER";
             /** @enum {string} */
-            effect: "PRICE" | "PERCENT" | "AMOUNT";
+            effect: "PRICE" | "PERCENT" | "AMOUNT" | "BONUS";
             /** @description The first step: a percentage, tugriks off, or a new unit price */
             value: string;
             /** @description The first step’s condition; null when it always applies */
@@ -17728,7 +17934,7 @@ export interface components {
             /** @enum {string} */
             scope: "PRODUCT" | "CATEGORY" | "ORDER";
             /** @enum {string} */
-            effect: "PRICE" | "PERCENT" | "AMOUNT";
+            effect: "PRICE" | "PERCENT" | "AMOUNT" | "BONUS";
             /** @description The first step: a percentage, tugriks off, or a new unit price */
             value: string;
             /** @description The first step’s condition; null when it always applies */
@@ -17818,7 +18024,7 @@ export interface components {
             programId: number;
             name: string;
             /** @enum {string} */
-            effect: "PRICE" | "PERCENT" | "AMOUNT";
+            effect: "PRICE" | "PERCENT" | "AMOUNT" | "BONUS";
             reached: components["schemas"]["CustomerAppOrderDealStep"] | null;
             next: components["schemas"]["CustomerAppOrderDealStep"] | null;
         };
@@ -19524,7 +19730,7 @@ export interface components {
             isActive?: boolean;
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "PRODUCT_NOT_IN_APP" | "ORDER_BELOW_MINIMUM" | "ATTENDANCE_NO_SITE" | "ATTENDANCE_OUT_OF_RANGE" | "ATTENDANCE_LOCATION_IMPRECISE" | "ATTENDANCE_ALREADY_IN" | "ATTENDANCE_NOT_IN" | "ATTENDANCE_EVENT_ORDER" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "ISSUE_LINES_UNCHECKED" | "ISSUE_WAREHOUSE_CONFIRMED" | "ISSUE_PARTLY_POSTED" | "ISSUE_RECIPIENT_KIND" | "ISSUE_CORRECTION_OPEN" | "ISSUE_NOT_SENT" | "PO_NOT_ARCHIVABLE" | "PO_NOT_EDITABLE" | "PO_LOAD_OVER" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "TRANSFER_LINES_UNCOUNTED" | "TRANSFER_REQUEST_EMPTY" | "HR_POLL_CLOSED" | "HR_POLL_ANSWERED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "STAGE_SKIP" | "ORDER_CHANGED" | "PICK_INCOMPLETE" | "PICK_TAKEN" | "PICK_STATE_INVALID" | "PICKER_INVALID" | "PIPELINE_KIND_STAGE" | "PIPELINE_KIND_CHANNEL" | "PIPELINE_NO_TRANSFER_WAREHOUSE" | "PIPELINE_TRANSFER_STAGE_NEEDS_STORE" | "PIPELINE_TRANSFER_WAREHOUSE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_CASHIER_NOT_ON_TILL" | "POS_SUPERVISOR_NOT_ON_TILL" | "POS_PRODUCT_NOT_ON_TILL" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "EDGE_LINK_INVALID" | "EDGE_LINK_PEPPER_MISSING" | "EDGE_ALREADY_LINKED" | "EDGE_LINK_UNREACHABLE" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "SUPPLIER_CATEGORY_INACTIVE" | "SUPPLIER_CATEGORY_HAS_CHILDREN" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "PRODUCT_NOT_IN_APP" | "ORDER_BELOW_MINIMUM" | "ATTENDANCE_NO_SITE" | "ATTENDANCE_OUT_OF_RANGE" | "ATTENDANCE_LOCATION_IMPRECISE" | "ATTENDANCE_ALREADY_IN" | "ATTENDANCE_NOT_IN" | "ATTENDANCE_EVENT_ORDER" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "ISSUE_LINES_UNCHECKED" | "ISSUE_WAREHOUSE_CONFIRMED" | "ISSUE_PARTLY_POSTED" | "ISSUE_RECIPIENT_KIND" | "ISSUE_CORRECTION_OPEN" | "ISSUE_NOT_SENT" | "PO_NOT_ARCHIVABLE" | "PO_NOT_EDITABLE" | "PO_LOAD_OVER" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "TRANSFER_LINES_UNCOUNTED" | "TRANSFER_REQUEST_EMPTY" | "HR_POLL_CLOSED" | "HR_POLL_ANSWERED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "STAGE_SKIP" | "ORDER_CHANGED" | "PICK_INCOMPLETE" | "PICK_TAKEN" | "PICK_STATE_INVALID" | "PICKER_INVALID" | "PIPELINE_KIND_STAGE" | "PIPELINE_KIND_CHANNEL" | "PIPELINE_NO_TRANSFER_WAREHOUSE" | "PIPELINE_TRANSFER_STAGE_NEEDS_STORE" | "PIPELINE_TRANSFER_WAREHOUSE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_CASHIER_NOT_ON_TILL" | "POS_SUPERVISOR_NOT_ON_TILL" | "POS_PRODUCT_NOT_ON_TILL" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "EDGE_LINK_INVALID" | "EDGE_LINK_PEPPER_MISSING" | "EDGE_ALREADY_LINKED" | "EDGE_LINK_UNREACHABLE" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -22921,6 +23127,10 @@ export interface operations {
                 /** @description Name in either script, code, phone, TIN or registration number */
                 q?: string;
                 status?: "ACTIVE" | "INACTIVE";
+                /** @description This category and everything below it (ADR-0161) */
+                categoryId?: number;
+                /** @description Suppliers linked to a product of this product category or below it */
+                productCategoryId?: number;
                 /** @description A saved supplier segment (ADR-0049) */
                 segmentId?: number;
                 /** @description Only these suppliers (1–200 ids, ADR-0037 batch read): names of a filter */
@@ -23118,6 +23328,8 @@ export interface operations {
                 /** @description nextCursor of the previous page */
                 cursor?: string;
                 limit?: number;
+                /** @description Only this product category and what is below it */
+                productCategoryId?: number;
             };
             header?: never;
             path: {
@@ -23133,6 +23345,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SupplierProductPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SupplierCategories_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierCategory"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SupplierCategories_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierCategoryCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierCategory"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SupplierCategories_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierCategoryUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierCategory"];
                 };
             };
             /** @description RFC 9457 problem details */
@@ -27348,6 +27657,15 @@ export interface operations {
                 limit?: number;
                 /** @description true: archived profiles; default live ones */
                 archived?: boolean;
+                /** @description By name */
+                q?: string;
+                status?: "ACTIVE" | "SCHEDULED" | "ARCHIVED";
+                /** @description Of the values in force today */
+                rounding?: "WHOLE" | "UP_10" | "UP_50" | "UP_100";
+                /** @description A bulk price today, or none */
+                bulk?: "WITH" | "WITHOUT";
+                /** @description Products use it today, or none */
+                used?: "USED" | "UNUSED";
             };
             header?: never;
             path?: never;
@@ -27439,6 +27757,68 @@ export interface operations {
             };
         };
     };
+    PriceProfiles_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceProfileUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceProfile"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PriceProfiles_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     PriceProfiles_rename: {
         parameters: {
             query?: never;
@@ -27510,6 +27890,36 @@ export interface operations {
             };
         };
     };
+    PriceProfiles_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceProfile"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     PriceProfiles_archive: {
         parameters: {
             query?: never;
@@ -27546,9 +27956,19 @@ export interface operations {
                 /** @description nextCursor of the previous page */
                 cursor?: string;
                 limit?: number;
-                list?: "WHOLESALE" | "RETAIL";
+                /** @description By name */
+                q?: string;
+                list?: "WHOLESALE" | "RETAIL" | "ALL";
+                applyType?: "PRODUCT" | "CATEGORY" | "SUPPLIER" | "SEGMENT" | "ORDER";
+                priority?: "ONLY" | "EXCLUDE";
+                /** @description In force on this date */
+                date?: string;
+                pipelineId?: number;
+                tillId?: number;
+                /** @description Has a real condition on this */
+                condition?: "QTY" | "AMOUNT";
                 scope?: "PRODUCT" | "CATEGORY" | "ORDER";
-                status?: "SCHEDULED" | "ACTIVE" | "ENDED";
+                status?: "DRAFT" | "SCHEDULED" | "ACTIVE" | "ENDED" | "ARCHIVED";
                 productId?: number;
             };
             header?: never;
@@ -27704,6 +28124,66 @@ export interface operations {
         };
     };
     DiscountPrograms_stop: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountProgram"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DiscountPrograms_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountProgram"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DiscountPrograms_restore: {
         parameters: {
             query?: never;
             header?: never;

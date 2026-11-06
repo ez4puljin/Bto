@@ -8,8 +8,20 @@ import {
   type DiscountScope,
   MAX_DISCOUNT_STEPS,
   MAX_QUOTE_LINES,
+  PRICE_ADJUSTS,
+  type PriceAdjust,
   PRICE_BASES,
   PRICE_LISTS,
+  PROGRAM_APPLY_TYPES,
+  PROGRAM_LISTS,
+  PROGRAM_STATES,
+  PROGRAM_TARGETS,
+  type ProgramApplyType,
+  type ProgramList,
+  type ProgramState,
+  type ProgramTarget,
+  STEP_RULES,
+  type StepRule,
   type PriceBasis,
   type PriceList,
 } from '@tugeel/shared/pricing';
@@ -18,6 +30,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -29,7 +42,12 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { PageQueryDto } from '../../../common/pagination/page';
-import { PROGRAM_STATUSES, type ProgramStatus } from '../services/discount-programs.service';
+import {
+  PROGRAM_PRIORITY_FILTERS,
+  PROGRAM_STATUSES,
+  type ProgramPriorityFilter,
+  type ProgramStatus,
+} from '../services/discount-programs.service';
 import { MAX_SALE_READY } from '../services/sale-readiness.service';
 
 const QTY = /^\d{1,11}(\.\d{1,3})?$/;
@@ -81,6 +99,10 @@ export class DiscountStepDto {
   @ApiProperty({ example: '22800', description: 'PRICE, AMOUNT: whole MNT; PERCENT: a percentage' })
   @Matches(DECIMAL_2)
   value: string;
+  @ApiPropertyOptional({ enum: STEP_RULES, description: 'Absent: MINIMUM' })
+  @IsOptional()
+  @IsIn(STEP_RULES)
+  rule?: StepRule;
 }
 
 @ApiSchema({ name: 'DiscountProgramRequest' })
@@ -91,7 +113,15 @@ export class DiscountProgramInputDto {
   @IsNotEmpty()
   @MaxLength(120)
   name: string;
-  @ApiProperty({ enum: PRICE_LISTS }) @IsIn(PRICE_LISTS) list: PriceList;
+  @ApiProperty({ enum: PROGRAM_LISTS }) @IsIn(PROGRAM_LISTS) list: ProgramList;
+  @ApiPropertyOptional({ enum: PROGRAM_STATES, description: 'Absent: ACTIVE' })
+  @IsOptional()
+  @IsIn(PROGRAM_STATES)
+  state?: ProgramState;
+  @ApiPropertyOptional({ description: 'Applies alone on a product' })
+  @IsOptional()
+  @IsBoolean()
+  priority?: boolean;
   @ApiProperty({ enum: DISCOUNT_SCOPES }) @IsIn(DISCOUNT_SCOPES) scope: DiscountScope;
   @ApiProperty({ enum: DISCOUNT_MEASURES }) @IsIn(DISCOUNT_MEASURES) measure: DiscountMeasure;
   @ApiProperty({ enum: DISCOUNT_EFFECTS }) @IsIn(DISCOUNT_EFFECTS) effect: DiscountEffect;
@@ -120,6 +150,49 @@ export class DiscountProgramInputDto {
   @IsInt()
   @Min(1)
   countUomId?: number | null;
+  @ApiPropertyOptional({ enum: PROGRAM_TARGETS, nullable: true })
+  @IsOptional()
+  @IsIn(PROGRAM_TARGETS)
+  targetKind?: ProgramTarget | null;
+  @ApiPropertyOptional({ type: [Number], description: 'Of targetKind' })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  targetIds?: number[];
+  @ApiPropertyOptional({ type: [Number], description: 'Of targetKind' })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  excludeTargetIds?: number[];
+  @ApiPropertyOptional({ type: [Number] })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  excludeProductIds?: number[];
+  @ApiPropertyOptional({ enum: PRICE_ADJUSTS, description: 'Absent: NONE' })
+  @IsOptional()
+  @IsIn(PRICE_ADJUSTS)
+  adjustKind?: PriceAdjust;
+  @ApiPropertyOptional({ description: 'Rounds to a multiple of this' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  adjustFactor?: number;
+  @ApiPropertyOptional({ type: [Number], description: 'Empty: every pipeline' })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  pipelineIds?: number[];
+  @ApiPropertyOptional({ type: [Number], description: 'Empty: every till' })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  tillIds?: number[];
   @ApiProperty({ example: '2026-11-01' }) @Matches(ISO_DATE) validFrom: string;
   @ApiPropertyOptional({ type: String, nullable: true, description: 'Up to, not including' })
   @IsOptional()
@@ -152,7 +225,9 @@ export class ProgramUnitDto {
 export class DiscountProgramDto {
   @ApiProperty() id: number;
   @ApiProperty() name: string;
-  @ApiProperty({ enum: PRICE_LISTS }) list: PriceList;
+  @ApiProperty({ enum: PROGRAM_LISTS }) list: ProgramList;
+  @ApiProperty({ enum: PROGRAM_STATES }) state: ProgramState;
+  @ApiProperty() priority: boolean;
   @ApiProperty({ enum: DISCOUNT_SCOPES }) scope: DiscountScope;
   @ApiProperty({ enum: DISCOUNT_MEASURES }) measure: DiscountMeasure;
   @ApiProperty({ enum: DISCOUNT_EFFECTS }) effect: DiscountEffect;
@@ -161,10 +236,21 @@ export class DiscountProgramDto {
   @ApiProperty({ type: ProgramUnitDto, nullable: true }) thresholdUnit: ProgramUnitDto | null;
   @ApiProperty({ type: Number, nullable: true }) categoryId: number | null;
   @ApiProperty({ type: Number, nullable: true }) countUomId: number | null;
+  @ApiProperty({ enum: PROGRAM_TARGETS, nullable: true }) targetKind: ProgramTarget | null;
+  @ApiProperty({ type: [Number] }) targetIds: number[];
+  @ApiProperty({ type: [Number] }) excludeTargetIds: number[];
+  @ApiProperty({ type: [Number] }) excludeProductIds: number[];
+  @ApiProperty({ type: [ProgramProductDto], description: 'The chosen and excluded products' })
+  namedProducts: ProgramProductDto[];
+  @ApiProperty({ enum: PRICE_ADJUSTS }) adjustKind: PriceAdjust;
+  @ApiProperty() adjustFactor: number;
+  @ApiProperty({ type: [Number] }) pipelineIds: number[];
+  @ApiProperty({ type: [Number] }) tillIds: number[];
   @ApiProperty() validFrom: string;
   @ApiProperty({ type: String, nullable: true }) validTo: string | null;
   @ApiProperty({ enum: PROGRAM_STATUSES }) status: ProgramStatus;
   @ApiProperty({ type: [DiscountStepDto] }) steps: DiscountStepDto[];
+  @ApiProperty({ type: String, nullable: true }) createdByName: string | null;
   @ApiProperty() createdAt: string;
   @ApiProperty() updatedAt: string;
 }
@@ -176,7 +262,33 @@ export class DiscountProgramPageDto {
 }
 
 export class DiscountProgramQueryDto extends PageQueryDto {
-  @ApiPropertyOptional({ enum: PRICE_LISTS }) @IsOptional() @IsIn(PRICE_LISTS) list?: PriceList;
+  @ApiPropertyOptional({ description: 'By name' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  q?: string;
+  @ApiPropertyOptional({ enum: PROGRAM_LISTS })
+  @IsOptional()
+  @IsIn(PROGRAM_LISTS)
+  list?: ProgramList;
+  @ApiPropertyOptional({ enum: PROGRAM_APPLY_TYPES })
+  @IsOptional()
+  @IsIn(PROGRAM_APPLY_TYPES)
+  applyType?: ProgramApplyType;
+  @ApiPropertyOptional({ enum: PROGRAM_PRIORITY_FILTERS })
+  @IsOptional()
+  @IsIn(PROGRAM_PRIORITY_FILTERS)
+  priority?: ProgramPriorityFilter;
+  @ApiPropertyOptional({ description: 'In force on this date' })
+  @IsOptional()
+  @Matches(ISO_DATE)
+  date?: string;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) pipelineId?: number;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) tillId?: number;
+  @ApiPropertyOptional({ enum: DISCOUNT_MEASURES, description: 'Has a real condition on this' })
+  @IsOptional()
+  @IsIn(DISCOUNT_MEASURES)
+  condition?: DiscountMeasure;
   @ApiPropertyOptional({ enum: DISCOUNT_SCOPES })
   @IsOptional()
   @IsIn(DISCOUNT_SCOPES)
@@ -207,6 +319,16 @@ export class QuoteRequestDto {
   @IsOptional()
   @Matches(ISO_DATE)
   date?: string;
+  @ApiPropertyOptional({ description: 'Where the order is: plans naming other pipelines stay out' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  pipelineId?: number;
+  @ApiPropertyOptional({ description: 'The till of a RETAIL quote' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  tillId?: number;
   @ApiProperty({ type: [QuoteLineRequestDto], maxItems: MAX_QUOTE_LINES })
   @IsArray()
   @ArrayMinSize(1)

@@ -14,6 +14,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { BulkProductsDto } from '../../../common/bulk/bulk.dto';
 import { MAX_PAGE_LIMIT, PageQueryDto, queryIds } from '../../../common/pagination/page';
@@ -43,6 +44,10 @@ export class SupplierDetailDto extends SupplierSummaryDto {
   @ApiProperty({ type: String, nullable: true }) bankAccount: string | null;
   @ApiProperty({ type: Number, nullable: true }) paymentTermDays: number | null;
   @ApiProperty({ type: String, nullable: true }) note: string | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'Its category (ADR-0161)' })
+  categoryId: number | null;
+  @ApiProperty({ type: String, nullable: true, description: 'From the top: Хүнс / Сүү' })
+  categoryPath: string | null;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt: string;
   @ApiProperty({ type: [ContactDto] }) contacts: ContactDto[];
@@ -60,7 +65,14 @@ export class SupplierListItemDto extends SupplierSummaryDto {
   @ApiProperty({ type: String, nullable: true }) note: string | null;
   @ApiProperty({ type: ListContactDto, nullable: true, description: 'The first contact' })
   contact: ListContactDto | null;
-  @ApiProperty({ description: 'Products linked to the supplier' }) productCount: number;
+  @ApiProperty({
+    description: 'Products linked to the supplier; within productCategoryId when it was asked for',
+  })
+  productCount: number;
+  @ApiProperty({ type: Number, nullable: true, description: 'Its category (ADR-0161)' })
+  categoryId: number | null;
+  @ApiProperty({ type: String, nullable: true, description: 'From the top: Хүнс / Сүү' })
+  categoryPath: string | null;
 }
 
 @ApiSchema({ name: 'SupplierPage' })
@@ -132,6 +144,16 @@ class SupplierFieldsDto {
   @IsBoolean()
   vatPayer?: boolean;
 
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'An active category; null: none',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  categoryId?: number | null;
+
   @ApiPropertyOptional({ type: String, nullable: true, maxLength: 1000 })
   @IsOptional()
   @Transform(trimmed)
@@ -187,6 +209,22 @@ export class SupplierListQueryDto extends PageQueryDto {
   @IsIn(PARTNER_STATUSES)
   status?: PartnerStatus;
 
+  @ApiPropertyOptional({ description: 'This category and everything below it (ADR-0161)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  categoryId?: number;
+
+  @ApiPropertyOptional({
+    description: 'Suppliers linked to a product of this product category or below it',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  productCategoryId?: number;
+
   @ApiPropertyOptional({ description: 'A saved supplier segment (ADR-0049)' })
   @IsOptional()
   @Type(() => Number)
@@ -205,6 +243,72 @@ export class SupplierListQueryDto extends PageQueryDto {
   @ArrayMaxSize(MAX_PAGE_LIMIT)
   @IsInt({ each: true })
   ids?: number[];
+}
+
+/** A supplier category with where it sits and what it holds (ADR-0161). */
+@ApiSchema({ name: 'SupplierCategory' })
+export class SupplierCategoryDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ type: Number, nullable: true }) parentId: number | null;
+  @ApiProperty() name: string;
+  @ApiProperty({ description: 'From the top: Хүнс / Сүү' }) path: string;
+  @ApiProperty({ description: '0 at the top' }) depth: number;
+  @ApiProperty() active: boolean;
+  @ApiProperty() sortOrder: number;
+  @ApiProperty({ description: 'Suppliers in it and everything below it' }) supplierCount: number;
+}
+
+@ApiSchema({ name: 'SupplierCategoryCreateRequest' })
+export class CreateSupplierCategoryDto {
+  @ApiProperty({ maxLength: 80 })
+  @Transform(trimmed)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(80)
+  name: string;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Null or absent: at the top' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  parentId?: number | null;
+
+  @ApiPropertyOptional({ description: 'Absent: after its siblings' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(999_999)
+  sortOrder?: number;
+}
+
+@ApiSchema({ name: 'SupplierCategoryUpdateRequest' })
+export class UpdateSupplierCategoryDto {
+  @ApiPropertyOptional({ maxLength: 80 })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(80)
+  name?: string;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Null: to the top' })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsInt()
+  @Min(1)
+  parentId?: number | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(999_999)
+  sortOrder?: number;
+
+  @ApiPropertyOptional({ description: 'False: retired; refused while anything active sits below' })
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
 }
 
 @ApiSchema({ name: 'LinkedSupplier' })
@@ -255,11 +359,21 @@ export class ProductSuppliersQueryDto {
   productIds?: number[];
 }
 
+export class SupplierProductsQueryDto extends PageQueryDto {
+  @ApiPropertyOptional({ description: 'Only this product category and what is below it' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  productCategoryId?: number;
+}
+
 @ApiSchema({ name: 'SupplierProductItem' })
 export class SupplierProductItemDto {
   @ApiProperty() id: number;
   @ApiProperty() sku: string;
   @ApiProperty() name: string;
+  @ApiProperty() categoryId: number;
   @ApiProperty({ enum: ['ACTIVE', 'INACTIVE'] }) status: 'ACTIVE' | 'INACTIVE';
   @ApiProperty({ type: String, nullable: true }) thumbUrl: string | null;
   @ApiProperty({ description: 'Name of the base unit' }) baseUnitName: string;

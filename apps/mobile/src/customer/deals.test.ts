@@ -133,3 +133,22 @@ describe('the cart hint of order amount programs', () => {
     ]);
   });
 });
+
+describe('N+M in words (ADR-0159 #3)', () => {
+  it('says its own condition, nothing else', () => {
+    expect(
+      dealSentenceOf(
+        deal({
+          effect: 'BONUS',
+          value: '1',
+          threshold: { qty: '1', unitName: 'ш', amount: null },
+          lastDay: '2026-11-30',
+        }),
+      ),
+    ).toMatchObject({
+      until: '11/30',
+      condition: null,
+      effect: { kind: 'bonus', buy: '1', free: '1' },
+    });
+  });
+});

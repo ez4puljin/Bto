@@ -16,6 +16,14 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { PageQueryDto } from '../../../common/pagination/page';
+import {
+  PROFILE_BULK_FILTERS,
+  PROFILE_STATUSES,
+  PROFILE_USE_FILTERS,
+  type ProfileBulkFilter,
+  type ProfileStatus,
+  type ProfileUseFilter,
+} from '../services/price-profiles.service';
 
 const PERCENT = /^\d{1,3}(\.\d{1,2})?$/;
 const QTY = /^\d{1,11}(\.\d{1,3})?$/;
@@ -71,6 +79,10 @@ export class CreatePriceProfileDto extends PriceProfileValuesInputDto {
   validFrom: string;
 }
 
+/** «Засах» (ADR-0160): its name and its values from a day on, in one transaction. */
+@ApiSchema({ name: 'PriceProfileUpdateRequest' })
+export class UpdatePriceProfileDto extends CreatePriceProfileDto {}
+
 @ApiSchema({ name: 'PriceProfileVersionRequest' })
 export class PriceProfileVersionInputDto extends PriceProfileValuesInputDto {
   @ApiProperty({ example: '2026-10-15', description: 'Today or later (Ulaanbaatar)' })
@@ -111,6 +123,7 @@ export class PriceProfileDto {
   @ApiProperty() id: number;
   @ApiProperty() name: string;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) archivedAt: string | null;
+  @ApiProperty({ enum: PROFILE_STATUSES }) status: ProfileStatus;
   @ApiProperty({
     type: PriceProfileVersionDto,
     nullable: true,
@@ -126,6 +139,7 @@ export class PriceProfileDto {
   history: PriceProfileVersionDto[];
   @ApiProperty({ description: 'Products whose price terms in force today use the profile' })
   productsToday: number;
+  @ApiProperty({ type: String, nullable: true }) createdByName: string | null;
   @ApiProperty() createdAt: string;
   @ApiProperty() updatedAt: string;
 }
@@ -142,4 +156,25 @@ export class PriceProfileQueryDto extends PageQueryDto {
   @Transform(queryBoolean)
   @IsBoolean()
   archived?: boolean;
+  @ApiPropertyOptional({ description: 'By name' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(MAX_PRICE_PROFILE_NAME)
+  q?: string;
+  @ApiPropertyOptional({ enum: PROFILE_STATUSES })
+  @IsOptional()
+  @IsIn(PROFILE_STATUSES)
+  status?: ProfileStatus;
+  @ApiPropertyOptional({ enum: PRICE_ROUNDINGS, description: 'Of the values in force today' })
+  @IsOptional()
+  @IsIn(PRICE_ROUNDINGS)
+  rounding?: PriceRounding;
+  @ApiPropertyOptional({ enum: PROFILE_BULK_FILTERS, description: 'A bulk price today, or none' })
+  @IsOptional()
+  @IsIn(PROFILE_BULK_FILTERS)
+  bulk?: ProfileBulkFilter;
+  @ApiPropertyOptional({ enum: PROFILE_USE_FILTERS, description: 'Products use it today, or none' })
+  @IsOptional()
+  @IsIn(PROFILE_USE_FILTERS)
+  used?: ProfileUseFilter;
 }

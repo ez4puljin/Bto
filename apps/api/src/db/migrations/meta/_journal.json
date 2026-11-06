@@ -526,6 +526,27 @@
       "when": 1793862588832,
       "tag": "0075_receipt_counter_account",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1793952650561,
+      "tag": "0076_discount_plans",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1793955826788,
+      "tag": "0077_price_profile_delete",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1793960675612,
+      "tag": "0078_supplier_categories",
+      "breakpoints": true
     }
   ]
 }

@@ -68,6 +68,8 @@ const supplierRow = (
 ): Schemas['SupplierListItem'] => ({
   tin: null,
   phone: null,
+  categoryId: null,
+  categoryPath: null,
   vatPayer: false,
   status: 'ACTIVE',
   regNo: null,
@@ -141,6 +143,8 @@ const MSM: Schemas['SupplierDetail'] = {
   name: 'МСМ ХХК',
   tin: '12345678901',
   phone: '+97670112233',
+  categoryId: null,
+  categoryPath: null,
   vatPayer: false,
   status: 'ACTIVE',
   regNo: '7654321',
@@ -863,8 +867,9 @@ describe('suppliers', () => {
       }),
     );
     const table = within(await screen.findByRole('table'));
-    // By default the bank and the address wait in «Баганууд» (ADR-0066).
-    expect(await table.findByText('12345678901')).toBeInTheDocument();
+    // By default the TIN, the bank and the address wait in «Баганууд» (ADR-0066, ADR-0161 #8).
+    expect(await table.findByText('7011 2233')).toBeInTheDocument();
+    expect(table.queryByText('12345678901')).toBeNull();
     expect(table.queryByText('MN120005005012345678')).toBeNull();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: mn.common.columns }));
@@ -970,6 +975,7 @@ describe('suppliers', () => {
       bankName: null,
       bankAccount: 'mn12 0005',
       paymentTermDays: 30,
+      categoryId: null,
       vatPayer: false,
       note: null,
     });

@@ -1,15 +1,16 @@
 import { Link } from 'react-router';
 import { Badge } from '@/components/ui/badge';
-import { formatCount } from '@/lib/money';
 import type { SupplierListItem } from './api';
 import { contactCell, none, text } from './list-cells';
 import type { ListColumn } from './list-column-cell';
 import { localPhone } from './phone';
+import { SupplierProductCount } from './supplier-products-popover';
 
 /** Every column of the supplier list (ADR-0037). */
 export const SUPPLIER_COLUMN_KEYS = [
   'code',
   'name',
+  'category',
   'regNo',
   'tin',
   'phone',
@@ -29,10 +30,11 @@ export type SupplierColumnKey = (typeof SUPPLIER_COLUMN_KEYS)[number];
 export const LOCKED_SUPPLIER_COLUMNS: readonly SupplierColumnKey[] = ['code', 'name'];
 
 /**
- * What a user who never chose sees hidden (ADR-0066): code, name, phone, TIN, the contact, the
- * product count and status fit a 1366px screen; every column stays in «Баганууд».
+ * What a user who never chose sees hidden (ADR-0066): code, name, category, phone, the contact, the
+ * product count and status fit a 1366px screen beside the filters; every column stays in «Баганууд».
  */
 export const DEFAULT_HIDDEN_SUPPLIER_COLUMNS: readonly SupplierColumnKey[] = [
+  'tin',
   'regNo',
   'email',
   'address',
@@ -76,6 +78,14 @@ export const SUPPLIER_COLUMNS: readonly SupplierColumn[] = [
       </Link>
     ),
   },
+  {
+    key: 'category',
+    kind: 'text',
+    weight: 2,
+    min: 8,
+    truncate: { text: (row, t) => row.categoryPath ?? t('common.none') },
+    cell: (row, t) => text(row.categoryPath, t),
+  },
   { key: 'regNo', kind: 'number', className: 'font-mono', cell: (row, t) => text(row.regNo, t) },
   {
     key: 'tin',
@@ -118,8 +128,11 @@ export const SUPPLIER_COLUMNS: readonly SupplierColumn[] = [
   {
     key: 'productCount',
     kind: 'count',
+    width: 7,
     numeric: true,
-    cell: (row) => formatCount(row.productCount),
+    cell: (row) => (
+      <SupplierProductCount supplierId={row.id} name={row.name} count={row.productCount} />
+    ),
   },
   {
     key: 'note',

@@ -70,6 +70,8 @@ const SUPPLIER: Schemas['SupplierListItem'] = {
   name: 'МСМ ХХК',
   tin: null,
   phone: null,
+  categoryId: null,
+  categoryPath: null,
   vatPayer: false,
   status: 'ACTIVE',
   regNo: null,

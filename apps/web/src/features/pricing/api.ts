@@ -6,6 +6,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { type components, idempotencyKey } from '@tugeel/api-client';
+import type { DiscountMeasure, PriceList, ProgramApplyType } from '@tugeel/shared/pricing';
 import { businessDate } from '@tugeel/shared/time';
 import { useApiClient } from '@/app/api-client-context';
 import { KEYS as CATALOG_KEYS } from '@/features/catalog/api';
@@ -23,10 +24,10 @@ export type PriceProfile = Schemas['PriceProfile'];
 export type PriceProfileVersion = Schemas['PriceProfileVersion'];
 export type PriceProfileValues = Schemas['PriceProfileValues'];
 export type PriceProfileRequest = Schemas['PriceProfileRequest'];
-export type PriceProfileVersionRequest = Schemas['PriceProfileVersionRequest'];
+export type PriceProfileUpdateRequest = Schemas['PriceProfileUpdateRequest'];
 export type PriceRounding = PriceProfileValues['rounding'];
 export type DiscountProgram = Schemas['DiscountProgram'];
-export type PriceList = DiscountProgram['list'];
+export type { PriceList };
 export type DiscountProgramRequest = Schemas['DiscountProgramRequest'];
 export type ProgramStatus = DiscountProgram['status'];
 export type Quote = Schemas['Quote'];
@@ -80,15 +81,23 @@ export function usePriceProfileChoices() {
   });
 }
 
-export function usePriceProfiles(archived: boolean) {
+export interface ProfileFilter {
+  q?: string;
+  status?: PriceProfile['status'];
+  rounding?: PriceRounding;
+  bulk?: 'WITH' | 'WITHOUT';
+  used?: 'USED' | 'UNUSED';
+}
+
+export function usePriceProfiles(filter: ProfileFilter) {
   const api = useApiClient();
   return useInfiniteQuery({
-    queryKey: [...KEYS.profiles, 'list', archived],
+    queryKey: [...KEYS.profiles, 'list', filter],
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam, signal }) =>
       unwrap(
         await api.GET('/api/v1/price-profiles', {
-          params: { query: { archived, cursor: pageParam, limit: 50 } },
+          params: { query: { ...filter, cursor: pageParam, limit: 50 } },
           signal,
         }),
       ),
@@ -107,7 +116,15 @@ export function usePriceProfile(id: number) {
 }
 
 export interface ProgramFilter {
+  q?: string;
   status?: ProgramStatus;
+  applyType?: ProgramApplyType;
+  priority?: 'ONLY' | 'EXCLUDE';
+  condition?: DiscountMeasure;
+  productId?: number;
+  pipelineId?: number;
+  tillId?: number;
+  date?: string;
 }
 
 export function useDiscountPrograms(filter: ProgramFilter) {
@@ -118,7 +135,7 @@ export function useDiscountPrograms(filter: ProgramFilter) {
     queryFn: async ({ pageParam, signal }) =>
       unwrap(
         await api.GET('/api/v1/discount-programs', {
-          params: { query: { status: filter.status, cursor: pageParam, limit: 50 } },
+          params: { query: { ...filter, cursor: pageParam, limit: 50 } },
           signal,
         }),
       ),
@@ -184,33 +201,24 @@ export function usePricingMutations() {
         ),
       onSuccess: () => invalidate(KEYS.profiles),
     }),
-    setProfileVersion: useMutation({
-      mutationFn: async ({
-        key,
-        id,
-        ...body
-      }: Keyed<PriceProfileVersionRequest & { id: number }>) =>
-        unwrap(
-          await api.POST('/api/v1/price-profiles/{id}/versions', {
-            params: { path: { id }, header: idempotencyKey(key) },
-            body,
-          }),
-        ),
-      onSuccess: () => Promise.all([invalidate(KEYS.profiles), invalidate(KEYS.prices)]),
-    }),
-    renameProfile: useMutation({
-      mutationFn: async ({ id, name }: { id: number; name: string }) =>
-        unwrap(
-          await api.PATCH('/api/v1/price-profiles/{id}', {
-            params: { path: { id } },
-            body: { name },
-          }),
-        ),
+    updateProfile: useMutation({
+      mutationFn: async ({ id, body }: { id: number; body: PriceProfileUpdateRequest }) =>
+        unwrap(await api.PUT('/api/v1/price-profiles/{id}', { params: { path: { id } }, body })),
       onSuccess: () => Promise.all([invalidate(KEYS.profiles), invalidate(KEYS.prices)]),
     }),
     archiveProfile: useMutation({
       mutationFn: async (id: number) =>
         unwrap(await api.POST('/api/v1/price-profiles/{id}/archive', { params: { path: { id } } })),
+      onSuccess: () => invalidate(KEYS.profiles),
+    }),
+    restoreProfile: useMutation({
+      mutationFn: async (id: number) =>
+        unwrap(await api.POST('/api/v1/price-profiles/{id}/restore', { params: { path: { id } } })),
+      onSuccess: () => invalidate(KEYS.profiles),
+    }),
+    deleteProfile: useMutation({
+      mutationFn: async (id: number) =>
+        unwrap(await api.DELETE('/api/v1/price-profiles/{id}', { params: { path: { id } } })),
       onSuccess: () => invalidate(KEYS.profiles),
     }),
     createProgram: useMutation({
@@ -233,6 +241,20 @@ export function usePricingMutations() {
         unwrap(await api.POST('/api/v1/discount-programs/{id}/stop', { params: { path: { id } } })),
       onSuccess: () => invalidate(KEYS.programs),
     }),
+    archiveProgram: useMutation({
+      mutationFn: async (id: number) =>
+        unwrap(
+          await api.POST('/api/v1/discount-programs/{id}/archive', { params: { path: { id } } }),
+        ),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: KEYS.programs }),
+    }),
+    restoreProgram: useMutation({
+      mutationFn: async (id: number) =>
+        unwrap(
+          await api.POST('/api/v1/discount-programs/{id}/restore', { params: { path: { id } } }),
+        ),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: KEYS.programs }),
+    }),
     deleteProgram: useMutation({
       mutationFn: async (id: number) =>
         unwrap(await api.DELETE('/api/v1/discount-programs/{id}', { params: { path: { id } } })),
@@ -248,16 +270,22 @@ export function usePricingMutations() {
 export function useLinesQuote(
   lines: readonly { productUnitId: number; qty: string }[],
   enabled = true,
+  pipelineId?: number | null,
 ) {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['pricing', 'quote', lines],
+    queryKey: ['pricing', 'quote', lines, pipelineId ?? null],
     enabled: enabled && lines.length > 0,
     placeholderData: keepPreviousData,
     queryFn: async ({ signal }) =>
       unwrap(
         await api.POST('/api/v1/pricing/quote', {
-          body: { list: 'WHOLESALE', date: businessDate(), lines: [...lines] },
+          body: {
+            list: 'WHOLESALE',
+            date: businessDate(),
+            ...(pipelineId ? { pipelineId } : {}),
+            lines: [...lines],
+          },
           signal,
         }),
       ),

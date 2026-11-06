@@ -60,7 +60,7 @@ export class EdgeVoidsService {
     reason: VoidReason,
     lines: readonly EdgeCartLine[],
   ): Promise<void> {
-    const quoted = this.checkout.quote(lines);
+    const quoted = this.checkout.quote(lines, tillCode);
     const docLines = quoted.lines.map((line) => {
       const unitPrice = new Decimal(line.unitPrice ?? '0');
       return {

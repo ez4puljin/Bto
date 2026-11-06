@@ -7,7 +7,12 @@ import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import { CatalogService, CategoriesService, TaxService } from '../../catalog';
 import { OrgService, UserNamesService } from '../../identity';
-import { DiscountProgramsService, PriceProfilesService, ProductPricesService } from '../../pricing';
+import {
+  DiscountProgramsService,
+  PriceProfilesService,
+  ProductPricesService,
+  ProgramTargetsService,
+} from '../../pricing';
 import { posCashiers, posTills } from '../schema';
 import type { EdgeNode } from './pos-edge-nodes.service';
 import { PosPaymentTypesService } from './pos-payment-types.service';
@@ -34,6 +39,7 @@ export class PosSnapshotService {
     private readonly prices: ProductPricesService,
     private readonly profiles: PriceProfilesService,
     private readonly programs: DiscountProgramsService,
+    private readonly targets: ProgramTargetsService,
     private readonly names: UserNamesService,
     private readonly settings: PosSettingsService,
     private readonly quickButtons: PosQuickButtonsService,
@@ -61,7 +67,10 @@ export class PosSnapshotService {
     const programs: SnapshotProgram[] = [];
     // Every list in a stable order: the version is a hash of the content.
     const inForce = await this.programs.inForce('RETAIL', today);
+    const sets = await this.targets.productSets(inForce);
+    const sold = new Set(catalogue.map((product) => product.id));
     for (const program of inForce.sort((a, b) => a.id - b.id)) {
+      const set = sets.get(program.id);
       programs.push({
         id: program.id,
         name: program.name,
@@ -76,7 +85,15 @@ export class PosSnapshotService {
         steps: program.steps.map((step) => ({
           threshold: step.threshold.toString(),
           value: step.value.toString(),
+          ...(step.rule ? { rule: step.rule } : {}),
         })),
+        // Only what a plan says: a snapshot without plans hashes as it did (ADR-0159).
+        ...(set ? { productIds: [...set].filter((id) => sold.has(id)).sort((a, b) => a - b) } : {}),
+        ...(program.priority ? { priority: true } : {}),
+        ...(program.adjustKind === 'NONE'
+          ? {}
+          : { adjust: { kind: program.adjustKind, factor: String(program.adjustFactor) } }),
+        ...(program.tillIds.length > 0 ? { tillIds: program.tillIds } : {}),
       });
     }
     const tillRows = await this.db.select().from(posTills).where(eq(posTills.edgeNodeId, node.id));

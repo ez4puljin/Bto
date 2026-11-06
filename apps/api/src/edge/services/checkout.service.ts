@@ -34,6 +34,7 @@ import {
   type QuoteLineInput,
   type QuoteResult,
   perBasePrices,
+  programServes,
   resolveQuote,
   unitPriceOf,
 } from '@tugeel/shared/pricing';
@@ -125,7 +126,7 @@ export class CheckoutService {
       .filter((product) => this.sells(sold, product))
       .filter((product) => !seen.has(product.id) && seen.add(product.id))
       .slice(0, SEARCH_LIMIT)
-      .map((product) => this.hit(loaded, product));
+      .map((product) => this.hit(loaded, product, tillCode));
   }
 
   /** The F7 panel (ADR-0104): the admin's groups with today's prices. */
@@ -140,7 +141,7 @@ export class CheckoutService {
               {
                 label: button.label,
                 unitId: button.unitId,
-                product: this.hit(loaded, found.product),
+                product: this.hit(loaded, found.product, tillCode),
               },
             ]
           : [];
@@ -167,27 +168,29 @@ export class CheckoutService {
         },
       );
     }
-    return { product: this.hit(loaded, found.product), unitId };
+    return { product: this.hit(loaded, found.product, tillCode), unitId };
   }
 
-  quote(lines: readonly EdgeCartLine[]): EdgeQuoteResponse {
-    return this.quoteOf(lines, []);
+  quote(lines: readonly EdgeCartLine[], tillCode?: string): EdgeQuoteResponse {
+    return this.quoteOf(lines, [], tillCode);
   }
 
   /** ADR-0110: the quote with the coupons and partner vouchers scanned, each checked first. */
   async quoteWithCodes(
     lines: readonly EdgeCartLine[],
     codes: readonly string[],
+    tillCode?: string,
   ): Promise<EdgeQuoteResponse> {
-    return this.quoteOf(lines, await this.vouchers.resolve(codes));
+    return this.quoteOf(lines, await this.vouchers.resolve(codes), tillCode);
   }
 
   private quoteOf(
     lines: readonly EdgeCartLine[],
     facts: readonly PosVoucherFacts[],
+    tillCode?: string,
   ): EdgeQuoteResponse {
     const loaded = this.store.get();
-    const { inputs, result } = this.price(loaded, lines, couponsOf(facts));
+    const { inputs, result } = this.price(loaded, lines, couponsOf(facts), tillCode);
     const vouchers = codesTaken(facts, result);
     const vat = inputs.map((input, index) => {
       const line = result.lines[index];
@@ -258,7 +261,7 @@ export class CheckoutService {
     // ADR-0110: a supervisor's PIN once for the sale's codes (owner 2026-10-27), always.
     const approver = codes.length > 0 ? await this.voucherApprover(request) : null;
     const facts = await this.vouchers.resolve(codes);
-    const { inputs, result } = this.price(loaded, request.lines, couponsOf(facts));
+    const { inputs, result } = this.price(loaded, request.lines, couponsOf(facts), tillCode);
     const taken = codesTaken(facts, result);
     result.lines.forEach((line, index) => {
       if (!line.priced) {
@@ -472,6 +475,7 @@ export class CheckoutService {
     loaded: LoadedSnapshot,
     lines: readonly EdgeCartLine[],
     coupons: readonly QuoteCoupon[] = [],
+    tillCode?: string,
   ): { inputs: QuoteLineInput[]; result: QuoteResult } {
     if (lines.length === 0 || lines.length > POS_LIMITS.maxLines) {
       throw new AppError('VALIDATION_FAILED', `a cart has 1 to ${POS_LIMITS.maxLines} lines`);
@@ -493,7 +497,12 @@ export class CheckoutService {
     const result = resolveQuote(inputs, {
       list: 'RETAIL',
       products: loaded.quote.products,
-      programs: loaded.quote.programs,
+      // ADR-0159 #5: a plan naming tills serves only those.
+      programs: loaded.quote.programs.filter((program) =>
+        programServes(program, 'RETAIL', {
+          tillId: tillCode === undefined ? null : (loaded.tills.get(tillCode)?.id ?? null),
+        }),
+      ),
       coupons,
     });
     return { inputs, result };
@@ -727,13 +736,18 @@ export class CheckoutService {
     return { retailPrice: retailPrice.toFixed(2), bulkPrice: part.listPrice.toFixed(2) };
   }
 
-  private hit(loaded: LoadedSnapshot, product: SnapshotProduct): EdgeProductHit {
+  private hit(loaded: LoadedSnapshot, product: SnapshotProduct, tillCode?: string): EdgeProductHit {
     return {
       productId: product.id,
       sku: product.sku,
       name: product.name,
       units: product.units.map((unit) => {
-        const { result } = this.price(loaded, [{ productUnitId: unit.unitId, qty: '1' }]);
+        const { result } = this.price(
+          loaded,
+          [{ productUnitId: unit.unitId, qty: '1' }],
+          [],
+          tillCode,
+        );
         const line = result.lines[0];
         return {
           unitId: unit.unitId,

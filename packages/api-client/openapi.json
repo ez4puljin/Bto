@@ -5208,6 +5208,26 @@
             }
           },
           {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "This category and everything below it (ADR-0161)",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "productCategoryId",
+            "required": false,
+            "in": "query",
+            "description": "Suppliers linked to a product of this product category or below it",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
             "name": "segmentId",
             "required": false,
             "in": "query",
@@ -5539,6 +5559,16 @@
               "default": 50,
               "type": "number"
             }
+          },
+          {
+            "name": "productCategoryId",
+            "required": false,
+            "in": "query",
+            "description": "Only this product category and what is below it",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -5548,6 +5578,154 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SupplierProductPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "partners"
+        ]
+      }
+    },
+    "/api/v1/supplier-categories": {
+      "get": {
+        "operationId": "SupplierCategories_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SupplierCategory"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "partners"
+        ]
+      },
+      "post": {
+        "operationId": "SupplierCategories_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierCategoryCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierCategory"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "partners"
+        ]
+      }
+    },
+    "/api/v1/supplier-categories/{id}": {
+      "patch": {
+        "operationId": "SupplierCategories_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierCategoryUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierCategory"
                 }
               }
             }
@@ -12781,6 +12959,70 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "By name",
+            "schema": {
+              "maxLength": 80,
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "SCHEDULED",
+                "ARCHIVED"
+              ]
+            }
+          },
+          {
+            "name": "rounding",
+            "required": false,
+            "in": "query",
+            "description": "Of the values in force today",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "WHOLE",
+                "UP_10",
+                "UP_50",
+                "UP_100"
+              ]
+            }
+          },
+          {
+            "name": "bulk",
+            "required": false,
+            "in": "query",
+            "description": "A bulk price today, or none",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "WITH",
+                "WITHOUT"
+              ]
+            }
+          },
+          {
+            "name": "used",
+            "required": false,
+            "in": "query",
+            "description": "Products use it today, or none",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "USED",
+                "UNUSED"
+              ]
+            }
           }
         ],
         "responses": {
@@ -12965,6 +13207,97 @@
         "tags": [
           "pricing"
         ]
+      },
+      "put": {
+        "operationId": "PriceProfiles_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceProfileUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceProfile"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Its name and new values from a day on, in one transaction (ADR-0160).",
+        "tags": [
+          "pricing"
+        ]
+      },
+      "delete": {
+        "operationId": "PriceProfiles_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Out of every list; refused while products use it; the row stays (ADR-0160).",
+        "tags": [
+          "pricing"
+        ]
       }
     },
     "/api/v1/price-profiles/{id}/versions": {
@@ -13027,6 +13360,51 @@
           }
         ],
         "summary": "New values from a day on (today or later); idempotent like every dated change.",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/price-profiles/{id}/restore": {
+      "post": {
+        "operationId": "PriceProfiles_restore",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceProfile"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "tags": [
           "pricing"
         ]
@@ -13103,6 +13481,16 @@
             }
           },
           {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "By name",
+            "schema": {
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
             "name": "list",
             "required": false,
             "in": "query",
@@ -13110,7 +13498,75 @@
               "type": "string",
               "enum": [
                 "WHOLESALE",
-                "RETAIL"
+                "RETAIL",
+                "ALL"
+              ]
+            }
+          },
+          {
+            "name": "applyType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PRODUCT",
+                "CATEGORY",
+                "SUPPLIER",
+                "SEGMENT",
+                "ORDER"
+              ]
+            }
+          },
+          {
+            "name": "priority",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ONLY",
+                "EXCLUDE"
+              ]
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "In force on this date",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pipelineId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "tillId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "condition",
+            "required": false,
+            "in": "query",
+            "description": "Has a real condition on this",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "QTY",
+                "AMOUNT"
               ]
             }
           },
@@ -13134,9 +13590,11 @@
             "schema": {
               "type": "string",
               "enum": [
+                "DRAFT",
                 "SCHEDULED",
                 "ACTIVE",
-                "ENDED"
+                "ENDED",
+                "ARCHIVED"
               ]
             }
           },
@@ -13329,7 +13787,7 @@
             "bearer": []
           }
         ],
-        "summary": "Only before the program starts.",
+        "summary": "At any time: the audit keeps what it was, orders keep what they froze (ADR-0159 #1).",
         "tags": [
           "pricing"
         ]
@@ -13366,7 +13824,7 @@
             "bearer": []
           }
         ],
-        "summary": "Only before the program starts.",
+        "summary": "Out of every list and quote; the row stays (ADR-0159 #1).",
         "tags": [
           "pricing"
         ]
@@ -13375,6 +13833,96 @@
     "/api/v1/discount-programs/{id}/stop": {
       "post": {
         "operationId": "DiscountPrograms_stop",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscountProgram"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/discount-programs/{id}/archive": {
+      "post": {
+        "operationId": "DiscountPrograms_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscountProgram"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/discount-programs/{id}/restore": {
+      "post": {
+        "operationId": "DiscountPrograms_restore",
         "parameters": [
           {
             "name": "id",
@@ -41160,7 +41708,17 @@
           },
           "productCount": {
             "type": "number",
-            "description": "Products linked to the supplier"
+            "description": "Products linked to the supplier; within productCategoryId when it was asked for"
+          },
+          "categoryId": {
+            "type": "number",
+            "nullable": true,
+            "description": "Its category (ADR-0161)"
+          },
+          "categoryPath": {
+            "type": "string",
+            "nullable": true,
+            "description": "From the top: Хүнс / Сүү"
           }
         },
         "required": [
@@ -41179,7 +41737,9 @@
           "paymentTermDays",
           "note",
           "contact",
-          "productCount"
+          "productCount",
+          "categoryId",
+          "categoryPath"
         ]
       },
       "SupplierPage": {
@@ -41260,6 +41820,16 @@
             "type": "string",
             "nullable": true
           },
+          "categoryId": {
+            "type": "number",
+            "nullable": true,
+            "description": "Its category (ADR-0161)"
+          },
+          "categoryPath": {
+            "type": "string",
+            "nullable": true,
+            "description": "From the top: Хүнс / Сүү"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -41290,6 +41860,8 @@
           "bankAccount",
           "paymentTermDays",
           "note",
+          "categoryId",
+          "categoryPath",
           "createdAt",
           "updatedAt",
           "contacts"
@@ -41347,6 +41919,12 @@
           "vatPayer": {
             "type": "boolean",
             "description": "A VAT payer (ADR-0078); omitted on create: no"
+          },
+          "categoryId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "An active category; null: none"
           },
           "note": {
             "type": "string",
@@ -41420,6 +41998,12 @@
             "type": "boolean",
             "description": "A VAT payer (ADR-0078); omitted on create: no"
           },
+          "categoryId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "An active category; null: none"
+          },
           "note": {
             "type": "string",
             "nullable": true,
@@ -41454,6 +42038,9 @@
           "name": {
             "type": "string"
           },
+          "categoryId": {
+            "type": "number"
+          },
           "status": {
             "enum": [
               "ACTIVE",
@@ -41474,6 +42061,7 @@
           "id",
           "sku",
           "name",
+          "categoryId",
           "status",
           "thumbUrl",
           "baseUnitName"
@@ -41516,6 +42104,97 @@
           "data",
           "nextCursor"
         ]
+      },
+      "SupplierCategory": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "parentId": {
+            "type": "number",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "description": "From the top: Хүнс / Сүү"
+          },
+          "depth": {
+            "type": "number",
+            "description": "0 at the top"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "supplierCount": {
+            "type": "number",
+            "description": "Suppliers in it and everything below it"
+          }
+        },
+        "required": [
+          "id",
+          "parentId",
+          "name",
+          "path",
+          "depth",
+          "active",
+          "sortOrder",
+          "supplierCount"
+        ]
+      },
+      "SupplierCategoryCreateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "parentId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Null or absent: at the top"
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 999999,
+            "description": "Absent: after its siblings"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "SupplierCategoryUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "parentId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Null: to the top"
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 999999
+          },
+          "active": {
+            "type": "boolean",
+            "description": "False: retired; refused while anything active sits below"
+          }
+        }
       },
       "LinkedSupplier": {
         "type": "object",
@@ -48027,6 +48706,14 @@
             "nullable": true,
             "format": "date-time"
           },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "SCHEDULED",
+              "ARCHIVED"
+            ],
+            "type": "string"
+          },
           "current": {
             "nullable": true,
             "description": "In force today; null when the first values start later",
@@ -48055,6 +48742,10 @@
             "type": "number",
             "description": "Products whose price terms in force today use the profile"
           },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string"
           },
@@ -48066,10 +48757,12 @@
           "id",
           "name",
           "archivedAt",
+          "status",
           "current",
           "scheduled",
           "history",
           "productsToday",
+          "createdByName",
           "createdAt",
           "updatedAt"
         ]
@@ -48204,6 +48897,58 @@
           "name"
         ]
       },
+      "PriceProfileUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "looseMarkupPct": {
+            "type": "string",
+            "example": "15",
+            "description": "Loose pieces: % added to the warehouse price"
+          },
+          "retailMarkupPct": {
+            "type": "string",
+            "example": "30",
+            "description": "Supermarket: % added to the warehouse price"
+          },
+          "retailBulkMinQty": {
+            "type": "string",
+            "nullable": true,
+            "example": "24",
+            "description": "Supermarket bulk price from this many base units of a product in the cart"
+          },
+          "retailBulkMarkupPct": {
+            "type": "string",
+            "nullable": true,
+            "example": "20",
+            "description": "Supermarket bulk: % added to the warehouse price; below the supermarket %"
+          },
+          "rounding": {
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "validFrom": {
+            "type": "string",
+            "example": "2026-10-14",
+            "description": "The first values start this day"
+          }
+        },
+        "required": [
+          "looseMarkupPct",
+          "retailMarkupPct",
+          "rounding",
+          "name",
+          "validFrom"
+        ]
+      },
       "ProgramProduct": {
         "type": "object",
         "properties": {
@@ -48255,6 +49000,15 @@
             "type": "string",
             "example": "22800",
             "description": "PRICE, AMOUNT: whole MNT; PERCENT: a percentage"
+          },
+          "rule": {
+            "enum": [
+              "MINIMUM",
+              "EXACT",
+              "EVERY"
+            ],
+            "type": "string",
+            "description": "Absent: MINIMUM"
           }
         },
         "required": [
@@ -48274,9 +49028,21 @@
           "list": {
             "enum": [
               "WHOLESALE",
-              "RETAIL"
+              "RETAIL",
+              "ALL"
             ],
             "type": "string"
+          },
+          "state": {
+            "enum": [
+              "DRAFT",
+              "ACTIVE",
+              "ARCHIVED"
+            ],
+            "type": "string"
+          },
+          "priority": {
+            "type": "boolean"
           },
           "scope": {
             "enum": [
@@ -48297,7 +49063,8 @@
             "enum": [
               "PRICE",
               "PERCENT",
-              "AMOUNT"
+              "AMOUNT",
+              "BONUS"
             ],
             "type": "string"
           },
@@ -48336,6 +49103,66 @@
             "type": "number",
             "nullable": true
           },
+          "targetKind": {
+            "nullable": true,
+            "enum": [
+              "PRODUCT",
+              "CATEGORY",
+              "SUPPLIER",
+              "SEGMENT"
+            ],
+            "type": "string"
+          },
+          "targetIds": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "excludeTargetIds": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "excludeProductIds": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "namedProducts": {
+            "description": "The chosen and excluded products",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProgramProduct"
+            }
+          },
+          "adjustKind": {
+            "enum": [
+              "NONE",
+              "ROUND",
+              "FLOOR",
+              "CEIL",
+              "ENDS_9"
+            ],
+            "type": "string"
+          },
+          "adjustFactor": {
+            "type": "number"
+          },
+          "pipelineIds": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "tillIds": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
           "validFrom": {
             "type": "string"
           },
@@ -48345,9 +49172,11 @@
           },
           "status": {
             "enum": [
+              "DRAFT",
               "SCHEDULED",
               "ACTIVE",
-              "ENDED"
+              "ENDED",
+              "ARCHIVED"
             ],
             "type": "string"
           },
@@ -48356,6 +49185,10 @@
             "items": {
               "$ref": "#/components/schemas/DiscountStep"
             }
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
           },
           "createdAt": {
             "type": "string"
@@ -48368,6 +49201,8 @@
           "id",
           "name",
           "list",
+          "state",
+          "priority",
           "scope",
           "measure",
           "effect",
@@ -48376,10 +49211,20 @@
           "thresholdUnit",
           "categoryId",
           "countUomId",
+          "targetKind",
+          "targetIds",
+          "excludeTargetIds",
+          "excludeProductIds",
+          "namedProducts",
+          "adjustKind",
+          "adjustFactor",
+          "pipelineIds",
+          "tillIds",
           "validFrom",
           "validTo",
           "status",
           "steps",
+          "createdByName",
           "createdAt",
           "updatedAt"
         ]
@@ -48413,9 +49258,23 @@
           "list": {
             "enum": [
               "WHOLESALE",
-              "RETAIL"
+              "RETAIL",
+              "ALL"
             ],
             "type": "string"
+          },
+          "state": {
+            "enum": [
+              "DRAFT",
+              "ACTIVE",
+              "ARCHIVED"
+            ],
+            "type": "string",
+            "description": "Absent: ACTIVE"
+          },
+          "priority": {
+            "type": "boolean",
+            "description": "Applies alone on a product"
           },
           "scope": {
             "enum": [
@@ -48436,7 +49295,8 @@
             "enum": [
               "PRICE",
               "PERCENT",
-              "AMOUNT"
+              "AMOUNT",
+              "BONUS"
             ],
             "type": "string"
           },
@@ -48464,6 +49324,71 @@
             "type": "number",
             "nullable": true,
             "minimum": 1
+          },
+          "targetKind": {
+            "nullable": true,
+            "enum": [
+              "PRODUCT",
+              "CATEGORY",
+              "SUPPLIER",
+              "SEGMENT"
+            ],
+            "type": "string"
+          },
+          "targetIds": {
+            "description": "Of targetKind",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "excludeTargetIds": {
+            "description": "Of targetKind",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "excludeProductIds": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "adjustKind": {
+            "enum": [
+              "NONE",
+              "ROUND",
+              "FLOOR",
+              "CEIL",
+              "ENDS_9"
+            ],
+            "type": "string",
+            "description": "Absent: NONE"
+          },
+          "adjustFactor": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Rounds to a multiple of this"
+          },
+          "pipelineIds": {
+            "description": "Empty: every pipeline",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "tillIds": {
+            "description": "Empty: every till",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
           },
           "validFrom": {
             "type": "string",
@@ -48583,6 +49508,16 @@
             "type": "string",
             "description": "Ulaanbaatar business date; default today"
           },
+          "pipelineId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Where the order is: plans naming other pipelines stay out"
+          },
+          "tillId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The till of a RETAIL quote"
+          },
           "lines": {
             "minItems": 1,
             "maxItems": 200,
@@ -48617,7 +49552,8 @@
             "enum": [
               "PRICE",
               "PERCENT",
-              "AMOUNT"
+              "AMOUNT",
+              "BONUS"
             ],
             "type": "string"
           },
@@ -56630,7 +57566,8 @@
             "enum": [
               "PRICE",
               "PERCENT",
-              "AMOUNT"
+              "AMOUNT",
+              "BONUS"
             ],
             "type": "string"
           },
@@ -67538,7 +68475,8 @@
             "enum": [
               "PRICE",
               "PERCENT",
-              "AMOUNT"
+              "AMOUNT",
+              "BONUS"
             ],
             "type": "string"
           },
@@ -67874,7 +68812,8 @@
             "enum": [
               "PRICE",
               "PERCENT",
-              "AMOUNT"
+              "AMOUNT",
+              "BONUS"
             ],
             "type": "string"
           },
@@ -74304,6 +75243,8 @@
           "SUPPLIER_INACTIVE",
           "EXPENSE_TYPE_INACTIVE",
           "CUSTOMER_CATEGORY_INACTIVE",
+          "SUPPLIER_CATEGORY_INACTIVE",
+          "SUPPLIER_CATEGORY_HAS_CHILDREN",
           "PRODUCT_INACTIVE",
           "SKU_OUT_OF_RANGE",
           "SKU_RESERVED",
