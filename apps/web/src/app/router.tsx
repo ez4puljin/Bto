@@ -84,6 +84,7 @@ import {
   SupplierBalancesPage,
   SupplierLedgerPage,
 } from '@/features/finance/supplier-payables-pages';
+import { EbarimtPage } from '@/features/ebarimt-check/ebarimt-page';
 import { FinanceSettingsPage } from '@/features/finance/finance-settings-page';
 import { InvoicesPage } from '@/features/finance/invoices-page';
 import { TransactionsPage } from '@/features/finance/transactions-page';
@@ -999,6 +1000,15 @@ function financeRoutes(): RouteObject[] {
       element: read(<TrialBalancePage />),
     },
     { path: 'finance/vat', handle: { width: 'wide' }, element: read(<VatReportPage />) },
+    {
+      path: 'finance/ebarimt',
+      handle: { width: 'wide' },
+      element: (
+        <RequirePermission permission="ebarimt.check.read">
+          <EbarimtPage />
+        </RequirePermission>
+      ),
+    },
     {
       path: 'finance/opening-check',
       handle: { width: 'wide' },

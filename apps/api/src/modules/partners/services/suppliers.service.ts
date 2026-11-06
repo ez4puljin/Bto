@@ -52,6 +52,16 @@ export type Supplier = Omit<
   'nameKey' | 'searchText' | 'searchPhonetic' | 'searchVersion'
 >;
 
+export interface SupplierBrief {
+  id: number;
+  code: string;
+  name: string;
+  regNo: string | null;
+  tin: string | null;
+  phone: string | null;
+  status: PartnerStatus;
+}
+
 export interface SupplierSummary {
   id: number;
   code: string;
@@ -255,6 +265,22 @@ export class SuppliersService implements OnModuleInit {
       contacts: await this.contacts.ofSupplier(id, executor),
       categoryPath: row.categoryId === null ? null : (paths?.get(row.categoryId) ?? null),
     };
+  }
+
+  /** Every supplier with the fields a whole-list report needs (ADR-0168), by name. */
+  async allBrief(executor: Db | Tx = this.db): Promise<SupplierBrief[]> {
+    return executor
+      .select({
+        id: suppliers.id,
+        code: suppliers.code,
+        name: suppliers.name,
+        regNo: suppliers.regNo,
+        tin: suppliers.tin,
+        phone: suppliers.phone,
+        status: suppliers.status,
+      })
+      .from(suppliers)
+      .orderBy(asc(suppliers.name), asc(suppliers.id));
   }
 
   async getMany(ids: readonly number[], executor: Db | Tx = this.db): Promise<SupplierSummary[]> {

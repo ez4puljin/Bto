@@ -37723,6 +37723,618 @@
           "procurement"
         ]
       }
+    },
+    "/api/v1/ebarimt-check/report": {
+      "get": {
+        "operationId": "EbarimtCheck_getReport",
+        "parameters": [
+          {
+            "name": "periods",
+            "required": true,
+            "in": "query",
+            "description": "Months, comma separated",
+            "schema": {
+              "minItems": 1,
+              "example": "202610,202609",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtReportDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/receipts": {
+      "get": {
+        "operationId": "EbarimtCheck_receipts",
+        "parameters": [
+          {
+            "name": "periods",
+            "required": true,
+            "in": "query",
+            "description": "Months, comma separated",
+            "schema": {
+              "minItems": 1,
+              "example": "202610,202609",
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtReceiptListDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The receipts behind a supplier's purchases; each row opens the receipt.",
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/entries": {
+      "get": {
+        "operationId": "EbarimtCheck_entries",
+        "parameters": [
+          {
+            "name": "periods",
+            "required": true,
+            "in": "query",
+            "description": "Months, comma separated",
+            "schema": {
+              "minItems": 1,
+              "example": "202610,202609",
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "ttd",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 40,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtEntriesDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "e-Barimt's lines behind a figure: a supplier's, or one register's.",
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/files": {
+      "get": {
+        "operationId": "EbarimtCheck_overview",
+        "parameters": [
+          {
+            "name": "year",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 2000,
+              "maximum": 2100,
+              "example": 2026,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtFileOverviewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      },
+      "post": {
+        "operationId": "EbarimtCheck_importFile",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbarimtImportRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtImportResultDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Attaches an uploaded export to the month its dates fall in; replaces that month's file.",
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/files/{period}": {
+      "delete": {
+        "operationId": "EbarimtCheck_removeFile",
+        "parameters": [
+          {
+            "name": "period",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/files/{id}/download": {
+      "get": {
+        "operationId": "EbarimtCheck_download",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file as uploaded"
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/settings": {
+      "get": {
+        "operationId": "EbarimtCheck_getSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtSettingsDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      },
+      "put": {
+        "operationId": "EbarimtCheck_saveSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbarimtSettingsRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtSettingsDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/month-values": {
+      "put": {
+        "operationId": "EbarimtCheck_saveMonthValue",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbarimtMonthValueRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/assignments": {
+      "put": {
+        "operationId": "EbarimtCheck_assign",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbarimtAssignRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtAssignResultDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/suppliers/{id}/profile": {
+      "put": {
+        "operationId": "EbarimtCheck_saveProfile",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbarimtProfileRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/receipt-links": {
+      "put": {
+        "operationId": "EbarimtCheck_link",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbarimtLinkRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtLinkResultDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
     }
   },
   "info": {
@@ -38015,6 +38627,10 @@
           "procurement.orders.edit",
           "procurement.orders.manage",
           "procurement.prices.read",
+          "ebarimt.check.read",
+          "ebarimt.check.edit",
+          "ebarimt.check.assign",
+          "ebarimt.check.settings",
           "imports.manage",
           "pricing.manage",
           "pricing.prices.manage",
@@ -39451,6 +40067,7 @@
               "procurement.invoice_image",
               "hr.employee_photo",
               "hr.message_image",
+              "ebarimt.source",
               "imports.source"
             ],
             "type": "string"
@@ -76552,6 +77169,934 @@
           }
         }
       },
+      "EbarimtEmployeeMonthsDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "number",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "periods": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "userId",
+          "name",
+          "periods"
+        ]
+      },
+      "EbarimtPeriodValuesDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "number"
+          },
+          "purchaseAmount": {
+            "type": "string"
+          },
+          "receiptCount": {
+            "type": "number"
+          },
+          "ebarimtAmount": {
+            "type": "string"
+          },
+          "ebarimtCount": {
+            "type": "number"
+          },
+          "exemptAmount": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "period",
+          "purchaseAmount",
+          "receiptCount",
+          "ebarimtAmount",
+          "ebarimtCount",
+          "exemptAmount",
+          "note"
+        ]
+      },
+      "EbarimtHistoryField": {
+        "type": "string",
+        "enum": [
+          "EMPLOYEE",
+          "EBARIMT",
+          "EXEMPT"
+        ]
+      },
+      "EbarimtHistoryKind": {
+        "type": "string",
+        "enum": [
+          "INIT",
+          "FILE",
+          "MANUAL",
+          "REVERT",
+          "LINK",
+          "UNLINK",
+          "EDIT"
+        ]
+      },
+      "EbarimtHistoryEventDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "number"
+          },
+          "field": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EbarimtHistoryField"
+              }
+            ]
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EbarimtHistoryKind"
+              }
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "nullable": true
+          },
+          "userName": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
+          "changedAt": {
+            "type": "string"
+          },
+          "changedByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "period",
+          "field",
+          "kind",
+          "amount",
+          "userName",
+          "source",
+          "changedAt",
+          "changedByName"
+        ]
+      },
+      "EbarimtReportRowDto": {
+        "type": "object",
+        "properties": {
+          "supplierId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "registers": {
+            "type": "string"
+          },
+          "registersDefault": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string"
+          },
+          "phoneDefault": {
+            "type": "string",
+            "nullable": true
+          },
+          "remark": {
+            "type": "string"
+          },
+          "sharedRegisters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "employeeUserId": {
+            "type": "number",
+            "nullable": true
+          },
+          "employeeName": {
+            "type": "string",
+            "nullable": true
+          },
+          "ordererName": {
+            "type": "string",
+            "nullable": true
+          },
+          "employeeAssigned": {
+            "type": "boolean"
+          },
+          "employeeMonths": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtEmployeeMonthsDto"
+            }
+          },
+          "purchaseAmount": {
+            "type": "string"
+          },
+          "receiptCount": {
+            "type": "number"
+          },
+          "ebarimtAmount": {
+            "type": "string"
+          },
+          "ebarimtCount": {
+            "type": "number"
+          },
+          "linkedAmount": {
+            "type": "string"
+          },
+          "exemptAmount": {
+            "type": "string"
+          },
+          "diffAmount": {
+            "type": "string"
+          },
+          "byPeriod": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtPeriodValuesDto"
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtHistoryEventDto"
+            }
+          }
+        },
+        "required": [
+          "supplierId",
+          "code",
+          "name",
+          "status",
+          "registers",
+          "registersDefault",
+          "phone",
+          "phoneDefault",
+          "remark",
+          "sharedRegisters",
+          "employeeUserId",
+          "employeeName",
+          "ordererName",
+          "employeeAssigned",
+          "employeeMonths",
+          "purchaseAmount",
+          "receiptCount",
+          "ebarimtAmount",
+          "ebarimtCount",
+          "linkedAmount",
+          "exemptAmount",
+          "diffAmount",
+          "byPeriod",
+          "history"
+        ]
+      },
+      "EbarimtUnregisteredRowDto": {
+        "type": "object",
+        "properties": {
+          "ttd": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "count": {
+            "type": "number"
+          },
+          "periods": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "ttd",
+          "name",
+          "amount",
+          "count",
+          "periods"
+        ]
+      },
+      "EbarimtLinkViewDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "number"
+          },
+          "receiptKey": {
+            "type": "string"
+          },
+          "ttd": {
+            "type": "string"
+          },
+          "partnerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveryNoteNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "docDate": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "string"
+          },
+          "supplierId": {
+            "type": "number"
+          },
+          "supplierCode": {
+            "type": "string"
+          },
+          "supplierName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "stale": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "period",
+          "receiptKey",
+          "ttd",
+          "partnerName",
+          "deliveryNoteNo",
+          "docDate",
+          "amount",
+          "supplierId",
+          "supplierCode",
+          "supplierName",
+          "createdAt",
+          "createdByName",
+          "stale"
+        ]
+      },
+      "EbarimtReportDto": {
+        "type": "object",
+        "properties": {
+          "periods": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "noFile": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtReportRowDto"
+            }
+          },
+          "unregistered": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtUnregisteredRowDto"
+            }
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtLinkViewDto"
+            }
+          },
+          "accountCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "periods",
+          "noFile",
+          "rows",
+          "unregistered",
+          "links",
+          "accountCodes"
+        ]
+      },
+      "EbarimtReceiptBriefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "period": {
+            "type": "number"
+          },
+          "day": {
+            "type": "string"
+          },
+          "supplierDocNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "accountCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "accountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "counted": {
+            "type": "boolean"
+          },
+          "pricePending": {
+            "type": "boolean"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "warehouses": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "period",
+          "day",
+          "supplierDocNo",
+          "accountCode",
+          "accountName",
+          "counted",
+          "pricePending",
+          "lineCount",
+          "warehouses",
+          "note",
+          "amount"
+        ]
+      },
+      "EbarimtReceiptListDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtReceiptBriefDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EbarimtEntryLinkDto": {
+        "type": "object",
+        "properties": {
+          "supplierId": {
+            "type": "number"
+          },
+          "supplierCode": {
+            "type": "string"
+          },
+          "supplierName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "supplierId",
+          "supplierCode",
+          "supplierName",
+          "createdAt",
+          "createdByName"
+        ]
+      },
+      "EbarimtEntryViewDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "number"
+          },
+          "receiptKey": {
+            "type": "string"
+          },
+          "ddtd": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveryNoteNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "docDate": {
+            "type": "string"
+          },
+          "partnerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "ttd": {
+            "type": "string"
+          },
+          "vatAmount": {
+            "type": "string"
+          },
+          "netAmount": {
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "link": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EbarimtEntryLinkDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "period",
+          "receiptKey",
+          "ddtd",
+          "deliveryNoteNo",
+          "docDate",
+          "partnerName",
+          "ttd",
+          "vatAmount",
+          "netAmount",
+          "totalAmount",
+          "kind",
+          "link"
+        ]
+      },
+      "EbarimtEntriesDto": {
+        "type": "object",
+        "properties": {
+          "registers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "noFile": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtEntryViewDto"
+            }
+          }
+        },
+        "required": [
+          "registers",
+          "noFile",
+          "rows"
+        ]
+      },
+      "EbarimtMonthFileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "period": {
+            "type": "number"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "rowCount": {
+            "type": "number"
+          },
+          "vatAmount": {
+            "type": "string",
+            "example": "90909.09"
+          },
+          "totalAmount": {
+            "type": "string",
+            "example": "1000000.00"
+          },
+          "uploadedAt": {
+            "type": "string"
+          },
+          "uploadedByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "period",
+          "fileName",
+          "rowCount",
+          "vatAmount",
+          "totalAmount",
+          "uploadedAt",
+          "uploadedByName"
+        ]
+      },
+      "EbarimtMonthDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "number"
+          },
+          "file": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EbarimtMonthFileDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "period",
+          "file"
+        ]
+      },
+      "EbarimtFileOverviewDto": {
+        "type": "object",
+        "properties": {
+          "months": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtMonthDto"
+            }
+          },
+          "latestPeriod": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "months",
+          "latestPeriod"
+        ]
+      },
+      "EbarimtImportRequestDto": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "An uploaded file of kind ebarimt.source"
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "example": "EBARIMT Падаан (Худалдан авалт) 2026 [10-р сар].xlsx"
+          }
+        },
+        "required": [
+          "fileId",
+          "fileName"
+        ]
+      },
+      "EbarimtImportResultDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "period": {
+            "type": "number"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "rowCount": {
+            "type": "number"
+          },
+          "vatAmount": {
+            "type": "string",
+            "example": "90909.09"
+          },
+          "totalAmount": {
+            "type": "string",
+            "example": "1000000.00"
+          },
+          "uploadedAt": {
+            "type": "string"
+          },
+          "uploadedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "replacedRowCount": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "period",
+          "fileName",
+          "rowCount",
+          "vatAmount",
+          "totalAmount",
+          "uploadedAt",
+          "uploadedByName",
+          "replacedRowCount"
+        ]
+      },
+      "EbarimtAccountOptionDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "counted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "isDefault",
+          "counted"
+        ]
+      },
+      "EbarimtSettingsDto": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtAccountOptionDto"
+            }
+          }
+        },
+        "required": [
+          "accounts"
+        ]
+      },
+      "EbarimtSettingsRequestDto": {
+        "type": "object",
+        "properties": {
+          "accountCodes": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 20
+            }
+          }
+        },
+        "required": [
+          "accountCodes"
+        ]
+      },
+      "EbarimtMonthValueRequestDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "number"
+          },
+          "supplierId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "exemptAmount": {
+            "type": "string",
+            "pattern": "^\\d{1,12}(\\.\\d{1,2})?$",
+            "example": "626673.00",
+            "description": "Exempt from VAT, up to 2 decimals"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "period",
+          "supplierId"
+        ]
+      },
+      "EbarimtAssignRequestDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "number"
+          },
+          "supplierIds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "userId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "null: back to the own orderer"
+          }
+        },
+        "required": [
+          "period",
+          "supplierIds",
+          "userId"
+        ]
+      },
+      "EbarimtAssignResultDto": {
+        "type": "object",
+        "properties": {
+          "changed": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "changed"
+        ]
+      },
+      "EbarimtProfileRequestDto": {
+        "type": "object",
+        "properties": {
+          "registers": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200,
+            "description": "null: the record’s"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 60,
+            "description": "null: the record’s"
+          },
+          "remark": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        }
+      },
+      "EbarimtLinkRequestDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "number"
+          },
+          "receiptKeys": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          "supplierId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "null: undoes the links"
+          }
+        },
+        "required": [
+          "period",
+          "receiptKeys",
+          "supplierId"
+        ]
+      },
+      "EbarimtLinkResultDto": {
+        "type": "object",
+        "properties": {
+          "linked": {
+            "type": "number"
+          },
+          "unlinked": {
+            "type": "number"
+          },
+          "skipped": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "linked",
+          "unlinked",
+          "skipped"
+        ]
+      },
       "ErrorCode": {
         "type": "string",
         "enum": [
@@ -76686,6 +78231,11 @@
           "ORDER_STATE_INVALID",
           "STAGE_SKIP",
           "ORDER_CHANGED",
+          "EBARIMT_FILE_UNREADABLE",
+          "EBARIMT_FILE_COLUMNS",
+          "EBARIMT_FILE_EMPTY",
+          "EBARIMT_FILE_ROW",
+          "EBARIMT_FILE_MONTHS",
           "PICK_INCOMPLETE",
           "PICK_TAKEN",
           "PICK_STATE_INVALID",

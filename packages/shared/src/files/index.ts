@@ -82,6 +82,13 @@ export const FILE_KINDS = {
     visibility: 'public',
     permissions: ['hr.attendance.manage'],
   },
+  /** A month's e-Barimt export for «Ebarimt» (ADR-0168): kept privately, every version. */
+  'ebarimt.source': {
+    contentTypes: [XLSX_CONTENT_TYPE],
+    maxBytes: 5 * 1024 * 1024,
+    visibility: 'private',
+    permissions: ['ebarimt.check.edit'],
+  },
   /** An Excel sheet for the importer (ADR-0036): kept privately as the record of what was imported. */
   'imports.source': {
     contentTypes: [XLSX_CONTENT_TYPE],

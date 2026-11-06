@@ -425,6 +425,13 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'finance.read',
       },
       {
+        // A month's purchases against e-Barimt (ADR-0168): for whoever holds its own right.
+        to: '/finance/ebarimt',
+        label: 'nav.ebarimtCheck',
+        icon: ReceiptText,
+        permission: 'ebarimt.check.read',
+      },
+      {
         to: '/finance/trial-balance',
         label: 'nav.trialBalance',
         icon: Scale,
