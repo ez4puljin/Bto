@@ -33245,6 +33245,51 @@
         ]
       }
     },
+    "/api/v1/app-releases/{variant}/apk": {
+      "get": {
+        "operationId": "AppReleases_download",
+        "parameters": [
+          {
+            "name": "variant",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "staff",
+                "customer"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The APK file",
+            "content": {
+              "application/vnd.android.package-archive": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "app-releases"
+        ]
+      }
+    },
     "/api/v1/reports/refresh-state": {
       "get": {
         "operationId": "Reports_refreshState",

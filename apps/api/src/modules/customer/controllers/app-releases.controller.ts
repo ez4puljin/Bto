@@ -1,6 +1,6 @@
 import { pipeline } from 'node:stream/promises';
 import { Controller, Get, Param, Res } from '@nestjs/common';
-import { ApiExcludeEndpoint, ApiOkResponse, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiParam, ApiProduces, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { Public } from '../../../common/auth/public.decorator';
 import { AppError } from '../../../common/errors/app-error';
@@ -45,7 +45,9 @@ export class AppReleasesController {
 
   @Public()
   @Get(':variant/apk')
-  @ApiExcludeEndpoint()
+  @ApiParam({ name: 'variant', enum: APP_RELEASE_VARIANTS })
+  @ApiProduces('application/vnd.android.package-archive')
+  @ApiOkResponse({ description: 'The APK file', schema: { type: 'string', format: 'binary' } })
   async download(@Param('variant') variant: string, @Res() response: Response): Promise<void> {
     const found = await this.releases.open(variantOf(variant));
     if (!found) throw new AppError('NOT_FOUND', 'no release of this app');

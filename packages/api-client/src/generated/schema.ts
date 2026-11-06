@@ -8180,6 +8180,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app-releases/{variant}/apk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AppReleases_download"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/refresh-state": {
         parameters: {
             query?: never;
@@ -39911,6 +39927,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AppReleaseLookup"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AppReleases_download: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                variant: "staff" | "customer";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The APK file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.android.package-archive": string;
                 };
             };
             /** @description RFC 9457 problem details */
