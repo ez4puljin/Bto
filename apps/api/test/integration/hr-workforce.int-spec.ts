@@ -207,8 +207,9 @@ describe('hr workforce', () => {
       .set(bearer(hr))
       .send({ approve: false, note: null })
       .expect(409);
-    // A missed punch, approved, becomes the punch.
-    const at = new Date(Date.now() - 2 * 3_600_000).toISOString();
+    // A missed punch, approved, becomes the punch. Today's first moment, never "hours ago": just after
+    // midnight that lands on yesterday, the leave day the report below reads.
+    const at = new Date(`${today}T00:00:00+08:00`).toISOString();
     const missed = await http()
       .post('/api/v1/hr/requests')
       .set(bearer(employeeToken))
