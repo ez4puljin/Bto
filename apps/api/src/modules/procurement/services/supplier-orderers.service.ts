@@ -46,6 +46,14 @@ export class SupplierOrderersService {
     return { supplierId, userId: row.userId, fullName: names.get(row.userId) ?? null };
   }
 
+  /** Every supplier's orderer (ADR-0168). */
+  async allUserIds(executor: Db | Tx = this.db): Promise<Map<number, number>> {
+    const rows = await executor
+      .select({ supplierId: supplierOrderers.supplierId, userId: supplierOrderers.userId })
+      .from(supplierOrderers);
+    return new Map(rows.map((row) => [row.supplierId, row.userId]));
+  }
+
   /** The staff members who may be an orderer: the active holders of the edit right, by name. */
   async candidates(): Promise<{ id: number; fullName: string }[]> {
     const ids = await this.holders.activeHolders(EDIT);

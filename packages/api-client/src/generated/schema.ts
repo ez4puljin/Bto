@@ -6201,6 +6201,232 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/finance/bank-statements/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BankStatements_calendar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/bank-statements/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BankStatements_rules"];
+        put: operations["BankStatements_saveRules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/bank-statements/export-manifest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BankStatements_manifest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/bank-statements/export-by-date.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BankStatements_exportByDate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/bank-statements/export-fees.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BankStatements_exportFees"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/bank-statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BankStatements_byDate"];
+        put?: never;
+        /** The file came through `POST /files/presign`; its lines are read here, at once. */
+        post: operations["BankStatements_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/bank-statements/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BankStatements_get"];
+        put?: never;
+        post?: never;
+        delete: operations["BankStatements_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/bank-statements/{id}/money-account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["BankStatements_link"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/bank-statements/{id}/swap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BankStatements_swap"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/bank-statements/{id}/lines/{lineId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["BankStatements_updateLine"];
+        trace?: never;
+    };
+    "/api/v1/finance/bank-statements/{id}/lines/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BankStatements_updateLines"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/bank-statements/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Each line's posting is keyed by the line itself, so a resend finds them in the books already. */
+        post: operations["BankStatements_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/bank-statements/{id}/lines/{lineId}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BankStatements_reverse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/bank-statements/{id}/export.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BankStatements_exportStatement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/supplier-balances": {
         parameters: {
             query?: never;
@@ -9091,6 +9317,185 @@ export interface paths {
         patch: operations["Trucks_update"];
         trace?: never;
     };
+    "/api/v1/ebarimt-check/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EbarimtCheck_getReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ebarimt-check/receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The receipts behind a supplier's purchases; each row opens the receipt. */
+        get: operations["EbarimtCheck_receipts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ebarimt-check/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** e-Barimt's lines behind a figure: a supplier's, or one register's. */
+        get: operations["EbarimtCheck_entries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ebarimt-check/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EbarimtCheck_overview"];
+        put?: never;
+        /** Attaches an uploaded export to the month its dates fall in; replaces that month's file. */
+        post: operations["EbarimtCheck_importFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ebarimt-check/files/{period}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["EbarimtCheck_removeFile"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ebarimt-check/files/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EbarimtCheck_download"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ebarimt-check/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EbarimtCheck_getSettings"];
+        put: operations["EbarimtCheck_saveSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ebarimt-check/month-values": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["EbarimtCheck_saveMonthValue"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ebarimt-check/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["EbarimtCheck_assign"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ebarimt-check/suppliers/{id}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["EbarimtCheck_saveProfile"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ebarimt-check/receipt-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["EbarimtCheck_link"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -9176,7 +9581,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "inventory.issues.confirm" | "procurement.orders.read" | "procurement.orders.edit" | "procurement.orders.manage" | "procurement.prices.read" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "ai.settings.manage" | "ai.data.catalog" | "ai.data.stock" | "ai.data.customers" | "ai.data.suppliers" | "ai.data.pricing" | "ai.data.sales" | "ai.data.finance" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.pickLead" | "sales.orders.moveAny" | "sales.orders.rep" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "pos.loyalty.manage" | "notifications.send" | "customer.home.manage" | "hr.attendance.view" | "hr.attendance.manage" | "reports.view" | "reports.margins.view";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "inventory.issues.confirm" | "procurement.orders.read" | "procurement.orders.edit" | "procurement.orders.manage" | "procurement.prices.read" | "ebarimt.check.read" | "ebarimt.check.edit" | "ebarimt.check.assign" | "ebarimt.check.settings" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "ai.settings.manage" | "ai.data.catalog" | "ai.data.stock" | "ai.data.customers" | "ai.data.suppliers" | "ai.data.pricing" | "ai.data.sales" | "ai.data.finance" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.pickLead" | "sales.orders.moveAny" | "sales.orders.rep" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "pos.loyalty.manage" | "notifications.send" | "customer.home.manage" | "hr.attendance.view" | "hr.attendance.manage" | "reports.view" | "reports.margins.view";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -9584,7 +9989,7 @@ export interface components {
         };
         FileUploadRequest: {
             /** @enum {string} */
-            kind: "catalog.product_image" | "catalog.product_thumb" | "notifications.notice_image" | "catalog.category_image" | "customer.banner_image" | "inventory.receipt_note" | "procurement.invoice_image" | "hr.employee_photo" | "hr.message_image" | "imports.source";
+            kind: "catalog.product_image" | "catalog.product_thumb" | "notifications.notice_image" | "catalog.category_image" | "customer.banner_image" | "inventory.receipt_note" | "procurement.invoice_image" | "hr.employee_photo" | "hr.message_image" | "finance.bank_statement" | "ebarimt.source" | "imports.source";
             /** @example image/jpeg */
             contentType: string;
             sizeBytes: number;
@@ -16332,6 +16737,198 @@ export interface components {
             /** @example Х-20261103-0001 */
             number: string;
         };
+        BankCalendarDay: {
+            /** @example 2026-11-05 */
+            date: string;
+            count: number;
+        };
+        /** @enum {string} */
+        BankLineAction: "CLOSE" | "CREATE" | "CLOSE_CREATE";
+        /** @enum {string} */
+        BankExportType: "BANK" | "CASH";
+        BankStatementRules: {
+            settlementAccountId: number | null;
+            settlementDescription: string;
+            settlementAction: components["schemas"]["BankLineAction"];
+            feeAccountId: number | null;
+            feeDescription: string;
+            feeAction: components["schemas"]["BankLineAction"];
+            feeExportType: components["schemas"]["BankExportType"];
+            /** @example 30000 */
+            partyCode: string;
+            counterAccountIds: number[];
+        };
+        BankStatementRulesRequest: {
+            settlementAccountId: number | null;
+            settlementDescription: string;
+            settlementAction: components["schemas"]["BankLineAction"];
+            feeAccountId: number | null;
+            feeDescription: string;
+            feeAction: components["schemas"]["BankLineAction"];
+            feeExportType: components["schemas"]["BankExportType"];
+            partyCode: string;
+            counterAccountIds: number[];
+        };
+        BankExportManifest: {
+            RECEIVABLE: number;
+            CASH: number;
+            BANK: number;
+            fees: number;
+        };
+        /** @enum {string} */
+        BankExportFile: "RECEIVABLE" | "CASH" | "BANK";
+        BankStatementMissing: {
+            party: number;
+            account: number;
+            description: number;
+            action: number;
+            export: number;
+        };
+        BankStatement: {
+            id: number;
+            accountNumber: string;
+            /** @example MNT */
+            currency: string;
+            /** @example 2026-11-05 */
+            statementDate: string;
+            /** @example 2026-11-05 */
+            dateTo: string;
+            fileName: string;
+            uploadedAt: string;
+            moneyAccountId: number | null;
+            moneyAccountName: string | null;
+            /** @description The chart code of the bank account */
+            accountCode: string | null;
+            lineCount: number;
+            feeCount: number;
+            /** @example 12006380.00 */
+            totalCredit: string;
+            /** @example 2180000.00 */
+            totalDebit: string;
+            filledCount: number;
+            postedCount: number;
+            missing: components["schemas"]["BankStatementMissing"];
+        };
+        BankStatementUploadRequest: {
+            fileId: number;
+            /**
+             * @description Khan Bank's own name, `Statement_MNT_<number>.xlsx`: it holds the account and the currency.
+             * @example Statement_MNT_5000000001.xlsx
+             */
+            fileName: string;
+        };
+        BankStatementUpload: {
+            statement: components["schemas"]["BankStatement"] | null;
+            newLines: number;
+            duplicateLines: number;
+        };
+        /** @enum {string} */
+        BankLineKind: "NORMAL" | "FEE" | "SETTLEMENT";
+        /** @enum {string} */
+        BankLineMissing: "party" | "account" | "description" | "action" | "export";
+        BankStatementLine: {
+            id: number;
+            lineNo: number;
+            txnAt: string;
+            /** @example 2026-11-05 */
+            businessDate: string;
+            /** @example 0.00 */
+            debit: string;
+            /** @example 168980.00 */
+            credit: string;
+            bankDescription: string;
+            bankCounterpart: string;
+            kind: components["schemas"]["BankLineKind"];
+            customerId: number | null;
+            customerName: string | null;
+            customerCode: string | null;
+            supplierId: number | null;
+            supplierName: string | null;
+            supplierCode: string | null;
+            counterAccountId: number | null;
+            counterAccountCode: string | null;
+            counterAccountName: string | null;
+            description: string;
+            action: components["schemas"]["BankLineAction"] | null;
+            exportType: components["schemas"]["BankExportType"] | null;
+            paymentId: number | null;
+            journalEntryId: number | null;
+            postedAt: string | null;
+            missing: components["schemas"]["BankLineMissing"][];
+        };
+        BankStatementDetail: {
+            id: number;
+            accountNumber: string;
+            /** @example MNT */
+            currency: string;
+            /** @example 2026-11-05 */
+            statementDate: string;
+            /** @example 2026-11-05 */
+            dateTo: string;
+            fileName: string;
+            uploadedAt: string;
+            moneyAccountId: number | null;
+            moneyAccountName: string | null;
+            /** @description The chart code of the bank account */
+            accountCode: string | null;
+            lineCount: number;
+            feeCount: number;
+            /** @example 12006380.00 */
+            totalCredit: string;
+            /** @example 2180000.00 */
+            totalDebit: string;
+            filledCount: number;
+            postedCount: number;
+            missing: components["schemas"]["BankStatementMissing"];
+            lines: components["schemas"]["BankStatementLine"][];
+        };
+        BankStatementLinkRequest: {
+            moneyAccountId: number;
+        };
+        BankLinePatch: {
+            customerId?: number | null;
+            supplierId?: number | null;
+            counterAccountId?: number | null;
+            description?: string;
+            action?: components["schemas"]["BankLineAction"] | null;
+            exportType?: components["schemas"]["BankExportType"] | null;
+        };
+        BankLinesBulkRequest: {
+            customerId?: number | null;
+            supplierId?: number | null;
+            counterAccountId?: number | null;
+            description?: string;
+            action?: components["schemas"]["BankLineAction"] | null;
+            exportType?: components["schemas"]["BankExportType"] | null;
+            lineIds: number[];
+            /** @description Each line's text made from its own bank text: «Дансаар - <банкны утга>». */
+            descriptionFromBank?: boolean;
+        };
+        BankLinesBulkResult: {
+            updated: number;
+            statement: components["schemas"]["BankStatementDetail"];
+        };
+        BankStatementPostRequest: {
+            /** @description Left out: every ready line of the statement. */
+            lineIds?: number[];
+        };
+        BankPostFailure: {
+            lineId: number;
+            lineNo: number;
+            /** @example FIN_PERIOD_CLOSED */
+            code: string;
+            detail: string;
+        };
+        BankStatementPostResult: {
+            posted: number;
+            /** @description Lines still lacking something */
+            skipped: number;
+            failures: components["schemas"]["BankPostFailure"][];
+            statement: components["schemas"]["BankStatementDetail"];
+        };
+        BankLineReverseRequest: {
+            reason: string;
+        };
         SupplierBalance: {
             supplierId: number;
             /** @example 0012 */
@@ -20060,8 +20657,224 @@ export interface components {
             capacityKg?: string | null;
             isActive?: boolean;
         };
+        EbarimtEmployeeMonthsDto: {
+            userId: number | null;
+            name: string | null;
+            periods: number[];
+        };
+        EbarimtPeriodValuesDto: {
+            period: number;
+            purchaseAmount: string;
+            receiptCount: number;
+            ebarimtAmount: string;
+            ebarimtCount: number;
+            exemptAmount: string;
+            note: string | null;
+        };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "SUPPLIER_CATEGORY_INACTIVE" | "SUPPLIER_CATEGORY_HAS_CHILDREN" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "PRODUCT_NOT_IN_APP" | "ORDER_BELOW_MINIMUM" | "ATTENDANCE_NO_SITE" | "ATTENDANCE_OUT_OF_RANGE" | "ATTENDANCE_LOCATION_IMPRECISE" | "ATTENDANCE_ALREADY_IN" | "ATTENDANCE_NOT_IN" | "ATTENDANCE_EVENT_ORDER" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "ISSUE_LINES_UNCHECKED" | "ISSUE_WAREHOUSE_CONFIRMED" | "ISSUE_PARTLY_POSTED" | "ISSUE_RECIPIENT_KIND" | "ISSUE_CORRECTION_OPEN" | "ISSUE_NOT_SENT" | "PO_NOT_ARCHIVABLE" | "PO_NOT_EDITABLE" | "PO_LOAD_OVER" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "TRANSFER_LINES_UNCOUNTED" | "TRANSFER_REQUEST_EMPTY" | "HR_POLL_CLOSED" | "HR_POLL_ANSWERED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "AI_DATA_FORBIDDEN" | "AI_BUDGET_REACHED" | "AI_USER_LIMIT_REACHED" | "AI_KEY_SECRET_MISSING" | "AI_PRICE_REQUIRED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "STAGE_SKIP" | "ORDER_CHANGED" | "PICK_INCOMPLETE" | "PICK_TAKEN" | "PICK_STATE_INVALID" | "PICKER_INVALID" | "PIPELINE_KIND_STAGE" | "PIPELINE_KIND_CHANNEL" | "PIPELINE_NO_TRANSFER_WAREHOUSE" | "PIPELINE_TRANSFER_STAGE_NEEDS_STORE" | "PIPELINE_TRANSFER_WAREHOUSE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_CASHIER_NOT_ON_TILL" | "POS_SUPERVISOR_NOT_ON_TILL" | "POS_PRODUCT_NOT_ON_TILL" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "EDGE_LINK_INVALID" | "EDGE_LINK_PEPPER_MISSING" | "EDGE_ALREADY_LINKED" | "EDGE_LINK_UNREACHABLE" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE";
+        EbarimtHistoryField: "EMPLOYEE" | "EBARIMT" | "EXEMPT";
+        /** @enum {string} */
+        EbarimtHistoryKind: "INIT" | "FILE" | "MANUAL" | "REVERT" | "LINK" | "UNLINK" | "EDIT";
+        EbarimtHistoryEventDto: {
+            period: number;
+            field: components["schemas"]["EbarimtHistoryField"];
+            kind: components["schemas"]["EbarimtHistoryKind"];
+            amount: string | null;
+            userName: string | null;
+            source: string | null;
+            changedAt: string;
+            changedByName: string | null;
+        };
+        EbarimtReportRowDto: {
+            supplierId: number;
+            code: string;
+            name: string;
+            status: string;
+            registers: string;
+            registersDefault: string | null;
+            phone: string;
+            phoneDefault: string | null;
+            remark: string;
+            sharedRegisters: string[];
+            employeeUserId: number | null;
+            employeeName: string | null;
+            ordererName: string | null;
+            employeeAssigned: boolean;
+            employeeMonths: components["schemas"]["EbarimtEmployeeMonthsDto"][];
+            purchaseAmount: string;
+            receiptCount: number;
+            ebarimtAmount: string;
+            ebarimtCount: number;
+            linkedAmount: string;
+            exemptAmount: string;
+            diffAmount: string;
+            byPeriod: components["schemas"]["EbarimtPeriodValuesDto"][];
+            history: components["schemas"]["EbarimtHistoryEventDto"][];
+        };
+        EbarimtUnregisteredRowDto: {
+            ttd: string;
+            name: string;
+            amount: string;
+            count: number;
+            periods: number[];
+        };
+        EbarimtLinkViewDto: {
+            period: number;
+            receiptKey: string;
+            ttd: string;
+            partnerName: string | null;
+            deliveryNoteNo: string | null;
+            docDate: string | null;
+            amount: string;
+            supplierId: number;
+            supplierCode: string;
+            supplierName: string;
+            createdAt: string;
+            createdByName: string | null;
+            stale: boolean;
+        };
+        EbarimtReportDto: {
+            periods: number[];
+            noFile: number[];
+            rows: components["schemas"]["EbarimtReportRowDto"][];
+            unregistered: components["schemas"]["EbarimtUnregisteredRowDto"][];
+            links: components["schemas"]["EbarimtLinkViewDto"][];
+            accountCodes: string[];
+        };
+        EbarimtReceiptBriefDto: {
+            id: number;
+            number: string | null;
+            period: number;
+            day: string;
+            supplierDocNo: string | null;
+            accountCode: string | null;
+            accountName: string | null;
+            counted: boolean;
+            pricePending: boolean;
+            lineCount: number;
+            warehouses: string;
+            note: string | null;
+            amount: string;
+        };
+        EbarimtReceiptListDto: {
+            data: components["schemas"]["EbarimtReceiptBriefDto"][];
+        };
+        EbarimtEntryLinkDto: {
+            supplierId: number;
+            supplierCode: string;
+            supplierName: string;
+            createdAt: string;
+            createdByName: string | null;
+        };
+        EbarimtEntryViewDto: {
+            period: number;
+            receiptKey: string;
+            ddtd: string | null;
+            deliveryNoteNo: string | null;
+            docDate: string;
+            partnerName: string | null;
+            ttd: string;
+            vatAmount: string;
+            netAmount: string;
+            totalAmount: string;
+            kind: string | null;
+            link: components["schemas"]["EbarimtEntryLinkDto"] | null;
+        };
+        EbarimtEntriesDto: {
+            registers: string[];
+            noFile: number[];
+            rows: components["schemas"]["EbarimtEntryViewDto"][];
+        };
+        EbarimtMonthFileDto: {
+            id: number;
+            period: number;
+            fileName: string;
+            rowCount: number;
+            /** @example 90909.09 */
+            vatAmount: string;
+            /** @example 1000000.00 */
+            totalAmount: string;
+            uploadedAt: string;
+            uploadedByName: string | null;
+        };
+        EbarimtMonthDto: {
+            period: number;
+            file: components["schemas"]["EbarimtMonthFileDto"] | null;
+        };
+        EbarimtFileOverviewDto: {
+            months: components["schemas"]["EbarimtMonthDto"][];
+            latestPeriod: number | null;
+        };
+        EbarimtImportRequestDto: {
+            /** @description An uploaded file of kind ebarimt.source */
+            fileId: number;
+            /** @example EBARIMT Падаан (Худалдан авалт) 2026 [10-р сар].xlsx */
+            fileName: string;
+        };
+        EbarimtImportResultDto: {
+            id: number;
+            period: number;
+            fileName: string;
+            rowCount: number;
+            /** @example 90909.09 */
+            vatAmount: string;
+            /** @example 1000000.00 */
+            totalAmount: string;
+            uploadedAt: string;
+            uploadedByName: string | null;
+            replacedRowCount: number | null;
+        };
+        EbarimtAccountOptionDto: {
+            code: string;
+            name: string;
+            isDefault: boolean;
+            counted: boolean;
+        };
+        EbarimtSettingsDto: {
+            accounts: components["schemas"]["EbarimtAccountOptionDto"][];
+        };
+        EbarimtSettingsRequestDto: {
+            accountCodes: string[];
+        };
+        EbarimtMonthValueRequestDto: {
+            period: number;
+            supplierId: number;
+            /**
+             * @description Exempt from VAT, up to 2 decimals
+             * @example 626673.00
+             */
+            exemptAmount?: string;
+            note?: string | null;
+        };
+        EbarimtAssignRequestDto: {
+            period: number;
+            supplierIds: number[];
+            /** @description null: back to the own orderer */
+            userId: number | null;
+        };
+        EbarimtAssignResultDto: {
+            changed: number;
+        };
+        EbarimtProfileRequestDto: {
+            /** @description null: the record’s */
+            registers?: string | null;
+            /** @description null: the record’s */
+            phone?: string | null;
+            remark?: string | null;
+        };
+        EbarimtLinkRequestDto: {
+            period: number;
+            receiptKeys: string[];
+            /** @description null: undoes the links */
+            supplierId: number | null;
+        };
+        EbarimtLinkResultDto: {
+            linked: number;
+            unlinked: number;
+            skipped: number;
+        };
+        /** @enum {string} */
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "SUPPLIER_CATEGORY_INACTIVE" | "SUPPLIER_CATEGORY_HAS_CHILDREN" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "PRODUCT_NOT_IN_APP" | "ORDER_BELOW_MINIMUM" | "ATTENDANCE_NO_SITE" | "ATTENDANCE_OUT_OF_RANGE" | "ATTENDANCE_LOCATION_IMPRECISE" | "ATTENDANCE_ALREADY_IN" | "ATTENDANCE_NOT_IN" | "ATTENDANCE_EVENT_ORDER" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "ISSUE_LINES_UNCHECKED" | "ISSUE_WAREHOUSE_CONFIRMED" | "ISSUE_PARTLY_POSTED" | "ISSUE_RECIPIENT_KIND" | "ISSUE_CORRECTION_OPEN" | "ISSUE_NOT_SENT" | "PO_NOT_ARCHIVABLE" | "PO_NOT_EDITABLE" | "PO_LOAD_OVER" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "TRANSFER_LINES_UNCOUNTED" | "TRANSFER_REQUEST_EMPTY" | "HR_POLL_CLOSED" | "HR_POLL_ANSWERED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "AI_DATA_FORBIDDEN" | "AI_BUDGET_REACHED" | "AI_USER_LIMIT_REACHED" | "AI_KEY_SECRET_MISSING" | "AI_PRICE_REQUIRED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "STAGE_SKIP" | "ORDER_CHANGED" | "EBARIMT_FILE_UNREADABLE" | "EBARIMT_FILE_COLUMNS" | "EBARIMT_FILE_EMPTY" | "EBARIMT_FILE_ROW" | "EBARIMT_FILE_MONTHS" | "PICK_INCOMPLETE" | "PICK_TAKEN" | "PICK_STATE_INVALID" | "PICKER_INVALID" | "PIPELINE_KIND_STAGE" | "PIPELINE_KIND_CHANNEL" | "PIPELINE_NO_TRANSFER_WAREHOUSE" | "PIPELINE_TRANSFER_STAGE_NEEDS_STORE" | "PIPELINE_TRANSFER_WAREHOUSE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "BANK_STATEMENT_UNREADABLE" | "BANK_STATEMENT_NO_ACCOUNT" | "BANK_STATEMENT_EMPTY" | "BANK_STATEMENT_POSTED" | "BANK_STATEMENT_UNLINKED" | "BANK_STATEMENT_CURRENCY" | "BANK_LINE_LOCKED" | "BANK_LINE_POSTED" | "BANK_LINE_INCOMPLETE" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_CASHIER_NOT_ON_TILL" | "POS_SUPERVISOR_NOT_ON_TILL" | "POS_PRODUCT_NOT_ON_TILL" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "EDGE_LINK_INVALID" | "EDGE_LINK_PEPPER_MISSING" | "EDGE_ALREADY_LINKED" | "EDGE_LINK_UNREACHABLE" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -35544,6 +36357,551 @@ export interface operations {
             };
         };
     };
+    BankStatements_calendar: {
+        parameters: {
+            query: {
+                month: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankCalendarDay"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BankStatements_rules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankStatementRules"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BankStatements_saveRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BankStatementRulesRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankStatementRules"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BankStatements_manifest: {
+        parameters: {
+            query: {
+                date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankExportManifest"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BankStatements_exportByDate: {
+        parameters: {
+            query: {
+                file: components["schemas"]["BankExportFile"];
+                date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BankStatements_exportFees: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BankStatements_byDate: {
+        parameters: {
+            query: {
+                date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankStatement"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BankStatements_upload: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BankStatementUploadRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankStatementUpload"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BankStatements_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankStatementDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BankStatements_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BankStatements_link: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BankStatementLinkRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankStatement"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BankStatements_swap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankStatementDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BankStatements_updateLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                lineId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BankLinePatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankStatementLine"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BankStatements_updateLines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BankLinesBulkRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankLinesBulkResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BankStatements_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BankStatementPostRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankStatementPostResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BankStatements_reverse: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+                lineId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BankLineReverseRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankStatementDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BankStatements_exportStatement: {
+        parameters: {
+            query: {
+                file: components["schemas"]["BankExportFile"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     SupplierBalances_list: {
         parameters: {
             query?: {
@@ -41975,6 +43333,410 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Truck"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtCheck_getReport: {
+        parameters: {
+            query: {
+                /** @description Months, comma separated */
+                periods: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtReportDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtCheck_receipts: {
+        parameters: {
+            query: {
+                /** @description Months, comma separated */
+                periods: string;
+                supplierId: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtReceiptListDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtCheck_entries: {
+        parameters: {
+            query: {
+                /** @description Months, comma separated */
+                periods: string;
+                supplierId?: number;
+                ttd?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtEntriesDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtCheck_overview: {
+        parameters: {
+            query: {
+                year: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtFileOverviewDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtCheck_importFile: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EbarimtImportRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtImportResultDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtCheck_removeFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtCheck_download: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file as uploaded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtCheck_getSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtSettingsDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtCheck_saveSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EbarimtSettingsRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtSettingsDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtCheck_saveMonthValue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EbarimtMonthValueRequestDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtCheck_assign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EbarimtAssignRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtAssignResultDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtCheck_saveProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EbarimtProfileRequestDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtCheck_link: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EbarimtLinkRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtLinkResultDto"];
                 };
             };
             /** @description RFC 9457 problem details */

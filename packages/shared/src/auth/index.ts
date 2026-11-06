@@ -47,6 +47,13 @@ export const PERMISSIONS = [
   'procurement.orders.edit',
   'procurement.orders.manage',
   'procurement.prices.read',
+  // «Ebarimt» (ADR-0168): read the month's purchases against e-Barimt (cost data); import its file,
+  // write the exempt amounts, notes and registers, link receipts; choose a supplier's employee on
+  // this page; which accounts' receipts count, and taking a month's file away.
+  'ebarimt.check.read',
+  'ebarimt.check.edit',
+  'ebarimt.check.assign',
+  'ebarimt.check.settings',
   'imports.manage',
   'pricing.manage',
   'pricing.prices.manage',
@@ -189,6 +196,9 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'procurement.orders.edit',
     'procurement.orders.manage',
     'procurement.prices.read',
+    // Who chases suppliers for their e-Barimt (ADR-0168).
+    'ebarimt.check.read',
+    'ebarimt.check.edit',
   ],
   // Warehouse staff count goods in and out but never see costs; an admin approves adjustments.
   WAREHOUSE: [
@@ -235,6 +245,10 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     // Management reports with margins (ADR-0108 #5).
     'reports.view',
     'reports.margins.view',
+    // The month's purchases against e-Barimt (ADR-0168).
+    'ebarimt.check.read',
+    'ebarimt.check.edit',
+    'ebarimt.check.settings',
   ],
   // Attendance (ADR-0131): the dashboard, the work sites, the schedule and the corrections.
   HR: ['hr.attendance.view', 'hr.attendance.manage'],

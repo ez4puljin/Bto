@@ -306,6 +306,24 @@ export interface ReceiptSummary {
   createdAt: Date;
 }
 
+/** A posted receipt as «Ebarimt» sums it (ADR-0168). */
+export interface PostedReceiptFact {
+  id: number;
+  number: string | null;
+  supplierId: number;
+  supplierDocNo: string | null;
+  /** The delivery note's date, else the posting's: the day the receipts list files it under. */
+  day: string;
+  /** The account the bill credits; null: the payable's own. */
+  counterAccountCode: string | null;
+  costingStatus: 'PENDING' | 'COSTED' | null;
+  lineCount: number;
+  warehouses: string;
+  note: string | null;
+  /** The payable: the latest costing's, else the typed prices less the discount. */
+  netAmount: Decimal;
+}
+
 export interface ReceiptQuery {
   /** Receipts with a line in this warehouse. */
   warehouseId?: number;
@@ -1599,6 +1617,52 @@ export class ReceiptsService implements OnModuleInit {
       })),
       nextCursor: page.nextCursor,
     };
+  }
+
+  /**
+   * The posted receipts whose delivery note (else posting) falls in a span of days, each with what
+   * the supplier is owed, the same figures the receipts list shows (ADR-0168).
+   */
+  async postedBetween(from: string, to: string, supplierId?: number): Promise<PostedReceiptFact[]> {
+    const day = sql`coalesce(goods_receipts.supplier_doc_date, goods_receipts.effective_date)`;
+    const rows = await this.db
+      .select({
+        id: goodsReceipts.id,
+        number: goodsReceipts.number,
+        supplierId: goodsReceipts.supplierId,
+        supplierDocNo: goodsReceipts.supplierDocNo,
+        day: sql<string>`${day}::text`,
+        counterAccountCode: goodsReceipts.counterAccountCode,
+        costingStatus: goodsReceipts.costingStatus,
+        costingVersion: goodsReceipts.costingVersion,
+        note: goodsReceipts.note,
+        lineCount: sql<string>`(SELECT count(*) FROM goods_receipt_lines l WHERE l.receipt_id = goods_receipts.id)`,
+        warehouses: sql<
+          string | null
+        >`(SELECT string_agg(DISTINCT w.name, ', ') FROM goods_receipt_lines l JOIN warehouses w ON w.id = l.warehouse_id WHERE l.receipt_id = goods_receipts.id)`,
+      })
+      .from(goodsReceipts)
+      .where(
+        and(
+          eq(goodsReceipts.status, 'POSTED'),
+          sql`${day} >= ${from}::date`,
+          sql`${day} <= ${to}::date`,
+          supplierId === undefined ? undefined : eq(goodsReceipts.supplierId, supplierId),
+        ),
+      )
+      .orderBy(sql`${day}`, goodsReceipts.id);
+    const costed = await this.posting.receiptPayables(
+      rows.filter((row) => row.costingVersion > 0).map((row) => row.id),
+    );
+    const typed = await this.typedPayables(
+      rows.filter((row) => row.costingVersion === 0).map((row) => row.id),
+    );
+    return rows.map(({ costingVersion, lineCount, warehouses, ...row }) => ({
+      ...row,
+      lineCount: Number.parseInt(lineCount, 10),
+      warehouses: warehouses ?? '',
+      netAmount: (costingVersion > 0 ? costed.get(row.id) : typed.get(row.id)) ?? new Decimal(0),
+    }));
   }
 
   // -------------------------------------------------------------------------------------------

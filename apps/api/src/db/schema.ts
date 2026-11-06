@@ -222,3 +222,13 @@ export {
   finSourceSystems,
   finTenants,
 } from '../finance-core/schema';
+export {
+  ebarimtCheckAccounts,
+  ebarimtCheckAssignments,
+  ebarimtCheckEntries,
+  ebarimtCheckFiles,
+  ebarimtCheckHistory,
+  ebarimtCheckMonthValues,
+  ebarimtCheckReceiptLinks,
+  ebarimtCheckSupplierProfiles,
+} from '../modules/ebarimt-check/schema';

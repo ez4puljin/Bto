@@ -8,6 +8,7 @@ import { HealthModule } from './health/health.module';
 import { LlmModule } from './integrations/llm';
 import { AiHttpModule } from './modules/ai';
 import { CatalogHttpModule } from './modules/catalog';
+import { EbarimtCheckHttpModule } from './modules/ebarimt-check';
 import { CustomerHttpModule } from './modules/customer';
 import { FinBridgeHttpModule } from './modules/fin-bridge';
 import { FinanceHttpModule } from './modules/finance';
@@ -51,6 +52,7 @@ import { SegmentsHttpModule } from './modules/segments';
     CustomerHttpModule,
     ReportingHttpModule,
     ProcurementHttpModule,
+    EbarimtCheckHttpModule,
   ],
 })
 export class AppModule {}

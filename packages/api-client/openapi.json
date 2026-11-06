@@ -25948,6 +25948,887 @@
         ]
       }
     },
+    "/api/v1/finance/bank-statements/calendar": {
+      "get": {
+        "operationId": "BankStatements_calendar",
+        "parameters": [
+          {
+            "name": "month",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "example": "2026-11",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BankCalendarDay"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/rules": {
+      "get": {
+        "operationId": "BankStatements_rules",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankStatementRules"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      },
+      "put": {
+        "operationId": "BankStatements_saveRules",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankStatementRulesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankStatementRules"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/export-manifest": {
+      "get": {
+        "operationId": "BankStatements_manifest",
+        "parameters": [
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-05",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankExportManifest"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/export-by-date.xlsx": {
+      "get": {
+        "operationId": "BankStatements_exportByDate",
+        "parameters": [
+          {
+            "name": "file",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/BankExportFile"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-05",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/export-fees.xlsx": {
+      "get": {
+        "operationId": "BankStatements_exportFees",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-30",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements": {
+      "get": {
+        "operationId": "BankStatements_byDate",
+        "parameters": [
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-05",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BankStatement"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      },
+      "post": {
+        "operationId": "BankStatements_upload",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankStatementUploadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankStatementUpload"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The file came through `POST /files/presign`; its lines are read here, at once.",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/{id}": {
+      "get": {
+        "operationId": "BankStatements_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankStatementDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      },
+      "delete": {
+        "operationId": "BankStatements_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/{id}/money-account": {
+      "put": {
+        "operationId": "BankStatements_link",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankStatementLinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankStatement"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/{id}/swap": {
+      "post": {
+        "operationId": "BankStatements_swap",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankStatementDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/{id}/lines/{lineId}": {
+      "patch": {
+        "operationId": "BankStatements_updateLine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lineId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankLinePatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankStatementLine"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/{id}/lines/bulk": {
+      "post": {
+        "operationId": "BankStatements_updateLines",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankLinesBulkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankLinesBulkResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/{id}/post": {
+      "post": {
+        "operationId": "BankStatements_post",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankStatementPostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankStatementPostResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Each line's posting is keyed by the line itself, so a resend finds them in the books already.",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/{id}/lines/{lineId}/reverse": {
+      "post": {
+        "operationId": "BankStatements_reverse",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lineId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankLineReverseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankStatementDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/{id}/export.xlsx": {
+      "get": {
+        "operationId": "BankStatements_exportStatement",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "file",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/BankExportFile"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
     "/api/v1/supplier-balances": {
       "get": {
         "operationId": "SupplierBalances_list",
@@ -37723,6 +38604,618 @@
           "procurement"
         ]
       }
+    },
+    "/api/v1/ebarimt-check/report": {
+      "get": {
+        "operationId": "EbarimtCheck_getReport",
+        "parameters": [
+          {
+            "name": "periods",
+            "required": true,
+            "in": "query",
+            "description": "Months, comma separated",
+            "schema": {
+              "minItems": 1,
+              "example": "202610,202609",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtReportDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/receipts": {
+      "get": {
+        "operationId": "EbarimtCheck_receipts",
+        "parameters": [
+          {
+            "name": "periods",
+            "required": true,
+            "in": "query",
+            "description": "Months, comma separated",
+            "schema": {
+              "minItems": 1,
+              "example": "202610,202609",
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtReceiptListDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The receipts behind a supplier's purchases; each row opens the receipt.",
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/entries": {
+      "get": {
+        "operationId": "EbarimtCheck_entries",
+        "parameters": [
+          {
+            "name": "periods",
+            "required": true,
+            "in": "query",
+            "description": "Months, comma separated",
+            "schema": {
+              "minItems": 1,
+              "example": "202610,202609",
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "ttd",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 40,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtEntriesDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "e-Barimt's lines behind a figure: a supplier's, or one register's.",
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/files": {
+      "get": {
+        "operationId": "EbarimtCheck_overview",
+        "parameters": [
+          {
+            "name": "year",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 2000,
+              "maximum": 2100,
+              "example": 2026,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtFileOverviewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      },
+      "post": {
+        "operationId": "EbarimtCheck_importFile",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbarimtImportRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtImportResultDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Attaches an uploaded export to the month its dates fall in; replaces that month's file.",
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/files/{period}": {
+      "delete": {
+        "operationId": "EbarimtCheck_removeFile",
+        "parameters": [
+          {
+            "name": "period",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/files/{id}/download": {
+      "get": {
+        "operationId": "EbarimtCheck_download",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file as uploaded"
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/settings": {
+      "get": {
+        "operationId": "EbarimtCheck_getSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtSettingsDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      },
+      "put": {
+        "operationId": "EbarimtCheck_saveSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbarimtSettingsRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtSettingsDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/month-values": {
+      "put": {
+        "operationId": "EbarimtCheck_saveMonthValue",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbarimtMonthValueRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/assignments": {
+      "put": {
+        "operationId": "EbarimtCheck_assign",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbarimtAssignRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtAssignResultDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/suppliers/{id}/profile": {
+      "put": {
+        "operationId": "EbarimtCheck_saveProfile",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbarimtProfileRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/receipt-links": {
+      "put": {
+        "operationId": "EbarimtCheck_link",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbarimtLinkRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtLinkResultDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
     }
   },
   "info": {
@@ -38015,6 +39508,10 @@
           "procurement.orders.edit",
           "procurement.orders.manage",
           "procurement.prices.read",
+          "ebarimt.check.read",
+          "ebarimt.check.edit",
+          "ebarimt.check.assign",
+          "ebarimt.check.settings",
           "imports.manage",
           "pricing.manage",
           "pricing.prices.manage",
@@ -39451,6 +40948,8 @@
               "procurement.invoice_image",
               "hr.employee_photo",
               "hr.message_image",
+              "finance.bank_statement",
+              "ebarimt.source",
               "imports.source"
             ],
             "type": "string"
@@ -63393,6 +64892,800 @@
           "number"
         ]
       },
+      "BankCalendarDay": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "example": "2026-11-05"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "date",
+          "count"
+        ]
+      },
+      "BankLineAction": {
+        "type": "string",
+        "enum": [
+          "CLOSE",
+          "CREATE",
+          "CLOSE_CREATE"
+        ]
+      },
+      "BankExportType": {
+        "type": "string",
+        "enum": [
+          "BANK",
+          "CASH"
+        ]
+      },
+      "BankStatementRules": {
+        "type": "object",
+        "properties": {
+          "settlementAccountId": {
+            "type": "number",
+            "nullable": true
+          },
+          "settlementDescription": {
+            "type": "string"
+          },
+          "settlementAction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankLineAction"
+              }
+            ]
+          },
+          "feeAccountId": {
+            "type": "number",
+            "nullable": true
+          },
+          "feeDescription": {
+            "type": "string"
+          },
+          "feeAction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankLineAction"
+              }
+            ]
+          },
+          "feeExportType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankExportType"
+              }
+            ]
+          },
+          "partyCode": {
+            "type": "string",
+            "example": "30000"
+          },
+          "counterAccountIds": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "settlementAccountId",
+          "settlementDescription",
+          "settlementAction",
+          "feeAccountId",
+          "feeDescription",
+          "feeAction",
+          "feeExportType",
+          "partyCode",
+          "counterAccountIds"
+        ]
+      },
+      "BankStatementRulesRequest": {
+        "type": "object",
+        "properties": {
+          "settlementAccountId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "settlementDescription": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "settlementAction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankLineAction"
+              }
+            ]
+          },
+          "feeAccountId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "feeDescription": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "feeAction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankLineAction"
+              }
+            ]
+          },
+          "feeExportType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankExportType"
+              }
+            ]
+          },
+          "partyCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "counterAccountIds": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "required": [
+          "settlementAccountId",
+          "settlementDescription",
+          "settlementAction",
+          "feeAccountId",
+          "feeDescription",
+          "feeAction",
+          "feeExportType",
+          "partyCode",
+          "counterAccountIds"
+        ]
+      },
+      "BankExportManifest": {
+        "type": "object",
+        "properties": {
+          "RECEIVABLE": {
+            "type": "number"
+          },
+          "CASH": {
+            "type": "number"
+          },
+          "BANK": {
+            "type": "number"
+          },
+          "fees": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "RECEIVABLE",
+          "CASH",
+          "BANK",
+          "fees"
+        ]
+      },
+      "BankExportFile": {
+        "type": "string",
+        "enum": [
+          "RECEIVABLE",
+          "CASH",
+          "BANK"
+        ]
+      },
+      "BankStatementMissing": {
+        "type": "object",
+        "properties": {
+          "party": {
+            "type": "number"
+          },
+          "account": {
+            "type": "number"
+          },
+          "description": {
+            "type": "number"
+          },
+          "action": {
+            "type": "number"
+          },
+          "export": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "party",
+          "account",
+          "description",
+          "action",
+          "export"
+        ]
+      },
+      "BankStatement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "accountNumber": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "example": "MNT"
+          },
+          "statementDate": {
+            "type": "string",
+            "example": "2026-11-05"
+          },
+          "dateTo": {
+            "type": "string",
+            "example": "2026-11-05"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "uploadedAt": {
+            "type": "string"
+          },
+          "moneyAccountId": {
+            "type": "number",
+            "nullable": true
+          },
+          "moneyAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "accountCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "The chart code of the bank account"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "feeCount": {
+            "type": "number"
+          },
+          "totalCredit": {
+            "type": "string",
+            "example": "12006380.00"
+          },
+          "totalDebit": {
+            "type": "string",
+            "example": "2180000.00"
+          },
+          "filledCount": {
+            "type": "number"
+          },
+          "postedCount": {
+            "type": "number"
+          },
+          "missing": {
+            "$ref": "#/components/schemas/BankStatementMissing"
+          }
+        },
+        "required": [
+          "id",
+          "accountNumber",
+          "currency",
+          "statementDate",
+          "dateTo",
+          "fileName",
+          "uploadedAt",
+          "moneyAccountId",
+          "moneyAccountName",
+          "accountCode",
+          "lineCount",
+          "feeCount",
+          "totalCredit",
+          "totalDebit",
+          "filledCount",
+          "postedCount",
+          "missing"
+        ]
+      },
+      "BankStatementUploadRequest": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Khan Bank's own name, `Statement_MNT_<number>.xlsx`: it holds the account and the currency.",
+            "minLength": 1,
+            "maxLength": 300,
+            "example": "Statement_MNT_5000000001.xlsx"
+          }
+        },
+        "required": [
+          "fileId",
+          "fileName"
+        ]
+      },
+      "BankStatementUpload": {
+        "type": "object",
+        "properties": {
+          "statement": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankStatement"
+              }
+            ]
+          },
+          "newLines": {
+            "type": "number"
+          },
+          "duplicateLines": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "statement",
+          "newLines",
+          "duplicateLines"
+        ]
+      },
+      "BankLineKind": {
+        "type": "string",
+        "enum": [
+          "NORMAL",
+          "FEE",
+          "SETTLEMENT"
+        ]
+      },
+      "BankLineMissing": {
+        "type": "string",
+        "enum": [
+          "party",
+          "account",
+          "description",
+          "action",
+          "export"
+        ]
+      },
+      "BankStatementLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "lineNo": {
+            "type": "number"
+          },
+          "txnAt": {
+            "type": "string"
+          },
+          "businessDate": {
+            "type": "string",
+            "example": "2026-11-05"
+          },
+          "debit": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "credit": {
+            "type": "string",
+            "example": "168980.00"
+          },
+          "bankDescription": {
+            "type": "string"
+          },
+          "bankCounterpart": {
+            "type": "string"
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankLineKind"
+              }
+            ]
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "supplierId": {
+            "type": "number",
+            "nullable": true
+          },
+          "supplierName": {
+            "type": "string",
+            "nullable": true
+          },
+          "supplierCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "counterAccountId": {
+            "type": "number",
+            "nullable": true
+          },
+          "counterAccountCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "counterAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string"
+          },
+          "action": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankLineAction"
+              }
+            ]
+          },
+          "exportType": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankExportType"
+              }
+            ]
+          },
+          "paymentId": {
+            "type": "number",
+            "nullable": true
+          },
+          "journalEntryId": {
+            "type": "number",
+            "nullable": true
+          },
+          "postedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankLineMissing"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "lineNo",
+          "txnAt",
+          "businessDate",
+          "debit",
+          "credit",
+          "bankDescription",
+          "bankCounterpart",
+          "kind",
+          "customerId",
+          "customerName",
+          "customerCode",
+          "supplierId",
+          "supplierName",
+          "supplierCode",
+          "counterAccountId",
+          "counterAccountCode",
+          "counterAccountName",
+          "description",
+          "action",
+          "exportType",
+          "paymentId",
+          "journalEntryId",
+          "postedAt",
+          "missing"
+        ]
+      },
+      "BankStatementDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "accountNumber": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "example": "MNT"
+          },
+          "statementDate": {
+            "type": "string",
+            "example": "2026-11-05"
+          },
+          "dateTo": {
+            "type": "string",
+            "example": "2026-11-05"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "uploadedAt": {
+            "type": "string"
+          },
+          "moneyAccountId": {
+            "type": "number",
+            "nullable": true
+          },
+          "moneyAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "accountCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "The chart code of the bank account"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "feeCount": {
+            "type": "number"
+          },
+          "totalCredit": {
+            "type": "string",
+            "example": "12006380.00"
+          },
+          "totalDebit": {
+            "type": "string",
+            "example": "2180000.00"
+          },
+          "filledCount": {
+            "type": "number"
+          },
+          "postedCount": {
+            "type": "number"
+          },
+          "missing": {
+            "$ref": "#/components/schemas/BankStatementMissing"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankStatementLine"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "accountNumber",
+          "currency",
+          "statementDate",
+          "dateTo",
+          "fileName",
+          "uploadedAt",
+          "moneyAccountId",
+          "moneyAccountName",
+          "accountCode",
+          "lineCount",
+          "feeCount",
+          "totalCredit",
+          "totalDebit",
+          "filledCount",
+          "postedCount",
+          "missing",
+          "lines"
+        ]
+      },
+      "BankStatementLinkRequest": {
+        "type": "object",
+        "properties": {
+          "moneyAccountId": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "moneyAccountId"
+        ]
+      },
+      "BankLinePatch": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "supplierId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "counterAccountId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "action": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankLineAction"
+              }
+            ]
+          },
+          "exportType": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankExportType"
+              }
+            ]
+          }
+        }
+      },
+      "BankLinesBulkRequest": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "supplierId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "counterAccountId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "action": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankLineAction"
+              }
+            ]
+          },
+          "exportType": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankExportType"
+              }
+            ]
+          },
+          "lineIds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "descriptionFromBank": {
+            "type": "boolean",
+            "description": "Each line's text made from its own bank text: «Дансаар - <банкны утга>»."
+          }
+        },
+        "required": [
+          "lineIds"
+        ]
+      },
+      "BankLinesBulkResult": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "number"
+          },
+          "statement": {
+            "$ref": "#/components/schemas/BankStatementDetail"
+          }
+        },
+        "required": [
+          "updated",
+          "statement"
+        ]
+      },
+      "BankStatementPostRequest": {
+        "type": "object",
+        "properties": {
+          "lineIds": {
+            "description": "Left out: every ready line of the statement.",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        }
+      },
+      "BankPostFailure": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number"
+          },
+          "lineNo": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "example": "FIN_PERIOD_CLOSED"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "lineId",
+          "lineNo",
+          "code",
+          "detail"
+        ]
+      },
+      "BankStatementPostResult": {
+        "type": "object",
+        "properties": {
+          "posted": {
+            "type": "number"
+          },
+          "skipped": {
+            "type": "number",
+            "description": "Lines still lacking something"
+          },
+          "failures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankPostFailure"
+            }
+          },
+          "statement": {
+            "$ref": "#/components/schemas/BankStatementDetail"
+          }
+        },
+        "required": [
+          "posted",
+          "skipped",
+          "failures",
+          "statement"
+        ]
+      },
+      "BankLineReverseRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
       "SupplierBalance": {
         "type": "object",
         "properties": {
@@ -76552,6 +78845,934 @@
           }
         }
       },
+      "EbarimtEmployeeMonthsDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "number",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "periods": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "userId",
+          "name",
+          "periods"
+        ]
+      },
+      "EbarimtPeriodValuesDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "number"
+          },
+          "purchaseAmount": {
+            "type": "string"
+          },
+          "receiptCount": {
+            "type": "number"
+          },
+          "ebarimtAmount": {
+            "type": "string"
+          },
+          "ebarimtCount": {
+            "type": "number"
+          },
+          "exemptAmount": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "period",
+          "purchaseAmount",
+          "receiptCount",
+          "ebarimtAmount",
+          "ebarimtCount",
+          "exemptAmount",
+          "note"
+        ]
+      },
+      "EbarimtHistoryField": {
+        "type": "string",
+        "enum": [
+          "EMPLOYEE",
+          "EBARIMT",
+          "EXEMPT"
+        ]
+      },
+      "EbarimtHistoryKind": {
+        "type": "string",
+        "enum": [
+          "INIT",
+          "FILE",
+          "MANUAL",
+          "REVERT",
+          "LINK",
+          "UNLINK",
+          "EDIT"
+        ]
+      },
+      "EbarimtHistoryEventDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "number"
+          },
+          "field": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EbarimtHistoryField"
+              }
+            ]
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EbarimtHistoryKind"
+              }
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "nullable": true
+          },
+          "userName": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
+          "changedAt": {
+            "type": "string"
+          },
+          "changedByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "period",
+          "field",
+          "kind",
+          "amount",
+          "userName",
+          "source",
+          "changedAt",
+          "changedByName"
+        ]
+      },
+      "EbarimtReportRowDto": {
+        "type": "object",
+        "properties": {
+          "supplierId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "registers": {
+            "type": "string"
+          },
+          "registersDefault": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string"
+          },
+          "phoneDefault": {
+            "type": "string",
+            "nullable": true
+          },
+          "remark": {
+            "type": "string"
+          },
+          "sharedRegisters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "employeeUserId": {
+            "type": "number",
+            "nullable": true
+          },
+          "employeeName": {
+            "type": "string",
+            "nullable": true
+          },
+          "ordererName": {
+            "type": "string",
+            "nullable": true
+          },
+          "employeeAssigned": {
+            "type": "boolean"
+          },
+          "employeeMonths": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtEmployeeMonthsDto"
+            }
+          },
+          "purchaseAmount": {
+            "type": "string"
+          },
+          "receiptCount": {
+            "type": "number"
+          },
+          "ebarimtAmount": {
+            "type": "string"
+          },
+          "ebarimtCount": {
+            "type": "number"
+          },
+          "linkedAmount": {
+            "type": "string"
+          },
+          "exemptAmount": {
+            "type": "string"
+          },
+          "diffAmount": {
+            "type": "string"
+          },
+          "byPeriod": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtPeriodValuesDto"
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtHistoryEventDto"
+            }
+          }
+        },
+        "required": [
+          "supplierId",
+          "code",
+          "name",
+          "status",
+          "registers",
+          "registersDefault",
+          "phone",
+          "phoneDefault",
+          "remark",
+          "sharedRegisters",
+          "employeeUserId",
+          "employeeName",
+          "ordererName",
+          "employeeAssigned",
+          "employeeMonths",
+          "purchaseAmount",
+          "receiptCount",
+          "ebarimtAmount",
+          "ebarimtCount",
+          "linkedAmount",
+          "exemptAmount",
+          "diffAmount",
+          "byPeriod",
+          "history"
+        ]
+      },
+      "EbarimtUnregisteredRowDto": {
+        "type": "object",
+        "properties": {
+          "ttd": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "count": {
+            "type": "number"
+          },
+          "periods": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "ttd",
+          "name",
+          "amount",
+          "count",
+          "periods"
+        ]
+      },
+      "EbarimtLinkViewDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "number"
+          },
+          "receiptKey": {
+            "type": "string"
+          },
+          "ttd": {
+            "type": "string"
+          },
+          "partnerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveryNoteNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "docDate": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "string"
+          },
+          "supplierId": {
+            "type": "number"
+          },
+          "supplierCode": {
+            "type": "string"
+          },
+          "supplierName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "stale": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "period",
+          "receiptKey",
+          "ttd",
+          "partnerName",
+          "deliveryNoteNo",
+          "docDate",
+          "amount",
+          "supplierId",
+          "supplierCode",
+          "supplierName",
+          "createdAt",
+          "createdByName",
+          "stale"
+        ]
+      },
+      "EbarimtReportDto": {
+        "type": "object",
+        "properties": {
+          "periods": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "noFile": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtReportRowDto"
+            }
+          },
+          "unregistered": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtUnregisteredRowDto"
+            }
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtLinkViewDto"
+            }
+          },
+          "accountCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "periods",
+          "noFile",
+          "rows",
+          "unregistered",
+          "links",
+          "accountCodes"
+        ]
+      },
+      "EbarimtReceiptBriefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "period": {
+            "type": "number"
+          },
+          "day": {
+            "type": "string"
+          },
+          "supplierDocNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "accountCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "accountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "counted": {
+            "type": "boolean"
+          },
+          "pricePending": {
+            "type": "boolean"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "warehouses": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "period",
+          "day",
+          "supplierDocNo",
+          "accountCode",
+          "accountName",
+          "counted",
+          "pricePending",
+          "lineCount",
+          "warehouses",
+          "note",
+          "amount"
+        ]
+      },
+      "EbarimtReceiptListDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtReceiptBriefDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EbarimtEntryLinkDto": {
+        "type": "object",
+        "properties": {
+          "supplierId": {
+            "type": "number"
+          },
+          "supplierCode": {
+            "type": "string"
+          },
+          "supplierName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "supplierId",
+          "supplierCode",
+          "supplierName",
+          "createdAt",
+          "createdByName"
+        ]
+      },
+      "EbarimtEntryViewDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "number"
+          },
+          "receiptKey": {
+            "type": "string"
+          },
+          "ddtd": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveryNoteNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "docDate": {
+            "type": "string"
+          },
+          "partnerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "ttd": {
+            "type": "string"
+          },
+          "vatAmount": {
+            "type": "string"
+          },
+          "netAmount": {
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "link": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EbarimtEntryLinkDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "period",
+          "receiptKey",
+          "ddtd",
+          "deliveryNoteNo",
+          "docDate",
+          "partnerName",
+          "ttd",
+          "vatAmount",
+          "netAmount",
+          "totalAmount",
+          "kind",
+          "link"
+        ]
+      },
+      "EbarimtEntriesDto": {
+        "type": "object",
+        "properties": {
+          "registers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "noFile": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtEntryViewDto"
+            }
+          }
+        },
+        "required": [
+          "registers",
+          "noFile",
+          "rows"
+        ]
+      },
+      "EbarimtMonthFileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "period": {
+            "type": "number"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "rowCount": {
+            "type": "number"
+          },
+          "vatAmount": {
+            "type": "string",
+            "example": "90909.09"
+          },
+          "totalAmount": {
+            "type": "string",
+            "example": "1000000.00"
+          },
+          "uploadedAt": {
+            "type": "string"
+          },
+          "uploadedByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "period",
+          "fileName",
+          "rowCount",
+          "vatAmount",
+          "totalAmount",
+          "uploadedAt",
+          "uploadedByName"
+        ]
+      },
+      "EbarimtMonthDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "number"
+          },
+          "file": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EbarimtMonthFileDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "period",
+          "file"
+        ]
+      },
+      "EbarimtFileOverviewDto": {
+        "type": "object",
+        "properties": {
+          "months": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtMonthDto"
+            }
+          },
+          "latestPeriod": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "months",
+          "latestPeriod"
+        ]
+      },
+      "EbarimtImportRequestDto": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "An uploaded file of kind ebarimt.source"
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "example": "EBARIMT Падаан (Худалдан авалт) 2026 [10-р сар].xlsx"
+          }
+        },
+        "required": [
+          "fileId",
+          "fileName"
+        ]
+      },
+      "EbarimtImportResultDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "period": {
+            "type": "number"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "rowCount": {
+            "type": "number"
+          },
+          "vatAmount": {
+            "type": "string",
+            "example": "90909.09"
+          },
+          "totalAmount": {
+            "type": "string",
+            "example": "1000000.00"
+          },
+          "uploadedAt": {
+            "type": "string"
+          },
+          "uploadedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "replacedRowCount": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "period",
+          "fileName",
+          "rowCount",
+          "vatAmount",
+          "totalAmount",
+          "uploadedAt",
+          "uploadedByName",
+          "replacedRowCount"
+        ]
+      },
+      "EbarimtAccountOptionDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "counted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "isDefault",
+          "counted"
+        ]
+      },
+      "EbarimtSettingsDto": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtAccountOptionDto"
+            }
+          }
+        },
+        "required": [
+          "accounts"
+        ]
+      },
+      "EbarimtSettingsRequestDto": {
+        "type": "object",
+        "properties": {
+          "accountCodes": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 20
+            }
+          }
+        },
+        "required": [
+          "accountCodes"
+        ]
+      },
+      "EbarimtMonthValueRequestDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "number"
+          },
+          "supplierId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "exemptAmount": {
+            "type": "string",
+            "pattern": "^\\d{1,12}(\\.\\d{1,2})?$",
+            "example": "626673.00",
+            "description": "Exempt from VAT, up to 2 decimals"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "period",
+          "supplierId"
+        ]
+      },
+      "EbarimtAssignRequestDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "number"
+          },
+          "supplierIds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "userId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "null: back to the own orderer"
+          }
+        },
+        "required": [
+          "period",
+          "supplierIds",
+          "userId"
+        ]
+      },
+      "EbarimtAssignResultDto": {
+        "type": "object",
+        "properties": {
+          "changed": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "changed"
+        ]
+      },
+      "EbarimtProfileRequestDto": {
+        "type": "object",
+        "properties": {
+          "registers": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200,
+            "description": "null: the record’s"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 60,
+            "description": "null: the record’s"
+          },
+          "remark": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        }
+      },
+      "EbarimtLinkRequestDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "number"
+          },
+          "receiptKeys": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          "supplierId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "null: undoes the links"
+          }
+        },
+        "required": [
+          "period",
+          "receiptKeys",
+          "supplierId"
+        ]
+      },
+      "EbarimtLinkResultDto": {
+        "type": "object",
+        "properties": {
+          "linked": {
+            "type": "number"
+          },
+          "unlinked": {
+            "type": "number"
+          },
+          "skipped": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "linked",
+          "unlinked",
+          "skipped"
+        ]
+      },
       "ErrorCode": {
         "type": "string",
         "enum": [
@@ -76686,6 +79907,11 @@
           "ORDER_STATE_INVALID",
           "STAGE_SKIP",
           "ORDER_CHANGED",
+          "EBARIMT_FILE_UNREADABLE",
+          "EBARIMT_FILE_COLUMNS",
+          "EBARIMT_FILE_EMPTY",
+          "EBARIMT_FILE_ROW",
+          "EBARIMT_FILE_MONTHS",
           "PICK_INCOMPLETE",
           "PICK_TAKEN",
           "PICK_STATE_INVALID",
@@ -76705,6 +79931,15 @@
           "JOURNAL_UNBALANCED",
           "ACCOUNT_ROLE_TAKEN",
           "ACCOUNT_ROLE_MISSING",
+          "BANK_STATEMENT_UNREADABLE",
+          "BANK_STATEMENT_NO_ACCOUNT",
+          "BANK_STATEMENT_EMPTY",
+          "BANK_STATEMENT_POSTED",
+          "BANK_STATEMENT_UNLINKED",
+          "BANK_STATEMENT_CURRENCY",
+          "BANK_LINE_LOCKED",
+          "BANK_LINE_POSTED",
+          "BANK_LINE_INCOMPLETE",
           "POS_NOT_CONFIGURED",
           "POS_TOTALS_MISMATCH",
           "POS_TAX_MISMATCH",

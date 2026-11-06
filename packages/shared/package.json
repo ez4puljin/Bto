@@ -47,6 +47,11 @@
       "types": "./dist/text/index.d.ts",
       "default": "./dist/text/index.js"
     },
+    "./ebarimt-check": {
+      "@tugeel/source": "./src/ebarimt-check/index.ts",
+      "types": "./dist/ebarimt-check/index.d.ts",
+      "default": "./dist/ebarimt-check/index.js"
+    },
     "./category-icons": {
       "@tugeel/source": "./src/category-icons/index.ts",
       "types": "./dist/category-icons/index.d.ts",

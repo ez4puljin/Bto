@@ -319,6 +319,16 @@ export class StorageService {
     return { file, body: this.store.read('private', file.key) };
   }
 
+  /** The bytes of a verified upload not yet attached to anything, to read before accepting it. */
+  async openUploaded(
+    fileId: number,
+    kind: FileKind,
+  ): Promise<{ file: StoredFile; body: Readable }> {
+    const file = await this.verifyUploaded(fileId, kind);
+    if (fileKind(kind).visibility !== 'private') throw new Error(`${kind} is not a private kind`);
+    return { file, body: this.store.read('private', file.key) };
+  }
+
   private kindOf(file: StoredFile): FileKind {
     if (!isFileKind(file.kind)) throw new Error(`file ${file.id} has an unknown kind ${file.kind}`);
     return file.kind;
