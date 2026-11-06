@@ -67,7 +67,6 @@ export default function CustomerLayout() {
             name="categories"
             options={{ contentStyle: { backgroundColor: colors.card } }}
           />
-          <Stack.Screen name="account" />
           <Stack.Screen name="checkout" />
           <Stack.Screen name="order/[id]" />
           <Stack.Screen name="invoice/[id]" />

@@ -13,7 +13,8 @@ import {
 import { inOrderOf } from '../../src/customer/home';
 import { cardPictures } from '../../src/images/pictures';
 import { idsParam, percentIn, popupQueue, replayQueue } from '../../src/notifications/feed';
-import { KIND_STYLES, KindIcon, useNoticeEyebrow } from '../../src/notifications/kinds';
+import { KIND_STYLES, useNoticeEyebrow } from '../../src/notifications/kinds';
+import { CompanyLogo } from '../../src/ui/brand';
 import { useCustomer } from '../../src/state/session';
 import { colors, fonts, radii, shadows, spacing, type } from '../../src/theme/tokens';
 import { PillButton } from '../../src/ui/controls';
@@ -212,7 +213,7 @@ function NoticeCard({
           </View>
         ) : (
           <View style={styles.kindIcon}>
-            <KindIcon kind={notice.kind} size={44} />
+            <CompanyLogo height={56} />
           </View>
         )}
         {notice.kind === 'NEW_PRODUCT' && !notice.imageUrl ? (

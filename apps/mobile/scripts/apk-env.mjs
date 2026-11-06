@@ -101,3 +101,40 @@ export function apkOptionsOf(argv) {
 export function apkFileName({ prefix, version, versionCode, debug }) {
   return `${prefix}-${version}-${versionCode}${debug ? '-debug' : ''}.apk`;
 }
+
+/** The options of `pnpm mobile:publish -- <apk> [--storage <dir>] [--emulator]` (ADR-0166). */
+export function publishOptionsOf(argv) {
+  const args = argv.filter((arg) => arg !== '--');
+  let apk = null;
+  let storage = null;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '--storage') {
+      storage = args[index + 1] ?? null;
+      index += 1;
+    } else if (!arg.startsWith('--')) {
+      apk = arg;
+    }
+  }
+  return { apk, storage, emulator: args.includes('--emulator') };
+}
+
+/**
+ * What an APK's name says, by the variants' prefixes: `{ variant, version, versionCode, fileName }`,
+ * or null for a debug build or any other name (the reverse of `apkFileName`).
+ */
+export function releaseOf(fileName, variants) {
+  for (const [variant, app] of Object.entries(variants)) {
+    if (!fileName.startsWith(`${app.apkPrefix}-`)) continue;
+    const match = /^(\d+\.\d+\.\d+)-(\d+)\.apk$/.exec(fileName.slice(app.apkPrefix.length + 1));
+    if (match) {
+      return { variant, version: match[1], versionCode: Number(match[2]), fileName };
+    }
+  }
+  return null;
+}
+
+/** Does the APK hold the native code real phones run? Its zip entries name it in plain text. */
+export function hasPhoneCode(bytes) {
+  return bytes.includes('lib/arm64-v8a/');
+}

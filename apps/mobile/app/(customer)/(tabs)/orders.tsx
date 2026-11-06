@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import { CalendarDays, ClipboardList, SlidersHorizontal } from 'lucide-react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { CalendarDays, ClipboardList, Info, SlidersHorizontal } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, SectionList, StyleSheet, View } from 'react-native';
@@ -9,6 +9,8 @@ import {
   useStoreOrders,
 } from '../../../src/api/customer';
 import { problemFrom } from '../../../src/api/problem';
+import { AccountPanel } from '../../../src/customer/account-panel';
+import { BankInfoSheet } from '../../../src/customer/bank-info-sheet';
 import { StoreOrderFilterSheet } from '../../../src/customer/order-filter-sheet';
 import {
   activeStoreFilters,
@@ -38,6 +40,7 @@ import { Page } from '../../../src/ui/layout';
 import { StatRow } from '../../../src/ui/stat-row';
 import { HeaderIconButton, StoreHeader } from '../../../src/ui/store-header';
 import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
+import { StoreTabs } from '../../../src/ui/store-tabs';
 import { Text } from '../../../src/ui/text';
 
 /** The days the page offers as chips (the Orders board); the calendar sets any other. */
@@ -46,19 +49,24 @@ const PAGE_PRESETS: readonly RangePreset[] = ['today', 'week', 'month'];
 /** The page opens on the last 7 days (the Orders board). */
 const DEFAULT_PRESET: RangePreset = 'week';
 
-type Opened = 'none' | 'filters' | 'dates';
+type Opened = 'none' | 'filters' | 'dates' | 'banks';
+
+type OrdersTab = 'orders' | 'account';
 
 /**
- * «Захиалга» (the Orders board, ADR-0079 #6): every order of the store from the app, the office and
- * every rep, for today, 7 days, this month or days from the calendar, filtered like the rep app's
- * history (the owner 2026-10-20: who took it — «Апп», «Оффис», «Бүх ХТ» or one rep —, a product,
- * the payment, delivery or pickup, the state); the count, the confirmed total and the orders
- * waiting for the office; the orders by day, newest first, each opening its page.
+ * «Захиалга» (the Orders board, ADR-0079 #6), holding «Тооцоо» beside the orders since ADR-0166 (the
+ * owner 2026-11-06): every order of the store from the app, the office and every rep, for today,
+ * 7 days, this month or days from the calendar, filtered like the rep app's history (the owner
+ * 2026-10-20: who took it — «Апп», «Оффис», «Бүх ХТ» or one rep —, a product, the payment, delivery
+ * or pickup, the state); the count, the confirmed total and the orders waiting for the office; the
+ * orders by day, newest first, each opening its page. `?tab=account` opens «Тооцоо».
  */
 export default function StoreOrdersScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const inset = useStoreTabBarInset();
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const tab: OrdersTab = params.tab === 'account' ? 'account' : 'orders';
   const meta = useOrderMeta();
   const me = useStoreMe();
   const today = me.data?.today ?? null;
@@ -221,77 +229,99 @@ export default function StoreOrdersScreen() {
   return (
     <Page edges={[]}>
       <StoreHeader
-        title={t('mobile.tabs.orders')}
+        title={t('mobile.customer.orders.pageTitle')}
         right={
-          <HeaderIconButton
-            icon={
-              <SlidersHorizontal size={22} strokeWidth={1.9} color={colors.primaryForeground} />
-            }
-            label={t('mobile.orders.filterButton', { n: active.length })}
-            badge={active.length}
-            onPress={() => setOpened('filters')}
-          />
-        }
-      />
-      <SectionList
-        sections={sections}
-        keyExtractor={(order) => String(order.id)}
-        stickySectionHeadersEnabled={false}
-        contentContainerStyle={[styles.list, { paddingBottom: inset + spacing.lg }]}
-        ListHeaderComponent={header}
-        renderSectionHeader={({ section }) => (
-          <Text accessibilityRole="header" style={[type.sectionHeader, styles.day]}>
-            {dayTitle(section.day)}
-          </Text>
-        )}
-        renderItem={renderOrder}
-        onEndReachedThreshold={0.5}
-        onEndReached={() => {
-          if (orders.hasNextPage && !orders.isFetchingNextPage) void orders.fetchNextPage();
-        }}
-        refreshing={orders.isRefetching && !orders.isFetchingNextPage}
-        onRefresh={() => {
-          void me.refetch();
-          void orders.refetch();
-        }}
-        ListEmptyComponent={
-          orders.isLoading || (!range && !me.error) ? (
-            <ActivityIndicator style={styles.loading} color={colors.primary} />
-          ) : orders.error || me.error ? null : (
-            <View style={styles.empty}>
-              <EmptyState
-                icon={<ClipboardList size={44} strokeWidth={1.5} color={colors.input} />}
-                title={t('mobile.customer.orders.empty')}
-                hint={
-                  active.length > 0
-                    ? t('mobile.orders.emptyHint')
-                    : t('mobile.customer.orders.emptyHint')
-                }
-              />
-              {active.length > 0 ? (
-                <PillButton
-                  title={t('mobile.orders.clearFilters')}
-                  variant="soft"
-                  height={44}
-                  onPress={() => setFilters(EMPTY_STORE_ORDER_FILTERS)}
-                />
-              ) : (
-                <PillButton
-                  title={t('mobile.customer.cart.browse')}
-                  variant="soft"
-                  height={44}
-                  onPress={() => router.navigate('/shop')}
-                />
-              )}
-            </View>
+          tab === 'orders' ? (
+            <HeaderIconButton
+              icon={
+                <SlidersHorizontal size={22} strokeWidth={1.9} color={colors.primaryForeground} />
+              }
+              label={t('mobile.orders.filterButton', { n: active.length })}
+              badge={active.length}
+              onPress={() => setOpened('filters')}
+            />
+          ) : (
+            <HeaderIconButton
+              icon={<Info size={22} strokeWidth={1.9} color={colors.primaryForeground} />}
+              label={t('mobile.customer.account.bankInfo.title')}
+              onPress={() => setOpened('banks')}
+            />
           )
         }
-        ListFooterComponent={
-          orders.isFetchingNextPage ? (
-            <ActivityIndicator style={styles.loading} color={colors.primary} />
-          ) : null
-        }
       />
+      <StoreTabs
+        label={t('mobile.customer.orders.pageTitle')}
+        tabs={[
+          { key: 'orders', label: t('mobile.tabs.orders') },
+          { key: 'account', label: t('mobile.customer.tabs.account') },
+        ]}
+        selected={tab}
+        onSelect={(next) => router.setParams({ tab: next })}
+        style={styles.tabs}
+      />
+      {tab === 'account' ? (
+        <AccountPanel bottom={inset} />
+      ) : (
+        <SectionList
+          sections={sections}
+          keyExtractor={(order) => String(order.id)}
+          stickySectionHeadersEnabled={false}
+          contentContainerStyle={[styles.list, { paddingBottom: inset + spacing.lg }]}
+          ListHeaderComponent={header}
+          renderSectionHeader={({ section }) => (
+            <Text accessibilityRole="header" style={[type.sectionHeader, styles.day]}>
+              {dayTitle(section.day)}
+            </Text>
+          )}
+          renderItem={renderOrder}
+          onEndReachedThreshold={0.5}
+          onEndReached={() => {
+            if (orders.hasNextPage && !orders.isFetchingNextPage) void orders.fetchNextPage();
+          }}
+          refreshing={orders.isRefetching && !orders.isFetchingNextPage}
+          onRefresh={() => {
+            void me.refetch();
+            void orders.refetch();
+          }}
+          ListEmptyComponent={
+            orders.isLoading || (!range && !me.error) ? (
+              <ActivityIndicator style={styles.loading} color={colors.primary} />
+            ) : orders.error || me.error ? null : (
+              <View style={styles.empty}>
+                <EmptyState
+                  icon={<ClipboardList size={44} strokeWidth={1.5} color={colors.input} />}
+                  title={t('mobile.customer.orders.empty')}
+                  hint={
+                    active.length > 0
+                      ? t('mobile.orders.emptyHint')
+                      : t('mobile.customer.orders.emptyHint')
+                  }
+                />
+                {active.length > 0 ? (
+                  <PillButton
+                    title={t('mobile.orders.clearFilters')}
+                    variant="soft"
+                    height={44}
+                    onPress={() => setFilters(EMPTY_STORE_ORDER_FILTERS)}
+                  />
+                ) : (
+                  <PillButton
+                    title={t('mobile.customer.cart.browse')}
+                    variant="soft"
+                    height={44}
+                    onPress={() => router.navigate('/shop')}
+                  />
+                )}
+              </View>
+            )
+          }
+          ListFooterComponent={
+            orders.isFetchingNextPage ? (
+              <ActivityIndicator style={styles.loading} color={colors.primary} />
+            ) : null
+          }
+        />
+      )}
       {today && range && defaultRange ? (
         <>
           <StoreOrderFilterSheet
@@ -319,11 +349,13 @@ export default function StoreOrdersScreen() {
           />
         </>
       ) : null}
+      <BankInfoSheet visible={opened === 'banks'} onClose={() => setOpened('none')} />
     </Page>
   );
 }
 
 const styles = StyleSheet.create({
+  tabs: { marginTop: spacing.md, marginHorizontal: spacing.lg },
   list: { paddingHorizontal: spacing.lg },
   subtitle: { marginTop: spacing.md, marginHorizontal: spacing.xs, color: colors.muted },
   chips: {

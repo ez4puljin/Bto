@@ -5,6 +5,9 @@ import type { FinCallContext } from '../../../finance-core';
 import { FinContexts } from '../../fin-bridge';
 import { type Actor, type AuthContext, systemActor } from '../../identity';
 
+/** The document attribute holding a voucher's «Гүйлгээний утга». */
+export const VOUCHER_MEMO = 'memo';
+
 /**
  * How finance reaches the Finance Core's books (ADR-0089): the installation's company, Bto as source
  * BTO for automatic postings and internal reads, a staff member for their own changes (manual

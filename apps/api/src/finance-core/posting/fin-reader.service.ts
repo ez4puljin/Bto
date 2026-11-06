@@ -89,6 +89,7 @@ export interface FinPartyLedgerRow {
     sourceSystem: string;
     sourceDocType: string;
     sourceDocId: string;
+    attributes: Record<string, string>;
   } | null;
   /** The document a reversal reverses. */
   reverses: {
@@ -98,6 +99,7 @@ export interface FinPartyLedgerRow {
     sourceSystem: string;
     sourceDocType: string;
     sourceDocId: string;
+    attributes: Record<string, string>;
   } | null;
 }
 
@@ -738,8 +740,10 @@ export class FinReader {
              sum(l.debit - l.credit) OVER (ORDER BY ${order}) AS balance_after,
              d.id AS doc_id, t.code AS doc_type_code, d.class AS doc_class, d.number AS doc_number,
              s.code AS doc_system, d.source_doc_type AS doc_source_type, d.source_doc_id AS doc_source_id,
+             d.attributes AS doc_attributes,
              o.id AS rev_id, ot.code AS rev_type_code, o.number AS rev_number, os.code AS rev_system,
-             o.source_doc_type AS rev_source_type, o.source_doc_id AS rev_source_id
+             o.source_doc_type AS rev_source_type, o.source_doc_id AS rev_source_id,
+             o.attributes AS rev_attributes
         FROM fin.journal_lines l
         JOIN fin.accounts a ON a.company_id = l.company_id AND a.id = l.account_id
         JOIN fin.journal_entries e ON e.company_id = l.company_id AND e.id = l.entry_id
@@ -869,13 +873,16 @@ function zeroExposure(): ExposureV1 {
   };
 }
 
+function attributesOf(value: unknown): Record<string, string> {
+  return value && typeof value === 'object'
+    ? Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, String(v)]),
+      )
+    : {};
+}
+
 function toDocumentRow(row: Row): FinDocumentRow {
-  const attributes =
-    row.attributes && typeof row.attributes === 'object'
-      ? Object.fromEntries(
-          Object.entries(row.attributes as Record<string, unknown>).map(([k, v]) => [k, String(v)]),
-        )
-      : {};
+  const attributes = attributesOf(row.attributes);
   return {
     id: int(row.id),
     typeCode: str(row.type_code),
@@ -932,6 +939,7 @@ function toLedgerRow(row: Row): FinPartyLedgerRow {
             sourceSystem: str(row.doc_system),
             sourceDocType: str(row.doc_source_type),
             sourceDocId: str(row.doc_source_id),
+            attributes: attributesOf(row.doc_attributes),
           },
     reverses:
       row.rev_id === null || row.rev_id === undefined
@@ -943,6 +951,7 @@ function toLedgerRow(row: Row): FinPartyLedgerRow {
             sourceSystem: str(row.rev_system),
             sourceDocType: str(row.rev_source_type),
             sourceDocId: str(row.rev_source_id),
+            attributes: attributesOf(row.rev_attributes),
           },
   };
 }

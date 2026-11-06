@@ -3,6 +3,7 @@ import {
   creditBarOf,
   creditWarningOf,
   debtOf,
+  ibanInGroups,
   invoiceDueOf,
   overdueOf,
   settlementCardOf,
@@ -11,8 +12,28 @@ import { noticeTabsOf, STORE_TILES, storeFactsOf, storeTargetOf } from './notifi
 import { backorderedIn, byDay, orderAmount, orderNotes, progressOf, takerOf } from './orders';
 import { reorderPlan } from './reorder';
 import { codeComplete, codeInput, newPasswordIssue, phoneInput, phoneOf } from './sign-in';
-import { columnAmount, lastMonthRange, statementPresetOf, statementRange } from './statement';
+import {
+  columnAmount,
+  lastMonthRange,
+  statementLink,
+  statementPresetOf,
+  statementRange,
+} from './statement';
 import { canOrder, lineStockNote } from './stock';
+
+describe('«Bto300»: «Тооцоо» (ADR-0167)', () => {
+  it('opens a purchase at its order, then at its invoice; a payment opens nothing', () => {
+    expect(statementLink({ invoiceId: 7, orderId: 42 })).toBe('/order/42');
+    expect(statementLink({ invoiceId: 7, orderId: null })).toBe('/invoice/7');
+    expect(statementLink({ invoiceId: null, orderId: null })).toBeNull();
+    expect(statementLink({ invoiceId: null, orderId: 42 })).toBeNull();
+  });
+
+  it('groups an IBAN in fours without a trailing space', () => {
+    expect(ibanInGroups('MN120005005012345678')).toBe('MN12 0005 0050 1234 5678');
+    expect(ibanInGroups('MN12000')).toBe('MN12 000');
+  });
+});
 
 describe('«Bto300»: the stock in words (ADR-0079 #4)', () => {
   it('lets a store order what is not «Дууссан» and priced', () => {
@@ -259,7 +280,7 @@ describe('«Bto300»: notifications (ADR-0079 #8)', () => {
     );
     expect(storeTargetOf({ kind: 'ORDER_SOLD', orderId: null, invoiceId: 3 })).toBeNull();
     expect(storeTargetOf({ kind: 'PAYMENT_RECORDED', orderId: null, invoiceId: null })).toBe(
-      '/account',
+      '/orders?tab=account',
     );
     expect(storeTargetOf({ kind: 'INVOICE_OVERDUE', orderId: null, invoiceId: 3 })).toBe(
       '/invoice/3',

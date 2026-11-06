@@ -7,15 +7,22 @@ describe('the build’s app config', () => {
       variant: 'staff',
       defaultServer: null,
       serverFixed: false,
+      selfUpdate: false,
     });
     expect(appConfigOf({ variant: 'customer' }).variant).toBe('customer');
+    expect(appConfigOf({ selfUpdate: true }).selfUpdate).toBe(true);
     expect(appConfigOf({ variant: 'driver' }).variant).toBe('staff');
   });
 
   it('fixes the server only when a production build names one', () => {
     expect(
       appConfigOf({ variant: 'customer', defaultServer: 'https://bto.mn', serverFixed: true }),
-    ).toEqual({ variant: 'customer', defaultServer: 'https://bto.mn', serverFixed: true });
+    ).toEqual({
+      variant: 'customer',
+      defaultServer: 'https://bto.mn',
+      serverFixed: true,
+      selfUpdate: false,
+    });
     expect(appConfigOf({ defaultServer: '', serverFixed: true })).toMatchObject({
       defaultServer: null,
       serverFixed: false,

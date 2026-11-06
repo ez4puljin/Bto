@@ -23,6 +23,8 @@ import {
   useSectionText,
 } from '../../../src/customer/home-parts';
 import { homeCategoriesOf, sectionRouteOf } from '../../../src/customer/home-sections';
+import { useAppUpdate } from '../../../src/updates/use-app-update';
+import { CompanyLogo } from '../../../src/ui/brand';
 import { HeaderIconButton, StoreHeaderBand } from '../../../src/ui/store-header';
 import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 import { initialsOf } from '../../../src/format/format';
@@ -35,9 +37,10 @@ import { Text } from '../../../src/ui/text';
 
 /**
  * «Нүүр» of «Bto300» as a shop window (ADR-0092 #1) in the E-mart structure (ADR-0095): the blue
- * header with «Bto300», the search (the scanner in it), the bell and the store's initials, and
- * the sections' names as links under them; the banners edge to edge; «АНГИЛЛЫН ЖАГСААЛТ»; then
- * the sections in the server's fixed order, each a row of cards and › to its full list.
+ * header with the company's logo on white (ADR-0166), the search (the scanner in it), the bell and
+ * the store's initials, and the sections' names as links under them; the banners edge to edge;
+ * «АНГИЛЛЫН ЖАГСААЛТ»; then the sections in the server's fixed order, each a row of cards and › to
+ * its full list. A new version of the app counts on the bell, where «Мэдэгдэл» offers it.
  */
 export default function CustomerHomeScreen() {
   const { t } = useTranslation();
@@ -47,7 +50,8 @@ export default function CustomerHomeScreen() {
   const storeMe = useStoreMe();
   const store = storeMe.data ?? me.store;
   const summary = useStoreNotificationSummary();
-  const unread = summary.data?.unread ?? 0;
+  const update = useAppUpdate();
+  const unread = (summary.data?.unread ?? 0) + (update ? 1 : 0);
   const home = useStoreHome();
   const actions = useCardActions();
   const sectionText = useSectionText();
@@ -82,9 +86,13 @@ export default function CustomerHomeScreen() {
     <Page white edges={[]}>
       <StoreHeaderBand>
         <View style={styles.bar}>
-          <Text accessibilityRole="header" style={storeType.wordmark}>
-            {t('mobile.customer.appName')}
-          </Text>
+          <View
+            accessibilityRole="header"
+            accessibilityLabel={t('brand.company')}
+            style={styles.logo}
+          >
+            <CompanyLogo height={26} />
+          </View>
           <View style={styles.search}>
             <Pressable
               accessibilityRole="search"
@@ -233,8 +241,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingLeft: 14,
+    paddingLeft: 10,
     paddingRight: spacing.sm,
+  },
+  logo: {
+    height: 34,
+    paddingHorizontal: 6,
+    borderRadius: spacing.sm,
+    backgroundColor: colors.card,
+    justifyContent: 'center',
   },
   search: {
     flex: 1,

@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { CalendarDays, ChevronRight, FileText, Minus, Plus } from 'lucide-react-native';
+import { CalendarDays, ChevronRight } from 'lucide-react-native';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -9,6 +9,7 @@ import {
   StyleSheet,
   type TextStyle,
   View,
+  type ViewStyle,
 } from 'react-native';
 import { type StoreStatement, type StoreStatementEntry, useStoreStatement } from '../api/customer';
 import { problemFrom } from '../api/problem';
@@ -26,19 +27,20 @@ import {
   lastMonthRange,
   STATEMENT_PRESETS,
   statementPresetOf,
+  statementLink,
   statementRange,
 } from './statement';
 
 /** «Дебит» and «Кредит»: «2,095,200» whole at 13 px; a larger amount shrinks to fit. */
-const AMOUNT = 66;
-const BALANCE = 72;
+const AMOUNT = 60;
+const BALANCE = 68;
 
 /**
- * «Тооцооны хуулга» on «Тооцоо» (ADR-0086; redrawn on the Account board, the owner 2026-10-21):
- * the days (three chips, any range from the calendar), the sum «Эхний үлдэгдэл + Дебит − Кредит =
- * Эцсийн үлдэгдэл», and the table «Огноо, баримт · Дебит · Кредит · Үлдэгдэл»: the opening
- * balance, every entry oldest first with the balance after it, «Нийт» and the closing balance.
- * A purchase opens its invoice.
+ * «Тооцооны хуулга» on «Тооцоо» (ADR-0086; redrawn by the owner's word 2026-11-06, ADR-0167): the
+ * days (three chips, any range from the calendar), three tiles «Дебит · Кредит · Эцсийн үлдэгдэл»,
+ * and the table «Огноо, баримт · Дебит · Кредит · Үлдэгдэл»: the opening balance, every entry oldest
+ * first with the balance after it, «Нийт» and the closing balance. A purchase opens its order, and
+ * the phone's back returns here with the days as they were.
  */
 export function StatementPanel({ today }: { today: string }) {
   const { t } = useTranslation();
@@ -52,11 +54,8 @@ export function StatementPanel({ today }: { today: string }) {
   return (
     <>
       <View style={styles.heading}>
-        <View style={styles.headingTile}>
-          <FileText size={18} strokeWidth={2} color={colors.primary} />
-        </View>
         <View style={styles.grow}>
-          <Text accessibilityRole="header" style={[storeType.sectionTitle, styles.upper]}>
+          <Text accessibilityRole="header" style={type.sectionTitle}>
             {t('mobile.customer.statement.title')}
           </Text>
           {data ? (
@@ -67,7 +66,6 @@ export function StatementPanel({ today }: { today: string }) {
         </View>
         <ChoiceChip
           compact
-          onWhite
           selected={calendar}
           label={t('mobile.customer.statement.range', {
             from: monthDay(range.from),
@@ -88,7 +86,6 @@ export function StatementPanel({ today }: { today: string }) {
           <ChoiceChip
             key={preset}
             compact
-            onWhite
             selected={chosen === preset}
             label={t(`mobile.customer.statement.presets.${preset}`)}
             onPress={() => setRange(statementRange(preset, today))}
@@ -129,56 +126,53 @@ export function StatementPanel({ today }: { today: string }) {
   );
 }
 
-/** «Эхний үлдэгдэл + Дебит − Кредит = Эцсийн үлдэгдэл» in four rows, the last one tinted. */
+/** What moved in these days and where it ended; the opening balance heads the table. */
 function StatementSum({ data }: { data: StoreStatement }) {
   const { t } = useTranslation();
-  const money = (amount: string) => t('pricing.money', { amount: formatMnt(amount) });
+  const signed = (key: 'plus' | 'minus', amount: string) =>
+    columnAmount(amount)
+      ? t(`mobile.customer.statement.${key}`, { amount: formatMnt(amount) })
+      : formatMnt(amount);
   return (
-    <View style={styles.card}>
-      <View style={styles.sumRow}>
-        <View style={styles.grow}>
-          <Text style={type.row}>{t('mobile.customer.statement.opening')}</Text>
-          <Text style={type.secondary}>
-            {t('mobile.customer.statement.openingAt', { date: monthDay(data.from) })}
-          </Text>
-        </View>
-        <Text style={[type.heading, tabular]}>{money(data.opening)}</Text>
-      </View>
-      <View style={styles.sumRule} />
-      <View style={styles.sumRow}>
-        <View style={[styles.sign, styles.signDebit]}>
-          <Plus size={14} strokeWidth={2.6} color={colors.foreground} />
-        </View>
-        <View style={styles.grow}>
-          <Text style={type.row}>{t('mobile.customer.statement.debit')}</Text>
-          <Text style={type.secondary}>{t('mobile.customer.statement.debitNote')}</Text>
-        </View>
-        <Text style={[type.heading, tabular]}>
-          {t('mobile.customer.statement.plus', { amount: money(data.totalDebit) })}
-        </Text>
-      </View>
-      <View style={[styles.sumRule, styles.sumRuleSign]} />
-      <View style={styles.sumRow}>
-        <View style={[styles.sign, styles.signCredit]}>
-          <Minus size={14} strokeWidth={2.6} color={colors.success} />
-        </View>
-        <View style={styles.grow}>
-          <Text style={type.row}>{t('mobile.customer.statement.credit')}</Text>
-          <Text style={type.secondary}>{t('mobile.customer.statement.creditNote')}</Text>
-        </View>
-        <Text style={[type.heading, tabular, styles.credit]}>
-          {t('mobile.customer.statement.minus', { amount: money(data.totalCredit) })}
-        </Text>
-      </View>
-      <View style={[styles.sumRow, styles.closingRow]}>
-        <View style={styles.grow}>
-          <Text style={type.rowStrong}>{t('mobile.customer.statement.closing')}</Text>
-          <Text style={[type.secondary, styles.label2]}>
-            {t('mobile.customer.statement.closingAt', { date: monthDay(data.to) })}
-          </Text>
-        </View>
-        <Text style={styles.closingAmount}>{money(data.closing)}</Text>
-      </View>
+    <View style={styles.tiles}>
+      <SumTile
+        label={t('mobile.customer.statement.debit')}
+        value={signed('plus', data.totalDebit)}
+      />
+      <SumTile
+        label={t('mobile.customer.statement.credit')}
+        value={signed('minus', data.totalCredit)}
+        valueStyle={styles.credit}
+      />
+      <SumTile
+        label={t('mobile.customer.statement.closing')}
+        value={formatMnt(data.closing)}
+        style={styles.tileClosing}
+        valueStyle={styles.tileClosingValue}
+      />
+    </View>
+  );
+}
+
+function SumTile({
+  label,
+  value,
+  style,
+  valueStyle,
+}: {
+  label: string;
+  value: string;
+  style?: StyleProp<ViewStyle>;
+  valueStyle?: StyleProp<TextStyle>;
+}) {
+  return (
+    <View style={[styles.tile, style]}>
+      <Text style={[type.heading, tabular, valueStyle]} numberOfLines={1} adjustsFontSizeToFit>
+        {value}
+      </Text>
+      <Text style={[type.secondary, styles.label2]} numberOfLines={2}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -240,8 +234,10 @@ function StatementTable({ data }: { data: StoreStatement }) {
 }
 
 /**
- * One entry: «10/12 Худалдан авалт», its number (blue with › when it opens the invoice) and, for a
- * purchase, who took its order; its amount under «Дебит» or «Кредит» and the balance after it.
+ * One entry: «10/12 Худалдан авалт», its number (blue with › when it opens the order) and, for a
+ * purchase, who took its order; its amount under «Дебит» or «Кредит» and the balance after it. A
+ * payment's «Гүйлгээний утга» runs under the row across its whole width (the owner 2026-11-06): once
+ * the bank's statement makes the vouchers, it is what the store wrote in its own transfer.
  */
 function EntryRow({ entry }: { entry: StoreStatementEntry }) {
   const { t } = useTranslation();
@@ -251,7 +247,7 @@ function EntryRow({ entry }: { entry: StoreStatementEntry }) {
   const taker = entry.orderChannel
     ? takerText(takerOf({ channel: entry.orderChannel, takerName: entry.orderTakerName }))
     : null;
-  const invoiceId = entry.invoiceId;
+  const link = statementLink(entry);
   const cell = (amount: string) => {
     const shown = columnAmount(amount);
     return shown ? formatMnt(shown) : '';
@@ -259,25 +255,32 @@ function EntryRow({ entry }: { entry: StoreStatementEntry }) {
   const content = (
     <>
       <View style={styles.grow}>
-        <View style={styles.line}>
-          <Text style={[storeType.tableCellStrong, tabular]}>{monthDay(entry.date)}</Text>
-          <Text style={[storeType.tableCell, styles.shrink]} numberOfLines={1}>
-            {kind}
-          </Text>
-        </View>
+        <Text
+          style={storeType.tableCell}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+        >
+          <Text style={[storeType.tableCellStrong, tabular]}>{monthDay(entry.date)}</Text> {kind}
+        </Text>
         <View style={styles.line}>
           <Text
-            style={[type.secondary, tabular, styles.shrink, invoiceId !== null && styles.link]}
+            style={[type.secondary, tabular, styles.shrink, link !== null && styles.link]}
             numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
           >
             {entry.number}
           </Text>
-          {invoiceId !== null ? (
-            <ChevronRight size={12} strokeWidth={2.4} color={colors.link} />
-          ) : null}
+          {link !== null ? <ChevronRight size={12} strokeWidth={2.4} color={colors.link} /> : null}
         </View>
         {taker ? (
-          <Text style={type.secondary} numberOfLines={1}>
+          <Text
+            style={type.secondary}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
             {taker}
           </Text>
         ) : null}
@@ -289,28 +292,43 @@ function EntryRow({ entry }: { entry: StoreStatementEntry }) {
       </Cell>
     </>
   );
-  return invoiceId !== null ? (
+  return link !== null ? (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={t('mobile.customer.statement.entryLabel', {
-        kind,
-        number: entry.number,
-        date: monthDay(entry.date),
-      })}
-      onPress={() => router.push(`/invoice/${invoiceId}`)}
+      accessibilityLabel={t(
+        entry.orderId !== null
+          ? 'mobile.customer.statement.entryLabelOrder'
+          : 'mobile.customer.statement.entryLabel',
+        { kind, number: entry.number, date: monthDay(entry.date) },
+      )}
+      onPress={() => router.push(link)}
       style={({ pressed }) => [styles.tr, styles.entry, styles.rule, pressed && styles.pressed]}
     >
       {content}
     </Pressable>
   ) : (
-    <View style={[styles.tr, styles.entry, styles.rule]}>{content}</View>
+    <View style={styles.rule}>
+      <View style={[styles.tr, styles.entry, entry.description ? styles.entryOver : null]}>
+        {content}
+      </View>
+      {entry.description ? (
+        <Text selectable style={[type.secondary, styles.description]}>
+          {entry.description}
+        </Text>
+      ) : null}
+    </View>
   );
 }
 
 /** A column's head, upper case and right-aligned over its amounts. */
 function Head({ width, children }: { width: number; children: ReactNode }) {
   return (
-    <Text style={[storeType.tableHead, styles.upper, styles.right, { width }]} numberOfLines={1}>
+    <Text
+      style={[storeType.tableHead, styles.upper, styles.right, { width }]}
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.8}
+    >
       {children}
     </Text>
   );
@@ -341,61 +359,48 @@ const styles = StyleSheet.create({
   credit: { color: colors.success },
   pressed: { backgroundColor: colors.accent },
   stale: { opacity: 0.5 },
-  heading: { marginTop: 22, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  headingTile: {
-    width: 30,
-    height: 30,
-    borderRadius: radii.iconTile,
-    backgroundColor: colors.secondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  heading: { marginTop: spacing.xl, flexDirection: 'row', alignItems: 'center', gap: 10 },
   presets: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
   loading: { marginVertical: spacing.xl },
-  card: {
+  tiles: { marginTop: spacing.md, flexDirection: 'row', gap: spacing.sm },
+  tile: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+    padding: 10,
+    borderRadius: radii.field,
+    backgroundColor: colors.card,
+  },
+  tileClosing: { backgroundColor: colors.secondary },
+  tileClosingValue: { color: colors.primary },
+  closingRow: { minHeight: 52, backgroundColor: colors.secondary },
+  table: {
     marginTop: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
+    borderRadius: radii.field,
     backgroundColor: colors.card,
     overflow: 'hidden',
-  },
-  sumRow: {
-    minHeight: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-  },
-  sumRule: { height: 1, marginLeft: 14, backgroundColor: colors.canvas },
-  sumRuleSign: { marginLeft: 46 },
-  sign: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  signDebit: { backgroundColor: colors.canvas },
-  signCredit: { backgroundColor: colors.successSoft },
-  closingRow: { minHeight: 60, backgroundColor: colors.secondary },
-  closingAmount: { ...type.title3, ...tabular, color: colors.primary },
-  table: {
-    marginTop: spacing.lg,
-    marginHorizontal: -spacing.lg,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: colors.border,
   },
   tr: {
     minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: spacing.xs,
     paddingVertical: 6,
     paddingHorizontal: 10,
   },
-  thead: { minHeight: 34, paddingVertical: 0, backgroundColor: colors.canvas },
-  tint: { backgroundColor: colors.canvas },
+  thead: {
+    minHeight: 34,
+    paddingVertical: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.canvas,
+  },
+  tint: { backgroundColor: colors.accent },
   rule: { borderBottomWidth: 1, borderBottomColor: colors.canvas },
   entry: { minHeight: 52, paddingVertical: 7 },
+  entryOver: { paddingBottom: 2 },
+  description: { paddingHorizontal: 10, paddingBottom: spacing.sm, color: colors.label2 },
   line: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   amount: { width: AMOUNT },
   balance: { width: BALANCE },
-  hint: { marginTop: 10 },
+  hint: { marginTop: 10, marginHorizontal: spacing.xs, color: colors.muted },
 });

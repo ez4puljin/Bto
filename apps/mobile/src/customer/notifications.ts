@@ -31,6 +31,9 @@ export function noticeTabsOf(
   return { orders, promos, first: orders === 0 && promos > 0 ? 'promos' : 'orders' };
 }
 
+/** «Тооцоо», inside the «Захиалга» tab since ADR-0166. */
+export const accountRoute = '/orders?tab=account';
+
 /** Where a tap goes: the order, the invoice, «Тооцоо», or nowhere when its record is gone. */
 export function storeTargetOf(notification: {
   kind: CustomerNotificationKind;
@@ -43,10 +46,10 @@ export function storeTargetOf(notification: {
     case 'ORDER_SOLD':
       return notification.orderId !== null ? `/order/${notification.orderId}` : null;
     case 'PAYMENT_RECORDED':
-      return '/account';
+      return accountRoute;
     case 'INVOICE_DUE_SOON':
     case 'INVOICE_OVERDUE':
-      return notification.invoiceId !== null ? `/invoice/${notification.invoiceId}` : '/account';
+      return notification.invoiceId !== null ? `/invoice/${notification.invoiceId}` : accountRoute;
   }
 }
 

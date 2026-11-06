@@ -7,6 +7,7 @@ import { NotificationsModule } from '../notifications';
 import { PartnersModule } from '../partners';
 import { PricingModule } from '../pricing';
 import { SalesModule } from '../sales';
+import { AppReleasesController } from './controllers/app-releases.controller';
 import {
   CustomerAppMoneyController,
   CustomerAppNotificationsController,
@@ -21,6 +22,7 @@ import {
 import { CustomerSettingsController } from './controllers/customer-settings.controller';
 import { SalesRepHomeController } from './controllers/sales-rep-home.controller';
 import { AppBannersService } from './services/app-banners.service';
+import { AppReleasesService } from './services/app-releases.service';
 import { CompanyContactsService } from './services/company-contacts.service';
 import { CustomerAccountService } from './services/customer-account.service';
 import { CustomerAppOrdersService } from './services/customer-app-orders.service';
@@ -55,9 +57,11 @@ import { CustomerShopService } from './services/customer-shop.service';
     CustomerSettingsController,
     CustomerBannersController,
     SalesRepHomeController,
+    AppReleasesController,
   ],
   providers: [
     AppBannersService,
+    AppReleasesService,
     CompanyContactsService,
     CustomerHomeService,
     CustomerAccountService,

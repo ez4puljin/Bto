@@ -547,6 +547,10 @@ export const finMoneyAccounts = finSchema.table(
     accountId: ref('account_id').notNull(),
     bankName: text('bank_name'),
     bankAccountNo: text('bank_account_no'),
+    /** The transfer's IBAN, apart from the number: the customer app lists both to copy. */
+    iban: text('iban'),
+    /** Whose name the bank account is in. */
+    accountHolder: text('account_holder'),
     /** Listed to the company's customers to pay into (Bto's «Харилцагчид харуулах», ADR-0079 #7). */
     showToCustomers: boolean('show_to_customers').notNull().default(false),
     status: status(),

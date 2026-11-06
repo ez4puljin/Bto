@@ -58,6 +58,7 @@ export function Sheet({
   footer,
   children,
   top = 62,
+  fit = false,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -67,11 +68,14 @@ export function Sheet({
   children: ReactNode;
   /** How far below the status bar the sheet starts: 62, or 12 for one stacked on another. */
   top?: number;
+  /** As tall as its content, never past `top`; a short list does not fill the screen. */
+  fit?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const { mounted, progress } = usePresence(visible);
   const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [height, 0] });
+  const body = fit ? styles.shrink : styles.grow;
   return (
     <Modal
       visible={mounted}
@@ -91,17 +95,18 @@ export function Sheet({
       </Animated.View>
       <Animated.View
         accessibilityViewIsModal
-        style={[styles.sheet, { top: insets.top + top, transform: [{ translateY }] }]}
+        style={[
+          styles.sheet,
+          fit ? { maxHeight: height - insets.top - top } : { top: insets.top + top },
+          { transform: [{ translateY }] },
+        ]}
       >
         <View style={styles.grabberRow}>
           <View style={styles.grabber} />
         </View>
         {header}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.grow}
-        >
-          <View style={styles.grow}>{children}</View>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={body}>
+          <View style={body}>{children}</View>
           {footer ? (
             <View
               style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) + 18 }]}
@@ -263,6 +268,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   grow: { flex: 1 },
+  shrink: { flexShrink: 1 },
   footer: {
     paddingTop: spacing.md,
     paddingHorizontal: spacing.lg,

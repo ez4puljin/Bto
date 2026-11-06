@@ -13,6 +13,8 @@ interface Variant {
   assets: string;
   apkPrefix: string;
   location: boolean;
+  /** Downloads its own new APK from the server and hands it to Android's installer (ADR-0166). */
+  selfUpdate?: boolean;
 }
 
 const variants = JSON.parse(readFileSync(path.join(__dirname, 'variants.json'), 'utf8')) as Record<
@@ -30,6 +32,9 @@ const production = process.env.APP_ENV === 'production';
 const defaultServer = process.env.BTO_DEFAULT_SERVER || null;
 
 const versionCode = Number.parseInt(process.env.BTO_VERSION_CODE ?? '1', 10);
+
+/** Google Play forbids an app updating itself: a Play build sets BTO_PLAY_BUILD=1 (ADR-0166). */
+const selfUpdate = variant.selfUpdate === true && process.env.BTO_PLAY_BUILD !== '1';
 
 const inter = (face: string) =>
   require.resolve(`@expo-google-fonts/inter/${face}/Inter_${face}.ttf`);
@@ -60,7 +65,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     // A store's number (staff) or the office's (customer, ADR-0079 #14) calls at once:
     // src/phone/call.ts, asked on the first tap.
-    permissions: ['android.permission.CALL_PHONE'],
+    permissions: [
+      'android.permission.CALL_PHONE',
+      ...(selfUpdate ? ['android.permission.REQUEST_INSTALL_PACKAGES'] : []),
+    ],
     // The store map asks for the position only while it is open (foreground, the owner 2026-10-18);
     // the customer app never asks for it.
     blockedPermissions: [
@@ -105,5 +113,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     defaultServer,
     /** A production build talks only to the server it was built for (ADR-0079 #10). */
     serverFixed: production && defaultServer !== null,
+    selfUpdate,
   },
 });

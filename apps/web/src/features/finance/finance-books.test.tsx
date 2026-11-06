@@ -203,6 +203,8 @@ describe('finance books (ADR-0060 #7, #8)', () => {
       branchId: null,
       bankName: null,
       bankAccountNo: '5000000000',
+      iban: null,
+      accountHolder: null,
       glAccountId: 1,
       showToCustomers: true,
     });

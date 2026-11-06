@@ -346,6 +346,8 @@ function MoneyAccountDialog({
   const [branchId, setBranchId] = useState<number | null>(account?.branchId ?? null);
   const [bankName, setBankName] = useState(account?.bankName ?? '');
   const [bankAccountNo, setBankAccountNo] = useState(account?.bankAccountNo ?? '');
+  const [iban, setIban] = useState(account?.iban ?? '');
+  const [accountHolder, setAccountHolder] = useState(account?.accountHolder ?? '');
   const [glAccountId, setGlAccountId] = useState<number | null>(account?.glAccountId ?? null);
   const [status, setStatus] = useState<MoneyAccount['status']>(account?.status ?? 'ACTIVE');
   const [showToCustomers, setShowToCustomers] = useState(account?.showToCustomers ?? false);
@@ -363,6 +365,8 @@ function MoneyAccountDialog({
       branchId,
       bankName: bankName.trim() || null,
       bankAccountNo: bankAccountNo.trim() || null,
+      iban: iban.trim() || null,
+      accountHolder: accountHolder.trim() || null,
       glAccountId,
       // Only a bank account is listed in the customer app (ADR-0079 #7); a cash box never is.
       ...(kind === 'BANK' ? { showToCustomers } : {}),
@@ -475,6 +479,29 @@ function MoneyAccountDialog({
                   value={bankAccountNo}
                   maxLength={40}
                   onChange={(event) => setBankAccountNo(event.target.value)}
+                />
+              </FormField>
+              <FormField
+                label={t('finance.settings.moneyAccountDialog.accountHolder')}
+                htmlFor="money-bank-holder"
+              >
+                <Input
+                  id="money-bank-holder"
+                  value={accountHolder}
+                  maxLength={120}
+                  onChange={(event) => setAccountHolder(event.target.value)}
+                />
+              </FormField>
+              <FormField
+                label={t('finance.settings.moneyAccountDialog.iban')}
+                htmlFor="money-bank-iban"
+              >
+                <Input
+                  id="money-bank-iban"
+                  className="font-mono"
+                  value={iban}
+                  maxLength={40}
+                  onChange={(event) => setIban(event.target.value)}
                 />
               </FormField>
             </div>

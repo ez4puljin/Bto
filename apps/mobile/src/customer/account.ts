@@ -14,6 +14,11 @@ export function debtOf(balance: string): Debt {
   return { kind: 'clear' };
 }
 
+/** An IBAN as it is read, in fours: «MN12 0005 0050 1234 5678»; it is copied whole. */
+export function ibanInGroups(iban: string): string {
+  return iban.replace(/(.{4})(?=.)/g, '$1 ');
+}
+
 /** «Хугацаа хэтэрсэн 350,000₮ · 10/10-нд дууссан»: null when nothing is overdue. */
 export function overdueOf(account: {
   overdueAmount: string;

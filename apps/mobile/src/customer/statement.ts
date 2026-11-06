@@ -41,6 +41,18 @@ export function statementPresetOf(range: DateRange, today: string): StatementPre
   );
 }
 
+/**
+ * What a statement row opens (the owner 2026-11-06): a purchase opens its order, or its invoice when
+ * it has no order of the store's; a payment or a return opens nothing.
+ */
+export function statementLink(entry: {
+  invoiceId: number | null;
+  orderId: number | null;
+}): `/order/${number}` | `/invoice/${number}` | null {
+  if (entry.invoiceId === null) return null;
+  return entry.orderId !== null ? `/order/${entry.orderId}` : `/invoice/${entry.invoiceId}`;
+}
+
 /** A statement amount as its column shows it: nothing for a zero. */
 export function columnAmount(value: string): string | null {
   return /^-?0+(\.0+)?$/.test(value) ? null : value;

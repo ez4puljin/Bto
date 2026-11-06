@@ -3,17 +3,44 @@ import { Server } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Pressable, type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Text } from './text';
-import customerIcon from '../../assets/customer/splash-icon.png';
+import orgilMark from '../../assets/customer/logo-mark.png';
+import orgilLogo from '../../assets/customer/logo.png';
 import splashIcon from '../../assets/splash-icon.png';
 import { APP } from '../config/app';
 import { serverHost } from '../server/server-url';
 import { colors, fonts, radii, shadows, type } from '../theme/tokens';
 
+/** The picture's own width to height (920 × 322). */
+const LOGO_RATIO = 920 / 322;
+
 /**
- * The splash's tile, the same picture the phone starts with: a white «B» on rounded blue, or
- * «B300» for the stores' app (ADR-0079 #13).
+ * The company's logo, the emblem with «Оргил» (the owner, 2026-11-06, ADR-0166). Dark green: on the
+ * blue header it needs a white ground.
  */
-const LOGO = APP.variant === 'customer' ? customerIcon : splashIcon;
+export function CompanyLogo({ height, style }: { height: number; style?: StyleProp<ViewStyle> }) {
+  return (
+    <View
+      style={[{ width: Math.round(height * LOGO_RATIO), height }, style]}
+      accessible={false}
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Image source={orgilLogo} contentFit="contain" accessible={false} style={styles.fill} />
+    </View>
+  );
+}
+
+/** The logo's round emblem alone, for a small square: a notification's picture (ADR-0166). */
+export function CompanyMark({ size, style }: { size: number; style?: StyleProp<ViewStyle> }) {
+  return (
+    <View
+      style={[{ width: size, height: size }, style]}
+      accessible={false}
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Image source={orgilMark} contentFit="contain" accessible={false} style={styles.fill} />
+    </View>
+  );
+}
 
 /** This build's name: «Bto», or «Bto300» for the stores (ADR-0079). */
 export function useAppName(): string {
@@ -21,40 +48,34 @@ export function useAppName(): string {
   return APP.variant === 'customer' ? t('mobile.customer.appName') : t('app.name');
 }
 
-/** The logo with the app's name and the company: the top of the server, sign-in and offline screens. */
+/**
+ * The top of the server and offline screens: the company's logo in «Bto300» (ADR-0166), the staff
+ * app's «B» tile and its name otherwise, each with the company.
+ */
 export function BrandLockup({ style }: { style?: StyleProp<ViewStyle> }) {
   const { t } = useTranslation();
   const name = useAppName();
   return (
     <View style={[styles.lockup, style]}>
-      <View style={styles.logo} accessible={false} importantForAccessibility="no-hide-descendants">
-        <Image source={LOGO} contentFit="contain" accessible={false} style={styles.image} />
-      </View>
+      {APP.variant === 'customer' ? (
+        <CompanyLogo height={44} />
+      ) : (
+        <View
+          style={styles.logo}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+        >
+          <Image source={splashIcon} contentFit="contain" accessible={false} style={styles.image} />
+        </View>
+      )}
       <View style={styles.names}>
-        <Text accessibilityRole="header" style={type.wordmark}>
-          {name}
-        </Text>
+        {APP.variant === 'customer' ? null : (
+          <Text accessibilityRole="header" style={type.wordmark}>
+            {name}
+          </Text>
+        )}
         <Text style={type.secondary}>{t('brand.company')}</Text>
       </View>
-    </View>
-  );
-}
-
-/** «Bto300»'s home mark (ADR-0092 #1, the Main board): the small logo tile and the app's name. */
-export function BrandMark({ style }: { style?: StyleProp<ViewStyle> }) {
-  const name = useAppName();
-  return (
-    <View style={[styles.mark, style]}>
-      <View
-        style={styles.markLogo}
-        accessible={false}
-        importantForAccessibility="no-hide-descendants"
-      >
-        <Image source={LOGO} contentFit="contain" accessible={false} style={styles.markImage} />
-      </View>
-      <Text accessibilityRole="header" style={type.wordmark} numberOfLines={1}>
-        {name}
-      </Text>
     </View>
   );
 }
@@ -105,9 +126,7 @@ const styles = StyleSheet.create({
   logo: { width: 48, height: 48, borderRadius: radii.control, boxShadow: shadows.brand },
   image: { width: 48, height: 48, borderRadius: radii.control },
   names: { flexShrink: 1 },
-  mark: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  markLogo: { width: 34, height: 34, borderRadius: radii.control },
-  markImage: { width: 34, height: 34, borderRadius: radii.control },
+  fill: { width: '100%', height: '100%' },
   chip: {
     alignSelf: 'center',
     height: 36,

@@ -33201,6 +33201,95 @@
         ]
       }
     },
+    "/api/v1/app-releases/{variant}": {
+      "get": {
+        "operationId": "AppReleases_latest",
+        "parameters": [
+          {
+            "name": "variant",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "staff",
+                "customer"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppReleaseLookup"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "app-releases"
+        ]
+      }
+    },
+    "/api/v1/app-releases/{variant}/apk": {
+      "get": {
+        "operationId": "AppReleases_download",
+        "parameters": [
+          {
+            "name": "variant",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "staff",
+                "customer"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The APK file",
+            "content": {
+              "application/vnd.android.package-archive": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "app-releases"
+        ]
+      }
+    },
     "/api/v1/reports/refresh-state": {
       "get": {
         "operationId": "Reports_refreshState",
@@ -61604,6 +61693,14 @@
             "type": "string",
             "nullable": true
           },
+          "iban": {
+            "type": "string",
+            "nullable": true
+          },
+          "accountHolder": {
+            "type": "string",
+            "nullable": true
+          },
           "glAccountId": {
             "type": "number"
           },
@@ -61648,6 +61745,8 @@
           "branchName",
           "bankName",
           "bankAccountNo",
+          "iban",
+          "accountHolder",
           "glAccountId",
           "glAccountCode",
           "glAccountName",
@@ -61691,6 +61790,16 @@
             "nullable": true,
             "maxLength": 40
           },
+          "iban": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
+          },
+          "accountHolder": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
+          },
           "glAccountId": {
             "type": "number",
             "minimum": 1,
@@ -61732,6 +61841,16 @@
             "type": "string",
             "nullable": true,
             "maxLength": 40
+          },
+          "iban": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
+          },
+          "accountHolder": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
           },
           "glAccountId": {
             "type": "number",
@@ -71117,6 +71236,11 @@
             "nullable": true,
             "description": "The rep of a SALES_REP order"
           },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "A payment’s «Гүйлгээний утга»"
+          },
           "debit": {
             "type": "string",
             "example": "350000.00",
@@ -71142,6 +71266,7 @@
           "orderNumber",
           "orderChannel",
           "orderTakerName",
+          "description",
           "debit",
           "credit",
           "balance"
@@ -71206,13 +71331,23 @@
           "bankAccountNo": {
             "type": "string",
             "nullable": true
+          },
+          "iban": {
+            "type": "string",
+            "nullable": true
+          },
+          "accountHolder": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
           "id",
           "name",
           "bankName",
-          "bankAccountNo"
+          "bankAccountNo",
+          "iban",
+          "accountHolder"
         ]
       },
       "CustomerAppNotice": {
@@ -72122,6 +72257,46 @@
           "banners",
           "subcategories",
           "sections"
+        ]
+      },
+      "AppRelease": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "example": "0.4.0"
+          },
+          "versionCode": {
+            "type": "number",
+            "description": "Grows with every build; the phone compares it with its own.",
+            "example": 445441
+          },
+          "sizeBytes": {
+            "type": "number",
+            "example": 78500000
+          }
+        },
+        "required": [
+          "version",
+          "versionCode",
+          "sizeBytes"
+        ]
+      },
+      "AppReleaseLookup": {
+        "type": "object",
+        "properties": {
+          "release": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AppRelease"
+              }
+            ]
+          }
+        },
+        "required": [
+          "release"
         ]
       },
       "ReportRefreshState": {

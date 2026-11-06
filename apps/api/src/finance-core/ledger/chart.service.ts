@@ -134,6 +134,8 @@ export interface FinMoneyAccountView {
   accountName: string;
   bankName: string | null;
   bankAccountNo: string | null;
+  iban: string | null;
+  accountHolder: string | null;
   showToCustomers: boolean;
   status: FinStatus;
   createdAt: Date;
@@ -149,6 +151,8 @@ export interface FinMoneyAccountInput {
   accountId: number;
   bankName: string | null;
   bankAccountNo: string | null;
+  iban?: string | null;
+  accountHolder?: string | null;
   showToCustomers: boolean;
 }
 
@@ -579,6 +583,8 @@ export class FinChartService {
       accountId: patch.accountId ?? before.accountId,
       bankName: patch.bankName === undefined ? before.bankName : patch.bankName,
       bankAccountNo: patch.bankAccountNo === undefined ? before.bankAccountNo : patch.bankAccountNo,
+      iban: patch.iban === undefined ? before.iban : patch.iban,
+      accountHolder: patch.accountHolder === undefined ? before.accountHolder : patch.accountHolder,
       showToCustomers: patch.showToCustomers ?? before.showToCustomers,
     };
     const values = {
@@ -609,6 +615,8 @@ export class FinChartService {
         accountId: before.accountId,
         bankName: before.bankName,
         bankAccountNo: before.bankAccountNo,
+        iban: before.iban,
+        accountHolder: before.accountHolder,
         showToCustomers: before.showToCustomers,
         status: before.status,
       },
@@ -1116,6 +1124,8 @@ export class FinChartService {
       accountId: input.accountId,
       bankName: optional(input.bankName, 'bankName', 120),
       bankAccountNo: optional(input.bankAccountNo, 'bankAccountNo', 40),
+      iban: optional(input.iban, 'iban', 34),
+      accountHolder: optional(input.accountHolder, 'accountHolder', 120),
       showToCustomers: input.showToCustomers,
     };
   }
@@ -1240,6 +1250,8 @@ async function moneyAccountRows(
     accountName,
     bankName: account.bankName,
     bankAccountNo: account.bankAccountNo,
+    iban: account.iban,
+    accountHolder: account.accountHolder,
     showToCustomers: account.showToCustomers,
     status: account.status,
     createdAt: account.createdAt,

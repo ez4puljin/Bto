@@ -25,7 +25,7 @@ import { BTO_SOURCE, FIN_DOC_TYPES, FinPartiesBridge } from '../../fin-bridge';
 import type { AuthContext } from '../../identity';
 import { CustomersService } from '../../partners';
 import { financeReconcileRuns, invoices } from '../schema';
-import { FinBooks } from './fin-books';
+import { FinBooks, VOUCHER_MEMO } from './fin-books';
 
 export interface CustomerBalance {
   customerId: number;
@@ -84,6 +84,8 @@ export interface StatementEntry {
   balance: Decimal;
   /** The sales order of an invoice's entry (a purchase, its void); null otherwise. */
   orderId: number | null;
+  /** A payment's «Гүйлгээний утга»; null for other documents (ADR-0167 #6). */
+  description: string | null;
 }
 
 /**
@@ -316,6 +318,10 @@ export class ArLedgerService {
         credit: row.credit,
         balance: row.balanceAfter,
         orderId: doc.docType === 'INVOICE' ? (orders.get(doc.docId) ?? null) : null,
+        description:
+          doc.docType === 'PAYMENT'
+            ? ((row.reverses ?? row.document)?.attributes[VOUCHER_MEMO] ?? null)
+            : null,
       };
     });
     const closing = opening.plus(totalDebit).minus(totalCredit);
