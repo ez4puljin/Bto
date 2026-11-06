@@ -782,6 +782,23 @@ describe('ebarimt check', () => {
       .query({ periods: String(period) })
       .set(bearer(accountant))
       .expect(200);
+    // Who chases suppliers reads and writes, but not the settings.
+    const buyer = (await login(app, await seedUser(app, { roles: ['PROCUREMENT'] }))).accessToken;
+    await http()
+      .get('/api/v1/ebarimt-check/report')
+      .query({ periods: String(period) })
+      .set(bearer(buyer))
+      .expect(200);
+    await http()
+      .put('/api/v1/ebarimt-check/month-values')
+      .set(bearer(buyer))
+      .send({ period, supplierId: alpha, note: 'Ярьсан' })
+      .expect(204);
+    await http()
+      .put('/api/v1/ebarimt-check/settings')
+      .set(bearer(buyer))
+      .send({ accountCodes: ['310101'] })
+      .expect(403);
     // Others have no right until a role is given one.
     await http()
       .get('/api/v1/ebarimt-check/report')

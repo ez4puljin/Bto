@@ -41,7 +41,7 @@ A **period** is year × 100 + month (202610). Helpers in `@tugeel/shared/ebarimt
 | `PUT suppliers/:id/profile` | edit | Registers, phone, remark; null returns to the record's |
 | `PUT receipt-links` | edit | Receipts counted for a supplier; `supplierId` null undoes |
 
-Rights: `ebarimt.check.read`, `.edit`, `.assign`, `.settings` (ADMIN all; ACCOUNTANT read, edit, settings).
+Rights: `ebarimt.check.read`, `.edit`, `.assign`, `.settings` (ADMIN all; ACCOUNTANT read, edit, settings; PROCUREMENT read, edit).
 
 ## Invariants
 

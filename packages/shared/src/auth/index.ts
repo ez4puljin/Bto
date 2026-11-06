@@ -196,6 +196,9 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'procurement.orders.edit',
     'procurement.orders.manage',
     'procurement.prices.read',
+    // Who chases suppliers for their e-Barimt (ADR-0168).
+    'ebarimt.check.read',
+    'ebarimt.check.edit',
   ],
   // Warehouse staff count goods in and out but never see costs; an admin approves adjustments.
   WAREHOUSE: [
