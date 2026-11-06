@@ -12,6 +12,7 @@ import { posCashiers, posTills } from '../schema';
 import type { EdgeNode } from './pos-edge-nodes.service';
 import { PosPaymentTypesService } from './pos-payment-types.service';
 import { PosQuickButtonsService } from './pos-quick-buttons.service';
+import { PosReceiptTemplatesService } from './pos-receipt-templates.service';
 import { PosSettingsService } from './pos-settings.service';
 import { PosTillsService } from './pos-tills.service';
 
@@ -39,6 +40,7 @@ export class PosSnapshotService {
     private readonly paymentTypes: PosPaymentTypesService,
     private readonly org: OrgService,
     private readonly tills: PosTillsService,
+    private readonly receiptTemplates: PosReceiptTemplatesService,
   ) {}
 
   forNode(node: EdgeNode): Promise<PosSnapshot> {
@@ -122,6 +124,8 @@ export class PosSnapshotService {
           cashierUserIds: [...(accessOf.get(till.id)?.cashiers ?? [])],
           supervisorUserIds: [...(accessOf.get(till.id)?.supervisors ?? [])],
           categoryIds: [...(accessOf.get(till.id)?.categories ?? [])],
+          saleTemplateId: till.saleTemplateId,
+          returnTemplateId: till.returnTemplateId,
           status: till.status,
           pairingCodeHash: till.pairingCodeHash,
           pairingExpiresAt: till.pairingExpiresAt?.toISOString() ?? null,
@@ -182,6 +186,7 @@ export class PosSnapshotService {
       programs,
       quickGroups: await this.quickButtons.forSnapshot(),
       paymentTypes: await this.paymentTypes.forSnapshot(),
+      receiptTemplates: await this.receiptTemplates.forSnapshot(),
     };
     const version = createHash('sha256').update(JSON.stringify(body)).digest('hex').slice(0, 20);
     return { version, generatedAt: new Date().toISOString(), ...body };

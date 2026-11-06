@@ -19,8 +19,6 @@ import { BranchesPage, WarehousesPage } from '@/features/identity/org-pages';
 import { RolesPage } from '@/features/identity/roles-page';
 import { SettingsPage } from '@/features/identity/settings-page';
 import { StructurePage } from '@/features/identity/structure-page';
-import { UserDetailPage } from '@/features/identity/user-detail-page';
-import { UsersPage } from '@/features/identity/users-page';
 import { AdjustmentPage, AdjustmentsPage } from '@/features/inventory/adjustments-pages';
 import { BinsPage } from '@/features/inventory/bins-page';
 import { LowStockPage } from '@/features/inventory/low-stock-page';
@@ -44,6 +42,8 @@ import { PriceProfilePage, PriceProfilesPage } from '@/features/pricing/profile-
 import { PriceQuotePage } from '@/features/pricing/quote-page';
 import { SalesOrderNewPage, SalesOrderPage } from '@/features/sales/orders-pages';
 import { SalesBatchPrintPage, SalesOrderPrintPage } from '@/features/sales/print-page';
+import { DocumentTemplateEditorPage } from '@/features/sales/document-template-editor';
+import { DocumentTemplatesPage } from '@/features/sales/document-templates-page';
 import { SalesSettingsPage } from '@/features/sales/settings-page';
 import { SalesWorkPage } from '@/features/sales/work-page';
 import { SegmentEditorPage, SegmentPage, SegmentsPage } from '@/features/segments/segment-pages';
@@ -84,6 +84,7 @@ import {
 } from '@/features/finance/supplier-payables-pages';
 import { FinanceSettingsPage } from '@/features/finance/finance-settings-page';
 import { InvoicesPage } from '@/features/finance/invoices-page';
+import { TransactionsPage } from '@/features/finance/transactions-page';
 import { JournalPage } from '@/features/finance/journal-page';
 import { PaymentsPage } from '@/features/finance/payments-page';
 import { InvoicePrintPage, PaymentPrintPage } from '@/features/finance/print-pages';
@@ -106,10 +107,26 @@ import { AppStoresPage } from '@/features/app-settings/stores-page';
 import { AttendanceDashboardPage } from '@/features/hr/dashboard-page';
 import { AttendanceDaysPage } from '@/features/hr/days-page';
 import { AttendanceSetupPage } from '@/features/hr/setup-page';
+import { DivisionsPage } from '@/features/hr/divisions-page';
+import { HrReportPage } from '@/features/hr/report-page';
+import { RequestsPage } from '@/features/hr/requests-page';
+import { SchedulesPage } from '@/features/hr/schedules-page';
+import { StaffPage } from '@/features/hr/staff-page';
+import { CalendarPage } from '@/features/hr/community/calendar-page';
+import { FeedbackPage } from '@/features/hr/community/feedback-page';
+import { MessagesPage } from '@/features/hr/community/messages-page';
+import { PollsPage } from '@/features/hr/community/polls-page';
+import { SharesPage } from '@/features/hr/community/shares-page';
+import { SitesPage } from '@/features/hr/community/sites-page';
+import { HrHomePage } from '@/features/hr/home-page';
+import { InsightsPage } from '@/features/hr/insights/insights-page';
+import { EmployeePage, OldUserRedirect, OldUsersRedirect } from '@/features/hr/employee-page';
 import { BannersPage } from '@/features/customer-app/banners-page';
 import { PosCashiersPage } from '@/features/pos/cashiers-page';
 import { PosLoyaltyMembersPage } from '@/features/pos/loyalty-members-page';
 import { PosQuickButtonsPage } from '@/features/pos/quick-buttons-page';
+import { ReceiptTemplateEditorPage } from '@/features/pos/receipt-template-editor';
+import { ReceiptTemplatesPage } from '@/features/pos/receipt-templates-page';
 import { PosSalesPage } from '@/features/pos/sales-page';
 import { PosSalePrintPage } from '@/features/pos/sale-print-page';
 import { PosSettingsPage } from '@/features/pos/settings-page';
@@ -484,6 +501,24 @@ export const routes: RouteObject[] = [
             ),
           },
           {
+            path: 'sales/document-templates',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="sales.boards.manage">
+                <DocumentTemplatesPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: 'sales/document-templates/:id',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="sales.boards.manage">
+                <DocumentTemplateEditorPage />
+              </RequirePermission>
+            ),
+          },
+          {
             path: 'sales/boards/settings',
             handle: { width: 'full' },
             element: (
@@ -601,23 +636,12 @@ export const routes: RouteObject[] = [
             ),
           },
           {
+            // One list since ADR-0145: the old addresses (recent pages, links) lead to the employees.
             path: 'users',
             handle: { width: 'wide' },
-            element: (
-              <RequirePermission permission="identity.users.read">
-                <UsersPage />
-              </RequirePermission>
-            ),
+            element: <OldUsersRedirect />,
           },
-          {
-            path: 'users/:id',
-            handle: { width: 'reading' },
-            element: (
-              <RequirePermission permission="identity.users.read">
-                <UserDetailPage />
-              </RequirePermission>
-            ),
-          },
+          { path: 'users/:id', handle: { width: 'wide' }, element: <OldUserRedirect /> },
           {
             path: 'roles',
             handle: { width: 'wide' },
@@ -696,6 +720,16 @@ function posRoutes(): RouteObject[] {
       path: 'pos/quick-buttons',
       handle: { width: 'wide' },
       element: read(<PosQuickButtonsPage />),
+    },
+    {
+      path: 'pos/receipt-templates',
+      handle: { width: 'wide' },
+      element: read(<ReceiptTemplatesPage />),
+    },
+    {
+      path: 'pos/receipt-templates/:id',
+      handle: { width: 'wide' },
+      element: read(<ReceiptTemplateEditorPage />),
     },
     { path: 'pos/settings', handle: { width: 'reading' }, element: manage(<PosSettingsPage />) },
     ...(import.meta.env.DEV
@@ -794,6 +828,26 @@ function hrRoutes(): RouteObject[] {
       element: view(<AttendanceDaysPage />),
     },
     { path: 'hr/setup', handle: { width: 'reading' }, element: view(<AttendanceSetupPage />) },
+    { path: 'hr/home', handle: { width: 'wide' }, element: view(<HrHomePage />) },
+    { path: 'hr/insights', handle: { width: 'wide' }, element: view(<InsightsPage />) },
+    { path: 'hr/calendar', handle: { width: 'wide' }, element: view(<CalendarPage />) },
+    {
+      path: 'hr/notices',
+      handle: { width: 'wide' },
+      element: view(<MessagesPage kind="NOTICE" />),
+    },
+    { path: 'hr/news', handle: { width: 'wide' }, element: view(<MessagesPage kind="NEWS" />) },
+    { path: 'hr/polls', handle: { width: 'wide' }, element: view(<PollsPage kind="VOTE" />) },
+    { path: 'hr/surveys', handle: { width: 'wide' }, element: view(<PollsPage kind="SURVEY" />) },
+    { path: 'hr/feedback', handle: { width: 'wide' }, element: view(<FeedbackPage />) },
+    { path: 'hr/shares', handle: { width: 'wide' }, element: view(<SharesPage />) },
+    { path: 'hr/sites', handle: { width: 'wide' }, element: view(<SitesPage />) },
+    { path: 'hr/staff', handle: { width: 'wide' }, element: view(<StaffPage />) },
+    { path: 'hr/staff/:id', handle: { width: 'wide' }, element: view(<EmployeePage />) },
+    { path: 'hr/divisions', handle: { width: 'reading' }, element: view(<DivisionsPage />) },
+    { path: 'hr/schedules', handle: { width: 'wide' }, element: view(<SchedulesPage />) },
+    { path: 'hr/requests', handle: { width: 'wide' }, element: view(<RequestsPage />) },
+    { path: 'hr/report', handle: { width: 'wide' }, element: view(<HrReportPage />) },
   ];
 }
 
@@ -900,6 +954,11 @@ function financeRoutes(): RouteObject[] {
       path: 'finance/suppliers/:id',
       handle: { width: 'wide' },
       element: read(<SupplierLedgerPage />),
+    },
+    {
+      path: 'finance/transactions',
+      handle: { width: 'wide' },
+      element: read(<TransactionsPage />),
     },
     { path: 'finance/journal', handle: { width: 'wide' }, element: read(<JournalPage />) },
     { path: 'finance/accounts', handle: { width: 'wide' }, element: read(<AccountsPage />) },

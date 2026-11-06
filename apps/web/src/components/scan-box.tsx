@@ -17,6 +17,8 @@ import { useWedgeScanner } from '@/lib/scan/use-wedge-scanner';
  * the cursor in the box (a document just created from a dialog).
  */
 export function ScanBox(props: {
+  /** Takes the row, in a narrow part of a window (ADR-0155). */
+  fill?: boolean;
   onScan: (code: string) => void;
   letters?: boolean;
   disabled?: boolean;
@@ -43,7 +45,7 @@ export function ScanBox(props: {
       <div className="flex gap-2">
         <Input
           aria-label={props.label ?? t('scan.label')}
-          className="max-w-sm font-mono"
+          className={props.fill ? 'font-mono' : 'max-w-sm font-mono'}
           disabled={disabled}
           autoFocus={props.autoFocus}
           autoComplete="off"

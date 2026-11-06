@@ -23,9 +23,13 @@ import {
   AccountLedgerQueryDto,
   AccountPartiesQueryDto,
   AccountPartyDto,
+  AccountTransactionRequestDto,
   CashBookPageDto,
+  ChartImportRequestDto,
+  ChartImportResultDto,
   DateRangeQueryDto,
   GlAccountDto,
+  GlAccountGroupDto,
   GlAccountPatchDto,
   GlAccountRequestDto,
   GlAccountRoleRequestDto,
@@ -39,6 +43,8 @@ import {
   MoneyAccountRequestDto,
 } from '../dto/finance.dto';
 import { type GlAccount, GlAccountsService } from '../services/gl-accounts.service';
+import { AccountTransactionsService } from '../services/account-transactions.service';
+import { FinanceImportsService } from '../services/finance-imports.service';
 import { JournalService } from '../services/journal.service';
 import { MoneyAccountsService } from '../services/money-accounts.service';
 import { PaymentsService } from '../services/payments.service';
@@ -71,7 +77,28 @@ export class GlAccountsController {
   constructor(
     private readonly accounts: GlAccountsService,
     private readonly journal: JournalService,
+    private readonly imports: FinanceImportsService,
   ) {}
+
+  /** The chart's group tree (ADR-0148). */
+  @Get('groups')
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: [GlAccountGroupDto] })
+  groups(): Promise<GlAccountGroupDto[]> {
+    return this.imports.chartGroups();
+  }
+
+  /** A whole chart with its tree, in one transaction (ADR-0148). */
+  @Post('chart')
+  @HttpCode(200)
+  @RequirePermission(SETTINGS)
+  @ApiOkResponse({ type: ChartImportResultDto })
+  importChart(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: ChartImportRequestDto,
+  ): Promise<ChartImportResultDto> {
+    return this.imports.importChartTree(ctx, body);
+  }
 
   @Get()
   @RequirePermission(READ)
@@ -210,7 +237,23 @@ export class MoneyAccountsController {
 @ApiTags('finance')
 @Controller('journal-entries')
 export class JournalController {
-  constructor(private readonly journal: JournalService) {}
+  constructor(
+    private readonly journal: JournalService,
+    private readonly transactions: AccountTransactionsService,
+  ) {}
+
+  /** A transaction by the account's journal, like Erkhet's forms (ADR-0150). */
+  @Post('by-account')
+  @RequirePermission(JOURNAL)
+  @Idempotent()
+  @ApiCreatedResponse({ type: JournalEntryDetailDto })
+  async postByAccount(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: AccountTransactionRequestDto,
+    @IdempotencyKey() key?: string,
+  ): Promise<JournalEntryDetailDto> {
+    return journalEntryDetailDto(await this.transactions.post(ctx, body, key));
+  }
 
   @Get()
   @RequirePermission(READ)

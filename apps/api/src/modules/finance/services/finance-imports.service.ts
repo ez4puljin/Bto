@@ -6,13 +6,16 @@ import { businessDate } from '@tugeel/shared/time';
 import { nameKey, normalizeName } from '@tugeel/shared/text';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
+import { inTransaction } from '../../../common/db/transaction';
 import {
   type FinAccountControl,
+  type FinAccountGroupView,
   type FinAccountKind,
   type FinCallContext,
   type FinChartImportApplied,
   type FinChartImportRow,
   FinChartService,
+  type FinGroupTreeRow,
   FinJournalReader,
   FinReader,
   type FinSide,
@@ -28,6 +31,7 @@ import {
 import { type Actor, PermissionHoldersService } from '../../identity';
 import { FinBooks } from './fin-books';
 import { FinPosting } from './fin-posting';
+import { ensureReceiptCounterKeysInTx } from './receipt-counter-key';
 
 const MONEY_SCALE = 2;
 
@@ -269,17 +273,103 @@ export class FinanceImportsService {
     };
   }
 
+  /** The chart's group tree (ADR-0148). */
+  async chartGroups(): Promise<FinAccountGroupView[]> {
+    return this.chart.groups(this.books.source(), { company: await this.books.company() });
+  }
+
+  /**
+   * A whole chart at once (ADR-0148): the group tree, the accounts with their groups (a posting
+   * key re-pointed where a row names one), and the old chart's accounts made inactive.
+   */
+  async importChartTree(
+    actor: Actor,
+    input: {
+      groups: readonly FinGroupTreeRow[];
+      accounts: readonly {
+        code: string;
+        name: string;
+        kind: FinChartImportRow['kind'];
+        normalSide: FinChartImportRow['normalSide'];
+        control: string | null;
+        groupCode: string;
+        key: string | null;
+        journal?: FinChartImportRow['journal'];
+        currency?: string;
+      }[];
+      inactiveCodes: readonly string[];
+    },
+  ): Promise<{
+    created: number;
+    updated: number;
+    unchanged: number;
+    inactive: number;
+    rulesMoved: string[];
+  }> {
+    const company = await this.books.company();
+    return inTransaction(this.db, async (tx) => {
+      const ctx = await this.staff(tx, actor);
+      await this.chart.saveGroupTreeInTx(tx, ctx, { company, groups: input.groups });
+      const applied = await this.chart.importChartInTx(tx, ctx, {
+        company,
+        on: businessDate(),
+        rows: input.accounts.map((row) => ({
+          code: row.code,
+          name: row.name,
+          kind: row.kind,
+          normalSide: row.normalSide,
+          control: row.control as FinChartImportRow['control'],
+          group: { code: row.groupCode, name: null },
+          key: row.key,
+          journal: row.journal ?? null,
+          currency: row.currency ?? null,
+        })),
+      });
+      const all = await this.chart.accounts(ctx, { company }, tx);
+      for (const account of all) {
+        if (account.status !== 'ACTIVE') continue;
+        await this.chart.ensureMoneyAccountInTx(tx, ctx, { company, accountId: account.id });
+      }
+      await ensureReceiptCounterKeysInTx(tx, this.chart, ctx, company, all);
+      const inactive = all.filter((row) => input.inactiveCodes.includes(row.code));
+      for (const account of inactive) {
+        await this.chart.updateAccountInTx(tx, ctx, {
+          company,
+          id: account.id,
+          patch: { status: 'INACTIVE' },
+        });
+      }
+      return {
+        created: applied.filter((row) => row.action === 'CREATE').length,
+        updated: applied.filter((row) => row.action === 'UPDATE').length,
+        unchanged: applied.filter((row) => row.action === 'UNCHANGED').length,
+        inactive: inactive.length,
+        rulesMoved: applied.flatMap((row) => (row.rule ? [row.rule.key] : [])),
+      };
+    });
+  }
+
   /** Erkhet's chart, as the staff member who committed the import (ADR-0102 #4). */
   async importChartInTx(
     tx: Tx,
     actor: Actor,
     rows: readonly FinChartImportRow[],
   ): Promise<FinChartImportApplied[]> {
-    return this.chart.importChartInTx(tx, await this.staff(tx, actor), {
-      company: await this.books.company(),
+    const ctx = await this.staff(tx, actor);
+    const company = await this.books.company();
+    const applied = await this.chart.importChartInTx(tx, ctx, {
+      company,
       rows,
       on: businessDate(),
     });
+    await ensureReceiptCounterKeysInTx(
+      tx,
+      this.chart,
+      ctx,
+      company,
+      await this.chart.accounts(ctx, { company }, tx),
+    );
+    return applied;
   }
 
   async revertChartInTx(

@@ -1,8 +1,18 @@
 import qrcode from 'qrcode-generator';
+import { cn } from 'cn';
 import { useMemo } from 'react';
 
 /** A QR code as crisp squares (e-Barimt asks for a sharp code); the data is never kept. */
-export function QrCode({ data, label }: { data: string; label: string }) {
+export function QrCode({
+  data,
+  label,
+  className,
+}: {
+  data: string;
+  label: string;
+  /** The code's size; e-Barimt's 38 mm when none is given. */
+  className?: string;
+}) {
   const path = useMemo(() => {
     const code = qrcode(0, 'M');
     code.addData(data);
@@ -22,7 +32,10 @@ export function QrCode({ data, label }: { data: string; label: string }) {
       aria-label={label}
       viewBox={`0 0 ${path.size} ${path.size}`}
       shapeRendering="crispEdges"
-      className="mx-auto block size-40 bg-background text-foreground print:size-[38mm]"
+      className={cn(
+        'mx-auto block bg-background text-foreground',
+        className ?? 'size-40 print:size-[38mm]',
+      )}
     >
       <path d={path.d} fill="currentColor" />
     </svg>

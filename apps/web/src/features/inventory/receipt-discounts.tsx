@@ -24,6 +24,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatMnt, formatQty, formatTugrik } from '@/lib/money';
+import { cn } from '@/lib/utils';
 import type { ReceiptLine } from './api';
 import { parseMoney } from './helpers';
 import { type PanelLine, ReceiptLinePanel } from './receipt-line-panel';
@@ -71,6 +72,8 @@ export function ReceiptDiscountsCard(props: {
   pending?: boolean;
   /** A discount exceeds the lines it applies to. */
   tooLarge?: boolean;
+  /** Inside a sheet (ADR-0156): no card of its own, and room for the sheet's ✕. */
+  plain?: boolean;
   onChange?: (discounts: DiscountDraft[]) => void;
   /** Free goods are added and removed on a draft only. */
   free?: {
@@ -130,8 +133,19 @@ export function ReceiptDiscountsCard(props: {
       : formatTugrik(discount.amount ?? '0');
 
   return (
-    <Card role="region" aria-labelledby={`${ids}-title`}>
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
+    <Card
+      role="region"
+      aria-labelledby={`${ids}-title`}
+      className={
+        props.plain ? '-mt-2 overflow-visible bg-transparent py-0 shadow-none ring-0' : undefined
+      }
+    >
+      <CardHeader
+        className={cn(
+          'flex flex-row items-center justify-between gap-2',
+          props.plain && 'pr-10 pl-0',
+        )}
+      >
         <CardTitle id={`${ids}-title`}>{text('title')}</CardTitle>
         {props.editable ? (
           <DropdownMenu modal={false}>
@@ -158,7 +172,7 @@ export function ReceiptDiscountsCard(props: {
           </DropdownMenu>
         ) : null}
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className={cn('flex flex-col gap-4', props.plain && 'px-0')}>
         {adding === 'free' && props.free ? (
           <ReceiptLinePanel
             free

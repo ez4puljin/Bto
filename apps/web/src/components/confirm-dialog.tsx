@@ -43,6 +43,7 @@ export function ConfirmDialog(props: {
   return (
     <Dialog open={props.open} onOpenChange={(open) => (open ? undefined : props.onClose())}>
       <DialogContent
+        guard={false}
         closeLabel={t('common.close')}
         onOpenAutoFocus={(event) => {
           const button = confirm.current;

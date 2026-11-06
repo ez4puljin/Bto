@@ -486,7 +486,6 @@ function IssueScreen(props: {
             ? t('inventory.issues.newTitle')
             : (detail.number ?? t('inventory.draftNo', { id: detail.id }))
         }
-        description={detail === null ? t('inventory.issues.newDescription') : undefined}
         meta={
           detail ? (
             <>

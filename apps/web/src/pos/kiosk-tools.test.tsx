@@ -8,6 +8,7 @@ import type {
   EdgeReturnRequest,
   EdgeReturnSale,
 } from '@tugeel/shared/pos';
+import { posReceiptBarcode } from '@tugeel/shared/pos';
 import { describe, expect, it } from 'vitest';
 import { wedgeScan } from '@/test/scan';
 import {
@@ -248,5 +249,17 @@ describe('kiosk: the till tools (ADR-0104)', () => {
       lines: [{ refundsLineNo: 1, qty: '1', damaged: false }],
       approval: { supervisorUserId: SUPERVISOR.userId, pin: '654321' },
     });
+  });
+
+  it('opens the return of a scanned receipt barcode (ADR-0142)', async () => {
+    const edge = await openSale({ 'GET /returns/sale': () => json(RETURN_SALE) });
+    const code = posReceiptBarcode(3, 'К1-261017-0002') ?? '';
+    await wedgeScan(code);
+    const dialog = await screen.findByRole('dialog', { name: k.returns.title });
+    expect(
+      await within(dialog).findByLabelText(k.returns.qty.replace('{{name}}', MILK.name)),
+    ).toBeInTheDocument();
+    expect(edge.callsTo('GET /returns/sale')[0]?.url.searchParams.get('number')).toBe(code);
+    expect(edge.callsTo('GET /products/barcode/' + code)).toHaveLength(0);
   });
 });

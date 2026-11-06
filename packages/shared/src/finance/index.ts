@@ -316,3 +316,69 @@ export {
   type SettlementSummary,
   settlementSummary,
 } from './settlement';
+
+/**
+ * What an account is on the screen (ADR-0149): Erkhet's «Журнал». The accounting kind stays beneath
+ * it, worked out from the code, because the statements and the year close read it.
+ */
+export const ACCOUNT_JOURNALS = [
+  'GENERAL',
+  'CASH',
+  'BANK',
+  'MONEY',
+  'RECEIVABLE_PAYABLE',
+  'VAT',
+  'INVENTORY',
+  'FIXED_ASSET',
+] as const;
+export type AccountJournal = (typeof ACCOUNT_JOURNALS)[number];
+
+/** Erkhet's currencies, in its order; an account names one, the ledger itself stays in MNT. */
+export const ACCOUNT_CURRENCIES = [
+  'MNT',
+  'USD',
+  'EUR',
+  'CNY',
+  'RUB',
+  'JPY',
+  'GBP',
+  'CHF',
+  'KRW',
+  'HKD',
+  'AUD',
+  'CAD',
+  'SGD',
+  'SEK',
+  'BGN',
+  'HUF',
+  'EGP',
+  'INR',
+  'KZT',
+  'KPW',
+  'CZK',
+  'TWD',
+  'THB',
+  'IDR',
+  'MYR',
+  'AED',
+  'KWD',
+  'NZD',
+  'DKK',
+  'PLN',
+  'UAH',
+  'NOK',
+  'NPR',
+  'TRY',
+  'ZAR',
+] as const;
+export type AccountCurrency = (typeof ACCOUNT_CURRENCIES)[number];
+
+/** The accounting kind a chart code falls in, by its first digits (ADR-0149); null: not a number. */
+export function accountKindOfCode(code: string): GlAccountKind | null {
+  if (/^[12]/.test(code)) return 'ASSET';
+  if (code.startsWith('3')) return 'LIABILITY';
+  if (code.startsWith('4') || code.startsWith('92')) return 'EQUITY';
+  if (/^5/.test(code)) return 'INCOME';
+  if (/^[6-9]/.test(code)) return 'EXPENSE';
+  return null;
+}

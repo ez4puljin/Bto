@@ -1,12 +1,15 @@
 import Constants from 'expo-constants';
-import { Server } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { Server, UsersRound } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { feedCount, useFeed } from '../../../src/api/community';
 import { initialsOf } from '../../../src/format/format';
 import { useRoleName } from '../../../src/state/role';
 import { useSignedIn } from '../../../src/state/session';
 import { colors, fonts, radii, spacing, type } from '../../../src/theme/tokens';
+import { CountBadge } from '../../../src/ui/controls';
 import { Group, ICON_INSET, IconTile, Row } from '../../../src/ui/grouped';
 import { Page } from '../../../src/ui/layout';
 import { ActionSheet } from '../../../src/ui/sheet';
@@ -20,7 +23,9 @@ import { Text } from '../../../src/ui/text';
  */
 export default function StoreProfileScreen() {
   const { t } = useTranslation();
+  const router = useRouter();
   const { session, me, server } = useSignedIn();
+  const community = feedCount(useFeed().data);
   const roleName = useRoleName();
   const [leaving, setLeaving] = useState(false);
   const build = Constants.expoConfig?.android?.versionCode;
@@ -42,6 +47,25 @@ export default function StoreProfileScreen() {
             </Text>
           </View>
         </View>
+
+        <Group inset={ICON_INSET} style={styles.group}>
+          <Row
+            minHeight={52}
+            icon={
+              <IconTile color={colors.tint.indigo}>
+                <UsersRound size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+              </IconTile>
+            }
+            title={t('mobile.community.title')}
+            accessibilityLabel={
+              community > 0
+                ? t('mobile.community.unreadLabel', { n: community })
+                : t('mobile.community.title')
+            }
+            right={<CountBadge count={community} ring={colors.card} />}
+            onPress={() => router.push('/community')}
+          />
+        </Group>
 
         <Group inset={ICON_INSET} style={styles.group}>
           <Row

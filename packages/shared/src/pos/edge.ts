@@ -11,6 +11,7 @@ import {
   type QuoteResult,
 } from '../pricing';
 import type { EbarimtTaxType } from '../mn';
+import type { ReceiptLayout, SnapshotReceiptTemplate } from './receipt-template';
 import type {
   EbarimtStatus,
   PosEventKind,
@@ -311,6 +312,9 @@ export interface SnapshotTill {
   cashierUserIds?: number[];
   supervisorUserIds?: number[];
   categoryIds?: number[];
+  /** ADR-0141: the receipt templates this POS prints with; null or absent: the default of the kind. */
+  saleTemplateId?: number | null;
+  returnTemplateId?: number | null;
   status: 'ACTIVE' | 'INACTIVE';
   /** sha-256 of `${id}:${code}` of the one-time pairing code the admin issued (S1). */
   pairingCodeHash: string | null;
@@ -373,6 +377,8 @@ export interface PosSnapshot {
   quickGroups?: SnapshotQuickGroup[];
   /** ADR-0111: the active payment types in order; absent in a snapshot taken before it. */
   paymentTypes?: SnapshotPaymentType[];
+  /** ADR-0141: the published receipt templates; absent in a snapshot taken before it. */
+  receiptTemplates?: SnapshotReceiptTemplate[];
 }
 
 /**
@@ -704,7 +710,8 @@ export interface EdgeShiftSummary {
 }
 
 export interface EdgeSession {
-  till: { code: string; name: string };
+  /** ADR-0142: `id` makes the receipt's barcode; absent from an older edge. */
+  till: { id?: number; code: string; name: string };
   cashier: EdgeCashier;
   shift: EdgeShiftSummary | null;
   businessDate: string;
@@ -713,6 +720,8 @@ export interface EdgeSession {
   approvalRequired?: boolean;
   /** ADR-0111: the payment types the till offers, in order; absent from an older edge. */
   paymentTypes?: SnapshotPaymentType[];
+  /** ADR-0141: the layouts this POS prints a sale's and a return's receipt with; null: the built-in one. */
+  receiptLayouts?: { SALE: ReceiptLayout | null; RETURN: ReceiptLayout | null };
 }
 
 export interface EdgeShiftOpenRequest {

@@ -329,6 +329,37 @@ export class SalesPickerDto {
   @ApiProperty() fullName: string;
 }
 
+@ApiSchema({ name: 'SalesOrderFieldChange' })
+export class SalesOrderFieldChangeDto {
+  @ApiProperty() field: string;
+  @ApiProperty({ type: String, nullable: true }) before: string | null;
+  @ApiProperty({ type: String, nullable: true }) after: string | null;
+}
+
+@ApiSchema({ name: 'SalesOrderLineChange' })
+export class SalesOrderLineChangeDto {
+  @ApiProperty({ enum: ['ADDED', 'REMOVED', 'CHANGED'] }) kind: 'ADDED' | 'REMOVED' | 'CHANGED';
+  @ApiProperty() productName: string;
+  @ApiProperty() unitName: string;
+  @ApiProperty() warehouseId: number;
+  @ApiProperty({ type: String, nullable: true }) qtyBefore: string | null;
+  @ApiProperty({ type: String, nullable: true }) qtyAfter: string | null;
+  @ApiProperty({ type: String, nullable: true }) totalBefore: string | null;
+  @ApiProperty({ type: String, nullable: true }) totalAfter: string | null;
+}
+
+@ApiSchema({ name: 'SalesOrderChange' })
+export class SalesOrderChangeDto {
+  @ApiProperty() version: number;
+  @ApiProperty({ enum: ORDER_STATUSES }) status: OrderStatus;
+  @ApiProperty({ type: [SalesOrderFieldChangeDto] }) fields: SalesOrderFieldChangeDto[];
+  @ApiProperty({ type: [SalesOrderLineChangeDto] }) lines: SalesOrderLineChangeDto[];
+  @ApiProperty({ type: String, nullable: true }) totalBefore: string | null;
+  @ApiProperty({ type: String, nullable: true }) totalAfter: string | null;
+  @ApiProperty({ type: String, nullable: true }) actorName: string | null;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
+}
+
 @ApiSchema({ name: 'SalesOrderDetail' })
 export class SalesOrderDetailDto {
   @ApiProperty() id: number;
@@ -382,6 +413,7 @@ export class SalesOrderDetailDto {
   picks: SalesOrderPickPartDto[];
   @ApiProperty({ type: [SalesOrderEventDto] }) events: SalesOrderEventDto[];
   @ApiProperty({ type: [SalesOrderMoveDto] }) moves: SalesOrderMoveDto[];
+  @ApiProperty({ type: [SalesOrderChangeDto] }) changes: SalesOrderChangeDto[];
 }
 
 @ApiSchema({ name: 'SalesOrderSummary' })

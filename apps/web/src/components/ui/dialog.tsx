@@ -86,23 +86,95 @@ export function useReturnFocus(
   }
 }
 
+/** Controls that count as work once used; a picker's search does not (ADR-0151). */
+const WORK_CONTROLS =
+  '[role="checkbox"],[role="switch"],[role="radio"],[role="combobox"],[role="option"]'
+
+/**
+ * What was typed in a dialog is not lost by accident (ADR-0151): once a field is used, a click
+ * outside does nothing, and ✕, Esc and «Болих» ask first. A dialog that knows better passes `dirty`;
+ * a question passes `guard={false}`. Saving closes the dialog as before.
+ */
+function useDiscardGuard(guard: boolean, dirty: boolean | undefined) {
+  const [touched, setTouched] = React.useState(false)
+  const [asking, setAsking] = React.useState(false)
+  const close = React.useRef<HTMLButtonElement>(null)
+  const pending = React.useRef<HTMLElement | null>(null)
+  const passing = React.useRef(false)
+  const active = guard && (dirty ?? touched)
+  return {
+    active,
+    asking,
+    close,
+    setAsking,
+    /** Inputs and pickers of this dialog, not of a dialog or a menu opened from it. */
+    onUse: (event: React.SyntheticEvent<HTMLElement>) => {
+      const target = event.target as HTMLElement
+      if (!event.currentTarget.contains(target)) return
+      if (target.matches('input[type="search"], [data-no-guard] *')) return
+      setTouched(true)
+    },
+    onClick: (event: React.MouseEvent<HTMLElement>) => {
+      const target = event.target as HTMLElement
+      if (!event.currentTarget.contains(target)) return
+      if (passing.current) return
+      if (target.closest(WORK_CONTROLS)) setTouched(true)
+      const button = target.closest("button")
+      if (!active || !button || button.type === "submit") return
+      if (button.textContent?.trim() !== cancelWord()) return
+      event.preventDefault()
+      event.stopPropagation()
+      pending.current = button
+      setAsking(true)
+    },
+    /** «Хадгалаад шинэ» resets its form: what stays is not work to lose. */
+    onReset: () => setTouched(false),
+    /** The asked close goes through: the same «Болих» pressed again, or ✕. */
+    discard: () => {
+      setAsking(false)
+      passing.current = true
+      const target = pending.current ?? close.current
+      pending.current = null
+      target?.click()
+      passing.current = false
+    },
+    keep: () => {
+      pending.current = null
+      setAsking(false)
+    },
+  }
+}
+
+let cancelText = ""
+const cancelWord = () => cancelText
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
   closeLabel,
   size = "sm",
+  guard = true,
+  dirty,
   onKeyDownCapture,
   onOpenAutoFocus,
   onCloseAutoFocus,
+  onInteractOutside,
+  onEscapeKeyDown,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
   /** Screen-reader label of the close button; «Хаах» unless named. */
   closeLabel?: string
   size?: keyof typeof DIALOG_SIZES
+  /** False: a question or a viewer, with nothing to lose. */
+  guard?: boolean
+  /** Whether there is work to lose; left out, any use of a field counts. */
+  dirty?: boolean
 }) {
   const { t } = useTranslation()
+  cancelText = t("common.cancel")
+  const discard = useDiscardGuard(guard, dirty)
   // A barcode scan's Enter never presses the focused button (ADR-0047 #4).
   const scanGuard = useScanEnterGuard()
   const focus = useReturnFocus(onOpenAutoFocus, onCloseAutoFocus)
@@ -122,22 +194,71 @@ function DialogContent({
         }}
         onOpenAutoFocus={focus.onOpenAutoFocus}
         onCloseAutoFocus={focus.onCloseAutoFocus}
+        onInputCapture={discard.onUse}
+        onResetCapture={discard.onReset}
+        onClickCapture={discard.onClick}
+        onInteractOutside={(event) => {
+          if (discard.active) event.preventDefault()
+          onInteractOutside?.(event)
+        }}
+        onEscapeKeyDown={(event) => {
+          if (discard.active) {
+            event.preventDefault()
+            discard.setAsking(true)
+          }
+          onEscapeKeyDown?.(event)
+        }}
         {...props}
       >
         {children}
+        {/* Kept even without its button: an asked close goes through it. */}
+        <DialogPrimitive.Close asChild>
+          <button ref={discard.close} type="button" hidden aria-hidden tabIndex={-1} />
+        </DialogPrimitive.Close>
         {showCloseButton && (
-          <DialogPrimitive.Close data-slot="dialog-close" asChild>
-            <Button
-              variant="ghost"
-              className="absolute top-3 right-3 z-20 rounded-full text-muted-foreground"
-              size="icon-sm"
-              aria-label={closeLabel ?? t("common.close")}
-              title={closeLabel ?? t("common.close")}
-            >
-              <XIcon />
-            </Button>
-          </DialogPrimitive.Close>
+          <Button
+            variant="ghost"
+            className="absolute top-3 right-3 z-20 rounded-full text-muted-foreground"
+            size="icon-sm"
+            data-slot="dialog-close"
+            aria-label={closeLabel ?? t("common.close")}
+            title={closeLabel ?? t("common.close")}
+            onClick={() => {
+              if (discard.active) discard.setAsking(true)
+              else discard.close.current?.click()
+            }}
+          >
+            <XIcon />
+          </Button>
         )}
+        {discard.asking ? (
+          <DialogPrimitive.Root open onOpenChange={(open) => (open ? undefined : discard.keep())}>
+            <DialogPortal>
+              <DialogOverlay />
+              <DialogPrimitive.Content
+                data-slot="dialog-content"
+                className={cn(
+                  "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-3 rounded-2xl bg-popover p-5 shadow-dialog sm:max-w-md"
+                )}
+              >
+                <DialogPrimitive.Title className="text-[1.0625rem] font-semibold">
+                  {t("common.discard.title")}
+                </DialogPrimitive.Title>
+                <DialogPrimitive.Description className="text-sm text-muted-foreground">
+                  {t("common.discard.description")}
+                </DialogPrimitive.Description>
+                <div className="mt-2 flex justify-end gap-2">
+                  <Button type="button" variant="ghost" onClick={discard.keep}>
+                    {t("common.discard.keep")}
+                  </Button>
+                  <Button type="button" variant="destructive" onClick={discard.discard}>
+                    {t("common.discard.confirm")}
+                  </Button>
+                </div>
+              </DialogPrimitive.Content>
+            </DialogPortal>
+          </DialogPrimitive.Root>
+        ) : null}
       </DialogPrimitive.Content>
     </DialogPortal>
   )

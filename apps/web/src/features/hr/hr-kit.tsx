@@ -41,8 +41,30 @@ export function InDot() {
   );
 }
 
-/** A round avatar of the person's initials (the first letters of the first two words). */
-export function Avatar({ name, className }: { name: string; className?: string }) {
+/**
+ * A round avatar: the person's photo when there is one (ADR-0144), else the initials (the first
+ * letters of the first two words).
+ */
+export function Avatar({
+  name,
+  src,
+  className,
+}: {
+  name: string;
+  src?: string | null;
+  className?: string;
+}) {
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt=""
+        aria-hidden
+        loading="lazy"
+        className={cn('size-8 shrink-0 rounded-full bg-secondary object-cover', className)}
+      />
+    );
+  }
   const initials = name
     .split(/\s+/)
     .filter(Boolean)

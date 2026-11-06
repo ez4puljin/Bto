@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { components } from '@tugeel/api-client';
 import mn from '@tugeel/shared/i18n/mn.json';
@@ -20,6 +20,7 @@ import {
   WH1,
   warehouses,
 } from '@/test/inventory-fixtures';
+import { choose } from '@/test/choose';
 import { ADMIN_ME, json, type Me, problem, renderApp, signedIn } from '@/test/render-app';
 import { wedgeScan } from '@/test/scan';
 
@@ -59,12 +60,6 @@ const SUPPLIER: Schemas['SupplierListItem'] = {
   contact: null,
   productCount: 0,
 };
-
-const ACCOUNTS: Schemas['ReceiptPaymentAccount'][] = [
-  { id: 21, code: '101', name: 'Касс', kind: 'CASH' },
-  { id: 22, code: '111', name: 'Хаан банк', kind: 'BANK' },
-  { id: 23, code: '112', name: 'Голомт банк', kind: 'BANK' },
-];
 
 const WH2 = { id: 2, name: 'Хоёрдугаар агуулах' };
 
@@ -217,7 +212,12 @@ const panelRoutes: Record<string, Handler> = {
 /** The routes every receipt editor reads: warehouses, the money accounts and the panel's. */
 const editorRoutes: Record<string, Handler> = {
   'GET /api/v1/warehouses': warehouses,
-  'GET /api/v1/receipts/payment-accounts': () => json(ACCOUNTS),
+  'GET /api/v1/receipts/counter-accounts': () =>
+    json([
+      { code: '310101', name: 'Байгууллагад өгөх өглөг', isDefault: true },
+      { code: '310105', name: 'Ачаа тээврийн зардал', isDefault: false },
+      { code: '313011', name: 'Тооллогын зөрүү', isDefault: false },
+    ]),
   'GET /api/v1/suppliers': () => list([SUPPLIER]),
   ...panelRoutes,
 };
@@ -290,9 +290,15 @@ const summary = (id: number, fields: Partial<Schemas['ReceiptSummary']> = {}) =>
     ...fields,
   }) satisfies Schemas['ReceiptSummary'];
 
-const panel = () => within(screen.getByRole('region', { name: panelText.title }));
-const findPanel = async () => within(await screen.findByRole('region', { name: panelText.title }));
-const productSearch = () => panel().getByRole('searchbox', { name: mn.inventory.product });
+const panel = () => within(screen.getByRole('rowgroup', { name: panelText.title }));
+const findPanel = async () =>
+  within(await screen.findByRole('rowgroup', { name: panelText.title }));
+const productSearch = () => panel().getByRole('combobox', { name: mn.inventory.product });
+/** A draft's discounts and free goods open in a sheet from the window's foot (ADR-0156). */
+async function openDiscounts(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: new RegExp(discountsText.open) }));
+  return within(await screen.findByRole('region', { name: discountsText.title }));
+}
 /** The query of each product lookup the page made, in order. */
 const lookups = (fetchMock: ReturnType<typeof signedIn>) =>
   calls(fetchMock, 'GET', '/api/v1/products/lookup').map(
@@ -446,7 +452,6 @@ describe('a new receipt (owner 2026-10-18 and 2026-10-23: one window like Erkhet
     await waitFor(() => expect(qty).toHaveFocus());
     // The warehouse never sees a price field.
     expect(panel().queryByLabelText(form.unitPrice)).toBeNull();
-    expect(panel().queryByLabelText(panelText.salePrice)).toBeNull();
     await user.keyboard('{Enter}');
     expect(await header.findByText(mn.validation.required)).toBeInTheDocument();
     expect(calls(fetchMock, 'POST', '/api/v1/receipts')).toHaveLength(0);
@@ -485,26 +490,21 @@ describe('a new receipt (owner 2026-10-18 and 2026-10-23: one window like Erkhet
     const user = userEvent.setup();
     const header = within(await screen.findByRole('region', { name: form.header }));
     await user.type(header.getByLabelText(mn.inventory.receipts.supplier), 'МСМ');
-    await user.click(await header.findByRole('button', { name: /МСМ ХХК/ }));
+    await user.click(await screen.findByRole('option', { name: /МСМ ХХК/ }));
 
     // Search → Enter takes the match → «Тоо» → Enter → «Нэгж үнэ» → Enter adds the line.
     await pickByKeyboard(user, 'Будаа');
     const qty = panel().getByLabelText(mn.inventory.qty);
     await waitFor(() => expect(qty).toHaveFocus());
-    // Under the fields: the home warehouse and its stock, the last receipt and the sale price.
+    // The location comes with the product; under the fields its stock, the last receipt and the
+    // sale price.
+    await waitFor(() =>
+      expect(panel().getByLabelText(panelText.location)).toHaveValue(`${WH1.name} · ${SHELF.code}`),
+    );
     const info = within(await screen.findByLabelText(panelText.infoLabel));
-    expect(await info.findByText(`${WH1.name} · үлдэгдэл 44`)).toBeInTheDocument();
+    expect(await info.findByText('44')).toBeInTheDocument();
     expect(await info.findByText('1,100₮/ш (1,100₮/ш) · 2026-10-01 · МСМ ХХК')).toBeInTheDocument();
     expect(await info.findByText('1,500₮')).toBeInTheDocument();
-    // The last receipt price waits under «Нэгж үнэ» too.
-    expect(
-      panel().getByText(
-        panelText.lastPriceHint
-          .replace('{{price}}', '1,100')
-          .replace('{{unit}}', 'ш')
-          .replace('{{date}}', '2026-10-01'),
-      ),
-    ).toBeInTheDocument();
     // The search kept to the chosen supplier's products (ADR-0103).
     expect(lookups(fetchMock).at(-1)?.get('supplierId')).toBe('3');
     await user.keyboard('3{Enter}');
@@ -515,8 +515,7 @@ describe('a new receipt (owner 2026-10-18 and 2026-10-23: one window like Erkhet
     // The amount shows what the price comes to, and the markup on the sale price.
     expect(panel().getByLabelText(form.amount)).toHaveAttribute('placeholder', '3,600');
     expect(info.getByText('25.0%')).toBeInTheDocument();
-    // A cost holder without the price right sets no sale price: «Нэгж үнэ» is the last field.
-    expect(panel().queryByLabelText(panelText.salePrice)).toBeNull();
+    // «Нэгж үнэ» is the last field.
     await new Promise((resolve) => setTimeout(resolve, 80));
     await user.keyboard('{Enter}');
 
@@ -538,7 +537,7 @@ describe('a new receipt (owner 2026-10-18 and 2026-10-23: one window like Erkhet
       expect(panel().getByPlaceholderText(panelText.supplierSearch)).toHaveFocus(),
     );
     // The panel empties for the next product.
-    expect(await panel().findByRole('searchbox', { name: mn.inventory.product })).toHaveValue('');
+    expect(await panel().findByRole('combobox', { name: mn.inventory.product })).toHaveValue('');
     const lines = within(screen.getByRole('region', { name: form.linesTitle }));
     expect(lines.getByRole('cell', { name: WH1.name })).toBeInTheDocument();
     expect(lines.getByRole('cell', { name: '3,600' })).toBeInTheDocument();
@@ -559,30 +558,31 @@ describe('a new receipt (owner 2026-10-18 and 2026-10-23: one window like Erkhet
     expect(await lines.findAllByRole('cell', { name: 'Будаа' })).toHaveLength(2);
   }, 25_000);
 
-  it('saves a new receipt with its header alone', async () => {
-    const fetchMock = signedIn(WAREHOUSE_ME, {
-      ...editorRoutes,
-      'POST /api/v1/receipts': () => json(DRAFT, 201),
-      'GET /api/v1/receipts/5': () => json(DRAFT),
-    });
-    const { router } = renderApp('/inventory/receipts/new', fetchMock);
-    const user = userEvent.setup();
+  it('has no number to type: it comes with the first save (ADR-0153)', async () => {
+    renderApp('/inventory/receipts/new', signedIn(WAREHOUSE_ME, editorRoutes));
     const header = within(await screen.findByRole('region', { name: form.header }));
-    await user.click(screen.getByRole('button', { name: mn.common.save }));
-    expect(await header.findByText(mn.validation.required)).toBeInTheDocument();
-    await user.type(header.getByLabelText(mn.inventory.receipts.supplier), 'МСМ');
-    await user.click(await header.findByRole('button', { name: /МСМ ХХК/ }));
-    await user.type(header.getByLabelText(mn.inventory.receipt.supplierDocNo), 'П-123');
-    await user.type(header.getByLabelText(form.note), 'Сарын татан авалт');
-    await user.click(screen.getByRole('button', { name: mn.common.save }));
-    await waitFor(() => expect(router.state.location.pathname).toBe('/inventory/receipts/5'));
-    expect(await bodyOf(calls(fetchMock, 'POST', '/api/v1/receipts')[0])).toEqual({
-      supplierId: 3,
-      supplierDocNo: 'П-123',
-      supplierDocDate: businessDate(),
-      note: 'Сарын татан авалт',
-      paymentMethod: 'CREDIT',
-    });
+    const number = header.getByLabelText(mn.inventory.receipt.supplierDocNo);
+    expect(number).toHaveAttribute('readonly');
+    expect(number).toHaveValue('');
+    expect(number).toHaveAttribute('placeholder', form.numberOnSave);
+    // A line is what saves: no empty document.
+    expect(screen.getAllByRole('button', { name: mn.common.save })).toHaveLength(1);
+    expect(
+      within(screen.getByRole('rowgroup', { name: panelText.title })).getByRole('button', {
+        name: mn.common.save,
+      }),
+    ).toBeInTheDocument();
+    cleanup();
+
+    renderApp(
+      '/inventory/receipts/5',
+      signedIn(WAREHOUSE_ME, {
+        ...editorRoutes,
+        'GET /api/v1/receipts/5': () => json({ ...DRAFT, number: 'GR-2026-000042' }),
+      }),
+    );
+    const saved = within(await screen.findByRole('region', { name: form.header }));
+    expect(saved.getByLabelText(mn.inventory.receipt.supplierDocNo)).toHaveValue('GR-2026-000042');
   });
 });
 
@@ -609,18 +609,27 @@ describe('the line panel (ADR-0099 #3)', () => {
     await waitFor(() => expect(qty).toHaveFocus());
     expect(panel().getByLabelText(mn.inventory.unit)).toHaveValue('77');
     const info = within(screen.getByLabelText(panelText.infoLabel));
-    expect(await info.findByText(`${WH1.name} · үлдэгдэл 240`)).toBeInTheDocument();
+    expect(await info.findByText('240')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(panel().getByLabelText(panelText.location)).toHaveValue(`${WH1.name} · ${SHELF.code}`),
+    );
+    // «Бараа засах» opens the product beside the window.
+    const editProduct = panel().getByRole('link', { name: panelText.editProduct });
+    expect(editProduct).toHaveAttribute('href', `/catalog/products/${COLA.id}`);
+    expect(editProduct).toHaveAttribute('target', '_blank');
     // The units and the weight come from the lookup by the product's code (ADR-0103).
     const byCode = lookups(fetchMock).find((query) => query.get('q') === COLA.sku);
     expect(byCode?.get('limit')).toBe('5');
-    const weight = (total: string) =>
-      panelText.weightValue.replace('{{kg}}', '0.26').replace('{{total}}', total);
-    expect(await info.findByText(weight('6.24'))).toBeInTheDocument();
+    // The weight is the product's, filled by itself.
+    await waitFor(() =>
+      expect(panel().getByLabelText(panelText.weightTotalLabel)).toHaveValue('6.24'),
+    );
+    expect(info.getByText('0.26')).toBeInTheDocument();
 
     // The same code again counts one more box, never a quantity of the barcode's digits.
     await wedgeScan('4006381333931');
     await waitFor(() => expect(qty).toHaveValue('2'));
-    expect(info.getByText(weight('12.48'))).toBeInTheDocument();
+    expect(panel().getByLabelText(panelText.weightTotalLabel)).toHaveValue('12.48');
     expect(calls(fetchMock, 'POST', '/api/v1/receipts/5/lines')).toHaveLength(0);
     await user.keyboard('{Enter}');
     await waitFor(() =>
@@ -660,15 +669,16 @@ describe('the line panel (ADR-0099 #3)', () => {
     renderApp('/inventory/receipts/5', fetchMock);
     const user = userEvent.setup();
     await findPanel();
-    const scope = within(panel().getByRole('radiogroup', { name: panelText.scope }));
+    expect(productSearch()).toHaveAttribute('placeholder', panelText.supplierSearch);
+
+    // The cursor in the box lists the supplier's products before anything is typed; the switch
+    // stands at the head of that list.
+    await user.click(productSearch());
+    const scope = within(await screen.findByRole('radiogroup', { name: panelText.scope }));
     const supplierOnly = scope.getByRole('radio', { name: panelText.scopes.supplier });
     const all = scope.getByRole('radio', { name: panelText.scopes.all });
     expect(supplierOnly).toHaveAttribute('aria-checked', 'true');
     expect(all).toHaveAttribute('aria-checked', 'false');
-    expect(productSearch()).toHaveAttribute('placeholder', panelText.supplierSearch);
-
-    // The cursor in the box lists the supplier's products before anything is typed.
-    await user.click(productSearch());
     const listed = () => within(screen.getByRole('listbox')).getAllByRole('option');
     await waitFor(() => expect(listed()).toHaveLength(3));
     expect(lookups(fetchMock).at(-1)?.get('supplierId')).toBe('3');
@@ -685,6 +695,11 @@ describe('the line panel (ADR-0099 #3)', () => {
     await waitFor(() => expect(lookups(fetchMock).at(-1)?.get('supplierId')).toBeNull());
     expect(lookups(fetchMock).at(-1)?.get('q')).toBe('Будаа');
     expect(productSearch()).toHaveAttribute('placeholder', mn.inventory.productSearchPlaceholder);
+    expect(productSearch()).toHaveFocus();
+
+    // F4 flips it back without leaving the box.
+    await user.keyboard('{F4}');
+    expect(supplierOnly).toHaveAttribute('aria-checked', 'true');
     expect(productSearch()).toHaveFocus();
   });
 
@@ -705,13 +720,13 @@ describe('the line panel (ADR-0099 #3)', () => {
     // The warehouse is asked first, once the product's locations are in.
     await waitFor(() => expect(warehouse).toHaveFocus());
     // Without the warehouse nothing is added.
-    await user.click(panel().getByRole('button', { name: mn.inventory.add }));
+    await user.click(panel().getByRole('button', { name: mn.common.save }));
     expect(await panel().findByText(panelText.pickHome)).toBeInTheDocument();
     expect(warehouse).toHaveFocus();
     expect(calls(fetchMock, 'POST', '/api/v1/receipts/5/lines')).toHaveLength(0);
 
     await user.selectOptions(warehouse, WH1.name);
-    await user.click(panel().getByRole('button', { name: mn.inventory.add }));
+    await user.click(panel().getByRole('button', { name: mn.common.save }));
     await waitFor(() =>
       expect(calls(fetchMock, 'POST', '/api/v1/receipts/5/lines')).toHaveLength(1),
     );
@@ -722,7 +737,7 @@ describe('the line panel (ADR-0099 #3)', () => {
     });
   });
 
-  it('takes a unit and a new sale price from a price holder', async () => {
+  it('takes a unit and sets no sale price, even for a price holder (ADR-0153)', async () => {
     const fetchMock = signedIn(ADMIN_ME, {
       ...editorRoutes,
       'GET /api/v1/receipts/5': () => json({ ...DRAFT, totals: NO_TOTALS }),
@@ -741,13 +756,8 @@ describe('the line panel (ADR-0099 #3)', () => {
     expect(panel().getByLabelText(mn.inventory.qty)).toHaveFocus();
     await user.keyboard('2{Enter}');
     expect(panel().getByLabelText(form.unitPrice)).toHaveFocus();
+    expect(screen.queryByText('Шинэ зарах үнэ (ш)')).toBeNull();
     await typeThenEnter(user, '24000');
-    const sale = panel().getByLabelText(panelText.salePrice);
-    expect(sale).toHaveFocus();
-    await user.keyboard('abc{Enter}');
-    expect(await panel().findByText(panelText.salePriceInvalid)).toBeInTheDocument();
-    await user.clear(sale);
-    await typeThenEnter(user, '1300');
     await waitFor(() =>
       expect(calls(fetchMock, 'POST', '/api/v1/receipts/5/lines')).toHaveLength(1),
     );
@@ -755,7 +765,6 @@ describe('the line panel (ADR-0099 #3)', () => {
       productUnitId: 77,
       enteredQty: '2',
       docUnitPrice: '24000',
-      salePrice: '1300',
     });
   }, 15_000);
 
@@ -763,10 +772,7 @@ describe('the line panel (ADR-0099 #3)', () => {
     let receipt: Detail = {
       ...DRAFT,
       totals: NO_TOTALS,
-      lines: [
-        BOX_LINE,
-        { ...RICE_LINE, docUnitPrice: '1000', docAmount: '5000', salePrice: '1400' },
-      ],
+      lines: [BOX_LINE, { ...RICE_LINE, docUnitPrice: '1000', docAmount: '5000' }],
     };
     const fetchMock = signedIn(ADMIN_ME, {
       ...editorRoutes,
@@ -782,7 +788,6 @@ describe('the line panel (ADR-0099 #3)', () => {
               qtyBase: '7',
               docUnitPrice: '1500',
               docAmount: '10500',
-              salePrice: '2000',
             },
           ],
         };
@@ -792,17 +797,15 @@ describe('the line panel (ADR-0099 #3)', () => {
     renderApp('/inventory/receipts/5', fetchMock);
     const user = userEvent.setup();
     const lines = within(await screen.findByRole('region', { name: form.linesTitle }));
-    // The table only reads; a new sale price shows bold, else the one in force.
-    expect(lines.queryByRole('textbox')).toBeNull();
-    expect(lines.getByText('1,400')).toHaveClass('font-semibold');
+    // The table's rows only read; the fields are the editor's, in its head.
+    expect(within(lines.getAllByRole('rowgroup')[1]!).queryByRole('textbox')).toBeNull();
     expect(lines.getByRole('columnheader', { name: form.markup })).toBeInTheDocument();
 
     await user.click(lines.getByRole('button', { name: `${mn.common.edit}: ${RICE_UNIT}` }));
-    const edit = within(screen.getByRole('region', { name: panelText.editTitle }));
+    const edit = within(screen.getByRole('rowgroup', { name: panelText.editTitle }));
     const qty = edit.getByLabelText(mn.inventory.qty);
     expect(qty).toHaveValue('5');
-    expect(edit.getByLabelText(form.unitPrice)).toHaveValue('1000');
-    expect(edit.getByLabelText(panelText.salePrice)).toHaveValue('1400');
+    expect(edit.getByLabelText(form.unitPrice)).toHaveValue('1,000');
     // The line keeps its product and unit.
     expect(edit.getByLabelText(mn.inventory.unit)).toBeDisabled();
     expect(edit.queryByRole('button', { name: panelText.changeProduct })).toBeNull();
@@ -811,8 +814,6 @@ describe('the line panel (ADR-0099 #3)', () => {
     await user.type(qty, '7');
     await user.clear(edit.getByLabelText(form.unitPrice));
     await user.type(edit.getByLabelText(form.unitPrice), '1500');
-    await user.clear(edit.getByLabelText(panelText.salePrice));
-    await user.type(edit.getByLabelText(panelText.salePrice), '2000');
     await user.click(edit.getByRole('button', { name: mn.common.save }));
     await waitFor(() =>
       expect(calls(fetchMock, 'PATCH', '/api/v1/receipt-lines/2')).toHaveLength(1),
@@ -820,11 +821,10 @@ describe('the line panel (ADR-0099 #3)', () => {
     expect(await bodyOf(calls(fetchMock, 'PATCH', '/api/v1/receipt-lines/2')[0])).toEqual({
       enteredQty: '7',
       docUnitPrice: '1500',
-      salePrice: '2000',
     });
     // The edit ends: the panel is for new lines again.
-    expect(await screen.findByRole('region', { name: panelText.title })).toBeInTheDocument();
-    expect(await lines.findByText('2,000')).toBeInTheDocument();
+    expect(await screen.findByRole('rowgroup', { name: panelText.title })).toBeInTheDocument();
+    expect(await lines.findByRole('cell', { name: '10,500' })).toBeInTheDocument();
   }, 15_000);
 
   it('removes a line', async () => {
@@ -839,6 +839,30 @@ describe('the line panel (ADR-0099 #3)', () => {
     await user.click(lines.getByRole('button', { name: `${mn.inventory.remove}: ${RICE_UNIT}` }));
     await waitFor(() => expect(lines.queryByRole('cell', { name: 'Будаа' })).toBeNull());
     expect(calls(fetchMock, 'DELETE', '/api/v1/receipt-lines/2')).toHaveLength(1);
+  });
+
+  it('answers F2 and Ctrl+Enter, and goes back to the search after an edit (ADR-0156)', async () => {
+    const fetchMock = signedIn(WAREHOUSE_ME, {
+      ...editorRoutes,
+      'GET /api/v1/receipts/5': () => json({ ...DRAFT, lines: [BOX_LINE] }),
+    });
+    renderApp('/inventory/receipts/5', fetchMock);
+    const user = userEvent.setup();
+    const lines = within(await screen.findByRole('region', { name: form.linesTitle }));
+    await user.click(lines.getByRole('button', { name: `${mn.common.edit}: ${COLA_UNIT}` }));
+    const edit = within(screen.getByRole('rowgroup', { name: panelText.editTitle }));
+    await waitFor(() => expect(edit.getByLabelText(mn.inventory.qty)).toHaveFocus());
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(productSearch()).toHaveFocus());
+
+    (document.activeElement as HTMLElement).blur();
+    await user.keyboard('{F2}');
+    expect(productSearch()).toHaveFocus();
+
+    await user.keyboard('{Control>}{Enter}{/Control}');
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByRole('button', { name: mn.inventory.receipt.post })).toBeInTheDocument();
+    expect(calls(fetchMock, 'POST', '/api/v1/receipts/5/post')).toHaveLength(0);
   });
 
   it('reads no scan while the posting dialog is open', async () => {
@@ -887,9 +911,8 @@ describe('the delivery note header', () => {
     renderApp('/inventory/receipts/5', fetchMock);
     const user = userEvent.setup();
     const header = within(await screen.findByRole('region', { name: form.header }));
-    // The bank accounts are offered; none is chosen yet.
-    expect(await header.findByRole('option', { name: 'Хаан банк' })).toBeInTheDocument();
-    expect(header.queryByRole('option', { name: 'Касс' })).toBeNull();
+    const counter = header.getByLabelText(form.counterAccount);
+    expect(counter).toHaveValue('');
     // The warehouse never sees the discounts.
     expect(screen.queryByRole('region', { name: discountsText.title })).toBeNull();
 
@@ -897,24 +920,27 @@ describe('the delivery note header', () => {
     expect(header.getByText(mn.validation.moneyAccountRequired)).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).toBeNull();
 
-    // Cash has one box: it is chosen with the method.
-    await user.selectOptions(header.getByLabelText(form.payment), 'CASH');
+    // «Харилцсан данс» lists only the payables and the count difference (ADR-0154).
+    await user.click(counter);
+    expect((await screen.findAllByRole('option')).map((row) => row.textContent)).toEqual([
+      '310101 · Байгууллагад өгөх өглөг',
+      '310105 · Ачаа тээврийн зардал',
+      '313011 · Тооллогын зөрүү',
+    ]);
+    await user.click(screen.getByRole('option', { name: /313011/ }));
     await waitFor(() => expect(calls(fetchMock, 'PATCH', '/api/v1/receipts/5')).toHaveLength(1));
     expect(await bodyOf(calls(fetchMock, 'PATCH', '/api/v1/receipts/5')[0])).toEqual({
-      paymentMethod: 'CASH',
-      moneyAccountId: 21,
+      paymentMethod: 'CREDIT',
+      counterAccountCode: '313011',
     });
-    expect(header.getByLabelText(form.account)).toHaveValue('21');
+    expect(counter).toHaveValue('313011 · Тооллогын зөрүү');
     expect(header.queryByText(mn.validation.moneyAccountRequired)).toBeNull();
 
-    const docNo = header.getByLabelText(mn.inventory.receipt.supplierDocNo);
-    expect(docNo).toHaveValue('П-123');
-    await user.clear(docNo);
-    await user.type(docNo, 'П-124');
+    await user.type(header.getByLabelText(form.note), 'Сарын');
     await user.tab();
     await waitFor(() => expect(calls(fetchMock, 'PATCH', '/api/v1/receipts/5')).toHaveLength(2));
     expect(await bodyOf(calls(fetchMock, 'PATCH', '/api/v1/receipts/5')[1])).toEqual({
-      supplierDocNo: 'П-124',
+      note: 'Сарын',
     });
 
     await user.click(screen.getByRole('button', { name: mn.inventory.receipt.post }));
@@ -933,8 +959,6 @@ describe('the delivery note header', () => {
   it('shows a refused account on its field', async () => {
     const receipt: Detail = {
       ...DRAFT,
-      paymentMethod: 'CASH',
-      moneyAccountId: 21,
       lines: [BOX_LINE],
     };
     const fetchMock = signedIn(WAREHOUSE_ME, {
@@ -947,7 +971,7 @@ describe('the delivery note header', () => {
             title: 'VALIDATION_FAILED',
             status: 422,
             code: 'VALIDATION_FAILED',
-            errors: [{ path: 'moneyAccountId', constraint: 'kind', message: 'cash box' }],
+            errors: [{ path: 'moneyAccountId', constraint: 'kind', message: 'refused' }],
           },
           422,
         ),
@@ -955,10 +979,12 @@ describe('the delivery note header', () => {
     renderApp('/inventory/receipts/5', fetchMock);
     const user = userEvent.setup();
     const header = within(await screen.findByRole('region', { name: form.header }));
-    await user.selectOptions(await header.findByLabelText(form.payment), 'BANK');
+    const counter = header.getByLabelText(form.counterAccount);
+    await waitFor(() => expect(counter).toHaveValue('310101 · Байгууллагад өгөх өглөг'));
+    await choose(user, counter, /313011/);
     expect(await header.findByText(mn.validation.moneyAccountRequired)).toBeInTheDocument();
     // The refusal undoes the change.
-    expect(header.getByLabelText(form.payment)).toHaveValue('CASH');
+    await waitFor(() => expect(counter).toHaveValue('310101 · Байгууллагад өгөх өглөг'));
   });
 
   it('reads only once posted, with the print links', async () => {
@@ -977,11 +1003,11 @@ describe('the delivery note header', () => {
     );
     const header = within(await screen.findByRole('region', { name: form.header }));
     expect(header.getByText('П-123')).toBeInTheDocument();
-    expect(header.getByText(mn.inventory.receipt.paymentMethods.CASH)).toBeInTheDocument();
+    expect(header.getByText('GR-2026-000005')).toBeInTheDocument();
     expect(header.getByText('Касс')).toBeInTheDocument();
     expect(header.getByText(`${WH1.name}, ${WH2.name}`)).toBeInTheDocument();
     expect(header.queryByRole('textbox')).toBeNull();
-    expect(screen.queryByRole('region', { name: panelText.title })).toBeNull();
+    expect(screen.queryByRole('rowgroup', { name: panelText.title })).toBeNull();
     expect(screen.queryByRole('button', { name: mn.inventory.receipt.post })).toBeNull();
     // Both papers open in a new tab.
     const document = screen.getByRole('link', { name: mn.inventory.receipt.print.document });
@@ -1000,11 +1026,13 @@ describe('the delivery note header', () => {
         'GET /api/v1/receipts/5': () => json({ ...DRAFT, lines: [BOX_LINE] }),
       }),
     );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: mn.common.print }));
     expect(
-      await screen.findByRole('link', { name: mn.inventory.receipt.print.document }),
+      await screen.findByRole('menuitem', { name: mn.inventory.receipt.print.document }),
     ).toHaveAttribute('href', '/inventory/receipts/5/print/document');
     expect(
-      screen.getByRole('link', { name: mn.inventory.receipt.print.warehouse }),
+      screen.getByRole('menuitem', { name: mn.inventory.receipt.print.warehouse }),
     ).toHaveAttribute('href', '/inventory/receipts/5/print/warehouse');
   });
 });
@@ -1044,7 +1072,8 @@ describe('delivery-note prices (ADR-0078, ADR-0099)', () => {
       }),
     );
     expect(await screen.findByText(form.vatNote.replace('{{rate}}', '10'))).toBeInTheDocument();
-    const totals = within(screen.getByLabelText(mn.inventory.costing.total));
+    await userEvent.setup().click(screen.getByRole('button', { name: /мөр/ }));
+    const totals = within(await screen.findByLabelText(mn.inventory.costing.total));
     expect(totals.getByText('48,000₮')).toBeInTheDocument();
     expect(totals.getByText(form.vatTotal)).toBeInTheDocument();
     expect(totals.getByText('4,363.64₮')).toBeInTheDocument();
@@ -1075,7 +1104,6 @@ describe('delivery-note prices (ADR-0078, ADR-0099)', () => {
     expect(lines.queryByRole('columnheader', { name: form.unitPrice })).toBeNull();
     expect(lines.queryByRole('columnheader', { name: form.markup })).toBeNull();
     // The sale price per piece is for everyone.
-    expect(lines.getByRole('columnheader', { name: form.salePrice })).toBeInTheDocument();
     expect(screen.queryByLabelText(form.unitPrice)).toBeNull();
     expect(screen.queryByLabelText(mn.inventory.costing.total)).toBeNull();
     expect(calls(fetchMock, 'GET', '/api/v1/receipts/last-prices')).toHaveLength(0);
@@ -1107,7 +1135,7 @@ describe('discounts and free goods of a draft (ADR-0103)', () => {
     renderApp('/inventory/receipts/5', fetchMock);
     const user = userEvent.setup();
     const puts = () => calls(fetchMock, 'PUT', '/api/v1/receipts/5/discounts');
-    const card = within(await screen.findByRole('region', { name: discountsText.title }));
+    const card = await openDiscounts(user);
     expect(card.getByText(discountsText.empty)).toBeInTheDocument();
 
     await user.click(card.getByRole('button', { name: discountsText.add }));
@@ -1182,7 +1210,7 @@ describe('discounts and free goods of a draft (ADR-0103)', () => {
     });
     renderApp('/inventory/receipts/5', fetchMock);
     const user = userEvent.setup();
-    const card = within(await screen.findByRole('region', { name: discountsText.title }));
+    const card = await openDiscounts(user);
     expect(card.getByText(discountsText.tooLarge)).toBeInTheDocument();
     // 9,000₮ off rice of 5,000₮ comes to no tugriks yet.
     const tooLarge = within(card.getByRole('row', { name: new RegExp(discountsText.kinds.LINES) }));
@@ -1226,14 +1254,13 @@ describe('discounts and free goods of a draft (ADR-0103)', () => {
     });
     renderApp('/inventory/receipts/5', fetchMock);
     const user = userEvent.setup();
-    const card = within(await screen.findByRole('region', { name: discountsText.title }));
+    const card = await openDiscounts(user);
     await user.click(card.getByRole('button', { name: discountsText.add }));
     await user.click(await screen.findByRole('menuitem', { name: discountsText.kinds.FREE }));
     const free = within(card.getByRole('region', { name: discountsText.freeTitle }));
     // A product, its unit and the quantity: no prices.
     expect(free.queryByLabelText(form.unitPrice)).toBeNull();
-    expect(free.queryByLabelText(panelText.salePrice)).toBeNull();
-    await user.click(free.getByRole('searchbox', { name: mn.inventory.product }));
+    await user.click(free.getByRole('combobox', { name: mn.inventory.product }));
     await user.keyboard('Будаа');
     await waitFor(() =>
       expect(screen.getByRole('option', { name: /Будаа/ })).toHaveAttribute(
@@ -1256,10 +1283,11 @@ describe('discounts and free goods of a draft (ADR-0103)', () => {
     const freeList = within(await card.findByRole('region', { name: discountsText.freeList }));
     const row = within(freeList.getByRole('row', { name: /Будаа/ }));
     expect(row.getByRole('cell', { name: '3' })).toBeInTheDocument();
-    // Not among the lines bought.
-    const lines = within(screen.getByRole('region', { name: form.linesTitle }));
-    expect(lines.getByRole('cell', { name: COLA.name })).toBeInTheDocument();
-    expect(lines.queryByRole('cell', { name: 'Будаа' })).toBeNull();
+    // Not among the lines bought, behind the sheet.
+    const hidden = { hidden: true };
+    const lines = within(screen.getByRole('region', { name: form.linesTitle, ...hidden }));
+    expect(lines.getByRole('cell', { name: COLA.name, ...hidden })).toBeInTheDocument();
+    expect(lines.queryByRole('cell', { name: 'Будаа', ...hidden })).toBeNull();
 
     await user.click(
       freeList.getByRole('button', { name: `${mn.inventory.remove}: ${RICE_UNIT}` }),

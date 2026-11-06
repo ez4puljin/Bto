@@ -274,7 +274,19 @@ export class AuditPageDto {
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
 }
 
+@ApiSchema({ name: 'AuditActionCount' })
+export class AuditActionCountDto {
+  @ApiProperty() action: string;
+  @ApiProperty() count: number;
+}
+
 export class AuditQueryDto extends PageQueryDto {
+  @ApiPropertyOptional({ example: 'UPDATE' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  action?: string;
+
   @ApiPropertyOptional({ example: 'users' })
   @IsOptional()
   @IsString()

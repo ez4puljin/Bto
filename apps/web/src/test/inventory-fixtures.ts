@@ -93,6 +93,8 @@ export const DRAFT: Schemas['ReceiptDetail'] = {
   paymentMethod: 'CREDIT',
   moneyAccountId: null,
   moneyAccountName: null,
+  counterAccountCode: null,
+  counterAccountName: null,
   supplierVatPayer: false,
   vatRatePct: '0',
   effectiveDate: null,

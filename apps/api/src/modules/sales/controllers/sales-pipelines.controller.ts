@@ -42,6 +42,8 @@ export function toPipelineDto(detail: PipelineDetail): SalesPipelineDto {
     ownOrdersOnly: pipeline.ownOrdersOnly,
     kind: pipeline.kind,
     transferWarehouseId: pipeline.transferWarehouseId,
+    pickListTemplateId: pipeline.pickListTemplateId,
+    deliveryNoteTemplateId: pipeline.deliveryNoteTemplateId,
     archivedAt: pipeline.archivedAt?.toISOString() ?? null,
     createdAt: pipeline.createdAt.toISOString(),
     roles: pipeline.roles,
@@ -72,6 +74,10 @@ const inputOf = (body: SalesPipelineRequestDto): PipelineInput => ({
   ownOrdersOnly: body.ownOrdersOnly,
   kind: body.kind ?? 'SALES',
   transferWarehouseId: body.transferWarehouseId ?? null,
+  ...(body.pickListTemplateId !== undefined ? { pickListTemplateId: body.pickListTemplateId } : {}),
+  ...(body.deliveryNoteTemplateId !== undefined
+    ? { deliveryNoteTemplateId: body.deliveryNoteTemplateId }
+    : {}),
   roles: body.roles,
   stages: body.stages.map((stage) => ({
     id: stage.id ?? null,

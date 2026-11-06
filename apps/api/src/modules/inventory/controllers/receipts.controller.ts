@@ -36,6 +36,7 @@ import {
   ReceiptLineRequestDto,
   ReceiptListQueryDto,
   ReceiptPageDto,
+  ReceiptCounterAccountDto,
   ReceiptPaymentAccountDto,
   UpdateReceiptDto,
   UpdateReceiptLineDto,
@@ -103,6 +104,14 @@ export class ReceiptsController {
     };
   }
 
+  /** The accounts a receipt's bill may credit (ADR-0154). */
+  @Get('counter-accounts')
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: [ReceiptCounterAccountDto] })
+  async counterAccounts(): Promise<ReceiptCounterAccountDto[]> {
+    return this.receipts.counterAccounts();
+  }
+
   /** The cash boxes and bank accounts a receipt may name (ADR-0078 #5). */
   @Get('payment-accounts')
   @RequirePermission(MANAGE)
@@ -149,6 +158,9 @@ export class ReceiptsController {
         ...(body.supplierDocDate === undefined ? {} : { supplierDocDate: body.supplierDocDate }),
         ...(body.note === undefined ? {} : { note: body.note }),
         ...(body.paymentMethod === undefined ? {} : { paymentMethod: body.paymentMethod }),
+        ...(body.counterAccountCode === undefined
+          ? {}
+          : { counterAccountCode: body.counterAccountCode }),
         ...(body.moneyAccountId === undefined ? {} : { moneyAccountId: body.moneyAccountId }),
         lines: (body.lines ?? []).map(lineInput),
       }),

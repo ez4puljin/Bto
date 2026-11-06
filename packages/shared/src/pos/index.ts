@@ -346,3 +346,6 @@ export * from './loyalty';
 
 // The store edge: sync, snapshot and kiosk shapes (ADR-0067).
 export * from './edge';
+
+// The receipt templates: blocks, layouts and their check (ADR-0141).
+export * from './receipt-template';

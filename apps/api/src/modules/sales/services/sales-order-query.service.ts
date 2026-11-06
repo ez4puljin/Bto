@@ -36,6 +36,7 @@ import { type PickPart, SalesPicksService } from './sales-picks.service';
 import { type CustomerOverdue, CustomersService } from '../../partners';
 import {
   orderStatusEvents,
+  salesOrderChanges,
   salesBoards,
   salesOrderLineParts,
   salesOrderLines,
@@ -43,6 +44,7 @@ import {
   salesStageMoves,
   salesStages,
 } from '../schema';
+import type { OrderFieldChange, OrderLineChange } from './order-changes';
 import { type Access, SalesAccessService } from './sales-access.service';
 
 type OrderRow = typeof salesOrders.$inferSelect;
@@ -89,6 +91,19 @@ export interface OrderLine {
   parts: OrderPart[];
 }
 
+/** One saved edit (ADR-0147), the lines only of the warehouses the caller sees. */
+export interface OrderChange {
+  version: number;
+  status: OrderStatus;
+  fields: OrderFieldChange[];
+  lines: OrderLineChange[];
+  totalBefore: Decimal | null;
+  totalAfter: Decimal | null;
+  actorId: number | null;
+  actorName: string | null;
+  createdAt: Date;
+}
+
 export interface OrderEvent {
   fromStatus: OrderStatus | null;
   toStatus: OrderStatus;
@@ -131,6 +146,7 @@ export interface OrderDetail extends Omit<
   picks: PickPart[];
   events: OrderEvent[];
   moves: StageMove[];
+  changes: OrderChange[];
 }
 
 /** The narrowing the board, the list and printing share (ADR-0057 #7). */
@@ -666,7 +682,13 @@ export class SalesOrderQueryService {
               .where(idIn(salesStages.id, stageIds))
           ).map((stage) => [stage.id, stage.name]),
     );
+    const changes = await executor
+      .select()
+      .from(salesOrderChanges)
+      .where(idIn(salesOrderChanges.orderId, ids))
+      .orderBy(asc(salesOrderChanges.version));
     const names = await this.names.namesOf([
+      ...changes.flatMap((change) => (change.actorId === null ? [] : [change.actorId])),
       ...orders.flatMap((order) => (order.createdBy === null ? [] : [order.createdBy])),
       ...events.flatMap((event) => (event.actorId === null ? [] : [event.actorId])),
       ...moves.flatMap((move) => (move.actorId === null ? [] : [move.actorId])),
@@ -716,6 +738,22 @@ export class SalesOrderQueryService {
             actorId: move.actorId,
             actorName: nameOf(move.actorId),
             createdAt: move.createdAt,
+          })),
+        changes: changes
+          .filter((change) => change.orderId === order.id)
+          .map((change) => ({
+            version: change.version,
+            status: change.status,
+            fields: change.fields as OrderFieldChange[],
+            lines: (change.lines as OrderLineChange[]).filter((line) =>
+              seesWarehouse(line.warehouseId),
+            ),
+            // A keeper sees only their lines, so not the order's money either.
+            totalBefore: visible === null ? change.totalBefore : null,
+            totalAfter: visible === null ? change.totalAfter : null,
+            actorId: change.actorId,
+            actorName: nameOf(change.actorId),
+            createdAt: change.createdAt,
           })),
         events: events
           .filter((event) => event.orderId === order.id)

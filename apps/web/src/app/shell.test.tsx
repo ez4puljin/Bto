@@ -113,7 +113,7 @@ describe('home page (ADR-0114)', () => {
   it('gives an admin every module and the tools', async () => {
     renderApp('/', signedIn(ADMIN_ME));
     const modules = within(await screen.findByRole('region', { name: mn.home.modules }));
-    expect(modules.getAllByRole('link')).toHaveLength(8);
+    expect(modules.getAllByRole('link')).toHaveLength(9);
     expect(modules.getByRole('link', { name: mn.nav.modules.app })).toHaveAttribute(
       'href',
       '/m/app',
@@ -144,25 +144,28 @@ describe('modules (ADR-0114)', () => {
     expect(navTrail('/reports/party-ledger')?.module.key).toBe('reports');
   });
 
-  it('registers staff from «Харилцагч»: the tile, the menu entry, the trail (owner 2026-10-29)', async () => {
-    expect(navTrail('/users/7')).toMatchObject({
-      module: { key: 'partners' },
-      group: { label: 'nav.groups.partners' },
-      item: { to: '/users', label: 'nav.staff' },
+  it('keeps one staff list under «Хүний нөөц» and leads the old addresses there (ADR-0145)', async () => {
+    expect(navTrail('/hr/staff/7')).toMatchObject({
+      module: { key: 'hr' },
+      group: { label: 'nav.groups.hrPeople' },
+      item: { to: '/hr/staff', label: 'nav.hrStaff' },
       exact: false,
     });
-    const systemGroup = NAV_GROUPS.find((group) => group.label === 'nav.groups.system');
-    expect(systemGroup?.items.map((item) => item.to)).not.toContain('/users');
+    expect(NAV_GROUPS.flatMap((group) => group.items).map((item) => item.to)).not.toContain(
+      '/users',
+    );
 
     const user = userEvent.setup();
-    renderApp('/m/partners', signedIn(ADMIN_ME));
-    const partners = within(await screen.findByRole('region', { name: mn.nav.groups.partners }));
-    expect(partners.getByRole('link', { name: mn.nav.staff })).toHaveAttribute('href', '/users');
-    expect(partners.getByRole('link', { name: mn.nav.customers })).toBeInTheDocument();
+    renderApp('/m/hr', signedIn(ADMIN_ME));
+    const people = within(await screen.findByRole('region', { name: mn.nav.groups.hrPeople }));
+    expect(people.getByRole('link', { name: mn.nav.hrStaff })).toHaveAttribute('href', '/hr/staff');
     const bar = within(screen.getByRole('navigation', { name: mn.shell.modules }));
-    await user.click(bar.getByRole('button', { name: mn.nav.modules.partners }));
+    await user.click(bar.getByRole('button', { name: mn.nav.modules.hr }));
     const menu = within(await screen.findByRole('menu'));
-    expect(menu.getByRole('menuitem', { name: mn.nav.staff })).toHaveAttribute('href', '/users');
+    expect(menu.getByRole('menuitem', { name: mn.nav.hrStaff })).toHaveAttribute(
+      'href',
+      '/hr/staff',
+    );
   });
 
   it('opens a module from the top bar and lists its pages on its own page', async () => {

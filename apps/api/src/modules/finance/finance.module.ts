@@ -5,7 +5,13 @@ import { FinanceCoreModule } from '../../finance-core';
 import { CatalogModule } from '../catalog';
 import { FinBridgeModule } from '../fin-bridge';
 import { IdentityModule } from '../identity';
-import { InventoryModule, PURCHASE_BOOKS, RECEIPT_MONEY_ACCOUNTS, STOCK_BOOKS } from '../inventory';
+import {
+  InventoryModule,
+  PURCHASE_BOOKS,
+  RECEIPT_COUNTER_ACCOUNTS,
+  RECEIPT_MONEY_ACCOUNTS,
+  STOCK_BOOKS,
+} from '../inventory';
 import { CUSTOMER_DEBT_READER, PartnersModule } from '../partners';
 import { CREDIT_CHECKER, SALE_SINK } from '../sales';
 import {
@@ -44,6 +50,7 @@ import { PosCreditService } from './services/pos-credit.service';
 import { PosVoucherBillingService } from './services/pos-voucher-billing.service';
 import { CustomerDebtsService } from './services/customer-debts.service';
 import { FinBooks } from './services/fin-books';
+import { AccountTransactionsService } from './services/account-transactions.service';
 import { FinanceSettingsService } from './services/finance-settings.service';
 import { GlAccountsService } from './services/gl-accounts.service';
 import { InvoiceQueryService } from './services/invoice-query.service';
@@ -53,6 +60,7 @@ import { JournalRepostService } from './services/journal-repost.service';
 import { JournalService } from './services/journal.service';
 import { MoneyAccountsService } from './services/money-accounts.service';
 import { PaymentsService } from './services/payments.service';
+import { ReceiptCounterAccountsService } from './services/receipt-counter-accounts.service';
 import { ReceiptMoneyAccountsService } from './services/receipt-money-accounts.service';
 import { StockBooksService } from './services/stock-books.service';
 import { SupplierBillsService } from './services/supplier-bills.service';
@@ -62,6 +70,7 @@ const SERVICES = [
   FinPosting,
   AllocationsService,
   FinanceSettingsService,
+  AccountTransactionsService,
   GlAccountsService,
   JournalService,
   ArLedgerService,
@@ -75,6 +84,7 @@ const SERVICES = [
   CreditNotesService,
   PosCreditService,
   PosVoucherBillingService,
+  ReceiptCounterAccountsService,
   ReceiptMoneyAccountsService,
   SupplierBillsService,
   StockBooksService,
@@ -109,6 +119,7 @@ const SERVICES = [
     { provide: CREDIT_CHECKER, useExisting: CreditControlService },
     { provide: SALE_SINK, useExisting: InvoicingService },
     { provide: RECEIPT_MONEY_ACCOUNTS, useExisting: ReceiptMoneyAccountsService },
+    { provide: RECEIPT_COUNTER_ACCOUNTS, useExisting: ReceiptCounterAccountsService },
     { provide: PURCHASE_BOOKS, useExisting: SupplierBillsService },
     { provide: STOCK_BOOKS, useExisting: StockBooksService },
     { provide: CUSTOMER_DEBT_READER, useExisting: CustomerDebtsService },
@@ -118,6 +129,7 @@ const SERVICES = [
     CREDIT_CHECKER,
     SALE_SINK,
     RECEIPT_MONEY_ACCOUNTS,
+    RECEIPT_COUNTER_ACCOUNTS,
     PURCHASE_BOOKS,
     STOCK_BOOKS,
     CUSTOMER_DEBT_READER,

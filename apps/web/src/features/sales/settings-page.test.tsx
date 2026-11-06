@@ -42,6 +42,8 @@ const PIPELINE: Schemas['SalesPipeline'] = {
   visibility: 'PUBLIC',
   ownOrdersOnly: false,
   transferWarehouseId: null,
+  pickListTemplateId: null,
+  deliveryNoteTemplateId: null,
   kind: 'SALES',
   archivedAt: null,
   createdAt: STAMP,
@@ -135,6 +137,8 @@ describe('boards and pipelines settings', () => {
       ownOrdersOnly: true,
       kind: 'SALES',
       transferWarehouseId: null,
+      pickListTemplateId: null,
+      deliveryNoteTemplateId: null,
       roles: { VIEW: [2], MANAGE: [], ALL_ORDERS: [4] },
       stages: [
         {

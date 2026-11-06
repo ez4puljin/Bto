@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it } from 'vitest';
 import { ACCOUNTANT_ME, bodyOf, calls } from '@/test/inventory-fixtures';
+import { choose } from '@/test/choose';
 import { ADMIN_ME, findSidebar, json, renderApp, signedIn } from '@/test/render-app';
 import type { IssueExpenseAccount, OpeningCheck } from './api';
 import { ACCOUNTS } from './finance-fixtures';
@@ -114,8 +115,7 @@ describe('the questionnaire’s suggestions (ADR-0106)', () => {
     // A seeded type keeps F4's account; only the admin's type has a picker.
     expect(await dialog.findByText(mn.finance.accounts.issueAccounts.seeded)).toBeInTheDocument();
     const picker = dialog.getByRole('combobox');
-    expect(picker).toHaveValue('');
-    await user.selectOptions(picker, '1');
+    await choose(user, picker, /^100101/);
     await waitFor(() =>
       expect(calls(fetchMock, 'PUT', '/api/v1/finance/issue-expense-accounts/7')).toHaveLength(1),
     );

@@ -9,6 +9,7 @@ import { FinError } from '../errors';
 import { accountsWithLines } from '../posting/journal-reader.service';
 import {
   FIN_ACCOUNT_CONTROLS,
+  FIN_ACCOUNT_JOURNALS,
   FIN_ACCOUNT_KINDS,
   FIN_MONEY_ACCOUNT_KINDS,
   type FIN_SIDES,
@@ -24,6 +25,7 @@ import {
 import type { FinAccountControl } from '../org/ensure-default-company';
 
 export type FinAccountKind = (typeof FIN_ACCOUNT_KINDS)[number];
+export type FinAccountJournal = (typeof FIN_ACCOUNT_JOURNALS)[number];
 export type FinSide = (typeof FIN_SIDES)[number];
 export type FinMoneyAccountKind = (typeof FIN_MONEY_ACCOUNT_KINDS)[number];
 export type FinStatus = (typeof FIN_STATUSES)[number];
@@ -35,6 +37,9 @@ export interface FinAccountView {
   kind: FinAccountKind;
   normalSide: FinSide;
   control: FinAccountControl;
+  /** Its type on the screen and its currency (ADR-0149). */
+  journal: FinAccountJournal;
+  currency: string;
   status: FinStatus;
   /** Its group in the chart (ADR-0102 #4), or null. */
   groupId: number | null;
@@ -46,7 +51,18 @@ export interface FinAccountGroupView {
   id: number;
   code: string;
   name: string;
+  /** The group above it (ADR-0148), or null at the top. */
+  parentId: number | null;
+  sort: number;
   status: FinStatus;
+}
+
+/** One group of an imported tree (ADR-0148); a parent comes before its children. */
+export interface FinGroupTreeRow {
+  code: string;
+  name: string;
+  parentCode: string | null;
+  sort: number;
 }
 
 /**
@@ -63,6 +79,9 @@ export interface FinChartImportRow {
   control: FinAccountControl | null;
   group: { code: string; name: string | null } | null;
   key: string | null;
+  /** Null or left out: the account's own (GENERAL, MNT for a new one; ADR-0149). */
+  journal?: FinAccountJournal | null;
+  currency?: string | null;
 }
 
 interface FinAccountFields {
@@ -71,6 +90,8 @@ interface FinAccountFields {
   normalSide: FinSide;
   control: FinAccountControl;
   groupId: number | null;
+  journal?: FinAccountJournal;
+  currency?: string;
 }
 
 /** What an imported row did, kept by the import for its revert. */
@@ -220,7 +241,14 @@ export class FinChartService {
   async createAccountInTx(
     tx: FinTx,
     ctx: FinCallContext,
-    input: { company: string; code: string; name: string; kind: FinAccountKind },
+    input: {
+      company: string;
+      code: string;
+      name: string;
+      kind: FinAccountKind;
+      journal?: FinAccountJournal;
+      currency?: string;
+    },
   ): Promise<FinAccountView> {
     const code = trimmed(input.code, 'code', 64);
     const name = trimmed(input.name, 'name', 200);
@@ -229,7 +257,16 @@ export class FinChartService {
       source: false,
       userAnyOf: CHART_WRITE,
     });
-    const values = { code, name, kind: input.kind, normalSide: normalSideOf(input.kind) };
+    const journal = checkedJournal(input.journal ?? 'GENERAL');
+    const values = {
+      code,
+      name,
+      kind: input.kind,
+      normalSide: normalSideOf(input.kind),
+      journal,
+      currency: checkedCurrency(input.currency ?? 'MNT'),
+      control: controlOfJournal(journal, input.kind, 'NONE'),
+    };
     const [row] = await tx
       .insert(finAccounts)
       .values({ companyId: scope.companyId, ...values })
@@ -256,7 +293,14 @@ export class FinChartService {
     input: {
       company: string;
       id: number;
-      patch: { code?: string; name?: string; kind?: FinAccountKind; status?: FinStatus };
+      patch: {
+        code?: string;
+        name?: string;
+        kind?: FinAccountKind;
+        status?: FinStatus;
+        journal?: FinAccountJournal;
+        currency?: string;
+      };
     },
   ): Promise<{ before: FinAccountView; after: FinAccountView } | null> {
     const scope = await resolveCompany(tx, ctx, input.company, {
@@ -272,7 +316,48 @@ export class FinChartService {
     const { patch } = input;
     if (patch.kind !== undefined && !FIN_ACCOUNT_KINDS.includes(patch.kind)) throw invalid('kind');
     if (patch.status !== undefined && !FIN_STATUSES.includes(patch.status)) throw invalid('status');
+    // As in Erkhet: an account with entries keeps its journal and currency (ADR-0149).
+    const journal = patch.journal === undefined ? undefined : checkedJournal(patch.journal);
+    const currency = patch.currency === undefined ? undefined : checkedCurrency(patch.currency);
+    const movesType =
+      (journal !== undefined && journal !== before.journal) ||
+      (currency !== undefined && currency !== before.currency);
+    if (movesType) {
+      const inUse = await accountsWithLines(tx, scope.companyId, [before.id]);
+      if (inUse.has(before.id)) {
+        throw new FinError('FIN_ACCOUNT_IN_USE', undefined, { path: 'journal', code: before.code });
+      }
+    }
+    const control =
+      journal === undefined
+        ? undefined
+        : controlOfJournal(journal, patch.kind ?? before.kind, before.control);
+    if (control !== undefined && control !== before.control) {
+      // An automatic posting that needs this account's control keeps it.
+      const bound = await tx
+        .select({ requiredControl: finPostingKeys.requiredControl })
+        .from(finPostingRules)
+        .innerJoin(
+          finPostingKeys,
+          and(
+            eq(finPostingKeys.companyId, finPostingRules.companyId),
+            eq(finPostingKeys.code, finPostingRules.postingKey),
+          ),
+        )
+        .where(
+          and(
+            eq(finPostingRules.companyId, scope.companyId),
+            eq(finPostingRules.accountId, before.id),
+          ),
+        );
+      if (bound.some((row) => row.requiredControl !== 'NONE' && row.requiredControl !== control)) {
+        throw invalid('journal');
+      }
+    }
     const set = {
+      ...(journal !== undefined ? { journal } : {}),
+      ...(currency !== undefined ? { currency } : {}),
+      ...(control !== undefined ? { control } : {}),
       ...(patch.code !== undefined ? { code: trimmed(patch.code, 'code', 64) } : {}),
       ...(patch.name !== undefined ? { name: trimmed(patch.name, 'name', 200) } : {}),
       ...(patch.kind !== undefined
@@ -559,11 +644,106 @@ export class FinChartService {
         id: finAccountGroups.id,
         code: finAccountGroups.code,
         name: finAccountGroups.name,
+        parentId: finAccountGroups.parentId,
+        sort: finAccountGroups.sort,
         status: finAccountGroups.status,
       })
       .from(finAccountGroups)
       .where(eq(finAccountGroups.companyId, scope.companyId))
       .orderBy(asc(finAccountGroups.code));
+  }
+
+  /**
+   * A cash or bank account's money account (ADR-0150 #6): made when it has none, with the account's
+   * code and name and no branch. A line on such an account must name one.
+   */
+  async ensureMoneyAccountInTx(
+    tx: FinTx,
+    ctx: FinCallContext,
+    input: { company: string; accountId: number },
+  ): Promise<void> {
+    const scope = await resolveCompany(tx, ctx, input.company, {
+      source: false,
+      userAnyOf: CHART_WRITE,
+    });
+    const [account] = await tx
+      .select(accountColumns)
+      .from(finAccounts)
+      .where(and(eq(finAccounts.companyId, scope.companyId), eq(finAccounts.id, input.accountId)));
+    if (!account || (account.journal !== 'CASH' && account.journal !== 'BANK')) return;
+    const [existing] = await tx
+      .select({ id: finMoneyAccounts.id })
+      .from(finMoneyAccounts)
+      .where(
+        and(
+          eq(finMoneyAccounts.companyId, scope.companyId),
+          eq(finMoneyAccounts.accountId, account.id),
+        ),
+      )
+      .limit(1);
+    if (existing) return;
+    const [made] = await tx
+      .insert(finMoneyAccounts)
+      .values({
+        companyId: scope.companyId,
+        code: account.code,
+        name: account.name,
+        kind: account.journal === 'CASH' ? 'CASH' : 'BANK',
+        accountId: account.id,
+      })
+      .onConflictDoNothing()
+      .returning({ id: finMoneyAccounts.id });
+    if (!made) return;
+    await recordFinAudit(tx, ctx, {
+      tenantId: scope.tenantId,
+      companyId: scope.companyId,
+      action: 'CREATE',
+      entity: 'money_account',
+      entityId: made.id,
+      after: { code: account.code, accountId: account.id },
+    });
+  }
+
+  /**
+   * The chart's group tree, inside the caller's transaction (ADR-0148): each group made or changed
+   * by code, under its parent, in its place. A group not named here stays as it is.
+   */
+  async saveGroupTreeInTx(
+    tx: FinTx,
+    ctx: FinCallContext,
+    input: { company: string; groups: readonly FinGroupTreeRow[] },
+  ): Promise<void> {
+    const scope = await resolveCompany(tx, ctx, input.company, {
+      source: false,
+      userAnyOf: CHART_WRITE,
+    });
+    const ids = new Map<string, number>();
+    for (const [index, row] of input.groups.entries()) {
+      const path = `groups.${index}`;
+      const code = trimmed(row.code, `${path}.code`, 64);
+      const name = trimmed(row.name, `${path}.name`, 200);
+      const parentId = row.parentCode === null ? null : (ids.get(row.parentCode) ?? null);
+      if (row.parentCode !== null && parentId === null) throw invalid(`${path}.parentCode`);
+      const values = { name, parentId, sort: row.sort, status: 'ACTIVE' as const };
+      const [saved] = await tx
+        .insert(finAccountGroups)
+        .values({ companyId: scope.companyId, code, ...values })
+        .onConflictDoUpdate({
+          target: [finAccountGroups.companyId, finAccountGroups.code],
+          set: { ...values, updatedAt: sql`now()` },
+        })
+        .returning({ id: finAccountGroups.id });
+      if (!saved) throw new Error('fin account group was not saved');
+      ids.set(code, saved.id);
+    }
+    await recordFinAudit(tx, ctx, {
+      tenantId: scope.tenantId,
+      companyId: scope.companyId,
+      action: 'IMPORT',
+      entity: 'chart_groups',
+      entityId: scope.companyId,
+      after: { groups: input.groups.length },
+    });
   }
 
   /**
@@ -659,6 +839,8 @@ export class FinChartService {
       }
       const control = row.control ?? before?.control ?? 'NONE';
       const values: FinAccountFields = {
+        journal: checkedJournal(row.journal ?? before?.journal ?? 'GENERAL'),
+        currency: checkedCurrency(row.currency ?? before?.currency ?? 'MNT'),
         name,
         kind: row.kind,
         normalSide:
@@ -692,6 +874,8 @@ export class FinChartService {
           before.kind === values.kind &&
           before.normalSide === values.normalSide &&
           before.control === values.control &&
+          before.journal === values.journal &&
+          before.currency === values.currency &&
           before.groupId === values.groupId;
         action = same ? 'UNCHANGED' : 'UPDATE';
         if (!same) {
@@ -732,6 +916,8 @@ export class FinChartService {
               kind: before.kind,
               normalSide: before.normalSide,
               control: before.control,
+              journal: before.journal,
+              currency: before.currency,
               groupId: before.groupId,
             }
           : null,
@@ -965,6 +1151,8 @@ const accountColumns = {
   kind: finAccounts.kind,
   normalSide: finAccounts.normalSide,
   control: finAccounts.control,
+  journal: finAccounts.journal,
+  currency: finAccounts.currency,
   status: finAccounts.status,
   groupId: finAccounts.groupId,
   createdAt: finAccounts.createdAt,
@@ -1064,6 +1252,33 @@ async function moneyAccountRows(
  * (docs/modules/finance-core.md §5): never touches a chart that has accounts, so an imported or
  * edited chart is never re-seeded. Runs at boot under ensureDefaultCompany's advisory lock.
  */
+function checkedJournal(journal: FinAccountJournal): FinAccountJournal {
+  if (!FIN_ACCOUNT_JOURNALS.includes(journal)) throw invalid('journal');
+  return journal;
+}
+
+function checkedCurrency(currency: string): string {
+  if (!/^[A-Z]{3}$/.test(currency)) throw invalid('currency');
+  return currency;
+}
+
+/** The control a journal means: money, a party's account, or nothing (ADR-0149). */
+function controlOfJournal(
+  journal: FinAccountJournal,
+  kind: FinAccountKind,
+  current: FinAccountControl,
+): FinAccountControl {
+  if (journal === 'CASH' || journal === 'BANK' || journal === 'MONEY') return 'MONEY';
+  if (journal !== 'RECEIVABLE_PAYABLE') return 'NONE';
+  if (current !== 'NONE' && current !== 'MONEY') return current;
+  return kind === 'ASSET' ? 'RECEIVABLE' : 'PAYABLE';
+}
+
+function journalOfControl(control: FinAccountControl): FinAccountJournal {
+  if (control === 'MONEY') return 'MONEY';
+  return control === 'NONE' ? 'GENERAL' : 'RECEIVABLE_PAYABLE';
+}
+
 export async function ensureDefaultChart(
   tx: FinTx,
   scope: { tenantId: number; companyId: number },
@@ -1085,6 +1300,7 @@ export async function ensureDefaultChart(
         kind: account.kind,
         normalSide: account.normalSide,
         control: account.control,
+        journal: journalOfControl(account.control),
       })),
     )
     .returning({ id: finAccounts.id, code: finAccounts.code });

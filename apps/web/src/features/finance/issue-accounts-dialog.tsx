@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useHasPermission } from '@/app/auth-context';
-import { NativeSelect } from '@/components/native-select';
+import { SearchSelect } from '@/components/search-select';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -27,6 +27,7 @@ import {
   useIssueExpenseAccountMutation,
   useIssueExpenseAccounts,
 } from './api';
+import { accountOption } from './account-option';
 
 /**
  * Which account each goods-issue expense type books to (ADR-0106 #3): a seeded type shows F4's
@@ -61,7 +62,7 @@ export function IssueAccountsDialog({
     });
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
-      <DialogContent size="lg" closeLabel={t('common.close')}>
+      <DialogContent size="xl" closeLabel={t('common.close')}>
         <DialogHeader>
           <DialogTitle>{t('finance.accounts.issueAccounts.title')}</DialogTitle>
           <DialogDescription>{t('finance.accounts.issueAccounts.description')}</DialogDescription>
@@ -96,19 +97,12 @@ export function IssueAccountsDialog({
                       ) : null}
                     </span>
                   ) : (
-                    <NativeSelect
+                    <SearchSelect
                       aria-label={`${row.name} — ${t('finance.accounts.issueAccounts.account')}`}
                       value={row.own && row.accountId !== null ? String(row.accountId) : ''}
-                      disabled={mutation.isPending}
-                      onChange={(event) => choose(row, event.target.value)}
-                    >
-                      <option value="">{otherLabel}</option>
-                      {active.map((account) => (
-                        <option key={account.id} value={String(account.id)}>
-                          {`${account.code} · ${account.name}`}
-                        </option>
-                      ))}
-                    </NativeSelect>
+                      options={[{ value: '', label: otherLabel }, ...active.map(accountOption)]}
+                      onChange={(value) => choose(row, value)}
+                    />
                   )}
                 </TableCell>
               </TableRow>

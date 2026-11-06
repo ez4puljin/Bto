@@ -546,13 +546,16 @@ export class StockPostingService implements OnModuleInit {
     }
 
     // 9. Documents: status, dates and their number, allocated last (inventory's own only). A
-    //    partial posting keeps the number its first part took (ADR-0117 #2).
+    //    partial posting keeps the number its first part took (ADR-0117 #2), a receipt the number
+    //    its first save took (ADR-0153).
     const numbers = new Map<number, string>();
     for (const doc of internal) {
       let number: string | null = null;
-      const existing = doc.partial ? await this.existingNumber(tx, doc) : null;
+      const existing =
+        doc.partial || doc.docType === 'GR' ? await this.existingNumber(tx, doc) : null;
       if (existing !== null) {
         numbers.set(doc.docId, existing);
+        if (!doc.partial) number = existing;
       } else if (doc.allocateNumber !== false) {
         const value = await this.numbering.next(tx, doc.docType, businessYear(postedAt));
         number = formatDocNumber(doc.docType, businessYear(postedAt), value);
@@ -1525,8 +1528,15 @@ export class StockPostingService implements OnModuleInit {
     }
   }
 
-  /** The number a partially posted goods issue already carries (its first part's), if any. */
+  /** The number a partly posted goods issue or a saved receipt already carries, if any. */
   private async existingNumber(tx: Tx, doc: PostingDoc): Promise<string | null> {
+    if (doc.docType === 'GR') {
+      const [row] = await tx
+        .select({ number: goodsReceipts.number })
+        .from(goodsReceipts)
+        .where(eq(goodsReceipts.id, doc.docId));
+      return row?.number ?? null;
+    }
     if (doc.docType !== 'GI') {
       throw new Error(`${doc.docType} ${doc.docId}: only a goods issue posts in parts`);
     }

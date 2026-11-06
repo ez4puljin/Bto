@@ -82,6 +82,8 @@ AI views (ADR-0045):
 - `ai.stock_movements` names `SO` documents.
 - Datasets: `AI_DATASETS`, mn.json `ai.datasets`.
 
+ADR-0143 (migration `0068_sales_document_templates`): `sales_document_templates` (kind PICK_LIST / DELIVERY_NOTE, published `layout`, `draft`, `version`, one `is_default` per kind; `REVOKE TRUNCATE`), `sales_document_template_versions` (append-only), `sales_pipelines.pick_list_template_id` / `delivery_note_template_id` (null: the default).
+
 ## 3. Public API (`modules/sales/index.ts`)
 
 | Export | Use |
@@ -160,6 +162,8 @@ Every board, pipeline and stage route carries `sales.orders.read`; the service c
 | `GET /sales-rep/thumbs` | `{ urls }`: the primary picture's thumbnail of every product the shop lists (relative URLs that never change), for the phone to keep once (ADR-0068 #15); catalog's `primaryThumbsOf` over the same shop ids as the suppliers' list |
 | `GET /sales-rep/customers?q&cursor&limit`, `GET /sales-rep/customers/:id` | ACTIVE customers (`CustomersService.list`, so `visibleTo` applies): id, code, name, phone, address. One customer: its live addresses (the default first) and contacts; 404 when not ACTIVE. No credit data |
 | `GET /sales-rep/customers/:id/orders?cursor&limit` | A store's order history (ADR-0068 #23): every order of a customer the caller may see (`CustomersService.isVisible`, else 404 `NOT_FOUND`), any channel, author and status, newest first, keyset by id (`limit` 20 by default, 1–50; `REP_STORE_ORDER_PAGE_LIMIT`). Each `{ id, number, status, channel, createdAt, createdDate, createdTime, takerName, mine, total, estimatedTotal, lineCount }`: `createdDate` / `createdTime` (HH:mm) in Ulaanbaatar; `takerName` the author's full name (null when unknown); `mine` = the caller's own SALES_REP order, exactly what `GET /sales-rep/orders/:id` opens (a rep's own order on another channel is not `mine`); `total` frozen, `estimatedTotal` a DRAFT's quote as in the list (#20). No lines and no other detail of another person's order |
+
+ADR-0143: `GET/POST /sales/document-templates`, `GET /:id`, `PUT /:id/draft`, `POST /:id/publish|discard|default`, `POST /:id/versions/:version/restore`, `DELETE /:id` [`sales.boards.manage`]; `GET /sales/document-templates/print-layouts?pipelineIds=` [`sales.orders.read`]; the pipeline body takes `pickListTemplateId` / `deliveryNoteTemplateId` (absent: kept).
 
 ## 5. Rules worth knowing
 
@@ -291,6 +295,8 @@ Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUS
       - «Ерөнхий»: name, board, Нийтийн / Хувийн with VIEW roles, MANAGE roles, «Зөвхөн өөрийнхийг харуулах» with the ALL_ORDERS roles;
       - «Шатууд»: rows with up / down, the stage dialog (name, action, documents, VIEW / EDIT / MOVE roles), remove, «+ Шат нэмэх».
 
+ADR-0143: «Падааны загвар» `/sales/document-templates` (+ `/:id` the shared block editor with an A4 / 80 mm preview); the pipeline sheet picks each document's template; the print pages draw with `DocumentView`.
+
 ## 9. Tests
 
 **Shared** (Vitest): `sales.test.ts`: dates, address, phone, cancellable and finished states, the number pattern and its rendering.
@@ -353,6 +359,8 @@ Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUS
 - `settings-page.test.tsx`
 - `print-page.test.tsx`: the pick list by warehouse on the roll, the paper from the address or the computer, the switch
 - `order-filters.test.ts`
+
+ADR-0143: `test/integration/sales-document-templates.int-spec.ts`, `packages/shared/src/sales/document-template.test.ts`, `features/sales/print-page.test.tsx` (the built-in layouts print as before).
 
 ## 10. Open items
 

@@ -1,7 +1,7 @@
 import { HR_LIMITS, hoursAndMinutes } from '@tugeel/shared/hr';
 import * as Location from 'expo-location';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { History, LogIn, LogOut, MapPin, PencilLine } from 'lucide-react-native';
+import { ClipboardPen, History, LogIn, LogOut, MapPin, PencilLine } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -436,6 +436,17 @@ export default function AttendanceScreen() {
             }
             title={t('mobile.attendance.history')}
             onPress={() => router.push(`/attendance/history?today=${data.today}`)}
+          />
+          <Row
+            minHeight={52}
+            icon={
+              <IconTile color={colors.tint.orange}>
+                <ClipboardPen size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+              </IconTile>
+            }
+            title={t('mobile.requests.entry')}
+            subtitle={t('mobile.requests.entryHint')}
+            onPress={() => router.push(`/attendance/requests?today=${data.today}`)}
           />
         </Group>
       </>

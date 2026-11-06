@@ -2,6 +2,9 @@ import { PRICE_BASES } from '@tugeel/shared/pricing';
 import {
   BOARD_LIMITS,
   CARD_SORTS,
+  DOCUMENT_TEMPLATE_KINDS,
+  DOCUMENT_TEMPLATE_LIMITS,
+  type DocumentLayout,
   FINISHED_STATUSES,
   FULFILMENTS,
   ORDER_CHANNELS,
@@ -24,6 +27,7 @@ import {
   date,
   foreignKey,
   index,
+  integer,
   pgTable,
   primaryKey,
   smallint,
@@ -283,6 +287,32 @@ export const salesOrderLineParts = pgTable(
   ],
 );
 
+/**
+ * One saved edit of an order (ADR-0147): its version, what changed and the total before and after.
+ * Append-only: the order's history. The names are copied, so it still reads after a product is renamed.
+ */
+export const salesOrderChanges = pgTable(
+  'sales_order_changes',
+  {
+    id: id(),
+    orderId: ref('order_id')
+      .notNull()
+      .references(() => salesOrders.id),
+    version: integer('version').notNull(),
+    status: text('status', { enum: ORDER_STATUSES }).notNull(),
+    fields: jsonValue('fields').notNull(),
+    lines: jsonValue('lines').notNull(),
+    totalBefore: money('total_before'),
+    totalAfter: money('total_after'),
+    actorId: userRef('actor_id'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('sales_order_changes_version').on(t.orderId, t.version),
+    check('sales_order_changes_version_positive', sql`${t.version} > 0`),
+  ],
+);
+
 /** Every state change of an order: who, when, from what to what, why. */
 export const orderStatusEvents = pgTable(
   'order_status_events',
@@ -353,6 +383,11 @@ export const salesPipelines = pgTable(
     kind: text('kind', { enum: PIPELINE_KINDS }).notNull().default('SALES'),
     /** The STORE warehouse a TRANSFER stage moves the picked goods into (ADR-0125); null = none. */
     transferWarehouseId: ref('transfer_warehouse_id').references(() => warehouses.id),
+    /** ADR-0143: the document templates its orders print with; null: the default of the kind. */
+    pickListTemplateId: ref('pick_list_template_id').references(() => salesDocumentTemplates.id),
+    deliveryNoteTemplateId: ref('delivery_note_template_id').references(
+      () => salesDocumentTemplates.id,
+    ),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdBy: userRef('created_by'),
     createdAt: createdAt(),
@@ -372,6 +407,55 @@ export const salesPipelines = pgTable(
       sql`(${t.kind} = 'TRANSFER') = (${t.transferWarehouseId} IS NOT NULL)`,
     ),
   ],
+);
+
+/**
+ * A printed document's template (ADR-0143): a pick list's or a delivery note's layout from blocks.
+ * The layout in force is the published one; the admin's edits wait in `draft`; each publish keeps
+ * its layout in `sales_document_template_versions`. One template of each kind is the default.
+ */
+export const salesDocumentTemplates = pgTable(
+  'sales_document_templates',
+  {
+    id: id(),
+    kind: text('kind', { enum: DOCUMENT_TEMPLATE_KINDS }).notNull(),
+    name: text('name').notNull(),
+    layout: jsonValue('layout').$type<DocumentLayout>().notNull(),
+    draft: jsonValue('draft').$type<DocumentLayout | null>(),
+    version: integer('version').notNull().default(1),
+    isDefault: boolean('is_default').notNull().default(false),
+    publishedBy: userRef('published_by'),
+    publishedAt: timestamp('published_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedBy: userRef('updated_by'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('sales_document_templates_one_default')
+      .on(t.kind)
+      .where(sql`${t.isDefault}`),
+    check('sales_document_templates_kind', inList(t.kind, DOCUMENT_TEMPLATE_KINDS)),
+    check(
+      'sales_document_templates_name',
+      sql`length(${t.name}) BETWEEN 1 AND ${sql.raw(String(DOCUMENT_TEMPLATE_LIMITS.maxName))}`,
+    ),
+    check('sales_document_templates_version', sql`${t.version} >= 1`),
+  ],
+);
+
+/** Every published layout of a document template (ADR-0143). Append-only. */
+export const salesDocumentTemplateVersions = pgTable(
+  'sales_document_template_versions',
+  {
+    templateId: ref('template_id')
+      .notNull()
+      .references(() => salesDocumentTemplates.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    layout: jsonValue('layout').$type<DocumentLayout>().notNull(),
+    publishedBy: userRef('published_by'),
+    publishedAt: timestamp('published_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.templateId, t.version] })],
 );
 
 /** Roles that may see a private pipeline, manage it, or see all of its orders; dropped with the role. */

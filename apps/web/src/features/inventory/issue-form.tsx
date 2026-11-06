@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DocumentWorkspace } from '@/components/document-layout';
 import { FormField } from '@/components/form';
 import { RowAction, RowActions, SegmentedControl } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
@@ -68,8 +69,7 @@ const HEADER_CODES = new Set([
 ]);
 const HEADER_GRID = 'grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3';
 /** The draft's fields in one row from `xl`, so a 1366 laptop shows the first lines (ADR-0113). */
-const EDITOR_GRID =
-  'grid gap-x-3 gap-y-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[9.5rem_minmax(9rem,1fr)_minmax(11rem,1fr)_minmax(22rem,2fr)_minmax(6rem,1fr)]';
+const EDITOR_GRID = 'grid gap-x-3 gap-y-3 sm:grid-cols-2';
 
 /** A chosen recipient record (a user, a customer or a supplier) as the header keeps it. */
 interface Picked {
@@ -794,127 +794,203 @@ function DraftEditor(props: {
   return (
     <>
       {detail ? <ReturnedBanner detail={detail} /> : null}
-      <HeaderCard>
-        <ProblemAlert
-          problem={
-            (headerProblem && !namesField(headerProblem) ? headerProblem : null) ??
-            problemFromError(warehouses.error) ??
-            problemFromError(types.error)
-          }
-        />
-        <div className={EDITOR_GRID}>
-          <FormField label={t('inventory.date')} htmlFor="issue-date" error={dateError}>
-            <DateInput
-              id="issue-date"
-              max={businessDate()}
-              aria-invalid={dateError !== undefined || undefined}
-              value={issuedOn}
-              onChange={(value) => setIssuedOn(value)}
-              onBlur={() => {
-                if (detail !== null && issuedOn !== detail.issuedOn && !dateMessage(issuedOn)) {
-                  const before = detail.issuedOn;
-                  patchHeader({ issuedOn }, () => setIssuedOn(before));
-                }
-              }}
+      <DocumentWorkspace
+        document={
+          <HeaderCard>
+            <ProblemAlert
+              problem={
+                (headerProblem && !namesField(headerProblem) ? headerProblem : null) ??
+                problemFromError(warehouses.error) ??
+                problemFromError(types.error)
+              }
             />
-          </FormField>
-          <FormField
-            label={t('inventory.issues.defaultWarehouse')}
-            htmlFor="issue-warehouse"
-            hint={t('inventory.issues.defaultWarehouseHint')}
-            error={required.warehouse ? 'validation.required' : undefined}
-          >
-            <WarehouseSelect
-              id="issue-warehouse"
-              options={warehouses.options}
-              value={warehouseId}
-              emptyLabel={t('inventory.pickWarehouse')}
-              onChange={(id) => {
-                if (id === undefined) {
-                  if (detail === null) setPickedWarehouse(undefined);
-                  return;
-                }
-                setRequired((previous) => ({ ...previous, warehouse: false }));
-                if (detail === null) setPickedWarehouse(id);
-                else if (id !== detail.warehouseId) patchHeader({ warehouseId: id });
-              }}
-            />
-          </FormField>
-          <FormField
-            label={t('inventory.issues.expenseType')}
-            htmlFor="issue-type"
-            hint={account ? <span className="font-mono">{account}</span> : undefined}
-            error={typeError}
-          >
-            <NativeSelect
-              id="issue-type"
-              aria-invalid={typeError !== undefined || undefined}
-              disabled={partlyPosted}
-              value={expenseTypeId ?? ''}
-              onChange={(event) => {
-                const next = event.target.value
-                  ? Number.parseInt(event.target.value, 10)
-                  : undefined;
-                const before = expenseTypeId;
-                setExpenseTypeId(next);
-                if (next === undefined) return;
-                setRequired((previous) => ({ ...previous, type: false }));
-                if (detail !== null && next !== detail.expenseTypeId) {
-                  patchHeader({ expenseTypeId: next }, () => setExpenseTypeId(before));
-                }
-              }}
-            >
-              <option value="">{t('inventory.issues.pickExpenseType')}</option>
-              {choices.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.active ? type.name : t('inventory.issues.retiredType', { name: type.name })}
-                </option>
-              ))}
-            </NativeSelect>
-          </FormField>
-          <div className="sm:col-span-2 xl:col-span-1">
-            <FormField
-              label={t('inventory.issues.recipient')}
-              htmlFor="issue-recipient"
-              hint={request === null ? t('inventory.issues.partyRequired') : undefined}
-              error={recipientError}
-            >
-              <div className="flex flex-col gap-2">
-                <SegmentedControl
-                  name={t('inventory.issues.recipientKind')}
-                  options={RECIPIENT_KINDS}
-                  value={recipient.kind}
-                  label={(kind) => t(`inventory.issues.recipientKinds.${kind}`)}
-                  onChange={(kind) => {
-                    if (partlyPosted) return;
-                    setRecipientState({ ...recipient, kind });
-                    setRequired((previous) => ({ ...previous, recipient: false }));
-                    // A kind with a choice kept from before is that choice again.
-                    const body = recipientRequest({ ...recipient, kind });
-                    if (detail !== null && body !== null) {
-                      patchHeader({ recipient: body }, () => setRecipientState(recipient));
+            <div className={EDITOR_GRID}>
+              <FormField label={t('inventory.date')} htmlFor="issue-date" error={dateError}>
+                <DateInput
+                  id="issue-date"
+                  max={businessDate()}
+                  aria-invalid={dateError !== undefined || undefined}
+                  value={issuedOn}
+                  onChange={(value) => setIssuedOn(value)}
+                  onBlur={() => {
+                    if (detail !== null && issuedOn !== detail.issuedOn && !dateMessage(issuedOn)) {
+                      const before = detail.issuedOn;
+                      patchHeader({ issuedOn }, () => setIssuedOn(before));
                     }
                   }}
                 />
-                {recipientControl()}
+              </FormField>
+              <FormField
+                label={t('inventory.issues.defaultWarehouse')}
+                htmlFor="issue-warehouse"
+                hint={t('inventory.issues.defaultWarehouseHint')}
+                error={required.warehouse ? 'validation.required' : undefined}
+              >
+                <WarehouseSelect
+                  id="issue-warehouse"
+                  options={warehouses.options}
+                  value={warehouseId}
+                  emptyLabel={t('inventory.pickWarehouse')}
+                  onChange={(id) => {
+                    if (id === undefined) {
+                      if (detail === null) setPickedWarehouse(undefined);
+                      return;
+                    }
+                    setRequired((previous) => ({ ...previous, warehouse: false }));
+                    if (detail === null) setPickedWarehouse(id);
+                    else if (id !== detail.warehouseId) patchHeader({ warehouseId: id });
+                  }}
+                />
+              </FormField>
+              <FormField
+                label={t('inventory.issues.expenseType')}
+                htmlFor="issue-type"
+                hint={account ? <span className="font-mono">{account}</span> : undefined}
+                error={typeError}
+              >
+                <NativeSelect
+                  id="issue-type"
+                  aria-invalid={typeError !== undefined || undefined}
+                  disabled={partlyPosted}
+                  value={expenseTypeId ?? ''}
+                  onChange={(event) => {
+                    const next = event.target.value
+                      ? Number.parseInt(event.target.value, 10)
+                      : undefined;
+                    const before = expenseTypeId;
+                    setExpenseTypeId(next);
+                    if (next === undefined) return;
+                    setRequired((previous) => ({ ...previous, type: false }));
+                    if (detail !== null && next !== detail.expenseTypeId) {
+                      patchHeader({ expenseTypeId: next }, () => setExpenseTypeId(before));
+                    }
+                  }}
+                >
+                  <option value="">{t('inventory.issues.pickExpenseType')}</option>
+                  {choices.map((type) => (
+                    <option key={type.id} value={type.id}>
+                      {type.active
+                        ? type.name
+                        : t('inventory.issues.retiredType', { name: type.name })}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </FormField>
+              <FormField
+                label={t('inventory.issues.note')}
+                htmlFor="issue-note"
+                error={fieldError(headerProblem, 'note')}
+              >
+                <Input
+                  id="issue-note"
+                  maxLength={500}
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                  onBlur={leaveNote}
+                />
+              </FormField>
+              <div className="sm:col-span-2">
+                <FormField
+                  label={t('inventory.issues.recipient')}
+                  htmlFor="issue-recipient"
+                  error={recipientError}
+                >
+                  <div className="flex flex-col gap-2">
+                    <SegmentedControl
+                      name={t('inventory.issues.recipientKind')}
+                      options={RECIPIENT_KINDS}
+                      value={recipient.kind}
+                      label={(kind) => t(`inventory.issues.recipientKinds.${kind}`)}
+                      onChange={(kind) => {
+                        if (partlyPosted) return;
+                        setRecipientState({ ...recipient, kind });
+                        setRequired((previous) => ({ ...previous, recipient: false }));
+                        // A kind with a choice kept from before is that choice again.
+                        const body = recipientRequest({ ...recipient, kind });
+                        if (detail !== null && body !== null) {
+                          patchHeader({ recipient: body }, () => setRecipientState(recipient));
+                        }
+                      }}
+                    />
+                    {recipientControl()}
+                  </div>
+                </FormField>
               </div>
-            </FormField>
-          </div>
-          <FormField
-            label={t('inventory.issues.note')}
-            htmlFor="issue-note"
-            error={fieldError(headerProblem, 'note')}
-          >
-            <Input
-              id="issue-note"
-              maxLength={500}
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              onBlur={leaveNote}
-            />
-          </FormField>
-        </div>
-      </HeaderCard>
+            </div>
+          </HeaderCard>
+        }
+        editor={
+          <Card role="region" aria-labelledby="issue-entry-title">
+            <CardHeader>
+              <CardTitle id="issue-entry-title">{t('inventory.receipt.panel.title')}</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <ScanToolbar
+                stacked
+                scanBox={
+                  <div ref={scanArea}>
+                    <ScanBox
+                      fill
+                      autoFocus={props.focusScan}
+                      label={t('inventory.scanLabel')}
+                      placeholder={t('inventory.scanPlaceholder')}
+                      onScan={onScan}
+                    />
+                  </div>
+                }
+                qty={<ScanQtyControl id="issue-scan-qty" qty={qty} onScan={onScan} />}
+                search={
+                  <ProductSearch
+                    className="max-w-none"
+                    onScan={onScan}
+                    onPick={(product) =>
+                      pick(product.baseUnit.id, product.baseUnit.uomName, product.name)
+                    }
+                  />
+                }
+                status={
+                  <>
+                    <span aria-live="polite" className="font-medium">
+                      {added
+                        ? added.base
+                          ? t('inventory.scanAddedBase', {
+                              qty: added.qty,
+                              unit: added.unit,
+                              base: added.base.qty,
+                              baseUnit: added.base.unit,
+                              name: added.name,
+                            })
+                          : t('inventory.scanAdded', {
+                              qty: added.qty,
+                              unit: added.unit,
+                              name: added.name,
+                            })
+                        : null}
+                    </span>
+                    {needHeader ? (
+                      <span className="text-destructive">{t('inventory.issues.needHeader')}</span>
+                    ) : null}
+                    {invalidQty ? (
+                      <span className="text-destructive">{t('inventory.scanQtyInvalid')}</span>
+                    ) : null}
+                    {missing ? (
+                      <span className="text-destructive">
+                        {t('inventory.scanNotFound', { code: missing })}
+                      </span>
+                    ) : null}
+                    {qty.value !== '1' ? (
+                      <span className="text-[0.8125rem] text-muted-foreground">
+                        {t('inventory.scanQtyHint')}
+                      </span>
+                    ) : null}
+                  </>
+                }
+              />
+              <ProblemAlert problem={confirm ? null : action.problem} />
+            </CardContent>
+          </Card>
+        }
+      />
       <Card role="region" aria-labelledby="issue-lines-title">
         <CardHeader>
           <CardTitle id="issue-lines-title">{t('inventory.issues.linesTitle')}</CardTitle>
@@ -929,65 +1005,6 @@ function DraftEditor(props: {
             </>
           ) : null}
           {detail ? <IssueConfirmations detail={detail} /> : null}
-          <ScanToolbar
-            scanBox={
-              <div ref={scanArea}>
-                <ScanBox
-                  autoFocus={props.focusScan}
-                  label={t('inventory.scanLabel')}
-                  placeholder={t('inventory.scanPlaceholder')}
-                  onScan={onScan}
-                />
-              </div>
-            }
-            qty={<ScanQtyControl id="issue-scan-qty" qty={qty} onScan={onScan} />}
-            search={
-              <ProductSearch
-                onScan={onScan}
-                onPick={(product) =>
-                  pick(product.baseUnit.id, product.baseUnit.uomName, product.name)
-                }
-              />
-            }
-            status={
-              <>
-                <span aria-live="polite" className="font-medium">
-                  {added
-                    ? added.base
-                      ? t('inventory.scanAddedBase', {
-                          qty: added.qty,
-                          unit: added.unit,
-                          base: added.base.qty,
-                          baseUnit: added.base.unit,
-                          name: added.name,
-                        })
-                      : t('inventory.scanAdded', {
-                          qty: added.qty,
-                          unit: added.unit,
-                          name: added.name,
-                        })
-                    : null}
-                </span>
-                {needHeader ? (
-                  <span className="text-destructive">{t('inventory.issues.needHeader')}</span>
-                ) : null}
-                {invalidQty ? (
-                  <span className="text-destructive">{t('inventory.scanQtyInvalid')}</span>
-                ) : null}
-                {missing ? (
-                  <span className="text-destructive">
-                    {t('inventory.scanNotFound', { code: missing })}
-                  </span>
-                ) : null}
-                {qty.value !== '1' ? (
-                  <span className="text-[0.8125rem] text-muted-foreground">
-                    {t('inventory.scanQtyHint')}
-                  </span>
-                ) : null}
-              </>
-            }
-          />
-          <ProblemAlert problem={confirm ? null : action.problem} />
           {lines.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('inventory.issues.linesEmpty')}</p>
           ) : (

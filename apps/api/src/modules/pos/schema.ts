@@ -20,6 +20,9 @@ import {
   LOYALTY_ISSUES,
   LOYALTY_LIMITS,
   LOYALTY_MEMBER_STATUSES,
+  RECEIPT_TEMPLATE_KINDS,
+  RECEIPT_TEMPLATE_LIMITS,
+  type ReceiptLayout,
 } from '@tugeel/shared/pos';
 import { REG_NO_MAX_LENGTH } from '@tugeel/shared/taxpayer';
 import { PRICE_BASES } from '@tugeel/shared/pricing';
@@ -194,6 +197,9 @@ export const posTills = pgTable(
      * prints to the PC's Windows default printer with --kiosk-printing).
      */
     printerName: text('printer_name'),
+    /** ADR-0141: the receipt templates this POS prints with; null: the default of the kind. */
+    saleTemplateId: ref('sale_template_id').references(() => posReceiptTemplates.id),
+    returnTemplateId: ref('return_template_id').references(() => posReceiptTemplates.id),
     /** sha-256 of the one-time code a manager types to bind a browser to this till (S2). */
     pairingCodeHash: text('pairing_code_hash'),
     pairingExpiresAt: timestamp('pairing_expires_at', { withTimezone: true }),
@@ -864,6 +870,55 @@ export const posPaymentTypes = pgTable(
     ),
     check('pos_payment_types_sort_range', sql`${t.sort} >= 0`),
   ],
+);
+
+/**
+ * A receipt template (ADR-0141): a sale's or a return's receipt laid out from blocks. The layout
+ * in force is the published one; the admin's unpublished edits wait in `draft`. Each publish
+ * keeps its layout in `pos_receipt_template_versions`. One template of each kind is the default.
+ */
+export const posReceiptTemplates = pgTable(
+  'pos_receipt_templates',
+  {
+    id: id(),
+    kind: text('kind', { enum: RECEIPT_TEMPLATE_KINDS }).notNull(),
+    name: text('name').notNull(),
+    layout: jsonValue('layout').$type<ReceiptLayout>().notNull(),
+    draft: jsonValue('draft').$type<ReceiptLayout | null>(),
+    version: integer('version').notNull().default(1),
+    isDefault: boolean('is_default').notNull().default(false),
+    publishedBy: userRef('published_by'),
+    publishedAt: timestamp('published_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedBy: userRef('updated_by'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('pos_receipt_templates_one_default')
+      .on(t.kind)
+      .where(sql`${t.isDefault}`),
+    check('pos_receipt_templates_kind', inList(t.kind, RECEIPT_TEMPLATE_KINDS)),
+    check(
+      'pos_receipt_templates_name',
+      sql`length(${t.name}) BETWEEN 1 AND ${lim(RECEIPT_TEMPLATE_LIMITS.maxName)}`,
+    ),
+    check('pos_receipt_templates_version', sql`${t.version} >= 1`),
+  ],
+);
+
+/** Every published layout of a template (ADR-0141), to look back at or start a draft from. Append-only. */
+export const posReceiptTemplateVersions = pgTable(
+  'pos_receipt_template_versions',
+  {
+    templateId: ref('template_id')
+      .notNull()
+      .references(() => posReceiptTemplates.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    layout: jsonValue('layout').$type<ReceiptLayout>().notNull(),
+    publishedBy: userRef('published_by'),
+    publishedAt: timestamp('published_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.templateId, t.version] })],
 );
 
 /**

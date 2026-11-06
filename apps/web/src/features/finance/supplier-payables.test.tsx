@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it } from 'vitest';
 import { ACCOUNTANT_ME, bodyOf, calls, list, UUID } from '@/test/inventory-fixtures';
+import { choose } from '@/test/choose';
 import { findSidebar, json, renderApp, signedIn } from '@/test/render-app';
 import type { PayableEntry, PayableOpenItem, SupplierBalance } from './api';
 import { ACCOUNTS, CASH_BOX } from './finance-fixtures';
@@ -149,7 +150,7 @@ describe('supplier payables (F3, ADR-0091)', () => {
     await user.click(dialog.getByRole('button', { name: mn.finance.allocations.oldestFirst }));
     const amount = (number: string) =>
       dialog.getByLabelText(`${mn.finance.allocations.amount}: ${number}`);
-    expect(amount('GR-20261015-0004')).toHaveValue('10000');
+    expect(amount('GR-20261015-0004')).toHaveValue('10,000');
     expect(amount('GR-20261018-0001')).toHaveValue('');
     await user.click(dialog.getByRole('button', { name: mn.finance.allocations.submit }));
     await waitFor(() =>
@@ -176,9 +177,9 @@ describe('supplier payables (F3, ADR-0091)', () => {
       dialog.getByLabelText(mn.finance.journal.dialog.descriptionField),
       'Нийлүүлэгчид төлөв',
     );
-    await user.selectOptions(dialog.getByLabelText(`${mn.finance.journal.dialog.account} 1`), '12');
+    await choose(user, dialog.getByLabelText(`${mn.finance.journal.dialog.account} 1`), /^310101/);
     await user.type(dialog.getByLabelText(`${mn.finance.journal.dialog.debit} 1`), '10000');
-    await user.selectOptions(dialog.getByLabelText(`${mn.finance.journal.dialog.account} 2`), '1');
+    await choose(user, dialog.getByLabelText(`${mn.finance.journal.dialog.account} 2`), /^100101/);
     await user.type(dialog.getByLabelText(`${mn.finance.journal.dialog.credit} 2`), '10000');
     await user.click(dialog.getByRole('button', { name: mn.finance.journal.dialog.submit }));
     expect(await dialog.findByRole('alert')).toHaveTextContent(

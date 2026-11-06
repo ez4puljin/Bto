@@ -535,6 +535,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Audit_actions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit": {
         parameters: {
             query?: never;
@@ -1890,6 +1906,23 @@ export interface paths {
         get: operations["Receipts_list"];
         put?: never;
         post: operations["Receipts_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/receipts/counter-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The accounts a receipt's bill may credit (ADR-0154). */
+        get: operations["Receipts_counterAccounts"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3630,6 +3663,726 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/hr/divisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Workforce_divisions"];
+        put?: never;
+        post: operations["Workforce_createDivision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/divisions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Workforce_updateDivision"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/divisions/{id}/archived": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Workforce_archiveDivision"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Workforce_staff"];
+        put?: never;
+        post: operations["Workforce_createStaff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/staff.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Workforce_staffXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/staff/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Workforce_updateStaff"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/staff/{userId}/left": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Workforce_setLeft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/staff/{userId}/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Workforce_resetPassword"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/staff/{userId}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Workforce_setPhoto"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Workforce_schedules"];
+        put?: never;
+        post: operations["Workforce_createSchedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/schedules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Workforce_updateSchedule"];
+        post?: never;
+        delete: operations["Workforce_archiveSchedule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/request-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Workforce_requestTypes"];
+        put?: never;
+        post: operations["Workforce_createRequestType"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/request-types/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Workforce_updateRequestType"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Workforce_requestList"];
+        put?: never;
+        post: operations["Workforce_createRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/requests/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Workforce_myRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/requests/pending-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Workforce_pendingCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/requests/{id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Workforce_decide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/requests/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Workforce_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/reports/days": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Workforce_reportDays"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/reports/days.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Workforce_reportDaysXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/me/feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Engagement_feed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/me/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Engagement_myMessages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/me/messages/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Engagement_readMessages"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/me/polls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Engagement_myPolls"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/me/polls/{id}/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Engagement_answerPoll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/me/mood": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Engagement_setMood"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/me/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Engagement_myFeedback"];
+        put?: never;
+        post: operations["Engagement_sendFeedback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/me/locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Engagement_myLocations"];
+        put?: never;
+        post: operations["Engagement_shareLocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/me/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Engagement_myProfile"];
+        put: operations["Engagement_saveProfile"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Engagement_calendar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/thanks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Engagement_thanks"];
+        put?: never;
+        post: operations["Engagement_sendThanks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Engagement_messages"];
+        put?: never;
+        post: operations["Engagement_createMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/messages/{id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Engagement_withdrawMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/polls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Engagement_polls"];
+        put?: never;
+        post: operations["Engagement_createPoll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/polls/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Engagement_closePoll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/moods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Engagement_moods"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Engagement_feedback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/feedback/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Engagement_decideFeedback"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/location-shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Engagement_locations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Engagement_createEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/events/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Engagement_updateEvent"];
+        post?: never;
+        delete: operations["Engagement_archiveEvent"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/staff/{userId}/details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Engagement_saveDetails"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/insights/workforce": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Engagement_workforceInsights"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/insights/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Engagement_attendanceInsights"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/insights/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Engagement_requestInsights"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/segments": {
         parameters: {
             query?: never;
@@ -4229,6 +4982,135 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales/document-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesDocumentTemplates_list"];
+        put?: never;
+        post: operations["SalesDocumentTemplates_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/document-templates/print-layouts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The published layouts and these pipelines' choices, for printing an order's documents. */
+        get: operations["SalesDocumentTemplates_printLayouts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/document-templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesDocumentTemplates_get"];
+        put?: never;
+        post?: never;
+        delete: operations["SalesDocumentTemplates_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/document-templates/{id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["SalesDocumentTemplates_saveDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/document-templates/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SalesDocumentTemplates_publish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/document-templates/{id}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SalesDocumentTemplates_discard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/document-templates/{id}/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SalesDocumentTemplates_makeDefault"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/document-templates/{id}/versions/{version}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SalesDocumentTemplates_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sales-stages/{id}": {
         parameters: {
             query?: never;
@@ -4683,6 +5565,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/gl-accounts/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The chart's group tree (ADR-0148). */
+        get: operations["GlAccounts_groups"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gl-accounts/chart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A whole chart with its tree, in one transaction (ADR-0148). */
+        post: operations["GlAccounts_importChart"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/gl-accounts": {
         parameters: {
             query?: never;
@@ -4842,6 +5758,23 @@ export interface paths {
         get: operations["MoneyAccounts_book"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/journal-entries/by-account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A transaction by the account's journal, like Erkhet's forms (ADR-0150). */
+        post: operations["Journal_postByAccount"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6050,6 +6983,119 @@ export interface paths {
         get: operations["PosPaymentTypes_list"];
         put: operations["PosPaymentTypes_replace"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/receipt-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosReceiptTemplates_list"];
+        put?: never;
+        post: operations["PosReceiptTemplates_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/receipt-templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosReceiptTemplates_get"];
+        put?: never;
+        post?: never;
+        delete: operations["PosReceiptTemplates_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/receipt-templates/{id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["PosReceiptTemplates_saveDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/receipt-templates/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosReceiptTemplates_publish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/receipt-templates/{id}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosReceiptTemplates_discard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/receipt-templates/{id}/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosReceiptTemplates_makeDefault"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/receipt-templates/{id}/versions/{version}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** An earlier version's layout becomes the draft. */
+        post: operations["PosReceiptTemplates_restore"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8292,6 +9338,10 @@ export interface components {
              */
             effectiveFrom: string;
         };
+        AuditActionCount: {
+            action: string;
+            count: number;
+        };
         AuditEntry: {
             id: number;
             /** Format: date-time */
@@ -8319,7 +9369,7 @@ export interface components {
         };
         FileUploadRequest: {
             /** @enum {string} */
-            kind: "catalog.product_image" | "catalog.product_thumb" | "notifications.notice_image" | "catalog.category_image" | "customer.banner_image" | "inventory.receipt_note" | "procurement.invoice_image" | "imports.source";
+            kind: "catalog.product_image" | "catalog.product_thumb" | "notifications.notice_image" | "catalog.category_image" | "customer.banner_image" | "inventory.receipt_note" | "procurement.invoice_image" | "hr.employee_photo" | "hr.message_image" | "imports.source";
             /** @example image/jpeg */
             contentType: string;
             sizeBytes: number;
@@ -9622,6 +10672,12 @@ export interface components {
             data: components["schemas"]["ReceiptSummary"][];
             nextCursor: string | null;
         };
+        ReceiptCounterAccount: {
+            code: string;
+            name: string;
+            /** @description The payable’s own account: what a receipt without a choice credits */
+            isDefault: boolean;
+        };
         ReceiptPaymentAccount: {
             id: number;
             code: string;
@@ -9756,6 +10812,8 @@ export interface components {
             paymentMethod: "CREDIT" | "CASH" | "BANK";
             moneyAccountId: number | null;
             moneyAccountName: string | null;
+            counterAccountCode: string | null;
+            counterAccountName: string | null;
             supplierVatPayer: boolean;
             /**
              * @description VAT inside the delivery-note prices
@@ -9825,6 +10883,8 @@ export interface components {
             paymentMethod?: "CREDIT" | "CASH" | "BANK";
             /** @description Cash box or bank account */
             moneyAccountId?: number | null;
+            /** @description The account the bill credits, from GET /receipts/counter-accounts (ADR-0154) */
+            counterAccountCode?: string | null;
             /** @description The delivery note’s total pieces (Σ base quantity), ADR-0115 */
             noteTotalQty?: string | null;
             /** @description The delivery note’s total amount, VAT in */
@@ -9844,6 +10904,8 @@ export interface components {
             paymentMethod?: "CREDIT" | "CASH" | "BANK";
             /** @description Cash box or bank account */
             moneyAccountId?: number | null;
+            /** @description The account the bill credits, from GET /receipts/counter-accounts (ADR-0154) */
+            counterAccountCode?: string | null;
             /** @description The delivery note’s total pieces (Σ base quantity), ADR-0115 */
             noteTotalQty?: string | null;
             /** @description The delivery note’s total amount, VAT in */
@@ -11647,7 +12709,7 @@ export interface components {
             /** @description The Ulaanbaatar date */
             businessDate: string;
             /** @enum {string} */
-            source: "APP" | "OFFICE";
+            source: "APP" | "OFFICE" | "REQUEST";
             siteId: number | null;
             siteName: string | null;
             lat: string | null;
@@ -11785,6 +12847,647 @@ export interface components {
         };
         AttendanceStrikeRequest: {
             reason: string;
+        };
+        HrDivision: {
+            id: number;
+            name: string;
+            sort: number;
+            /** Format: date-time */
+            archivedAt: string | null;
+            employeeCount: number;
+        };
+        HrDivisionRequest: {
+            name: string;
+            sort: number;
+        };
+        HrArchiveRequest: {
+            archived: boolean;
+        };
+        /** @enum {string} */
+        EmploymentType: "PERMANENT" | "PROBATION" | "CONTRACT" | "PART_TIME" | "INTERN";
+        /** @enum {string} */
+        EmployeeGender: "MALE" | "FEMALE";
+        /** @enum {string} */
+        HrEducationLevel: "SECONDARY_INCOMPLETE" | "SECONDARY" | "VOCATIONAL" | "BACHELOR" | "MASTER" | "DOCTOR" | "SCIENCE_DOCTOR" | "PROFESSOR" | "HONORARY_DOCTOR";
+        /** @enum {string} */
+        HrMaritalStatus: "SINGLE" | "MARRIED" | "DIVORCED" | "WIDOWED";
+        /** @enum {string} */
+        HrJobLevel: "EXECUTIVE" | "MANAGEMENT" | "SENIOR" | "MID" | "ENTRY";
+        /** @enum {string} */
+        HrLeftReasonKind: "PERSONAL" | "COMPANY" | "CONTRACT_END" | "RETIRED" | "OTHER";
+        HrStaffChild: {
+            name?: string | null;
+            gender?: components["schemas"]["EmployeeGender"] | null;
+            birthDate: string;
+        };
+        HrStaff: {
+            userId: number;
+            fullName: string;
+            firstName: string | null;
+            lastName: string | null;
+            phone: string | null;
+            /** @enum {string} */
+            status: "ACTIVE" | "DISABLED";
+            roles: string[];
+            position: string | null;
+            divisionId: number | null;
+            divisionName: string | null;
+            employmentType: components["schemas"]["EmploymentType"];
+            gender: components["schemas"]["EmployeeGender"] | null;
+            employedOn: string | null;
+            leftOn: string | null;
+            leftReason: string | null;
+            photoUrl: string | null;
+            scheduleId: number | null;
+            scheduleName: string | null;
+            tracked: boolean;
+            /** Format: date-time */
+            lastLoginAt: string | null;
+            /** Format: date-time */
+            lockedUntil: string | null;
+            passwordSet: boolean;
+            birthDate: string | null;
+            education: components["schemas"]["HrEducationLevel"] | null;
+            maritalStatus: components["schemas"]["HrMaritalStatus"] | null;
+            district: string | null;
+            jobLevel: components["schemas"]["HrJobLevel"] | null;
+            leftReasonKind: components["schemas"]["HrLeftReasonKind"] | null;
+            children: components["schemas"]["HrStaffChild"][];
+        };
+        HrStaffRequest: {
+            firstName: string;
+            lastName: string;
+            /** @example 99112233 */
+            phone: string;
+            position: string | null;
+            divisionId: number | null;
+            employmentType: components["schemas"]["EmploymentType"];
+            gender: components["schemas"]["EmployeeGender"] | null;
+            employedOn: string | null;
+            scheduleId: number | null;
+            /** @description The first password, when registering; never returned */
+            password?: string | null;
+        };
+        HrStaffLeftRequest: {
+            /** @description null: back at work */
+            leftOn: string | null;
+            reason: string | null;
+            reasonKind?: components["schemas"]["HrLeftReasonKind"] | null;
+        };
+        HrStaffPasswordRequest: {
+            password: string;
+        };
+        HrStaffPhotoRequest: {
+            fileId: number | null;
+        };
+        /** @enum {string} */
+        ScheduleKind: "FIXED" | "FLEXIBLE";
+        HrScheduleDay: {
+            /** @description Monday = 1 … Sunday = 7 */
+            weekday: number;
+            start: string | null;
+            end: string | null;
+            breakStart: string | null;
+            breakEnd: string | null;
+            /** @description FLEXIBLE: the minutes to work; FIXED: computed */
+            minutes: number;
+        };
+        HrWorkSchedule: {
+            id: number;
+            name: string;
+            kind: components["schemas"]["ScheduleKind"];
+            color: string;
+            days: components["schemas"]["HrScheduleDay"][];
+            /** Format: date-time */
+            archivedAt: string | null;
+            userIds: number[];
+        };
+        HrWorkScheduleRequest: {
+            name: string;
+            kind: components["schemas"]["ScheduleKind"];
+            /** @example #f59e0b */
+            color: string;
+            days: components["schemas"]["HrScheduleDay"][];
+            userIds: number[];
+        };
+        /** @enum {string} */
+        RequestGroup: "NOT_WORKED" | "WORKED" | "OVERTIME" | "OVERTIME_LEAVE" | "PUNCH_CHOSEN" | "PUNCH_SENT" | "OTHER";
+        HrRequestType: {
+            id: number;
+            name: string;
+            group: components["schemas"]["RequestGroup"];
+            color: string;
+            wholeDays: boolean;
+            active: boolean;
+            sort: number;
+        };
+        HrRequestTypeRequest: {
+            name: string;
+            group: components["schemas"]["RequestGroup"];
+            color: string;
+            wholeDays: boolean;
+            active: boolean;
+            sort: number;
+        };
+        /** @enum {string} */
+        RequestStatus: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
+        HrTimeRequest: {
+            id: number;
+            userId: number;
+            fullName: string;
+            typeId: number;
+            typeName: string;
+            group: components["schemas"]["RequestGroup"];
+            color: string;
+            wholeDays: boolean;
+            fromDate: string;
+            toDate: string;
+            /** Format: date-time */
+            startsAt: string | null;
+            /** Format: date-time */
+            endsAt: string | null;
+            /** @enum {string|null} */
+            punchKind: "IN" | "OUT" | null;
+            minutes: number | null;
+            days: number;
+            note: string | null;
+            status: components["schemas"]["RequestStatus"];
+            decidedBy: string | null;
+            /** Format: date-time */
+            decidedAt: string | null;
+            decisionNote: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        HrPendingCount: {
+            pending: number;
+        };
+        HrTimeRequestCreate: {
+            /** @description HR only: someone else; the app sends none */
+            userId?: number;
+            typeId: number;
+            /** @example 2026-11-05 */
+            fromDate: string;
+            toDate?: string | null;
+            /** Format: date-time */
+            startsAt?: string | null;
+            /** Format: date-time */
+            endsAt?: string | null;
+            /** @enum {string|null} */
+            punchKind?: "IN" | "OUT" | null;
+            note?: string | null;
+            lat?: string | null;
+            lng?: string | null;
+            accuracyM?: number | null;
+        };
+        HrTimeRequestDecision: {
+            approve: boolean;
+            note: string | null;
+        };
+        /** @enum {string} */
+        HrReportStatus: "PRESENT" | "LATE" | "ABSENT" | "OFF" | "LEAVE" | "AWAY" | "OPEN";
+        HrReportRow: {
+            date: string;
+            userId: number;
+            fullName: string;
+            firstName: string | null;
+            lastName: string | null;
+            photoUrl: string | null;
+            divisionId: number | null;
+            divisionName: string | null;
+            position: string | null;
+            status: components["schemas"]["HrReportStatus"];
+            requestName: string | null;
+            planStart: string | null;
+            planEnd: string | null;
+            flexible: boolean;
+            /** Format: date-time */
+            firstIn: string | null;
+            /** Format: date-time */
+            lastOut: string | null;
+            arrivalDiff: number | null;
+            departureDiff: number | null;
+            breakMinutes: number;
+            scheduledMinutes: number;
+            workedInSchedule: number;
+            workedMinutes: number;
+            lateMinutes: number;
+            earlyLeaveMinutes: number;
+            overtimeMinutes: number;
+            siteName: string | null;
+            openIn: boolean;
+        };
+        HrReportTotals: {
+            scheduledMinutes: number;
+            absentDays: number;
+            lateMinutes: number;
+            lateDays: number;
+            workedMinutes: number;
+            workedInSchedule: number;
+            earlyArrivalMinutes: number;
+            lateDepartureMinutes: number;
+            overtimeMinutes: number;
+            leaveDays: number;
+        };
+        HrReport: {
+            rows: components["schemas"]["HrReportRow"][];
+            totals: components["schemas"]["HrReportTotals"];
+        };
+        /** @enum {string} */
+        HrMessageKind: "NOTICE" | "NEWS";
+        HrMyMessage: {
+            id: number;
+            kind: components["schemas"]["HrMessageKind"];
+            title: string;
+            body: string;
+            category: string | null;
+            imageUrl: string | null;
+            popup: boolean;
+            /** Format: date-time */
+            publishAt: string;
+            read: boolean;
+        };
+        HrFeed: {
+            unreadNotices: number;
+            unreadNews: number;
+            openPolls: number;
+            popups: components["schemas"]["HrMyMessage"][];
+            moodToday: number | null;
+        };
+        HrReadMessagesRequest: {
+            ids: number[];
+        };
+        /** @enum {string} */
+        HrPollKind: "VOTE" | "SURVEY";
+        /** @enum {string} */
+        HrPollQuestionKind: "SINGLE" | "MULTI" | "TEXT" | "SCALE";
+        HrPollOption: {
+            id: number;
+            text: string;
+            count: number;
+            voters: string[];
+        };
+        HrPollMine: {
+            optionIds: number[];
+            text: string | null;
+            value: number | null;
+        };
+        HrPollQuestion: {
+            id: number;
+            text: string;
+            kind: components["schemas"]["HrPollQuestionKind"];
+            required: boolean;
+            options: components["schemas"]["HrPollOption"][];
+            texts: string[];
+            average: string | null;
+            answered: number;
+            mine: components["schemas"]["HrPollMine"];
+        };
+        HrPoll: {
+            id: number;
+            kind: components["schemas"]["HrPollKind"];
+            title: string;
+            note: string | null;
+            imageUrl: string | null;
+            showResults: boolean;
+            allowChange: boolean;
+            anonymous: boolean;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string | null;
+            /** Format: date-time */
+            closedAt: string | null;
+            open: boolean;
+            createdByName: string;
+            /** Format: date-time */
+            createdAt: string;
+            userIds: number[];
+            recipients: number;
+            respondents: number;
+            answered: boolean;
+            resultsShown: boolean;
+            questions: components["schemas"]["HrPollQuestion"][];
+        };
+        HrPollAnswerRequest: {
+            questionId: number;
+            optionIds?: number[];
+            text?: string | null;
+            value?: number | null;
+        };
+        HrPollAnswersRequest: {
+            answers: components["schemas"]["HrPollAnswerRequest"][];
+        };
+        HrMoodRequest: {
+            score: number;
+        };
+        HrMyMood: {
+            day: string;
+            score: number;
+        };
+        /** @enum {string} */
+        HrFeedbackCategory: "SUGGESTION" | "COMPLAINT" | "QUESTION" | "OTHER";
+        /** @enum {string} */
+        HrFeedbackStatus: "NEW" | "SEEN" | "DONE";
+        HrFeedback: {
+            id: number;
+            userId: number | null;
+            fullName: string | null;
+            category: components["schemas"]["HrFeedbackCategory"];
+            title: string;
+            body: string;
+            status: components["schemas"]["HrFeedbackStatus"];
+            reply: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        HrFeedbackRequest: {
+            category: components["schemas"]["HrFeedbackCategory"];
+            title: string;
+            body: string;
+            anonymous?: boolean;
+        };
+        HrLocationShare: {
+            id: number;
+            userId: number;
+            fullName: string;
+            photoUrl: string | null;
+            lat: string;
+            lng: string;
+            accuracyM: number | null;
+            note: string | null;
+            day: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        HrLocationShareRequest: {
+            lat: string;
+            lng: string;
+            accuracyM?: number | null;
+            note?: string | null;
+        };
+        HrChild: {
+            name?: string | null;
+            gender?: components["schemas"]["EmployeeGender"] | null;
+            birthDate: string;
+        };
+        HrProfile: {
+            birthDate: string | null;
+            gender: components["schemas"]["EmployeeGender"] | null;
+            education: components["schemas"]["HrEducationLevel"] | null;
+            maritalStatus: components["schemas"]["HrMaritalStatus"] | null;
+            district: string | null;
+            children: components["schemas"]["HrChild"][];
+        };
+        HrProfileRequest: {
+            birthDate?: string | null;
+            gender?: components["schemas"]["EmployeeGender"] | null;
+            education?: components["schemas"]["HrEducationLevel"] | null;
+            maritalStatus?: components["schemas"]["HrMaritalStatus"] | null;
+            district?: string | null;
+            children: components["schemas"]["HrChild"][];
+        };
+        /** @enum {string} */
+        HrCalendarItemKind: "EVENT" | "MEETING" | "HOLIDAY" | "BIRTHDAY" | "ANNIVERSARY";
+        HrCalendarItem: {
+            date: string;
+            kind: components["schemas"]["HrCalendarItemKind"];
+            title: string;
+            note: string | null;
+            eventId: number | null;
+            toDate: string | null;
+            userId: number | null;
+            photoUrl: string | null;
+            years: number | null;
+        };
+        HrThanksEntry: {
+            id: number;
+            fromUserId: number;
+            fromName: string;
+            toUserId: number;
+            toName: string;
+            toPhotoUrl: string | null;
+            note: string;
+            day: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        HrThanksRank: {
+            userId: number;
+            fullName: string;
+            photoUrl: string | null;
+            count: number;
+        };
+        HrThanks: {
+            items: components["schemas"]["HrThanksEntry"][];
+            ranking: components["schemas"]["HrThanksRank"][];
+        };
+        HrThanksRequest: {
+            toUserId: number;
+            note: string;
+        };
+        HrMessage: {
+            id: number;
+            kind: components["schemas"]["HrMessageKind"];
+            title: string;
+            body: string;
+            category: string | null;
+            imageUrl: string | null;
+            popup: boolean;
+            /** Format: date-time */
+            publishAt: string;
+            /** Format: date-time */
+            withdrawnAt: string | null;
+            createdByName: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** @description Everybody when empty */
+            userIds: number[];
+            recipients: number;
+            reads: number;
+        };
+        HrMessageRequest: {
+            kind: components["schemas"]["HrMessageKind"];
+            title: string;
+            body: string;
+            category?: string | null;
+            imageFileId?: number | null;
+            popup?: boolean;
+            /** Format: date-time */
+            publishAt?: string | null;
+            /** @description Everybody when left out or empty */
+            userIds?: number[];
+        };
+        HrPollQuestionRequest: {
+            text: string;
+            kind: components["schemas"]["HrPollQuestionKind"];
+            required?: boolean;
+            options?: string[];
+        };
+        HrPollRequest: {
+            kind: components["schemas"]["HrPollKind"];
+            title: string;
+            note?: string | null;
+            imageFileId?: number | null;
+            showResults?: boolean;
+            allowChange?: boolean;
+            anonymous?: boolean;
+            /** Format: date-time */
+            startsAt?: string | null;
+            /** Format: date-time */
+            endsAt?: string | null;
+            userIds?: number[];
+            questions: components["schemas"]["HrPollQuestionRequest"][];
+        };
+        HrMoodCount: {
+            score: number;
+            count: number;
+        };
+        HrMoods: {
+            scores: components["schemas"]["HrMoodCount"][];
+            total: number;
+        };
+        HrFeedbackDecision: {
+            status: components["schemas"]["HrFeedbackStatus"];
+            reply?: string | null;
+        };
+        /** @enum {string} */
+        HrEventKind: "EVENT" | "MEETING" | "HOLIDAY";
+        HrEventRequest: {
+            kind: components["schemas"]["HrEventKind"];
+            title: string;
+            note?: string | null;
+            fromDate: string;
+            toDate?: string | null;
+        };
+        HrStaffDetailsRequest: {
+            birthDate?: string | null;
+            gender?: components["schemas"]["EmployeeGender"] | null;
+            education?: components["schemas"]["HrEducationLevel"] | null;
+            maritalStatus?: components["schemas"]["HrMaritalStatus"] | null;
+            district?: string | null;
+            children: components["schemas"]["HrChild"][];
+            jobLevel?: components["schemas"]["HrJobLevel"] | null;
+        };
+        HrCount: {
+            key: string;
+            count: number;
+        };
+        HrMatrixRow: {
+            division: string;
+            levels: components["schemas"]["HrCount"][];
+            total: number;
+        };
+        HrGenderCount: {
+            key: string;
+            male: number;
+            female: number;
+            unknown: number;
+        };
+        HrMovementMonth: {
+            month: string;
+            joined: number;
+            left: number;
+        };
+        HrMissingDetails: {
+            birthDate: number;
+            gender: number;
+            education: number;
+            district: number;
+            level: number;
+        };
+        HrWorkforceInsights: {
+            from: string;
+            to: string;
+            total: number;
+            totalBefore: number;
+            joined: number;
+            left: number;
+            joinedBefore: number;
+            leftBefore: number;
+            averageAge: string | null;
+            averageAgeBefore: string | null;
+            averageTenure: string | null;
+            averageTenureBefore: string | null;
+            matrix: components["schemas"]["HrMatrixRow"][];
+            tenure: components["schemas"]["HrCount"][];
+            education: components["schemas"]["HrCount"][];
+            ageGender: components["schemas"]["HrGenderCount"][];
+            genders: components["schemas"]["HrCount"][];
+            districts: components["schemas"]["HrCount"][];
+            marital: components["schemas"]["HrCount"][];
+            children: components["schemas"]["HrGenderCount"][];
+            childrenTotal: number;
+            employmentTypes: components["schemas"]["HrCount"][];
+            movement: components["schemas"]["HrMovementMonth"][];
+            leftReasons: components["schemas"]["HrCount"][];
+            missing: components["schemas"]["HrMissingDetails"];
+        };
+        HrAttendanceDivision: {
+            division: string;
+            plannedMinutes: number;
+            workedMinutes: number;
+            performance: string | null;
+        };
+        HrAttendanceEmployee: {
+            userId: number;
+            fullName: string;
+            photoUrl: string | null;
+            division: string | null;
+            plannedMinutes: number;
+            workedMinutes: number;
+            lateMinutes: number;
+            absentDays: number;
+            performance: string | null;
+        };
+        HrAttendanceTrend: {
+            month: string;
+            plannedMinutes: number;
+            workedMinutes: number;
+            performance: string | null;
+        };
+        HrAttendanceInsights: {
+            from: string;
+            to: string;
+            plannedMinutes: number;
+            workedMinutes: number;
+            performance: string | null;
+            performanceBefore: string | null;
+            averageArrival: string | null;
+            averageDeparture: string | null;
+            averageLateMinutes: number;
+            averageEarlyMinutes: number;
+            absentDays: number;
+            lateDays: number;
+            divisions: components["schemas"]["HrAttendanceDivision"][];
+            employees: components["schemas"]["HrAttendanceEmployee"][];
+            trend: components["schemas"]["HrAttendanceTrend"][];
+        };
+        HrRequestTypeCount: {
+            typeId: number;
+            name: string;
+            color: string;
+            count: number;
+            days: number;
+        };
+        HrRequestEmployeeCount: {
+            userId: number;
+            fullName: string;
+            photoUrl: string | null;
+            count: number;
+        };
+        HrRequestMonth: {
+            month: string;
+            count: number;
+        };
+        HrRequestInsights: {
+            year: number;
+            total: number;
+            minutes: number;
+            types: components["schemas"]["HrRequestTypeCount"][];
+            employees: components["schemas"]["HrRequestEmployeeCount"][];
+            months: components["schemas"]["HrRequestMonth"][];
+            statuses: components["schemas"]["HrCount"][];
         };
         Segment: {
             id: number;
@@ -12026,6 +13729,34 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        SalesOrderFieldChange: {
+            field: string;
+            before: string | null;
+            after: string | null;
+        };
+        SalesOrderLineChange: {
+            /** @enum {string} */
+            kind: "ADDED" | "REMOVED" | "CHANGED";
+            productName: string;
+            unitName: string;
+            warehouseId: number;
+            qtyBefore: string | null;
+            qtyAfter: string | null;
+            totalBefore: string | null;
+            totalAfter: string | null;
+        };
+        SalesOrderChange: {
+            version: number;
+            /** @enum {string} */
+            status: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
+            fields: components["schemas"]["SalesOrderFieldChange"][];
+            lines: components["schemas"]["SalesOrderLineChange"][];
+            totalBefore: string | null;
+            totalAfter: string | null;
+            actorName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
         SalesOrderDetail: {
             id: number;
             /** @example 20261015_0001 */
@@ -12090,6 +13821,7 @@ export interface components {
             picks: components["schemas"]["SalesOrderPickPart"][];
             events: components["schemas"]["SalesOrderEvent"][];
             moves: components["schemas"]["SalesOrderMove"][];
+            changes: components["schemas"]["SalesOrderChange"][];
         };
         SalesOrderProductInfo: {
             productId: number;
@@ -12260,6 +13992,9 @@ export interface components {
             kind: "SALES" | "TRANSFER";
             /** @description The STORE warehouse a TRANSFER stage moves the picked goods into (ADR-0125) */
             transferWarehouseId: number | null;
+            /** @description ADR-0143; null: the default */
+            pickListTemplateId: number | null;
+            deliveryNoteTemplateId: number | null;
             /** Format: date-time */
             archivedAt: string | null;
             /** Format: date-time */
@@ -12344,6 +14079,10 @@ export interface components {
             kind?: "SALES" | "TRANSFER";
             /** @description The STORE warehouse a TRANSFER stage moves the picked goods into (ADR-0125) */
             transferWarehouseId?: number | null;
+            /** @description ADR-0143: its pick list template; null: the default; absent: kept */
+            pickListTemplateId?: number | null;
+            /** @description ADR-0143: as above */
+            deliveryNoteTemplateId?: number | null;
             roles: components["schemas"]["SalesPipelineRoles"];
             /** @description Every stage, in its order */
             stages: components["schemas"]["SalesStageInput"][];
@@ -12351,6 +14090,84 @@ export interface components {
         SalesPipelineCopyRequest: {
             name: string;
             boardId: number;
+        };
+        /** @enum {string} */
+        DocumentTemplateKind: "PICK_LIST" | "DELIVERY_NOTE";
+        SalesDocumentTemplatePipeline: {
+            id: number;
+            name: string;
+        };
+        SalesDocumentTemplate: {
+            id: number;
+            kind: components["schemas"]["DocumentTemplateKind"];
+            name: string;
+            isDefault: boolean;
+            /** @description The published version in force */
+            version: number;
+            /** Format: date-time */
+            publishedAt: string;
+            /** @description Unpublished edits are waiting */
+            hasDraft: boolean;
+            /** @description The pipelines that chose it */
+            pipelines: components["schemas"]["SalesDocumentTemplatePipeline"][];
+        };
+        SalesPublishedDocumentTemplate: {
+            id: number;
+            kind: components["schemas"]["DocumentTemplateKind"];
+            isDefault: boolean;
+            layout: {
+                [key: string]: unknown;
+            };
+        };
+        SalesDocumentPipelineChoice: {
+            id: number;
+            pickListTemplateId: number | null;
+            deliveryNoteTemplateId: number | null;
+        };
+        SalesDocumentPrintLayouts: {
+            templates: components["schemas"]["SalesPublishedDocumentTemplate"][];
+            pipelines: components["schemas"]["SalesDocumentPipelineChoice"][];
+        };
+        SalesDocumentTemplateVersion: {
+            version: number;
+            /** Format: date-time */
+            publishedAt: string;
+            publishedBy: string | null;
+        };
+        SalesDocumentTemplateDetail: {
+            id: number;
+            kind: components["schemas"]["DocumentTemplateKind"];
+            name: string;
+            isDefault: boolean;
+            /** @description The published version in force */
+            version: number;
+            /** Format: date-time */
+            publishedAt: string;
+            /** @description Unpublished edits are waiting */
+            hasDraft: boolean;
+            /** @description The pipelines that chose it */
+            pipelines: components["schemas"]["SalesDocumentTemplatePipeline"][];
+            /** @description The published DocumentLayout (@tugeel/shared/sales): size, blocks */
+            layout: {
+                [key: string]: unknown;
+            };
+            draft: {
+                [key: string]: unknown;
+            } | null;
+            versions: components["schemas"]["SalesDocumentTemplateVersion"][];
+        };
+        SalesDocumentTemplateCreate: {
+            kind: components["schemas"]["DocumentTemplateKind"];
+            name: string;
+            /** @description Copy its published layout */
+            copyFromId?: number | null;
+        };
+        SalesDocumentTemplateDraft: {
+            name: string;
+            /** @description A DocumentLayout */
+            layout: {
+                [key: string]: unknown;
+            };
         };
         SalesStageSortRequest: {
             /** @enum {string} */
@@ -13286,6 +15103,52 @@ export interface components {
             /** @description What a customer payment settles; omitted = oldest due first */
             allocations?: components["schemas"]["PaymentAllocationRequest"][] | null;
         };
+        GlAccountGroup: {
+            id: number;
+            code: string;
+            name: string;
+            parentId: number | null;
+            sort: number;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+        };
+        ChartGroupRow: {
+            code: string;
+            name: string;
+            parentCode: string | null;
+            sort: number;
+        };
+        /** @enum {string} */
+        AccountJournal: "GENERAL" | "CASH" | "BANK" | "MONEY" | "RECEIVABLE_PAYABLE" | "VAT" | "INVENTORY" | "FIXED_ASSET";
+        ChartAccountRow: {
+            code: string;
+            name: string;
+            /** @enum {string} */
+            kind: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
+            /** @enum {string|null} */
+            normalSide: "DEBIT" | "CREDIT" | null;
+            /** @description Null keeps the account’s own */
+            control: string | null;
+            groupCode: string;
+            journal?: components["schemas"]["AccountJournal"];
+            /** @enum {string} */
+            currency?: "MNT" | "USD" | "EUR" | "CNY" | "RUB" | "JPY" | "GBP" | "CHF" | "KRW" | "HKD" | "AUD" | "CAD" | "SGD" | "SEK" | "BGN" | "HUF" | "EGP" | "INR" | "KZT" | "KPW" | "CZK" | "TWD" | "THB" | "IDR" | "MYR" | "AED" | "KWD" | "NZD" | "DKK" | "PLN" | "UAH" | "NOK" | "NPR" | "TRY" | "ZAR";
+            /** @description Re-points this posting key to it */
+            key: string | null;
+        };
+        ChartImportRequest: {
+            groups: components["schemas"]["ChartGroupRow"][];
+            accounts: components["schemas"]["ChartAccountRow"][];
+            /** @description Accounts of the old chart to make inactive */
+            inactiveCodes: string[];
+        };
+        ChartImportResult: {
+            created: number;
+            updated: number;
+            unchanged: number;
+            inactive: number;
+            rulesMoved: string[];
+        };
         GlAccount: {
             id: number;
             /** @example 120101 */
@@ -13297,6 +15160,10 @@ export interface components {
             role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "TRANSFER_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | "RETAINED_EARNINGS" | "VOUCHER_CLEARING" | "VOUCHER_BREAKAGE" | "LOYALTY_LIABILITY" | "LOYALTY_EXPENSE" | null;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
+            groupId: number | null;
+            journal: components["schemas"]["AccountJournal"];
+            /** @example MNT */
+            currency: string;
             /**
              * @description Σ debit of the entries
              * @example 150000.00
@@ -13318,8 +15185,14 @@ export interface components {
             /** @example 120102 */
             code: string;
             name: string;
+            /**
+             * @description Left out: from the code
+             * @enum {string}
+             */
+            kind?: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
+            journal?: components["schemas"]["AccountJournal"];
             /** @enum {string} */
-            kind: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
+            currency?: "MNT" | "USD" | "EUR" | "CNY" | "RUB" | "JPY" | "GBP" | "CHF" | "KRW" | "HKD" | "AUD" | "CAD" | "SGD" | "SEK" | "BGN" | "HUF" | "EGP" | "INR" | "KZT" | "KPW" | "CZK" | "TWD" | "THB" | "IDR" | "MYR" | "AED" | "KWD" | "NZD" | "DKK" | "PLN" | "UAH" | "NOK" | "NPR" | "TRY" | "ZAR";
         };
         GlAccountPatch: {
             code?: string;
@@ -13328,6 +15201,9 @@ export interface components {
             kind?: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
             /** @enum {string} */
             status?: "ACTIVE" | "INACTIVE";
+            journal?: components["schemas"]["AccountJournal"];
+            /** @enum {string} */
+            currency?: "MNT" | "USD" | "EUR" | "CNY" | "RUB" | "JPY" | "GBP" | "CHF" | "KRW" | "HKD" | "AUD" | "CAD" | "SGD" | "SEK" | "BGN" | "HUF" | "EGP" | "INR" | "KZT" | "KPW" | "CZK" | "TWD" | "THB" | "IDR" | "MYR" | "AED" | "KWD" | "NZD" | "DKK" | "PLN" | "UAH" | "NOK" | "NPR" | "TRY" | "ZAR";
         };
         GlAccountRoleRequest: {
             /**
@@ -13502,37 +15378,25 @@ export interface components {
              */
             opening: string;
         };
-        JournalEntry: {
-            id: number;
-            /** @example Ж-20261016-0003 */
-            number: string;
-            /** @example 2026-10-16 */
+        TransactionParty: {
+            customerId?: number | null;
+            supplierId?: number | null;
+        };
+        AccountTransactionRequest: {
+            journal: components["schemas"]["AccountJournal"];
+            /** @example 2026-11-05 */
             entryDate: string;
             description: string;
+            accountId: number;
             /** @enum {string} */
-            source: "AUTO_INVOICE" | "AUTO_PAYMENT" | "AUTO_CREDIT_NOTE" | "AUTO_VOID" | "MANUAL" | "OPENING" | "AUTO_POS_SHIFT";
-            /** @enum {string|null} */
-            sourceType: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "JOURNAL" | "POS_SHIFT" | null;
-            sourceId: number | null;
-            /** @description The document behind it */
-            sourceNumber: string | null;
-            reversesId: number | null;
-            reversesNumber: string | null;
-            reversedById: number | null;
-            reversedByNumber: string | null;
-            /**
-             * @description Σ debit
-             * @example 150000.00
-             */
+            side: "DEBIT" | "CREDIT";
+            counterAccountId: number;
+            /** @example 150000 */
             amount: string;
-            lineCount: number;
-            postedByName: string | null;
-            /** Format: date-time */
-            createdAt: string;
-        };
-        JournalPage: {
-            data: components["schemas"]["JournalEntry"][];
-            nextCursor: string | null;
+            party?: components["schemas"]["TransactionParty"] | null;
+            counterParty?: components["schemas"]["TransactionParty"] | null;
+            withVat?: boolean;
+            withCityTax?: boolean;
         };
         JournalLine: {
             id: number;
@@ -13581,6 +15445,38 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             lines: components["schemas"]["JournalLine"][];
+        };
+        JournalEntry: {
+            id: number;
+            /** @example Ж-20261016-0003 */
+            number: string;
+            /** @example 2026-10-16 */
+            entryDate: string;
+            description: string;
+            /** @enum {string} */
+            source: "AUTO_INVOICE" | "AUTO_PAYMENT" | "AUTO_CREDIT_NOTE" | "AUTO_VOID" | "MANUAL" | "OPENING" | "AUTO_POS_SHIFT";
+            /** @enum {string|null} */
+            sourceType: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "JOURNAL" | "POS_SHIFT" | null;
+            sourceId: number | null;
+            /** @description The document behind it */
+            sourceNumber: string | null;
+            reversesId: number | null;
+            reversesNumber: string | null;
+            reversedById: number | null;
+            reversedByNumber: string | null;
+            /**
+             * @description Σ debit
+             * @example 150000.00
+             */
+            amount: string;
+            lineCount: number;
+            postedByName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        JournalPage: {
+            data: components["schemas"]["JournalEntry"][];
+            nextCursor: string | null;
         };
         JournalLineRequest: {
             accountId: number;
@@ -14267,6 +16163,9 @@ export interface components {
             /** @description ADR-0111: information only */
             printerName: string | null;
             drawerKick: boolean;
+            /** @description ADR-0141: null prints with the default */
+            saleTemplateId: number | null;
+            returnTemplateId: number | null;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
             /** Format: date-time */
@@ -14304,6 +16203,9 @@ export interface components {
             printerPort?: number;
             printerName?: string | null;
             drawerKick?: boolean;
+            /** @description ADR-0141; null: the default */
+            saleTemplateId?: number | null;
+            returnTemplateId?: number | null;
             /** @enum {string} */
             status?: "ACTIVE" | "INACTIVE";
         };
@@ -15122,6 +17024,69 @@ export interface components {
         PosPaymentTypesRequest: {
             /** @description The whole list, in order */
             types: components["schemas"]["PosPaymentTypeInput"][];
+        };
+        /** @enum {string} */
+        ReceiptTemplateKind: "SALE" | "RETURN";
+        PosReceiptTemplateTill: {
+            id: number;
+            code: string;
+            name: string;
+        };
+        PosReceiptTemplate: {
+            id: number;
+            kind: components["schemas"]["ReceiptTemplateKind"];
+            name: string;
+            isDefault: boolean;
+            /** @description The published version in force */
+            version: number;
+            /** Format: date-time */
+            publishedAt: string;
+            /** @description Unpublished edits are waiting */
+            hasDraft: boolean;
+            /** @description The POS that chose it */
+            tills: components["schemas"]["PosReceiptTemplateTill"][];
+        };
+        PosReceiptTemplateVersion: {
+            version: number;
+            /** Format: date-time */
+            publishedAt: string;
+            publishedBy: string | null;
+        };
+        PosReceiptTemplateDetail: {
+            id: number;
+            kind: components["schemas"]["ReceiptTemplateKind"];
+            name: string;
+            isDefault: boolean;
+            /** @description The published version in force */
+            version: number;
+            /** Format: date-time */
+            publishedAt: string;
+            /** @description Unpublished edits are waiting */
+            hasDraft: boolean;
+            /** @description The POS that chose it */
+            tills: components["schemas"]["PosReceiptTemplateTill"][];
+            /** @description The published ReceiptLayout (@tugeel/shared/pos): paper, size, blocks */
+            layout: {
+                [key: string]: unknown;
+            };
+            /** @description The unpublished ReceiptLayout; null: none */
+            draft: {
+                [key: string]: unknown;
+            } | null;
+            versions: components["schemas"]["PosReceiptTemplateVersion"][];
+        };
+        PosReceiptTemplateCreate: {
+            kind: components["schemas"]["ReceiptTemplateKind"];
+            name: string;
+            /** @description Copy its published layout */
+            copyFromId?: number | null;
+        };
+        PosReceiptTemplateDraft: {
+            name: string;
+            /** @description A ReceiptLayout; checked by checkReceiptLayout */
+            layout: {
+                [key: string]: unknown;
+            };
         };
         PosAttention: {
             openShifts: number;
@@ -17512,7 +19477,7 @@ export interface components {
             isActive?: boolean;
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "PRODUCT_NOT_IN_APP" | "ORDER_BELOW_MINIMUM" | "ATTENDANCE_NO_SITE" | "ATTENDANCE_OUT_OF_RANGE" | "ATTENDANCE_LOCATION_IMPRECISE" | "ATTENDANCE_ALREADY_IN" | "ATTENDANCE_NOT_IN" | "ATTENDANCE_EVENT_ORDER" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "ISSUE_LINES_UNCHECKED" | "ISSUE_WAREHOUSE_CONFIRMED" | "ISSUE_PARTLY_POSTED" | "ISSUE_RECIPIENT_KIND" | "ISSUE_CORRECTION_OPEN" | "ISSUE_NOT_SENT" | "PO_NOT_ARCHIVABLE" | "PO_NOT_EDITABLE" | "PO_LOAD_OVER" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "TRANSFER_LINES_UNCOUNTED" | "TRANSFER_REQUEST_EMPTY" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "STAGE_SKIP" | "ORDER_CHANGED" | "PICK_INCOMPLETE" | "PICK_TAKEN" | "PICK_STATE_INVALID" | "PICKER_INVALID" | "PIPELINE_KIND_STAGE" | "PIPELINE_KIND_CHANNEL" | "PIPELINE_NO_TRANSFER_WAREHOUSE" | "PIPELINE_TRANSFER_STAGE_NEEDS_STORE" | "PIPELINE_TRANSFER_WAREHOUSE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_CASHIER_NOT_ON_TILL" | "POS_SUPERVISOR_NOT_ON_TILL" | "POS_PRODUCT_NOT_ON_TILL" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "EDGE_LINK_INVALID" | "EDGE_LINK_PEPPER_MISSING" | "EDGE_ALREADY_LINKED" | "EDGE_LINK_UNREACHABLE" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "PRODUCT_NOT_IN_APP" | "ORDER_BELOW_MINIMUM" | "ATTENDANCE_NO_SITE" | "ATTENDANCE_OUT_OF_RANGE" | "ATTENDANCE_LOCATION_IMPRECISE" | "ATTENDANCE_ALREADY_IN" | "ATTENDANCE_NOT_IN" | "ATTENDANCE_EVENT_ORDER" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "ISSUE_LINES_UNCHECKED" | "ISSUE_WAREHOUSE_CONFIRMED" | "ISSUE_PARTLY_POSTED" | "ISSUE_RECIPIENT_KIND" | "ISSUE_CORRECTION_OPEN" | "ISSUE_NOT_SENT" | "PO_NOT_ARCHIVABLE" | "PO_NOT_EDITABLE" | "PO_LOAD_OVER" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "TRANSFER_LINES_UNCOUNTED" | "TRANSFER_REQUEST_EMPTY" | "HR_POLL_CLOSED" | "HR_POLL_ANSWERED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "STAGE_SKIP" | "ORDER_CHANGED" | "PICK_INCOMPLETE" | "PICK_TAKEN" | "PICK_STATE_INVALID" | "PICKER_INVALID" | "PIPELINE_KIND_STAGE" | "PIPELINE_KIND_CHANNEL" | "PIPELINE_NO_TRANSFER_WAREHOUSE" | "PIPELINE_TRANSFER_STAGE_NEEDS_STORE" | "PIPELINE_TRANSFER_WAREHOUSE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_CASHIER_NOT_ON_TILL" | "POS_SUPERVISOR_NOT_ON_TILL" | "POS_PRODUCT_NOT_ON_TILL" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "EDGE_LINK_INVALID" | "EDGE_LINK_PEPPER_MISSING" | "EDGE_ALREADY_LINKED" | "EDGE_LINK_UNREACHABLE" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -18832,12 +20797,41 @@ export interface operations {
             };
         };
     };
+    Audit_actions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditActionCount"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Audit_list: {
         parameters: {
             query?: {
                 /** @description nextCursor of the previous page */
                 cursor?: string;
                 limit?: number;
+                action?: string;
                 entity?: string;
                 entityId?: string;
                 actorId?: number;
@@ -22403,6 +24397,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReceiptDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Receipts_counterAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptCounterAccount"][];
                 };
             };
             /** @description RFC 9457 problem details */
@@ -26605,6 +28627,1841 @@ export interface operations {
             };
         };
     };
+    Workforce_divisions: {
+        parameters: {
+            query?: {
+                includeArchived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrDivision"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_createDivision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrDivisionRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrDivision"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_updateDivision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrDivisionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrDivision"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_archiveDivision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrArchiveRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrDivision"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_staff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrStaff"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_createStaff: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrStaffRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrStaff"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_staffXlsx: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_updateStaff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrStaffRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrStaff"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_setLeft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrStaffLeftRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrStaff"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_resetPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrStaffPasswordRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrStaff"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_setPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrStaffPhotoRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrStaff"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_schedules: {
+        parameters: {
+            query?: {
+                includeArchived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrWorkSchedule"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_createSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrWorkScheduleRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrWorkSchedule"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_updateSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrWorkScheduleRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrWorkSchedule"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_archiveSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_requestTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrRequestType"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_createRequestType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrRequestTypeRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrRequestType"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_updateRequestType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrRequestTypeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrRequestType"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_requestList: {
+        parameters: {
+            query?: {
+                status?: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
+                userId?: number;
+                typeId?: number;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrTimeRequest"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_createRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrTimeRequestCreate"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrTimeRequest"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_myRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrTimeRequest"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_pendingCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrPendingCount"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_decide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrTimeRequestDecision"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrTimeRequest"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrTimeRequest"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_reportDays: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                userId?: number;
+                divisionId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrReport"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Workforce_reportDaysXlsx: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                userId?: number;
+                divisionId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_feed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrFeed"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_myMessages: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["HrMessageKind"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrMyMessage"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_readMessages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrReadMessagesRequest"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_myPolls: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrPoll"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_answerPoll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrPollAnswersRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrPoll"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_setMood: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrMoodRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrMyMood"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_myFeedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrFeedback"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_sendFeedback: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrFeedbackRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrFeedback"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_myLocations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrLocationShare"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_shareLocation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrLocationShareRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrLocationShare"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_myProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrProfile"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_saveProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrProfileRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrProfile"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_calendar: {
+        parameters: {
+            query: {
+                /** @description YYYY-MM */
+                month: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrCalendarItem"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_thanks: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrThanks"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_sendThanks: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrThanksRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrThanksEntry"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_messages: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["HrMessageKind"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrMessage"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_createMessage: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrMessageRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrMessage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_withdrawMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrMessage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_polls: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["HrPollKind"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrPoll"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_createPoll: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrPollRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrPoll"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_closePoll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrPoll"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_moods: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrMoods"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_feedback: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                status?: components["schemas"]["HrFeedbackStatus"];
+                category?: components["schemas"]["HrFeedbackCategory"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrFeedback"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_decideFeedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrFeedbackDecision"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrFeedback"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_locations: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                userId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrLocationShare"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_createEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrEventRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrCalendarItem"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_updateEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrEventRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrCalendarItem"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_archiveEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_saveDetails: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrStaffDetailsRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrStaff"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_workforceInsights: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrWorkforceInsights"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_attendanceInsights: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrAttendanceInsights"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_requestInsights: {
+        parameters: {
+            query: {
+                year: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrRequestInsights"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Segments_list: {
         parameters: {
             query?: {
@@ -28047,6 +31904,310 @@ export interface operations {
             };
         };
     };
+    SalesDocumentTemplates_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesDocumentTemplate"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesDocumentTemplates_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesDocumentTemplateCreate"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesDocumentTemplateDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesDocumentTemplates_printLayouts: {
+        parameters: {
+            query?: {
+                /** @description Pipeline ids, comma-separated (up to 100) */
+                pipelineIds?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesDocumentPrintLayouts"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesDocumentTemplates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesDocumentTemplateDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesDocumentTemplates_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesDocumentTemplates_saveDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesDocumentTemplateDraft"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesDocumentTemplateDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesDocumentTemplates_publish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesDocumentTemplateDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesDocumentTemplates_discard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesDocumentTemplateDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesDocumentTemplates_makeDefault: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesDocumentTemplateDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesDocumentTemplates_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesDocumentTemplateDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     SalesStages_archive: {
         parameters: {
             query?: never;
@@ -29162,6 +33323,66 @@ export interface operations {
             };
         };
     };
+    GlAccounts_groups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GlAccountGroup"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GlAccounts_importChart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChartImportRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChartImportResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GlAccounts_list: {
         parameters: {
             query?: never;
@@ -29553,6 +33774,41 @@ export interface operations {
             };
         };
     };
+    Journal_postByAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountTransactionRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntryDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Journal_list: {
         parameters: {
             query?: {
@@ -29564,6 +33820,7 @@ export interface operations {
                 source?: "AUTO_INVOICE" | "AUTO_PAYMENT" | "AUTO_CREDIT_NOTE" | "AUTO_VOID" | "MANUAL" | "OPENING" | "AUTO_POS_SHIFT";
                 accountId?: number;
                 customerId?: number;
+                journal?: components["schemas"]["AccountJournal"];
             };
             header?: never;
             path?: never;
@@ -32399,6 +36656,279 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PosPaymentType"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosReceiptTemplates_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosReceiptTemplate"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosReceiptTemplates_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosReceiptTemplateCreate"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosReceiptTemplateDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosReceiptTemplates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosReceiptTemplateDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosReceiptTemplates_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosReceiptTemplates_saveDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosReceiptTemplateDraft"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosReceiptTemplateDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosReceiptTemplates_publish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosReceiptTemplateDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosReceiptTemplates_discard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosReceiptTemplateDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosReceiptTemplates_makeDefault: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosReceiptTemplateDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosReceiptTemplates_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosReceiptTemplateDetail"];
                 };
             };
             /** @description RFC 9457 problem details */

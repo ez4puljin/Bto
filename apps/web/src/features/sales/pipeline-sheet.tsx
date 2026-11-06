@@ -42,6 +42,9 @@ import {
 } from './pipelines-api';
 import { useRoleOptions } from './role-options';
 import { StageDialog } from './stage-dialog';
+import { DOCUMENT_TEMPLATE_KINDS } from '@tugeel/shared/sales';
+import { useHasPermission } from '@/app/auth-context';
+import { useDocumentTemplates } from './document-templates-api';
 
 const VISIBILITIES = ['PUBLIC', 'PRIVATE'] as const satisfies readonly PipelineVisibility[];
 
@@ -82,6 +85,15 @@ export function PipelineSheet({
   const [transferWarehouseId, setTransferWarehouseId] = useState<number | null>(
     pipeline?.transferWarehouseId ?? null,
   );
+  // ADR-0143: the documents' templates, for whoever manages the boards (a MANAGE role keeps them).
+  const canTemplates = useHasPermission('sales.boards.manage');
+  const documentTemplates = useDocumentTemplates({ enabled: canTemplates });
+  const [pickListTemplateId, setPickListTemplateId] = useState<number | null>(
+    pipeline?.pickListTemplateId ?? null,
+  );
+  const [deliveryNoteTemplateId, setDeliveryNoteTemplateId] = useState<number | null>(
+    pipeline?.deliveryNoteTemplateId ?? null,
+  );
   const warehouses = useWarehouses();
   const stores = (warehouses.data ?? []).filter(
     (entry) =>
@@ -112,6 +124,8 @@ export function PipelineSheet({
     ownOrdersOnly,
     kind,
     transferWarehouseId,
+    pickListTemplateId,
+    deliveryNoteTemplateId,
     roles,
     stages: stages.map(({ key: _key, ...stage }) => stage),
   });
@@ -141,6 +155,7 @@ export function PipelineSheet({
         ownOrdersOnly,
         kind,
         transferWarehouseId: kind === 'TRANSFER' ? transferWarehouseId : null,
+        ...(canTemplates ? { pickListTemplateId, deliveryNoteTemplateId } : {}),
         roles: {
           VIEW: visibility === 'PRIVATE' ? roles.VIEW : [],
           MANAGE: roles.MANAGE,
@@ -253,6 +268,46 @@ export function PipelineSheet({
                     ))}
                   </NativeSelect>
                 </FormField>
+              ) : null}
+              {canTemplates ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {DOCUMENT_TEMPLATE_KINDS.map((docKind) => {
+                    const value =
+                      docKind === 'PICK_LIST' ? pickListTemplateId : deliveryNoteTemplateId;
+                    const set =
+                      docKind === 'PICK_LIST' ? setPickListTemplateId : setDeliveryNoteTemplateId;
+                    const options = (documentTemplates.data ?? []).filter(
+                      (entry) => entry.kind === docKind,
+                    );
+                    const fallback = options.find((entry) => entry.isDefault);
+                    return (
+                      <FormField
+                        key={docKind}
+                        label={t(`sales.documentTemplates.pipelineField.${docKind}`)}
+                        htmlFor={`pipeline-template-${docKind}`}
+                      >
+                        <NativeSelect
+                          id={`pipeline-template-${docKind}`}
+                          value={value ?? ''}
+                          onChange={(event) => set(Number.parseInt(event.target.value, 10) || null)}
+                        >
+                          <option value="">
+                            {t('sales.documentTemplates.pipelineField.default', {
+                              name: fallback?.name ?? '',
+                            })}
+                          </option>
+                          {options
+                            .filter((entry) => !entry.isDefault || entry.id === value)
+                            .map((entry) => (
+                              <option key={entry.id} value={entry.id}>
+                                {entry.name}
+                              </option>
+                            ))}
+                        </NativeSelect>
+                      </FormField>
+                    );
+                  })}
+                </div>
               ) : null}
               <RolesField
                 right="MANAGE"

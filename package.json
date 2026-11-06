@@ -51,6 +51,7 @@
     "partners:reindex-search": "pnpm run build:packages && pnpm --filter @tugeel/api run partners:reindex-search",
     "inventory:reconcile": "pnpm run build:packages && pnpm --filter @tugeel/api run inventory:reconcile",
     "inventory:rebuild-balances": "pnpm run build:packages && pnpm --filter @tugeel/api run inventory:rebuild-balances",
+    "hr:import-timely": "pnpm --filter @tugeel/api run hr:import-timely",
     "finance:reconcile": "pnpm run build:packages && pnpm --filter @tugeel/api run finance:reconcile",
     "finance:repost-journal": "pnpm run build:packages && pnpm --filter @tugeel/api run finance:repost-journal"
   },

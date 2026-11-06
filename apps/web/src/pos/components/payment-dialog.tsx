@@ -86,7 +86,7 @@ interface PayRow {
  * one in that place). It opens with the first type (cash) for the whole amount (owner 2026-11-04:
  * «илүү ухаалаг хялбар»); a tap on another type while one row pays it all swaps that row, otherwise
  * it adds a row with what is left — cash may exceed it (the change), the rest may not; a CREDIT row
- * needs its customer (ADR-0109). A card row asks no terminal: the bank's terminal is set up on the PC. When the
+ * needs its customer (ADR-0109). A card row asks nothing more: the bank's terminal is set up on the PC. When the
  * rows make the total, «Баримт хэвлэх» asks «Хувь хүн НӨАТ» or «Байгууллага НӨАТ» — a sale with
  * credit prints its slip without VAT at once.
  */

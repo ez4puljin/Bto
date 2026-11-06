@@ -21,6 +21,8 @@ Finance Core is one finance engine for every business system the owner builds. B
 
 Path abbreviations: `F/` = `apps/api/src/modules/finance/`, `P/` = `apps/api/src/modules/pos/`, `S` = `packages/shared/src/finance/index.ts`, `M26` / `M27` = `apps/api/src/db/migrations/0026_finance.sql` / `0027_pos.sql`, `FC/` = the planned `apps/api/src/finance-core/`.
 
+> ADR-0148 (2026-11-05): the chart is Erkhet's, with its group tree in `fin.account_groups` (`parent_id`, `sort`), loaded through `POST /gl-accounts/chart`.
+
 ## 1. Owner's answers behind the design (2026-10-18)
 
 | # | Topic | Answer | Consequence |

@@ -3,59 +3,67 @@ import type { Permission } from '@tugeel/shared/auth';
 import {
   Activity,
   ArrowLeftRight,
+  BadgePercent,
+  BellRing,
   BookOpenText,
   BookUser,
-  CalendarCheck,
-  CalendarClock,
-  Coins,
-  FileStack,
-  FileText,
-  Landmark,
-  ListTree,
-  Wallet,
-  WalletCards,
-  BadgePercent,
   Boxes,
   Briefcase,
   Building2,
   Calculator,
+  CalendarCheck,
+  CalendarClock,
+  CalendarDays,
+  CalendarRange,
   ChartBar,
+  ChartPie,
   ClipboardCheck,
   ClipboardList,
-  Contact,
+  ClipboardPen,
+  Coins,
   Factory,
-  Gauge,
   FileChartColumn,
   FileSpreadsheet,
+  FileStack,
+  FileText,
   FolderTree,
+  Gauge,
   HandCoins,
-  IdCard,
   History,
-  House,
   Hourglass,
+  House,
+  IdCard,
   KeyRound,
+  Landmark,
+  LayoutDashboard,
   LayoutGrid,
-  type LucideIcon,
+  ListChecks,
+  ListTree,
+  LocateFixed,
+  Map,
   MapPinned,
   Megaphone,
+  MessageSquareText,
   Monitor,
-  Network,
-  Palette,
-  Phone,
   Move,
+  Network,
+  Newspaper,
   Package,
   PackageCheck,
   PackageMinus,
   PackageOpen,
   PackagePlus,
   PackageSearch,
+  Palette,
+  Percent,
+  Phone,
   ReceiptText,
   Ruler,
+  Scale,
   ScanBarcode,
   ScrollText,
   Settings,
   Shapes,
-  SquareKanban,
   ShieldCheck,
   ShoppingBag,
   ShoppingBasket,
@@ -63,20 +71,23 @@ import {
   SlidersHorizontal,
   Smartphone,
   Sparkles,
+  SquareKanban,
   Store,
   TabletSmartphone,
   Tag,
   Tags,
+  TicketPercent,
   Timer,
   TrendingUp,
   Truck,
-  TicketPercent,
+  type LucideIcon,
   Undo2,
   UserCheck,
   Users,
+  Vote,
+  Wallet,
+  WalletCards,
   Warehouse,
-  Percent,
-  Scale,
 } from 'lucide-react';
 
 type NavKey = `nav.${Exclude<keyof (typeof mn)['nav'], 'groups' | 'modules' | 'menu' | 'account'>}`;
@@ -107,8 +118,8 @@ export interface NavGroup {
  * the supermarket, the apps, the assistant, the system. An entry with a permission
  * is shown only to users who hold it (ADR-0027); a group without visible entries is hidden. Catalog
  * pages and suppliers are readable by every user; customers only by the office, accountants and
- * admins. The staff registry («Ажилтан», the users) sits among the partners (owner 2026-10-29): a
- * new rep, store seller or keeper is registered from «Харилцагч», and the roles stay under «Систем».
+ * admins. The one staff list («Ажилтны бүртгэл», ADR-0145) sits under «Хүний нөөц»: a new rep,
+ * store seller or keeper is registered there, and the roles stay under «Систем».
  * Branches and warehouses are readable by every user too (other pages list them), but only
  * people who manage them need the menu entry. Stock, its history, the low-stock list and receipts
  * are read by every user (without costs); transfers, goods issues, moves, adjustments, stocktakes
@@ -128,6 +139,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: SquareKanban,
         permission: 'sales.orders.read',
         also: ['/sales/orders'],
+      },
+      {
+        to: '/sales/document-templates',
+        label: 'nav.salesDocumentTemplates',
+        icon: FileText,
+        permission: 'sales.boards.manage',
       },
     ],
   },
@@ -244,17 +261,111 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'partners.customers.read',
       },
       { to: '/partners/suppliers', label: 'nav.suppliers', icon: Factory },
-      { to: '/users', label: 'nav.staff', icon: Contact, permission: 'identity.users.read' },
     ],
   },
   {
-    // Attendance (ADR-0131): the day's board and the log for HR and the owner, the setup for HR.
+    // HR's first page and dashboard, the calendar (ADR-0146).
+    label: 'nav.groups.hrMain',
+    items: [
+      {
+        to: '/hr/home',
+        label: 'nav.hrHome',
+        icon: LayoutDashboard,
+        permission: 'hr.attendance.view',
+      },
+      {
+        to: '/hr/insights',
+        label: 'nav.hrInsights',
+        icon: ChartPie,
+        permission: 'hr.attendance.view',
+      },
+      {
+        to: '/hr/calendar',
+        label: 'nav.hrCalendar',
+        icon: CalendarDays,
+        permission: 'hr.attendance.view',
+      },
+    ],
+  },
+  {
+    // What reaches the staff app and what comes back from it (ADR-0146).
+    label: 'nav.groups.hrCommunity',
+    items: [
+      {
+        to: '/hr/notices',
+        label: 'nav.hrNotices',
+        icon: BellRing,
+        permission: 'hr.attendance.view',
+      },
+      { to: '/hr/news', label: 'nav.hrNews', icon: Newspaper, permission: 'hr.attendance.view' },
+      { to: '/hr/polls', label: 'nav.hrPolls', icon: Vote, permission: 'hr.attendance.view' },
+      {
+        to: '/hr/surveys',
+        label: 'nav.hrSurveys',
+        icon: ListChecks,
+        permission: 'hr.attendance.view',
+      },
+      {
+        to: '/hr/feedback',
+        label: 'nav.hrFeedback',
+        icon: MessageSquareText,
+        permission: 'hr.attendance.view',
+      },
+      {
+        to: '/hr/shares',
+        label: 'nav.hrShares',
+        icon: LocateFixed,
+        permission: 'hr.attendance.view',
+      },
+    ],
+  },
+  {
+    // HR (ADR-0144): the employees' cards like timely.mn, their divisions, the schedules and the
+    // time requests.
+    label: 'nav.groups.hrPeople',
+    items: [
+      {
+        to: '/hr/staff',
+        label: 'nav.hrStaff',
+        icon: IdCard,
+        permission: 'hr.attendance.view',
+      },
+      {
+        to: '/hr/divisions',
+        label: 'nav.hrDivisions',
+        icon: Building2,
+        permission: 'hr.attendance.view',
+      },
+      {
+        to: '/hr/schedules',
+        label: 'nav.hrSchedules',
+        icon: CalendarClock,
+        permission: 'hr.attendance.view',
+      },
+      {
+        to: '/hr/requests',
+        label: 'nav.hrRequests',
+        icon: ClipboardPen,
+        permission: 'hr.attendance.view',
+      },
+      { to: '/hr/sites', label: 'nav.hrSites', icon: Map, permission: 'hr.attendance.view' },
+    ],
+  },
+  {
+    // Attendance (ADR-0131): the day's board and the log for HR and the owner, the setup for HR;
+    // the time report (ADR-0144).
     label: 'nav.groups.hr',
     items: [
       {
         to: '/hr/attendance',
         label: 'nav.hrDashboard',
         icon: UserCheck,
+        permission: 'hr.attendance.view',
+      },
+      {
+        to: '/hr/report',
+        label: 'nav.hrReport',
+        icon: CalendarRange,
         permission: 'hr.attendance.view',
       },
       {
@@ -292,6 +403,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         to: '/finance/suppliers',
         label: 'nav.supplierBalances',
         icon: Truck,
+        permission: 'finance.read',
+      },
+      {
+        to: '/finance/transactions',
+        label: 'nav.transactions',
+        icon: ArrowLeftRight,
         permission: 'finance.read',
       },
       {
@@ -437,6 +554,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'pos.read',
       },
       {
+        to: '/pos/receipt-templates',
+        label: 'nav.posReceiptTemplates',
+        icon: ReceiptText,
+        permission: 'pos.read',
+      },
+      {
         to: '/pos/settings',
         label: 'nav.posSettings',
         icon: Settings,
@@ -574,6 +697,7 @@ export type ModuleKey =
   | 'inventory'
   | 'catalog'
   | 'partners'
+  | 'hr'
   | 'finance'
   | 'reports'
   | 'pos'
@@ -616,7 +740,13 @@ export const NAV_MODULES: readonly NavModule[] = [
     key: 'partners',
     label: 'nav.modules.partners',
     icon: Users,
-    groups: ['nav.groups.partners', 'nav.groups.hr'],
+    groups: ['nav.groups.partners'],
+  },
+  {
+    key: 'hr',
+    label: 'nav.modules.hr',
+    icon: IdCard,
+    groups: ['nav.groups.hrMain', 'nav.groups.hrCommunity', 'nav.groups.hrPeople', 'nav.groups.hr'],
   },
   {
     key: 'finance',

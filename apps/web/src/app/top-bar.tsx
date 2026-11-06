@@ -83,19 +83,21 @@ export function TopBar(props: {
           ))}
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-0.5">
-          {/* A pill with its shortcut from `2xl` (the modules need the room at 1366 since the root scale), an icon button below. */}
+          {/* A pill with its shortcut from 2200 px (nine modules need the room at 1366 and 1536 since ADR-0144; the modules show their icons and arrows from there too), an icon button below. */}
           <button
             type="button"
-            className="grid size-9 place-items-center rounded-full text-foreground transition-colors duration-200 hover:bg-black/[0.05] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none 2xl:mr-1 2xl:flex 2xl:h-8.5 2xl:w-44 2xl:items-center 2xl:gap-2 2xl:bg-black/[0.05] 2xl:px-3 2xl:text-[0.8125rem] 2xl:text-muted-foreground 2xl:hover:bg-black/[0.08]"
+            className="grid size-9 place-items-center rounded-full text-foreground transition-colors duration-200 hover:bg-black/[0.05] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none min-[2200px]:mr-1 min-[2200px]:flex min-[2200px]:h-8.5 min-[2200px]:w-44 min-[2200px]:items-center min-[2200px]:gap-2 min-[2200px]:bg-black/[0.05] min-[2200px]:px-3 min-[2200px]:text-[0.8125rem] min-[2200px]:text-muted-foreground min-[2200px]:hover:bg-black/[0.08]"
             aria-keyshortcuts="Control+K Meta+K"
             title={t('shell.search')}
             onClick={props.onSearch}
           >
             <Search aria-hidden className="size-4" />
-            <span className="sr-only flex-1 text-left 2xl:not-sr-only">{t('shell.search')}</span>
+            <span className="sr-only flex-1 text-left min-[2200px]:not-sr-only">
+              {t('shell.search')}
+            </span>
             <kbd
               aria-hidden
-              className="hidden rounded border border-black/10 bg-background px-1 font-sans text-xs text-muted-foreground 2xl:inline"
+              className="hidden rounded border border-black/10 bg-background px-1 font-sans text-xs text-muted-foreground min-[2200px]:inline"
             >
               {t(isMac ? 'shell.shortcutMac' : 'shell.shortcut')}
             </kbd>
@@ -155,13 +157,16 @@ function ModuleMenu({
           <button
             type="button"
             className={cn(
-              'flex h-8.5 items-center gap-1 rounded-full px-2.5 text-sm 2xl:gap-1.5 2xl:px-3 font-medium whitespace-nowrap text-foreground/80 transition-colors duration-200 hover:bg-black/[0.04] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none aria-expanded:bg-black/[0.05] aria-expanded:text-foreground',
+              'flex h-8.5 items-center gap-1 rounded-full px-2.5 text-sm min-[2200px]:gap-1.5 min-[2200px]:px-3 font-medium whitespace-nowrap text-foreground/80 transition-colors duration-200 hover:bg-black/[0.04] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none aria-expanded:bg-black/[0.05] aria-expanded:text-foreground',
               active && 'bg-secondary text-secondary-foreground hover:bg-secondary',
             )}
           >
-            <module.icon aria-hidden className="size-4 shrink-0" />
+            <module.icon aria-hidden className="hidden size-4 shrink-0 min-[2200px]:block" />
             {label}
-            <ChevronDown aria-hidden className="hidden size-3.5 shrink-0 opacity-60 2xl:block" />
+            <ChevronDown
+              aria-hidden
+              className="hidden size-3.5 shrink-0 opacity-60 min-[2200px]:block"
+            />
           </button>
         )}
       </DropdownMenuTrigger>

@@ -51,6 +51,9 @@ export interface PipelineView {
   kind: PipelineKind;
   /** The STORE warehouse a TRANSFER stage fills (ADR-0125); null = none. */
   transferWarehouseId: number | null;
+  /** ADR-0143: the document templates its orders print with; null: the default of the kind. */
+  pickListTemplateId: number | null;
+  deliveryNoteTemplateId: number | null;
   archivedAt: Date | null;
   createdBy: number | null;
   createdAt: Date;
@@ -270,6 +273,8 @@ export class SalesAccessService {
         ownOrdersOnly: row.ownOrdersOnly,
         kind: row.kind,
         transferWarehouseId: row.transferWarehouseId,
+        pickListTemplateId: row.pickListTemplateId,
+        deliveryNoteTemplateId: row.deliveryNoteTemplateId,
         archivedAt: row.archivedAt,
         createdBy: row.createdBy,
         createdAt: row.createdAt,

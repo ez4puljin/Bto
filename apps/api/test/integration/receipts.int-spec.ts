@@ -142,7 +142,9 @@ describe('goods receipts', () => {
       lines: [{ productUnitId: unitOf(cola, 'BOX').id, enteredQty: '2' }],
     }).expect(201);
     const draft = created.body as ReceiptJson;
-    expect(draft).toMatchObject({ status: 'DRAFT', number: null });
+    // Numbered at its first save (ADR-0153); the posting keeps that number.
+    expect(draft.status).toBe('DRAFT');
+    expect(draft.number).toMatch(/^GR-\d{4}-\d{6}$/);
     expect(draft.lines).toEqual([
       expect.objectContaining({
         unitName: 'хайрцаг',
@@ -184,7 +186,7 @@ describe('goods receipts', () => {
     expect(posted).toMatchObject({
       status: 'POSTED',
       costingStatus: 'PENDING',
-      number: `GR-${businessYear()}-000001`,
+      number: draft.number,
     });
     expect(await stock(cola.id)).toMatchObject({ on_hand: '72.000' });
     expect(await stock(rice.id)).toMatchObject({ on_hand: '6.000' });
@@ -507,10 +509,11 @@ describe('goods receipts', () => {
     const half = (await post(scoped, draft.id)).body as ReceiptJson & {
       confirmations: { warehouseId: number }[];
     };
-    expect(half).toMatchObject({ status: 'DRAFT', number: null });
+    expect(half).toMatchObject({ status: 'DRAFT', number: draft.number });
     expect(half.confirmations.map((row) => row.warehouseId)).toEqual([wh2.id]);
     const posted = (await post(worker, draft.id)).body as ReceiptJson;
     expect(posted.status).toBe('POSTED');
+    expect(posted.number).toBe(draft.number);
     // The salt had no fixed shelf: it is on WH2's sellable «Тавиургүй» shelf.
     expect(posted.lines.map((line) => [line.warehouseId, line.binCode])).toEqual([
       [wh1.id, 'A-01-01'],
@@ -559,5 +562,55 @@ describe('goods receipts', () => {
     expect(await listed(wh2.id)).toContain(draft.id);
     const empty = await inventory.warehouse('WH3');
     expect(await listed(empty.id)).toEqual([]);
+  });
+
+  it('gives a draft older than ADR-0153 its number at the posting', async () => {
+    const created = await create(worker, {
+      supplierId,
+      lines: [{ productUnitId: unitOf(rice, 'PCS').id, enteredQty: '1' }],
+    }).expect(201);
+    const draft = created.body as ReceiptJson;
+    await sql.query(`UPDATE goods_receipts SET number = NULL WHERE id = $1`, [draft.id]);
+    const posted = (await post(worker, draft.id)).body as ReceiptJson;
+    expect(posted.status).toBe('POSTED');
+    expect(posted.number).toMatch(/^GR-\d{4}-\d{6}$/);
+    expect(posted.number).not.toBe(draft.number);
+  });
+
+  it('keeps the number of a cancelled draft and never gives it again', async () => {
+    const first = (
+      await create(worker, {
+        supplierId,
+        lines: [{ productUnitId: unitOf(rice, 'PCS').id, enteredQty: '1' }],
+      }).expect(201)
+    ).body as ReceiptJson;
+    await http().post(`/api/v1/receipts/${first.id}/cancel`).set(bearer(worker)).expect(200);
+    const second = (
+      await create(worker, {
+        supplierId,
+        lines: [{ productUnitId: unitOf(rice, 'PCS').id, enteredQty: '1' }],
+      }).expect(201)
+    ).body as ReceiptJson;
+    expect(second.number).not.toBe(first.number);
+    const { rows } = await sql.query<{ number: string; status: string }>(
+      `SELECT number, status FROM goods_receipts WHERE id = $1`,
+      [first.id],
+    );
+    expect(rows[0]).toEqual({ number: first.number, status: 'CANCELLED' });
+    await http().post(`/api/v1/receipts/${second.id}/cancel`).set(bearer(worker)).expect(200);
+  });
+
+  it('lets a receipt name only a counter account the chart offers (ADR-0154)', async () => {
+    const list = (
+      await http().get('/api/v1/receipts/counter-accounts').set(bearer(worker)).expect(200)
+    ).body as { code: string }[];
+    expect(Array.isArray(list)).toBe(true);
+    await create(worker, {
+      supplierId,
+      counterAccountCode: '100101',
+      lines: [{ productUnitId: unitOf(rice, 'PCS').id, enteredQty: '1' }],
+    }).expect((response) => {
+      expect(response.status).toBeGreaterThanOrEqual(422);
+    });
   });
 });

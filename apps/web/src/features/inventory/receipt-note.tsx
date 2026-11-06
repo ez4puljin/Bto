@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Hint } from '@/components/ui/tooltip';
 import { formatQty } from '@/lib/money';
 import { toast } from '@/lib/toast';
 import { uploadFile } from '@/lib/upload';
@@ -16,6 +17,10 @@ import { useAction } from '@/lib/use-action';
 import { type ReceiptDetail, useInventoryMutations } from './api';
 import { parseMoney } from './helpers';
 import { useWritableWarehouses } from './writable-warehouses';
+
+/** A note total in the window's foot: the height of the buttons beside it. */
+const INLINE_FIELD =
+  'h-8.5 w-[6.75rem] px-2 text-right font-mono placeholder:text-left md:text-[0.8125rem]';
 
 /** A quantity typed with a comma or spaces, as the API takes it; null when it is not one. */
 function parseQty(value: string): string | null {
@@ -27,10 +32,15 @@ function parseQty(value: string): string | null {
  * The delivery note's totals and photo (ADR-0115): the keeper types the note's pieces and amount
  * from the paper; the pieces must equal the lines' (checked when the last warehouse confirms), the
  * amount the payable within 1₮ (checked at the accountant's price check). The photo is optional.
- * Each field is saved when left.
+ * Each field is saved when left. `inline`: one row and no card of its own, for the foot of the
+ * receipt window (ADR-0156), the fields named by what they hold.
  */
-export function ReceiptNoteCard(props: { detail: ReceiptDetail; editable: boolean }) {
-  const { detail, editable } = props;
+export function ReceiptNoteCard(props: {
+  detail: ReceiptDetail;
+  editable: boolean;
+  inline?: boolean;
+}) {
+  const { detail, editable, inline } = props;
   const { t } = useTranslation();
   const api = useApiClient();
   const mutations = useInventoryMutations();
@@ -77,6 +87,110 @@ export function ReceiptNoteCard(props: { detail: ReceiptDetail; editable: boolea
       window.open(URL.createObjectURL(data), '_blank', 'noopener');
     });
 
+  const qtyInput = (
+    <Input
+      id="receipt-note-qty"
+      inputMode="decimal"
+      aria-label={inline ? t('inventory.receipt.note.qty') : undefined}
+      placeholder={inline ? t('inventory.receipt.note.qty') : undefined}
+      className={inline ? INLINE_FIELD : 'font-mono'}
+      disabled={!editable}
+      value={qty}
+      onChange={(event) => setQty(event.target.value)}
+      onBlur={() => save('noteTotalQty', qty)}
+    />
+  );
+  const amountInput = (
+    <Input
+      id="receipt-note-amount"
+      inputMode="decimal"
+      aria-label={inline ? t('inventory.receipt.note.amount') : undefined}
+      placeholder={inline ? t('inventory.receipt.note.amount') : undefined}
+      className={inline ? INLINE_FIELD : 'font-mono'}
+      disabled={!editable}
+      value={amount}
+      onChange={(event) => setAmount(event.target.value)}
+      onBlur={() => save('noteTotalAmount', amount)}
+    />
+  );
+  const countedText = t('inventory.receipt.note.counted', { qty: formatQty(counted.toString()) });
+  const check =
+    diff === null ? null : diff.isZero() ? (
+      <Badge variant="success">
+        <Check />
+        {t('inventory.receipt.note.match')}
+      </Badge>
+    ) : (
+      <Badge variant="warning">
+        {t('inventory.receipt.note.mismatch', { diff: formatQty(diff.toString()) })}
+      </Badge>
+    );
+  const fileField = editable ? (
+    <input
+      ref={fileInput}
+      type="file"
+      accept="image/jpeg,image/png,image/webp"
+      capture="environment"
+      className="hidden"
+      aria-label={t('inventory.receipt.note.photo')}
+      onChange={(event) => attach(event.target.files?.[0])}
+    />
+  ) : null;
+
+  if (inline) {
+    return (
+      <div
+        role="region"
+        aria-labelledby="receipt-note-title"
+        className="flex flex-wrap items-center gap-x-2 gap-y-1.5"
+      >
+        {action.problem ? (
+          <div className="basis-full">
+            <ProblemAlert problem={action.problem} />
+          </div>
+        ) : null}
+        <span id="receipt-note-title" className="whitespace-nowrap text-muted-foreground">
+          {t('inventory.receipt.note.title')}
+        </span>
+        {qtyInput}
+        {amountInput}
+        {check ? (
+          <Hint label={countedText}>
+            <span>{check}</span>
+          </Hint>
+        ) : (
+          <span className="whitespace-nowrap text-muted-foreground">{countedText}</span>
+        )}
+        {detail.hasNotePhoto ? (
+          <Hint label={t('inventory.receipt.note.photoView')}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t('inventory.receipt.note.photoView')}
+              onClick={view}
+            >
+              <ImageIcon />
+            </Button>
+          </Hint>
+        ) : null}
+        {fileField}
+        {editable ? (
+          <Hint label={t('inventory.receipt.note.photoAdd')}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t('inventory.receipt.note.photoAdd')}
+              pending={mutations.updateReceipt.isPending}
+              onClick={() => fileInput.current?.click()}
+            >
+              {mutations.updateReceipt.isPending ? null : <Camera />}
+            </Button>
+          </Hint>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <Card role="region" aria-labelledby="receipt-note-title">
       <CardHeader>
@@ -86,68 +200,31 @@ export function ReceiptNoteCard(props: { detail: ReceiptDetail; editable: boolea
         <ProblemAlert problem={action.problem} />
         <div className="grid items-end gap-x-3 gap-y-3 sm:grid-cols-2 lg:grid-cols-[10rem_12rem_minmax(0,1fr)]">
           <FormField label={t('inventory.receipt.note.qty')} htmlFor="receipt-note-qty">
-            <Input
-              id="receipt-note-qty"
-              inputMode="decimal"
-              className="font-mono"
-              disabled={!editable}
-              value={qty}
-              onChange={(event) => setQty(event.target.value)}
-              onBlur={() => save('noteTotalQty', qty)}
-            />
+            {qtyInput}
           </FormField>
           <FormField label={t('inventory.receipt.note.amount')} htmlFor="receipt-note-amount">
-            <Input
-              id="receipt-note-amount"
-              inputMode="decimal"
-              className="font-mono"
-              disabled={!editable}
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-              onBlur={() => save('noteTotalAmount', amount)}
-            />
+            {amountInput}
           </FormField>
           <div className="flex flex-wrap items-center gap-2 pb-1.5 text-[0.8125rem]">
-            <span className="text-muted-foreground">
-              {t('inventory.receipt.note.counted', { qty: formatQty(counted.toString()) })}
-            </span>
-            {diff === null ? null : diff.isZero() ? (
-              <Badge variant="success">
-                <Check />
-                {t('inventory.receipt.note.match')}
-              </Badge>
-            ) : (
-              <Badge variant="warning">
-                {t('inventory.receipt.note.mismatch', { diff: formatQty(diff.toString()) })}
-              </Badge>
-            )}
+            <span className="text-muted-foreground">{countedText}</span>
+            {check}
             {detail.hasNotePhoto ? (
               <Button variant="outline" size="sm" onClick={view}>
                 <ImageIcon />
                 {t('inventory.receipt.note.photoView')}
               </Button>
             ) : null}
+            {fileField}
             {editable ? (
-              <>
-                <input
-                  ref={fileInput}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  capture="environment"
-                  className="hidden"
-                  aria-label={t('inventory.receipt.note.photo')}
-                  onChange={(event) => attach(event.target.files?.[0])}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  pending={mutations.updateReceipt.isPending}
-                  onClick={() => fileInput.current?.click()}
-                >
-                  <Camera />
-                  {t('inventory.receipt.note.photoAdd')}
-                </Button>
-              </>
+              <Button
+                variant="outline"
+                size="sm"
+                pending={mutations.updateReceipt.isPending}
+                onClick={() => fileInput.current?.click()}
+              >
+                <Camera />
+                {t('inventory.receipt.note.photoAdd')}
+              </Button>
             ) : null}
           </div>
         </div>

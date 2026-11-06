@@ -15,6 +15,7 @@ import type {
 import { FinBooks } from './fin-books';
 import { FinPosting } from './fin-posting';
 import { controlTotal, intakeLines, type RoleLine } from './intake-lines';
+import { receiptCounterKey } from './receipt-counter-key';
 
 const ZERO = new Decimal(0);
 
@@ -55,6 +56,10 @@ export class SupplierBillsService implements PurchaseBooks {
     revision = 1,
   ): Promise<void> {
     const groupRef = receiptGroupRef(facts.receiptId);
+    // The account chosen on the receipt has a key of its own (ADR-0154), its re-costings too.
+    const counterKey = facts.counterAccountCode
+      ? { key: receiptCounterKey(facts.counterAccountCode) }
+      : {};
     if (facts.previous === null) {
       const { payable, vat, vatBase, stock } = facts.totals;
       if (!payable.gt(0)) return;
@@ -71,6 +76,7 @@ export class SupplierBillsService implements PurchaseBooks {
           { role: 'VAT_INPUT', debit: vat, credit: ZERO, taxBase: vatBase },
           {
             role: 'AP',
+            ...counterKey,
             debit: ZERO,
             credit: payable,
             extra: { openItem: { dueDate: facts.date, groupRef } },
@@ -93,6 +99,7 @@ export class SupplierBillsService implements PurchaseBooks {
     const ap: RoleLine | null = delta.payable.gt(0)
       ? {
           role: 'AP',
+          ...counterKey,
           debit: ZERO,
           credit: delta.payable,
           extra: { openItem: { dueDate: today, groupRef } },
@@ -100,6 +107,7 @@ export class SupplierBillsService implements PurchaseBooks {
       : delta.payable.lt(0)
         ? {
             role: 'AP',
+            ...counterKey,
             debit: delta.payable.negated(),
             credit: ZERO,
             extra: {

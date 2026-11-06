@@ -69,7 +69,9 @@ function Heading(props: {
     [t('inventory.receipt.print.number'), props.number],
     [t('inventory.receipt.print.date'), detail.supplierDocDate ?? detail.effectiveDate ?? none],
     [t('inventory.receipt.print.supplier'), `${detail.supplierName} · ${detail.supplierCode}`],
-    [t('inventory.receipt.print.supplierDoc'), detail.supplierDocNo ?? none],
+    ...(detail.supplierDocNo
+      ? [[t('inventory.receipt.form.supplierNote'), detail.supplierDocNo] as [string, string]]
+      : []),
     ...(props.extra ?? []),
   ];
   return (

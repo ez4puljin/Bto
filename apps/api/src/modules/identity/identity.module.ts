@@ -45,6 +45,7 @@ import { PermissionHoldersService } from './services/permission-holders.service'
 import { RolesService } from './services/roles.service';
 import { ScopeService } from './services/scope.service';
 import { SettingsService } from './services/settings.service';
+import { StaffAccountsService } from './services/staff-accounts.service';
 import { StorageService } from './services/storage.service';
 import { UserNamesService } from './services/user-names.service';
 import { UsersService } from './services/users.service';
@@ -61,8 +62,10 @@ const CORE_SERVICES = [
   PermissionHoldersService,
   ScopeService,
   SettingsService,
+  StaffAccountsService,
   StorageService,
   UserNamesService,
+  PasswordHasher,
 ];
 
 /** Identity services every process may use (api, worker jobs, CLIs). */

@@ -68,6 +68,20 @@ export const FILE_KINDS = {
     visibility: 'private',
     permissions: ['procurement.orders.manage', 'procurement.orders.edit', 'inventory.costs.manage'],
   },
+  /** An employee's photo (ADR-0144), square, resized in the browser; shown in «Ажилтан» and the staff app. */
+  'hr.employee_photo': {
+    contentTypes: IMAGE_TYPES,
+    maxBytes: 1024 * 1024,
+    visibility: 'public',
+    permissions: ['hr.attendance.manage'],
+  },
+  /** A notice's, news' or vote's picture in the staff app (ADR-0146), public like the photos. */
+  'hr.message_image': {
+    contentTypes: IMAGE_TYPES,
+    maxBytes: 2 * 1024 * 1024,
+    visibility: 'public',
+    permissions: ['hr.attendance.manage'],
+  },
   /** An Excel sheet for the importer (ADR-0036): kept privately as the record of what was imported. */
   'imports.source': {
     contentTypes: [XLSX_CONTENT_TYPE],

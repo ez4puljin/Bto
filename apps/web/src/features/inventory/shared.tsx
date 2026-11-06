@@ -311,6 +311,8 @@ export function ScanQtyControl(props: {
  * scan did — so the first line of the document stays near the top of the window.
  */
 export function ScanToolbar(props: {
+  /** In a narrow part of a window (ADR-0155): the scan box, then the quantity and the search. */
+  stacked?: boolean;
   scanBox: ReactNode;
   qty?: ReactNode;
   search?: ReactNode;
@@ -319,13 +321,23 @@ export function ScanToolbar(props: {
   return (
     <div className="flex flex-col gap-2">
       {/* The scan box keeps room for its label and buttons; the search wraps below when tight. */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-start lg:gap-4">
-        <div className="min-w-0 lg:min-w-[26rem] lg:flex-1">{props.scanBox}</div>
-        {props.qty}
-        {props.search ? (
-          <div className="min-w-0 lg:w-64 xl:w-72 2xl:w-96">{props.search}</div>
-        ) : null}
-      </div>
+      {props.stacked ? (
+        <div className="flex flex-col gap-3">
+          {props.scanBox}
+          <div className="flex flex-wrap items-start gap-3">
+            {props.qty}
+            {props.search ? <div className="min-w-48 flex-1">{props.search}</div> : null}
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-start lg:gap-4">
+          <div className="min-w-0 lg:min-w-[26rem] lg:flex-1">{props.scanBox}</div>
+          {props.qty}
+          {props.search ? (
+            <div className="min-w-0 lg:w-64 xl:w-72 2xl:w-96">{props.search}</div>
+          ) : null}
+        </div>
+      )}
       {props.status ? (
         <div className="flex min-h-5 flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           {props.status}

@@ -4,6 +4,7 @@ import {
   allocateReceiptDiscounts,
   canRecost,
   costingDeadline,
+  formatDocNumber,
   lineAmountOf,
   noteAmountMatches,
   ReceiptDiscountError,
@@ -15,7 +16,7 @@ import {
   unitCostOf,
 } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
-import { businessDate } from '@tugeel/shared/time';
+import { businessDate, businessYear } from '@tugeel/shared/time';
 import { and, desc, eq, ilike, inArray, lt, or, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -33,12 +34,16 @@ import {
   ScopeService,
   StorageService,
   UserNamesService,
+  NumberingService,
 } from '../../identity';
 import { ProductSuppliersService, SuppliersService } from '../../partners';
 import {
   RECEIPT_MONEY_ACCOUNTS,
   RECEIPT_PROGRESS,
   RECEIPT_SALE_PRICES,
+  RECEIPT_COUNTER_ACCOUNTS,
+  type ReceiptCounterAccount,
+  type ReceiptCounterAccounts,
   type ReceiptMoneyAccount,
   type ReceiptMoneyAccounts,
   type ReceiptBookFacts,
@@ -125,6 +130,7 @@ export interface ReceiptInput {
   paymentMethod?: ReceiptPaymentMethod;
   /** The cash box or bank account of a CASH / BANK receipt; required by the posting. */
   moneyAccountId?: number | null;
+  counterAccountCode?: string | null;
   /** The delivery note's total pieces and amount (ADR-0115). */
   noteTotalQty?: Decimal | null;
   noteTotalAmount?: Decimal | null;
@@ -141,6 +147,7 @@ export interface ReceiptPatch {
   note?: string | null;
   paymentMethod?: ReceiptPaymentMethod;
   moneyAccountId?: number | null;
+  counterAccountCode?: string | null;
   noteTotalQty?: Decimal | null;
   noteTotalAmount?: Decimal | null;
   /** An uploaded photo of the delivery note (kind `inventory.receipt_note`); null removes it. */
@@ -254,6 +261,9 @@ export interface ReceiptDetail {
   paymentMethod: ReceiptPaymentMethod;
   moneyAccountId: number | null;
   moneyAccountName: string | null;
+  /** The account the bill credits; null: the payable's own, named by `counterAccountName`. */
+  counterAccountCode: string | null;
+  counterAccountName: string | null;
   supplierVatPayer: boolean;
   /** VAT inside the delivery-note prices; frozen at posting. */
   vatRatePct: Decimal;
@@ -410,6 +420,7 @@ export interface ReceiptCosting {
 @Injectable()
 export class ReceiptsService implements OnModuleInit {
   private moneyAccounts: ReceiptMoneyAccounts | null = null;
+  private counterAccountsHook: ReceiptCounterAccounts | null = null;
   private salePrices: ReceiptSalePrices | null = null;
   private progress: ReceiptProgress | null = null;
 
@@ -429,6 +440,7 @@ export class ReceiptsService implements OnModuleInit {
     private readonly storage: StorageService,
     private readonly userNames: UserNamesService,
     private readonly moduleRef: ModuleRef,
+    private readonly numbering: NumberingService,
   ) {}
 
   onModuleInit(): void {
@@ -445,12 +457,27 @@ export class ReceiptsService implements OnModuleInit {
       this.moneyAccounts = null;
     }
     try {
+      this.counterAccountsHook = this.moduleRef.get<ReceiptCounterAccounts>(
+        RECEIPT_COUNTER_ACCOUNTS,
+        {
+          strict: false,
+        },
+      );
+    } catch {
+      this.counterAccountsHook = null;
+    }
+    try {
       this.salePrices = this.moduleRef.get<ReceiptSalePrices>(RECEIPT_SALE_PRICES, {
         strict: false,
       });
     } catch {
       this.salePrices = null;
     }
+  }
+
+  /** The accounts a receipt's bill may credit (finance's; empty without finance, ADR-0154). */
+  async counterAccounts(executor?: Db | Tx): Promise<ReceiptCounterAccount[]> {
+    return this.counterAccountsHook ? this.counterAccountsHook.active(executor ?? this.db) : [];
   }
 
   /** The cash boxes and bank accounts a receipt may name (finance's; empty without finance). */
@@ -471,16 +498,20 @@ export class ReceiptsService implements OnModuleInit {
     await this.suppliers.assertActive(tx, input.supplierId);
     const paymentMethod = input.paymentMethod ?? 'CREDIT';
     const moneyAccountId = await this.checkPayment(tx, paymentMethod, input.moneyAccountId);
+    const counterAccountCode = await this.checkCounter(tx, input.counterAccountCode);
     const supplierDocDate = input.supplierDocDate ?? null;
     const [row] = await tx
       .insert(goodsReceipts)
       .values({
+        // Numbered at the first save, not at the posting (owner 2026-11-05, ADR-0153).
+        number: await this.allocateNumber(tx),
         supplierId: input.supplierId,
         supplierDocNo: optionalText(input.supplierDocNo) ?? null,
         supplierDocDate,
         note: optionalText(input.note) ?? null,
         paymentMethod,
         moneyAccountId,
+        counterAccountCode,
         vatRatePct: await this.vatRateOf(tx, input.supplierId, supplierDocDate),
         noteTotalQty: noteQtyOf(input.noteTotalQty),
         noteTotalAmount: noteAmountOf(input.noteTotalAmount),
@@ -498,6 +529,14 @@ export class ReceiptsService implements OnModuleInit {
       after: row,
     });
     return row.id;
+  }
+
+  /** The database's clock decides the year, as a posting's does. */
+  private async allocateNumber(tx: Tx): Promise<string> {
+    const { rows } = await tx.execute<{ now: string | Date }>(sql`SELECT now() AS now`);
+    const now = rows[0]?.now;
+    const year = businessYear(now instanceof Date ? now : new Date(now ?? Date.now()));
+    return formatDocNumber('GR', year, await this.numbering.next(tx, 'GR', year));
   }
 
   async update(_ctx: AuthContext, id: number, patch: ReceiptPatch): Promise<ReceiptDetail> {
@@ -549,6 +588,9 @@ export class ReceiptsService implements OnModuleInit {
           ...(patch.note === undefined ? {} : { note: optionalText(patch.note) ?? null }),
           paymentMethod,
           moneyAccountId,
+          ...(patch.counterAccountCode === undefined
+            ? {}
+            : { counterAccountCode: await this.checkCounter(tx, patch.counterAccountCode) }),
           vatRatePct: await this.vatRateOf(tx, supplierId, supplierDocDate),
           ...(patch.noteTotalQty === undefined
             ? {}
@@ -1329,6 +1371,10 @@ export class ReceiptsService implements OnModuleInit {
         ? null
         : ((await this.paymentAccounts()).find((account) => account.id === header.moneyAccountId)
             ?.name ?? null);
+    const counters = await this.counterAccounts(executor);
+    const counter = header.counterAccountCode
+      ? counters.find((row) => row.code === header.counterAccountCode)
+      : counters.find((row) => row.isDefault);
     return {
       id: header.id,
       number: header.number,
@@ -1346,6 +1392,8 @@ export class ReceiptsService implements OnModuleInit {
       paymentMethod: header.paymentMethod,
       moneyAccountId: header.moneyAccountId,
       moneyAccountName: accountName,
+      counterAccountCode: header.counterAccountCode,
+      counterAccountName: counter?.name ?? null,
       supplierVatPayer: supplier?.vatPayer ?? false,
       vatRatePct: header.vatRatePct,
       discounts: views,
@@ -1556,6 +1604,16 @@ export class ReceiptsService implements OnModuleInit {
   // -------------------------------------------------------------------------------------------
 
   /** CREDIT names no account; CASH / BANK may name one of their kind (required at posting). */
+  private async checkCounter(tx: Tx, code: string | null | undefined): Promise<string | null> {
+    if (code === null || code === undefined) return null;
+    if (!this.counterAccountsHook) {
+      throw invalid('counterAccountCode', 'unavailable', 'counter accounts are not available');
+    }
+    const account = await this.counterAccountsHook.assertUsable(tx, code);
+    // The payable's own account is what no choice means, and books by the key AP.
+    return account.isDefault ? null : code;
+  }
+
   private async checkPayment(
     tx: Tx,
     method: ReceiptPaymentMethod,
@@ -1646,6 +1704,7 @@ export class ReceiptsService implements OnModuleInit {
       version: header.costingVersion,
       totals,
       previous,
+      counterAccountCode: header.counterAccountCode,
       warehouseIds: [...new Set(rows.map((row) => row.warehouseId))],
     };
   }

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatUbDateTime } from '@/lib/dayjs';
+import { formatTugrik } from '@/lib/money';
 import type { SalesOrder } from './api';
 
 interface Entry {
@@ -9,6 +10,8 @@ interface Entry {
   actor: string | null;
   text: string;
   detail?: string | null;
+  /** A saved edit's changes, one line each (ADR-0147). */
+  rows?: string[];
 }
 
 /**
@@ -51,6 +54,53 @@ export function OrderActivity({ order, limit }: { order: SalesOrder; limit?: num
         detail: event.reason,
       });
     });
+    order.changes.forEach((change) => {
+      const none = t('common.none');
+      const value = (field: string, raw: string | null) => {
+        if (raw === null) return none;
+        if (field === 'fulfilment') return t(`sales.fulfilments.${raw}` as never);
+        if (field === 'paymentMethod') return t(`sales.paymentMethods.${raw}` as never);
+        return raw;
+      };
+      const tugrik = (raw: string | null) => (raw === null ? none : formatTugrik(raw));
+      list.push({
+        key: `change:${change.version}`,
+        at: Date.parse(change.createdAt),
+        actor: change.actorName,
+        text: t('sales.panel.activity.edited', { version: change.version }),
+        rows: [
+          ...change.fields.map((row) =>
+            t('sales.panel.activity.fieldChanged', {
+              field: t(`sales.panel.activity.fields.${row.field}` as never),
+              before: value(row.field, row.before),
+              after: value(row.field, row.after),
+            }),
+          ),
+          ...change.lines.map((line) => {
+            const name = `${line.productName} (${line.unitName})`;
+            if (line.kind === 'ADDED') {
+              return t('sales.panel.activity.lineAdded', { name, qty: line.qtyAfter ?? none });
+            }
+            if (line.kind === 'REMOVED') {
+              return t('sales.panel.activity.lineRemoved', { name, qty: line.qtyBefore ?? none });
+            }
+            return t('sales.panel.activity.lineChanged', {
+              name,
+              before: line.qtyBefore ?? none,
+              after: line.qtyAfter ?? none,
+            });
+          }),
+          ...(change.totalBefore !== change.totalAfter
+            ? [
+                t('sales.panel.activity.totalChanged', {
+                  before: tugrik(change.totalBefore),
+                  after: tugrik(change.totalAfter),
+                }),
+              ]
+            : []),
+        ],
+      });
+    });
     if (order.archivedAt) {
       list.push({
         key: 'archived',
@@ -82,6 +132,13 @@ export function OrderActivity({ order, limit }: { order: SalesOrder; limit?: num
               </p>
               {entry.detail ? (
                 <p className="text-[0.8125rem] text-muted-foreground">{entry.detail}</p>
+              ) : null}
+              {entry.rows?.length ? (
+                <ul className="mt-0.5 flex flex-col text-[0.8125rem] text-muted-foreground">
+                  {entry.rows.map((row) => (
+                    <li key={row}>{row}</li>
+                  ))}
+                </ul>
               ) : null}
             </div>
             <time

@@ -14,6 +14,11 @@ export function formatUbDateTime(epochMs: number): string {
   return dayjs(epochMs).tz(BUSINESS_TZ).format('YYYY-MM-DD HH:mm:ss');
 }
 
+/** An instant as Ulaanbaatar date and minute, «2026-11-04 09:07» (the HR requests, ADR-0144). */
+export function formatUbMinute(iso: string): string {
+  return dayjs(iso).tz(BUSINESS_TZ).format('YYYY-MM-DD HH:mm');
+}
+
 /** The Ulaanbaatar wall-clock time of an instant, «09:07» (the attendance pages, ADR-0131). */
 export function formatUbTime(iso: string): string {
   return dayjs(iso).tz(BUSINESS_TZ).format('HH:mm');
