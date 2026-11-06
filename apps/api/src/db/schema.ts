@@ -115,6 +115,9 @@ export {
   salesStages,
 } from '../modules/sales/schema';
 export {
+  bankStatementLines,
+  bankStatementSettings,
+  bankStatements,
   creditNoteLines,
   creditNotes,
   financeReconcileRuns,

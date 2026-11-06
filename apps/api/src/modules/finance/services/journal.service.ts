@@ -284,6 +284,20 @@ export class JournalService {
     input: { entryDate: string; description: string; lines: readonly JournalLineInput[] },
     key?: string | null,
   ): Promise<JournalEntryDetail> {
+    const entryId = await inTransaction(this.db, (tx) => this.postManualInTx(tx, ctx, input, key));
+    return this.get(entryId);
+  }
+
+  /**
+   * The same inside the caller's transaction (a bank statement's line, ADR-0169, whose row is locked
+   * first): the new entry's id. The checks come before any write, so a refusal leaves nothing.
+   */
+  async postManualInTx(
+    tx: Tx,
+    ctx: AuthContext,
+    input: { entryDate: string; description: string; lines: readonly JournalLineInput[] },
+    key?: string | null,
+  ): Promise<number> {
     assertNotFuture(input.entryDate);
     checkLines(input.lines);
     const description = checkedDescription(input.description);
@@ -292,90 +306,86 @@ export class JournalService {
         throw invalid(`lines[${index}].accountId`, 'required', 'an account');
       return line.accountId;
     });
-    const entryId = await inTransaction(this.db, async (tx) => {
-      const accounts = await this.accounts.activeByIds(
-        ids,
-        (index) => `lines[${index}].accountId`,
-        tx,
-      );
-      const money = new Map((await this.moneyAccounts.list(tx)).map((row) => [row.id, row]));
-      const lines: LineV1[] = [];
-      for (const [index, line] of input.lines.entries()) {
-        const account = accounts.get(ids[index] ?? 0);
-        if (!account) throw invalid(`lines[${index}].accountId`, 'exists', 'an account');
-        const debit = line.debit.gt(0);
-        const moneyAccount =
-          line.moneyAccountId == null ? undefined : money.get(line.moneyAccountId);
-        if (line.moneyAccountId != null && !moneyAccount) {
-          throw invalid(`lines[${index}].moneyAccountId`, 'exists', 'a cash box or bank account');
-        }
-        if (moneyAccount && moneyAccount.glAccountId !== account.id) {
-          throw invalid(
-            `lines[${index}].moneyAccountId`,
-            'ofAccount',
-            "a cash box or bank account of the line's account",
-          );
-        }
-        let party: LineV1['party'];
-        if (line.customerId != null && line.supplierId != null) {
-          throw invalid(`lines[${index}].supplierId`, 'oneParty', 'a customer or a supplier');
-        }
-        if (line.customerId != null) {
-          await this.parties.customerPartyInTx(tx, ctx, line.customerId);
-          party = await this.parties.customerPartyIn(tx, line.customerId);
-        }
-        if (line.supplierId != null) {
-          await this.suppliers.get(line.supplierId, tx);
-          await this.parties.supplierPartyInTx(tx, ctx, line.supplierId);
-          party = await this.parties.supplierPartyIn(tx, line.supplierId);
-        }
-        lines.push({
-          lineNo: index + 1,
-          key: MANUAL_KEY,
-          side: debit ? 'DEBIT' : 'CREDIT',
-          amount: (debit ? line.debit : line.credit).toFixed(MONEY_SCALE),
-          accountCode: account.code,
-          ...(moneyAccount ? { moneyAccount: moneyAccount.code } : {}),
-          ...(party ? { party } : {}),
-          ...(line.description?.trim() ? { description: line.description.trim() } : {}),
-        });
+    const accounts = await this.accounts.activeByIds(
+      ids,
+      (index) => `lines[${index}].accountId`,
+      tx,
+    );
+    const money = new Map((await this.moneyAccounts.list(tx)).map((row) => [row.id, row]));
+    const lines: LineV1[] = [];
+    for (const [index, line] of input.lines.entries()) {
+      const account = accounts.get(ids[index] ?? 0);
+      if (!account) throw invalid(`lines[${index}].accountId`, 'exists', 'an account');
+      const debit = line.debit.gt(0);
+      const moneyAccount = line.moneyAccountId == null ? undefined : money.get(line.moneyAccountId);
+      if (line.moneyAccountId != null && !moneyAccount) {
+        throw invalid(`lines[${index}].moneyAccountId`, 'exists', 'a cash box or bank account');
       }
-      const total = input.lines.reduce((sum, line) => sum.plus(line.debit), new Decimal(0));
-      const payableLines = new Set(
-        input.lines.flatMap((_, index) =>
-          accounts.get(ids[index] ?? 0)?.role === 'AP' ? [index] : [],
-        ),
-      );
-      const result = await this.submitManual(tx, ctx, payableLines, {
-        source: { system: FIN_SOURCE, docType: MANUAL_DOC_TYPE, docId: key ?? randomUUID() },
-        body: {
-          action: 'POST',
-          documentType: FIN_DOC_TYPES.JOURNAL.code,
-          documentDate: input.entryDate,
-          currency: 'MNT',
-          description,
-          controlTotal: total.toFixed(MONEY_SCALE),
-          lines,
-        },
+      if (moneyAccount && moneyAccount.glAccountId !== account.id) {
+        throw invalid(
+          `lines[${index}].moneyAccountId`,
+          'ofAccount',
+          "a cash box or bank account of the line's account",
+        );
+      }
+      let party: LineV1['party'];
+      if (line.customerId != null && line.supplierId != null) {
+        throw invalid(`lines[${index}].supplierId`, 'oneParty', 'a customer or a supplier');
+      }
+      if (line.customerId != null) {
+        await this.parties.customerPartyInTx(tx, ctx, line.customerId);
+        party = await this.parties.customerPartyIn(tx, line.customerId);
+      }
+      if (line.supplierId != null) {
+        await this.suppliers.get(line.supplierId, tx);
+        await this.parties.supplierPartyInTx(tx, ctx, line.supplierId);
+        party = await this.parties.supplierPartyIn(tx, line.supplierId);
+      }
+      lines.push({
+        lineNo: index + 1,
+        key: MANUAL_KEY,
+        side: debit ? 'DEBIT' : 'CREDIT',
+        amount: (debit ? line.debit : line.credit).toFixed(MONEY_SCALE),
+        accountCode: account.code,
+        ...(moneyAccount ? { moneyAccount: moneyAccount.code } : {}),
+        ...(party ? { party } : {}),
+        ...(line.description?.trim() ? { description: line.description.trim() } : {}),
       });
-      const posted = Number.parseInt(result.document?.journalEntryId ?? '0', 10);
-      await this.audit.record(tx, ctx, {
+    }
+    const total = input.lines.reduce((sum, line) => sum.plus(line.debit), new Decimal(0));
+    const payableLines = new Set(
+      input.lines.flatMap((_, index) =>
+        accounts.get(ids[index] ?? 0)?.role === 'AP' ? [index] : [],
+      ),
+    );
+    const result = await this.submitManual(tx, ctx, payableLines, {
+      source: { system: FIN_SOURCE, docType: MANUAL_DOC_TYPE, docId: key ?? randomUUID() },
+      body: {
         action: 'POST',
-        entity: 'journal_entries',
-        entityId: posted,
-        after: {
-          number: result.document?.journalNo ?? null,
-          entryDate: input.entryDate,
-          lines: input.lines.map((line) => ({
-            accountId: line.accountId,
-            debit: line.debit.toFixed(MONEY_SCALE),
-            credit: line.credit.toFixed(MONEY_SCALE),
-          })),
-        },
-      });
-      return posted;
+        documentType: FIN_DOC_TYPES.JOURNAL.code,
+        documentDate: input.entryDate,
+        currency: 'MNT',
+        description,
+        controlTotal: total.toFixed(MONEY_SCALE),
+        lines,
+      },
     });
-    return this.get(entryId);
+    const posted = Number.parseInt(result.document?.journalEntryId ?? '0', 10);
+    await this.audit.record(tx, ctx, {
+      action: 'POST',
+      entity: 'journal_entries',
+      entityId: posted,
+      after: {
+        number: result.document?.journalNo ?? null,
+        entryDate: input.entryDate,
+        lines: input.lines.map((line) => ({
+          accountId: line.accountId,
+          debit: line.debit.toFixed(MONEY_SCALE),
+          credit: line.credit.toFixed(MONEY_SCALE),
+        })),
+      },
+    });
+    return posted;
   }
 
   /** Reverses a manual entry by hand (the intake's REVERSE); automatic ones go through their document. */
@@ -384,34 +394,44 @@ export class JournalService {
     entryId: number,
     input: { description: string },
   ): Promise<JournalEntryDetail> {
-    const reason = checkedDescription(input.description);
-    const reversalId = await inTransaction(this.db, async (tx) => {
-      const company = await this.books.company();
-      const original = await this.reader.entry(this.books.source(), { company, id: entryId }, tx);
-      if (!original) throw notFound('journal_entry', entryId);
-      const source = sourceOf(original);
-      if ((source !== 'MANUAL' && source !== 'OPENING') || original.documentId === null) {
-        throw invalid('entryId', 'manual', 'only a manual or opening entry is reversed by hand');
-      }
-      await this.assertNotReversed(tx, company, entryId, original.number);
-      const result = await this.submitManual(tx, ctx, new Set(), {
-        source: {
-          system: FIN_SOURCE,
-          docType: original.sourceDocType ?? MANUAL_DOC_TYPE,
-          docId: original.sourceDocId ?? '',
-        },
-        body: { action: 'REVERSE', accountingDate: businessDate(), reason },
-      });
-      const reversed = Number.parseInt(result.document?.journalEntryId ?? '0', 10);
-      await this.audit.record(tx, ctx, {
-        action: 'POST',
-        entity: 'journal_entries',
-        entityId: reversed,
-        after: { number: result.document?.journalNo ?? null, reverses: original.number },
-      });
-      return reversed;
-    });
+    const reversalId = await inTransaction(this.db, (tx) =>
+      this.reverseManualInTx(tx, ctx, entryId, input),
+    );
     return this.get(reversalId);
+  }
+
+  /** The same inside the caller's transaction: the reversing entry's id. */
+  async reverseManualInTx(
+    tx: Tx,
+    ctx: AuthContext,
+    entryId: number,
+    input: { description: string },
+  ): Promise<number> {
+    const reason = checkedDescription(input.description);
+    const company = await this.books.company();
+    const original = await this.reader.entry(this.books.source(), { company, id: entryId }, tx);
+    if (!original) throw notFound('journal_entry', entryId);
+    const source = sourceOf(original);
+    if ((source !== 'MANUAL' && source !== 'OPENING') || original.documentId === null) {
+      throw invalid('entryId', 'manual', 'only a manual or opening entry is reversed by hand');
+    }
+    await this.assertNotReversed(tx, company, entryId, original.number);
+    const result = await this.submitManual(tx, ctx, new Set(), {
+      source: {
+        system: FIN_SOURCE,
+        docType: original.sourceDocType ?? MANUAL_DOC_TYPE,
+        docId: original.sourceDocId ?? '',
+      },
+      body: { action: 'REVERSE', accountingDate: businessDate(), reason },
+    });
+    const reversed = Number.parseInt(result.document?.journalEntryId ?? '0', 10);
+    await this.audit.record(tx, ctx, {
+      action: 'POST',
+      entity: 'journal_entries',
+      entityId: reversed,
+      after: { number: result.document?.journalNo ?? null, reverses: original.number },
+    });
+    return reversed;
   }
 
   async list(query: JournalQuery): Promise<{

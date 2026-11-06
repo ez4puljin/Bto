@@ -411,33 +411,36 @@ export class PaymentsService implements OnModuleInit {
 
   /** Voids a posted voucher: the core reverses it and gives its allocations back to the invoices. */
   async void(ctx: AuthContext, id: number, reason: string): Promise<PaymentDetail> {
+    await inTransaction(this.db, (tx) => this.voidInTx(tx, ctx, id, reason));
+    return this.get(id);
+  }
+
+  /** The same inside the caller's transaction (a bank statement's line taken back, ADR-0169). */
+  async voidInTx(tx: Tx, ctx: AuthContext, id: number, reason: string): Promise<void> {
     const trimmed = reason.trim();
     if (trimmed.length === 0 || trimmed.length > FINANCE_LIMITS.maxReason) {
       throw invalid('reason', 'length', `1 to ${FINANCE_LIMITS.maxReason} characters`);
     }
-    await inTransaction(this.db, async (tx) => {
-      const voucher = await this.voucher(id);
-      if (voucher.reversal) {
-        throw new AppError('PAYMENT_STATE_INVALID', `payment ${voucher.number} is VOID`, {
-          number: voucher.number,
-          status: 'VOID',
-        });
-      }
-      const customerId = await this.customerOf(voucher.partyId);
-      if (customerId !== null) await this.customers.lockForUpdate(tx, customerId);
-      const result = await this.posting.submitInTx(tx, this.books.user(ctx), {
-        source: { system: FIN_SOURCE, docType: voucher.sourceDocType, docId: voucher.sourceDocId },
-        body: { action: 'REVERSE', accountingDate: businessDate(), reason: trimmed },
+    const voucher = await this.voucher(id);
+    if (voucher.reversal) {
+      throw new AppError('PAYMENT_STATE_INVALID', `payment ${voucher.number} is VOID`, {
+        number: voucher.number,
+        status: 'VOID',
       });
-      await this.audit.record(tx, ctx, {
-        action: 'VOID',
-        entity: 'payments',
-        entityId: id,
-        before: { status: 'POSTED' },
-        after: { status: 'VOID', reason: trimmed, reversal: result.document?.journalNo ?? null },
-      });
+    }
+    const customerId = await this.customerOf(voucher.partyId);
+    if (customerId !== null) await this.customers.lockForUpdate(tx, customerId);
+    const result = await this.posting.submitInTx(tx, this.books.user(ctx), {
+      source: { system: FIN_SOURCE, docType: voucher.sourceDocType, docId: voucher.sourceDocId },
+      body: { action: 'REVERSE', accountingDate: businessDate(), reason: trimmed },
     });
-    return this.get(id);
+    await this.audit.record(tx, ctx, {
+      action: 'VOID',
+      entity: 'payments',
+      entityId: id,
+      before: { status: 'POSTED' },
+      after: { status: 'VOID', reason: trimmed, reversal: result.document?.journalNo ?? null },
+    });
   }
 
   async list(

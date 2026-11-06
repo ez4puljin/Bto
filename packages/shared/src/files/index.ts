@@ -82,6 +82,13 @@ export const FILE_KINDS = {
     visibility: 'public',
     permissions: ['hr.attendance.manage'],
   },
+  /** A bank's statement in Excel for «Тооцоо хаах» (ADR-0169): kept privately as what came in. */
+  'finance.bank_statement': {
+    contentTypes: [XLSX_CONTENT_TYPE],
+    maxBytes: 5 * 1024 * 1024,
+    visibility: 'private',
+    permissions: ['finance.journal.manage'],
+  },
   /** An Excel sheet for the importer (ADR-0036): kept privately as the record of what was imported. */
   'imports.source': {
     contentTypes: [XLSX_CONTENT_TYPE],

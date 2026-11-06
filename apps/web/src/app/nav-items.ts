@@ -413,6 +413,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'finance.read',
       },
       {
+        to: '/finance/bank-statements',
+        label: 'nav.bankStatements',
+        icon: FileSpreadsheet,
+        permission: 'finance.read',
+      },
+      {
         to: '/finance/journal',
         label: 'nav.journal',
         icon: BookOpenText,
