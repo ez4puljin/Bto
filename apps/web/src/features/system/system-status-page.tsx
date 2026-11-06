@@ -1,10 +1,12 @@
 import { RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useHasPermission } from '@/app/auth-context';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
+import { AiUsageCard } from '../ai/ai-usage-card';
 import { useHealth } from './use-health';
 
 type StateKey = 'systemStatus.state.up' | 'systemStatus.state.down' | 'systemStatus.state.unknown';
@@ -40,8 +42,9 @@ function StatusRow({ label, state }: { label: string; state: string }) {
 export function SystemStatusPage() {
   const { t } = useTranslation();
   const health = useHealth();
+  const mayManageAi = useHasPermission('ai.settings.manage');
   return (
-    <div>
+    <div className="flex flex-col gap-4">
       <PageHeader
         title={t('systemStatus.title')}
         description={t('systemStatus.description')}
@@ -83,6 +86,7 @@ export function SystemStatusPage() {
           ) : null}
         </CardContent>
       </Card>
+      {mayManageAi ? <AiUsageCard /> : null}
     </div>
   );
 }

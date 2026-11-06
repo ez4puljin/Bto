@@ -146,7 +146,7 @@ describe('roles', () => {
   });
 });
 
-describe("system roles and a staff member's rights (ADR-0163)", () => {
+describe("system roles and a staff member's rights (ADR-0165)", () => {
   it('changes a system role: its name stays, only the rights are sent, no delete', async () => {
     let patched: unknown;
     const warehouse: Schemas['Role'] = {

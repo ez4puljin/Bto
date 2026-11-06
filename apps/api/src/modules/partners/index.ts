@@ -32,6 +32,10 @@ export {
   CustomerCategoriesService,
 } from './services/customer-categories.service';
 export {
+  type SupplierCategory,
+  SupplierCategoriesService,
+} from './services/supplier-categories.service';
+export {
   type CreditInput,
   type CreditTerms,
   type CustomerDetail,

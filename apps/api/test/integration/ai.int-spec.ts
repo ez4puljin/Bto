@@ -2,6 +2,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import ExcelJS from 'exceljs';
 import type { Client } from 'pg';
 import request from 'supertest';
+import { AI_DATA_GROUPS, aiDataPermission } from '@tugeel/shared/ai';
 import { businessDate } from '@tugeel/shared/time';
 import { LLM_CLIENT, LlmError } from '../../src/integrations/llm';
 import { clarify, FakeLlm, query, unsupported } from '../harness/ai';
@@ -36,6 +37,9 @@ interface ReportJson {
   createdBy: { id: number; fullName: string };
 }
 
+/** Asks, and reads every data group (ADR-0162). */
+const AI_ASKER = ['ai.ask', ...AI_DATA_GROUPS.map(aiDataPermission)];
+
 const PRODUCTS_SQL = 'SELECT sku AS "Код", name AS "Нэр" FROM products ORDER BY sku';
 
 /** The AI assistant over HTTP with a scripted model (ADR-0045, docs/modules/ai.md). */
@@ -58,8 +62,8 @@ describe('AI assistant', () => {
     });
     sql = await connectAs('migrator');
     admin = (await login(app, await seedUser(app, { roles: ['ADMIN'] }))).accessToken;
-    asker = await customRoleUser(app, admin, ['ai.ask']);
-    other = await customRoleUser(app, admin, ['ai.ask']);
+    asker = await customRoleUser(app, admin, AI_ASKER);
+    other = await customRoleUser(app, admin, AI_ASKER);
     worker = (await login(app, await seedUser(app, { roles: ['WAREHOUSE'] }))).accessToken;
     const catalog = catalogApi(app, admin);
     const category = await catalog.category('Ундаа');
@@ -83,7 +87,7 @@ describe('AI assistant', () => {
 
   it('tells its status and keeps out people without ai.ask', async () => {
     const status = await http().get('/api/v1/ai/status').set(bearer(asker)).expect(200);
-    expect(status.body).toEqual({
+    expect(status.body).toMatchObject({
       configured: true,
       database: true,
       provider: 'openai',
@@ -390,7 +394,12 @@ describe('AI assistant, not configured', () => {
       .get('/api/v1/ai/status')
       .set(bearer(admin))
       .expect(200);
-    expect(status.body).toEqual({ configured: false, database: true, provider: null, model: null });
+    expect(status.body).toMatchObject({
+      configured: false,
+      database: true,
+      provider: null,
+      model: null,
+    });
     const refused = await request(app.getHttpServer())
       .post('/api/v1/ai/questions')
       .set(bearer(admin))

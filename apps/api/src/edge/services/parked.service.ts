@@ -48,7 +48,7 @@ export class EdgeParkedService {
     cashier: EdgeCashier,
     request: EdgeParkRequest,
   ): Promise<EdgeParkedBasket> {
-    const quoted = this.checkout.quote(request.lines);
+    const quoted = this.checkout.quote(request.lines, tillCode);
     return inEdgeTransaction(this.db, async (tx) => {
       const [existing] = await tx
         .select()

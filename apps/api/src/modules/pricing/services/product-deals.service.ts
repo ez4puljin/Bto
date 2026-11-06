@@ -10,6 +10,7 @@ import {
   type DiscountScope,
   type DiscountStep,
   type PriceList,
+  programServes,
   type QuoteProgram,
 } from '@tugeel/shared/pricing';
 import {
@@ -21,6 +22,7 @@ import {
 import { type DiscountProgram, DiscountProgramsService } from './discount-programs.service';
 import { type PackPrice, PriceQuoteService } from './price-quote.service';
 import { ProductPricesService } from './product-prices.service';
+import { ProgramTargetsService } from './program-targets.service';
 
 /** A product's badge (ADR-0092 #3): the program behind it and its first step in words. */
 export interface ProductDeal extends DealFacts {
@@ -46,7 +48,7 @@ const ONE = new Decimal(1);
 /**
  * The WHOLESALE discount programs in force on one business date and the products each marks
  * (ADR-0092 #3, ADR-0093): a PRODUCT program its product, a CATEGORY program every product of its
- * subtree; ORDER programs apart. Read once per request; a product in a promotion and a discount
+ * subtree, a program with targets every product of its set (ADR-0159); ORDER programs apart. Read once per request; a product in a promotion and a discount
  * counts as a promotion only.
  */
 export class DealBook {
@@ -56,6 +58,7 @@ export class DealBook {
     private readonly marks: ReadonlyMap<number, readonly number[]>,
     private readonly subtrees: ReadonlyMap<number, ReadonlySet<number>>,
     readonly orderPrograms: readonly OrderDealProgram[],
+    private readonly sets: ReadonlyMap<number, ReadonlySet<number>> = new Map(),
   ) {}
 
   /** Products marked by a program with an end date. */
@@ -96,6 +99,12 @@ export class DealBook {
         program.categoryId === null ? null : (this.subtrees.get(program.categoryId) ?? null),
       countUomId: program.countUomId,
       steps: program.steps,
+      productIds: this.sets.get(program.id) ?? null,
+      priority: program.priority,
+      adjust:
+        program.adjustKind === 'NONE'
+          ? null
+          : { kind: program.adjustKind, factor: new Decimal(program.adjustFactor) },
     };
   }
 
@@ -131,12 +140,16 @@ export class ProductDealsService {
     private readonly categories: CategoriesService,
     private readonly units: UnitConversionService,
     private readonly uoms: UomsService,
+    private readonly targets: ProgramTargetsService,
   ) {}
 
-  /** The programs of `list` in force on `date` and the products they mark. */
-  async book(list: PriceList, date: string): Promise<DealBook> {
+  /**
+   * The programs of `list` in force on `date` and the products they mark; those naming pipelines
+   * count only for the pipeline given (ADR-0159 #5).
+   */
+  async book(list: PriceList, date: string, pipelineId: number | null = null): Promise<DealBook> {
     const views = (await this.programs.inForceViews(list, date)).filter(
-      (program) => program.steps.length > 0,
+      (program) => program.steps.length > 0 && programServes(program, list, { pipelineId }),
     );
     const programs = new Map(views.map((program) => [program.id, program]));
     const marks = new Map<number, number[]>();
@@ -146,6 +159,10 @@ export class ProductDealsService {
       else marks.set(productId, [programId]);
     };
     const subtrees = new Map<number, ReadonlySet<number>>();
+    const sets = await this.targets.productSets(views);
+    for (const [programId, products] of sets) {
+      for (const productId of products) mark(productId, programId);
+    }
     for (const program of views) {
       if (program.scope === 'PRODUCT' && program.product) mark(program.product.id, program.id);
       if (program.scope === 'CATEGORY' && program.categoryId !== null) {
@@ -171,7 +188,7 @@ export class ProductDealsService {
         effect: program.effect,
         steps: program.steps,
       }));
-    return new DealBook(date, programs, marks, subtrees, orderPrograms);
+    return new DealBook(date, programs, marks, subtrees, orderPrograms, sets);
   }
 
   /**
@@ -281,7 +298,8 @@ export class ProductDealsService {
 /** A first step that always applies (ADR-0092 #7), on prices a pack can show. */
 function isUnconditional(program: DiscountProgram): boolean {
   const first = program.steps[0];
-  if (!first) return false;
+  if (!first || program.effect === 'BONUS' || (first.rule ?? 'MINIMUM') !== 'MINIMUM') return false;
+  if (program.scope === 'PRODUCT' && program.measure === 'AMOUNT') return first.threshold.isZero();
   if (program.scope === 'PRODUCT') return first.threshold.lte(ONE);
   // A category's tugriks off its total cannot be shown per pack; ORDER programs never are.
   return program.scope === 'CATEGORY' && program.effect === 'PERCENT' && first.threshold.isZero();

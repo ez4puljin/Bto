@@ -78,6 +78,18 @@ export const EnvSchema = z.object({
   ),
   /** Role ai_reader: the assistant's queries and saved reports run only through it. */
   AI_DATABASE_URL: unsetWhenEmpty(postgresUrl),
+  /**
+   * Seals the provider key saved on the settings screen (ADR-0162): 32 random bytes in base64, a
+   * secret like JWT_SECRET, api only. Without it a key can only come from LLM_API_KEY.
+   */
+  AI_KEY_SECRET: unsetWhenEmpty(
+    z
+      .string()
+      .trim()
+      .refine((value) => Buffer.from(value, 'base64').length === 32, {
+        error: 'AI_KEY_SECRET must be 32 bytes in base64',
+      }),
+  ),
   /** The assistant's own pool (§10.2); at most the role's CONNECTION LIMIT 4. */
   AI_POOL_MAX: unsetWhenEmpty(z.coerce.number().int().min(1).max(4)),
 });

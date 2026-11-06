@@ -50,9 +50,19 @@ export const PERMISSIONS = [
   'imports.manage',
   'pricing.manage',
   'pricing.prices.manage',
-  // The AI assistant (ADR-0045): asking shows costs, credit and personal data to the holder.
+  // The AI assistant (ADR-0045): asking, within the data groups the holder's roles open (ADR-0162).
   'ai.ask',
   'ai.reports.manage',
+  // The connection, the limits and the usage of the AI (ADR-0162).
+  'ai.settings.manage',
+  // What the assistant may read for the holder (ADR-0162, AI_DATA_GROUPS in `@tugeel/shared/ai`).
+  'ai.data.catalog',
+  'ai.data.stock',
+  'ai.data.customers',
+  'ai.data.suppliers',
+  'ai.data.pricing',
+  'ai.data.sales',
+  'ai.data.finance',
   // Segments (ADR-0049): creating, changing and archiving them; everyone reads and uses them.
   'segments.manage',
   // Customer orders (ADR-0055): reading them, and entering, submitting and cancelling them.
@@ -113,7 +123,7 @@ export function isPermission(value: unknown): value is Permission {
 }
 
 /**
- * What ADMIN keeps whatever is edited (ADR-0163 #3): without these nobody could open the roles
+ * What ADMIN keeps whatever is edited (ADR-0165 #3): without these nobody could open the roles
  * screen or repair a role, and a lost right could not be given back from the system.
  */
 export const ADMIN_LOCKED_PERMISSIONS: readonly Permission[] = [
@@ -135,7 +145,7 @@ export function isAssignablePermission(value: Permission): boolean {
 
 /**
  * System roles (SPEC §3). Their permission sets start from `SYSTEM_ROLE_PERMISSIONS`; an admin's
- * ticks are kept as differences from it (`systemRolePermissions`, ADR-0163).
+ * ticks are kept as differences from it (`systemRolePermissions`, ADR-0165).
  */
 export const SYSTEM_ROLES = [
   'ADMIN',
@@ -243,7 +253,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
   DRIVER: [],
 };
 
-/** One admin's tick on a system role, kept as a difference from the code (ADR-0163 #2). */
+/** One admin's tick on a system role, kept as a difference from the code (ADR-0165 #2). */
 export interface RolePermissionOverride {
   readonly permissionCode: string;
   readonly granted: boolean;
@@ -251,7 +261,7 @@ export interface RolePermissionOverride {
 
 /**
  * A system role's rights: the code's set, plus what an admin ticked, minus what an admin unticked
- * (ADR-0163 #2). A right a later version adds to the code therefore still reaches an edited role.
+ * (ADR-0165 #2). A right a later version adds to the code therefore still reaches an edited role.
  */
 export function systemRolePermissions(
   role: SystemRole,

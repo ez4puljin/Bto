@@ -1,5 +1,6 @@
 import { Decimal, roundHalfUp } from '../money';
 import {
+  adjustedPrice,
   type AppliedDiscount,
   allocate,
   type DiscountEffect,
@@ -238,39 +239,70 @@ interface PartState {
   /** The part's amount so far, whole MNT. */
   amount: Decimal;
   applied: AppliedDiscount[];
+  /** A priority program took it (ADR-0159 #4): no other program touches it. */
+  alone: boolean;
+  /** N+M programs on it, cut from the product's parts together after the unit prices. */
+  bonuses: { program: QuoteProgram; step: DiscountStep }[];
 }
 
 /**
  * Prices a cart. In order:
  * 1. each line's parts and their list prices (above);
  * 2. the product's programs on each part, reached by the product's quantity in the whole cart (base
- *    units): a program for a unit reaches only the parts in that unit, a percentage without a unit
- *    every part; PRICE (never above the price so far), then PERCENT, then AMOUNT per unit, then the
- *    unit price rounded to whole MNT and the part's subtotal = unit price × quantity (whole MNT);
- * 3. category programs, reached by the boxes counted or the amount of the category's parts after
- *    step 2; a percentage comes off each part (whole MNT), an amount is split over the parts in
- *    proportion to their amounts;
- * 4. order programs, reached by the cart's amount after step 3, applied the same way;
- * 5. the till's coupons (ADR-0110), each on the amounts the earlier steps and coupons left.
+ *    units) or its amount at list prices: a program for a unit reaches only the parts in that unit,
+ *    one without a unit every part (a set's PRICE and AMOUNT are per base unit); the newest priority
+ *    program reached takes the part alone (ADR-0159 #4); PRICE (never above the price so far), then
+ *    PERCENT, then AMOUNT per unit, each rounded as its program says but never above the price it
+ *    started from, then the unit price rounded to whole MNT and the part's subtotal = unit price ×
+ *    quantity (whole MNT);
+ * 3. N+M programs (ADR-0159 #3): of the product's quantity every N+M has M free, taken off its parts
+ *    at what they cost so far, in proportion to their amounts; the quantity written stays;
+ * 4. category programs, reached by the boxes counted or the amount of their parts after step 3; a
+ *    percentage comes off each part (whole MNT), an amount is split over the parts in proportion to
+ *    their amounts;
+ * 5. order programs, reached by the cart's amount after step 4, applied the same way;
+ * 6. the till's coupons (ADR-0110), each on the amounts the earlier steps and coupons left.
  * Within a stage every program is measured on the stage's starting amounts, then PERCENT programs
- * and AMOUNT programs apply in that order, each by id. A line without price terms is left out of
- * the amounts but its quantity still counts.
+ * and AMOUNT programs apply in that order, each by id. A part a priority program took counts towards
+ * the thresholds of steps 4–5 but takes no discount from them. A line without price terms is left
+ * out of the amounts but its quantity still counts.
  */
 export function resolveQuote(lines: readonly QuoteLineInput[], context: QuoteContext): QuoteResult {
   const productQty = new Map<number, Decimal>();
   for (const line of lines) {
     productQty.set(line.productId, (productQty.get(line.productId) ?? ZERO).plus(line.qtyBase));
   }
-  const states = lines.map((line) =>
-    priceParts(line, context, productQty.get(line.productId) ?? ZERO),
+  const listed = lines.map((line) =>
+    listParts(line, context, productQty.get(line.productId) ?? ZERO),
   );
+  const productAmount = new Map<number, Decimal>();
+  lines.forEach((line, index) => {
+    for (const { part, listPrice } of listed[index] ?? []) {
+      productAmount.set(
+        line.productId,
+        (productAmount.get(line.productId) ?? ZERO).plus(listPrice.times(part.qty)),
+      );
+    }
+  });
+  const states = lines.map((line, index) => {
+    const own = listed[index];
+    return own
+      ? priceParts(
+          line,
+          own,
+          context,
+          productQty.get(line.productId) ?? ZERO,
+          productAmount.get(line.productId) ?? ZERO,
+        )
+      : null;
+  });
   const partsOf = (indexes: readonly number[]) => indexes.flatMap((index) => states[index] ?? []);
+
+  applyBonuses(lines, states, productQty);
 
   const reachedInCategories = stageOrder(context.programs, 'CATEGORY').map((program) => {
     const members = lines.flatMap((line, index) =>
-      program.categoryIds?.has(context.products.get(line.productId)?.categoryId ?? -1)
-        ? [index]
-        : [],
+      inGroup(program, line.productId, context) ? [index] : [],
     );
     const measured =
       program.measure === 'QTY'
@@ -279,14 +311,14 @@ export function resolveQuote(lines: readonly QuoteLineInput[], context: QuoteCon
     return { program, parts: partsOf(members), step: reachedStep(program.steps, measured) };
   });
   for (const { program, parts, step } of reachedInCategories) {
-    if (step) applyToAmounts(program, step, parts);
+    if (step) applyToAmounts(program, step, parts.filter(notAlone));
   }
 
   const everyPart = states.flatMap((parts) => parts ?? []);
   const orderAmount = amountOf(everyPart);
   for (const program of stageOrder(context.programs, 'ORDER')) {
     const step = reachedStep(program.steps, orderAmount);
-    if (step) applyToAmounts(program, step, everyPart);
+    if (step) applyToAmounts(program, step, everyPart.filter(notAlone));
   }
   for (const coupon of context.coupons ?? []) {
     applyToAmounts(
@@ -325,12 +357,32 @@ export function resolveQuote(lines: readonly QuoteLineInput[], context: QuoteCon
   return { lines: results, subtotal, discountTotal: subtotal.minus(total), total, orderAmount };
 }
 
-/** Steps 1–2 for one line: its parts, their list prices and the product's own programs. */
-function priceParts(
+const notAlone = (state: PartState) => !state.alone;
+
+/** Whether a line's product is in a product program's set: its one product, or its targets. */
+function targetsProduct(program: QuoteProgram, productId: number): boolean {
+  return program.productIds ? program.productIds.has(productId) : program.productId === productId;
+}
+
+/** Whether a line's product is in a group program: its set, or its category subtree. */
+function inGroup(program: QuoteProgram, productId: number, context: QuoteContext): boolean {
+  if (program.productIds) return program.productIds.has(productId);
+  return program.categoryIds?.has(context.products.get(productId)?.categoryId ?? -1) === true;
+}
+
+interface ListedPart {
+  part: LinePart;
+  listPrice: Decimal;
+  /** The part's unit in base units. */
+  factor: Decimal;
+}
+
+/** Step 1 for one line: its parts and their list prices; null without price terms. */
+function listParts(
   line: QuoteLineInput,
   context: QuoteContext,
   productQty: Decimal,
-): PartState[] | null {
+): ListedPart[] | null {
   const product = context.products.get(line.productId);
   const unit = product?.units.find((candidate) => candidate.unitId === line.unitId);
   const base = product?.units.find((candidate) => candidate.isBase);
@@ -356,25 +408,73 @@ function priceParts(
                 : ('RETAIL' as const),
           },
         ];
-  const programs = stageOrder(context.programs, 'PRODUCT').filter(
-    (program) => program.productId === line.productId,
-  );
   return parts.map((part) => {
     const partUnit = product.units.find((candidate) => candidate.unitId === part.unitId) ?? base;
-    const listPrice = unitPriceOf(basisPrice(prices, part.basis), partUnit.factor);
+    return {
+      part,
+      listPrice: unitPriceOf(basisPrice(prices, part.basis), partUnit.factor),
+      factor: partUnit.factor,
+    };
+  });
+}
+
+/** The step a product program reaches on this product: N+M from one whole N+M on. */
+function productStep(
+  program: QuoteProgram,
+  productQty: Decimal,
+  productAmount: Decimal,
+): DiscountStep | null {
+  if (program.effect === 'BONUS') {
+    const [step] = program.steps;
+    return step && productQty.gte(step.threshold.plus(step.value)) ? step : null;
+  }
+  return reachedStep(program.steps, program.measure === 'AMOUNT' ? productAmount : productQty);
+}
+
+/** Step 2 for one line: the product's own programs on its parts. */
+function priceParts(
+  line: QuoteLineInput,
+  listed: readonly ListedPart[],
+  context: QuoteContext,
+  productQty: Decimal,
+  productAmount: Decimal,
+): PartState[] {
+  const programs = stageOrder(context.programs, 'PRODUCT').filter((program) =>
+    targetsProduct(program, line.productId),
+  );
+  return listed.map(({ part, listPrice, factor }) => {
     let price = listPrice;
     const applied: AppliedDiscount[] = [];
-    for (const program of programs) {
-      if (program.productUnitId !== null && program.productUnitId !== part.unitId) continue;
-      const step = reachedStep(program.steps, productQty);
-      if (!step) continue;
+    const bonuses: PartState['bonuses'] = [];
+    const reached = programs.flatMap((program) => {
+      if (program.productUnitId !== null && program.productUnitId !== part.unitId) return [];
+      const step = productStep(program, productQty, productAmount);
+      return step ? [{ program, step }] : [];
+    });
+    const first = reached
+      .filter(({ program }) => program.priority === true)
+      .sort((a, b) => b.program.id - a.program.id)[0];
+    for (const { program, step } of first ? [first] : reached) {
+      if (program.effect === 'BONUS') {
+        bonuses.push({ program, step });
+        continue;
+      }
+      const before = price;
+      // A set's PRICE and AMOUNT are per base unit, whichever unit the line is in.
+      const perUnit = program.productUnitId === null ? step.value.times(factor) : step.value;
       if (program.effect === 'PRICE') {
-        if (!step.value.lt(price)) continue;
-        price = step.value;
+        if (!perUnit.lt(price)) continue;
+        price = perUnit;
       } else if (program.effect === 'PERCENT') {
         price = price.times(HUNDRED.minus(step.value)).div(HUNDRED);
       } else {
-        price = Decimal.max(ZERO, price.minus(step.value));
+        price = Decimal.max(ZERO, price.minus(perUnit));
+      }
+      if (program.adjust) {
+        price = Decimal.min(
+          before,
+          adjustedPrice(price, program.adjust.kind, program.adjust.factor),
+        );
       }
       applied.push(appliedOf(program, step, null));
     }
@@ -388,11 +488,60 @@ function priceParts(
       subtotal,
       amount: subtotal,
       applied,
+      alone: first !== undefined,
+      bonuses,
     };
   });
 }
 
-/** Steps 3–4: one category or order program on the amounts of its parts. */
+/**
+ * Step 3: of each product's quantity every N+M has M free. The cut is what the free units cost at
+ * the parts' amounts so far, split over the parts holding the program; the quantity stays.
+ */
+function applyBonuses(
+  lines: readonly QuoteLineInput[],
+  states: readonly (PartState[] | null)[],
+  productQty: ReadonlyMap<number, Decimal>,
+): void {
+  const groups = new Map<
+    string,
+    { program: QuoteProgram; step: DiscountStep; productId: number; parts: PartState[] }
+  >();
+  lines.forEach((line, index) => {
+    for (const state of states[index] ?? []) {
+      for (const { program, step } of state.bonuses) {
+        const key = `${program.id}:${line.productId}`;
+        const group = groups.get(key);
+        if (group) group.parts.push(state);
+        else groups.set(key, { program, step, productId: line.productId, parts: [state] });
+      }
+    }
+  });
+  const ordered = [...groups.values()].sort(
+    (a, b) => a.program.id - b.program.id || a.productId - b.productId,
+  );
+  for (const { program, step, productId, parts } of ordered) {
+    const free = (productQty.get(productId) ?? ZERO)
+      .dividedToIntegerBy(step.threshold.plus(step.value))
+      .times(step.value);
+    const counted = parts.reduce((sum, state) => sum.plus(state.part.qtyBase), ZERO);
+    const amount = amountOf(parts);
+    if (!free.gt(0) || !counted.gt(0) || !amount.gt(0)) continue;
+    const cut = Decimal.min(amount, roundHalfUp(amount.times(free).div(counted), 0));
+    const cuts = allocate(
+      cut,
+      parts.map((state) => state.amount),
+    );
+    parts.forEach((state, index) => {
+      const own = cuts[index] ?? ZERO;
+      if (own.isZero()) return;
+      state.amount = state.amount.minus(own);
+      state.applied.push(appliedOf(program, step, own));
+    });
+  }
+}
+
+/** Steps 4–6: one category or order program on the amounts of its parts. */
 function applyToAmounts(
   program: QuoteProgram,
   step: DiscountStep,
@@ -460,9 +609,9 @@ function amountOf(members: readonly PartState[]): Decimal {
   return members.reduce((sum, state) => sum.plus(state.amount), ZERO);
 }
 
-const EFFECT_ORDER: Record<DiscountEffect, number> = { PRICE: 0, PERCENT: 1, AMOUNT: 2 };
+const EFFECT_ORDER: Record<DiscountEffect, number> = { PRICE: 0, PERCENT: 1, AMOUNT: 2, BONUS: 3 };
 
-/** A stage's programs in application order: PRICE, PERCENT, AMOUNT, each by id. */
+/** A stage's programs in application order: PRICE, PERCENT, AMOUNT, BONUS, each by id. */
 function stageOrder(programs: readonly QuoteProgram[], scope: DiscountScope): QuoteProgram[] {
   return programs
     .filter((program) => program.scope === scope)

@@ -16,8 +16,8 @@ case "${ROLE:-}" in
     ;;
   worker)
     # The worker never asks the AI assistant (ADR-0045): its key and read-only role stay with the api.
-    exec env -u MIGRATOR_DATABASE_URL -u ADMIN_DATABASE_URL -u LLM_API_KEY -u AI_DATABASE_URL \
-      node dist/worker.js
+    exec env -u MIGRATOR_DATABASE_URL -u ADMIN_DATABASE_URL -u LLM_API_KEY -u AI_KEY_SECRET \
+      -u AI_DATABASE_URL node dist/worker.js
     ;;
   edge)
     # The store edge (ADR-0067): its own small database, migrated by the one role that owns it.

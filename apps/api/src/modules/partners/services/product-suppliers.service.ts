@@ -7,7 +7,7 @@ import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
-import { CatalogService, type ProductSummary } from '../../catalog';
+import { CatalogService, ProductFiltersService, type ProductSummary } from '../../catalog';
 import { type Actor, AuditService } from '../../identity';
 import { productSuppliers, suppliers } from '../schema';
 import type { PartnerStatus } from './customers.service';
@@ -43,6 +43,7 @@ export class ProductSuppliersService {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly catalog: CatalogService,
+    private readonly productFilters: ProductFiltersService,
   ) {}
 
   /** Links of a product, the main supplier first. */
@@ -88,16 +89,26 @@ export class ProductSuppliersService {
    */
   async productsOf(
     supplierId: number,
-    query: { cursor?: string; limit?: number } = {},
+    query: { cursor?: string; limit?: number; productCategoryId?: number } = {},
   ): Promise<{ data: SupplierProduct[]; nextCursor: string | null }> {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const after = decodeCursor(query.cursor);
+    // ADR-0161 #7: only the products of a product category and what is below it.
+    const inCategory = query.productCategoryId
+      ? await this.productFilters.idsWhere({
+          field: 'category',
+          op: 'IN',
+          ids: [query.productCategoryId],
+        })
+      : null;
+    if (inCategory?.length === 0) return { data: [], nextCursor: null };
     const rows = await this.db
       .select()
       .from(productSuppliers)
       .where(
         and(
           eq(productSuppliers.supplierId, supplierId),
+          inCategory ? idIn(productSuppliers.productId, inCategory) : undefined,
           typeof after?.id === 'number' ? gt(productSuppliers.id, after.id) : undefined,
         ),
       )

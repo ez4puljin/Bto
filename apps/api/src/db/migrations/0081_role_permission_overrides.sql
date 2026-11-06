@@ -1,4 +1,4 @@
--- ADR-0163 #2: an admin's ticks on a system role, as differences from the code's set.
+-- ADR-0165 #2: an admin's ticks on a system role, as differences from the code's set.
 CREATE TABLE "role_permission_overrides" (
 	"role_id" bigint NOT NULL,
 	"permission_code" text NOT NULL,

@@ -419,3 +419,314 @@ describe('the till coupons (ADR-0110)', () => {
     expect(result.discountTotal.toFixed()).toBe('1600');
   });
 });
+
+describe('resolveQuote: programs with sets, N+M, rounding and priority (ADR-0159)', () => {
+  const inSet = (...ids: number[]) => ({ productIds: new Set(ids) });
+  const rulePrograms = (rule: 'EXACT' | 'EVERY', threshold: number) =>
+    program({
+      id: 1,
+      scope: 'PRODUCT',
+      effect: 'PERCENT',
+      ...inSet(WATER),
+      steps: [{ threshold: d(threshold), value: d(10), rule }],
+    });
+
+  it('reaches every product of a set, each counted on its own', () => {
+    const plan = program({
+      id: 1,
+      scope: 'PRODUCT',
+      effect: 'PERCENT',
+      ...inSet(COLA, WATER),
+      steps: steps([10, 10]),
+    });
+    const result = resolveQuote(
+      [line(WATER, waterPcs, 10), line(COLA, colaPcs, 5), line(JUICE, juicePcs, 10)],
+      context([plan]),
+    );
+    expect(partsOf(result, 0)).toEqual(['10×71 WAREHOUSE 800→720 = 7200']);
+    // Below the threshold on its own, and outside the set.
+    expect(priced(result, 1).discountAmount.toFixed()).toBe('0');
+    expect(priced(result, 1).parts[0]?.applied).toEqual([]);
+    expect(priced(result, 2).parts[0]?.applied).toEqual([]);
+  });
+
+  it("takes a set's new price and tugriks per base unit, whichever unit the line is in", () => {
+    const plan = program({
+      id: 1,
+      scope: 'PRODUCT',
+      effect: 'AMOUNT',
+      ...inSet(COLA),
+      steps: steps([0, 100]),
+    });
+    const result = resolveQuote([line(COLA, colaBox, 1)], context([plan]));
+    expect(partsOf(result, 0)).toEqual(['1×12 WAREHOUSE 20000→18000 = 18000']);
+    const price = program({
+      id: 2,
+      scope: 'PRODUCT',
+      effect: 'PRICE',
+      ...inSet(COLA),
+      steps: steps([0, 700]),
+    });
+    expect(partsOf(resolveQuote([line(COLA, colaBox, 1)], context([price])), 0)).toEqual([
+      '1×12 WAREHOUSE 20000→14000 = 14000',
+    ]);
+  });
+
+  it('adds a set counted together, by its amount', () => {
+    const plan = program({
+      id: 1,
+      scope: 'CATEGORY',
+      effect: 'PERCENT',
+      ...inSet(WATER, JUICE),
+      steps: steps([10000, 10]),
+    });
+    const result = resolveQuote(
+      [line(WATER, waterPcs, 10), line(JUICE, juiceBox, 1), line(RICE, riceBag, 1)],
+      context([plan]),
+    );
+    expect(priced(result, 0).discountAmount.toFixed()).toBe('800');
+    expect(priced(result, 1).discountAmount.toFixed()).toBe('600');
+    expect(priced(result, 2).discountAmount.toFixed()).toBe('0');
+  });
+
+  it('reads a step from an amount of the product at list prices', () => {
+    const plan = program({
+      id: 1,
+      scope: 'PRODUCT',
+      measure: 'AMOUNT',
+      effect: 'PERCENT',
+      ...inSet(WATER),
+      steps: steps([8000, 10]),
+    });
+    expect(
+      priced(resolveQuote([line(WATER, waterPcs, 9)], context([plan])), 0).total.toFixed(),
+    ).toBe('7200');
+    expect(
+      priced(resolveQuote([line(WATER, waterPcs, 10)], context([plan])), 0).total.toFixed(),
+    ).toBe('7200');
+  });
+
+  it('meets an exact step only at it and an every step at its multiples', () => {
+    const exact = rulePrograms('EXACT', 10);
+    const total = (plan: QuoteProgram, qty: number) =>
+      priced(
+        resolveQuote([line(WATER, waterPcs, qty)], context([plan])),
+        0,
+      ).discountAmount.toFixed();
+    const unitPrice = (plan: QuoteProgram, qty: number) =>
+      priced(
+        resolveQuote([line(WATER, waterPcs, qty)], context([plan])),
+        0,
+      ).parts[0]?.unitPrice.toFixed();
+    expect(unitPrice(exact, 10)).toBe('720');
+    expect(unitPrice(exact, 11)).toBe('800');
+    const every = rulePrograms('EVERY', 3);
+    expect(unitPrice(every, 3)).toBe('720');
+    expect(unitPrice(every, 6)).toBe('720');
+    expect(unitPrice(every, 7)).toBe('800');
+    expect(total(every, 6)).toBe('0');
+  });
+
+  describe('N+M', () => {
+    const onePlusOne = program({
+      id: 1,
+      scope: 'PRODUCT',
+      effect: 'BONUS',
+      ...inSet(WATER),
+      steps: steps([1, 1]),
+    });
+
+    it.each([
+      [1, '800', '0'],
+      [2, '800', '800'],
+      [3, '1600', '800'],
+      [4, '1600', '1600'],
+      [5, '2400', '1600'],
+    ])('1+1 on %i pieces: pays %s, takes %s off', (qty, paid, off) => {
+      const result = resolveQuote([line(WATER, waterPcs, qty)], context([onePlusOne]));
+      const own = priced(result, 0);
+      expect(own.total.toFixed()).toBe(paid);
+      expect(own.discountAmount.toFixed()).toBe(off);
+      // The quantity written stays, and the price per unit does not change.
+      expect(own.parts[0]?.qty.toFixed()).toBe(String(qty));
+      expect(own.parts[0]?.unitPrice.toFixed()).toBe('800');
+    });
+
+    it('counts 5+1 and names itself on the line', () => {
+      const plan = program({ ...onePlusOne, steps: steps([5, 1]) });
+      const own = priced(resolveQuote([line(WATER, waterPcs, 12)], context([plan])), 0);
+      expect(own.discountAmount.toFixed()).toBe('1600');
+      const [applied] = own.parts[0]?.applied ?? [];
+      expect(applied?.effect).toBe('BONUS');
+      expect(applied?.amount?.toFixed()).toBe('1600');
+    });
+
+    it('counts a product over its lines and parts, and the total comes out exact', () => {
+      const result = resolveQuote(
+        [line(COLA, colaBox, 1), line(COLA, colaPcs, 2)],
+        context([program({ ...onePlusOne, ...inSet(COLA) })]),
+      );
+      // 22 pieces: 11 free of what they cost so far, 20,000 + 2 × 1,150 = 22,300.
+      expect(result.discountTotal.toFixed()).toBe('11150');
+      expect(result.total.toFixed()).toBe('11150');
+    });
+
+    it('takes the free units at the price left by a percentage', () => {
+      const percent = program({
+        id: 2,
+        scope: 'PRODUCT',
+        effect: 'PERCENT',
+        ...inSet(WATER),
+        steps: steps([0, 50]),
+      });
+      const own = priced(
+        resolveQuote([line(WATER, waterPcs, 2)], context([onePlusOne, percent])),
+        0,
+      );
+      expect(own.subtotal.toFixed()).toBe('800');
+      expect(own.total.toFixed()).toBe('400');
+    });
+
+    it('does not start below one whole N+M', () => {
+      const plan = program({ ...onePlusOne, priority: true, steps: steps([2, 1]) });
+      const other = program({
+        id: 2,
+        scope: 'PRODUCT',
+        effect: 'PERCENT',
+        ...inSet(WATER),
+        steps: steps([0, 10]),
+      });
+      // 2 pieces do not fill 2+1, so the priority program has not taken them.
+      const below = priced(resolveQuote([line(WATER, waterPcs, 2)], context([plan, other])), 0);
+      expect(below.parts[0]?.unitPrice.toFixed()).toBe('720');
+      const reached = priced(resolveQuote([line(WATER, waterPcs, 3)], context([plan, other])), 0);
+      expect(reached.parts[0]?.unitPrice.toFixed()).toBe('800');
+      expect(reached.total.toFixed()).toBe('1600');
+    });
+  });
+
+  describe('rounding the price', () => {
+    const percent = (adjust: QuoteProgram['adjust']) =>
+      program({
+        id: 1,
+        scope: 'PRODUCT',
+        effect: 'PERCENT',
+        ...inSet(WATER),
+        steps: steps([0, 7]),
+        adjust,
+      });
+    const unitPrice = (plan: QuoteProgram) =>
+      priced(
+        resolveQuote([line(WATER, waterPcs, 1)], context([plan])),
+        0,
+      ).parts[0]?.unitPrice.toFixed();
+
+    // 800 less 7% is 744.
+    it.each([
+      ['ROUND', 10, '740'],
+      ['ROUND', 100, '700'],
+      ['FLOOR', 10, '740'],
+      ['CEIL', 10, '750'],
+      ['ENDS_9', 10, '739'],
+      ['ENDS_9', 100, '699'],
+    ] as const)('%s to %i gives %s', (kind, factor, expected) => {
+      expect(unitPrice(percent({ kind, factor: d(factor) }))).toBe(expected);
+    });
+
+    it('never rounds above the price it started from', () => {
+      const small = program({
+        id: 1,
+        scope: 'PRODUCT',
+        effect: 'AMOUNT',
+        ...inSet(WATER),
+        steps: steps([0, 5]),
+        adjust: { kind: 'CEIL', factor: d(1000) },
+      });
+      expect(unitPrice(small)).toBe('800');
+    });
+
+    it('never rounds a price down to nothing', () => {
+      const plan = percent({ kind: 'FLOOR', factor: d(1000) });
+      expect(unitPrice(plan)).toBe('744');
+    });
+  });
+
+  describe('priority', () => {
+    const plan = (id: number, value: number, priority = false) =>
+      program({
+        id,
+        scope: 'PRODUCT',
+        effect: 'PERCENT',
+        ...inSet(WATER),
+        steps: steps([0, value]),
+        priority,
+      });
+    const unitPrice = (programs: QuoteProgram[]) =>
+      priced(
+        resolveQuote([line(WATER, waterPcs, 1)], context(programs)),
+        0,
+      ).parts[0]?.unitPrice.toFixed();
+
+    it('stacks without one', () => {
+      expect(unitPrice([plan(1, 10), plan(2, 50)])).toBe('360');
+    });
+
+    it('applies alone, the newest of several', () => {
+      expect(unitPrice([plan(1, 10), plan(2, 50, true)])).toBe('400');
+      expect(unitPrice([plan(1, 10, true), plan(2, 50, true), plan(3, 5)])).toBe('400');
+    });
+
+    it('leaves the part out of group and order programs but counts it towards them', () => {
+      const order = program({
+        id: 5,
+        scope: 'ORDER',
+        effect: 'PERCENT',
+        steps: steps([1000, 10]),
+      });
+      const result = resolveQuote(
+        [line(WATER, waterPcs, 1), line(JUICE, juicePcs, 1)],
+        context([plan(1, 50, true), order]),
+      );
+      // Water 400 and juice 575 come to 975: the order program is not reached.
+      expect(result.discountTotal.toFixed()).toBe('0');
+      const reached = resolveQuote(
+        [line(WATER, waterPcs, 2), line(JUICE, juicePcs, 1)],
+        context([plan(1, 50, true), order]),
+      );
+      expect(priced(reached, 0).discountAmount.toFixed()).toBe('0');
+      expect(priced(reached, 1).discountAmount.toFixed()).toBe('58');
+    });
+
+    it('still takes a coupon', () => {
+      const result = resolveQuote([line(WATER, waterPcs, 1)], {
+        ...context([plan(1, 50, true)]),
+        coupons: [{ code: 'C1', name: 'C', effect: 'AMOUNT', value: d(100) }],
+      });
+      expect(result.total.toFixed()).toBe('300');
+    });
+
+    it('takes a unit program only on the parts in its unit', () => {
+      const boxOnly = program({
+        id: 2,
+        scope: 'PRODUCT',
+        effect: 'PERCENT',
+        productId: COLA,
+        productUnitId: colaBox.unitId,
+        steps: steps([0, 50]),
+        priority: true,
+      });
+      const pieces = program({
+        id: 1,
+        scope: 'PRODUCT',
+        effect: 'PERCENT',
+        productId: COLA,
+        steps: steps([0, 10]),
+      });
+      const result = resolveQuote([line(COLA, colaPcs, 25)], context([boxOnly, pieces]));
+      expect(partsOf(result, 0)).toEqual([
+        '1×12 WAREHOUSE 20000→10000 = 10000',
+        '5×11 LOOSE 1150→1035 = 5175',
+      ]);
+    });
+  });
+});

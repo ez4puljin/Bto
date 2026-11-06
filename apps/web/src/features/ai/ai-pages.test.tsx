@@ -21,6 +21,8 @@ const list = <T,>(data: T[], nextCursor: string | null = null) => json({ data, n
 
 const READY: Schemas['AiStatus'] = {
   configured: true,
+  budget: 'NONE',
+  datasets: ['products', 'stock'],
   database: true,
   provider: 'openai',
   model: 'test-model',
@@ -108,7 +110,14 @@ describe('AI assistant pages (ADR-0045)', () => {
       signedIn(ADMIN_ME, {
         ...AI_ROUTES,
         'GET /api/v1/ai/status': () =>
-          json({ configured: false, database: false, provider: null, model: null }),
+          json({
+            budget: 'NONE',
+            datasets: [],
+            configured: false,
+            database: false,
+            provider: null,
+            model: null,
+          }),
       }),
     );
     expect(await screen.findByText(mn.ai.notConfigured.title)).toBeInTheDocument();

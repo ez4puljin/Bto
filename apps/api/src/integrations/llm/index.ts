@@ -1,7 +1,16 @@
 // Large language model providers of the AI assistant (ADR-0045, docs/architecture.md §9.5).
 export { ANTHROPIC_BASE_URL, ANTHROPIC_VERSION, AnthropicClient } from './anthropic.client';
 export { createLlmClient, llmConfigFromEnv } from './create-llm-client';
-export { LLM_CLIENT, LlmModule } from './llm.module';
+export { type LlmCheck } from './llm-check';
+export {
+  type LlmCallFacts,
+  type LlmConnectionStore,
+  type LlmFailure,
+  LlmGateway,
+  type LlmSavedConnection,
+  type LlmWork,
+} from './llm-gateway';
+export { LLM_CLIENT, LLM_FETCH, LlmModule } from './llm.module';
 export {
   type LlmContentPart,
   textOf,

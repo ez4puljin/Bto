@@ -1,6 +1,6 @@
 # Module `ai` — contract
 
-Status: **built** 2026-10-13 within delivery 2 (ADR-0045); off until a provider is configured (§10), a real provider not yet tried (the owner tests with their own key). The owner asked for an assistant that answers questions in Mongolian from the company's own data, makes reports and keeps them.
+Status: **built** 2026-10-13 within delivery 2 (ADR-0045); on Claude since 2026-11-06; the connection, data groups, limits and meter since ADR-0162 the same day. The owner asked for an assistant that answers questions in Mongolian from the company's own data, makes reports and keeps them.
 
 ai depends on `identity` (access decorators, audit, idempotency) in code and on `integrations/llm` for the model. It reads catalog, inventory, partners and pricing data only through its own views in schema `ai`, connected as the read-only role `ai_reader`. Nobody imports it.
 
@@ -11,8 +11,8 @@ ai depends on `identity` (access decorators, audit, idempotency) in code and on 
 - **Data sent to the provider.** The question, the dataset descriptions, earlier steps of the conversation, and up to 50 result rows so the model writes a summary.
 - **Data the assistant reads.** Catalog; stock, movements and costs; customers, suppliers and credit; prices and discounts. Sales and finance come with their modules.
 - **Personal data.** Phones, registration numbers and TINs, addresses and GPS points are shown and may be sent to the provider. This is the owner's decision; the legal question is SPEC §11 #24.
-- **Who.** A new permission «AI асуулт», ADMIN only at first.
-- **Limits.** None per user; every question is logged with its token counts.
+- **Who.** A new permission «AI асуулт», ADMIN only at first; since ADR-0162 it reads only the data groups the person's roles open.
+- **Limits.** None at first; since ADR-0162 a month limit and a person's day limit, both optional, stop new work.
 - **Keeping results.** History, Excel download, and saved reports that run again without the model.
 - **Conversation.** Follow-up questions use the earlier steps.
 - **SQL on screen.** Shown, folded under «Яаж тооцсон».
@@ -25,6 +25,13 @@ ai depends on `identity` (access decorators, audit, idempotency) in code and on 
 | `ai_conversations` | a person's conversation: owner, title (the first question, cut), created / updated | owner only (404 otherwise) |
 | `ai_questions` | one asked question: conversation, asker, question, kind (`QUERY` / `CLARIFY` / `UNSUPPORTED`), SQL, explanation, summary, status, row count, truncated, duration, provider, model, input / output tokens, error code, created_at | append-only like `audit_log` (`REVOKE UPDATE, DELETE, TRUNCATE` + the `forbid_update_delete` trigger); never result rows |
 | `ai_reports` | a saved report: name, SQL copied on the server from an answered question, source question, creator, deleted_at | soft delete; audited |
+
+Since ADR-0162 (migration `0079_ai_settings`):
+
+| Table | What | Guards |
+|---|---|---|
+| `ai_settings` | one row: the switch, provider, model, Ollama's address, the sealed key and its last characters, prices, the month and day limits | never deleted; only the api writes it; `ai_reader` has no access |
+| `ai_usage` | one model call the provider answered: purpose (`ASK`, `INVOICE_CHECK`), person, provider, model, tokens, cost at that day's price (NULL when no price is known) | append-only like `ai_questions`; never a prompt or an answer |
 
 Schema `ai` holds views owned by `migrator`; `ai_reader` has `USAGE` on the schema and `SELECT` on the views, `app` has neither. Every view lists its columns explicitly, calls built-in functions only and has no `security_invoker`; "today" is `(now() AT TIME ZONE 'Asia/Ulaanbaatar')::date`.
 
@@ -62,9 +69,13 @@ None: nothing imports `modules/ai`. Inside the module:
 
 | Piece | Use |
 |---|---|
-| `AskFlowService` (`ask-flow.service.ts`) | `status()`, `ask(actor, { conversationId?, question })`: prompt → model → guard → reader → one repair → summary → log; it runs between transactions |
-| `sqlGuard(sql)` (`sql/sql-guard.ts`) | parses with `libpg-query` and returns `{ ok: true, sql }` or `{ ok: false, reason }` |
-| `AiReaderService` (`sql/ai-reader.service.ts`) | `run(sql, { maxRows, timeoutMs })` → columns, rows (strings), truncated; the pool over `AI_DATABASE_URL` is created on first use |
+| `AskFlowService` (`ask-flow.service.ts`) | `status(actor)`, `ask(actor, { conversationId?, question })`: limits → prompt of the person's views → model → guard → reader → one repair → summary → log; it runs between transactions |
+| `guardSql(sql, access)` (`sql/sql-guard.ts`) | parses with `libpg-query` and returns `{ ok: true, sql }` or `{ ok: false, reason }`; a view outside `access` is `DATA_ACCESS` |
+| `AiReaderService` (`sql/ai-reader.service.ts`) | `run(sql, access, { maxRows, timeoutMs })` → columns, rows (strings), truncated; `access` is required; the pool over `AI_DATABASE_URL` is created on first use |
+| `accessOf(permissions)`, `AI_GROUP_VIEWS` (`semantic/data-groups.ts`) | the views a person's `ai.data.*` permissions open |
+| `AiSettingsFlowService` (`ai-settings-flow.service.ts`) | the connection, its check and the usage page; attaches to `LlmGateway` at start |
+| `AiLimitsService` (`ai-limits.service.ts`) | the limits, the meter and their totals |
+| `LlmGateway` (`integrations/llm`, ADR-0162) | what flows inject in place of `LLM_CLIENT`: `current()` for the state, `forWork({ purpose, userId })` for a metered client after the month's limit; the invoice check uses it too |
 | `ConversationsService`, `ReportsService` | history and saved reports |
 | `AI_DATASETS`, `buildInstructions()` (`semantic/`) | the semantic catalog and the prompt |
 
@@ -72,7 +83,10 @@ None: nothing imports `modules/ai`. Inside the module:
 
 | Route | Access | Notes |
 |---|---|---|
-| `GET /ai/status` | `ai.ask` | `{ configured, provider, model }` (never the key) |
+| `GET /ai/status` | `ai.ask` | `{ configured, database, provider, model, budget, datasets }` (never the key; `budget` is a state without amounts, `datasets` the person's views) |
+| `GET /ai/settings`, `PATCH /ai/settings` | `ai.settings.manage` | the connection and limits; `apiKey` is write-only; `provider: null` removes the saved connection (ADR-0162) |
+| `POST /ai/settings/test` | `ai.settings.manage` | a free request to the provider with typed values, or the connection in force; saves nothing |
+| `GET /ai/usage` | `ai.settings.manage` | the connection's state (`?check=true` asks again, otherwise kept 5 minutes), today's and the month's totals, the limit, the people |
 | `POST /ai/questions` | `ai.ask`, Idempotency-Key | `{ conversationId?, question }` → the answer: conversation, question id, status, kind, explanation, summary, SQL, columns, rows (≤ 500), truncated. A replay returns the stored answer without rows; the web then calls `run` |
 | `GET /ai/conversations` | `ai.ask` | own conversations, newest first, keyset |
 | `GET /ai/conversations/:id` | `ai.ask` | own conversation with its questions (no rows) |
@@ -110,11 +124,11 @@ None: nothing imports `modules/ai`. Inside the module:
 
 ## 6. Error codes introduced
 
-`AI_NOT_CONFIGURED` (503: no provider, or no `AI_DATABASE_URL`), `AI_PROVIDER_FAILED` (502: timeout, network, HTTP error, refusal, unreadable answer; `params.reason`, `status`, `providerCode`), `AI_QUERY_FAILED` (422: a question or report run again, or exported, no longer runs; `params.code`). Also used: `NOT_FOUND`, `FORBIDDEN`, `VALIDATION_FAILED`, `IDEMPOTENCY_KEY_IN_PROGRESS`.
+`AI_NOT_CONFIGURED` (503: no provider, or no `AI_DATABASE_URL`), `AI_PROVIDER_FAILED` (502: timeout, network, HTTP error, refusal, unreadable answer; `params.reason`, `status`, `providerCode`), `AI_QUERY_FAILED` (422: a question or report run again, or exported, no longer runs; `params.code`), `AI_DATA_FORBIDDEN` (403: no data group, or a stored query outside the person's groups), `AI_BUDGET_REACHED` (429: the month's limit), `AI_USER_LIMIT_REACHED` (429: the person's day limit), `AI_KEY_SECRET_MISSING` (503: a key cannot be saved without `AI_KEY_SECRET`), `AI_PRICE_REQUIRED` (422: a month's limit for a model of unknown price). Also used: `NOT_FOUND`, `FORBIDDEN`, `VALIDATION_FAILED`, `IDEMPOTENCY_KEY_IN_PROGRESS`.
 
 ## 7. Audit
 
-`ai_reports` CREATE (name, source question), UPDATE (the name, before and after), DELETE (soft). Questions are their own log (`ai_questions`).
+`ai_reports` CREATE (name, source question), UPDATE (the name, before and after), DELETE (soft). `ai_settings` CREATE and UPDATE (every fact before and after, whether a key exists and whether it changed; never the key, its sealed text or its last characters). Questions are their own log (`ai_questions`).
 
 ## 8. Screens (`apps/web`)
 
@@ -126,6 +140,8 @@ None: nothing imports `modules/ai`. Inside the module:
   An empty conversation shows example questions. When the assistant is not configured, a notice says what to set.
 - **«Тайлангууд»** (`/ai/reports`): the saved reports with «Ажиллуулах», «Excel татах», rename and delete.
 - Home: the quick action «AI-аас асуух».
+- **«Тохиргоо → AI»** (`/settings?tab=ai`, `ai.settings.manage`, ADR-0162): the connection (switch, provider, model, key, prices, a free check, removal), the limits, and a table of ADMIN and the custom roles against «Асуух» and the seven data groups, saving at once through `PATCH /roles/:id`.
+- **«Системийн төлөв»** (`/system/status`, `ai.settings.manage`): a card with the connection, today's and the month's questions, invoice checks, tokens and cost, the limit as a meter, the people, the last failure in plain words (a provider's code «credit» included) and a link to the provider's billing page, because no API gives the credit left.
 
 Verified in the browser on 2026-10-13 at phone width (the dev database, no provider configured): the notice, the examples and the 16 datasets; a labelled test conversation inserted by hand showed its rows through `ai_reader` («42», «29,278.79»), was saved as a report, run and deleted on «Тайлангууд»; `nyarav` sees no AI menu and `/ai` answers «Энэ үйлдлийг хийх эрх танд алга». The test rows were removed afterwards.
 
@@ -144,7 +160,9 @@ Verified in the browser on 2026-10-13 at phone width (the dev database, no provi
 
 ## 10. Configuration
 
-`LLM_PROVIDER` (`openai` | `anthropic` | `ollama`; empty = off), `LLM_MODEL`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_TIMEOUT_MS`, `AI_DATABASE_URL` (role `ai_reader`), `AI_POOL_MAX`. All are api only, and empty means unset. The key lives only in the gitignored `apps/api/.env`. Tests never see it: the harness deletes `LLM_*`.
+`LLM_PROVIDER` (`openai` | `anthropic` | `ollama`; empty = off), `LLM_MODEL`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_TIMEOUT_MS`, `AI_DATABASE_URL` (role `ai_reader`), `AI_POOL_MAX`, `AI_KEY_SECRET`. All are api only, and empty means unset. Tests never see a real key: the harness deletes `LLM_*` and scripts the fetch.
+
+Since ADR-0162 a connection saved on «Тохиргоо → AI» overrides `LLM_*`, and removing it returns to them. Its key is sealed in `ai_settings` under `AI_KEY_SECRET`. A database backup alone does not reveal it; losing the secret only means typing the key again. A key goes only to its provider's own address.
 
 ## 11. Opening a module's data to the assistant
 
@@ -159,6 +177,6 @@ A migration that changes a column an `ai.*` view uses recreates the view in the 
 ## 12. Open items
 
 - The owner's first real questions with their own key: collect wrong answers and improve the glossary, the examples or the views.
-- SPEC §11 #24 (legal advice on sending personal data abroad) and #25 (provider retention terms, monthly budget).
+- SPEC §11 #24 (legal advice on sending personal data abroad) and #25 (provider retention terms; the monthly budget now has a field, ADR-0162).
 - `temp_file_limit` on the managed database at go-live (architecture A6).
-- Later, if asked: charts, scheduled reports, a monthly cost limit.
+- Later, if asked: charts, scheduled reports.

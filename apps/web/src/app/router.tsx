@@ -38,6 +38,7 @@ import {
 } from '@/features/pricing/discount-form';
 import { DiscountProgramPage, DiscountProgramsPage } from '@/features/pricing/discount-pages';
 import { PendingProductsPage } from '@/features/pricing/pending-products-page';
+import { PriceProfileCreatePage, PriceProfileEditPage } from '@/features/pricing/profile-form';
 import { PriceProfilePage, PriceProfilesPage } from '@/features/pricing/profile-pages';
 import { PriceQuotePage } from '@/features/pricing/quote-page';
 import { SalesOrderNewPage, SalesOrderPage } from '@/features/sales/orders-pages';
@@ -52,6 +53,7 @@ import { CustomerCreatePage } from '@/features/partners/customer-create-page';
 import { CustomerPage } from '@/features/partners/customer-page';
 import { CustomerCategoriesPage } from '@/features/partners/customer-categories-page';
 import { CustomersPage } from '@/features/partners/customers-page';
+import { SupplierCategoriesPage } from '@/features/partners/supplier-categories-page';
 import {
   SupplierCreatePage,
   SupplierPage,
@@ -364,6 +366,11 @@ export const routes: RouteObject[] = [
           },
           { path: 'partners/suppliers', handle: { width: 'wide' }, element: <SuppliersPage /> },
           {
+            path: 'partners/supplier-categories',
+            handle: { width: 'reading' },
+            element: <SupplierCategoriesPage />,
+          },
+          {
             path: 'partners/suppliers/new',
             handle: { width: 'reading' },
             element: (
@@ -457,6 +464,24 @@ export const routes: RouteObject[] = [
             ),
           },
           { path: 'pricing/profiles', handle: { width: 'wide' }, element: <PriceProfilesPage /> },
+          {
+            path: 'pricing/profiles/new',
+            handle: { width: 'reading' },
+            element: (
+              <RequirePermission permission="pricing.manage">
+                <PriceProfileCreatePage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: 'pricing/profiles/:id/edit',
+            handle: { width: 'reading' },
+            element: (
+              <RequirePermission permission="pricing.manage">
+                <PriceProfileEditPage />
+              </RequirePermission>
+            ),
+          },
           {
             path: 'pricing/profiles/:id',
             handle: { width: 'reading' },

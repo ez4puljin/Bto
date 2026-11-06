@@ -18,7 +18,7 @@ export class RoleDto {
     string | null;
   @ApiProperty() isSystem: boolean;
   @ApiProperty({ enum: PERMISSIONS, enumName: 'Permission', isArray: true }) permissions: string[];
-  @ApiProperty({ description: 'A system role whose rights differ from the code (ADR-0163)' })
+  @ApiProperty({ description: 'A system role whose rights differ from the code (ADR-0165)' })
   customized: boolean;
   @ApiProperty() userCount: number;
 }

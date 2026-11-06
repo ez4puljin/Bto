@@ -310,8 +310,8 @@ export class KioskController {
 
   @Post('quote')
   @HttpCode(200)
-  quote(@Body() body: QuoteDto): Promise<EdgeQuoteResponse> {
-    return this.checkout.quoteWithCodes(body.lines, body.codes ?? []);
+  quote(@Kiosk() kiosk: KioskContext, @Body() body: QuoteDto): Promise<EdgeQuoteResponse> {
+    return this.checkout.quoteWithCodes(body.lines, body.codes ?? [], kiosk.device.tillCode);
   }
 
   /** ADR-0110: a scanned or typed coupon or partner voucher, as the till may take it today. */

@@ -30,7 +30,7 @@ export interface RoleView {
   name: string | null;
   isSystem: boolean;
   permissions: Permission[];
-  /** A system role an admin has changed (it differs from the code's set, ADR-0163). */
+  /** A system role an admin has changed (it differs from the code's set, ADR-0165). */
   customized: boolean;
   userCount: number;
 }
@@ -46,7 +46,7 @@ function invalid(path: string, constraint: string, message: string): AppError {
 
 /**
  * Admins build custom roles from the assignable permissions (ADR-0027 #5) and change the rights of
- * system roles too (ADR-0163): a system role keeps its code and label and cannot be deleted, and
+ * system roles too (ADR-0165): a system role keeps its code and label and cannot be deleted, and
  * its ticks are stored as differences from the code's set, so they survive every boot.
  */
 @Injectable()
@@ -184,7 +184,7 @@ export class RolesService {
   }
 
   /**
-   * The ticks on a system role (ADR-0163): the rights it holds now, and the differences from the
+   * The ticks on a system role (ADR-0165): the rights it holds now, and the differences from the
    * code's set the boot sync rebuilds them from. The admin-only codes stay with ADMIN, which
    * cannot lose what keeps this screen reachable (#3).
    */

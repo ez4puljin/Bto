@@ -687,6 +687,7 @@ export class SalesOrdersService implements OnModuleInit {
         {
           list: 'WHOLESALE',
           date: today,
+          pipelineId: order.pipelineId,
           lines: lines.map((line) => ({ productUnitId: line.productUnitId, qty: line.qty })),
         },
         tx,

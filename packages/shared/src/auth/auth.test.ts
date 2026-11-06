@@ -69,7 +69,7 @@ describe('usernames', () => {
   });
 });
 
-describe('system role permissions (ADR-0163)', () => {
+describe('system role permissions (ADR-0165)', () => {
   it('keeps the code set until an admin changes it', () => {
     expect(systemRolePermissions('DRIVER', [])).toEqual([]);
     expect([...systemRolePermissions('HR', [])].sort()).toEqual(

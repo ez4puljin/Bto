@@ -32,6 +32,7 @@ import {
 import { overdueDto } from '../overdue';
 import { AppSettingsService } from './app-settings.service';
 import { SalesOrdersService } from './sales-orders.service';
+import { SalesPipelinesService } from './sales-pipelines.service';
 
 /** A product as the rep's shop shows it: units with their wholesale price, and the stock. */
 export interface RepProduct {
@@ -209,11 +210,15 @@ export class SalesRepShopService {
     private readonly deals: ProductDealsService,
     private readonly settings: AppSettingsService,
     private readonly units: UnitConversionService,
+    private readonly pipelines: SalesPipelinesService,
   ) {}
 
   /** The WHOLESALE programs in force on `today` and the products they mark (one read per request). */
-  dealBook(today = businessDate()): Promise<DealBook> {
-    return this.deals.book('WHOLESALE', today);
+  async dealBook(
+    today = businessDate(),
+    channel: 'SALES_REP' | 'CUSTOMER_APP' = 'SALES_REP',
+  ): Promise<DealBook> {
+    return this.deals.book('WHOLESALE', today, await this.pipelines.channelPipeline(channel));
   }
 
   /**

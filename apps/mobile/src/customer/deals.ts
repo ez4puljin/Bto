@@ -39,6 +39,7 @@ export type DealCondition =
 
 /** What the first step gives. */
 export type DealEffect =
+  | { kind: 'bonus'; buy: string; free: string }
   | { kind: 'percent'; value: string }
   | { kind: 'amount'; value: string; per: string | null }
   | { kind: 'price'; value: string; per: string | null };
@@ -54,6 +55,14 @@ export interface DealSentence {
 export function dealSentenceOf(deal: StoreDeal): DealSentence {
   const category = deal.scope === 'CATEGORY';
   const threshold = deal.threshold;
+  // N+M says its own condition (ADR-0159 #3).
+  if (deal.effect === 'BONUS') {
+    return {
+      until: deal.lastDay ? monthDay(deal.lastDay) : null,
+      condition: null,
+      effect: { kind: 'bonus', buy: formatQty(threshold?.qty ?? '0'), free: formatQty(deal.value) },
+    };
+  }
   let condition: DealCondition = null;
   if (threshold?.qty) {
     condition = {

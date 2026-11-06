@@ -14,7 +14,7 @@ const VIEWS = ['ALL', 'HELD', 'MISSING'] as const;
 type View = (typeof VIEWS)[number];
 
 /**
- * What one staff member may and may not do (owner 2026-11-06, ADR-0163 #5): every right of the
+ * What one staff member may and may not do (owner 2026-11-06, ADR-0165 #5): every right of the
  * catalog per module, ticked when one of their roles grants it, with the roles that grant it. The
  * view (`?show=`) narrows it to the rights held or missing; the server's guard reads the same roles.
  */

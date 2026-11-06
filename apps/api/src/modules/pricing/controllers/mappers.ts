@@ -52,10 +52,12 @@ export function toPriceProfileDto(profile: PriceProfile): PriceProfileDto {
     id: profile.id,
     name: profile.name,
     archivedAt: profile.archivedAt?.toISOString() ?? null,
+    status: profile.status,
     current: profile.current ? toVersionDto(profile.current) : null,
     scheduled: profile.scheduled.map(toVersionDto),
     history: profile.history.map(toVersionDto),
     productsToday: profile.productsToday,
+    createdByName: profile.createdByName,
     createdAt: profile.createdAt.toISOString(),
     updatedAt: profile.updatedAt.toISOString(),
   };
@@ -105,6 +107,8 @@ export function toProgramInput(body: DiscountProgramInputDto): DiscountProgramIn
   return {
     name: body.name,
     list: body.list,
+    state: body.state ?? 'ACTIVE',
+    priority: body.priority ?? false,
     scope: body.scope,
     measure: body.measure,
     effect: body.effect,
@@ -113,11 +117,20 @@ export function toProgramInput(body: DiscountProgramInputDto): DiscountProgramIn
     thresholdUnitId: body.thresholdUnitId ?? null,
     categoryId: body.categoryId ?? null,
     countUomId: body.countUomId ?? null,
+    targetKind: body.targetKind ?? null,
+    targetIds: body.targetIds ?? [],
+    excludeTargetIds: body.excludeTargetIds ?? [],
+    excludeProductIds: body.excludeProductIds ?? [],
+    adjustKind: body.adjustKind ?? 'NONE',
+    adjustFactor: body.adjustFactor ?? 1,
+    pipelineIds: body.pipelineIds ?? [],
+    tillIds: body.tillIds ?? [],
     validFrom: body.validFrom,
     validTo: body.validTo ?? null,
     steps: body.steps.map((step) => ({
       threshold: new Decimal(step.threshold),
       value: new Decimal(step.value),
+      ...(step.rule ? { rule: step.rule } : {}),
     })),
   };
 }
@@ -134,6 +147,7 @@ export function toProgramDto(program: DiscountProgram): DiscountProgramDto {
     steps: program.steps.map((step) => ({
       threshold: step.threshold.toString(),
       value: step.value.toString(),
+      ...(step.rule ? { rule: step.rule } : {}),
     })),
     createdAt: program.createdAt.toISOString(),
     updatedAt: program.updatedAt.toISOString(),

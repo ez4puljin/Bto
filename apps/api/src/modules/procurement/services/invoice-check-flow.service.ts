@@ -7,12 +7,7 @@ import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, notFound } from '../../../common/errors/app-error';
-import {
-  LLM_CLIENT,
-  type LlmClient,
-  type LlmContentPart,
-  LlmError,
-} from '../../../integrations/llm';
+import { type LlmContentPart, LlmError, LlmGateway } from '../../../integrations/llm';
 import { CatalogService, UnitConversionService } from '../../catalog';
 import {
   actorUserId,
@@ -181,7 +176,7 @@ export class InvoiceCheckFlowService {
 
   constructor(
     @Inject(DB) private readonly db: Db,
-    @Inject(LLM_CLIENT) private readonly llm: LlmClient | null,
+    private readonly gateway: LlmGateway,
     private readonly audit: AuditService,
     private readonly storage: StorageService,
     private readonly catalog: CatalogService,
@@ -192,8 +187,8 @@ export class InvoiceCheckFlowService {
   ) {}
 
   /** Whether a check can run now (a model is configured). */
-  get configured(): boolean {
-    return this.llm !== null;
+  async configured(): Promise<boolean> {
+    return (await this.gateway.current()) !== null;
   }
 
   /** The checks of a supplier on an order, newest first. */
@@ -235,7 +230,7 @@ export class InvoiceCheckFlowService {
     fileId: number,
   ): Promise<InvoiceCheckView> {
     await this.assertRunner(ctx, supplierId);
-    const llm = this.llm;
+    const llm = await this.gateway.forWork({ purpose: 'INVOICE_CHECK', userId: actorUserId(ctx) });
     if (llm === null) {
       throw new AppError('AI_NOT_CONFIGURED', 'no model is configured for the invoice check');
     }

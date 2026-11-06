@@ -4,7 +4,9 @@ import {
   type DiscountMeasure,
   type DiscountScope,
   type PriceBasis,
+  type PriceAdjust,
   type PriceRounding,
+  type StepRule,
   type QuoteLineInput,
   type QuoteProduct,
   type QuoteProgram,
@@ -298,7 +300,13 @@ export interface SnapshotProgram {
   productUnitId: number | null;
   categoryIds: number[] | null;
   countUomId: number | null;
-  steps: { threshold: string; value: string }[];
+  steps: { threshold: string; value: string; rule?: StepRule }[];
+  /** ADR-0159: a plan's products, expanded by the centre; absent in older snapshots. */
+  productIds?: number[];
+  priority?: boolean;
+  adjust?: { kind: PriceAdjust; factor: string };
+  /** The tills it serves; absent: all of them. */
+  tillIds?: number[];
 }
 
 export interface SnapshotTill {
@@ -544,7 +552,14 @@ export function quoteContextOf(snapshot: PosSnapshot): {
     steps: program.steps.map((step) => ({
       threshold: new Decimal(step.threshold),
       value: new Decimal(step.value),
+      ...(step.rule ? { rule: step.rule } : {}),
     })),
+    ...(program.productIds ? { productIds: new Set(program.productIds) } : {}),
+    ...(program.priority ? { priority: true } : {}),
+    ...(program.adjust
+      ? { adjust: { kind: program.adjust.kind, factor: new Decimal(program.adjust.factor) } }
+      : {}),
+    ...(program.tillIds ? { tillIds: program.tillIds } : {}),
   }));
   return { products, programs };
 }

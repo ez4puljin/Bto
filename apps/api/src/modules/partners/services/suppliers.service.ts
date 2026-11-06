@@ -12,10 +12,12 @@ import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
+import { ProductFiltersService } from '../../catalog';
 import { type Actor, AuditService } from '../../identity';
 import { SUPPLIER_CHANGED_HOOK, type SupplierChangedHook, type SupplierPartyFacts } from '../hooks';
 import { productSuppliers, supplierContacts, suppliers } from '../schema';
 import { type SupplierContact, SupplierContactsService } from './contacts.service';
+import { SupplierCategoriesService } from './supplier-categories.service';
 import type { ListContact, PartnerStatus } from './customers.service';
 import { advisoryLock, LOCKS, nextNumericCode, optionalText, partnerSearch } from './support';
 
@@ -38,6 +40,8 @@ export interface SupplierInput {
   paymentTermDays?: number | null;
   /** A VAT payer: its delivery-note prices hold VAT (ADR-0078). Omitted on create: no. */
   vatPayer?: boolean;
+  /** An active category (ADR-0161); null: none. */
+  categoryId?: number | null;
   note?: string | null;
 }
 
@@ -68,17 +72,25 @@ export interface SupplierListItem extends SupplierSummary {
   paymentTermDays: number | null;
   note: string | null;
   contact: ListContact | null;
-  /** Products linked to the supplier. */
+  /** Products linked to the supplier; within the product category when one was asked for. */
   productCount: number;
+  categoryId: number | null;
+  /** «Хүнс / Сүүн бүтээгдэхүүн» (ADR-0161). */
+  categoryPath: string | null;
 }
 
 export interface SupplierDetail extends Supplier {
   contacts: SupplierContact[];
+  categoryPath: string | null;
 }
 
 export interface SupplierQuery {
   q?: string;
   status?: PartnerStatus;
+  /** This category and everything below it (ADR-0161). */
+  categoryId?: number;
+  /** Suppliers linked to a product of this product category or below it (ADR-0161 #7). */
+  productCategoryId?: number;
   cursor?: string;
   limit?: number;
 }
@@ -114,6 +126,8 @@ export class SuppliersService implements OnModuleInit {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly contacts: SupplierContactsService,
+    private readonly categories: SupplierCategoriesService,
+    private readonly productFilters: ProductFiltersService,
     private readonly moduleRef: ModuleRef,
   ) {}
 
@@ -140,6 +154,7 @@ export class SuppliersService implements OnModuleInit {
 
   async createInTx(tx: Tx, actor: Actor, input: SupplierInput): Promise<number> {
     const fields = validated(input);
+    if (fields.categoryId !== null) await this.categories.assertActive(tx, fields.categoryId);
     await advisoryLock(tx, LOCKS.supplierCode);
     const code = input.code ?? (await this.nextCode(tx));
     const name = normalizeName(input.name);
@@ -193,8 +208,13 @@ export class SuppliersService implements OnModuleInit {
       paymentTermDays:
         patch.paymentTermDays === undefined ? before.paymentTermDays : patch.paymentTermDays,
       vatPayer: patch.vatPayer ?? before.vatPayer,
+      categoryId: patch.categoryId === undefined ? before.categoryId : patch.categoryId,
       note: patch.note === undefined ? before.note : patch.note,
     });
+    // A retired category stays on a supplier that has it; only a new one must be active.
+    if (fields.categoryId !== null && fields.categoryId !== before.categoryId) {
+      await this.categories.assertActive(tx, fields.categoryId);
+    }
     const code = patch.code ?? before.code;
     const name = patch.name === undefined ? before.name : normalizeName(patch.name);
     const keys = searchKeys(name, [code]);
@@ -229,7 +249,12 @@ export class SuppliersService implements OnModuleInit {
   async get(id: number, executor: Db | Tx = this.db): Promise<SupplierDetail> {
     const [row] = await executor.select().from(suppliers).where(eq(suppliers.id, id));
     if (!row) throw notFound('supplier', id);
-    return { ...supplierView(row), contacts: await this.contacts.ofSupplier(id, executor) };
+    const paths = row.categoryId === null ? null : await this.categories.pathsOf(executor);
+    return {
+      ...supplierView(row),
+      contacts: await this.contacts.ofSupplier(id, executor),
+      categoryPath: row.categoryId === null ? null : (paths?.get(row.categoryId) ?? null),
+    };
   }
 
   async getMany(ids: readonly number[], executor: Db | Tx = this.db): Promise<SupplierSummary[]> {
@@ -256,7 +281,15 @@ export class SuppliersService implements OnModuleInit {
     within: readonly number[] | null = null,
   ): Promise<{ data: SupplierListItem[]; nextCursor: string | null }> {
     if (within?.length === 0) return { data: [], nextCursor: null };
-    const page = await this.pageRows(query, within);
+    const inCategory = query.productCategoryId
+      ? await this.productFilters.idsWhere({
+          field: 'category',
+          op: 'IN',
+          ids: [query.productCategoryId],
+        })
+      : null;
+    if (inCategory?.length === 0) return { data: [], nextCursor: null };
+    const page = await this.pageRows(query, within, inCategory);
     const ids = page.data.map((row) => row.id);
     if (ids.length === 0) return { data: [], nextCursor: page.nextCursor };
     const contacts = await this.db
@@ -271,8 +304,16 @@ export class SuppliersService implements OnModuleInit {
     const counts = await this.db
       .select({ supplierId: productSuppliers.supplierId, count: sql<number>`count(*)::int` })
       .from(productSuppliers)
-      .where(inArray(productSuppliers.supplierId, ids))
+      .where(
+        and(
+          inArray(productSuppliers.supplierId, ids),
+          inCategory ? idIn(productSuppliers.productId, inCategory) : undefined,
+        ),
+      )
       .groupBy(productSuppliers.supplierId);
+    const paths = page.data.some((row) => row.categoryId !== null)
+      ? await this.categories.pathsOf()
+      : new Map<number, string>();
     const contactOf = new Map(contacts.map((contact) => [contact.supplierId, contact]));
     const countOf = new Map(counts.map((row) => [row.supplierId, row.count]));
     return {
@@ -289,6 +330,8 @@ export class SuppliersService implements OnModuleInit {
           note: row.note,
           contact: contact ? { name: contact.name, phone: contact.phone } : null,
           productCount: countOf.get(row.id) ?? 0,
+          categoryId: row.categoryId,
+          categoryPath: row.categoryId === null ? null : (paths.get(row.categoryId) ?? null),
         };
       }),
       nextCursor: page.nextCursor,
@@ -319,11 +362,28 @@ export class SuppliersService implements OnModuleInit {
   }
 
   /** One keyset page of suppliers (search rank, name, id) with every column the lists show. */
-  private async pageRows(query: SupplierQuery, within: readonly number[] | null = null) {
+  private async pageRows(
+    query: SupplierQuery,
+    within: readonly number[] | null = null,
+    linkedTo: readonly number[] | null = null,
+  ) {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const filters: SQL[] = [];
     if (within) filters.push(idIn(suppliers.id, within));
+    if (linkedTo) {
+      filters.push(sql`EXISTS (SELECT 1 FROM product_suppliers ps
+        WHERE ps.supplier_id = suppliers.id AND ${idIn(sql`ps.product_id`, linkedTo)})`);
+    }
     if (query.status) filters.push(eq(suppliers.status, query.status));
+    if (query.categoryId) {
+      filters.push(sql`${suppliers.categoryId} IN (
+        WITH RECURSIVE down(id) AS (
+          SELECT id FROM supplier_categories WHERE id = ${query.categoryId}
+          UNION ALL
+          SELECT c.id FROM supplier_categories c JOIN down ON c.parent_id = down.id
+        )
+        SELECT id FROM down)`);
+    }
     const searched = partnerSearch(suppliers, query.q);
     if (searched) filters.push(searched.match);
     // Without a search every row ranks 0; a bare 0 in ORDER BY would mean "column 0".
@@ -344,6 +404,7 @@ export class SuppliersService implements OnModuleInit {
         bankAccount: suppliers.bankAccount,
         paymentTermDays: suppliers.paymentTermDays,
         note: suppliers.note,
+        categoryId: suppliers.categoryId,
         rank: sql<number>`${rank}`,
       })
       .from(suppliers)
@@ -442,6 +503,7 @@ function validated(input: SupplierInput) {
     bankAccount: bankAccount ?? null,
     paymentTermDays: input.paymentTermDays ?? null,
     vatPayer: input.vatPayer ?? false,
+    categoryId: input.categoryId ?? null,
     note: optionalText(input.note) ?? null,
   };
 }

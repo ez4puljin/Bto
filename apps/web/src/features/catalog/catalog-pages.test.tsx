@@ -310,6 +310,8 @@ describe('products list', () => {
       name,
       tin: null,
       phone: null,
+      categoryId: null,
+      categoryPath: null,
       vatPayer: false,
       status: 'ACTIVE',
       regNo: null,

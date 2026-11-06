@@ -388,6 +388,131 @@ describe('pricing', () => {
     await pricing().profile('Хэрэггүй');
   });
 
+  it('edits, filters, restores and deletes a profile (ADR-0160)', async () => {
+    const values = {
+      looseMarkupPct: '15',
+      retailMarkupPct: '30',
+      retailBulkMinQty: null,
+      retailBulkMarkupPct: null,
+      rounding: 'WHOLE',
+    };
+    const names = async (query: Record<string, unknown>) =>
+      (
+        (await http().get('/api/v1/price-profiles').query(query).set(bearer(office)).expect(200))
+          .body.data as ProfileJson[]
+      ).map((row) => row.name);
+    const made = (
+      await createProfile(admin, { ...values, name: 'Засагдах', validFrom: today }).expect(201)
+    ).body as { id: number; status: string; createdByName: string | null };
+    expect(made.status).toBe('ACTIVE');
+    expect(made.createdByName).toEqual(expect.any(String));
+
+    // A rename alone keeps the values; new values make one new version; both in one call.
+    const put = (body: object) =>
+      http().put(`/api/v1/price-profiles/${made.id}`).set(bearer(admin)).send(body);
+    await put({ ...values, name: 'Засагдсан', validFrom: today }).expect(200);
+    const count = async () =>
+      (
+        await sql.query<{ n: string }>(
+          'SELECT count(*)::text AS n FROM price_profile_versions WHERE profile_id = $1',
+          [made.id],
+        )
+      ).rows[0]?.n;
+    expect(await count()).toBe('1');
+    const later = addDays(today, 2);
+    const edited = (
+      await put({ ...values, looseMarkupPct: '17', name: 'Шинэ нэр', validFrom: later }).expect(200)
+    ).body as ProfileJson & {
+      current: { looseMarkupPct: string };
+      scheduled: { validFrom: string }[];
+    };
+    expect(edited.name).toBe('Шинэ нэр');
+    expect(edited.current.looseMarkupPct).toBe('15.00');
+    expect(edited.scheduled.map((row) => row.validFrom)).toEqual([later]);
+    await put({ ...values, name: 'Хоцорсон', validFrom: addDays(today, -1) }).expect(422);
+    await http()
+      .put(`/api/v1/price-profiles/${made.id}`)
+      .set(bearer(office))
+      .send({ ...values, name: 'Эрхгүй', validFrom: today })
+      .expect(403);
+
+    // The list's filters read today's values.
+    const bulky = (
+      await createProfile(admin, {
+        ...values,
+        name: 'Бөөний',
+        retailBulkMinQty: '24',
+        retailBulkMarkupPct: '20',
+        rounding: 'UP_50',
+        validFrom: today,
+      }).expect(201)
+    ).body as { id: number };
+    const planned = (
+      await createProfile(admin, { ...values, name: 'Ирээдүй', validFrom: later }).expect(201)
+    ).body as { id: number; status: string };
+    expect(planned.status).toBe('SCHEDULED');
+    expect(await names({ q: 'бөөний' })).toEqual(['Бөөний']);
+    expect(await names({ rounding: 'UP_50' })).toContain('Бөөний');
+    expect(await names({ rounding: 'UP_50' })).not.toContain('Шинэ нэр');
+    expect(await names({ bulk: 'WITH' })).toContain('Бөөний');
+    expect(await names({ bulk: 'WITH' })).not.toContain('Шинэ нэр');
+    expect(await names({ bulk: 'WITHOUT' })).toContain('Шинэ нэр');
+    expect(await names({ status: 'SCHEDULED' })).toContain('Ирээдүй');
+    expect(await names({ status: 'SCHEDULED' })).not.toContain('Шинэ нэр');
+    expect(await names({ status: 'ACTIVE' })).not.toContain('Ирээдүй');
+    expect(await names({ used: 'UNUSED' })).toContain('Шинэ нэр');
+    expect(await names({ used: 'USED' })).not.toContain('Шинэ нэр');
+
+    // Archived, then brought back; a live profile of that name refuses it.
+    await http().post(`/api/v1/price-profiles/${bulky.id}/archive`).set(bearer(admin)).expect(200);
+    expect(await names({ status: 'ARCHIVED' })).toContain('Бөөний');
+    expect(await names({})).not.toContain('Бөөний');
+    const clone = (
+      await createProfile(admin, { ...values, name: 'Бөөний', validFrom: today }).expect(201)
+    ).body as { id: number };
+    const taken = await http()
+      .post(`/api/v1/price-profiles/${bulky.id}/restore`)
+      .set(bearer(admin))
+      .expect(409);
+    expect(taken.body.code).toBe('DUPLICATE_VALUE');
+    await http().delete(`/api/v1/price-profiles/${clone.id}`).set(bearer(admin)).expect(204);
+    const back = await http()
+      .post(`/api/v1/price-profiles/${bulky.id}/restore`)
+      .set(bearer(admin))
+      .expect(200);
+    expect(back.body).toMatchObject({ status: 'ACTIVE', archivedAt: null });
+
+    // Deleted: out of every list, the row and the audit stay, the name is free; refused in use.
+    await http().delete(`/api/v1/price-profiles/${bulky.id}`).set(bearer(office)).expect(403);
+    const inUse = await pricing().profile('Хэрэглэж буй');
+    await pricing().terms(water.id, '900', inUse, null);
+    const refused = await http()
+      .delete(`/api/v1/price-profiles/${inUse}`)
+      .set(bearer(admin))
+      .expect(409);
+    expect(refused.body.code).toBe('PRICE_PROFILE_IN_USE');
+    await http().delete(`/api/v1/price-profiles/${bulky.id}`).set(bearer(admin)).expect(204);
+    await http().get(`/api/v1/price-profiles/${bulky.id}`).set(bearer(office)).expect(404);
+    await http().delete(`/api/v1/price-profiles/${bulky.id}`).set(bearer(admin)).expect(404);
+    expect(await names({ status: 'ARCHIVED' })).not.toContain('Бөөний');
+    const row = await sql.query<{ deleted: boolean; archived: boolean }>(
+      'SELECT deleted_at IS NOT NULL AS deleted, archived_at IS NOT NULL AS archived FROM price_profiles WHERE id = $1',
+      [bulky.id],
+    );
+    expect(row.rows[0]).toEqual({ deleted: true, archived: true });
+    await createProfile(admin, { ...values, name: 'Бөөний', validFrom: today }).expect(201);
+    const actions = await sql.query<{ action: string }>(
+      `SELECT action FROM audit_log WHERE entity = 'price_profiles' AND entity_id = $1 ORDER BY id`,
+      [String(bulky.id)],
+    );
+    expect(actions.rows.map((entry) => entry.action)).toEqual([
+      'CREATE',
+      'ARCHIVE',
+      'RESTORE',
+      'DELETE',
+    ]);
+  });
+
   it('keeps discount programs: no two new prices at once, edits before the start, stops after', async () => {
     const boxPrice = {
       name: 'Кока бөөний үнэ',
@@ -446,13 +571,12 @@ describe('pricing', () => {
     expect(edited.body.steps).toEqual([{ threshold: '50', value: '3' }]);
     await http().delete(`/api/v1/discount-programs/${later.id}`).set(bearer(admin)).expect(204);
 
-    const started = await http()
+    // ADR-0159 #1: a running program may be edited; the audit keeps what it was.
+    await http()
       .put(`/api/v1/discount-programs/${created.id}`)
       .set(bearer(admin))
       .send(boxPrice)
-      .expect(409);
-    expect(started.body.code).toBe('DISCOUNT_PROGRAM_STARTED');
-    await http().delete(`/api/v1/discount-programs/${created.id}`).set(bearer(admin)).expect(409);
+      .expect(200);
     const stopped = await http()
       .post(`/api/v1/discount-programs/${created.id}/stop`)
       .set(bearer(admin))
@@ -472,6 +596,7 @@ describe('pricing', () => {
       'CREATE',
       'UPDATE',
       'DELETE',
+      'UPDATE',
       'STOP',
     ]);
   });

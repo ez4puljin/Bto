@@ -2,6 +2,7 @@ import { Injectable, Logger, type OnApplicationShutdown } from '@nestjs/common';
 import { AI_EXPORT_MAX_ROWS, AI_MAX_ROWS } from '@tugeel/shared/ai';
 import { type FieldDef, Pool, type PoolClient, type QueryArrayConfig, type QueryConfig } from 'pg';
 import { AppConfig } from '../../../common/config/app-config';
+import type { AiAccess } from '../semantic/data-groups';
 import { cursorStatement, guardSql } from './sql-guard';
 
 /** How the web shows a column, from its PostgreSQL type. */
@@ -75,10 +76,10 @@ export class AiReaderService implements OnApplicationShutdown {
   }
 
   /** The first rows of a query, for the screen. */
-  async run(sql: string, limits: ReadLimits = SCREEN_LIMITS): Promise<AiResult> {
+  async run(sql: string, access: AiAccess, limits: ReadLimits = SCREEN_LIMITS): Promise<AiResult> {
     let columns: AiResultColumn[] = [];
     const rows: AiRow[] = [];
-    const { truncated } = await this.stream(sql, limits, (batchColumns, batch) => {
+    const { truncated } = await this.stream(sql, access, limits, (batchColumns, batch) => {
       columns = batchColumns;
       rows.push(...batch);
     });
@@ -88,10 +89,11 @@ export class AiReaderService implements OnApplicationShutdown {
   /** Feeds the rows in batches (an Excel export) without holding them all in memory. */
   async stream(
     sql: string,
+    access: AiAccess,
     limits: ReadLimits,
     onBatch: (columns: AiResultColumn[], rows: AiRow[]) => Promise<void> | void,
   ): Promise<{ rowCount: number; truncated: boolean }> {
-    const checked = await guardSql(sql);
+    const checked = await guardSql(sql, access);
     if (!checked.ok) throw new AiQueryError('GUARD', checked.reason, checked.detail, true);
     const declare = await cursorStatement(checked.sql, CURSOR);
     const client = await this.connect();

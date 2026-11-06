@@ -220,6 +220,30 @@ export const customerContacts = pgTable(
 );
 
 /** Suppliers (SPEC §5.3): unique names too, so the product sheet's supplier column can match. */
+/**
+ * Supplier categories (ADR-0161): a tree the owner keeps, a name unique among its siblings. Never
+ * deleted (suppliers name them); a retired one stays on its suppliers and leaves the pickers. The
+ * service keeps a category from sitting below itself.
+ */
+export const supplierCategories = pgTable(
+  'supplier_categories',
+  {
+    id: id(),
+    parentId: ref('parent_id').references((): AnyPgColumn => supplierCategories.id),
+    name: text('name').notNull(),
+    nameKey: text('name_key').notNull(),
+    active: boolean('active').notNull().default(true),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('supplier_categories_parent_name_key').on(t.parentId, t.nameKey).nullsNotDistinct(),
+    index('supplier_categories_parent_idx').on(t.parentId),
+    check('supplier_categories_name', sql`length(${t.name}) BETWEEN 1 AND 80`),
+  ],
+);
+
 export const suppliers = pgTable(
   'suppliers',
   {
@@ -241,6 +265,8 @@ export const suppliers = pgTable(
     paymentTermDays: integer('payment_term_days'),
     /** A VAT payer: its delivery-note prices hold VAT the company takes back (ADR-0078). */
     vatPayer: boolean('vat_payer').notNull().default(false),
+    /** The owner's category (ADR-0161); NULL = none. */
+    categoryId: ref('category_id').references(() => supplierCategories.id),
     note: text('note'),
     status: text('status', { enum: PARTNER_STATUSES }).notNull().default('ACTIVE'),
     createdAt: createdAt(),
@@ -248,6 +274,7 @@ export const suppliers = pgTable(
   },
   (t) => [
     unique('suppliers_code_key').on(t.code),
+    index('suppliers_category_idx').on(t.categoryId, t.id),
     unique('suppliers_name_key_key').on(t.nameKey),
     index('suppliers_name_idx').on(t.name, t.id),
     index('suppliers_search_text_idx').using('gin', t.searchText.op('gin_trgm_ops')),

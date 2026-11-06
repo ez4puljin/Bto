@@ -1,9 +1,19 @@
-import { Archive, Pencil, Plus, Tags } from 'lucide-react';
-import { useState } from 'react';
+import { PRICE_ROUNDINGS } from '@tugeel/shared/pricing';
+import {
+  Archive,
+  ArchiveRestore,
+  Pencil,
+  Plus,
+  SlidersHorizontal,
+  Tags,
+  Trash2,
+} from 'lucide-react';
+import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useParams, useSearchParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FilterChoices, FilterSection } from '@/components/filter-panel';
 import {
   ChevronHead,
   EmptyState,
@@ -12,10 +22,12 @@ import {
   ListCard,
   ListTable,
   LoadMore,
-  SegmentedControl,
+  RowAction,
+  RowActionSpacer,
+  RowActions,
+  SearchField,
   SkeletonRows,
-  SpacerCell,
-  SpacerHead,
+  TruncateCell,
 } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -31,49 +43,88 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { ColumnSpec } from '@/lib/column-layout';
-import { formatCount, plainDecimal } from '@/lib/money';
+import { formatUbDateTime } from '@/lib/dayjs';
+import { formatCount } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
-import { useCreateParam } from '@/lib/use-create-param';
 import {
   type PriceProfile,
   type PriceProfileVersion,
+  type ProfileFilter,
   usePriceProfile,
   usePriceProfiles,
   usePricingMutations,
 } from './api';
 import { lastDayOf } from './helpers';
 import { profileValuesOf, useProfileSummaryParts } from './price-views';
-import { ProfileExample, ProfileValuesDialog, RenameProfileDialog } from './profile-form';
+import { ProfileExample, ProfileProductsLink } from './profile-form';
 
-const FILTERS = ['LIVE', 'ARCHIVED'] as const;
+const STATUSES = ['ACTIVE', 'SCHEDULED', 'ARCHIVED'] as const;
+const BULKS = ['WITH', 'WITHOUT'] as const;
+const USES = ['USED', 'UNUSED'] as const;
 
-/** The list's columns (ADR-0119): the markups are percentages, the bulk one with its quantity. */
+const STATUS_VARIANT: Record<PriceProfile['status'], 'success' | 'default' | 'secondary'> = {
+  ACTIVE: 'success',
+  SCHEDULED: 'default',
+  ARCHIVED: 'secondary',
+};
+
+/** The list's columns (ADR-0119): the markups and the rounding read as one, each whole. */
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'name', kind: 'text', weight: 3, min: 14 },
-  { key: 'loose', kind: 'percent', width: 7 },
-  { key: 'retail', kind: 'percent', width: 8.5 },
-  { key: 'retailBulk', kind: 'percent', width: 11 },
-  { key: 'rounding', kind: 'text', weight: 1 },
-  { key: 'products', kind: 'count' },
-  { key: 'spacer', kind: 'spacer' },
+  { key: 'name', kind: 'text', weight: 2, min: 10 },
+  { key: 'status', kind: 'status', width: 6.5 },
+  { key: 'values', kind: 'text', weight: 4, min: 13 },
+  { key: 'products', kind: 'count', width: 5.75 },
+  { key: 'createdBy', kind: 'text', weight: 1, min: 5 },
+  { key: 'createdAt', kind: 'date', width: 7 },
+  { key: 'updatedAt', kind: 'date', width: 7 },
+  { key: 'actions', kind: 'actions', actions: 3 },
   { key: 'chevron', kind: 'chevron' },
 ];
 
+const inList = <T extends string>(options: readonly T[], value: string | null): T | undefined =>
+  options.find((option) => option === value);
+
 /**
- * «Үнэ» → «Үнийн тохиргоо» (ADR-0048 #3): the profiles products take their prices from, with the
- * values in force today and how many products use each. Every user reads them; pricing.manage
- * creates them (`?new=1`) and changes them on their pages.
+ * «Үнэ» → «Үнийн тохиргоо» (ADR-0048 #3, ADR-0160): filters on the left and the profiles products
+ * take their prices from, with the values in force today, how many products use each, who made it
+ * and when, and its row's edit, archive and delete. Every user reads them; pricing.manage changes.
  */
 export function PriceProfilesPage() {
   const { t } = useTranslation();
   const canManage = useHasPermission('pricing.manage');
   const [params, setParams] = useSearchParams();
-  const archived = params.get('archived') === '1';
-  const profiles = usePriceProfiles(archived);
-  const [creating, setCreating] = useCreateParam();
+  const status = inList(STATUSES, params.get('status'));
+  const rounding = inList(PRICE_ROUNDINGS, params.get('rounding'));
+  const bulk = inList(BULKS, params.get('bulk'));
+  const used = inList(USES, params.get('used'));
+  const q = params.get('q') ?? '';
+  const [search, setSearch] = useState(q);
+  const filter: ProfileFilter = {
+    ...(q ? { q } : {}),
+    ...(status ? { status } : {}),
+    ...(rounding ? { rounding } : {}),
+    ...(bulk ? { bulk } : {}),
+    ...(used ? { used } : {}),
+  };
+  const profiles = usePriceProfiles(filter);
   const rows = profiles.data?.pages.flatMap((page) => page.data) ?? [];
+  const setParam = (key: string, value: string | null) =>
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        return next;
+      },
+      { replace: true },
+    );
+  const filtered = Object.keys(filter).length > 0;
+  const clear = () => {
+    setSearch('');
+    setParams({}, { replace: true });
+  };
 
   return (
     <div>
@@ -82,101 +133,306 @@ export function PriceProfilesPage() {
         description={t('pricing.profiles.intro')}
         actions={
           canManage ? (
-            <Button onClick={() => setCreating(true)}>
-              <Plus />
-              {t('pricing.profiles.new')}
+            <Button asChild>
+              <Link to="/pricing/profiles/new">
+                <Plus />
+                {t('pricing.profiles.new')}
+              </Link>
             </Button>
           ) : null
         }
       />
-      <FilterBar>
-        <SegmentedControl
-          options={FILTERS}
-          label={(value) => t(`pricing.profiles.filters.${value}`)}
-          value={archived ? 'ARCHIVED' : 'LIVE'}
-          onChange={(value) =>
-            setParams(value === 'ARCHIVED' ? { archived: '1' } : {}, { replace: true })
-          }
-        />
-      </FilterBar>
-      <ProblemAlert problem={problemFromError(profiles.error)} onRetry={profiles.refetch} />
-      <ListCard scroll>
-        <ListTable columns={COLUMNS}>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('pricing.profiles.columns.name')}</TableHead>
-              <TableHead className="text-right">{t('pricing.profiles.columns.loose')}</TableHead>
-              <TableHead className="text-right">{t('pricing.profiles.columns.retail')}</TableHead>
-              <TableHead className="text-right">
-                {t('pricing.profiles.columns.retailBulk')}
-              </TableHead>
-              <TableHead>{t('pricing.profiles.columns.rounding')}</TableHead>
-              <TableHead className="text-right">{t('pricing.profiles.columns.products')}</TableHead>
-              <SpacerHead />
-              <ChevronHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {profiles.isPending ? <SkeletonRows columns={8} /> : null}
-            {rows.map((profile) => (
-              <ProfileRow key={profile.id} profile={profile} />
-            ))}
-          </TableBody>
-        </ListTable>
-        {!profiles.isPending && rows.length === 0 ? (
-          <EmptyState
-            icon={Tags}
-            title={archived ? t('pricing.profiles.emptyArchived') : t('pricing.profiles.empty')}
-          />
-        ) : null}
-        <LoadMore query={profiles} />
-      </ListCard>
-      {creating && canManage ? (
-        <ProfileValuesDialog profile={null} onClose={() => setCreating(false)} />
-      ) : null}
+      <div className="flex items-start gap-3">
+        <aside
+          aria-label={t('pricing.profiles.panel.label')}
+          className="hidden w-52 shrink-0 lg:block"
+        >
+          <ListCard scroll beside>
+            <div className="flex items-center gap-2 px-3 py-2.5 text-sm font-semibold">
+              <SlidersHorizontal aria-hidden className="size-4 text-muted-foreground" />
+              <span className="flex-1">{t('pricing.profiles.panel.title')}</span>
+              {filtered ? (
+                <Button type="button" size="xs" variant="ghost" onClick={clear}>
+                  {t('pricing.profiles.panel.clear')}
+                </Button>
+              ) : null}
+            </div>
+            <FilterSection
+              title={t('pricing.profiles.columns.status')}
+              defaultOpen
+              active={!!status}
+            >
+              <FilterChoices
+                options={STATUSES}
+                label={(value) => t(`pricing.profiles.statuses.${value}`)}
+                value={status ?? null}
+                onChange={(value) => setParam('status', value)}
+              />
+            </FilterSection>
+            <FilterSection
+              title={t('pricing.profiles.fields.rounding')}
+              defaultOpen
+              active={!!rounding}
+            >
+              <FilterChoices
+                options={PRICE_ROUNDINGS}
+                label={(value) => t(`pricing.roundings.${value}`)}
+                value={rounding ?? null}
+                onChange={(value) => setParam('rounding', value)}
+              />
+            </FilterSection>
+            <FilterSection title={t('pricing.profiles.panel.bulk')} active={!!bulk}>
+              <FilterChoices
+                options={BULKS}
+                label={(value) => t(`pricing.profiles.panel.bulks.${value}`)}
+                value={bulk ?? null}
+                onChange={(value) => setParam('bulk', value)}
+              />
+            </FilterSection>
+            <FilterSection title={t('pricing.profiles.panel.used')} active={!!used}>
+              <FilterChoices
+                options={USES}
+                label={(value) => t(`pricing.profiles.panel.uses.${value}`)}
+                value={used ?? null}
+                onChange={(value) => setParam('used', value)}
+              />
+            </FilterSection>
+          </ListCard>
+        </aside>
+        <div className="min-w-0 flex-1">
+          <FilterBar>
+            <SearchField
+              className="sm:w-60"
+              aria-label={t('common.search')}
+              placeholder={t('pricing.profiles.search')}
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setParam('q', event.target.value.trim() || null);
+              }}
+            />
+          </FilterBar>
+          <ProblemAlert problem={problemFromError(profiles.error)} onRetry={profiles.refetch} />
+          <ProfileTable
+            rows={rows}
+            pending={profiles.isPending}
+            canManage={canManage}
+            filtered={filtered}
+            archivedOnly={status === 'ARCHIVED'}
+            onClear={clear}
+          >
+            <LoadMore query={profiles} />
+          </ProfileTable>
+        </div>
+      </div>
     </div>
   );
 }
 
-function ProfileRow({ profile }: { profile: PriceProfile }) {
+type RowAct = { kind: 'archive' | 'restore' | 'delete'; profile: PriceProfile };
+
+function ProfileTable(props: {
+  rows: readonly PriceProfile[];
+  pending: boolean;
+  canManage: boolean;
+  filtered: boolean;
+  archivedOnly: boolean;
+  onClear: () => void;
+  children: ReactNode;
+}) {
   const { t } = useTranslation();
+  const mutations = usePricingMutations();
+  const action = useAction();
+  const [acting, setActing] = useState<RowAct | null>(null);
+
+  const run = async () => {
+    if (!acting) return;
+    const { kind, profile } = acting;
+    const ok = await action.run(() => {
+      if (kind === 'delete') return mutations.deleteProfile.mutateAsync(profile.id);
+      if (kind === 'archive') return mutations.archiveProfile.mutateAsync(profile.id);
+      return mutations.restoreProfile.mutateAsync(profile.id);
+    });
+    if (!ok) return;
+    setActing(null);
+    toast.success(t(`pricing.profiles.done.${kind}`));
+  };
+
+  return (
+    <>
+      <ListCard scroll beside>
+        <ListTable columns={COLUMNS}>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('pricing.profiles.columns.name')}</TableHead>
+              <TableHead>{t('pricing.profiles.columns.status')}</TableHead>
+              <TableHead>{t('pricing.profiles.columns.values')}</TableHead>
+              <TableHead className="text-right">{t('pricing.profiles.columns.products')}</TableHead>
+              <TableHead>{t('pricing.profiles.columns.createdBy')}</TableHead>
+              <TableHead>{t('pricing.profiles.columns.createdAt')}</TableHead>
+              <TableHead>{t('pricing.profiles.columns.updatedAt')}</TableHead>
+              <TableHead>
+                <span className="sr-only">{t('pricing.profiles.columns.actions')}</span>
+              </TableHead>
+              <ChevronHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {props.pending ? <SkeletonRows columns={9} /> : null}
+            {props.rows.map((profile) => (
+              <ProfileRow
+                key={profile.id}
+                profile={profile}
+                canManage={props.canManage}
+                onAct={(kind) => setActing({ kind, profile })}
+              />
+            ))}
+          </TableBody>
+        </ListTable>
+        {!props.pending && props.rows.length === 0 ? (
+          <EmptyState
+            icon={Tags}
+            title={
+              props.archivedOnly ? t('pricing.profiles.emptyArchived') : t('pricing.profiles.empty')
+            }
+            {...(props.filtered ? { onClearFilters: props.onClear } : {})}
+          />
+        ) : null}
+        {props.children}
+      </ListCard>
+      <ConfirmDialog
+        open={acting !== null}
+        title={t(`pricing.profiles.confirm.${acting?.kind ?? 'archive'}.title`, {
+          name: acting?.profile.name ?? '',
+        })}
+        description={t(`pricing.profiles.confirm.${acting?.kind ?? 'archive'}.description`)}
+        confirmLabel={t(`pricing.profiles.${acting?.kind ?? 'archive'}`)}
+        {...(acting?.kind === 'delete' ? { variant: 'destructive' as const } : {})}
+        pending={
+          mutations.deleteProfile.isPending ||
+          mutations.archiveProfile.isPending ||
+          mutations.restoreProfile.isPending
+        }
+        problem={action.problem}
+        onConfirm={() => void run()}
+        onClose={() => {
+          action.clear();
+          setActing(null);
+        }}
+      />
+    </>
+  );
+}
+
+function ProfileRow(props: {
+  profile: PriceProfile;
+  canManage: boolean;
+  onAct: (kind: RowAct['kind']) => void;
+}) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const summary = useProfileSummaryParts();
+  const { profile } = props;
   // A profile whose first values start later shows those, marked with their day.
   const upcoming = profile.current ? null : (profile.scheduled[0] ?? null);
   const values = profile.current ?? upcoming;
-  const markup = (pct: string) => t('pricing.profiles.markup', { pct: plainDecimal(pct) });
-  const none = <span className="text-muted-foreground">{t('common.none')}</span>;
+  const archived = profile.status === 'ARCHIVED';
   return (
     <LinkRow to={`/pricing/profiles/${profile.id}`}>
-      <TableCell>
+      <TruncateCell text={profile.name}>
         <Link
           to={`/pricing/profiles/${profile.id}`}
           className="font-medium underline-offset-4 hover:underline"
         >
           {profile.name}
         </Link>
-        {upcoming ? (
-          <Badge variant="outline" className="ml-2">
-            {t('pricing.profiles.startsOn', { date: upcoming.validFrom })}
-          </Badge>
-        ) : null}
+      </TruncateCell>
+      <TableCell>
+        <Badge variant={STATUS_VARIANT[profile.status]}>
+          {t(`pricing.profiles.statuses.${profile.status}`)}
+        </Badge>
+      </TableCell>
+      <TableCell className="whitespace-normal">
+        {/* Each value whole; on a narrow window they wrap between themselves. */}
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+          {upcoming ? (
+            <span className="text-muted-foreground">
+              {t('pricing.profiles.startsOn', { date: upcoming.validFrom })}
+            </span>
+          ) : null}
+          {values ? (
+            summary(values).map((part) => (
+              <span key={part} className="whitespace-nowrap">
+                {part}
+              </span>
+            ))
+          ) : (
+            <span className="text-muted-foreground">{t('common.none')}</span>
+          )}
+        </div>
       </TableCell>
       <TableCell className="text-right font-mono">
-        {values ? markup(values.looseMarkupPct) : none}
+        {profile.productsToday > 0 ? (
+          <Link
+            to={`/catalog/products?profile=${profile.id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-link underline-offset-4 hover:underline"
+          >
+            {formatCount(profile.productsToday)}
+          </Link>
+        ) : (
+          formatCount(profile.productsToday)
+        )}
       </TableCell>
-      <TableCell className="text-right font-mono">
-        {values ? markup(values.retailMarkupPct) : none}
+      <TruncateCell text={profile.createdByName ?? t('common.none')} />
+      {/* The day in the row, the minute on hover. */}
+      <TableCell
+        className="font-mono text-xs"
+        title={formatUbDateTime(Date.parse(profile.createdAt))}
+      >
+        {formatUbDateTime(Date.parse(profile.createdAt)).slice(0, 10)}
       </TableCell>
-      <TableCell className="text-right font-mono">
-        {values?.retailBulkMarkupPct && values.retailBulkMinQty
-          ? t('pricing.profiles.bulkCell', {
-              pct: plainDecimal(values.retailBulkMarkupPct),
-              qty: plainDecimal(values.retailBulkMinQty),
-            })
-          : none}
+      <TableCell
+        className="font-mono text-xs"
+        title={formatUbDateTime(Date.parse(profile.updatedAt))}
+      >
+        {formatUbDateTime(Date.parse(profile.updatedAt)).slice(0, 10)}
       </TableCell>
-      <TableCell>{values ? t(`pricing.roundings.${values.rounding}`) : none}</TableCell>
-      <TableCell className="text-right font-mono">{formatCount(profile.productsToday)}</TableCell>
-      <SpacerCell />
+      {props.canManage ? (
+        <RowActions>
+          {archived ? (
+            <RowActionSpacer />
+          ) : (
+            <RowAction
+              label={t('common.edit')}
+              icon={Pencil}
+              onClick={() => void navigate(`/pricing/profiles/${profile.id}/edit`)}
+            />
+          )}
+          {archived ? (
+            <RowAction
+              label={t('pricing.profiles.restore')}
+              icon={ArchiveRestore}
+              onClick={() => props.onAct('restore')}
+            />
+          ) : (
+            <RowAction
+              label={t('pricing.profiles.archive')}
+              icon={Archive}
+              onClick={() => props.onAct('archive')}
+            />
+          )}
+          <RowAction
+            label={t('pricing.profiles.delete')}
+            icon={Trash2}
+            destructive
+            onClick={() => props.onAct('delete')}
+          />
+        </RowActions>
+      ) : (
+        <TableCell />
+      )}
     </LinkRow>
   );
 }
@@ -193,15 +449,17 @@ export function PriceProfilePage() {
 }
 
 type VersionStatus = 'SCHEDULED' | 'CURRENT' | 'PAST';
+type DetailAct = 'archive' | 'restore' | 'delete';
 
 function ProfileDetail({ profile }: { profile: PriceProfile }) {
   const { t } = useTranslation();
-  const archived = profile.archivedAt !== null;
-  const canManage = useHasPermission('pricing.manage') && !archived;
+  const navigate = useNavigate();
+  const archived = profile.status === 'ARCHIVED';
+  const canManage = useHasPermission('pricing.manage');
   const mutations = usePricingMutations();
-  const archiving = useAction();
+  const action = useAction();
   const summary = useProfileSummaryParts();
-  const [open, setOpen] = useState<'values' | 'rename' | 'archive' | null>(null);
+  const [open, setOpen] = useState<DetailAct | null>(null);
   // Latest first: the planned values, today's, then the earlier ones.
   const versions: { version: PriceProfileVersion; status: VersionStatus }[] = [
     ...[...profile.scheduled].reverse().map((version) => ({
@@ -212,11 +470,18 @@ function ProfileDetail({ profile }: { profile: PriceProfile }) {
     ...profile.history.map((version) => ({ version, status: 'PAST' as const })),
   ];
 
-  const archive = async () => {
-    const ok = await archiving.run(() => mutations.archiveProfile.mutateAsync(profile.id));
+  const run = async () => {
+    if (!open) return;
+    const kind = open;
+    const ok = await action.run(() => {
+      if (kind === 'delete') return mutations.deleteProfile.mutateAsync(profile.id);
+      if (kind === 'archive') return mutations.archiveProfile.mutateAsync(profile.id);
+      return mutations.restoreProfile.mutateAsync(profile.id);
+    });
     if (!ok) return;
     setOpen(null);
-    toast.success(t('pricing.profiles.archivedToast'));
+    toast.success(t(`pricing.profiles.done.${kind}`));
+    if (kind === 'delete') void navigate('/pricing/profiles');
   };
 
   return (
@@ -225,31 +490,49 @@ function ProfileDetail({ profile }: { profile: PriceProfile }) {
         title={profile.name}
         meta={
           <>
-            {archived ? <Badge variant="secondary">{t('pricing.profiles.archived')}</Badge> : null}
+            <Badge variant={STATUS_VARIANT[profile.status]}>
+              {t(`pricing.profiles.statuses.${profile.status}`)}
+            </Badge>
             <span>
               {t('pricing.profiles.productsCount', { count: formatCount(profile.productsToday) })}
+            </span>
+            <span>
+              {t('pricing.profiles.madeBy', {
+                name: profile.createdByName ?? t('common.none'),
+                date: formatUbDateTime(Date.parse(profile.createdAt)).slice(0, 10),
+              })}
+            </span>
+            <span>
+              {t('pricing.profiles.changedOn', {
+                date: formatUbDateTime(Date.parse(profile.updatedAt)).slice(0, 10),
+              })}
             </span>
           </>
         }
         actions={
           canManage ? (
             <>
-              <Button variant="outline" onClick={() => setOpen('rename')}>
-                <Pencil />
-                {t('pricing.profiles.rename')}
+              <Button variant="outline" onClick={() => setOpen(archived ? 'restore' : 'archive')}>
+                {archived ? <ArchiveRestore /> : <Archive />}
+                {t(archived ? 'pricing.profiles.restore' : 'pricing.profiles.archive')}
               </Button>
-              <Button variant="outline" onClick={() => setOpen('archive')}>
-                <Archive />
-                {t('pricing.profiles.archive')}
+              <Button variant="destructive" onClick={() => setOpen('delete')}>
+                <Trash2 />
+                {t('pricing.profiles.delete')}
               </Button>
-              <Button onClick={() => setOpen('values')}>
-                <Plus />
-                {t('pricing.profiles.setValues')}
-              </Button>
+              {archived ? null : (
+                <Button variant="secondary" asChild>
+                  <Link to={`/pricing/profiles/${profile.id}/edit`}>
+                    <Pencil />
+                    {t('common.edit')}
+                  </Link>
+                </Button>
+              )}
             </>
           ) : null
         }
       />
+      <ProblemAlert problem={open ? null : action.problem} />
       {/* The history takes the wider share: dates on one line, one price a line. */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <Card role="region" aria-label={t('pricing.profiles.current')}>
@@ -260,6 +543,7 @@ function ProfileDetail({ profile }: { profile: PriceProfile }) {
                 ? t('pricing.profiles.currentFrom', { date: profile.current.validFrom })
                 : t('pricing.profiles.noCurrent')}
             </CardDescription>
+            <ProfileProductsLink profile={profile} />
           </CardHeader>
           {profile.current ? (
             <CardContent>
@@ -319,23 +603,21 @@ function ProfileDetail({ profile }: { profile: PriceProfile }) {
           </CardContent>
         </Card>
       </div>
-      {open === 'values' && canManage ? (
-        <ProfileValuesDialog profile={profile} onClose={() => setOpen(null)} />
-      ) : null}
-      {open === 'rename' && canManage ? (
-        <RenameProfileDialog profile={profile} onClose={() => setOpen(null)} />
-      ) : null}
       <ConfirmDialog
-        open={open === 'archive'}
-        title={t('pricing.profiles.archiveTitle', { name: profile.name })}
-        description={t('pricing.profiles.archiveDescription')}
-        confirmLabel={t('pricing.profiles.archive')}
-        variant="destructive"
-        pending={mutations.archiveProfile.isPending}
-        problem={archiving.problem}
-        onConfirm={() => void archive()}
+        open={open !== null}
+        title={t(`pricing.profiles.confirm.${open ?? 'archive'}.title`, { name: profile.name })}
+        description={t(`pricing.profiles.confirm.${open ?? 'archive'}.description`)}
+        confirmLabel={t(`pricing.profiles.${open ?? 'archive'}`)}
+        {...(open === 'delete' ? { variant: 'destructive' as const } : {})}
+        pending={
+          mutations.deleteProfile.isPending ||
+          mutations.archiveProfile.isPending ||
+          mutations.restoreProfile.isPending
+        }
+        problem={action.problem}
+        onConfirm={() => void run()}
         onClose={() => {
-          archiving.clear();
+          action.clear();
           setOpen(null);
         }}
       />

@@ -96,7 +96,7 @@ export class PosDevService {
       const node = await this.nodes.get(till.edgeNodeId, tx);
       const soldAt = new Date();
       const today = businessDate(soldAt);
-      const lines = await this.priceLines(tx, input.lines, today);
+      const lines = await this.priceLines(tx, input.lines, today, till.id);
       const totals = saleTotals(lines);
       const seq = await this.numbering.next(tx, `POS_SALE:${node.id}:${till.code}`, today);
       const doc: SaleDoc = {
@@ -166,8 +166,9 @@ export class PosDevService {
     tx: Tx,
     lines: { productUnitId: number; qty: Decimal }[],
     today: string,
+    tillId: number,
   ): Promise<SaleDocLine[]> {
-    const quote = await this.quotes.quote({ list: 'RETAIL', date: today, lines }, tx);
+    const quote = await this.quotes.quote({ list: 'RETAIL', date: today, tillId, lines }, tx);
     const company = await this.tax.companyRates(today, tx);
     const products = new Map(
       (

@@ -568,7 +568,11 @@ export class SalesRepOrdersService {
   async withEstimate(order: OrderDetail): Promise<RepOrderDetail> {
     const estimate =
       order.status === 'DRAFT' && order.lines.length > 0
-        ? await this.estimate(order.lines, businessDate())
+        ? await this.estimate(
+            order.lines,
+            businessDate(),
+            order.pipelineId ?? (await this.pipelines.channelPipeline('SALES_REP')),
+          )
         : null;
     return {
       ...order,
@@ -606,9 +610,19 @@ export class SalesRepOrdersService {
       else byOrder.set(line.orderId, [line]);
     }
     const today = businessDate();
+    // Each draft on the pipeline it landed on; else where the channel's orders land (ADR-0159 #5).
+    const places = new Map(
+      (
+        await this.db
+          .select({ id: salesOrders.id, pipelineId: salesOrders.pipelineId })
+          .from(salesOrders)
+          .where(idIn(salesOrders.id, orderIds))
+      ).map((row) => [row.id, row.pipelineId] as const),
+    );
+    const fallback = await this.pipelines.channelPipeline('SALES_REP');
     // One at a time: the quote runs a handful of queries, and the pool is small (architecture §10.2).
     for (const [orderId, own] of byOrder) {
-      estimates.set(orderId, await this.estimate(own, today));
+      estimates.set(orderId, await this.estimate(own, today, places.get(orderId) ?? fallback));
     }
     return estimates;
   }
@@ -621,12 +635,14 @@ export class SalesRepOrdersService {
   private async estimate(
     lines: readonly { id: number; productUnitId: number; qty: Decimal }[],
     date: string,
+    pipelineId: number | null,
   ): Promise<DraftEstimate> {
     let quote: Quote;
     try {
       quote = await this.quotes.quote({
         list: 'WHOLESALE',
         date,
+        pipelineId,
         lines: lines.map((line) => ({ productUnitId: line.productUnitId, qty: line.qty })),
       });
     } catch (error) {

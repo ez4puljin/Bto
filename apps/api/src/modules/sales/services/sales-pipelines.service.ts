@@ -552,6 +552,21 @@ export class SalesPipelinesService {
   }
 
   /**
+   * The pipeline a channel's orders land on by default, or null: what its discount programs count
+   * for before an order exists (ADR-0159 #5).
+   */
+  async channelPipeline(
+    channel: OrderChannel,
+    executor: Db | Tx = this.db,
+  ): Promise<number | null> {
+    const [row] = await executor
+      .select({ pipelineId: salesChannelDefaults.pipelineId })
+      .from(salesChannelDefaults)
+      .where(eq(salesChannelDefaults.channel, channel));
+    return row?.pipelineId ?? null;
+  }
+
+  /**
    * Where a new order lands (ADR-0057 #4), the pipeline and the stage locked FOR SHARE: the
    * chosen pipeline (one the caller sees) or the channel's default; with `stageId` that stage,
    * which must be live, without an action and open to the caller's MOVE; else the channel's stage

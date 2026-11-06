@@ -1,7 +1,8 @@
+import { ALL_VIEWS } from '../semantic/data-groups';
 import { cursorStatement, type GuardReason, guardSql, SQL_MAX_LENGTH } from './sql-guard';
 
 async function reasonOf(sql: string): Promise<GuardReason | 'OK'> {
-  const result = await guardSql(sql);
+  const result = await guardSql(sql, ALL_VIEWS);
   return result.ok ? 'OK' : result.reason;
 }
 
@@ -50,12 +51,13 @@ describe('guardSql (ADR-0045 #3)', () => {
     ],
     ['a CTE named like a view', 'WITH stock AS (SELECT 1 AS x) SELECT x FROM stock'],
   ])('allows %s', async (_name, sql) => {
-    expect(await guardSql(sql)).toEqual({ ok: true, sql: expect.any(String) });
+    expect(await guardSql(sql, ALL_VIEWS)).toEqual({ ok: true, sql: expect.any(String) });
   });
 
   it('returns the statement without its semicolon, counting UTF-8 bytes', async () => {
     const result = await guardSql(
       '  SELECT name AS "Нэр" FROM products WHERE name = \'Ус\';  -- сүүлийн тайлбар\n',
+      ALL_VIEWS,
     );
     expect(result).toEqual({
       ok: true,
@@ -157,14 +159,14 @@ describe('guardSql (ADR-0045 #3)', () => {
   });
 
   it('names what the model must change', async () => {
-    expect(await guardSql('SELECT * FROM users')).toEqual({
+    expect(await guardSql('SELECT * FROM users', ALL_VIEWS)).toEqual({
       ok: false,
       reason: 'RELATION',
       detail: expect.stringMatching(
         /^relation "users" is not available; use only the datasets categories, products, /,
       ),
     });
-    expect(await guardSql("SELECT string_agg(name, ',') FROM products")).toEqual({
+    expect(await guardSql("SELECT string_agg(name, ',') FROM products", ALL_VIEWS)).toEqual({
       ok: false,
       reason: 'FUNCTION',
       detail: 'function "string_agg" is not allowed',

@@ -530,8 +530,36 @@
     {
       "idx": 75,
       "version": "7",
-      "when": 1793971451835,
-      "tag": "0080_role_permission_overrides",
+      "when": 1793952650561,
+      "tag": "0076_discount_plans",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1793955826788,
+      "tag": "0077_price_profile_delete",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1793960675612,
+      "tag": "0078_supplier_categories",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1793961614863,
+      "tag": "0079_ai_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1793974489400,
+      "tag": "0081_role_permission_overrides",
       "breakpoints": true
     }
   ]

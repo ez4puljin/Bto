@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { CatalogModule, UNIT_SUPERSEDED_HOOK } from '../catalog';
 import { IdentityModule } from '../identity';
 import { RECEIPT_SALE_PRICES, SALE_PRICE_READER } from '../inventory';
+import { PartnersModule } from '../partners';
 import {
   DiscountProgramsController,
   PriceProfilesController,
@@ -14,6 +15,7 @@ import { PriceQuoteService } from './services/price-quote.service';
 import { PricingUnitsHook } from './services/pricing-units.hook';
 import { ProductDealsService } from './services/product-deals.service';
 import { ProductPricesService } from './services/product-prices.service';
+import { ProgramTargetsService } from './services/program-targets.service';
 import { IssueSalePricesHook } from './services/issue-sale-prices.hook';
 import { ReceiptSalePricesHook } from './services/receipt-sale-prices.hook';
 import { SaleReadinessService } from './services/sale-readiness.service';
@@ -24,6 +26,7 @@ const CORE_SERVICES = [
   PriceQuoteService,
   ProductDealsService,
   ProductPricesService,
+  ProgramTargetsService,
   SaleReadinessService,
 ];
 
@@ -35,7 +38,7 @@ const CORE_SERVICES = [
  * transaction (ADR-0099 #5).
  */
 @Module({
-  imports: [IdentityModule, CatalogModule],
+  imports: [IdentityModule, CatalogModule, PartnersModule],
   providers: [
     ...CORE_SERVICES,
     PricingUnitsHook,

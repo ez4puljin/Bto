@@ -35,6 +35,7 @@ import {
   CreateReportDto,
   RenameReportDto,
 } from '../dto/ai.dto';
+import { accessOf } from '../semantic/data-groups';
 import { AiExportService, queryFailed } from '../services/ai-export.service';
 import { AskFlowService } from '../services/ask-flow.service';
 import { ConversationsService } from '../services/conversations.service';
@@ -44,10 +45,10 @@ import { AiQueryError, AiReaderService, type AiResult } from '../sql/ai-reader.s
 const ASK = 'ai.ask';
 
 /** Runs stored SQL again (guard + read-only reader); a failure is 422 AI_QUERY_FAILED. */
-async function rerun(reader: AiReaderService, sql: string): Promise<AiResult> {
+async function rerun(reader: AiReaderService, sql: string, ctx: AuthContext): Promise<AiResult> {
   if (!reader.configured) throw new AppError('AI_NOT_CONFIGURED', 'no read-only database');
   try {
-    return await reader.run(sql);
+    return await reader.run(sql, accessOf(ctx.permissions));
   } catch (error: unknown) {
     if (error instanceof AiQueryError) throw queryFailed(error);
     throw error;
@@ -68,8 +69,8 @@ export class AiController {
   @Get('status')
   @RequirePermission(ASK)
   @ApiOkResponse({ type: AiStatusDto })
-  status(): AiStatusDto {
-    return this.flow.status();
+  status(@CurrentUser() ctx: AuthContext): Promise<AiStatusDto> {
+    return this.flow.status(ctx);
   }
 
   @Post('questions')
@@ -108,7 +109,7 @@ export class AiController {
     @CurrentUser() ctx: AuthContext,
     @Param('id', ParseIntPipe) id: number,
   ): Promise<AiResultDto> {
-    return rerun(this.reader, await this.answeredSql(ctx, id));
+    return rerun(this.reader, await this.answeredSql(ctx, id), ctx);
   }
 
   @Get('questions/:id/export')
@@ -120,7 +121,8 @@ export class AiController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<StreamableFile> {
     const sql = await this.answeredSql(ctx, id);
-    return xlsxFile(await this.exports.workbook(sql, `AI ${id}`), `ai-${id}`, `AI ${id}`);
+    const workbook = await this.exports.workbook(sql, `AI ${id}`, accessOf(ctx.permissions));
+    return xlsxFile(workbook, `ai-${id}`, `AI ${id}`);
   }
 
   /** The SQL of one of the caller's answered questions. */
@@ -188,18 +190,24 @@ export class AiReportsController {
   @HttpCode(200)
   @RequirePermission(ASK)
   @ApiOkResponse({ type: AiResultDto })
-  async run(@Param('id', ParseIntPipe) id: number): Promise<AiResultDto> {
-    return rerun(this.reader, (await this.reports.get(id)).sql);
+  async run(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<AiResultDto> {
+    return rerun(this.reader, (await this.reports.get(id)).sql, ctx);
   }
 
   @Get(':id/export')
   @RequirePermission(ASK)
   @ApiProduces(XLSX_CONTENT_TYPE)
   @ApiOkResponse({ schema: { type: 'string', format: 'binary' } })
-  async export(@Param('id', ParseIntPipe) id: number): Promise<StreamableFile> {
+  async export(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<StreamableFile> {
     const report = await this.reports.get(id);
     return xlsxFile(
-      await this.exports.workbook(report.sql, report.name),
+      await this.exports.workbook(report.sql, report.name, accessOf(ctx.permissions)),
       `report-${id}`,
       report.name,
     );

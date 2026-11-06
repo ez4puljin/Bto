@@ -74,9 +74,9 @@ function PermissionLabel({ code }: { code: Permission }) {
 
 /**
  * Every role with its rights, changed in a dialog by those who manage roles: custom ones an admin
- * builds (ADR-0027 #5) and the system ones too (ADR-0163), whose name stays and which cannot be
+ * builds (ADR-0027 #5) and the system ones too (ADR-0165), whose name stays and which cannot be
  * deleted. The bar's «Ажилтан» (`?user=`) narrows the list to that person's roles and shows every
- * right they hold or lack (ADR-0163 #5).
+ * right they hold or lack (ADR-0165 #5).
  */
 export function RolesPage() {
   const { t } = useTranslation();
@@ -274,7 +274,7 @@ function RoleDialog({ role, onClose }: { role: Role | 'new'; onClose: () => void
   const catalog = usePermissionCatalog();
   const mutations = useIdentityMutations();
   const isNew = role === 'new';
-  // A system role's code: its name is the code's label, shown but not sent (ADR-0163 #1).
+  // A system role's code: its name is the code's label, shown but not sent (ADR-0165 #1).
   const systemCode = !isNew && role.code && isSystemRole(role.code) ? role.code : null;
   const isAdmin = systemCode === 'ADMIN';
   const form = useForm<RoleValues>({
@@ -301,7 +301,7 @@ function RoleDialog({ role, onClose }: { role: Role | 'new'; onClose: () => void
     }
   });
   const { errors, isSubmitting } = form.formState;
-  // The admin-only codes are shown only on ADMIN, ticked and locked (ADR-0163 #3).
+  // The admin-only codes are shown only on ADMIN, ticked and locked (ADR-0165 #3).
   const offered = (catalog.data ?? []).filter((permission) => isAdmin || permission.assignable);
   const groups = groupPermissions(offered.map((permission) => permission.code));
 

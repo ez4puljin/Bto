@@ -102,7 +102,7 @@ export const rolePermissions = pgTable(
 );
 
 /**
- * An admin's ticks on a system role, as differences from the code's set (ADR-0163 #2): `granted`
+ * An admin's ticks on a system role, as differences from the code's set (ADR-0165 #2): `granted`
  * adds the right, otherwise it takes it away. `role_permissions` stays what the guard reads; the
  * boot sync rebuilds a system role's rows from the code and these.
  */

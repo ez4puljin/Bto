@@ -6,6 +6,7 @@ import {
   type PriceList,
   type QuoteLineInput,
   type QuoteProduct,
+  programServes,
   type QuoteProgram,
   resolveQuote,
   wholeUnitOf,
@@ -17,11 +18,15 @@ import { CatalogService, CategoriesService, UnitConversionService } from '../../
 import { DiscountProgramsService } from './discount-programs.service';
 import { PriceProfilesService } from './price-profiles.service';
 import { ProductPricesService, quoteUnitsOf } from './product-prices.service';
+import { ProgramTargetsService } from './program-targets.service';
 
 export interface QuoteRequest {
   list: PriceList;
   /** The Ulaanbaatar business date whose prices, profiles and programs apply. */
   date: string;
+  /** Where the order is (ADR-0159 #5); unknown: only programs that name no pipeline or till. */
+  pipelineId?: number | null;
+  tillId?: number | null;
   lines: { productUnitId: number; qty: Decimal }[];
 }
 
@@ -83,6 +88,7 @@ export class PriceQuoteService {
     private readonly prices: ProductPricesService,
     private readonly profiles: PriceProfilesService,
     private readonly programs: DiscountProgramsService,
+    private readonly targets: ProgramTargetsService,
   ) {}
 
   /**
@@ -104,7 +110,14 @@ export class PriceQuoteService {
       request.date,
       executor,
     );
-    const programs = await this.programs.inForce(request.list, request.date, executor);
+    const programs = (await this.programs.inForce(request.list, request.date, executor)).filter(
+      (program) =>
+        programServes(program, request.list, {
+          pipelineId: request.pipelineId ?? null,
+          tillId: request.tillId ?? null,
+        }),
+    );
+    const sets = await this.targets.productSets(programs, executor);
     const subtrees = new Map<number, ReadonlySet<number>>();
     const quotePrograms: QuoteProgram[] = [];
     for (const program of programs) {
@@ -116,7 +129,15 @@ export class PriceQuoteService {
           subtrees.set(program.categoryId, categoryIds);
         }
       }
-      quotePrograms.push({ ...program, categoryIds });
+      quotePrograms.push({
+        ...program,
+        categoryIds,
+        productIds: sets.get(program.id) ?? null,
+        adjust:
+          program.adjustKind === 'NONE'
+            ? null
+            : { kind: program.adjustKind, factor: new Decimal(program.adjustFactor) },
+      });
     }
     const inputs: QuoteLineInput[] = converted.map((line) => ({
       productId: line.productId,

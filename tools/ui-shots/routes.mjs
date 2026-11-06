@@ -286,6 +286,7 @@ export const ROUTES = [
   { area: 'system', name: 'warehouses', path: '/warehouses' },
   { area: 'system', name: 'warehouses-new', path: '/warehouses?new=1', dialog: true },
   { area: 'system', name: 'settings', path: '/settings' },
+  { area: 'system', name: 'settings-ai', path: '/settings?tab=ai' },
   { area: 'system', name: 'audit', path: '/audit' },
   { area: 'system', name: 'imports', path: '/imports' },
   { area: 'system', name: 'import', path: '/imports/{import}' },

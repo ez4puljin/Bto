@@ -1,6 +1,12 @@
 import { Decimal } from '../money';
 import { addDays } from '../time';
-import type { DiscountEffect, DiscountMeasure, DiscountScope, DiscountStep } from './discounts';
+import type {
+  DiscountEffect,
+  DiscountMeasure,
+  DiscountScope,
+  DiscountStep,
+  StepRule,
+} from './discounts';
 
 /**
  * What a product card says about the discount program behind it (ADR-0092 #3, ADR-0093): the
@@ -46,6 +52,8 @@ export interface DealFacts {
   perUnitName: string | null;
   /** A promotion's last day (the day before its exclusive end); null for a discount. */
   lastDay: string | null;
+  /** The first step's rule, when it is not «from this on» (ADR-0159 #6). */
+  rule?: Exclude<StepRule, 'MINIMUM'>;
 }
 
 const ONE = new Decimal(1);
@@ -59,6 +67,7 @@ const HUNDRED = new Decimal(100);
 export function dealOf(program: DealProgram): DealFacts | null {
   const first = program.steps[0];
   if (!first) return null;
+  if (program.effect === 'BONUS') return bonusDeal(program, first);
   return {
     kind: program.validTo === null ? 'DISCOUNT' : 'PROMOTION',
     effect: program.effect,
@@ -68,6 +77,28 @@ export function dealOf(program: DealProgram): DealFacts | null {
       program.effect !== 'PERCENT' && program.programUnit && !program.programUnit.isBase
         ? program.programUnit.name
         : null,
+    lastDay: program.validTo === null ? null : addDays(program.validTo, -1),
+    ...(first.rule && first.rule !== 'MINIMUM' ? { rule: first.rule } : {}),
+  };
+}
+
+/** N+M: in the threshold unit when both are whole numbers of it, else in base units. */
+function bonusDeal(program: DealProgram, step: DiscountStep): DealFacts {
+  const shown = program.thresholdUnit ?? null;
+  const fits =
+    shown !== null &&
+    step.threshold.div(shown.factor).isInteger() &&
+    step.value.div(shown.factor).isInteger();
+  const factor = fits ? shown.factor : ONE;
+  return {
+    kind: program.validTo === null ? 'DISCOUNT' : 'PROMOTION',
+    effect: 'BONUS',
+    value: step.value.div(factor),
+    threshold: {
+      qty: step.threshold.div(factor),
+      unitName: fits ? shown.name : (program.baseUnitName ?? ''),
+    },
+    perUnitName: fits && !shown.factor.eq(ONE) ? shown.name : null,
     lastDay: program.validTo === null ? null : addDays(program.validTo, -1),
   };
 }
@@ -88,15 +119,21 @@ function thresholdOf(program: DealProgram, threshold: Decimal): DealThreshold | 
 
 /**
  * The badge: «10+ ш −5%», «20+ хайрцаг −3%», «−200₮», «−200₮/хайрцаг», «900₮», «50,000₮+ −3%»,
- * a promotion with its last day «−10% · 10/31».
+ * «1+1», «2+1 хайрцаг», a promotion with its last day «−10% · 10/31».
  */
 export function dealLabel(deal: DealFacts): string {
+  const lastDay = deal.lastDay ? ` · ${deal.lastDay.slice(5, 7)}/${deal.lastDay.slice(8, 10)}` : '';
+  if (deal.effect === 'BONUS') {
+    const buy = deal.threshold && 'qty' in deal.threshold ? plain(deal.threshold.qty) : '';
+    const unit = deal.perUnitName ? ` ${deal.perUnitName}` : '';
+    return `${buy}+${plain(deal.value)}${unit}${lastDay}`;
+  }
   const words: string[] = [];
   if (deal.threshold) {
     words.push(
       'qty' in deal.threshold
-        ? `${plain(deal.threshold.qty)}+ ${deal.threshold.unitName}`.trimEnd()
-        : `${grouped(deal.threshold.amount)}₮+`,
+        ? `${ruled(deal.rule, plain(deal.threshold.qty))} ${deal.threshold.unitName}`.trimEnd()
+        : ruled(deal.rule, `${grouped(deal.threshold.amount)}₮`),
     );
   }
   let effect: string;
@@ -112,10 +149,7 @@ export function dealLabel(deal: DealFacts): string {
       break;
   }
   words.push(deal.perUnitName ? `${effect}/${deal.perUnitName}` : effect);
-  const label = words.join(' ');
-  return deal.lastDay
-    ? `${label} · ${deal.lastDay.slice(5, 7)}/${deal.lastDay.slice(8, 10)}`
-    : label;
+  return `${words.join(' ')}${lastDay}`;
 }
 
 /**
@@ -128,11 +162,21 @@ export function dealPercent(program: DealProgram, basePrice: Decimal | null): De
   const first = program.steps[0];
   if (!first) return null;
   if (program.effect === 'PERCENT') return first.value;
+  // Of every N+M, M are free.
+  if (program.effect === 'BONUS') {
+    return first.value.div(first.threshold.plus(first.value)).times(HUNDRED);
+  }
   if (program.scope !== 'PRODUCT' || basePrice === null) return null;
   const unitPrice = basePrice.times(program.programUnit?.factor ?? ONE);
   if (!unitPrice.gt(0)) return null;
   const off = program.effect === 'PRICE' ? unitPrice.minus(first.value) : first.value;
   return Decimal.min(HUNDRED, Decimal.max(0, off.div(unitPrice).times(HUNDRED)));
+}
+
+/** «10+», from this on; «10», exactly this; «×10», at its multiples. */
+function ruled(rule: DealFacts['rule'], text: string): string {
+  if (rule === 'EXACT') return text;
+  return rule === 'EVERY' ? `×${text}` : `${text}+`;
 }
 
 /** The minus sign of the boards (U+2212), not a hyphen. */

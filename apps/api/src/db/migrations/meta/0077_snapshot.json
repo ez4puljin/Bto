@@ -1,6 +1,6 @@
 {
-  "id": "d5a9aeb1-04dc-4a2b-87e8-376ae0e9d24c",
-  "prevId": "0f1aab6b-6856-41ce-8808-7f6b4e00a540",
+  "id": "82a7f0c9-f8b3-493c-a701-22a67eaec404",
+  "prevId": "8a36518b-17ae-49ad-8b5a-b43afad7dc40",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -4930,6 +4930,65 @@
       },
       "isRLSEnabled": false
     },
+    "public.discount_program_links": {
+      "name": "discount_program_links",
+      "schema": "",
+      "columns": {
+        "program_id": {
+          "name": "program_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ref_id": {
+          "name": "ref_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "discount_program_links_program_id_discount_programs_id_fk": {
+          "name": "discount_program_links_program_id_discount_programs_id_fk",
+          "tableFrom": "discount_program_links",
+          "tableTo": "discount_programs",
+          "columnsFrom": [
+            "program_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "discount_program_links_program_id_role_ref_id_pk": {
+          "name": "discount_program_links_program_id_role_ref_id_pk",
+          "columns": [
+            "program_id",
+            "role",
+            "ref_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "discount_program_links_role": {
+          "name": "discount_program_links_role",
+          "value": "\"discount_program_links\".\"role\" IN ('TARGET', 'EXCLUDE_TARGET', 'EXCLUDE_PRODUCT', 'PIPELINE', 'TILL')"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.discount_programs": {
       "name": "discount_programs",
       "schema": "",
@@ -4962,6 +5021,20 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ACTIVE'"
+        },
+        "priority": {
+          "name": "priority",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "scope": {
           "name": "scope",
@@ -5011,6 +5084,26 @@
           "primaryKey": false,
           "notNull": false
         },
+        "target_kind": {
+          "name": "target_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "adjust_kind": {
+          "name": "adjust_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'NONE'"
+        },
+        "adjust_factor": {
+          "name": "adjust_factor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
         "valid_from": {
           "name": "valid_from",
           "type": "date",
@@ -5042,6 +5135,18 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_by": {
+          "name": "deleted_by",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -5175,6 +5280,19 @@
           ],
           "onDelete": "set null",
           "onUpdate": "no action"
+        },
+        "discount_programs_deleted_by_users_id_fk": {
+          "name": "discount_programs_deleted_by_users_id_fk",
+          "tableFrom": "discount_programs",
+          "tableTo": "users",
+          "columnsFrom": [
+            "deleted_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -5187,7 +5305,23 @@
         },
         "discount_programs_list": {
           "name": "discount_programs_list",
-          "value": "\"discount_programs\".\"list\" IN ('WHOLESALE', 'RETAIL')"
+          "value": "\"discount_programs\".\"list\" IN ('WHOLESALE', 'RETAIL', 'ALL')"
+        },
+        "discount_programs_state": {
+          "name": "discount_programs_state",
+          "value": "\"discount_programs\".\"state\" IN ('DRAFT', 'ACTIVE', 'ARCHIVED')"
+        },
+        "discount_programs_target_kind": {
+          "name": "discount_programs_target_kind",
+          "value": "\"discount_programs\".\"target_kind\" IS NULL OR \"discount_programs\".\"target_kind\" IN ('PRODUCT', 'CATEGORY', 'SUPPLIER', 'SEGMENT')"
+        },
+        "discount_programs_adjust_kind": {
+          "name": "discount_programs_adjust_kind",
+          "value": "\"discount_programs\".\"adjust_kind\" IN ('NONE', 'ROUND', 'FLOOR', 'CEIL', 'ENDS_9')"
+        },
+        "discount_programs_adjust": {
+          "name": "discount_programs_adjust",
+          "value": "\"discount_programs\".\"adjust_factor\" >= 1\n        AND (\"discount_programs\".\"adjust_kind\" = 'NONE' OR (\"discount_programs\".\"scope\" = 'PRODUCT' AND \"discount_programs\".\"effect\" <> 'BONUS'))"
         },
         "discount_programs_scope": {
           "name": "discount_programs_scope",
@@ -5199,11 +5333,11 @@
         },
         "discount_programs_effect": {
           "name": "discount_programs_effect",
-          "value": "\"discount_programs\".\"effect\" IN ('PRICE', 'PERCENT', 'AMOUNT')"
+          "value": "\"discount_programs\".\"effect\" IN ('PRICE', 'PERCENT', 'AMOUNT', 'BONUS')"
         },
         "discount_programs_shape": {
           "name": "discount_programs_shape",
-          "value": "(\"discount_programs\".\"scope\" = 'PRODUCT' AND \"discount_programs\".\"product_id\" IS NOT NULL AND \"discount_programs\".\"category_id\" IS NULL\n          AND \"discount_programs\".\"count_uom_id\" IS NULL AND \"discount_programs\".\"measure\" = 'QTY'\n          AND (\"discount_programs\".\"effect\" = 'PERCENT' OR \"discount_programs\".\"product_unit_id\" IS NOT NULL))\n        OR (\"discount_programs\".\"scope\" = 'CATEGORY' AND \"discount_programs\".\"category_id\" IS NOT NULL AND \"discount_programs\".\"product_id\" IS NULL\n          AND \"discount_programs\".\"product_unit_id\" IS NULL AND \"discount_programs\".\"threshold_unit_id\" IS NULL AND \"discount_programs\".\"effect\" <> 'PRICE'\n          AND (\"discount_programs\".\"measure\" = 'QTY') = (\"discount_programs\".\"count_uom_id\" IS NOT NULL))\n        OR (\"discount_programs\".\"scope\" = 'ORDER' AND \"discount_programs\".\"product_id\" IS NULL AND \"discount_programs\".\"product_unit_id\" IS NULL\n          AND \"discount_programs\".\"threshold_unit_id\" IS NULL AND \"discount_programs\".\"category_id\" IS NULL AND \"discount_programs\".\"count_uom_id\" IS NULL\n          AND \"discount_programs\".\"measure\" = 'AMOUNT' AND \"discount_programs\".\"effect\" <> 'PRICE')"
+          "value": "(\"discount_programs\".\"scope\" = 'PRODUCT' AND (\"discount_programs\".\"product_id\" IS NOT NULL) <> (\"discount_programs\".\"target_kind\" IS NOT NULL)\n          AND \"discount_programs\".\"category_id\" IS NULL AND \"discount_programs\".\"count_uom_id\" IS NULL\n          AND (\"discount_programs\".\"target_kind\" IS NULL\n            OR (\"discount_programs\".\"product_unit_id\" IS NULL AND \"discount_programs\".\"threshold_unit_id\" IS NULL))\n          AND (\"discount_programs\".\"effect\" IN ('PERCENT', 'BONUS') OR \"discount_programs\".\"target_kind\" IS NOT NULL\n            OR \"discount_programs\".\"product_unit_id\" IS NOT NULL)\n          AND (\"discount_programs\".\"effect\" <> 'BONUS' OR (\"discount_programs\".\"measure\" = 'QTY' AND \"discount_programs\".\"product_unit_id\" IS NULL)))\n        OR (\"discount_programs\".\"scope\" = 'CATEGORY' AND (\"discount_programs\".\"category_id\" IS NOT NULL) <> (\"discount_programs\".\"target_kind\" IS NOT NULL)\n          AND \"discount_programs\".\"product_id\" IS NULL AND \"discount_programs\".\"product_unit_id\" IS NULL AND \"discount_programs\".\"threshold_unit_id\" IS NULL\n          AND \"discount_programs\".\"effect\" IN ('PERCENT', 'AMOUNT') AND NOT \"discount_programs\".\"priority\"\n          AND (\"discount_programs\".\"measure\" = 'QTY') = (\"discount_programs\".\"count_uom_id\" IS NOT NULL))\n        OR (\"discount_programs\".\"scope\" = 'ORDER' AND \"discount_programs\".\"target_kind\" IS NULL AND \"discount_programs\".\"product_id\" IS NULL\n          AND \"discount_programs\".\"product_unit_id\" IS NULL AND \"discount_programs\".\"threshold_unit_id\" IS NULL AND \"discount_programs\".\"category_id\" IS NULL\n          AND \"discount_programs\".\"count_uom_id\" IS NULL AND \"discount_programs\".\"measure\" = 'AMOUNT' AND NOT \"discount_programs\".\"priority\"\n          AND \"discount_programs\".\"effect\" IN ('PERCENT', 'AMOUNT'))"
         },
         "discount_programs_validity": {
           "name": "discount_programs_validity",
@@ -5250,6 +5384,13 @@
           "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": true
+        },
+        "rule": {
+          "name": "rule",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'MINIMUM'"
         }
       },
       "indexes": {},
@@ -5281,6 +5422,10 @@
       },
       "policies": {},
       "checkConstraints": {
+        "discount_steps_rule": {
+          "name": "discount_steps_rule",
+          "value": "\"discount_steps\".\"rule\" IN ('MINIMUM', 'EXACT', 'EVERY')"
+        },
         "discount_steps_values": {
           "name": "discount_steps_values",
           "value": "\"discount_steps\".\"threshold\" >= 0 AND \"discount_steps\".\"value\" > 0"
@@ -23166,6 +23311,18 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_by": {
+          "name": "deleted_by",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -23193,6 +23350,19 @@
           "tableTo": "users",
           "columnsFrom": [
             "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "price_profiles_deleted_by_users_id_fk": {
+          "name": "price_profiles_deleted_by_users_id_fk",
+          "tableFrom": "price_profiles",
+          "tableTo": "users",
+          "columnsFrom": [
+            "deleted_by"
           ],
           "columnsTo": [
             "id"
@@ -25562,72 +25732,6 @@
           "value": "\"reconciliation_runs\".\"diff_count\" >= 0 AND (\"reconciliation_runs\".\"status\" = 'OK') = (\"reconciliation_runs\".\"diff_count\" = 0)"
         }
       },
-      "isRLSEnabled": false
-    },
-    "public.role_permission_overrides": {
-      "name": "role_permission_overrides",
-      "schema": "",
-      "columns": {
-        "role_id": {
-          "name": "role_id",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "permission_code": {
-          "name": "permission_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "granted": {
-          "name": "granted",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "role_permission_overrides_role_id_roles_id_fk": {
-          "name": "role_permission_overrides_role_id_roles_id_fk",
-          "tableFrom": "role_permission_overrides",
-          "tableTo": "roles",
-          "columnsFrom": [
-            "role_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "role_permission_overrides_permission_code_permissions_code_fk": {
-          "name": "role_permission_overrides_permission_code_permissions_code_fk",
-          "tableFrom": "role_permission_overrides",
-          "tableTo": "permissions",
-          "columnsFrom": [
-            "permission_code"
-          ],
-          "columnsTo": [
-            "code"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "role_permission_overrides_role_id_permission_code_pk": {
-          "name": "role_permission_overrides_role_id_permission_code_pk",
-          "columns": [
-            "role_id",
-            "permission_code"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.role_permissions": {

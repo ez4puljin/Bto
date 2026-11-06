@@ -1,6 +1,6 @@
 import { type Permission, permissionGroup, type PermissionGroup } from '@tugeel/shared/auth';
 
-/** The permissions in the given order, one list per module (ADR-0163 #6). */
+/** The permissions in the given order, one list per module (ADR-0165 #6). */
 export function groupPermissions<T extends Permission>(
   codes: readonly T[],
 ): { group: PermissionGroup; codes: T[] }[] {

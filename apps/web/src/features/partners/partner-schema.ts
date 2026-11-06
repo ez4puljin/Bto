@@ -333,6 +333,7 @@ export const supplierSchema = z.object({
       'validation.days',
     ),
   vatPayer: z.boolean(),
+  categoryId: z.string(),
   note: text(1000),
   status: z.enum(PARTNER_STATUSES),
 });
@@ -351,6 +352,7 @@ export function emptySupplier(code: string): SupplierFormValues {
     bankAccount: '',
     paymentTermDays: '',
     vatPayer: false,
+    categoryId: '',
     note: '',
     status: 'ACTIVE',
   };
@@ -369,6 +371,7 @@ export function supplierValues(supplier: SupplierDetail): SupplierFormValues {
     bankAccount: supplier.bankAccount ?? '',
     paymentTermDays: supplier.paymentTermDays === null ? '' : String(supplier.paymentTermDays),
     vatPayer: supplier.vatPayer,
+    categoryId: supplier.categoryId === null ? '' : String(supplier.categoryId),
     note: supplier.note ?? '',
     status: supplier.status,
   };
@@ -387,6 +390,7 @@ function supplierFields(values: SupplierFormValues) {
     paymentTermDays:
       values.paymentTermDays === '' ? null : Number.parseInt(values.paymentTermDays, 10),
     vatPayer: values.vatPayer,
+    categoryId: values.categoryId === '' ? null : Number.parseInt(values.categoryId, 10),
     note: orNull(values.note),
   };
 }

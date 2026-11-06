@@ -14,7 +14,9 @@ import type {
   PosSnapshot,
   SaleDocWire,
 } from '@tugeel/shared/pos';
+import { Decimal } from '@tugeel/shared/money';
 import { posSaleNumber } from '@tugeel/shared/pos';
+import { businessDate } from '@tugeel/shared/time';
 import { eq } from 'drizzle-orm';
 import { EDGE_DB, type EdgeDb, inEdgeTransaction } from '../../src/edge/db/edge-db';
 import { edgeOutbox, edgeSales } from '../../src/edge/db/schema';
@@ -43,6 +45,7 @@ describe('pos edge', () => {
   let kiosk: ReturnType<typeof kioskApi>;
   let sync: SyncRunner;
   let shift: EdgeShiftSummary;
+  let admin: string;
   const receipts: EdgeReceipt[] = [];
 
   const colaUnit = () => unitOf(cola, 'PCS').id;
@@ -59,6 +62,7 @@ describe('pos edge', () => {
     await central.listen(0, '127.0.0.1');
     port = (central.getHttpServer().address() as AddressInfo).port;
     const actors = await posActors(central);
+    admin = actors.admin;
     store = await posStore(central, actors.admin, 'PE');
     cola = await store.product('9301', 'Кола касс', '1000', '10');
     bread = await store.product('9302', 'Талх касс', '2000', '0');
@@ -329,5 +333,57 @@ describe('pos edge', () => {
     });
     const recent = (await kiosk.get('/sales/recent').expect(200)).body as EdgeReceipt[];
     expect(recent).toEqual([]);
+  });
+
+  it('prices a plan offline, on the tills it names (ADR-0159)', async () => {
+    const plan = (name: string, tillIds: number[], fields: object = {}) =>
+      store.pos
+        .http()
+        .post('/api/v1/discount-programs')
+        .set('Authorization', `Bearer ${admin}`)
+        .set('Idempotency-Key', randomUUID())
+        .send({
+          name,
+          list: 'RETAIL',
+          scope: 'PRODUCT',
+          measure: 'QTY',
+          effect: 'BONUS',
+          targetKind: 'PRODUCT',
+          targetIds: [bread.id],
+          validFrom: businessDate(),
+          steps: [{ threshold: '1', value: '1' }],
+          tillIds,
+          ...fields,
+        })
+        .expect(201);
+    const quoted = async (product: number, qty: string) =>
+      (await kiosk.post('/quote', { lines: [{ productUnitId: product, qty }] }).expect(200))
+        .body as EdgeQuoteResponse;
+    const before = await quoted(breadUnit(), '2');
+    const one = new Decimal(before.total).div(2);
+
+    await plan('Өөр кассын', [store.till.id + 999]);
+    expect(await sync.pullOnce()).toBe('changed');
+    expect((await quoted(breadUnit(), '2')).total).toBe(before.total);
+
+    await plan('Энэ кассын 1+1', [store.till.id]);
+    expect(await sync.pullOnce()).toBe('changed');
+    const after = await quoted(breadUnit(), '2');
+    // Two written, one paid; the line still says two.
+    expect(new Decimal(after.total).eq(one)).toBe(true);
+    expect(after.lines[0]?.qty).toBe('2');
+    expect(new Decimal(after.lines[0]?.discount ?? '0').eq(one)).toBe(true);
+
+    // A rounded percentage on another product, from the set the centre expanded.
+    await plan('Тоймтой', [], {
+      effect: 'PERCENT',
+      targetIds: [cola.id],
+      steps: [{ threshold: '0', value: '7' }],
+      adjustKind: 'ENDS_9',
+      adjustFactor: 100,
+    });
+    expect(await sync.pullOnce()).toBe('changed');
+    const rounded = await quoted(colaUnit(), '1');
+    expect(rounded.lines[0]?.unitPrice).toMatch(/^\d*99(\.0+)?$/);
   });
 });

@@ -46,15 +46,17 @@ export function useDealSentence() {
     }
     const effect = sentence.effect;
     parts.push(
-      effect.kind === 'percent'
-        ? t('mobile.customer.deal.percent', { value: effect.value })
-        : effect.kind === 'amount'
-          ? effect.per
-            ? t('mobile.customer.deal.amountPer', { per: effect.per, value: effect.value })
-            : t('mobile.customer.deal.amount', { value: effect.value })
-          : effect.per
-            ? t('mobile.customer.deal.pricePer', { per: effect.per, value: effect.value })
-            : t('mobile.customer.deal.price', { value: effect.value }),
+      effect.kind === 'bonus'
+        ? t('mobile.customer.deal.bonus', { buy: effect.buy, free: effect.free })
+        : effect.kind === 'percent'
+          ? t('mobile.customer.deal.percent', { value: effect.value })
+          : effect.kind === 'amount'
+            ? effect.per
+              ? t('mobile.customer.deal.amountPer', { per: effect.per, value: effect.value })
+              : t('mobile.customer.deal.amount', { value: effect.value })
+            : effect.per
+              ? t('mobile.customer.deal.pricePer', { per: effect.per, value: effect.value })
+              : t('mobile.customer.deal.price', { value: effect.value }),
     );
     return `${capitalised(parts.join(' '))}. ${t('mobile.customer.deal.auto')}`;
   };

@@ -13,7 +13,6 @@ import {
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { BulkResultDto } from '../../../common/bulk/bulk.dto';
 import { invalid } from '../../../common/errors/app-error';
-import { PageQueryDto } from '../../../common/pagination/page';
 import {
   type AuthContext,
   Authenticated,
@@ -33,6 +32,7 @@ import {
   SupplierListQueryDto,
   SupplierPageDto,
   SupplierProductPageDto,
+  SupplierProductsQueryDto,
   UpdateSupplierDto,
 } from '../dto/suppliers.dto';
 import { PartnerSegmentsService } from '../services/partner-segments.service';
@@ -132,7 +132,7 @@ export class SuppliersController {
   @ApiOkResponse({ type: SupplierProductPageDto })
   async products(
     @Param('id', ParseIntPipe) id: number,
-    @Query() query: PageQueryDto,
+    @Query() query: SupplierProductsQueryDto,
   ): Promise<SupplierProductPageDto> {
     await this.suppliers.get(id);
     const page = await this.links.productsOf(id, query);
@@ -144,6 +144,7 @@ export class SuppliersController {
           id: row.product.id,
           sku: row.product.sku,
           name: row.product.name,
+          categoryId: row.product.categoryId,
           status: row.product.status,
           thumbUrl: row.product.thumbUrl,
           baseUnitName: row.product.baseUnit.uomName,

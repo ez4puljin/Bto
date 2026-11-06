@@ -261,6 +261,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'partners.customers.read',
       },
       { to: '/partners/suppliers', label: 'nav.suppliers', icon: Factory },
+      { to: '/partners/supplier-categories', label: 'nav.supplierCategories', icon: Tags },
     ],
   },
   {

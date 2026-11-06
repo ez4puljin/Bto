@@ -1,12 +1,14 @@
 import mn from '@tugeel/shared/i18n/mn.json';
 import { textOf } from '../../../integrations/llm';
 import { guardSql } from '../sql/sql-guard';
+import { AI_GROUP_VIEWS, ALL_VIEWS } from './data-groups';
 import { AI_DATASETS } from './datasets';
 import {
   buildInstructions,
   buildSummaryRequest,
   buildUserTurn,
   EXAMPLES,
+  exampleDatasets,
   GLOSSARY,
   parseAnswer,
   SUMMARY_LIMITS,
@@ -20,7 +22,7 @@ describe('the prompt of the AI assistant (ADR-0045 #6)', () => {
   });
 
   it('describes every dataset and column, the glossary and the examples', () => {
-    const text = buildInstructions('2026-10-13');
+    const text = buildInstructions('2026-10-13', ALL_VIEWS);
     expect(text).toContain('Today is 2026-10-13 (Ulaanbaatar).');
     for (const set of AI_DATASETS) {
       expect(text).toContain(`ai.${set.name}: ${set.description}`);
@@ -31,7 +33,27 @@ describe('the prompt of the AI assistant (ADR-0045 #6)', () => {
   });
 
   it.each(Object.entries(EXAMPLES))('example %s passes the guard', async (_key, sql) => {
-    expect(await guardSql(sql)).toEqual({ ok: true, sql: expect.any(String) });
+    expect(await guardSql(sql, ALL_VIEWS)).toEqual({ ok: true, sql: expect.any(String) });
+  });
+
+  it('tells the model only what the person may read (ADR-0162)', () => {
+    const text = buildInstructions('2026-10-13', new Set(AI_GROUP_VIEWS.catalog));
+    expect(text).toContain('ai.products:');
+    expect(text).not.toContain('ai.customers:');
+    expect(text).not.toContain('ai.stock:');
+    expect(text).not.toContain('ai.invoices:');
+    expect(text).toContain(`"${mn.ai.glossary.category}" → ${GLOSSARY.category}`);
+    expect(text).not.toContain(`"${mn.ai.glossary.credit}"`);
+    expect(text).not.toContain(`"${mn.ai.glossary.stockValue}"`);
+    expect(text).not.toContain(`Question: ${mn.ai.examples.creditCustomers}`);
+  });
+
+  it('every example names only its real datasets', () => {
+    for (const key of Object.keys(EXAMPLES) as (keyof typeof EXAMPLES)[]) {
+      const views = exampleDatasets(key);
+      expect(views.length).toBeGreaterThan(0);
+      for (const view of views) expect(ALL_VIEWS.has(view)).toBe(true);
+    }
   });
 
   it('reads the model answer and tolerates a code fence', () => {

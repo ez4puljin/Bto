@@ -1,4 +1,4 @@
-# ADR-0163: Every role's rights are edited on «Дүрүүд», system roles too; a staff member's rights held and missing
+# ADR-0165: Every role's rights are edited on «Дүрүүд», system roles too; a staff member's rights held and missing
 
 | | |
 |---|---|
@@ -6,7 +6,7 @@
 | Date | 2026-11-06 |
 | Deciders | Owner (the request of 2026-11-06: «roles бүрийн тохиргоог засах өөрчлөх боломжтой болго. Системийн дүрийг ч бас. Мөн ажилтнаар filter хийж ямар эрхтэй байгаа, ямар эрхгүй байгааг харах боломжтой болго»), Claude (Claude Code session) |
 | Amends | ADR-0027 #4 (a system role's permissions are no longer exactly the code's), ADR-0027 #5 (system roles are no longer read-only) |
-| Migration | `0080_role_permission_overrides` |
+| Migration | `0081_role_permission_overrides` |
 
 ## Context
 

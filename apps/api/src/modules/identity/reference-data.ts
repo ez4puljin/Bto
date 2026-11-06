@@ -23,7 +23,7 @@ const REFERENCE_DATA_LOCK = 72_026_102;
 /**
  * Makes `permissions` and the system roles equal to the code catalog in @tugeel/shared/auth
  * (ADR-0027 #4), and each system role's `role_permissions` equal to the code's set with the admin's
- * ticks on top (ADR-0163 #2). Idempotent; custom roles keep their own permissions, except codes
+ * ticks on top (ADR-0165 #2). Idempotent; custom roles keep their own permissions, except codes
  * that left the catalog (removed by the foreign-key cascade).
  */
 export async function syncAccessCatalog(tx: Tx): Promise<void> {

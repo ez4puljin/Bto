@@ -43,6 +43,9 @@ export type CustomerAppAccount = Schemas['CustomerAppAccount'];
 export type CustomerAppCode = Schemas['CustomerAppCode'];
 export type AppAccountFilter = 'ACTIVE' | 'DISABLED' | 'NONE';
 export type CustomerKind = CustomerDetail['kind'];
+/** A supplier category (ADR-0161): in tree order, with its path; retired ones stay on suppliers. */
+export type SupplierCategory = Schemas['SupplierCategory'];
+export type SupplierCategoryUpdate = Schemas['SupplierCategoryUpdateRequest'];
 /** A customer category (ADR-0107); retired ones stay on their customers. */
 export type CustomerCategory = Schemas['CustomerCategory'];
 export type CustomerCategoryUpdate = Schemas['CustomerCategoryUpdateRequest'];
@@ -51,6 +54,7 @@ export type PartnerStatus = CustomerDetail['status'];
 export const KEYS = {
   customers: ['partners', 'customers'] as const,
   customerCategories: ['partners', 'customer-categories'] as const,
+  supplierCategories: ['partners', 'supplier-categories'] as const,
   suppliers: ['partners', 'suppliers'] as const,
   productSuppliers: ['partners', 'product-suppliers'] as const,
 };
@@ -221,8 +225,58 @@ export function useCustomerCategoryMutations() {
   };
 }
 
+/** Every supplier category in tree order, retired ones too (ADR-0161). */
+export function useSupplierCategories(options: { enabled?: boolean } = {}) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: KEYS.supplierCategories,
+    enabled: options.enabled ?? true,
+    staleTime: 5 * 60_000,
+    queryFn: async ({ signal }) => unwrap(await api.GET('/api/v1/supplier-categories', { signal })),
+  });
+}
+
+export function useSupplierCategoryMutations() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  // The list names each supplier's category by its path.
+  const changed = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: KEYS.supplierCategories }),
+      queryClient.invalidateQueries({ queryKey: KEYS.suppliers }),
+    ]);
+  return {
+    create: useMutation({
+      mutationFn: async ({
+        key,
+        ...body
+      }: Keyed<{ name: string; parentId?: number | null; sortOrder?: number | undefined }>) =>
+        unwrap(
+          await api.POST('/api/v1/supplier-categories', {
+            params: { header: idempotencyKey(key) },
+            body,
+          }),
+        ),
+      onSuccess: changed,
+    }),
+    update: useMutation({
+      mutationFn: async ({ id, body }: { id: number; body: SupplierCategoryUpdate }) =>
+        unwrap(
+          await api.PATCH('/api/v1/supplier-categories/{id}', { params: { path: { id } }, body }),
+        ),
+      onSuccess: changed,
+    }),
+  };
+}
+
 export function useSuppliers(
-  filter: { q?: string; status?: PartnerStatus; segmentId?: number },
+  filter: {
+    q?: string;
+    status?: PartnerStatus;
+    segmentId?: number;
+    categoryId?: number;
+    productCategoryId?: number | undefined;
+  },
   options: ListReadOptions = {},
 ) {
   const api = useApiClient();
@@ -239,6 +293,8 @@ export function useSuppliers(
               q: filter.q || undefined,
               status: filter.status,
               segmentId: filter.segmentId,
+              categoryId: filter.categoryId,
+              productCategoryId: filter.productCategoryId,
               cursor: pageParam,
               limit,
             },
@@ -287,15 +343,25 @@ export function useNextSupplierCode() {
   });
 }
 
-export function useSupplierProducts(id: number) {
+export function useSupplierProducts(
+  id: number,
+  filter: { productCategoryId?: number | undefined } = {},
+) {
   const api = useApiClient();
   return useInfiniteQuery({
-    queryKey: [...KEYS.suppliers, id, 'products'],
+    queryKey: [...KEYS.suppliers, id, 'products', filter.productCategoryId ?? null],
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam, signal }) =>
       unwrap(
         await api.GET('/api/v1/suppliers/{id}/products', {
-          params: { path: { id }, query: { cursor: pageParam, limit: 50 } },
+          params: {
+            path: { id },
+            query: {
+              cursor: pageParam,
+              limit: 50,
+              productCategoryId: filter.productCategoryId,
+            },
+          },
           signal,
         }),
       ),

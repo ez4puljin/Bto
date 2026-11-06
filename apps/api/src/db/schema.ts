@@ -34,6 +34,7 @@ export {
 export {
   customerAddresses,
   customerCategories,
+  supplierCategories,
   customerContacts,
   customers,
   productSuppliers,
@@ -82,13 +83,14 @@ export {
   trucks,
 } from '../modules/procurement/schema';
 export {
+  discountProgramLinks,
   discountPrograms,
   discountSteps,
   priceProfiles,
   priceProfileVersions,
   productPrices,
 } from '../modules/pricing/schema';
-export { aiConversations, aiQuestions, aiReports } from '../modules/ai/schema';
+export { aiConversations, aiQuestions, aiReports, aiSettings, aiUsage } from '../modules/ai/schema';
 export { segmentProducts, segments } from '../modules/segments/schema';
 export {
   appSettings,
