@@ -12,6 +12,7 @@ export {
   numberSequences,
   passwordResets,
   permissions,
+  rolePermissionOverrides,
   rolePermissions,
   roles,
   settings,

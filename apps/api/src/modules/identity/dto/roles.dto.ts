@@ -18,6 +18,8 @@ export class RoleDto {
     string | null;
   @ApiProperty() isSystem: boolean;
   @ApiProperty({ enum: PERMISSIONS, enumName: 'Permission', isArray: true }) permissions: string[];
+  @ApiProperty({ description: 'A system role whose rights differ from the code (ADR-0165)' })
+  customized: boolean;
   @ApiProperty() userCount: number;
 }
 
@@ -38,7 +40,7 @@ export class CreateRoleDto {
 
 @ApiSchema({ name: 'RoleUpdateRequest' })
 export class UpdateRoleDto {
-  @ApiPropertyOptional({ maxLength: 60 })
+  @ApiPropertyOptional({ maxLength: 60, description: 'Custom roles only' })
   @IsOptional()
   @IsString()
   @IsNotEmpty()

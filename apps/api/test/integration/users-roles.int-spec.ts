@@ -1,7 +1,11 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { isAssignablePermission, PERMISSIONS } from '@tugeel/shared/auth';
+import { isAssignablePermission, PERMISSIONS, SYSTEM_ROLE_PERMISSIONS } from '@tugeel/shared/auth';
 import type { Client } from 'pg';
 import request from 'supertest';
+import { DB } from '../../src/common/db/db.tokens';
+import type { Db } from '../../src/common/db/db.types';
+import { inTransaction } from '../../src/common/db/transaction';
+import { syncAccessCatalog } from '../../src/modules/identity/reference-data';
 import { connectAs, createHttpApp } from '../harness/apps';
 import { bearer, login, seedUser, testIp, uniquePhone } from '../harness/identity';
 
@@ -290,13 +294,91 @@ describe('users and roles API (SPEC §5.1, ADR-0027)', () => {
       });
     });
 
-    it('keeps system roles read-only and validates custom roles', async () => {
-      const edit = await http()
-        .patch(`/api/v1/roles/${roleId('WAREHOUSE')}`)
+    it('changes a system role at once, keeps it across boots, and goes back to the code', async () => {
+      const role = () =>
+        http()
+          .get('/api/v1/roles')
+          .set(asAdmin())
+          .expect(200)
+          .then((response) =>
+            (response.body as { data: (RoleBody & { customized: boolean })[] }).data.find(
+              (row) => row.code === 'HR',
+            ),
+          );
+      const worker = await seedUser(app, { roles: ['HR'] });
+      const { accessToken } = await login(app, worker);
+      await http().get('/api/v1/audit').set(bearer(accessToken)).expect(403);
+      const code = [...SYSTEM_ROLE_PERMISSIONS.HR];
+      const ticked = await http()
+        .patch(`/api/v1/roles/${roleId('HR')}`)
         .set(asAdmin())
-        .send({ permissions: ['identity.audit.read'] })
+        .send({ permissions: ['hr.attendance.view', 'identity.audit.read'] })
+        .expect(200);
+      expect(ticked.body).toMatchObject({ customized: true });
+      // The holder's very next request has the new right.
+      await http().get('/api/v1/audit').set(bearer(accessToken)).expect(200);
+      // A boot rebuilds the role from the code and the ticks; an untouched role stays the code's.
+      await inTransaction(app.get<Db>(DB), (tx) => syncAccessCatalog(tx));
+      expect([...((await role())?.permissions ?? [])].sort()).toEqual([
+        'hr.attendance.view',
+        'identity.audit.read',
+      ]);
+      // Ticking the code's set again leaves no difference behind.
+      await http()
+        .patch(`/api/v1/roles/${roleId('HR')}`)
+        .set(asAdmin())
+        .send({ permissions: code })
+        .expect(200);
+      expect(await role()).toMatchObject({ customized: false });
+      await http().get('/api/v1/audit').set(bearer(accessToken)).expect(403);
+      const audit = await sql.query<{ action: string }>(
+        `SELECT action FROM audit_log WHERE entity = 'roles' AND entity_id = $1`,
+        [String(roleId('HR'))],
+      );
+      expect(audit.rows.map((row) => row.action)).toEqual(['UPDATE', 'UPDATE']);
+    });
+
+    it('keeps a system role undeletable, its name, and the admin-only rights with ADMIN', async () => {
+      const remove = await http()
+        .delete(`/api/v1/roles/${roleId('WAREHOUSE')}`)
+        .set(asAdmin())
         .expect(409);
-      expect(edit.body).toMatchObject({ code: 'ROLE_SYSTEM_READONLY' });
+      expect(remove.body).toMatchObject({ code: 'ROLE_SYSTEM_READONLY' });
+      for (const [id, body, constraint] of [
+        [roleId('WAREHOUSE'), { name: 'Нярав' }, 'systemRole'],
+        [roleId('WAREHOUSE'), { permissions: ['identity.users.manage'] }, 'isAssignable'],
+        [roleId('WAREHOUSE'), { permissions: ['identity.nothing'] }, 'isPermission'],
+        [roleId('ADMIN'), { permissions: ['identity.users.read'] }, 'adminLocked'],
+      ] as const) {
+        const refused = await http()
+          .patch(`/api/v1/roles/${id}`)
+          .set(asAdmin())
+          .send(body)
+          .expect(422);
+        expect(refused.body).toMatchObject({ errors: [{ constraint }] });
+      }
+      // ADMIN may lose any other right, and a boot does not give it back.
+      const fewer = PERMISSIONS.filter((code) => code !== 'identity.audit.read');
+      await http()
+        .patch(`/api/v1/roles/${roleId('ADMIN')}`)
+        .set(asAdmin())
+        .send({ permissions: fewer })
+        .expect(200);
+      await inTransaction(app.get<Db>(DB), (tx) => syncAccessCatalog(tx));
+      const { rows } = await sql.query<{ held: boolean }>(
+        `SELECT EXISTS (SELECT 1 FROM role_permissions WHERE role_id = $1
+           AND permission_code = 'identity.audit.read') AS held`,
+        [roleId('ADMIN')],
+      );
+      expect(rows[0]?.held).toBe(false);
+      await http()
+        .patch(`/api/v1/roles/${roleId('ADMIN')}`)
+        .set(asAdmin())
+        .send({ permissions: [...PERMISSIONS] })
+        .expect(200);
+    });
+
+    it('validates custom roles', async () => {
       for (const permissions of [['identity.users.manage'], ['identity.nothing']]) {
         const response = await http()
           .post('/api/v1/roles')
@@ -346,7 +428,8 @@ describe('users and roles API (SPEC §5.1, ADR-0027)', () => {
         .expect(200);
       await http().delete(`/api/v1/roles/${role.id}`).set(asAdmin()).expect(204);
       const audit = await sql.query<{ action: string }>(
-        `SELECT action FROM audit_log WHERE entity = 'roles' ORDER BY id`,
+        `SELECT action FROM audit_log WHERE entity = 'roles' AND entity_id = $1 ORDER BY id`,
+        [String(role.id)],
       );
       expect(audit.rows.map((row) => row.action)).toEqual(['CREATE', 'DELETE']);
     });

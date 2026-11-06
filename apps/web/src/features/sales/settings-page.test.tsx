@@ -79,8 +79,24 @@ const routes = {
   'GET /api/v1/roles': () =>
     json({
       data: [
-        { id: 2, code: 'OFFICE', name: null, isSystem: true, permissions: [], userCount: 1 },
-        { id: 4, code: 'WAREHOUSE', name: null, isSystem: true, permissions: [], userCount: 1 },
+        {
+          id: 2,
+          code: 'OFFICE',
+          name: null,
+          isSystem: true,
+          permissions: [],
+          customized: false,
+          userCount: 1,
+        },
+        {
+          id: 4,
+          code: 'WAREHOUSE',
+          name: null,
+          isSystem: true,
+          permissions: [],
+          customized: false,
+          userCount: 1,
+        },
       ],
       nextCursor: null,
     }),

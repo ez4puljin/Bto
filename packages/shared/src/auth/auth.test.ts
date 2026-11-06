@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ADMIN_LOCKED_PERMISSIONS,
   ADMIN_ONLY_PERMISSIONS,
   checkPassword,
   isAssignablePermission,
@@ -9,7 +10,10 @@ import {
   parseStaffLogin,
   PASSWORD_MIN_LENGTH,
   PERMISSIONS,
+  permissionGroup,
   SYSTEM_ROLE_PERMISSIONS,
+  systemRoleOverrides,
+  systemRolePermissions,
   SYSTEM_ROLES,
   usernameFromPhone,
   USERNAME_PATTERN,
@@ -62,6 +66,51 @@ describe('usernames', () => {
     expect(USERNAME_PATTERN.test('ba')).toBe(false);
     expect(USERNAME_PATTERN.test('.bat')).toBe(false);
     expect(USERNAME_PATTERN.test('бат')).toBe(false);
+  });
+});
+
+describe('system role permissions (ADR-0165)', () => {
+  it('keeps the code set until an admin changes it', () => {
+    expect(systemRolePermissions('DRIVER', [])).toEqual([]);
+    expect([...systemRolePermissions('HR', [])].sort()).toEqual(
+      [...SYSTEM_ROLE_PERMISSIONS.HR].sort(),
+    );
+  });
+
+  it('applies ticks and unticks on top of the code, so new code rights still arrive', () => {
+    const edited = systemRolePermissions('HR', [
+      { permissionCode: 'hr.attendance.manage', granted: false },
+      { permissionCode: 'identity.audit.read', granted: true },
+    ]);
+    expect(edited).toContain('hr.attendance.view');
+    expect(edited).toContain('identity.audit.read');
+    expect(edited).not.toContain('hr.attendance.manage');
+  });
+
+  it('ignores a code that left the catalog and never takes the locked rights from ADMIN', () => {
+    expect(
+      systemRolePermissions('DRIVER', [{ permissionCode: 'gone.right', granted: true }]),
+    ).toEqual([]);
+    const admin = systemRolePermissions(
+      'ADMIN',
+      ADMIN_LOCKED_PERMISSIONS.map((permissionCode) => ({ permissionCode, granted: false })),
+    );
+    for (const code of ADMIN_LOCKED_PERMISSIONS) expect(admin).toContain(code);
+  });
+
+  it('stores only the differences from the code', () => {
+    expect(systemRoleOverrides('HR', [...SYSTEM_ROLE_PERMISSIONS.HR])).toEqual([]);
+    expect(systemRoleOverrides('HR', ['hr.attendance.view', 'identity.audit.read'])).toEqual(
+      expect.arrayContaining([
+        { permissionCode: 'hr.attendance.manage', granted: false },
+        { permissionCode: 'identity.audit.read', granted: true },
+      ]),
+    );
+  });
+
+  it('names every permission group by the first segment of its code', () => {
+    expect(permissionGroup('identity.users.read')).toBe('identity');
+    expect(permissionGroup('sales.orders.pickLead')).toBe('sales');
   });
 });
 

@@ -280,6 +280,7 @@ export const ROUTES = [
   { area: 'hr', name: 'report-employees', path: '/hr/report?tab=employees' },
   { area: 'hr', name: 'report-grid', path: '/hr/report?tab=grid' },
   { area: 'system', name: 'roles', path: '/roles' },
+  { area: 'system', name: 'roles-staff', path: '/roles?user={user}' },
   { area: 'system', name: 'roles-new', path: '/roles?new=1', dialog: true },
   { area: 'system', name: 'branches', path: '/branches' },
   { area: 'system', name: 'warehouses', path: '/warehouses' },

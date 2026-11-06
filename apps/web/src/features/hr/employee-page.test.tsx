@@ -77,7 +77,15 @@ const ACCOUNT: Schemas['UserDetail'] = {
   updatedAt: STAMP,
 };
 const ROLES: Schemas['Role'][] = [
-  { id: 4, code: 'WAREHOUSE', name: null, isSystem: true, permissions: [], userCount: 1 },
+  {
+    id: 4,
+    code: 'WAREHOUSE',
+    name: null,
+    isSystem: true,
+    permissions: [],
+    customized: false,
+    userCount: 1,
+  },
 ];
 const list = <T,>(data: T[]) => json({ data, nextCursor: null });
 const ROUTES = {

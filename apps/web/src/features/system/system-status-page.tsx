@@ -44,7 +44,7 @@ export function SystemStatusPage() {
   const health = useHealth();
   const mayManageAi = useHasPermission('ai.settings.manage');
   return (
-    <div className="flex flex-col gap-4">
+    <div className="space-y-4">
       <PageHeader
         title={t('systemStatus.title')}
         description={t('systemStatus.description')}

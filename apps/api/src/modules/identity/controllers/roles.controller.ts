@@ -21,7 +21,7 @@ import {
 } from '../dto/roles.dto';
 import { RolesService } from '../services/roles.service';
 
-/** System roles (read-only) and admin-built custom roles (ADR-0027 #5). */
+/** System roles (their rights editable, ADR-0165) and admin-built custom roles (ADR-0027 #5). */
 @ApiTags('roles')
 @Controller()
 export class RolesController {

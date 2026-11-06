@@ -122,12 +122,31 @@ export function isPermission(value: unknown): value is Permission {
   return typeof value === 'string' && (PERMISSIONS as readonly string[]).includes(value);
 }
 
+/**
+ * What ADMIN keeps whatever is edited (ADR-0165 #3): without these nobody could open the roles
+ * screen or repair a role, and a lost right could not be given back from the system.
+ */
+export const ADMIN_LOCKED_PERMISSIONS: readonly Permission[] = [
+  'identity.users.read',
+  ...ADMIN_ONLY_PERMISSIONS,
+];
+
+/** The module a permission belongs to: the first segment of its code. */
+export type PermissionGroup = Permission extends `${infer Group}.${string}` ? Group : never;
+
+export function permissionGroup(code: Permission): PermissionGroup {
+  return code.slice(0, code.indexOf('.')) as PermissionGroup;
+}
+
 /** True for codes an admin may select when building a custom role. */
 export function isAssignablePermission(value: Permission): boolean {
   return !ADMIN_ONLY_PERMISSIONS.includes(value);
 }
 
-/** System roles (SPEC §3). Their permission sets come from code and cannot be edited in the UI. */
+/**
+ * System roles (SPEC §3). Their permission sets start from `SYSTEM_ROLE_PERMISSIONS`; an admin's
+ * ticks are kept as differences from it (`systemRolePermissions`, ADR-0165).
+ */
 export const SYSTEM_ROLES = [
   'ADMIN',
   'OFFICE',
@@ -233,6 +252,43 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
   SALES_REP: ['sales.orders.rep'],
   DRIVER: [],
 };
+
+/** One admin's tick on a system role, kept as a difference from the code (ADR-0165 #2). */
+export interface RolePermissionOverride {
+  readonly permissionCode: string;
+  readonly granted: boolean;
+}
+
+/**
+ * A system role's rights: the code's set, plus what an admin ticked, minus what an admin unticked
+ * (ADR-0165 #2). A right a later version adds to the code therefore still reaches an edited role.
+ */
+export function systemRolePermissions(
+  role: SystemRole,
+  overrides: readonly RolePermissionOverride[],
+): Permission[] {
+  const held = new Set<Permission>(SYSTEM_ROLE_PERMISSIONS[role]);
+  for (const { permissionCode, granted } of overrides) {
+    if (!isPermission(permissionCode)) continue;
+    if (granted) held.add(permissionCode);
+    else held.delete(permissionCode);
+  }
+  if (role === 'ADMIN') for (const code of ADMIN_LOCKED_PERMISSIONS) held.add(code);
+  return PERMISSIONS.filter((code) => held.has(code));
+}
+
+/** The differences to store for the rights an admin ticked on a system role. */
+export function systemRoleOverrides(
+  role: SystemRole,
+  ticked: readonly Permission[],
+): { permissionCode: Permission; granted: boolean }[] {
+  const defaults = new Set<Permission>(SYSTEM_ROLE_PERMISSIONS[role]);
+  const chosen = new Set<Permission>(ticked);
+  return PERMISSIONS.flatMap((permissionCode) => {
+    if (chosen.has(permissionCode) === defaults.has(permissionCode)) return [];
+    return [{ permissionCode, granted: chosen.has(permissionCode) }];
+  });
+}
 
 /** Staff login names: lowercase Latin letters, digits and `._-`, 3–32 characters. */
 export const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{2,31}$/;
