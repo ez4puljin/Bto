@@ -17,7 +17,7 @@ export function ProductCreatePage() {
   const loadProblem = problemFromError(uoms.error ?? categories.error);
 
   return (
-    <div className="max-w-3xl xl:max-w-none">
+    <div>
       <PageHeader title={t('catalog.product.newTitle')} />
       <ProblemAlert problem={loadProblem} />
       {uoms.data && categories.data ? (

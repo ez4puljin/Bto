@@ -56,7 +56,7 @@ export function SystemStatusPage() {
           </Button>
         }
       />
-      <Card className="max-w-xl gap-0 py-0 xl:max-w-4xl">
+      <Card className="gap-0 py-0">
         <CardContent className="px-0">
           {health.isPending ? (
             <p role="status" className="px-4 py-3 text-sm text-muted-foreground">

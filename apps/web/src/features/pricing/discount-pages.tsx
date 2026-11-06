@@ -194,7 +194,7 @@ function ProgramDetail({ program }: { program: DiscountProgram }) {
   };
 
   return (
-    <div className="max-w-3xl space-y-4 xl:max-w-none">
+    <div className="space-y-4">
       <PageHeader
         title={program.name}
         meta={

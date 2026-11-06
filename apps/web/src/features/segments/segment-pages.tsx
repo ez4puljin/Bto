@@ -208,7 +208,7 @@ export function SegmentPage() {
   const data = segment.data;
   if (!data) {
     return (
-      <div className="max-w-3xl xl:max-w-none">
+      <div>
         <PageHeader title={t('segments.title')} />
         <ProblemAlert problem={problemFromError(segment.error)} onRetry={segment.refetch} />
         {segment.isPending ? (
@@ -224,7 +224,7 @@ export function SegmentPage() {
     }
   };
   return (
-    <div className="max-w-3xl xl:max-w-none">
+    <div>
       <PageHeader
         title={data.name}
         crumbs={[
@@ -406,7 +406,7 @@ export function SegmentEditorPage() {
       ? definitionFromProductList(new URLSearchParams(from))
       : newDefinition(entity);
   return (
-    <div className="max-w-3xl xl:max-w-none">
+    <div>
       <PageHeader
         title={t('segments.create')}
         crumbs={[{ label: t(`segments.entities.${entity}`), to: `/segments?entity=${entity}` }]}
@@ -421,7 +421,7 @@ function EditSegment({ id }: { id: number }) {
   const segment = useSegment(id);
   const data = segment.data;
   return (
-    <div className="max-w-3xl xl:max-w-none">
+    <div>
       <PageHeader
         title={data ? data.name : t('segments.edit')}
         crumbs={data ? [{ label: data.name, to: `/segments/${data.id}` }] : []}

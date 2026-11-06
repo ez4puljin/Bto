@@ -82,16 +82,8 @@ export function FinanceSettingsPage() {
     <div>
       <PageHeader title={t('finance.settings.title')} />
       <ProblemAlert problem={problemFromError(numbering.error)} onRetry={numbering.refetch} />
-      {/* The numbering beside the money accounts from xl (owner 2026-10-30: the page hugged the left). */}
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        {numbering.data ? (
-          <DetailCard
-            title={t('finance.settings.numbering')}
-            canEdit
-            view={<NumberingView numbering={numbering.data} />}
-            edit={(close) => <NumberingForm numbering={numbering.data} onClose={close} />}
-          />
-        ) : null}
+      {/* The accounts first, then the numbering: seven columns need the reading column's width. */}
+      <div className="grid items-start gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-3">
             <div>
@@ -177,6 +169,14 @@ export function FinanceSettingsPage() {
             </Table>
           </CardContent>
         </Card>
+        {numbering.data ? (
+          <DetailCard
+            title={t('finance.settings.numbering')}
+            canEdit
+            view={<NumberingView numbering={numbering.data} />}
+            edit={(close) => <NumberingForm numbering={numbering.data} onClose={close} />}
+          />
+        ) : null}
       </div>
       {creating ? (
         <MoneyAccountDialog open account={null} onClose={() => setCreating(false)} />
@@ -192,16 +192,20 @@ function NumberingView({ numbering }: { numbering: FinanceNumbering }) {
   const { t } = useTranslation();
   const today = businessDate();
   return (
-    <FieldList
-      description={t('finance.settings.numberingDescription')}
-      items={FINANCE_DOC_KINDS.map((kind) => ({
-        label: t(`finance.settings.${PATTERN_KEYS[kind]}`),
-        value: <span className="font-mono">{numbering[kind].pattern}</span>,
-        hint: t('finance.settings.example', {
-          example: renderFinanceNumber(numbering[kind].pattern, numbering[kind].digits, today, 1),
-        }),
-      }))}
-    />
+    // The list measures this box for its two columns.
+    <div className="@container">
+      <FieldList
+        columns={2}
+        description={t('finance.settings.numberingDescription')}
+        items={FINANCE_DOC_KINDS.map((kind) => ({
+          label: t(`finance.settings.${PATTERN_KEYS[kind]}`),
+          value: <span className="font-mono">{numbering[kind].pattern}</span>,
+          hint: t('finance.settings.example', {
+            example: renderFinanceNumber(numbering[kind].pattern, numbering[kind].digits, today, 1),
+          }),
+        }))}
+      />
+    </div>
   );
 }
 
