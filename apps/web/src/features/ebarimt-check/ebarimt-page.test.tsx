@@ -214,7 +214,7 @@ describe('EbarimtPage', () => {
     const input = screen.getByRole('textbox', { name: 'Альфа: НӨАТ чөлөөлөгдөх дүн' });
     await user.clear(input);
     await user.type(input, '250{Enter}');
-    expect(await screen.findByText(/өөр хэрэглэгч түрүүлж/)).toBeInTheDocument();
+    expect(await screen.findByText(/өөр хэрэглэгч түрүүлж.*«300»/)).toBeInTheDocument();
     expect(
       await screen.findByRole('button', { name: 'Альфа: НӨАТ чөлөөлөгдөх дүн: 300' }),
     ).toBeInTheDocument();
@@ -496,6 +496,35 @@ describe('EbarimtPage', () => {
       }),
     );
     expect(await screen.findByText(mn.ebarimtCheck.emptySearch)).toBeInTheDocument();
+  });
+
+  it('says nothing of a remark closed on purpose, by Enter or by Esc', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...REPORT_ROUTES,
+      'PUT /api/v1/ebarimt-check/suppliers/1/profile': () => new Response(null, { status: 204 }),
+    });
+    renderApp(PAGE, fetchMock);
+    const user = userEvent.setup();
+    const pencil = async () =>
+      user.click(
+        await screen.findByRole('button', {
+          name: mn.ebarimtCheck.cells.remarkName.replace('{{name}}', 'Альфа'),
+        }),
+      );
+    const field = () =>
+      screen.getByRole('textbox', {
+        name: mn.ebarimtCheck.cells.remarkName.replace('{{name}}', 'Альфа'),
+      });
+    await pencil();
+    await user.type(field(), 'x{Escape}');
+    expect(screen.queryByText(/хадгалагдаагүй/)).toBeNull();
+    expect(calls(fetchMock, 'PUT', '/api/v1/ebarimt-check/suppliers/1/profile')).toHaveLength(0);
+    await pencil();
+    await user.type(field(), 'x{Enter}');
+    await waitFor(() =>
+      expect(calls(fetchMock, 'PUT', '/api/v1/ebarimt-check/suppliers/1/profile')).toHaveLength(1),
+    );
+    expect(screen.queryByText(/хадгалагдаагүй/)).toBeNull();
   });
 
   it('says a cell left with changes was not saved, and saves nothing', async () => {

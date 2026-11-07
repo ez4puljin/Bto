@@ -521,11 +521,21 @@ export function EbarimtPage() {
   };
 
   /** One cell's save: what it refuses is said by name and stays, as focus has moved on by then. */
-  const saveCell = (key: string, label: string, write: () => Promise<unknown>) =>
+  const saveCell = (
+    key: string,
+    label: string,
+    write: () => Promise<unknown>,
+    showValue?: (value: string) => string,
+  ) =>
     void write().then(
       () => setRefusals((list) => list.filter((entry) => entry.key !== key)),
       (error: unknown) => {
-        const problem = problemFromError(error);
+        const told = problemFromError(error);
+        const value = told?.params?.value;
+        const problem =
+          told && showValue && typeof value === 'string'
+            ? { ...told, params: { ...told.params, value: showValue(value) } }
+            : told;
         setRefusals((list) => [
           ...list.filter((entry) => entry.key !== key),
           { key, label, problem },
@@ -545,6 +555,7 @@ export function EbarimtPage() {
           exemptAmount,
           previousExemptAmount: shown,
         }),
+      amountText,
     );
   const saveNote = (row: EbarimtRow, note: string, shown: string) =>
     saveCell(
@@ -757,14 +768,16 @@ export function EbarimtPage() {
         </div>
         {othersChanged ? (
           <Button
-            size="sm"
+            // Beside the no-file mark the row has room for its icon alone: a second row would
+            // take the list's height.
+            size={noFile.length > 0 ? 'icon-sm' : 'sm'}
             variant="outline"
             aria-label={`${t('ebarimtCheck.staleTitle')} ${t('ebarimtCheck.staleReload')}`}
-            title={t('ebarimtCheck.staleTitle')}
+            title={`${t('ebarimtCheck.staleTitle')} ${t('ebarimtCheck.staleReload')}`}
             onClick={refresh}
           >
             <TriangleAlert className="text-warning" />
-            {t('ebarimtCheck.staleReload')}
+            {noFile.length > 0 ? null : t('ebarimtCheck.staleReload')}
           </Button>
         ) : null}
         {noFile.length > 0 ? (
@@ -1256,7 +1269,7 @@ export function EbarimtPage() {
       ) : null}
 
       {refusals.length > 0 ? (
-        <div className="fixed right-4 bottom-4 z-30 flex w-[min(28rem,calc(100%-2rem))] flex-col gap-2">
+        <div className="fixed right-4 bottom-4 z-30 flex max-h-[calc(100dvh-5rem)] w-[min(22rem,calc(100%-2rem))] flex-col gap-2 overflow-y-auto">
           {refusals.map((refusal) => (
             <div
               key={refusal.key}

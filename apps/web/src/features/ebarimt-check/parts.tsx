@@ -1,7 +1,7 @@
 import { EBARIMT_AMOUNT_PATTERN } from '@tugeel/shared/ebarimt-check';
 import { Decimal } from '@tugeel/shared/money';
 import { Check, RotateCcw } from 'lucide-react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MoneyInput } from '@/components/money-input';
 import { Input } from '@/components/ui/input';
@@ -63,7 +63,12 @@ function useHoldsRow(editing: boolean, onEditing: ((editing: boolean) => void) |
  * A cell left with changes, by Back or a row gone from the report, says they were not saved: a save
  * here could commit half a number, and saying nothing would lose it unseen.
  */
-function useSaysIfLeft(editing: boolean, changed: boolean, label: string) {
+function useSaysIfLeft(
+  editing: boolean,
+  changed: boolean,
+  label: string,
+  finished: RefObject<boolean>,
+) {
   const { t } = useTranslation();
   const latest = useRef({ editing, changed, label, t });
   useEffect(() => {
@@ -72,10 +77,11 @@ function useSaysIfLeft(editing: boolean, changed: boolean, label: string) {
   useEffect(
     () => () => {
       const now = latest.current;
-      if (!now.editing || !now.changed) return;
+      // A close by Enter, leaving or Esc may remove the cell before it renders closed.
+      if (!now.editing || !now.changed || finished.current) return;
       toast.warning(now.t('ebarimtCheck.cells.notSaved', { label: now.label }));
     },
-    [],
+    [finished],
   );
 }
 
@@ -117,7 +123,7 @@ export function InlineText(props: {
     if (editing) input.current?.select();
   }, [editing]);
   useHoldsRow(editing, props.onEditing);
-  useSaysIfLeft(editing, draft.trim() !== shown.current.trim(), props.label);
+  useSaysIfLeft(editing, draft.trim() !== shown.current.trim(), props.label, finished);
   const open = () => {
     finished.current = false;
     shown.current = props.value;
@@ -238,7 +244,7 @@ export function InlineAmount(props: {
     if (editing) input.current?.select();
   }, [editing]);
   useHoldsRow(editing, props.onEditing);
-  useSaysIfLeft(editing, draft !== opened.current, props.label);
+  useSaysIfLeft(editing, draft !== opened.current, props.label, finished);
   if (!props.editable) {
     return (
       <span className={cn('font-mono', amount.isZero() ? 'text-muted-foreground' : 'text-warning')}>
