@@ -30,6 +30,8 @@ export * from '@/components/confirm-dialog';
 export * from '@/components/date-input';
 export * from '@/components/detail';
 export * from '@/components/field-error';
+export * from '@/components/filter-panel';
+export * from '@/components/filter-tree';
 export * from '@/components/form';
 export * from '@/components/list';
 export * from '@/components/native-select';
@@ -43,6 +45,8 @@ export * from '@/components/toaster';
 
 export { TopBar } from '@/app/top-bar';
 export { BrandMark } from '@/pos/components/layout';
+export { CategoryIcon, CategoryIconField } from '@/features/catalog/category-icon';
+export { CATEGORY_ICON_KEYS, suggestCategoryIcon } from '@tugeel/shared/category-icons';
 export { pauseToasts, resumeToasts, toast } from '@/lib/toast';
 export { cn } from '@/lib/utils';
 

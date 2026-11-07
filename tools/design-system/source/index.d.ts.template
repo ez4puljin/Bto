@@ -156,6 +156,26 @@ export interface BrandMarkProps {
   className?: string;
 }
 export declare function BrandMark(props: BrandMarkProps): React.ReactElement;
+/** The keys of the 96 category drawings, as `categories.icon_key` stores them. */
+export declare const CATEGORY_ICON_KEYS: readonly string[];
+/** The drawing a category's name asks for; `bag` when none of its words is known. */
+export declare function suggestCategoryIcon(name: string): string;
+export interface CategoryIconProps {
+  /** `iconKey` null follows the name. */
+  category: { iconKey: string | null; name: string };
+  /** Size and spacing; `size-7` when left out. */
+  className?: string;
+}
+export declare function CategoryIcon(props: CategoryIconProps): React.ReactElement;
+export interface CategoryIconFieldProps {
+  id: string;
+  /** The category's name as typed: the drawing follows it while `value` is empty. */
+  name: string;
+  /** A chosen key, or '' to follow the name. */
+  value: string;
+  onChange: (value: string) => void;
+}
+export declare function CategoryIconField(props: CategoryIconFieldProps): React.ReactElement;
 export interface TopBarProps {
   menuOpen: boolean;
   onMenu: () => void;
@@ -224,6 +244,53 @@ export interface FilterChipProps {
   onClear: () => void;
 }
 export declare function FilterChip(props: FilterChipProps): React.ReactElement;
+export interface FilterSectionProps {
+  title: string;
+  /** In use: a dot beside the title, and it starts open. */
+  active?: boolean;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}
+export declare function FilterSection(props: FilterSectionProps): React.ReactElement;
+export interface FilterOptionProps {
+  label: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
+  /** Right of the label, such as a count. */
+  hint?: React.ReactNode;
+}
+export declare function FilterOption(props: FilterOptionProps): React.ReactElement;
+export interface FilterChoicesProps<T extends string = string> {
+  options: readonly T[];
+  label: (value: T) => string;
+  value: string | null;
+  /** null when the chosen one is picked again. */
+  onChange: (value: T | null) => void;
+}
+export declare function FilterChoices<T extends string>(props: FilterChoicesProps<T>): React.ReactElement;
+export interface FilterTreeRow {
+  id: number;
+  parentId: number | null;
+  /** What the row says, beside its code. */
+  title: string;
+  /** Its whole name: on hover, and what a search finds it by. */
+  name: string;
+  code?: string | null;
+  /** What it holds, everything below it included. */
+  count: number;
+}
+export interface FilterTreeProps {
+  /** Siblings stay in the order given. */
+  rows: readonly FilterTreeRow[];
+  selected: number | undefined;
+  /** undefined when «all» or the chosen row is picked. */
+  onPick: (id: number | undefined) => void;
+  allLabel: string;
+  /** With it, a box above the tree finds a row by name. */
+  searchLabel?: string;
+  noMatchLabel?: string;
+}
+export declare function FilterTree(props: FilterTreeProps): React.ReactElement;
 export interface ColumnChooserProps<K extends string = string> {
   keys: readonly K[];
   locked: readonly K[];

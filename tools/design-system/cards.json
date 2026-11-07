@@ -7,6 +7,17 @@
     "source": ["apps/web/src/pos/components/layout.tsx"]
   },
   {
+    "name": "CategoryIcon",
+    "group": "Brand",
+    "height": 800,
+    "width": 960,
+    "source": [
+      "apps/web/src/features/catalog/category-icon.tsx",
+      "packages/shared/src/category-icons/art.ts",
+      "packages/shared/src/category-icons/match.ts"
+    ]
+  },
+  {
     "name": "Button",
     "group": "Actions",
     "height": 290,
@@ -155,6 +166,16 @@
     "height": 400,
     "width": 960,
     "source": ["apps/web/src/components/list.tsx"]
+  },
+  {
+    "name": "FilterSection",
+    "group": "Lists",
+    "height": 700,
+    "width": 800,
+    "source": [
+      "apps/web/src/components/filter-panel.tsx",
+      "apps/web/src/components/filter-tree.tsx"
+    ]
   },
   {
     "name": "ColumnChooser",

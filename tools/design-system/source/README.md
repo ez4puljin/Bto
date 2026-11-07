@@ -98,7 +98,7 @@ Never the old faint halo. A field in error takes a `destructive` border with a 3
 
 ### Imagery
 
-Product photos are the only photographs, on white, 32 px in lists. The one illustration is the sign-in page's map of Mongolia's aimags, with Khövsgöl and Övörkhangai lit and Ulaanbaatar in gold. Empty states use a lucide icon on a `fill` disc. No stock art and no gradients.
+Product photos are the only photographs, on white, 32 px in lists. The one illustration is the sign-in page's map of Mongolia's aimags, with Khövsgöl and Övörkhangai lit and Ulaanbaatar in gold. Empty states use a lucide icon on a `fill` disc. No stock art and no gradients, the category icons' tiles aside (see Iconography).
 
 ## Iconography
 
@@ -106,12 +106,13 @@ Product photos are the only photographs, on white, 32 px in lists. The one illus
 - **Size:** `icon-size` 16 px in a default button, row or menu item, `icon-size-sm` in a small button, `icon-size-xs` in an extra-small button or a badge; 18 px in a tile.
 - **Colour:** icons follow the text. A module tile's icon is `link` on a `secondary` square.
 - **No emoji or glyphs** as icons. Page and module icons are fixed in `app/nav-items.ts`; do not invent a second icon for the same place.
+- **Category icons:** the one drawn, coloured set (ADR-0163, the `CategoryIcon` card): 96 flat drawings on soft two-tone tiles, one per kind of goods, in `@tugeel/shared/category-icons` for the web and the phones alike. A category's name picks its drawing (`suggestCategoryIcon`) and the office may choose another in the category's dialog. Their colours are the drawings' own, not tokens. Only for product categories: 28 px in a list, 56 to 72 px on a phone tile; never in a button or beside a lucide icon, and a category's own picture comes before it.
 - **The mark:** on the web a `primary` rounded square with a white «B» from Inter, live text, not a file (`BrandMark`). The phone apps carry the drawn mark in `assets/Logos`: a geometric «B» for the staff app, «B300» for Bto300. Never redraw either.
 
 ## Page patterns
 
 - **Shell.** A sticky white top bar (`topbar-h`): ⋮⋮ «Бүх цэс», the brand, the eight modules as menus from `lg`, then search (Ctrl/⌘+K), ☆, 🔔, ✨, ⚙ and the account. The open page's module is tinted `secondary`.
-- **List page.** In this order: `PageHeader` with «Шинэ …» as the main button, `FilterBar`, `ProblemAlert`, `ListCard scroll` holding the table, `EmptyState` and `LoadMore`. Filters live in the URL. A row opens its record on a click anywhere and keeps a real link for the keyboard; rows edited by dialogs end in icon `RowActions`. Codes, dates, money and status pills have fixed column widths in rem; names share the rest by weight and cut with «…».
+- **List page.** In this order: `PageHeader` with «Шинэ …» as the main button, `FilterBar`, `ProblemAlert`, `ListCard scroll` holding the table, `EmptyState` and `LoadMore`. Filters live in the URL. A list with many filters keeps them in a panel on its left from `lg` (the products, the suppliers, the discount plans, the price profiles): `FilterSection`s of `FilterOption`s, and a `FilterTree` with a box that finds a category; below `lg` the bar holds them. A row opens its record on a click anywhere and keeps a real link for the keyboard; rows edited by dialogs end in icon `RowActions`. Codes, dates, money and status pills have fixed column widths in rem; names share the rest by weight and cut with «…».
 - **Forms.** `FormSection`s of `FormRow`s: label left in `form-label`, field right, hint and error under the field; stacked by container query where narrow. Dialogs use `FormField`s. «Болих» (ghost) then the main button, on the right. On/off is a `Switch`, never a lone checkbox. Never put a create form above a list.
 - **Creating.** A short header form opens a dialog on `?new=1`; a long one has its own `/new` page; a form filled many times in a row stays on its page and says what it saved.
 - **Record page.** `PageHeader` with `meta` (code, status, dates), then read-first `DetailCard`s. Reading and editing share rows, so the card does not jump on «Засах». Two columns from `xl` where a side column is natural.
