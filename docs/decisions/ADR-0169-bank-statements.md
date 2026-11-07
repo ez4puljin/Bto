@@ -1,4 +1,4 @@
-# ADR-0169: «Тооцоо хаах», the bank's statements filled line by line and written to the books
+# ADR-0169: «Банкны хуулга хаах», the bank's statements filled line by line and written to the books
 
 | | |
 |---|---|
@@ -6,6 +6,7 @@
 | Date | 2026-11-07 |
 | Deciders | Owner («https://bto.puljika.site/bank-statements цэсийг судалж ойлгож Bto-д шинэ цэс болгон оруул», 2026-11-07, asleep: no questions, recommended defaults decide), Claude |
 | Amends | ADR-0083 (the bank import moves from "after go-live" to now); ADR-0077 #6 and ADR-0080 keep the rule that a statement match may record a payment |
+| Renamed | Owner, 2026-11-07: the page was first «Тооцоо хаах», the old tool's name; on screen it is «Банкны хуулга хаах». Route, tables and code names unchanged |
 
 ## Context
 
@@ -13,7 +14,7 @@ The accountant closes the day in the owner's older system, Butenorgil, on its me
 
 ## Decision
 
-1. **A new page «Санхүү → Тооцоо хаах»** at `/finance/bank-statements`, with the old tool's two tabs: «Календар» (a month with the days that hold statements, the day's statements as cards with how far each is filled and what it lacks, one statement's lines to work on) and «Тохиргоо». An open statement takes the whole width: its lines need it, and the day's other statements stay as chips above it.
+1. **A new page «Санхүү → Банкны хуулга хаах»** at `/finance/bank-statements`, with the old tool's two tabs: «Календар» (a month with the days that hold statements, the day's statements as cards with how far each is filled and what it lacks, one statement's lines to work on) and «Тохиргоо». An open statement takes the whole width: its lines need it, and the day's other statements stay as chips above it.
 2. **Upload.** Files come through the private file kind `finance.bank_statement` and are read at once (`parseBankStatement`): the account and the currency from Khan Bank's file name `Statement_<MNT>_<number>`, the columns by their header words (the bank has swapped debit and credit before), every dated row with an amount; the totals row has no date and falls away. A statement is dated by the first day of its lines, whichever day is open on the screen. `dedupe_key` (sha256 of the account, the row and its occurrence in the file) makes a re-upload harmless: a file seen whole adds nothing, a later file of the same day adds a statement of its new lines only. The old tool had no such guard.
 3. **Kinds.** A line is `NORMAL`, `FEE` or `SETTLEMENT`. Only money out is a fee, and only money in a settlement. The old tool called any line with the words a fee, so a customer paying «үйлчилгээний төлбөр» was lost as a bank charge; `\bfee\b` also keeps «coffee» out.
 4. **The bank account.** A statement's money account is the accountant's link, else the number on the account («Дансны дугаар»), else the number in its name. An unknown number shows «Бүртгэлгүй данс» with a choice of the bank accounts, kept on every statement of that number. It cannot be written to the books until then, nor can a statement in another currency. The old tool's «Хадгалсан данс» list is not copied: Bto's money accounts are that list.

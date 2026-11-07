@@ -49,7 +49,7 @@ const TABS = ['calendar', 'settings'] as const;
 const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 
 /**
- * «Тооцоо хаах» (ADR-0169), the old tool's menu on Bto's books: a calendar of the days with bank
+ * «Банкны хуулга хаах» (ADR-0169), the old tool's menu on Bto's books: a calendar of the days with bank
  * statements, a day's statements as cards with how far each is filled, one statement's lines to fill
  * and write to the books, and the rules. The URL keeps the day and the open statement.
  */

@@ -187,7 +187,7 @@ function withPrefix(bankDescription: string): string {
 }
 
 /**
- * «Тооцоо хаах» (ADR-0169): the accountant uploads the bank's daily statements, fills each line (party,
+ * «Банкны хуулга хаах» (ADR-0169): the accountant uploads the bank's daily statements, fills each line (party,
  * counter account, text, action) and writes the ready lines to the books: a customer's money on the
  * receivable account is a voucher settling their oldest invoices, every other line a journal entry on
  * the statement's bank account. Each line's posting and its mark happen in one transaction with the

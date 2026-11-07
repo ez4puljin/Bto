@@ -83,12 +83,12 @@ async function statementFile(rows: readonly (readonly unknown[])[]): Promise<Buf
 }
 
 /**
- * «Тооцоо хаах» (ADR-0169): a statement comes in once, its lines are filled from the rules and from
+ * «Банкны хуулга хаах» (ADR-0169): a statement comes in once, its lines are filled from the rules and from
  * the last choice for the counterpart, a ready line goes to the books once, a customer's money closes
  * the oldest invoice, a line is taken back by its document's reversal, and a posted statement stays.
  * Synthetic data.
  */
-describe('bank statements, «Тооцоо хаах»', () => {
+describe('bank statements, «Банкны хуулга хаах»', () => {
   let app: NestExpressApplication;
   let admin: string;
   let accountant: string;

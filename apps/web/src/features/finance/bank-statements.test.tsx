@@ -142,7 +142,7 @@ const routes = () => ({
     ]),
 });
 
-describe('«Тооцоо хаах» (ADR-0169)', () => {
+describe('«Банкны хуулга хаах» (ADR-0169)', () => {
   it('shows the day’s statements with how far each is filled, and what they lack', async () => {
     renderApp('/finance/bank-statements?date=2026-11-05', signedIn(ACCOUNTANT_ME, routes()));
     expect(await screen.findByRole('heading', { name: TEXT.title })).toBeInTheDocument();

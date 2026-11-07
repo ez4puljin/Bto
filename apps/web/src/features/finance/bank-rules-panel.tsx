@@ -23,7 +23,7 @@ import { useGlAccounts, useMoneyAccounts } from './api';
 import { type BankRules, useBankMutations, useBankRules } from './bank-api';
 
 /**
- * «Тооцоо хаах»'s rules (ADR-0169 #5): what a card settlement and a bank fee are filled with, the
+ * «Банкны хуулга хаах»'s rules (ADR-0169 #5): what a card settlement and a bank fee are filled with, the
  * accounts offered first and Erkhet's general party. Saving fills the open locked lines again.
  */
 export function BankRulesPanel() {
