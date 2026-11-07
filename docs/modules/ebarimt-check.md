@@ -72,4 +72,4 @@ The month, mode, chosen months, employee, «Дутуутай», filters and the 
 
 ## Status
 
-Built 2026-11-07. `bto_main` holds the old system's eleven months (2025-12 … 2026-10) carried over by a one-off script through this API: Orgil's e-Barimt files, registers, phones, remarks, exempt amounts, notes, links, and employees for the three whose names plainly match staff. Real data stays out of the repository.
+Built 2026-11-07. `bto_main` holds the old system's eleven months (2025-12 … 2026-10) carried over through this API by `tools/ebarimt-carry` (safe to run again; once more at cut-over if the old page stays in use): Orgil's e-Barimt files, registers, phones, remarks, exempt amounts, notes, links, and employees for the three whose names plainly match staff. Real data stays out of the repository.
