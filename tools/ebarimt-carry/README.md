@@ -32,6 +32,6 @@ That only reads, and prints how many values would change.
 node tools/ebarimt-carry/carry.mjs --write
 ```
 
-That writes them. Running it again writes nothing, because only what differs from Bto is written. An old value of nothing never clears what is in Bto, but an old value that differs replaces what people typed in Bto, so run it before people start working in Bto, not after.
+That writes them. This path has not written anything yet: when the tool was written, `bto_main` already held it all, so try it on a copy of the database first. Running it again writes nothing, because only what differs from Bto is written. An old value of nothing never clears what is in Bto, but an old value that differs replaces what people typed in Bto, so run it before people start working in Bto, not after.
 
 It signs in as `import` with the password from `tmp/dev-logins.txt` (`--login` picks another name; `CARRY_PASSWORD` overrides the file) and takes `--api` for another server. It prints counts only, never names or amounts.
