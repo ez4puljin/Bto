@@ -175,9 +175,12 @@ for (const row of items) {
 }
 
 // Beside the dump, so as gitignored as the dump is. A run that finds everything leaves no old list.
+// A run with failures does not know what it would have found, so it leaves the old list alone.
 const notFoundFile = join(OLD, NOT_FOUND_FILE);
-if (notFound.length > 0) writeFileSync(notFoundFile, `${JSON.stringify(notFound, null, 2)}\n`);
-else rmSync(notFoundFile, { force: true });
+if (failures === 0) {
+  if (notFound.length > 0) writeFileSync(notFoundFile, `${JSON.stringify(notFound, null, 2)}\n`);
+  else rmSync(notFoundFile, { force: true });
+}
 
 const sum = (counts) => [...counts.values()].reduce((total, by) => total + by, 0);
 const line = (what, by) => console.log(`  ${what}: ${by}`);
@@ -192,7 +195,8 @@ if (write) {
 }
 line('rows found by name', tally.byName);
 line('products not found', `${productsNotFound.size} (${tally.productRows} rows)`);
-if (notFound.length > 0) line('their rows written to the --old folder', NOT_FOUND_FILE);
+if (failures > 0) line(`${NOT_FOUND_FILE} left as it was, since rows failed`, failures);
+else if (notFound.length > 0) line('their rows written to the --old folder', NOT_FOUND_FILE);
 line('rows left out', sum(leftOut));
 for (const [why, by] of leftOut) line(`  ${why}`, by);
 line('history rows sent', tally.historySent);

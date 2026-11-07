@@ -1,7 +1,7 @@
 import * as Crypto from 'expo-crypto';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { ScanLine } from 'lucide-react-native';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -23,17 +23,20 @@ import {
 import { type AppProblem, problemFrom } from '../../../src/api/problem';
 import { useBarcodeLookup } from '../../../src/api/transfers';
 import { StatusPill } from '../../../src/community/parts';
-import { ExpiryFields, ExpiryRecordRow, HeaderSearch } from '../../../src/expiry/parts';
+import { useLeaveGuard } from '../../../src/expiry/leave-guard';
+import { ExpiryFields, ExpiryRecordRow, HeaderSearch, LeaveSheet } from '../../../src/expiry/parts';
 import {
   type ChosenProduct,
   chosenFromBarcode,
   chosenFromLookup,
   createBodyOf,
+  createTurns,
   duplicateChoiceOf,
   EMPTY_EXPIRY_FORM,
   type ExpiryForm,
   hasProblems,
   isAwaitingRows,
+  isNewRecordTyped,
   problemsOfNew,
 } from '../../../src/expiry/rules';
 import { useDebounced } from '../../../src/state/use-debounced';
@@ -54,12 +57,14 @@ type After = 'back' | 'next';
  * A new record (ADR-0172 #5, #9): the camera (at once with `?scan=1`) or a search, then the product
  * with its open records first, the date with its days as it is typed, the two counts and a note.
  * «Хадгалах» goes back to the list; «Хадгалаад дараагийн бараа» clears the form and opens the camera
- * again, for walking a shelf. One Idempotency-Key per form until it succeeds. A failed save stays on
- * the screen as typed (no offline mode, ADR-0020).
+ * again, for walking a shelf. One Idempotency-Key per product's form until it succeeds. A failed
+ * save stays on the screen as typed (no offline mode, ADR-0020), and leaving with something typed
+ * asks first.
  */
 export default function NewExpiryRecordScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const params = useLocalSearchParams<{ scan?: string }>();
@@ -69,6 +74,8 @@ export default function NewExpiryRecordScreen() {
 
   const [scanning, setScanning] = useState(params.scan === '1');
   const [looking, setLooking] = useState(false);
+  const [turns] = useState(createTurns);
+  const scroller = useRef<ScrollView>(null);
   const [text, setText] = useState('');
   const q = useDebounced(text.trim(), 350);
   const [product, setProduct] = useState<ChosenProduct | null>(null);
@@ -79,6 +86,8 @@ export default function NewExpiryRecordScreen() {
   const [existing, setExisting] = useState<{ itemId: number; after: After } | null>(null);
   // What «Шинээр нэмэх» said yes to, kept until the save succeeds (`duplicateChoiceOf`).
   const [duplicateChoice, setDuplicateChoice] = useState<string | null>(null);
+  // The server has seen this form's key with another body: an earlier save landed unheard.
+  const [landed, setLanded] = useState<After | null>(null);
   const [problem, setProblem] = useState<AppProblem | null>(null);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
 
@@ -88,79 +97,106 @@ export default function NewExpiryRecordScreen() {
   const fractional = useBaseUnitFractional(product?.id ?? null);
   const problems = problemsOfNew(form, today, fractional);
   const change = (patch: Partial<ExpiryForm>) => setForm((current) => ({ ...current, ...patch }));
+  const leaving = useLeaveGuard(isNewRecordTyped(product !== null, form));
 
   const choose = (next: ChosenProduct) => {
+    // A product chosen ends any scan still being looked up, so its late answer cannot swap the
+    // product under what gets typed for this one.
+    turns.take();
+    setLooking(false);
     setProduct(next);
     setProblem(null);
     setText('');
   };
 
   const onCode = async (code: string) => {
+    const turn = turns.take();
     setScanning(false);
     setProblem(null);
     setLooking(true);
     try {
       const found = await lookup(code);
+      if (!turns.isLatest(turn)) return;
       if (found) choose(chosenFromBarcode(found));
       else toast.show({ message: t('mobile.expiry.new.unknownBarcode') });
     } catch (error) {
-      setProblem(problemFrom(error));
+      if (turns.isLatest(turn)) setProblem(problemFrom(error));
     } finally {
-      setLooking(false);
+      if (turns.isLatest(turn)) setLooking(false);
     }
   };
 
-  /**
-   * The form's key until it succeeds. A key the server says it saw with another body means an
-   * earlier save did land although its answer never came, and the person has changed something
-   * since: that needs a key of its own, and the server then tells of the record it already holds.
-   * A yes to a duplicate never goes with it: it was given before that record was known.
-   */
-  const post = async (productId: number, allowDuplicate: boolean) => {
-    try {
-      await create.mutateAsync({ key, body: createBodyOf(productId, form, allowDuplicate) });
-    } catch (error) {
-      if (problemFrom(error).code !== 'IDEMPOTENCY_KEY_REUSED') throw error;
-      const fresh = Crypto.randomUUID();
-      setKey(fresh);
-      setDuplicateChoice(null);
-      await create.mutateAsync({ key: fresh, body: createBodyOf(productId, form, false) });
-    }
+  /** A new key takes no yes to a duplicate with it: that was given for what the old key sent. */
+  const renewKey = () => {
+    const fresh = Crypto.randomUUID();
+    setKey(fresh);
+    setDuplicateChoice(null);
+    return fresh;
   };
 
-  const save = async (after: After, addAnyway = false) => {
+  /** Each product's form has its own key, so a refused key can only be about this product. */
+  const changeProduct = () => {
+    setProduct(null);
+    setLanded(null);
+    renewKey();
+  };
+
+  const save = async (after: After, how: { addAnyway?: boolean; key?: string } = {}) => {
     if (!product) return;
     setChecked(true);
     setProblem(null);
+    setLanded(null);
     if (hasProblems(problems)) return;
     setSaving(after);
     const choice = duplicateChoiceOf(product.id, form);
+    const addAnyway = how.addAnyway === true;
     if (addAnyway) setDuplicateChoice(choice);
+    const allowDuplicate = addAnyway || (how.key === undefined && duplicateChoice === choice);
     try {
-      await post(product.id, addAnyway || duplicateChoice === choice);
-      setKey(Crypto.randomUUID());
-      setDuplicateChoice(null);
+      await create.mutateAsync({
+        key: how.key ?? key,
+        body: createBodyOf(product.id, form, allowDuplicate),
+      });
+      renewKey();
       toast.show({ message: t('mobile.expiry.new.saved') });
-      if (after === 'back') {
+      // The person may have left while this was answered, and neither going back nor the camera
+      // may then land on the screen they are on now.
+      const stillHere = navigation.isFocused();
+      if (after === 'back' && stillHere) {
+        leaving.release();
         router.back();
         return;
       }
-      setLastSaved(product.name);
+      // Whoever comes back to this screen finds no saved values passing for typed ones.
       setProduct(null);
       setForm(EMPTY_EXPIRY_FORM);
       setChecked(false);
-      setScanning(true);
+      if (after === 'next') {
+        setLastSaved(product.name);
+        setScanning(stillHere);
+      }
     } catch (error) {
       const failure = problemFrom(error);
       const itemId = failure.params?.itemId;
       if (failure.code === 'EXPIRY_ITEM_EXISTS' && typeof itemId === 'number') {
         setExisting({ itemId, after });
+      } else if (failure.code === 'IDEMPOTENCY_KEY_REUSED') {
+        // An earlier save landed although its answer never came, and something has changed since.
+        // Nothing is sent again unasked: that record may hold the very values just corrected. The
+        // hook's refresh of `['expiry']`, started with this answer, brings it into the open records.
+        setLanded(after);
+        scroller.current?.scrollTo({ y: 0 });
       } else {
         setProblem(failure);
       }
     } finally {
       setSaving(null);
     }
+  };
+
+  /** A record beside the one that landed, on the person's word; the server may still ask. */
+  const addAnother = () => {
+    if (landed) void save(landed, { key: renewKey() });
   };
 
   const openRecords = open.data?.data ?? [];
@@ -194,7 +230,11 @@ export default function NewExpiryRecordScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.flex}
         >
-          <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            ref={scroller}
+            contentContainerStyle={styles.body}
+            keyboardShouldPersistTaps="handled"
+          >
             <View style={styles.card}>
               <View style={styles.productHead}>
                 <View style={styles.grow}>
@@ -207,7 +247,7 @@ export default function NewExpiryRecordScreen() {
                 </View>
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => setProduct(null)}
+                  onPress={changeProduct}
                   style={({ pressed }) => [styles.change, pressed && styles.faded]}
                 >
                   <Text style={styles.changeText}>{t('mobile.expiry.new.change')}</Text>
@@ -259,21 +299,42 @@ export default function NewExpiryRecordScreen() {
           </ScrollView>
           <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
             <ProblemText problem={problem} style={styles.barProblem} />
-            <PillButton
-              title={t('mobile.expiry.new.saveNext')}
-              height={46}
-              loading={saving === 'next'}
-              disabled={saving !== null}
-              onPress={() => void save('next')}
-            />
-            <PillButton
-              title={t('common.save')}
-              variant="soft"
-              height={46}
-              loading={saving === 'back'}
-              disabled={saving !== null}
-              onPress={() => void save('back')}
-            />
+            {landed ? (
+              <>
+                <View accessibilityRole="alert" style={styles.landed}>
+                  <Text style={styles.landedText}>{t('mobile.expiry.new.landed')}</Text>
+                </View>
+                <PillButton
+                  title={t('mobile.expiry.new.addAnyway')}
+                  height={46}
+                  onPress={addAnother}
+                />
+                <PillButton
+                  title={t('common.cancel')}
+                  variant="soft"
+                  height={46}
+                  onPress={() => setLanded(null)}
+                />
+              </>
+            ) : (
+              <>
+                <PillButton
+                  title={t('mobile.expiry.new.saveNext')}
+                  height={46}
+                  loading={saving === 'next'}
+                  disabled={saving !== null}
+                  onPress={() => void save('next')}
+                />
+                <PillButton
+                  title={t('common.save')}
+                  variant="soft"
+                  height={46}
+                  loading={saving === 'back'}
+                  disabled={saving !== null}
+                  onPress={() => void save('back')}
+                />
+              </>
+            )}
           </View>
         </KeyboardAvoidingView>
       ) : (
@@ -349,13 +410,14 @@ export default function NewExpiryRecordScreen() {
             onPress: () => {
               const after = existing?.after;
               setExisting(null);
-              if (after) void save(after, true);
+              if (after) void save(after, { addAnyway: true });
             },
           },
         ]}
         cancelLabel={t('common.cancel')}
         onCancel={() => setExisting(null)}
       />
+      <LeaveSheet guard={leaving} />
     </Page>
   );
 }
@@ -402,4 +464,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.canvas,
   },
   barProblem: { marginTop: 0 },
+  landed: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.field,
+    backgroundColor: colors.warningSoft,
+  },
+  landedText: { ...type.body, color: colors.warningText },
 });

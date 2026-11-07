@@ -12,8 +12,15 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, NavigationType, useNavigationType, useSearchParams } from 'react-router';
+import {
+  Link,
+  type Location,
+  NavigationType,
+  useNavigationType,
+  useSearchParams,
+} from 'react-router';
 import { ColumnChooser } from '@/components/column-chooser';
+import { LeaveGuard } from '@/components/leave-guard';
 import {
   ButtonRow,
   ChevronHead,
@@ -85,6 +92,13 @@ const COLUMNS_LIST = 'inventory.expiry';
 const SEARCH_WAIT_MS = 300;
 const NO_FILTER_OPTIONS: ExpiryFilterOptions = { suppliers: [], warehouses: [], creators: [] };
 
+/** The record and the new-record dialog live in the address: changing those leaves what is typed. */
+const leavesWork = (current: Location, next: Location) => {
+  const before = new URLSearchParams(current.search);
+  const after = new URLSearchParams(next.search);
+  return ['item', 'new'].some((param) => before.get(param) !== after.get(param));
+};
+
 /**
  * «Хугацааны хяналт» (ADR-0172 #8): the register of what expires, for every signed-in person. The
  * URL keeps the filters and the open record (`?item=`), so the home tiles and a printed list lead
@@ -108,6 +122,8 @@ export function ExpiryPage() {
   const items = useExpiryItems({ ...filter, q });
   const rows = items.data?.pages.flatMap((page) => page.data) ?? [];
   const [creating, setCreating] = useCreateParam();
+  const [createDirty, setCreateDirty] = useState(false);
+  const [recordDirty, setRecordDirty] = useState(false);
   const itemId = positiveId(params.get('item'));
   const today = summary.data?.today;
 
@@ -148,7 +164,14 @@ export function ExpiryPage() {
     <div>
       <PageHeader
         title={t('expiry.title')}
-        meta={countLine(t, summary.data, filter.view, narrowed, rows.length, items.hasNextPage)}
+        meta={countLine(
+          t,
+          summary.data,
+          filter.view,
+          narrowed,
+          items.data ? rows.length : undefined,
+          items.hasNextPage,
+        )}
         actions={
           <>
             <Button asChild variant="outline">
@@ -258,29 +281,46 @@ export function ExpiryPage() {
           today={today}
           recordHref={(id) => `?${expiryRecordParams(params, id).toString()}`}
           onOpenRecord={(id) => setParams(expiryRecordParams(params, id), { replace: true })}
+          onDirty={setCreateDirty}
           onClose={() => setCreating(false)}
         />
       ) : null}
-      <ExpiryRecordPanel itemId={itemId} today={today} onClose={() => setParam('item', '')} />
+      <ExpiryRecordPanel
+        itemId={itemId}
+        today={today}
+        dirty={recordDirty}
+        onDirty={setRecordDirty}
+        onClose={() => setParam('item', '')}
+      />
+      {/* Here and not in each: a router keeps a single blocker, so a second guard would lose one. */}
+      <LeaveGuard
+        when={recordDirty || createDirty}
+        leaves={leavesWork}
+        title={t('common.discard.title')}
+        description={t('common.discard.description')}
+        leaveLabel={t('common.discard.confirm')}
+      />
     </div>
   );
 }
 
 /**
  * The header's count, in the old page's words. The summary knows a whole view; with another filter
- * on, only what has loaded is known, so a list with more to load says «+».
+ * on, only what has loaded is known, so a list with more to load says «+», and a list still loading
+ * or whose read failed (`loaded` undefined) says nothing.
  */
 function countLine(
   t: TFunction,
   summary: ExpirySummary | undefined,
   view: ExpiryView,
   narrowed: boolean,
-  loaded: number,
+  loaded: number | undefined,
   more: boolean,
 ): string | undefined {
   if (!narrowed) {
     return summary ? t('expiry.count', { n: formatCount(viewCount(summary, view)) }) : undefined;
   }
+  if (loaded === undefined) return undefined;
   return more
     ? t('expiry.countMore', { n: formatCount(loaded) })
     : t('expiry.count', { n: formatCount(loaded) });

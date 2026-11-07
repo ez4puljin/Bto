@@ -9,8 +9,8 @@ import {
 import { daysBetween } from '@tugeel/shared/finance';
 import { isIsoDate } from '@tugeel/shared/time';
 import { X } from 'lucide-react';
-import { type KeyboardEvent, useMemo, useRef, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { Controller, type FieldErrors, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { z } from 'zod';
@@ -32,12 +32,13 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { type ProductSummary, useBarcodeLookup } from '@/features/catalog/api';
 import { ProductSearch } from '@/features/inventory/shared';
+import { parseDateText } from '@/lib/calendar';
 import { formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useScanGuard } from '@/lib/scan/use-wedge-scanner';
 import { toast } from '@/lib/toast';
 import { randomUuid } from '@/lib/uuid';
-import { type ExpiryCreateBody, useExpiryMutations, useProductOpenExpiry } from './api';
+import { useExpiryMutations, useProductOpenExpiry } from './api';
 import { daysText, isQty, isZeroQty, plainQty } from './helpers';
 import { DaysLeft, ExpiryStatusBadge } from './parts';
 
@@ -108,7 +109,7 @@ const FLOOR_FIELD = 'expiry-new-floor';
 const WAREHOUSE_FIELD = 'expiry-new-warehouse';
 const NOTE_FIELD = 'expiry-new-note';
 
-/** The fields where a scan does not belong; the two product boxes read scans themselves. */
+/** The fields where a scan does not belong, in the form's order; the two product boxes read scans. */
 const SCAN_GUARDED = new Map<string, keyof CreateValues>([
   [DATE_FIELD, 'expiryDate'],
   [FLOOR_FIELD, 'qtyFloor'],
@@ -116,27 +117,52 @@ const SCAN_GUARDED = new Map<string, keyof CreateValues>([
   [NOTE_FIELD, 'note'],
 ]);
 
+/** After whatever is closing has given the focus back: the cursor goes here, its text selected. */
+const focusField = (id: string) =>
+  window.setTimeout(() => {
+    const box = document.getElementById(id);
+    if (box instanceof HTMLInputElement || box instanceof HTMLTextAreaElement) {
+      box.focus();
+      box.select();
+    }
+  }, 0);
+
+/** The date box holds no ref for the form to focus, so a refused save does it for every field. */
+const focusFirstError = (failed: FieldErrors<CreateValues>) => {
+  for (const [id, field] of SCAN_GUARDED) {
+    if (failed[field]) {
+      focusField(id);
+      return;
+    }
+  }
+};
+
 /**
  * A new record on `?new=1` (ADR-0172 #2, #5): scan or find the product, see what is already open on
  * it, type the date and the two counts. One `Idempotency-Key` per record until a save succeeds; a
- * refused repeat of an open product and date offers that record or a new one anyway. What was typed
- * for one product is never carried to the next: moving on asks when something is typed.
+ * refused repeat of an open product and date offers that record or a new one anyway. A key the
+ * server saw with another body means an earlier save did land although its answer never came: that
+ * is said, and only the person's choice adds another, under a new key. What was typed for one
+ * product is never carried to the next: moving on asks when something is typed. The dialog's own
+ * exits ask through `DialogContent`; `onDirty` tells the page's guard, which asks before Back, the
+ * palette and a reload, all of which the dialog never hears of.
  */
 export function ExpiryCreateDialog(props: {
   today: string | undefined;
   recordHref: (id: number) => string;
   onOpenRecord: (id: number) => void;
+  onDirty: (dirty: boolean) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const { today } = props;
+  const { today, onDirty } = props;
   const mutations = useExpiryMutations();
   const lookup = useBarcodeLookup();
   const [key, setKey] = useState(randomUuid);
   const [chosen, setChosen] = useState<Chosen | null>(null);
   /** The next product while the question about what is typed for this one is open. */
   const [held, setHeld] = useState<Chosen | null>(null);
-  /** The question was answered with moving on, so the focus does not go back where it was. */
+  /** The question was answered by dropping what was typed: the cursor is on its way to the date. */
   const movingOn = useRef(false);
   const [problem, setProblem] = useState<ProblemDetails | null>(null);
   const [duplicate, setDuplicate] = useState<{
@@ -144,35 +170,44 @@ export function ExpiryCreateDialog(props: {
     mode: SaveMode;
     then: Chosen | null;
   } | null>(null);
+  /** The save the server refused because an earlier one landed: only a choice repeats it. */
+  const [landed, setLanded] = useState<{ mode: SaveMode; then: Chosen | null } | null>(null);
   const [added, setAdded] = useState<string | null>(null);
   /** A new product on the shelf: the scan box mounts again and takes the cursor. */
   const [round, setRound] = useState(0);
   const product = chosen?.product ?? null;
   const open = useProductOpenExpiry(product?.id ?? null);
   const resolver = useMemo(() => zodResolver(createSchema(today)), [today]);
-  const form = useForm<CreateValues>({ resolver, defaultValues: EMPTY });
+  const form = useForm<CreateValues>({
+    resolver,
+    defaultValues: EMPTY,
+    shouldFocusError: false,
+  });
   const {
     formState: { errors, isDirty },
   } = form;
   const date = form.watch('expiryDate');
   const days = today && isIsoDate(date) ? daysBetween(today, date) : null;
 
-  /** After the search box has taken its cursor back: the date is what comes next. */
-  const focusDate = () =>
-    window.setTimeout(() => {
-      const box = document.getElementById(DATE_FIELD);
-      if (box instanceof HTMLInputElement) {
-        box.focus();
-        box.select();
-      }
-    }, 0);
-  /** Another product is another record, under a key of its own. */
+  useEffect(() => {
+    onDirty(isDirty);
+    return () => onDirty(false);
+  }, [isDirty, onDirty]);
+  /** What is typed was saved or the person was asked, so the page's guard must not ask again. */
+  const clearDirty = () => onDirty(false);
+  const close = () => {
+    clearDirty();
+    props.onClose();
+  };
+
+  /** Another product is another record, under a key of its own; the date is what comes next. */
   const goOn = (next: Chosen) => {
     setChosen(next);
     setKey(randomUuid());
     setDuplicate(null);
+    setLanded(null);
     setProblem(null);
-    focusDate();
+    focusField(DATE_FIELD);
   };
   const pick = (next: Chosen) => {
     setAdded(null);
@@ -180,7 +215,7 @@ export function ExpiryCreateDialog(props: {
     if (product?.id === next.product.id) {
       // The same product again: only what was read of it changes (a box after a piece).
       setChosen(next);
-      if (blank) focusDate();
+      if (blank) focusField(DATE_FIELD);
       return;
     }
     if (product && !blank) {
@@ -198,9 +233,25 @@ export function ExpiryCreateDialog(props: {
       onError: (error) => setProblem(problemFromError(error)),
     });
   };
-  /** The field gets back what it held; the date box's own draft only goes on leaving the box. */
+  /**
+   * What a field holds as a burst starts: a short date («2026.12.1») is still only the box's text,
+   * and it goes out on leaving the box.
+   */
+  const valueAtBurst = (field: keyof CreateValues, box: EventTarget) => {
+    const value = form.getValues(field);
+    if (field !== 'expiryDate' || !(box instanceof HTMLInputElement)) return value;
+    return parseDateText(box.value) ?? value;
+  };
+  /**
+   * The field gets back what it held, and the error the burst's digits earned goes with them. After
+   * a save every change is checked, but an empty field is no mistake until the next save.
+   */
   const restoreField = (field: keyof CreateValues, value: string) => {
-    form.setValue(field, value, { shouldDirty: true });
+    form.clearErrors(field);
+    form.setValue(field, value, {
+      shouldDirty: true,
+      shouldValidate: form.formState.isSubmitted && value.trim() !== '',
+    });
     if (field !== 'expiryDate') return;
     const box = document.getElementById(DATE_FIELD);
     box?.blur();
@@ -210,45 +261,38 @@ export function ExpiryCreateDialog(props: {
   const guard = useScanGuard(scan);
   const guardFields = (event: KeyboardEvent<HTMLElement>) => {
     const field = event.target instanceof HTMLElement && SCAN_GUARDED.get(event.target.id);
-    if (field) guard(event, form.getValues(field), (value) => restoreField(field, value));
-  };
-
-  /**
-   * A key the server says it saw with another body means an earlier save did land although its
-   * answer never came, and the person has changed something since: that needs a key of its own, and
-   * the server then tells of the record it already holds.
-   */
-  const send = async (body: ExpiryCreateBody) => {
-    try {
-      return await mutations.create.mutateAsync({ key, body });
-    } catch (error) {
-      if (problemFromError(error)?.code !== 'IDEMPOTENCY_KEY_REUSED') throw error;
-      const fresh = randomUuid();
-      setKey(fresh);
-      return await mutations.create.mutateAsync({ key: fresh, body });
+    if (field) {
+      guard(event, valueAtBurst(field, event.target), (value) => restoreField(field, value));
     }
   };
+
   const post = async (
     values: CreateValues,
     mode: SaveMode,
     allowDuplicate: boolean,
     then: Chosen | null,
+    postKey: string,
   ) => {
     if (!product) return;
+    setKey(postKey);
     setProblem(null);
     setDuplicate(null);
+    setLanded(null);
     try {
-      const created = await send({
-        productId: product.id,
-        expiryDate: values.expiryDate,
-        qtyFloor: plainQty(values.qtyFloor),
-        qtyWarehouse: plainQty(values.qtyWarehouse),
-        ...(values.note.trim() ? { note: values.note.trim() } : {}),
-        ...(allowDuplicate ? { allowDuplicate: true } : {}),
+      const created = await mutations.create.mutateAsync({
+        key: postKey,
+        body: {
+          productId: product.id,
+          expiryDate: values.expiryDate,
+          qtyFloor: plainQty(values.qtyFloor),
+          qtyWarehouse: plainQty(values.qtyWarehouse),
+          ...(values.note.trim() ? { note: values.note.trim() } : {}),
+          ...(allowDuplicate ? { allowDuplicate: true } : {}),
+        },
       });
       if (mode === 'close') {
         toast.success(t('expiry.new.createdToast'));
-        props.onClose();
+        close();
         return;
       }
       setAdded(t('expiry.new.added', { name: created.product.name }));
@@ -266,14 +310,30 @@ export function ExpiryCreateDialog(props: {
       const itemId = refused?.params?.itemId;
       if (refused?.code === 'EXPIRY_ITEM_EXISTS' && typeof itemId === 'number') {
         setDuplicate({ itemId, mode, then });
+      } else if (refused?.code === 'IDEMPOTENCY_KEY_REUSED') {
+        // The key stays: a repeat of what landed is answered with that record, a changed form is
+        // refused again, and neither adds a second record nobody asked for.
+        mutations.refresh();
+        setLanded({ mode, then });
       } else {
         setProblem(refused);
       }
     }
   };
-  /** `then`: the product to go on to once this one is in; a refused form stays where it is. */
-  const save = (mode: SaveMode, allowDuplicate = false, then: Chosen | null = null) =>
-    form.handleSubmit((values) => post(values, mode, allowDuplicate, then))();
+  /**
+   * `then`: the product to go on to once this one is in; a refused form stays where it is. `postKey`:
+   * another key than this record's, which it becomes once a post goes out under it.
+   */
+  const save = (
+    mode: SaveMode,
+    allowDuplicate = false,
+    then: Chosen | null = null,
+    postKey = key,
+  ) =>
+    form.handleSubmit(
+      (values) => post(values, mode, allowDuplicate, then, postKey),
+      focusFirstError,
+    )();
 
   const unit = product?.baseUnit.uomName;
   const openRows = open.data?.data ?? [];
@@ -281,7 +341,7 @@ export function ExpiryCreateDialog(props: {
   const exit = isDirty ? { 'data-dialog-exit': '' } : {};
   return (
     <>
-      <Dialog open onOpenChange={(next) => (next ? undefined : props.onClose())}>
+      <Dialog open onOpenChange={(next) => (next ? undefined : close())}>
         <DialogContent size="lg" closeLabel={t('common.close')} dirty={isDirty || product !== null}>
           <DialogHeader>
             <DialogTitle>{t('expiry.new.title')}</DialogTitle>
@@ -343,6 +403,7 @@ export function ExpiryCreateDialog(props: {
                     onClick={() => {
                       setChosen(null);
                       setDuplicate(null);
+                      setLanded(null);
                     }}
                   >
                     <X />
@@ -363,6 +424,7 @@ export function ExpiryCreateDialog(props: {
                             to={props.recordHref(row.id)}
                             replace
                             className="text-link underline-offset-4 hover:underline"
+                            onClick={clearDirty}
                             {...exit}
                           >
                             {t('expiry.new.openRow', {
@@ -393,7 +455,10 @@ export function ExpiryCreateDialog(props: {
                       type="button"
                       size="sm"
                       variant="outline"
-                      onClick={() => props.onOpenRecord(duplicate.itemId)}
+                      onClick={() => {
+                        clearDirty();
+                        props.onOpenRecord(duplicate.itemId);
+                      }}
                       {...exit}
                     >
                       {t('expiry.new.openRecord')}
@@ -404,6 +469,24 @@ export function ExpiryCreateDialog(props: {
                       variant="outline"
                       pending={mutations.create.isPending}
                       onClick={() => void save(duplicate.mode, true, duplicate.then)}
+                    >
+                      {t('expiry.new.addAnyway')}
+                    </Button>
+                  </span>
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            {landed ? (
+              <Alert>
+                <AlertDescription>
+                  {t('expiry.new.landed')}
+                  <span className="mt-2 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      pending={mutations.create.isPending}
+                      onClick={() => void save(landed.mode, false, landed.then, randomUuid())}
                     >
                       {t('expiry.new.addAnyway')}
                     </Button>
@@ -485,7 +568,7 @@ export function ExpiryCreateDialog(props: {
             <DialogFormFooter
               pending={mutations.create.isPending}
               disabled={product === null}
-              onCancel={props.onClose}
+              onCancel={close}
               onSaveAndNew={() => void save('next')}
             />
           </form>
@@ -495,6 +578,9 @@ export function ExpiryCreateDialog(props: {
         <ConfirmDialog
           open
           variant="default"
+          // A scan opens it, and the tail of the next scan must not press the main button
+          // (ADR-0047 #4): the focus starts on «Болих».
+          initialFocus="first"
           title={t('expiry.new.heldTitle', { name: product?.name ?? '' })}
           description={t('expiry.new.heldDescription', { name: held.product.name })}
           confirmLabel={t('expiry.new.heldSave')}
@@ -507,8 +593,9 @@ export function ExpiryCreateDialog(props: {
               goOn(held);
             },
           }}
+          // The focus goes back to the field it left: a refused save stays there, one that goes
+          // through moves on to the date.
           onConfirm={() => {
-            movingOn.current = true;
             setHeld(null);
             void save('next', false, held);
           }}
@@ -516,6 +603,10 @@ export function ExpiryCreateDialog(props: {
           onCloseAutoFocus={(event) => {
             if (movingOn.current) event.preventDefault();
             movingOn.current = false;
+            // Opened by the camera's read: what had the focus went with the camera's dialog.
+            window.setTimeout(() => {
+              if (document.activeElement === document.body) focusField(DATE_FIELD);
+            }, 0);
           }}
         />
       ) : null}

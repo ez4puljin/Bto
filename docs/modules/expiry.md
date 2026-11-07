@@ -56,6 +56,8 @@ What the tool must send: times with their zone (`2026-03-05T04:10:00Z`, `+08:00`
 - Staff app: `app/(staff)/(work)/expiry.tsx`, `app/(staff)/expiry/new.tsx`, `app/(staff)/expiry/[id].tsx`, rules in `apps/mobile/src/expiry/` (`docs/modules/mobile.md`).
 - AI: `ai.expiry_items`, data group `stock` (`docs/modules/ai.md`).
 
+Both clients keep what a person typed: leaving with unsaved values asks first; a save refused by a newer edit or an archive leaves the values on screen beside what the record now holds. `IDEMPOTENCY_KEY_REUSED` on `POST /expiry/items` proves an earlier save landed with its answer lost, so a client never re-posts by itself: it refreshes the product's open records, says so, and posts under a new key only when the person chooses to add another.
+
 ## 7. Invariants
 
 - Stock never moves: this module imports nothing that posts, and its suite proves `expectReconciled` still holds.

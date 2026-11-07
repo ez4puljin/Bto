@@ -19,6 +19,7 @@ import { NativeSelect } from '@/components/native-select';
 import { ProblemAlert } from '@/components/problem-alert';
 import { FactChips, PanelSection, RecordSheet } from '@/components/record-sheet';
 import { RoleName } from '@/components/role-name';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -56,11 +57,15 @@ const draftOf = (item: ExpiryItem): RecordDraft => ({
 
 /**
  * A record in the panel (`?item=`): its facts, the correction form, the status, the liability and
- * the history. Closing or archiving with something typed and not saved asks first.
+ * the history. Anything that would drop what is typed and not saved asks first: ✕, Esc, Back, a link
+ * or the palette through the page's guard (`onDirty` tells it), a reload through the browser's, an
+ * archive through its own.
  */
 export function ExpiryRecordPanel(props: {
   itemId: number | null;
   today: string | undefined;
+  dirty: boolean;
+  onDirty: (dirty: boolean) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -69,29 +74,35 @@ export function ExpiryRecordPanel(props: {
   const canManage = useHasPermission('expiry.items.manage');
   const mutations = useExpiryMutations();
   const statusAction = useAction();
-  const [dirty, setDirty] = useState(false);
-  const [asking, setAsking] = useState<'close' | 'archive' | null>(null);
+  const { clear: clearStatusProblem } = statusAction;
+  const [askingArchive, setAskingArchive] = useState(false);
   /** A new form: the person said to drop what was typed, so a restore does not bring it back. */
   const [formRound, setFormRound] = useState(0);
 
-  const close = () => {
-    setAsking(null);
-    setDirty(false);
-    statusAction.clear();
-    props.onClose();
-  };
+  // Another record or none: what was asked or refused about this one is over.
+  useEffect(() => {
+    setAskingArchive(false);
+    clearStatusProblem();
+  }, [props.itemId, clearStatusProblem]);
+
   const changeStatus = async (status: ExpiryStatus, message: string) =>
     item !== undefined &&
     statusAction.run(async () => {
-      await mutations.setStatus.mutateAsync({ id: item.id, status });
+      try {
+        await mutations.setStatus.mutateAsync({ id: item.id, status });
+      } catch (error) {
+        // The refusal says to restore: the panel catches up, so that it offers to.
+        if (problemFromError(error)?.code === 'EXPIRY_ITEM_ARCHIVED') void query.refetch();
+        throw error;
+      }
       toast.success(message);
     });
   const askStatus = (status: ExpiryStatus, message: string) => {
-    if (status === 'ARCHIVED' && dirty) setAsking('archive');
+    if (status === 'ARCHIVED' && props.dirty) setAskingArchive(true);
     else void changeStatus(status, message);
   };
   const archiveDropping = async () => {
-    setAsking(null);
+    setAskingArchive(false);
     if (await changeStatus('ARCHIVED', t('expiry.panel.archivedToast'))) {
       setFormRound((round) => round + 1);
     }
@@ -101,8 +112,8 @@ export function ExpiryRecordPanel(props: {
     <>
       <RecordSheet
         open={props.itemId !== null}
-        onClose={() => (dirty ? setAsking('close') : close())}
-        title={item?.product.name ?? t('common.loading')}
+        onClose={props.onClose}
+        title={item?.product.name ?? (query.isError ? t('expiry.title') : t('common.loading'))}
         {...(item ? { description: `${item.product.sku} · ${item.product.baseUomName}` } : {})}
         badges={
           item ? (
@@ -135,26 +146,18 @@ export function ExpiryRecordPanel(props: {
               item={item}
               today={props.today}
               onReload={() => void query.refetch()}
-              onDirty={setDirty}
+              onDirty={props.onDirty}
             />
           ) : null}
         </div>
       </RecordSheet>
       <ConfirmDialog
-        open={asking === 'close'}
-        title={t('common.discard.title')}
-        description={t('common.discard.description')}
-        confirmLabel={t('common.discard.confirm')}
-        onConfirm={close}
-        onClose={() => setAsking(null)}
-      />
-      <ConfirmDialog
-        open={asking === 'archive'}
+        open={askingArchive}
         title={t('expiry.panel.archiveDirtyTitle')}
         description={t('expiry.panel.archiveDirtyDescription')}
         confirmLabel={t('expiry.panel.archiveDirtyConfirm')}
         onConfirm={() => void archiveDropping()}
-        onClose={() => setAsking(null)}
+        onClose={() => setAskingArchive(false)}
       />
     </>
   );
@@ -220,6 +223,8 @@ function useRecordDraft(item: ExpiryItem) {
   const [read, setRead] = useState({ version: item.editVersion, values: draftOf(item) });
   const [draft, setDraft] = useState(read.values);
   const [moveOn, setMoveOn] = useState(false);
+  /** A stale save was refused: the fields say what stands now, until a save goes through. */
+  const [conflicted, setConflicted] = useState(false);
   if (item.editVersion > read.version) {
     const clean = isSameDraft(draft, read.values);
     if (clean || moveOn) {
@@ -233,13 +238,18 @@ function useRecordDraft(item: ExpiryItem) {
     read,
     draft,
     setDraft,
+    conflicted,
     /** The answer of a save: the record as it now stands. */
     saved: (next: ExpiryItem) => {
       setRead({ version: next.editVersion, values: draftOf(next) });
       setDraft(draftOf(next));
       setMoveOn(false);
+      setConflicted(false);
     },
-    refused: () => setMoveOn(true),
+    refused: () => {
+      setMoveOn(true);
+      setConflicted(true);
+    },
   };
 }
 
@@ -253,12 +263,12 @@ function RecordBody(props: {
   const { item, onDirty } = props;
   const archived = item.status === 'ARCHIVED';
   const form = useRecordDraft(item);
-  const dirty = !archived && !isSameDraft(form.draft, form.read.values);
-  useEffect(() => onDirty(dirty), [dirty, onDirty]);
-  /** A correction the archiving beat: the form goes, so the refusal and what was typed stay here. */
-  const [refusal, setRefusal] = useState<ProblemDetails | null>(null);
-  // A restore gives the form back, with what was typed in it: the refusal is over.
-  useEffect(() => (archived ? () => setRefusal(null) : undefined), [archived]);
+  // An archive that arrives takes the form away, not what was typed: that still counts as work.
+  const dirty = !isSameDraft(form.draft, form.read.values);
+  useEffect(() => {
+    onDirty(dirty);
+    return () => onDirty(false);
+  }, [dirty, onDirty]);
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -267,11 +277,8 @@ function RecordBody(props: {
         <PanelSection title={t('expiry.panel.formTitle')}>
           {archived ? (
             <div className="flex flex-col gap-3">
-              {refusal ? (
-                <RefusedCorrection
-                  problem={refusal}
-                  typed={changedFields(form.draft, form.read.values)}
-                />
+              {dirty ? (
+                <HeldCorrection typed={changedFields(form.draft, form.read.values)} />
               ) : null}
               <ArchivedValues item={item} />
             </div>
@@ -282,7 +289,6 @@ function RecordBody(props: {
               form={form}
               dirty={dirty}
               onReload={props.onReload}
-              onRefusedArchived={setRefusal}
             />
           )}
         </PanelSection>
@@ -319,12 +325,12 @@ function factsOf(t: TFunction, item: ExpiryItem) {
 }
 
 /**
- * What was typed when the save met an archived record: nothing else on the screen holds it, and a
- * person without the right to restore can only pass it on.
+ * What was typed when the record came back archived, by whatever route (a refused save, a reload, a
+ * liability's answer): nothing else on the screen holds it, and a person without the right to
+ * restore can only pass it on. A restore gives the form back with it.
  */
-function RefusedCorrection(props: { problem: ProblemDetails; typed: Partial<RecordDraft> }) {
+function HeldCorrection({ typed }: { typed: Partial<RecordDraft> }) {
   const { t } = useTranslation();
-  const { typed } = props;
   const parts = [
     { label: t('expiry.columns.expiryDate'), value: typed.expiryDate },
     { label: t('expiry.columns.qtyFloor'), value: typed.qtyFloor },
@@ -332,14 +338,14 @@ function RefusedCorrection(props: { problem: ProblemDetails; typed: Partial<Reco
     { label: t('expiry.columns.note'), value: typed.note },
   ].flatMap(({ label, value }) => (value === undefined ? [] : [`${label} ${value}`]));
   return (
-    <div className="flex flex-col gap-2">
-      <ProblemAlert problem={props.problem} />
-      {parts.length > 0 ? (
-        <p className="text-[0.8125rem] font-medium break-words">
+    <Alert variant="destructive">
+      <AlertDescription>
+        {t('expiry.panel.typedNotSaved')}
+        <span className="mt-1 block font-medium break-words">
           {t('expiry.panel.typed', { values: parts.join(' · ') })}
-        </p>
-      ) : null}
-    </div>
+        </span>
+      </AlertDescription>
+    </Alert>
   );
 }
 
@@ -368,15 +374,13 @@ function RecordForm(props: {
   form: ReturnType<typeof useRecordDraft>;
   dirty: boolean;
   onReload: () => void;
-  onRefusedArchived: (problem: ProblemDetails) => void;
 }) {
   const { t } = useTranslation();
   const { item, today, form, dirty } = props;
-  const { draft, read } = form;
+  const { draft, read, conflicted } = form;
   const unit = item.product.baseUomName;
   const mutations = useExpiryMutations();
   const [problem, setProblem] = useState<ProblemDetails | null>(null);
-  const [conflicted, setConflicted] = useState(false);
   const [shown, setShown] = useState(false);
   const problems = draftProblems(draft, read.values, today);
   const invalid = Object.keys(problems).length > 0;
@@ -393,16 +397,15 @@ function RecordForm(props: {
         body: { expectedVersion: read.version, ...changedFields(draft, read.values) },
       });
       form.saved(saved);
-      setConflicted(false);
       setShown(false);
       toast.success(t('expiry.panel.savedToast'));
     } catch (error) {
       const refused = problemFromError(error);
       setProblem(refused);
-      if (refused?.code === 'EXPIRY_ITEM_ARCHIVED') props.onRefusedArchived(refused);
+      // Only a stale version moves the form on. An archive says nothing of the version: the form
+      // stays on the one it read, so that after a restore a later edit is refused, not overwritten.
+      if (refused?.code === 'EXPIRY_ITEM_CHANGED') form.refused();
       if (refused?.code === 'EXPIRY_ITEM_CHANGED' || refused?.code === 'EXPIRY_ITEM_ARCHIVED') {
-        form.refused();
-        setConflicted(true);
         props.onReload();
       }
     }

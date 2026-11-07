@@ -20,7 +20,7 @@ export type ExpiryChange = Schemas['ExpiryChangeDto'];
 export type ExpiryRole = Schemas['ExpiryRoleDto'];
 export type ExpiryPerson = Schemas['ExpiryPersonDto'];
 export type ExpiryLiability = Schemas['ExpiryLiabilityDto'];
-export type ExpiryCreateBody = Schemas['ExpiryCreateRequestDto'];
+type ExpiryCreateBody = Schemas['ExpiryCreateRequestDto'];
 type PatchBody = Schemas['ExpiryPatchRequestDto'];
 type LiabilityBody = Schemas['ExpiryLiabilityRequestDto'];
 
@@ -201,24 +201,25 @@ export function useExpiryAttention(enabled: boolean) {
 export function useExpiryMutations() {
   const api = useApiClient();
   const queryClient = useQueryClient();
+  /** Every list, a product's open records among them, and the counts read again. */
+  const refresh = () => {
+    for (const queryKey of [KEYS.lists, KEYS.summary, KEYS.filters, ATTENTION_KEY]) {
+      void queryClient.invalidateQueries({ queryKey });
+    }
+  };
   /**
    * The answer is the record as it now stands. The record's own query takes it directly: a reload
    * would race the screen's edit, whose version is what keeps a save from overwriting anyone.
    */
   const changed = (item: ExpiryItem) => {
     queryClient.setQueryData(KEYS.item(item.id), item);
-    for (const queryKey of [
-      KEYS.lists,
-      KEYS.summary,
-      KEYS.filters,
-      KEYS.history(item.id),
-      ATTENTION_KEY,
-    ]) {
-      void queryClient.invalidateQueries({ queryKey });
-    }
+    void queryClient.invalidateQueries({ queryKey: KEYS.history(item.id) });
+    refresh();
   };
 
   return {
+    /** A write landed although its answer never came, so no `onSuccess` told the lists. */
+    refresh,
     create: useMutation({
       mutationFn: async (input: { key: string; body: ExpiryCreateBody }) =>
         unwrap(

@@ -17,12 +17,15 @@ import { formatQty } from '../format/format';
 import { colors, fonts, radii, spacing, tabular, TOUCH, type } from '../theme/tokens';
 import { SearchField } from '../ui/controls';
 import { TextField } from '../ui/field';
+import { ActionSheet } from '../ui/sheet';
 import { Text, type TextInput } from '../ui/text';
+import type { LeaveGuard } from './leave-guard';
 import {
   cleanQty,
   daysLeftOf,
   daysWords,
   displayDate,
+  type ExpiryEdits,
   type ExpiryForm,
   type FormProblems,
   STATUS_TONES,
@@ -30,6 +33,23 @@ import {
 } from './rules';
 
 // The pieces the three «Хугацаа илрүүлэлт» screens share (ADR-0172 #9).
+
+/** What back asks while something typed is unsaved: stay, or drop it and leave (`useLeaveGuard`). */
+export function LeaveSheet({ guard }: { guard: LeaveGuard }) {
+  const { t } = useTranslation();
+  return (
+    <ActionSheet
+      visible={guard.asking}
+      title={t('mobile.expiry.leave.title')}
+      message={t('mobile.expiry.leave.message')}
+      actions={[
+        { label: t('mobile.expiry.leave.confirm'), destructive: true, onPress: guard.leave },
+      ]}
+      cancelLabel={t('common.discard.keep')}
+      onCancel={guard.stay}
+    />
+  );
+}
 
 /** A record's status on its soft colour. */
 export function ExpiryStatusPill({ status }: { status: ExpiryStatus }) {
@@ -175,7 +195,8 @@ export function HeaderSearch({
 /**
  * The date, the two counts and the note of a new record and a correction. The date shows its days
  * as it is typed, a past one clearly, since finding expired goods is the point; a problem shows
- * once a save was tried, a date's as soon as all of it is there.
+ * once a save was tried, a date's as soon as all of it is there. `beside` is what stands now under
+ * a typed field, after someone else's save refused this one (`standingBeside`).
  */
 export function ExpiryFields({
   form,
@@ -185,6 +206,7 @@ export function ExpiryFields({
   today,
   fractional,
   unit,
+  beside = null,
 }: {
   form: ExpiryForm;
   onChange: (patch: Partial<ExpiryForm>) => void;
@@ -193,6 +215,7 @@ export function ExpiryFields({
   today: string | null;
   fractional: boolean | null;
   unit: string;
+  beside?: ExpiryEdits | null;
 }) {
   const { t } = useTranslation();
   const floorRef = useRef<TextInput>(null);
@@ -217,6 +240,10 @@ export function ExpiryFields({
       : problem === 'whole'
         ? t('mobile.expiry.errors.whole')
         : t('mobile.expiry.errors.qty');
+  const standingHint = (value: string | undefined) =>
+    value === undefined
+      ? null
+      : t('expiry.panel.currentValue', { value: value === '' ? t('common.none') : value });
 
   return (
     <View style={styles.fields}>
@@ -234,6 +261,7 @@ export function ExpiryFields({
           keyboardType="number-pad"
           maxLength={10}
           error={dateError}
+          hint={standingHint(beside?.date)}
         />
         {daysLeft !== null && dateError === null ? (
           <View style={styles.days}>
@@ -258,6 +286,7 @@ export function ExpiryFields({
           returnKeyType="next"
           onSubmitEditing={() => warehouseRef.current?.focus()}
           error={qtyError(problems.floor)}
+          hint={standingHint(beside?.floor)}
         />
         <TextField
           inputRef={warehouseRef}
@@ -268,6 +297,7 @@ export function ExpiryFields({
           keyboardType={qtyKeyboard}
           selectTextOnFocus
           error={qtyError(problems.warehouse)}
+          hint={standingHint(beside?.warehouse)}
         />
       </View>
       {checked && problems.counts ? (
@@ -280,6 +310,7 @@ export function ExpiryFields({
         value={form.note}
         onChangeText={(note) => onChange({ note })}
         maxLength={EXPIRY_NOTE_MAX}
+        hint={standingHint(beside?.note)}
       />
     </View>
   );

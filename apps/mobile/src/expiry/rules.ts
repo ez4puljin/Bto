@@ -161,6 +161,17 @@ export interface ExpiryForm {
 
 export const EMPTY_EXPIRY_FORM: ExpiryForm = { date: '', floor: '', warehouse: '', note: '' };
 
+/**
+ * Whether leaving a new record would lose typing: a product is chosen and a field holds something,
+ * a typed 0 too. Without a product the form is off the screen, and there is nothing to ask about.
+ */
+export function isNewRecordTyped(productChosen: boolean, form: ExpiryForm): boolean {
+  return (
+    productChosen &&
+    [form.date, form.floor, form.warehouse, form.note].some((value) => value.trim() !== '')
+  );
+}
+
 /** A new record: a real date in range, counts that are numbers, at least one above zero. */
 export function problemsOfNew(
   form: ExpiryForm,
@@ -277,21 +288,66 @@ export interface ExpiryPatch {
   note?: string;
 }
 
+/**
+ * What the person typed that differs from what stands; a field that matches, or was never touched,
+ * is absent. Counts compare as numbers and an empty one is 0; the note is trimmed.
+ */
+export function typedChanges(standing: ExpiryStanding, edits: ExpiryEdits): ExpiryEdits {
+  const { date, floor, warehouse, note } = formOf(standing, edits);
+  const typedNote = note.trim();
+  return {
+    ...(date === standing.expiryDate ? {} : { date }),
+    ...(sameQty(floor, standing.qtyFloor) ? {} : { floor: asQty(floor) }),
+    ...(sameQty(warehouse, standing.qtyWarehouse) ? {} : { warehouse: asQty(warehouse) }),
+    ...(typedNote === (standing.note ?? '') ? {} : { note: typedNote }),
+  };
+}
+
 /** The `PATCH` of a correction: only the fields that differ from what stands; null when none do. */
 export function patchOf(
   standing: ExpiryStanding,
   edits: ExpiryEdits,
   expectedVersion: number,
 ): ExpiryPatch | null {
-  const { date, floor, warehouse, note } = formOf(standing, edits);
-  const typedNote = note.trim();
-  const changed = {
-    ...(date === standing.expiryDate ? {} : { expiryDate: date }),
-    ...(sameQty(floor, standing.qtyFloor) ? {} : { qtyFloor: normalQty(floor) }),
-    ...(sameQty(warehouse, standing.qtyWarehouse) ? {} : { qtyWarehouse: normalQty(warehouse) }),
-    ...(typedNote === (standing.note ?? '') ? {} : { note: typedNote }),
+  const typed = typedChanges(standing, edits);
+  if (Object.keys(typed).length === 0) return null;
+  return {
+    expectedVersion,
+    ...(typed.date === undefined ? {} : { expiryDate: typed.date }),
+    ...(typed.floor === undefined ? {} : { qtyFloor: normalQty(typed.floor) }),
+    ...(typed.warehouse === undefined ? {} : { qtyWarehouse: normalQty(typed.warehouse) }),
+    ...(typed.note === undefined ? {} : { note: typed.note }),
   };
-  return Object.keys(changed).length === 0 ? null : { expectedVersion, ...changed };
+}
+
+/**
+ * After a refusal, what stands now beside each typed field that differs from it, so a second save
+ * overwrites only what the person has seen (ADR-0172 #6). Counts as a list shows them; an empty
+ * string is a note that stands empty.
+ */
+export function standingBeside(standing: ExpiryStanding, edits: ExpiryEdits): ExpiryEdits {
+  const typed = typedChanges(standing, edits);
+  return {
+    ...(typed.date === undefined ? {} : { date: standing.expiryDate }),
+    ...(typed.floor === undefined ? {} : { floor: formatQty(standing.qtyFloor) }),
+    ...(typed.warehouse === undefined ? {} : { warehouse: formatQty(standing.qtyWarehouse) }),
+    ...(typed.note === undefined ? {} : { note: standing.note ?? '' }),
+  };
+}
+
+/**
+ * What of the typing stays on the screen, read-only, when an archive reaches the record: the fields
+ * that differ, since nothing else holds them (ADR-0172 #9). Null when nothing was typed, and when
+ * the person archived it themselves, having been told that the typed values go.
+ */
+export function keptByArchive(
+  standing: ExpiryStanding,
+  edits: ExpiryEdits,
+  ownArchive: boolean,
+): ExpiryEdits | null {
+  if (ownArchive) return null;
+  const typed = typedChanges(standing, edits);
+  return Object.keys(typed).length === 0 ? null : typed;
 }
 
 export interface QtyMove {
@@ -311,6 +367,22 @@ export function movesOf(change: {
   return {
     floor: move(change.qtyFloorOld, change.qtyFloorNew),
     warehouse: move(change.qtyWarehouseOld, change.qtyWarehouseNew),
+  };
+}
+
+/**
+ * Whose answer still counts when answers can overtake each other: each request takes a turn, and so
+ * does whatever makes a waiting answer pointless (a product chosen by hand). Only the latest turn
+ * may act on its answer, so a slow lookup never swaps the product under values typed for another.
+ */
+export function createTurns() {
+  let latest = 0;
+  return {
+    take: (): number => {
+      latest += 1;
+      return latest;
+    },
+    isLatest: (turn: number): boolean => turn === latest,
   };
 }
 

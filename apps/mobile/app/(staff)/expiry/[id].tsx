@@ -1,6 +1,6 @@
 import { isSystemRole } from '@tugeel/shared/auth';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -26,22 +26,31 @@ import {
 } from '../../../src/api/expiry';
 import { type AppProblem, problemFrom } from '../../../src/api/problem';
 import { FirstLoad, useAt } from '../../../src/community/parts';
-import { DaysText, ExpiryFields, ExpiryStatusPill, QtyCells } from '../../../src/expiry/parts';
+import { useLeaveGuard } from '../../../src/expiry/leave-guard';
+import {
+  DaysText,
+  ExpiryFields,
+  ExpiryStatusPill,
+  LeaveSheet,
+  QtyCells,
+} from '../../../src/expiry/parts';
 import {
   displayDate,
   type ExpiryEdits,
   type ExpiryForm,
   formOf,
   hasProblems,
+  keptByArchive,
   movesOf,
   OPEN_STATUSES,
   patchOf,
   problemsOfEdit,
+  standingBeside,
 } from '../../../src/expiry/rules';
 import { formatQty } from '../../../src/format/format';
 import { mayManageExpiry } from '../../../src/state/phase';
 import { useSignedIn } from '../../../src/state/session';
-import { colors, radii, spacing, tabular, type } from '../../../src/theme/tokens';
+import { colors, radii, spacing, tabular, TOUCH, type } from '../../../src/theme/tokens';
 import { PillButton } from '../../../src/ui/controls';
 import { Group, Row } from '../../../src/ui/grouped';
 import { ProblemText } from '../../../src/ui/kit';
@@ -50,6 +59,9 @@ import { ActionSheet } from '../../../src/ui/sheet';
 import { StoreHeader } from '../../../src/ui/store-header';
 import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
+
+/** Why values typed over a record that has since been archived were not saved. */
+const ARCHIVED_PROBLEM: AppProblem = { code: 'EXPIRY_ITEM_ARCHIVED', status: 409 };
 
 /** One record (ADR-0172 #3, #6, #9), once it has loaded. */
 export default function ExpiryRecordScreen() {
@@ -76,9 +88,12 @@ export default function ExpiryRecordScreen() {
 
 /**
  * The product, the date and its days; a correction that sends only what changed, with the version
- * it read, and keeps what was typed when someone else got there first; for a holder of the right
- * the status and archive; the liability to read (it is assigned on the web); who added it; the
- * history, oldest first. An archived record is read-only until it is restored.
+ * it read, and when someone else got there first keeps what was typed, says so until it is saved
+ * and shows what stands now beside each typed field; for a holder of the right the status and
+ * archive, which asks before it drops what was typed; the liability to read (it is assigned on the
+ * web); who added it; the history, oldest first. An archived record is read-only until it is
+ * restored; a correction someone else's archive beat stays readable until it is dismissed. Leaving
+ * with something typed asks first.
  */
 function RecordBody({
   item,
@@ -107,21 +122,38 @@ function RecordBody({
   const [readVersion, setReadVersion] = useState<number | null>(null);
   const [checked, setChecked] = useState(false);
   const [problem, setProblem] = useState<AppProblem | null>(null);
+  // Someone else's save refused this one: the notice stays, with what stands now beside each typed
+  // field, until a save succeeds (ADR-0172 #6). A toast would fade before anyone could check.
+  const [conflict, setConflict] = useState<AppProblem | null>(null);
+  // What someone else's archive beat: read-only, and it stays until the person dismisses it.
+  const [refused, setRefused] = useState<ExpiryEdits | null>(null);
   const [choosing, setChoosing] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  // This person's own archive, after the sheet told them that what is typed goes.
+  const [ownArchive, setOwnArchive] = useState(false);
 
   const archived = item.status === 'ARCHIVED';
   const body = patchOf(item, edits, readVersion ?? item.editVersion);
   const problems = problemsOfEdit(item, edits, today, fractional);
   const edited = !archived && body !== null;
+  const leaving = useLeaveGuard(edited);
 
-  // Archiving drops a correction in progress: a restored record starts from what it holds.
-  useEffect(() => {
-    if (!archived) return;
-    setEdits({});
-    setReadVersion(null);
-    setChecked(false);
-  }, [archived]);
+  // An archive ends a correction in progress, by whichever route it arrived: a restored record
+  // starts from what it holds. Done while rendering, as it reads the typing of this very render.
+  const [wasArchived, setWasArchived] = useState(archived);
+  if (archived !== wasArchived) {
+    setWasArchived(archived);
+    setOwnArchive(false);
+    if (archived) {
+      const kept = keptByArchive(item, edits, ownArchive);
+      if (kept) setRefused(kept);
+      setEdits({});
+      setReadVersion(null);
+      setChecked(false);
+      setProblem(null);
+      setConflict(null);
+    }
+  }
 
   const change = (next: Partial<ExpiryForm>) => {
     setReadVersion((current) => current ?? item.editVersion);
@@ -137,11 +169,12 @@ function RecordBody({
       setEdits({});
       setReadVersion(null);
       setChecked(false);
+      setConflict(null);
       toast.show({ message: t('mobile.expiry.record.saved') });
     } catch (error) {
       const failure = problemFrom(error);
       if (failure.code === 'EXPIRY_ITEM_CHANGED') {
-        toast.show({ message: t('errors.EXPIRY_ITEM_CHANGED') });
+        setConflict(failure);
         const fresh = await refetch();
         if (fresh.data) setReadVersion(fresh.data.editVersion);
         return;
@@ -155,13 +188,29 @@ function RecordBody({
     setChoosing(false);
     setArchiving(false);
     setProblem(null);
+    setOwnArchive(status === 'ARCHIVED');
     try {
       await setStatus.mutateAsync({ id: item.id, status });
       toast.show({ message });
     } catch (error) {
+      setOwnArchive(false);
       setProblem(problemFrom(error));
     }
   };
+
+  /** What was typed, as a line of labelled values. */
+  const typedLine = (typed: ExpiryEdits) =>
+    [
+      { label: t('mobile.expiry.fields.date'), value: typed.date },
+      { label: t('mobile.expiry.row.floor'), value: typed.floor },
+      { label: t('mobile.expiry.row.warehouse'), value: typed.warehouse },
+      {
+        label: t('mobile.expiry.fields.note'),
+        value: typed.note === '' ? t('common.none') : typed.note,
+      },
+    ]
+      .flatMap(({ label, value }) => (value === undefined ? [] : [`${label} ${value}`]))
+      .join(' · ');
 
   const roleName = (role: ExpiryRole) =>
     role.code && isSystemRole(role.code) ? t(`roles.system.${role.code}`) : (role.name ?? '');
@@ -221,6 +270,21 @@ function RecordBody({
           {archived && item.note ? <Text style={type.body}>{item.note}</Text> : null}
         </View>
 
+        {refused ? (
+          <View style={styles.card}>
+            {archived ? <ProblemText problem={ARCHIVED_PROBLEM} style={styles.barProblem} /> : null}
+            <Text style={type.body}>
+              {t('mobile.expiry.record.notSaved', { values: typedLine(refused) })}
+            </Text>
+            <PillButton
+              title={t('common.close')}
+              variant="soft"
+              height={TOUCH}
+              onPress={() => setRefused(null)}
+            />
+          </View>
+        ) : null}
+
         {archived ? (
           <View style={styles.card}>
             {item.archivedAt ? (
@@ -257,6 +321,7 @@ function RecordBody({
                 today={today}
                 fractional={fractional}
                 unit={item.product.baseUomName}
+                beside={conflict ? standingBeside(item, edits) : null}
               />
             </View>
           </View>
@@ -327,7 +392,7 @@ function RecordBody({
 
       {edited || problem ? (
         <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
-          <ProblemText problem={problem} style={styles.barProblem} />
+          <ProblemText problem={problem ?? (edited ? conflict : null)} style={styles.barProblem} />
           {edited ? (
             <PillButton
               title={t('common.save')}
@@ -350,11 +415,19 @@ function RecordBody({
       />
       <ActionSheet
         visible={archiving}
-        title={t('mobile.expiry.record.archiveTitle')}
-        message={t('mobile.expiry.record.archiveMessage')}
+        title={
+          edited ? t('expiry.panel.archiveDirtyTitle') : t('mobile.expiry.record.archiveTitle')
+        }
+        message={
+          edited
+            ? t('expiry.panel.archiveDirtyDescription')
+            : t('mobile.expiry.record.archiveMessage')
+        }
         actions={[
           {
-            label: t('mobile.expiry.record.archive'),
+            label: edited
+              ? t('expiry.panel.archiveDirtyConfirm')
+              : t('mobile.expiry.record.archive'),
             destructive: true,
             onPress: () => void decide('ARCHIVED', t('mobile.expiry.record.archived')),
           },
@@ -362,6 +435,7 @@ function RecordBody({
         cancelLabel={t('common.cancel')}
         onCancel={() => setArchiving(false)}
       />
+      <LeaveSheet guard={leaving} />
     </KeyboardAvoidingView>
   );
 }

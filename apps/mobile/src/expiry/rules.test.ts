@@ -5,6 +5,7 @@ import {
   chosenFromLookup,
   cleanQty,
   createBodyOf,
+  createTurns,
   daysLeftOf,
   daysWords,
   displayDate,
@@ -16,10 +17,14 @@ import {
   formOf,
   hasProblems,
   isAwaitingRows,
+  isNewRecordTyped,
+  keptByArchive,
   movesOf,
   patchOf,
   problemsOfEdit,
   problemsOfNew,
+  standingBeside,
+  typedChanges,
 } from './rules';
 
 const TODAY = '2026-11-07';
@@ -152,6 +157,28 @@ describe('a new record', () => {
   });
 });
 
+describe('leaving a new record', () => {
+  const typed = (patch: Partial<ExpiryForm>) =>
+    isNewRecordTyped(true, { ...EMPTY_EXPIRY_FORM, ...patch });
+
+  it('loses nothing with a product chosen and nothing typed', () => {
+    expect(isNewRecordTyped(true, EMPTY_EXPIRY_FORM)).toBe(false);
+    expect(typed({ note: '   ' })).toBe(false);
+  });
+
+  it('loses what any one field holds, a part of a date and a typed 0 too', () => {
+    expect(typed({ date: '2027-0' })).toBe(true);
+    expect(typed({ floor: '0' })).toBe(true);
+    expect(typed({ warehouse: '3' })).toBe(true);
+    expect(typed({ note: 'тавиур 3' })).toBe(true);
+  });
+
+  it('has nothing to ask about while no product is chosen and the form is off the screen', () => {
+    expect(isNewRecordTyped(false, EMPTY_EXPIRY_FORM)).toBe(false);
+    expect(isNewRecordTyped(false, form({ warehouse: '3' }))).toBe(false);
+  });
+});
+
 describe('the yes to a duplicate', () => {
   const given = duplicateChoiceOf(7, form({ warehouse: '3' }));
 
@@ -229,6 +256,103 @@ describe('a correction', () => {
     expect(
       hasProblems(problemsOfEdit(standing, { floor: '0', warehouse: '0' }, TODAY, false)),
     ).toBe(false);
+  });
+});
+
+describe('what was typed', () => {
+  it('holds only the fields that differ, as numbers for the counts and trimmed for the note', () => {
+    expect(typedChanges(standing, {})).toEqual({});
+    expect(
+      typedChanges(standing, {
+        date: '2027-01-31',
+        floor: '012',
+        warehouse: '2.50',
+        note: ' Эхний тэмдэглэл ',
+      }),
+    ).toEqual({});
+    expect(typedChanges(standing, { floor: '10', note: ' шинэ ' })).toEqual({
+      floor: '10',
+      note: 'шинэ',
+    });
+  });
+
+  it('reads an empty count as 0 and keeps an emptied note', () => {
+    expect(typedChanges(standing, { floor: '', note: '' })).toEqual({ floor: '0', note: '' });
+  });
+
+  it('keeps a date that is not whole yet as it was typed', () => {
+    expect(typedChanges(standing, { date: '2027-0' })).toEqual({ date: '2027-0' });
+  });
+});
+
+describe('an archive reaching the record', () => {
+  const archivedRecord = { ...standing, qtyFloor: '8' };
+
+  it('keeps what differs from what the archived record holds', () => {
+    expect(keptByArchive(archivedRecord, { floor: '10', warehouse: '2.5' }, false)).toEqual({
+      floor: '10',
+    });
+  });
+
+  it('keeps nothing when nothing typed differs', () => {
+    expect(keptByArchive(archivedRecord, {}, false)).toBeNull();
+    expect(keptByArchive(archivedRecord, { floor: '8.000' }, false)).toBeNull();
+  });
+
+  it('keeps nothing when the person archived it themselves, having been told', () => {
+    expect(keptByArchive(archivedRecord, { floor: '10' }, true)).toBeNull();
+  });
+});
+
+describe('what stands beside a typed field after a refusal', () => {
+  const reloaded = { ...standing, qtyFloor: '8.000', note: 'Өөр хүн бичсэн' };
+
+  it('names only the typed fields that differ, a count as a list shows it', () => {
+    expect(standingBeside(reloaded, { floor: '10', note: 'Миний тэмдэглэл' })).toEqual({
+      floor: '8',
+      note: 'Өөр хүн бичсэн',
+    });
+  });
+
+  it('names no field that was not typed, or whose typed value now stands', () => {
+    expect(standingBeside(reloaded, {})).toEqual({});
+    expect(standingBeside(reloaded, { floor: '8', warehouse: '2.5' })).toEqual({});
+  });
+
+  it('covers the date and the warehouse, and a note that stands empty', () => {
+    expect(
+      standingBeside(
+        { ...reloaded, qtyWarehouse: '4.500', note: null },
+        { date: '2027-02-01', warehouse: '3', note: 'Миний тэмдэглэл' },
+      ),
+    ).toEqual({ date: '2027-01-31', warehouse: '4.5', note: '' });
+  });
+});
+
+describe('answers that overtake each other', () => {
+  it('lets only the latest turn act', () => {
+    const turns = createTurns();
+    const first = turns.take();
+    expect(turns.isLatest(first)).toBe(true);
+    const second = turns.take();
+    expect(turns.isLatest(first)).toBe(false);
+    expect(turns.isLatest(second)).toBe(true);
+  });
+
+  it('ends a waiting scan when a product is chosen by hand', () => {
+    const turns = createTurns();
+    const scan = turns.take();
+    turns.take();
+    expect(turns.isLatest(scan)).toBe(false);
+  });
+
+  it('keeps each screen’s turns apart', () => {
+    const one = createTurns();
+    const other = createTurns();
+    const turn = one.take();
+    other.take();
+    other.take();
+    expect(one.isLatest(turn)).toBe(true);
   });
 });
 

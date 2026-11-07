@@ -128,6 +128,14 @@ const ROUTES = {
 
 const queryOf = (request: Request) => new URL(request.url).searchParams;
 
+/** Whether the browser would ask before a reload or a closed tab. */
+const browserAsks = () => {
+  const event = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(event);
+  return event.defaultPrevented;
+};
+const leaveQuestion = () => screen.findByRole('dialog', { name: mn.common.discard.title });
+
 /** The new-record dialog with a product scanned into it. */
 async function scannedDialog(fetchMock: ReturnType<typeof signedIn>) {
   const rendered = renderApp(`${PAGE}?new=1`, fetchMock);
@@ -297,6 +305,22 @@ describe('ExpiryPage', () => {
     expect(screen.queryByText(mn.expiry.empty)).toBeNull();
   });
 
+  it('counts nothing in a narrowed list until it has read one', async () => {
+    let fail = true;
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...ROUTES,
+      'GET /api/v1/expiry/items': () =>
+        fail ? problem('INTERNAL_ERROR', 500) : page([ITEM, SECOND]),
+    });
+    renderApp(`${PAGE}?q=сүү`, fetchMock);
+    const retry = await screen.findByRole('button', { name: mn.common.retry });
+    expect(screen.queryByText('0 бараа')).toBeNull();
+
+    fail = false;
+    await userEvent.setup().click(retry);
+    expect(await screen.findByText('2 бараа')).toBeInTheDocument();
+  });
+
   describe('the columns', () => {
     /**
      * The rem the table has beside the filter panel: the page's gutters (2rem each side), the panel
@@ -317,6 +341,13 @@ describe('ExpiryPage', () => {
       expect(needs(FULL_DEFAULT_HIDDEN_EXPIRY_COLUMNS)).toBeLessThanOrEqual(room(1900, 19));
       // The reason the fullest set waits for 1900px.
       expect(needs(FULL_DEFAULT_HIDDEN_EXPIRY_COLUMNS)).toBeGreaterThan(room(1600, 18));
+    });
+
+    it('keep a seven-character count whole, as its cell has no other way to read it', () => {
+      // 1.5rem of a 5.5rem cell is padding; «123,456» takes about 3.65rem at 17px.
+      for (const key of ['qtyFloor', 'qtyWarehouse', 'qtyTotal'] as const) {
+        expect(EXPIRY_COLUMN_SPECS[key].width).toBeGreaterThanOrEqual(5.5);
+      }
     });
 
     it('shows the supplier, the note and the author on a full screen', async () => {
@@ -459,6 +490,167 @@ describe('ExpiryPage', () => {
       expect(screen.queryByText(mn.common.discard.title)).toBeNull();
     });
 
+    describe('leaving with something typed', () => {
+      /** How many times the question came up so far, however briefly. */
+      let asked = 0;
+      let watcher: MutationObserver;
+      beforeEach(() => {
+        asked = 0;
+        let showing = false;
+        watcher = new MutationObserver(() => {
+          const now = document.body.textContent.includes(mn.common.discard.title);
+          if (now && !showing) asked += 1;
+          showing = now;
+        });
+        watcher.observe(document.body, { childList: true, subtree: true });
+      });
+      afterEach(() => watcher.disconnect());
+
+      /** Opened by the page's own button, so closing it steps back: `scannedDialog` drops `?new=1`. */
+      async function pushedDialog(fetchMock: ReturnType<typeof signedIn>) {
+        const rendered = renderApp(PAGE, fetchMock);
+        const create = await screen.findByRole('button', { name: mn.expiry.create });
+        await userEvent.setup().click(create);
+        const dialog = within(await screen.findByRole('dialog'));
+        await waitFor(() => expect(dialog.getByLabelText(mn.scan.label)).toHaveFocus());
+        await wedgeScan(COLA_BOX.barcode.code);
+        await dialog.findByText(COLA_BOX.product.name);
+        return { dialog, ...rendered };
+      }
+      const OPEN_WAYS = [
+        ['the page’s button', pushedDialog],
+        ['a link', scannedDialog],
+      ] as const;
+      const closed = async (router: ReturnType<typeof renderApp>['router']) => {
+        await waitFor(() => expect(router.state.location.search).toBe(''));
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      };
+
+      it('asks before Back and stays when told to, then before another page and a reload', async () => {
+        const { dialog, router } = await pushedDialog(signedIn(ADMIN_ME, { ...ROUTES, ...SCANS }));
+        const user = userEvent.setup();
+        expect(browserAsks()).toBe(false);
+        await fillRecord(dialog, user);
+        expect(browserAsks()).toBe(true);
+
+        await act(() => router.navigate(-1));
+        const back = within(await leaveQuestion());
+        expect(router.state.location.search).toBe('?new=1');
+        await user.click(back.getByRole('button', { name: mn.common.cancel }));
+        await waitFor(() =>
+          expect(screen.queryByRole('dialog', { name: mn.common.discard.title })).toBeNull(),
+        );
+        expect(router.state.location.search).toBe('?new=1');
+        expect(dialog.getByText(COLA_BOX.product.name)).toBeInTheDocument();
+        expect(dialog.getByLabelText(mn.expiry.columns.expiryDate)).toHaveValue('2026-12-01');
+        expect(dialog.getByLabelText(FLOOR)).toHaveValue('6');
+        expect(browserAsks()).toBe(true);
+
+        // The palette and any other link go to another page.
+        await act(() => router.navigate('/'));
+        const away = within(await leaveQuestion());
+        expect(router.state.location.pathname).toBe(PAGE);
+        await user.click(away.getByRole('button', { name: mn.common.discard.confirm }));
+        await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+        expect(browserAsks()).toBe(false);
+        expect(asked).toBe(2);
+      });
+
+      it('goes back when told to, with the dialog gone', async () => {
+        const { dialog, router } = await pushedDialog(signedIn(ADMIN_ME, { ...ROUTES, ...SCANS }));
+        const user = userEvent.setup();
+        await fillRecord(dialog, user);
+        await act(() => router.navigate(-1));
+        await user.click(
+          within(await leaveQuestion()).getByRole('button', { name: mn.common.discard.confirm }),
+        );
+        await closed(router);
+        expect(browserAsks()).toBe(false);
+        expect(asked).toBe(1);
+      });
+
+      it('lets Back close at once with only a product chosen, as nothing is typed', async () => {
+        const { router } = await pushedDialog(signedIn(ADMIN_ME, { ...ROUTES, ...SCANS }));
+        expect(browserAsks()).toBe(false);
+        await act(() => router.navigate(-1));
+        await closed(router);
+        expect(asked).toBe(0);
+      });
+
+      it.each(OPEN_WAYS)('closes without asking once saved, opened by %s', async (_way, open) => {
+        const fetchMock = signedIn(ADMIN_ME, {
+          ...ROUTES,
+          ...SCANS,
+          'POST /api/v1/expiry/items': () => json({ ...ITEM, id: 9 }, 201),
+        });
+        const { dialog, router } = await open(fetchMock);
+        const user = userEvent.setup();
+        await fillRecord(dialog, user);
+        await user.click(dialog.getByRole('button', { name: mn.common.save }));
+        await closed(router);
+        expect(calls(fetchMock, 'POST', '/api/v1/expiry/items')).toHaveLength(1);
+        expect(browserAsks()).toBe(false);
+        expect(asked).toBe(0);
+      });
+
+      it('asks nothing after «Хадгалаад шинэ», and Back then closes at once', async () => {
+        const created: Item = { ...ITEM, id: 9, product: { ...ITEM.product, name: 'Кока кола' } };
+        const fetchMock = signedIn(ADMIN_ME, {
+          ...ROUTES,
+          ...SCANS,
+          'POST /api/v1/expiry/items': () => json(created, 201),
+        });
+        const { dialog, router } = await pushedDialog(fetchMock);
+        const user = userEvent.setup();
+        await fillRecord(dialog, user);
+        await user.click(dialog.getByRole('button', { name: mn.common.saveAndNew }));
+        expect(await dialog.findByText('Кока кола бүртгэгдлээ')).toBeInTheDocument();
+        expect(router.state.location.search).toBe('?new=1');
+        await waitFor(() => expect(browserAsks()).toBe(false));
+
+        await act(() => router.navigate(-1));
+        await closed(router);
+        expect(asked).toBe(0);
+      });
+
+      it.each([
+        ['«Болих»', 'the page’s button', pushedDialog],
+        ['«Болих»', 'a link', scannedDialog],
+        ['✕', 'a link', scannedDialog],
+        ['Esc', 'the page’s button', pushedDialog],
+      ] as const)('asks once only before %s closes it, opened by %s', async (exit, _way, open) => {
+        const { dialog, router } = await open(signedIn(ADMIN_ME, { ...ROUTES, ...SCANS }));
+        const user = userEvent.setup();
+        await fillRecord(dialog, user);
+        if (exit === 'Esc') await user.keyboard('{Escape}');
+        else {
+          const name = exit === '✕' ? mn.common.close : mn.common.cancel;
+          await user.click(dialog.getByRole('button', { name }));
+        }
+        const question = within(await leaveQuestion());
+        expect(router.state.location.search).toBe('?new=1');
+        await user.click(question.getByRole('button', { name: mn.common.discard.confirm }));
+        await closed(router);
+        expect(browserAsks()).toBe(false);
+        expect(asked).toBe(1);
+      });
+
+      it('asks once only before a listed record’s link, and that record opens', async () => {
+        const { dialog, router } = await pushedDialog(signedIn(ADMIN_ME, { ...ROUTES, ...SCANS }));
+        const user = userEvent.setup();
+        await fillRecord(dialog, user);
+        await user.click(await dialog.findByRole('link', { name: /2026-11-04/ }));
+        await user.click(
+          within(await leaveQuestion()).getByRole('button', { name: mn.common.discard.confirm }),
+        );
+        await waitFor(() => expect(router.state.location.search).toBe('?item=1'));
+        const panel = within(await screen.findByRole('dialog'));
+        expect(await panel.findByRole('heading', { name: 'Туршилтын сүү' })).toBeInTheDocument();
+        expect(browserAsks()).toBe(false);
+        expect(asked).toBe(1);
+      });
+    });
+
     describe('a scan with something typed', () => {
       /** Product A with its date and count typed, the cursor in the count, then product B's scan. */
       async function heldScan(fetchMock: ReturnType<typeof signedIn>) {
@@ -521,6 +713,31 @@ describe('ExpiryPage', () => {
         );
       });
 
+      it('opens on «Болих», so the tail of another scan cannot save', async () => {
+        const fetchMock = signedIn(ADMIN_ME, {
+          ...ROUTES,
+          ...SCANS,
+          'POST /api/v1/expiry/items': () => json({ ...ITEM, id: 9 }, 201),
+        });
+        const { dialog, question, user } = await heldScan(fetchMock);
+        const cancel = question.getByRole('button', { name: mn.common.cancel });
+        await waitFor(() => expect(cancel).toHaveFocus());
+        expect(question.getByRole('button', { name: mn.expiry.new.heldSave })).not.toHaveFocus();
+
+        // The last keys of a read cut short by the question, too few to read as a scan.
+        await user.keyboard('12{Enter}');
+        await waitFor(() =>
+          expect(
+            screen.queryByRole('dialog', {
+              name: mn.expiry.new.heldTitle.replace('{{name}}', COLA_BOX.product.name),
+            }),
+          ).toBeNull(),
+        );
+        expect(calls(fetchMock, 'POST', '/api/v1/expiry/items')).toHaveLength(0);
+        expect(dialog.getByText(COLA_BOX.product.name)).toBeInTheDocument();
+        expect(dialog.getByLabelText(FLOOR)).toHaveValue('6');
+      });
+
       it('stays on this product when its save is refused, its scan given up', async () => {
         const fetchMock = signedIn(ADMIN_ME, {
           ...ROUTES,
@@ -530,8 +747,11 @@ describe('ExpiryPage', () => {
         const { dialog, question, user } = await heldScan(fetchMock);
         await user.click(question.getByRole('button', { name: mn.expiry.new.heldSave }));
         expect(await dialog.findByText(mn.errors.INTERNAL_ERROR)).toBeInTheDocument();
-        expect(dialog.getByLabelText(FLOOR)).toHaveValue('6');
+        const floor = dialog.getByLabelText(FLOOR);
+        expect(floor).toHaveValue('6');
         expect(dialog.queryByText(OTHER.product.name)).toBeNull();
+        // The cursor is back in the field it left, so the keyboard still works.
+        await waitFor(() => expect(floor).toHaveFocus());
       });
 
       it('still goes on to the scanned one after a repeat is added anyway', async () => {
@@ -568,6 +788,10 @@ describe('ExpiryPage', () => {
         expect(dialog.queryByText(OTHER.product.name)).toBeNull();
         expect(dialog.getByLabelText(FLOOR)).toHaveValue('6');
         expect(calls(fetchMock, 'POST', '/api/v1/expiry/items')).toHaveLength(0);
+        // The cursor goes to what must be fixed.
+        await waitFor(() =>
+          expect(dialog.getByLabelText(mn.expiry.columns.expiryDate)).toHaveFocus(),
+        );
       });
 
       it('drops what is typed when told to, saving nothing', async () => {
@@ -664,37 +888,113 @@ describe('ExpiryPage', () => {
       expect(dialog.queryByText(/хайрцаг/)).toBeNull();
     });
 
-    it('draws a new key once when the server saw this one with another body', async () => {
+    it('says an earlier save landed when its key comes back refused, and adds only when told', async () => {
+      // The first save went in although its answer never came, and the person changed the date.
       let posted = 0;
       const fetchMock = signedIn(ADMIN_ME, {
         ...ROUTES,
         ...SCANS,
         'POST /api/v1/expiry/items': () => {
           posted += 1;
-          if (posted === 1) return problem('IDEMPOTENCY_KEY_REUSED', 409);
-          if (posted === 2) return problem('EXPIRY_ITEM_EXISTS', 409, { itemId: 1 });
+          if (posted <= 2) return problem('IDEMPOTENCY_KEY_REUSED', 409);
+          if (posted === 3) return problem('EXPIRY_ITEM_EXISTS', 409, { itemId: 1 });
           return json({ ...ITEM, id: 9 }, 201);
         },
       });
+      const { dialog, router } = await scannedDialog(fetchMock);
+      const user = userEvent.setup();
+      await dialog.findByRole('link', { name: /2026-11-04/ });
+      await fillRecord(dialog, user);
+      const openReads = () =>
+        calls(fetchMock, 'GET', '/api/v1/expiry/items').filter((read) =>
+          queryOf(read).has('productId'),
+        ).length;
+      const readsBefore = openReads();
+      const save = dialog.getByRole('button', { name: mn.common.save });
+      const posts = () => calls(fetchMock, 'POST', '/api/v1/expiry/items');
+      const keyOf = (index: number) => posts()[index]!.headers.get('Idempotency-Key');
+      await user.click(save);
+
+      // Nothing is posted again by itself: the product's list is read again and the person is told.
+      expect(await dialog.findByText(mn.expiry.new.landed)).toBeInTheDocument();
+      await waitFor(() => expect(openReads()).toBeGreaterThan(readsBefore));
+      expect(dialog.queryByText(mn.errors.IDEMPOTENCY_KEY_REUSED)).toBeNull();
+      expect(posted).toBe(1);
+      expect(router.state.location.search).toBe('?new=1');
+      expect(dialog.getByLabelText(FLOOR)).toHaveValue('6');
+
+      // Saving again is the same save, not a second record.
+      await user.click(save);
+      await waitFor(() => expect(posted).toBe(2));
+      expect(keyOf(1)).toBe(keyOf(0));
+
+      // Only the choice draws a new key; the server may then tell of the record it holds.
+      await waitFor(() => expect(dialog.getByText(mn.expiry.new.landed)).toBeInTheDocument());
+      await user.click(dialog.getByRole('button', { name: mn.expiry.new.addAnyway }));
+      await waitFor(() => expect(posted).toBe(3));
+      expect(keyOf(2)).toMatch(UUID);
+      expect(keyOf(2)).not.toBe(keyOf(0));
+      expect(await bodyOf(posts()[2])).toEqual(await bodyOf(posts()[0]));
+      expect(dialog.queryByText(mn.expiry.new.landed)).toBeNull();
+
+      await user.click(await dialog.findByRole('button', { name: mn.expiry.new.addAnyway }));
+      await waitFor(() => expect(posted).toBe(4));
+      expect(keyOf(3)).toBe(keyOf(2));
+      await waitFor(() => expect(router.state.location.search).toBe(''));
+    });
+
+    it('takes a short date still in the box along when a scan lands there', async () => {
+      const fetchMock = signedIn(ADMIN_ME, {
+        ...ROUTES,
+        ...SCANS,
+        'POST /api/v1/expiry/items': () => json({ ...ITEM, id: 9 }, 201),
+      });
       const { dialog } = await scannedDialog(fetchMock);
       const user = userEvent.setup();
-      await fillRecord(dialog, user);
+      // Only the date is typed, in the short form that goes out on leaving the box.
+      const date = dialog.getByLabelText(mn.expiry.columns.expiryDate);
+      await user.type(date, '2026.12.1');
+      await afterTyping();
+      await wedgeScan(OTHER.barcode.code);
+
+      // That date is something typed, so the scan asks; and it is still there afterwards.
+      const question = within(
+        await screen.findByRole('dialog', {
+          name: mn.expiry.new.heldTitle.replace('{{name}}', COLA_BOX.product.name),
+        }),
+      );
+      expect(date).toHaveValue('2026-12-01');
+      await user.click(question.getByRole('button', { name: mn.common.cancel }));
+      await waitFor(() => expect(screen.queryByText(/хадгалагдаагүй/)).toBeNull());
+      expect(date).toHaveValue('2026-12-01');
+
+      await user.type(dialog.getByLabelText(FLOOR), '6');
       await user.click(dialog.getByRole('button', { name: mn.common.save }));
+      await waitFor(() => expect(calls(fetchMock, 'POST', '/api/v1/expiry/items')).toHaveLength(1));
+      expect(await bodyOf(calls(fetchMock, 'POST', '/api/v1/expiry/items')[0])).toMatchObject({
+        expiryDate: '2026-12-01',
+        qtyFloor: '6',
+      });
+    });
 
-      // The ordinary choice comes up, as the record the unheard save left is told of.
-      const addAnyway = await dialog.findByRole('button', { name: mn.expiry.new.addAnyway });
-      expect(dialog.queryByText(mn.errors.IDEMPOTENCY_KEY_REUSED)).toBeNull();
-      const [first, second] = calls(fetchMock, 'POST', '/api/v1/expiry/items');
-      const key = second!.headers.get('Idempotency-Key');
-      expect(key).toMatch(UUID);
-      expect(key).not.toBe(first!.headers.get('Idempotency-Key'));
-      expect(await bodyOf(second)).toEqual(await bodyOf(first));
+    it('leaves no false error under a count a scan landed in', async () => {
+      const fetchMock = signedIn(ADMIN_ME, { ...ROUTES, ...SCANS });
+      const { dialog } = await scannedDialog(fetchMock);
+      const user = userEvent.setup();
+      // A refused save: from now on every change is checked, a burst's digits too.
+      await user.click(dialog.getByRole('button', { name: mn.common.save }));
+      await dialog.findByText(mn.validation.date);
+      await fillRecord(dialog, user);
+      await afterTyping();
+      await wedgeScan(COLA_BOX.barcode.code);
 
-      await user.click(addAnyway);
-      await waitFor(() => expect(posted).toBe(3));
-      expect(
-        calls(fetchMock, 'POST', '/api/v1/expiry/items')[2]!.headers.get('Idempotency-Key'),
-      ).toBe(key);
+      await waitFor(() =>
+        expect(calls(fetchMock, 'GET', `/api/v1/barcodes/${COLA_BOX.barcode.code}`)).toHaveLength(
+          2,
+        ),
+      );
+      expect(dialog.getByLabelText(FLOOR)).toHaveValue('6');
+      await waitFor(() => expect(dialog.queryByText(mn.validation.expiryQty)).toBeNull());
     });
 
     it('closes the calendar’s days outside the shared range', async () => {
@@ -907,13 +1207,208 @@ describe('ExpiryPage', () => {
       await user.click(panel.getByRole('button', { name: mn.common.save }));
 
       expect(await panel.findByText(mn.expiry.panel.archivedNote)).toBeInTheDocument();
-      expect(panel.getByText(mn.errors.EXPIRY_ITEM_ARCHIVED)).toBeInTheDocument();
+      expect(panel.getByText(mn.expiry.panel.typedNotSaved)).toBeInTheDocument();
       expect(panel.getByText('Таны оруулсан: Заал 5')).toBeInTheDocument();
 
       // A restore gives the form back with the count in it, and the refusal is over.
       await user.click(panel.getByRole('button', { name: mn.expiry.panel.restore }));
       expect(await panel.findByLabelText(FLOOR)).toHaveValue('5');
+      expect(panel.queryByText(mn.expiry.panel.typedNotSaved)).toBeNull();
       expect(panel.queryByText(mn.errors.EXPIRY_ITEM_ARCHIVED)).toBeNull();
+    });
+
+    it('holds what was typed when the archive arrives without a save, and asks before it goes', async () => {
+      let current = ITEM;
+      const fetchMock = signedIn(
+        { ...WORKER_ME, permissions: [] },
+        { ...ROUTES, 'GET /api/v1/expiry/items/1': () => json(current) },
+      );
+      const { router } = renderApp(`${PAGE}?item=1`, fetchMock);
+      const user = userEvent.setup();
+      const panel = within(await screen.findByRole('dialog'));
+      const floor = await panel.findByLabelText(FLOOR);
+      await user.clear(floor);
+      await user.type(floor, '5');
+
+      // Someone archives it, and a reconnect's read brings that in while this person types.
+      current = { ...ITEM, status: 'ARCHIVED', archivedAt: '2026-11-03T02:00:00.000Z' };
+      act(() => {
+        focusManager.setFocused(false);
+        focusManager.setFocused(true);
+      });
+      expect(await panel.findByText(mn.expiry.panel.archivedNote)).toBeInTheDocument();
+      focusManager.setFocused(undefined);
+      expect(panel.getByText(mn.expiry.panel.typedNotSaved)).toBeInTheDocument();
+      expect(panel.getByText('Таны оруулсан: Заал 5')).toBeInTheDocument();
+      // No save was refused, and this person has no restore: closing is the only way to lose it.
+      expect(panel.queryByRole('button', { name: mn.expiry.panel.restore })).toBeNull();
+      await user.keyboard('{Escape}');
+      expect(await screen.findByText(mn.common.discard.title)).toBeInTheDocument();
+      expect(router.state.location.search).toBe('?item=1');
+      await user.click(screen.getByRole('button', { name: mn.common.discard.confirm }));
+      await waitFor(() => expect(router.state.location.search).toBe(''));
+    });
+
+    it('is refused, not overwriting, when someone edits after an archive met its save', async () => {
+      const archived: Item = {
+        ...ITEM,
+        status: 'ARCHIVED',
+        archivedAt: '2026-11-03T02:00:00.000Z',
+      };
+      const corrected: Item = { ...ITEM, qtyFloor: '7', qtyTotal: '10', editVersion: 2 };
+      let current = ITEM;
+      let patches = 0;
+      const fetchMock = signedIn(ADMIN_ME, {
+        ...ROUTES,
+        'GET /api/v1/expiry/items/1': () => json(current),
+        'PATCH /api/v1/expiry/items/1': () => {
+          patches += 1;
+          if (patches === 1) {
+            current = archived;
+            return problem('EXPIRY_ITEM_ARCHIVED', 409);
+          }
+          if (patches === 2) return problem('EXPIRY_ITEM_CHANGED', 409, { currentVersion: 2 });
+          return json({ ...corrected, qtyFloor: '10', qtyTotal: '13', editVersion: 3 });
+        },
+        // Someone else restored it and corrected the floor: the status stands, and the answer says so.
+        'PUT /api/v1/expiry/items/1/status': () => {
+          current = corrected;
+          return json(current);
+        },
+      });
+      renderApp(`${PAGE}?item=1`, fetchMock);
+      const user = userEvent.setup();
+      const panel = within(await screen.findByRole('dialog'));
+      const typed = await panel.findByLabelText(FLOOR);
+      await user.clear(typed);
+      await user.type(typed, '10');
+      await user.click(panel.getByRole('button', { name: mn.common.save }));
+      await panel.findByText(mn.expiry.panel.archivedNote);
+
+      await user.click(panel.getByRole('button', { name: mn.expiry.panel.restore }));
+      const floor = await panel.findByLabelText(FLOOR);
+      expect(floor).toHaveValue('10');
+      const save = panel.getByRole('button', { name: mn.common.save });
+
+      // Still on the version it read, so the first save after the restore cannot overwrite the 7.
+      await user.click(save);
+      await waitFor(() => expect(patches).toBe(2));
+      const sent = calls(fetchMock, 'PATCH', '/api/v1/expiry/items/1');
+      expect(await bodyOf(sent[1])).toEqual({ expectedVersion: 1, qtyFloor: '10' });
+      expect(await panel.findByText(mn.errors.EXPIRY_ITEM_CHANGED)).toBeInTheDocument();
+      expect(await panel.findByText('Одоогийн утга: 7')).toBeInTheDocument();
+      expect(floor).toHaveValue('10');
+
+      // Told, and on the new version: only now a second press saves.
+      await user.click(save);
+      await waitFor(() => expect(patches).toBe(3));
+      expect(await bodyOf(calls(fetchMock, 'PATCH', '/api/v1/expiry/items/1')[2])).toEqual({
+        expectedVersion: 2,
+        qtyFloor: '10',
+      });
+    });
+
+    it('catches up when a status change is refused because the record is archived', async () => {
+      let current = ITEM;
+      const fetchMock = signedIn(ADMIN_ME, {
+        ...ROUTES,
+        'GET /api/v1/expiry/items/1': () => json(current),
+        'PUT /api/v1/expiry/items/1/status': () => {
+          current = { ...ITEM, status: 'ARCHIVED', archivedAt: '2026-11-03T02:00:00.000Z' };
+          return problem('EXPIRY_ITEM_ARCHIVED', 409);
+        },
+      });
+      renderApp(`${PAGE}?item=1`, fetchMock);
+      const user = userEvent.setup();
+      const panel = within(await screen.findByRole('dialog'));
+      await user.selectOptions(
+        await panel.findByRole('combobox', { name: mn.expiry.panel.statusLabel }),
+        'CITY_RETURN',
+      );
+      expect(await panel.findByText(mn.errors.EXPIRY_ITEM_ARCHIVED)).toBeInTheDocument();
+      // What the refusal says to do is now on the screen.
+      expect(
+        await panel.findByRole('button', { name: mn.expiry.panel.restore }),
+      ).toBeInTheDocument();
+    });
+
+    it('titles the panel neutrally when the record’s read failed, not as still loading', async () => {
+      renderApp(`${PAGE}?item=999`, signedIn(ADMIN_ME, ROUTES));
+      const panel = within(await screen.findByRole('dialog'));
+      expect(await panel.findByRole('heading', { name: mn.expiry.title })).toBeInTheDocument();
+      expect(panel.queryByRole('heading', { name: mn.common.loading })).toBeNull();
+    });
+
+    describe('leaving with something typed', () => {
+      const WITH_SECOND = {
+        ...ROUTES,
+        'GET /api/v1/expiry/items/2': () => json(SECOND),
+        'GET /api/v1/expiry/items/2/history': () => json({ data: [] }),
+      };
+
+      it('asks before Back and another page, and the browser asks before a reload', async () => {
+        const { router } = renderApp(PAGE, signedIn(ADMIN_ME, WITH_SECOND));
+        const user = userEvent.setup();
+        // The product's link adds a history entry, so Back closes the panel.
+        await user.click(await screen.findByRole('link', { name: 'Туршилтын сүү' }));
+        const panel = within(await screen.findByRole('dialog'));
+        const note = await panel.findByLabelText(mn.expiry.columns.note);
+        expect(browserAsks()).toBe(false);
+        await user.type(note, ' нэмэлт');
+        expect(browserAsks()).toBe(true);
+
+        await act(() => router.navigate(-1));
+        const back = within(await leaveQuestion());
+        expect(router.state.location.search).toBe('?item=1');
+        await user.click(back.getByRole('button', { name: mn.common.cancel }));
+        await waitFor(() =>
+          expect(screen.queryByRole('dialog', { name: mn.common.discard.title })).toBeNull(),
+        );
+        expect(note).toHaveValue('Лангуун дээр нэмэлт');
+        expect(router.state.location.search).toBe('?item=1');
+
+        // The palette and any other link go to another page.
+        await act(() => router.navigate('/'));
+        const away = within(await leaveQuestion());
+        expect(router.state.location.pathname).toBe(PAGE);
+        await user.click(away.getByRole('button', { name: mn.common.discard.confirm }));
+        await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+        expect(browserAsks()).toBe(false);
+      });
+
+      it('asks before another record, and that record starts with nothing left over', async () => {
+        const { router } = renderApp(`${PAGE}?item=1`, signedIn(ADMIN_ME, WITH_SECOND));
+        const user = userEvent.setup();
+        const panel = within(await screen.findByRole('dialog'));
+        const note = await panel.findByLabelText(mn.expiry.columns.note);
+        await user.type(note, ' нэмэлт');
+
+        await act(() => router.navigate(`${PAGE}?item=2`));
+        await user.click(
+          within(await leaveQuestion()).getByRole('button', { name: mn.common.discard.confirm }),
+        );
+        await waitFor(() => expect(router.state.location.search).toBe('?item=2'));
+        expect(await panel.findByRole('heading', { name: 'Туршилтын тос' })).toBeInTheDocument();
+        await panel.findByLabelText(mn.expiry.columns.note);
+
+        // Nothing is typed in this one, so it closes without a question.
+        expect(browserAsks()).toBe(false);
+        await user.keyboard('{Escape}');
+        await waitFor(() => expect(router.state.location.search).toBe(''));
+        expect(screen.queryByRole('dialog', { name: mn.common.discard.title })).toBeNull();
+      });
+
+      it('lets a filter in the address change without asking', async () => {
+        const { router } = renderApp(`${PAGE}?item=1`, signedIn(ADMIN_ME, WITH_SECOND));
+        const user = userEvent.setup();
+        const panel = within(await screen.findByRole('dialog'));
+        const note = await panel.findByLabelText(mn.expiry.columns.note);
+        await user.type(note, ' нэмэлт');
+        await act(() => router.navigate(`${PAGE}?item=1&view=URGENT`));
+        await waitFor(() => expect(router.state.location.search).toBe('?item=1&view=URGENT'));
+        expect(screen.queryByRole('dialog', { name: mn.common.discard.title })).toBeNull();
+        expect(note).toHaveValue('Лангуун дээр нэмэлт');
+      });
     });
 
     it('closes the calendar’s days outside the range, and saves other fields of a carried date', async () => {
