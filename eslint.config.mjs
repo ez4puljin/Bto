@@ -63,6 +63,9 @@ const MODULE_DEPS = {
   procurement: ['identity', 'partners', 'catalog', 'inventory', 'finance'],
   // ADR-0168: suppliers, posted receipts and each supplier's orderer; only reads them, nobody imports it.
   'ebarimt-check': ['identity', 'partners', 'inventory', 'procurement'],
+  // ADR-0172: a product's name, main supplier and home warehouse for the register's rows; it posts
+  // nothing and moves no stock, and nobody imports it.
+  expiry: ['identity', 'catalog', 'partners', 'inventory'],
   // ADR-0062: sales only for the SALE_LISTENER token, its payload type and the order's foreign key.
   // ADR-0082: sales' ORDER_LISTENER, finance's PAYMENT_LISTENER, the invoice and payment foreign
   // keys and the open invoices the reminders read.

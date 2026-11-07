@@ -21,6 +21,8 @@ import { SettingsPage } from '@/features/identity/settings-page';
 import { StructurePage } from '@/features/identity/structure-page';
 import { AdjustmentPage, AdjustmentsPage } from '@/features/inventory/adjustments-pages';
 import { BinsPage } from '@/features/inventory/bins-page';
+import { ExpiryPage } from '@/features/expiry/expiry-page';
+import { ExpiryPrintPage } from '@/features/expiry/expiry-print-page';
 import { LowStockPage } from '@/features/inventory/low-stock-page';
 import { BinMovesPage } from '@/features/inventory/moves-page';
 import { IssueConfirmPage } from '@/features/inventory/issue-confirm-page';
@@ -229,6 +231,16 @@ export const routes: RouteObject[] = [
     errorElement: <RouteErrorBoundary />,
   },
   {
+    // What the expiry list's filters show, on paper (ADR-0172 #8).
+    path: '/inventory/expiry/print',
+    element: (
+      <RequireAuth>
+        <ExpiryPrintPage />
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
     // The trial balance and the VAT report for paper (ADR-0105).
     path: '/finance/trial-balance/print',
     element: (
@@ -386,6 +398,8 @@ export const routes: RouteObject[] = [
           { path: 'inventory/stock/:id', handle: { width: 'wide' }, element: <StockProductPage /> },
           { path: 'inventory/movements', handle: { width: 'wide' }, element: <MovementsPage /> },
           { path: 'inventory/low-stock', handle: { width: 'wide' }, element: <LowStockPage /> },
+          // The register of expiry dates: open to every signed-in person (ADR-0172 #4, #8).
+          { path: 'inventory/expiry', handle: { width: 'wide' }, element: <ExpiryPage /> },
           { path: 'inventory/receipts', handle: { width: 'wide' }, element: <ReceiptsPage /> },
           // One page for a new receipt (`new`) and an existing one, so the page that creates a
           // draft stays mounted when it takes the draft's address; `?new=1` on the list redirects

@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Permission } from '@tugeel/shared/auth';
-import { and, asc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { escapeLike } from '../../../common/db/like';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
-import { rolePermissions, userRoles, users } from '../schema';
+import { rolePermissions, roles, userRoles, users } from '../schema';
 
 export interface UserSummary {
   id: number;
@@ -12,6 +12,13 @@ export interface UserSummary {
   phone: string | null;
   fullName: string;
   status: 'ACTIVE' | 'DISABLED';
+}
+
+/** A role as a picker names it: a system role by its code (labelled in mn.json), a custom one by name. */
+export interface RoleBrief {
+  id: number;
+  code: string | null;
+  name: string | null;
 }
 
 /**
@@ -54,6 +61,19 @@ export class UserNamesService {
       )
       .orderBy(asc(users.fullName), asc(users.id))
       .limit(limit);
+  }
+
+  /**
+   * Roles by id, or every role without `ids`: the expiry register's liability (ADR-0172). System
+   * roles first, then by id; nothing about a role's rights.
+   */
+  async rolesBrief(ids?: readonly number[], executor: Db | Tx = this.db): Promise<RoleBrief[]> {
+    if (ids?.length === 0) return [];
+    return executor
+      .select({ id: roles.id, code: roles.code, name: roles.name })
+      .from(roles)
+      .where(ids ? inArray(roles.id, [...new Set(ids)]) : undefined)
+      .orderBy(desc(roles.isSystem), asc(roles.id));
   }
 
   /**

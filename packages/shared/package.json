@@ -52,6 +52,11 @@
       "types": "./dist/ebarimt-check/index.d.ts",
       "default": "./dist/ebarimt-check/index.js"
     },
+    "./expiry": {
+      "@tugeel/source": "./src/expiry/index.ts",
+      "types": "./dist/expiry/index.d.ts",
+      "default": "./dist/expiry/index.js"
+    },
     "./category-icons": {
       "@tugeel/source": "./src/category-icons/index.ts",
       "types": "./dist/category-icons/index.d.ts",

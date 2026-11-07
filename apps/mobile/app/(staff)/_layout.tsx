@@ -53,6 +53,9 @@ export default function StaffLayout() {
           <Stack.Screen name="attendance/history" />
           {/* «Цагийн хүсэлт» (ADR-0144): every staff member sends their own. */}
           <Stack.Screen name="attendance/requests" />
+          {/* «Хугацаа илрүүлэлт» (ADR-0172): every staff member records what is on the shelf. */}
+          <Stack.Screen name="expiry/new" />
+          <Stack.Screen name="expiry/[id]" />
           {/* «Хамт олон» (ADR-0146): every staff member's, from their profile. */}
           <Stack.Screen name="community/index" />
           <Stack.Screen name="community/messages" />

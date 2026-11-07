@@ -95,6 +95,7 @@ export function ScanSheet({
             accessibilityRole="button"
             accessibilityLabel={t('common.close')}
             onPress={onClose}
+            hitSlop={spacing.xs}
             style={[styles.close, { top: insets.top + spacing.md }]}
           >
             <X size={20} strokeWidth={2.6} color={colors.foreground} />

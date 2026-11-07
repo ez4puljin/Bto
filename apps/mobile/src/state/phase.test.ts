@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CustomerPrincipal, Me } from '../api/session';
-import { isRep, mayPick, mayRequestTransfers, mayUseApp, phaseOf } from './phase';
+import { isRep, mayManageExpiry, mayPick, mayRequestTransfers, mayUseApp, phaseOf } from './phase';
 
 const rep = { id: 7, permissions: ['sales.orders.rep'] } as unknown as Me;
 const office = { id: 8, permissions: ['sales.orders.read'] } as unknown as Me;
@@ -42,6 +42,15 @@ describe('the phases of the two apps', () => {
     expect(isRep(keeper)).toBe(false);
     expect(mayRequestTransfers(keeper)).toBe(false);
     expect(mayPick(office)).toBe(false);
+  });
+
+  it('lets only a holder of the right change an expiry record’s status (ADR-0172 #4)', () => {
+    const manager = { id: 13, permissions: ['expiry.items.manage'] } as unknown as Me;
+    const liable = { id: 14, permissions: ['expiry.liability.manage'] } as unknown as Me;
+    expect(mayManageExpiry(manager)).toBe(true);
+    expect(mayManageExpiry(liable)).toBe(false);
+    expect(mayManageExpiry(rep)).toBe(false);
+    expect(mayManageExpiry(office)).toBe(false);
   });
 
   it('tells a rep who also requests transfers from one who does not', () => {

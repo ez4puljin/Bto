@@ -10,6 +10,7 @@ import { AiHttpModule } from './modules/ai';
 import { CatalogHttpModule } from './modules/catalog';
 import { EbarimtCheckHttpModule } from './modules/ebarimt-check';
 import { CustomerHttpModule } from './modules/customer';
+import { ExpiryHttpModule } from './modules/expiry';
 import { FinBridgeHttpModule } from './modules/fin-bridge';
 import { FinanceHttpModule } from './modules/finance';
 import { HrHttpModule } from './modules/hr';
@@ -53,6 +54,7 @@ import { SegmentsHttpModule } from './modules/segments';
     ReportingHttpModule,
     ProcurementHttpModule,
     EbarimtCheckHttpModule,
+    ExpiryHttpModule,
   ],
 })
 export class AppModule {}

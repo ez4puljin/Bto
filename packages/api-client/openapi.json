@@ -39532,6 +39532,644 @@
           "ebarimt-check"
         ]
       }
+    },
+    "/api/v1/expiry/summary": {
+      "get": {
+        "operationId": "Expiry_summary",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpirySummaryDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "expiry"
+        ]
+      }
+    },
+    "/api/v1/expiry/filters": {
+      "get": {
+        "operationId": "Expiry_filters",
+        "parameters": [
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ExpiryView"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpiryFiltersDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "expiry"
+        ]
+      }
+    },
+    "/api/v1/expiry/attention": {
+      "get": {
+        "operationId": "Expiry_attention",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpiryAttentionDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "expiry"
+        ]
+      }
+    },
+    "/api/v1/expiry/liability-options": {
+      "get": {
+        "operationId": "Expiry_liabilityOptions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpiryLiabilityOptionsDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "expiry"
+        ]
+      }
+    },
+    "/api/v1/expiry/items": {
+      "get": {
+        "operationId": "Expiry_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ExpiryView"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Product name, code or barcode",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": false,
+            "in": "query",
+            "description": "The product’s main supplier",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "description": "The product’s home warehouse",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "createdByName",
+            "required": false,
+            "in": "query",
+            "description": "Exactly as `creators` of the filters route names them",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "liability",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ExpiryLiabilityType"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpiryItemPageDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "expiry"
+        ]
+      },
+      "post": {
+        "operationId": "Expiry_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpiryCreateRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpiryItemDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "expiry"
+        ]
+      }
+    },
+    "/api/v1/expiry/items/carry": {
+      "post": {
+        "operationId": "Expiry_carry",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpiryCarryRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpiryCarryResultDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "expiry"
+        ]
+      }
+    },
+    "/api/v1/expiry/items/{id}": {
+      "get": {
+        "operationId": "Expiry_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpiryItemDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "expiry"
+        ]
+      },
+      "patch": {
+        "operationId": "Expiry_patch",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpiryPatchRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpiryItemDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "expiry"
+        ]
+      }
+    },
+    "/api/v1/expiry/items/{id}/history": {
+      "get": {
+        "operationId": "Expiry_history",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpiryHistoryDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "expiry"
+        ]
+      }
+    },
+    "/api/v1/expiry/items/{id}/status": {
+      "put": {
+        "operationId": "Expiry_setStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpiryStatusRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpiryItemDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "expiry"
+        ]
+      }
+    },
+    "/api/v1/expiry/items/{id}/liability": {
+      "put": {
+        "operationId": "Expiry_setLiability",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpiryLiabilityRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpiryItemDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "expiry"
+        ]
+      }
     }
   },
   "info": {
@@ -39866,7 +40504,10 @@
           "hr.attendance.view",
           "hr.attendance.manage",
           "reports.view",
-          "reports.margins.view"
+          "reports.margins.view",
+          "expiry.items.manage",
+          "expiry.liability.manage",
+          "expiry.items.carry"
         ]
       },
       "RoleRef": {
@@ -80237,6 +80878,801 @@
           "skipped"
         ]
       },
+      "ExpiryStatusCountsDto": {
+        "type": "object",
+        "properties": {
+          "REVIEW": {
+            "type": "number"
+          },
+          "CITY_RETURN": {
+            "type": "number"
+          },
+          "INTERNAL_SALE": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "REVIEW",
+          "CITY_RETURN",
+          "INTERNAL_SALE"
+        ]
+      },
+      "ExpirySummaryDto": {
+        "type": "object",
+        "properties": {
+          "today": {
+            "type": "string",
+            "example": "2026-11-07",
+            "description": "The server’s business date"
+          },
+          "soonDays": {
+            "type": "number",
+            "example": 30
+          },
+          "urgentDays": {
+            "type": "number",
+            "example": 7
+          },
+          "active": {
+            "type": "number",
+            "description": "Records not archived"
+          },
+          "expired": {
+            "type": "number",
+            "description": "Open records past their date"
+          },
+          "urgent": {
+            "type": "number",
+            "description": "Open records dated today … today + urgentDays"
+          },
+          "soon": {
+            "type": "number",
+            "description": "Open records dated today … today + soonDays"
+          },
+          "archived": {
+            "type": "number"
+          },
+          "byStatus": {
+            "$ref": "#/components/schemas/ExpiryStatusCountsDto"
+          }
+        },
+        "required": [
+          "today",
+          "soonDays",
+          "urgentDays",
+          "active",
+          "expired",
+          "urgent",
+          "soon",
+          "archived",
+          "byStatus"
+        ]
+      },
+      "ExpiryView": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "EXPIRED",
+          "URGENT",
+          "SOON",
+          "REVIEW",
+          "CITY_RETURN",
+          "INTERNAL_SALE",
+          "ARCHIVED"
+        ]
+      },
+      "ExpiryNamedDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "ExpiryFiltersDto": {
+        "type": "object",
+        "properties": {
+          "suppliers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpiryNamedDto"
+            }
+          },
+          "warehouses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpiryNamedDto"
+            }
+          },
+          "creators": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "suppliers",
+          "warehouses",
+          "creators"
+        ]
+      },
+      "ExpiryAttentionDto": {
+        "type": "object",
+        "properties": {
+          "expired": {
+            "type": "number",
+            "description": "Open records past their date"
+          },
+          "dueSoon": {
+            "type": "number",
+            "description": "Open records dated today … today + 7"
+          },
+          "cap": {
+            "type": "number",
+            "example": 100,
+            "description": "Counts stop here; show «99+» at the cap"
+          }
+        },
+        "required": [
+          "expired",
+          "dueSoon",
+          "cap"
+        ]
+      },
+      "ExpiryRoleDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
+      "ExpiryPersonDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "fullName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "fullName"
+        ]
+      },
+      "ExpiryLiabilityOptionsDto": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpiryRoleDto"
+            }
+          },
+          "users": {
+            "description": "Active staff",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpiryPersonDto"
+            }
+          }
+        },
+        "required": [
+          "roles",
+          "users"
+        ]
+      },
+      "ExpiryLiabilityType": {
+        "type": "string",
+        "enum": [
+          "NONE",
+          "SPECIFIC",
+          "ALL_STAFF"
+        ]
+      },
+      "ExpiryProductDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string",
+            "description": "The product code"
+          },
+          "name": {
+            "type": "string"
+          },
+          "baseUomName": {
+            "type": "string",
+            "description": "The unit both counted quantities are in"
+          },
+          "thumbUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "sku",
+          "name",
+          "baseUomName",
+          "thumbUrl"
+        ]
+      },
+      "ExpiryUrgency": {
+        "type": "string",
+        "enum": [
+          "EXPIRED",
+          "URGENT",
+          "SOON",
+          "OK"
+        ]
+      },
+      "ExpiryStatus": {
+        "type": "string",
+        "enum": [
+          "REVIEW",
+          "CITY_RETURN",
+          "INTERNAL_SALE",
+          "ARCHIVED"
+        ]
+      },
+      "ExpiryLiabilityDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExpiryLiabilityType"
+              }
+            ]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpiryRoleDto"
+            }
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpiryPersonDto"
+            }
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "type",
+          "roles",
+          "users",
+          "note"
+        ]
+      },
+      "ExpiryItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "product": {
+            "$ref": "#/components/schemas/ExpiryProductDto"
+          },
+          "supplier": {
+            "nullable": true,
+            "description": "The main supplier, read live (the old «Брэнд»)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExpiryNamedDto"
+              }
+            ]
+          },
+          "homeWarehouse": {
+            "nullable": true,
+            "description": "The home warehouse, read live (the old «Байршил»)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExpiryNamedDto"
+              }
+            ]
+          },
+          "expiryDate": {
+            "type": "string",
+            "example": "2026-11-07"
+          },
+          "daysLeft": {
+            "type": "number",
+            "description": "Days from the server’s business date; negative when past"
+          },
+          "urgency": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExpiryUrgency"
+              }
+            ]
+          },
+          "qtyFloor": {
+            "type": "string",
+            "example": "12"
+          },
+          "qtyWarehouse": {
+            "type": "string",
+            "example": "0"
+          },
+          "qtyTotal": {
+            "type": "string",
+            "example": "12"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExpiryStatus"
+              }
+            ]
+          },
+          "liability": {
+            "$ref": "#/components/schemas/ExpiryLiabilityDto"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "editVersion": {
+            "type": "number",
+            "description": "What a correction sends back as expectedVersion"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "archivedByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "product",
+          "supplier",
+          "homeWarehouse",
+          "expiryDate",
+          "daysLeft",
+          "urgency",
+          "qtyFloor",
+          "qtyWarehouse",
+          "qtyTotal",
+          "status",
+          "liability",
+          "note",
+          "editVersion",
+          "createdAt",
+          "createdByName",
+          "updatedAt",
+          "archivedAt",
+          "archivedByName"
+        ]
+      },
+      "ExpiryItemPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpiryItemDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "ExpiryCreateRequestDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "expiryDate": {
+            "type": "string",
+            "example": "2026-11-07",
+            "description": "At most 5 years back, 15 years ahead"
+          },
+          "qtyFloor": {
+            "type": "string",
+            "example": "12",
+            "description": "Base units on the sales floor"
+          },
+          "qtyWarehouse": {
+            "type": "string",
+            "example": "0",
+            "description": "Base units in the warehouse"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "allowDuplicate": {
+            "type": "boolean",
+            "description": "Add it although an open record has this product and date (ADR-0172 #5)"
+          }
+        },
+        "required": [
+          "productId",
+          "expiryDate",
+          "qtyFloor",
+          "qtyWarehouse"
+        ]
+      },
+      "ExpiryChangeKind": {
+        "type": "string",
+        "enum": [
+          "CREATE",
+          "UPDATE"
+        ]
+      },
+      "ExpiryCarryChangeDto": {
+        "type": "object",
+        "properties": {
+          "legacyId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExpiryChangeKind"
+              }
+            ]
+          },
+          "qtyFloorOld": {
+            "type": "string"
+          },
+          "qtyFloorNew": {
+            "type": "string"
+          },
+          "qtyWarehouseOld": {
+            "type": "string"
+          },
+          "qtyWarehouseNew": {
+            "type": "string"
+          },
+          "changedAt": {
+            "type": "string",
+            "example": "2026-03-05T04:10:00Z",
+            "description": "With its zone"
+          },
+          "changedByName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "legacyId",
+          "kind",
+          "qtyFloorOld",
+          "qtyFloorNew",
+          "qtyWarehouseOld",
+          "qtyWarehouseNew",
+          "changedAt",
+          "changedByName"
+        ]
+      },
+      "ExpiryCarryRequestDto": {
+        "type": "object",
+        "properties": {
+          "legacyId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The old record’s id"
+          },
+          "productId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "expiryDate": {
+            "type": "string",
+            "example": "2026-11-07"
+          },
+          "qtyFloor": {
+            "type": "string"
+          },
+          "qtyWarehouse": {
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExpiryStatus"
+              }
+            ]
+          },
+          "liabilityType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExpiryLiabilityType"
+              }
+            ]
+          },
+          "liabilityRoleIds": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "liabilityUserIds": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "liabilityNote": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-03-05T04:10:00Z",
+            "description": "With its zone"
+          },
+          "createdByName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "The old author, kept as text"
+          },
+          "archivedAt": {
+            "type": "string",
+            "example": "2026-03-05T04:10:00Z",
+            "description": "With its zone"
+          },
+          "archivedByName": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpiryCarryChangeDto"
+            }
+          }
+        },
+        "required": [
+          "legacyId",
+          "productId",
+          "expiryDate",
+          "qtyFloor",
+          "qtyWarehouse",
+          "status",
+          "liabilityType",
+          "liabilityRoleIds",
+          "liabilityUserIds",
+          "createdAt",
+          "createdByName",
+          "history"
+        ]
+      },
+      "ExpiryCarryOutcome": {
+        "type": "string",
+        "enum": [
+          "CREATED",
+          "UPDATED",
+          "UNCHANGED",
+          "KEPT"
+        ]
+      },
+      "ExpiryCarryResultDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "outcome": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExpiryCarryOutcome"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "outcome"
+        ]
+      },
+      "ExpiryChangeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExpiryChangeKind"
+              }
+            ]
+          },
+          "qtyFloorOld": {
+            "type": "string"
+          },
+          "qtyFloorNew": {
+            "type": "string"
+          },
+          "qtyWarehouseOld": {
+            "type": "string"
+          },
+          "qtyWarehouseNew": {
+            "type": "string"
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "changedByName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "qtyFloorOld",
+          "qtyFloorNew",
+          "qtyWarehouseOld",
+          "qtyWarehouseNew",
+          "changedAt",
+          "changedByName"
+        ]
+      },
+      "ExpiryHistoryDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpiryChangeDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ExpiryPatchRequestDto": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The editVersion the screen read"
+          },
+          "expiryDate": {
+            "type": "string",
+            "example": "2026-11-07"
+          },
+          "qtyFloor": {
+            "type": "string",
+            "example": "12"
+          },
+          "qtyWarehouse": {
+            "type": "string",
+            "example": "0"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Empty clears it"
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ]
+      },
+      "ExpiryStatusRequestDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExpiryStatus"
+              }
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "ExpiryLiabilityRequestDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExpiryLiabilityType"
+              }
+            ]
+          },
+          "roleIds": {
+            "description": "Kept only with SPECIFIC",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "userIds": {
+            "description": "Kept only with SPECIFIC",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "NONE clears it"
+          }
+        },
+        "required": [
+          "type",
+          "roleIds",
+          "userIds"
+        ]
+      },
       "ErrorCode": {
         "type": "string",
         "enum": [
@@ -80452,7 +81888,10 @@
           "EBARIMT_LOOKUP_UNAVAILABLE",
           "EBARIMT_TAXPAYER_NOT_FOUND",
           "EBARIMT_RECEIPT_STATE_INVALID",
-          "EBARIMT_POSAPI_UNAVAILABLE"
+          "EBARIMT_POSAPI_UNAVAILABLE",
+          "EXPIRY_ITEM_EXISTS",
+          "EXPIRY_ITEM_CHANGED",
+          "EXPIRY_ITEM_ARCHIVED"
         ]
       },
       "ProblemFieldError": {

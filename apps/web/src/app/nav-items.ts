@@ -15,6 +15,7 @@ import {
   CalendarClock,
   CalendarDays,
   CalendarRange,
+  CalendarX2,
   ChartBar,
   ChartPie,
   ClipboardCheck,
@@ -185,6 +186,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'inventory.moves.manage',
       },
       { to: '/inventory/low-stock', label: 'nav.lowStock', icon: PackageMinus },
+      // Open to everyone: the person at the shelf finds the goods (ADR-0172 #4).
+      { to: '/inventory/expiry', label: 'nav.expiry', icon: CalendarX2 },
       { to: '/inventory/movements', label: 'nav.movements', icon: History },
       {
         to: '/inventory/bins',
@@ -908,7 +911,9 @@ export type AttentionCount =
   | 'lowStock'
   | 'productsWaitingForPrices'
   | 'overdueReceivables'
-  | 'shiftsToHandOver';
+  | 'shiftsToHandOver'
+  | 'expiryExpired'
+  | 'expiryDueSoon';
 
 export interface AttentionTile {
   count: AttentionCount;
@@ -991,5 +996,20 @@ export const ATTENTION_TILES: readonly AttentionTile[] = [
     icon: PackageMinus,
     permission: 'inventory.transfers.manage',
     to: '/inventory/low-stock',
+  },
+  // The old system's daily digest, live instead (ADR-0172 #10).
+  {
+    count: 'expiryExpired',
+    label: 'home.attention.expiryExpired',
+    icon: CalendarX2,
+    permission: 'expiry.items.manage',
+    to: '/inventory/expiry?view=EXPIRED',
+  },
+  {
+    count: 'expiryDueSoon',
+    label: 'home.attention.expiryDueSoon',
+    icon: CalendarClock,
+    permission: 'expiry.items.manage',
+    to: '/inventory/expiry?view=URGENT',
   },
 ];
