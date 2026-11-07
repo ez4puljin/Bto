@@ -14,6 +14,14 @@ if errorlevel 1 (
   goto :fail
 )
 
+rem This script never starts Docker Desktop (owner, 2026-11-07): it stops and says so.
+call :docker_running
+if errorlevel 1 (
+  echo Docker Desktop асаагүй байна. Bto-ийн өгөгдлийн сан Docker дотор ажилладаг.
+  echo Docker Desktop-ийг өөрөө асаагаад start.bat-ийг дахин ажиллуулна уу.
+  goto :fail
+)
+
 echo [1/4] Өгөгдлийн сан ^(PostgreSQL^) асааж байна...
 docker compose up -d --wait
 if errorlevel 1 (
@@ -64,6 +72,12 @@ echo Зогсоохдоо stop.bat-ийг ажиллуулна.
 echo.
 pause
 exit /b 0
+
+:docker_running
+rem Asks Windows, not docker: on 2026-11-07 Docker Desktop started right after a docker command, three
+rem times out of three, so any docker command here could bring it up by itself.
+tasklist /FI "IMAGENAME eq com.docker.backend.exe" /NH | findstr /I "com.docker.backend.exe" >nul
+exit /b %errorlevel%
 
 :listening
 netstat -ano | findstr /r /c:":%1 .*LISTENING" >nul

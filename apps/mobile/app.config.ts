@@ -106,6 +106,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     ['expo-build-properties', { android: { usesCleartextTraffic: !production } }],
     './plugins/with-cmake-object-path.cjs',
+    './plugins/with-gradle-memory.cjs',
   ],
   extra: {
     /** Which app this build is: src/config/app.ts picks its screens (ADR-0085). */
