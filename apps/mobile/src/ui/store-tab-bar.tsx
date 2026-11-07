@@ -27,7 +27,8 @@ export function useStoreTabBarHeight(): number {
   return BAR_HEIGHT + insets.bottom;
 }
 
-function useKeyboardShown(): boolean {
+/** Whether the keyboard is up: the bar then leaves, and so does a footer pinned above it. */
+export function useKeyboardShown(): boolean {
   const [shown, setShown] = useState(false);
   useEffect(() => {
     const show = Keyboard.addListener('keyboardDidShow', () => setShown(true));

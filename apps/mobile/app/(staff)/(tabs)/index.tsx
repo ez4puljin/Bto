@@ -134,6 +134,8 @@ export default function HomeScreen() {
     ),
     { key: 'map', label: t('mobile.map.title'), onPress: () => router.push('/map') },
     { key: 'orders', label: t('mobile.tabs.orders'), onPress: () => router.navigate('/orders') },
+    // A rep has no work bar, and finds expired goods on a store's shelf too (ADR-0172 #9).
+    { key: 'expiry', label: t('mobile.expiry.title'), onPress: () => router.push('/expiry') },
     // A rep who also requests a store's transfers (ADR-0116 #1).
     ...(mayRequestTransfers(me)
       ? [

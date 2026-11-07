@@ -61,6 +61,29 @@ describe('«Анхаарах» tiles (ADR-0047 #7)', () => {
     expect(region.getAllByRole('link')).toHaveLength(4);
   });
 
+  it('shows the expiry register’s two counts to whoever manages it (ADR-0172 #10)', async () => {
+    const manager: Me = { ...ADMIN_ME, id: 9, permissions: ['expiry.items.manage'], roles: [] };
+    const fetchMock = signedIn(manager, {
+      'GET /api/v1/expiry/attention': () => json({ expired: 3, dueSoon: 100, cap: 100 }),
+    });
+    renderApp('/', fetchMock);
+    expect(await tile(mn.home.attention.expiryExpired, '3')).toHaveAttribute(
+      'href',
+      '/inventory/expiry?view=EXPIRED',
+    );
+    expect(await tile(mn.home.attention.expiryDueSoon, '99+')).toHaveAttribute(
+      'href',
+      '/inventory/expiry?view=URGENT',
+    );
+    expect(calls(fetchMock, 'GET', '/api/v1/inventory/attention')).toHaveLength(0);
+    cleanup();
+
+    const quiet = signedIn({ ...ADMIN_ME, id: 10, permissions: [], roles: [] });
+    renderApp('/', quiet);
+    await screen.findAllByRole('heading', { level: 1 });
+    expect(calls(quiet, 'GET', '/api/v1/expiry/attention')).toHaveLength(0);
+  });
+
   it('asks only for the counts a person may act on', async () => {
     const fetchMock = signedIn(ACCOUNTANT_ME, {
       'GET /api/v1/inventory/attention': () => json({ ...NOTHING, receiptsToCost: 1 }),
@@ -82,7 +105,10 @@ describe('«Анхаарах» tiles (ADR-0047 #7)', () => {
   it('says so when nothing waits, and claims nothing when the counts fail', async () => {
     renderApp(
       '/',
-      signedIn(WAREHOUSE_ME, { 'GET /api/v1/inventory/attention': () => json(NOTHING) }),
+      signedIn(WAREHOUSE_ME, {
+        'GET /api/v1/inventory/attention': () => json(NOTHING),
+        'GET /api/v1/expiry/attention': () => json({ expired: 0, dueSoon: 0, cap: 100 }),
+      }),
     );
     const quiet = within(await tiles());
     expect(await quiet.findByText(mn.home.nothingWaiting)).toBeInTheDocument();

@@ -88,13 +88,14 @@ export function useScanEnterGuard(): (event: ReactKeyboardEvent<HTMLElement>) =>
 /**
  * For a text field of a scan screen (a quantity): a scan that lands in it goes to `onScan` and the
  * field gets back the value it had before the burst, so scanning the next item never turns into a
- * quantity of 4 901 234 567 894. Returns the field's keydown handler.
+ * quantity of 4 901 234 567 894. Returns the field's keydown handler, which a form may also call
+ * for all its fields from one capture-phase handler.
  */
 export function useScanGuard(
   onScan: (code: string) => void,
   options: { letters?: boolean } = {},
 ): (
-  event: ReactKeyboardEvent<HTMLInputElement>,
+  event: ReactKeyboardEvent<HTMLElement>,
   value: string,
   restore: (value: string) => void,
 ) => void {

@@ -108,11 +108,11 @@ export function SaveState(props: { saving: boolean; saved: boolean }) {
 }
 
 /**
- * Search active products by name, SKU or barcode and pick one (documents without a scanner). The
- * matches open under the box without moving the page (ADR-0066): ↑/↓ choose one, Enter adds the
- * chosen one (the first unless moved), Escape clears; a click adds too. With `onScan`, a scan that
- * lands in the box goes to the page's scanner instead (the scanned unit, not the base unit) and the
- * typed text comes back.
+ * Search active products by name, SKU or barcode and pick one (documents without a scanner); with
+ * `anyStatus` the inactive ones too, marked. The matches open under the box without moving the page
+ * (ADR-0066): ↑/↓ choose one, Enter adds the chosen one (the first unless moved), Escape clears; a
+ * click adds too. With `onScan`, a scan that lands in the box goes to the page's scanner instead
+ * (the scanned unit, not the base unit) and the typed text comes back.
  */
 export function ProductSearch({
   id,
@@ -123,6 +123,7 @@ export function ProductSearch({
   className,
   variant = 'default',
   saleReady,
+  anyStatus = false,
 }: {
   /** Set when a visible label names the search box. */
   id?: string;
@@ -139,6 +140,8 @@ export function ProductSearch({
   variant?: 'default' | 'filter';
   /** Only products whose prices are complete (an app notice's products, ADR-0062). */
   saleReady?: boolean;
+  /** Inactive products too: a register of what is on the shelf (ADR-0172 #2). */
+  anyStatus?: boolean;
 }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
@@ -149,7 +152,11 @@ export function ProductSearch({
   const listId = useId();
   const typed = search.trim();
   const q = useDeferredValue(typed);
-  const products = useProducts({ q, status: 'ACTIVE', ...(saleReady ? { saleReady } : {}) });
+  const products = useProducts({
+    q,
+    ...(anyStatus ? {} : { status: 'ACTIVE' as const }),
+    ...(saleReady ? { saleReady } : {}),
+  });
   // Nothing from an older search once the box is cleared (a pick, Escape).
   const rows = typed && q ? (products.data?.pages[0]?.data ?? []).slice(0, 8) : [];
   const index = highlight.q === q && highlight.index < rows.length ? highlight.index : 0;
@@ -247,6 +254,11 @@ export function ProductSearch({
                       {product.sku}
                     </span>
                     <span className="min-w-0 flex-1 truncate">{product.name}</span>
+                    {product.status === 'INACTIVE' ? (
+                      <Badge variant="secondary" className="shrink-0">
+                        {t('catalog.products.status.INACTIVE')}
+                      </Badge>
+                    ) : null}
                     <span className="shrink-0 text-[0.8125rem] font-medium text-link">{label}</span>
                   </button>
                 </li>

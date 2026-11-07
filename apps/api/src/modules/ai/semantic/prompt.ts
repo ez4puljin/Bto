@@ -30,6 +30,8 @@ export const GLOSSARY = {
   issue:
     "goods issues (зарлага): stock_documents with doc_type = 'GI' (adjustment_reason holds the expense type, supplier_name the supplier of a return); stock_movements GOODS_ISSUE",
   lowStock: 'low_stock',
+  expiry:
+    "expiry_items, open records only (status <> 'ARCHIVED'): days_left < 0 is expired, days_left BETWEEN 0 AND N expires within N days",
   category: 'categories; products.category_path and products.top_category_name',
   unit: 'product_units (uom_code PCS piece, BOX box, BLOCK block, KG kilogram)',
   customer: 'customers (shops and individuals) and customer_addresses',
@@ -84,6 +86,12 @@ export const EXAMPLES = {
  WHERE adjustment_reason = 'DAMAGED' AND movement_date >= date_trunc('year', current_date)
  GROUP BY product_name
  ORDER BY 3 DESC`,
+  expiringSoon: `SELECT product_name ${as(C.product)}, expiry_date ${as(C.expiryDate)}, days_left ${as(C.daysLeft)},
+       qty_total ${as(C.quantity)}, status ${as(C.status)}
+  FROM expiry_items
+ WHERE status <> 'ARCHIVED' AND days_left BETWEEN 0 AND 30
+ ORDER BY expiry_date, product_name
+ LIMIT 500`,
 } as const;
 export type ExampleKey = keyof typeof EXAMPLES;
 

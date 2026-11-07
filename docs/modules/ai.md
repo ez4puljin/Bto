@@ -46,6 +46,7 @@ Schema `ai` holds views owned by `migrator`; `ai_reader` has `USAGE` on the sche
 | `ai.stock_movements` | ledger line, with the document number, warehouse, shelf and cost |
 | `ai.stock_documents` | stock document header (receipts, bin moves, adjustments, stocktakes, transfers) |
 | `ai.receipt_lines` | goods-receipt line, with the supplier and the unit cost |
+| `ai.expiry_items` | a record of the expiry register: product, date, days left, the two counted quantities and their total, status, note, who recorded it (0090, ADR-0172); no liability; data group `stock` |
 | `ai.customers` | customer, with contact, tax and credit fields |
 | `ai.customer_addresses` | customer address, with GPS |
 | `ai.suppliers` | supplier, with contact and bank fields |

@@ -2,6 +2,7 @@ import { ChevronDown, Search, X } from 'lucide-react-native';
 import type { ReactNode, Ref } from 'react';
 import {
   ActivityIndicator,
+  type Insets,
   Pressable,
   type StyleProp,
   StyleSheet,
@@ -323,6 +324,7 @@ export function ChoiceChip({
   onWhite = false,
   compact = false,
   icon,
+  hitSlop,
 }: {
   label: string;
   selected: boolean;
@@ -332,12 +334,15 @@ export function ChoiceChip({
   /** The 32 px chips of a page (the orders' days); 34 px in a sheet. */
   compact?: boolean;
   icon?: ReactNode;
+  /** More room to press than the chip draws (a row of chips with space above and below). */
+  hitSlop?: Insets;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
+      hitSlop={hitSlop}
       style={[
         styles.choice,
         compact && styles.choiceCompact,

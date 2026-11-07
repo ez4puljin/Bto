@@ -44,4 +44,4 @@ export { ScopeService } from './services/scope.service';
 export { SettingsService } from './services/settings.service';
 export { StaffAccountsService } from './services/staff-accounts.service';
 export { StorageService, type StoredFile } from './services/storage.service';
-export { UserNamesService, type UserSummary } from './services/user-names.service';
+export { type RoleBrief, UserNamesService, type UserSummary } from './services/user-names.service';

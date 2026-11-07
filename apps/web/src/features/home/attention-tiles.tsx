@@ -3,6 +3,7 @@ import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { ATTENTION_TILES, type AttentionTile, type ModuleKey, navTrail } from '@/app/nav-items';
+import { useExpiryAttention } from '@/features/expiry/api';
 import { useFinanceAttention } from '@/features/finance/api';
 import { usePosAttention } from '@/features/pos/api';
 import { useInventoryAttention, usePricingAttention } from './api';
@@ -23,7 +24,9 @@ function useAttention(permissions: readonly Permission[], only?: ModuleKey) {
       (tile) =>
         tile.count !== 'productsWaitingForPrices' &&
         tile.count !== 'overdueReceivables' &&
-        tile.count !== 'shiftsToHandOver',
+        tile.count !== 'shiftsToHandOver' &&
+        tile.count !== 'expiryExpired' &&
+        tile.count !== 'expiryDueSoon',
     ),
   );
   const pricing = usePricingAttention(
@@ -31,13 +34,23 @@ function useAttention(permissions: readonly Permission[], only?: ModuleKey) {
   );
   const finance = useFinanceAttention(tiles.some((tile) => tile.count === 'overdueReceivables'));
   const pos = usePosAttention(tiles.some((tile) => tile.count === 'shiftsToHandOver'));
+  const expiry = useExpiryAttention(
+    tiles.some((tile) => tile.count === 'expiryExpired' || tile.count === 'expiryDueSoon'),
+  );
 
   const shown = tiles.flatMap((tile) => {
-    const counted = countOf(tile, inventory.data, pricing.data, finance.data, pos.data);
+    const counted = countOf(
+      tile,
+      inventory.data,
+      pricing.data,
+      finance.data,
+      pos.data,
+      expiry.data,
+    );
     return counted && counted.count > 0 ? [{ tile, ...counted }] : [];
   });
   // Every count it asked for has come back (a query it never asked for stays idle).
-  const settled = [inventory, pricing, finance, pos].every(
+  const settled = [inventory, pricing, finance, pos, expiry].every(
     (query) => query.isSuccess || (query.isPending && query.fetchStatus === 'idle'),
   );
   return { shown, settled };
@@ -144,7 +157,14 @@ function countOf(
   pricing: ReturnType<typeof usePricingAttention>['data'],
   finance: ReturnType<typeof useFinanceAttention>['data'],
   pos: ReturnType<typeof usePosAttention>['data'],
+  expiry: ReturnType<typeof useExpiryAttention>['data'],
 ): { count: number; cap: number; to: string } | null {
+  if (tile.count === 'expiryExpired') {
+    return expiry ? { count: expiry.expired, cap: expiry.cap, to: tile.to } : null;
+  }
+  if (tile.count === 'expiryDueSoon') {
+    return expiry ? { count: expiry.dueSoon, cap: expiry.cap, to: tile.to } : null;
+  }
   if (tile.count === 'shiftsToHandOver') {
     return pos ? { count: pos.shiftsToHandOver, cap: 1000, to: tile.to } : null;
   }

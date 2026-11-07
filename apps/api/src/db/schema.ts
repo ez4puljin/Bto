@@ -234,3 +234,9 @@ export {
   ebarimtCheckReceiptLinks,
   ebarimtCheckSupplierProfiles,
 } from '../modules/ebarimt-check/schema';
+export {
+  expiryItemChanges,
+  expiryItemRoles,
+  expiryItemUsers,
+  expiryItems,
+} from '../modules/expiry/schema';

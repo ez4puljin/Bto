@@ -115,6 +115,11 @@ export const PERMISSIONS = [
   // values in them only with the second code.
   'reports.view',
   'reports.margins.view',
+  // The expiry register (ADR-0172): reading, recording and correcting are open to all staff. These
+  // are a record's status and archive with the home tiles; its liability; carrying old records.
+  'expiry.items.manage',
+  'expiry.liability.manage',
+  'expiry.items.carry',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -189,6 +194,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'pos.read',
     // The office registers bonus card members and resets their PINs (owner 2026-10-28, ADR-0112).
     'pos.loyalty.manage',
+    // What happens to goods near their date (ADR-0172 #4).
+    'expiry.items.manage',
   ],
   // Purchase orders by supplier (ADR-0115): managers and senior staff hold this role.
   PROCUREMENT: [
@@ -199,6 +206,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     // Who chases suppliers for their e-Barimt (ADR-0168).
     'ebarimt.check.read',
     'ebarimt.check.edit',
+    // A city return goes back through the supplier (ADR-0172 #4).
+    'expiry.items.manage',
   ],
   // Warehouse staff count goods in and out but never see costs; an admin approves adjustments.
   WAREHOUSE: [
@@ -215,6 +224,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     // Keepers type their own warehouse's quantities into an order while «Бэлдэж» (ADR-0115).
     'procurement.orders.read',
     'procurement.orders.edit',
+    // What happens to goods near their date (ADR-0172 #4).
+    'expiry.items.manage',
   ],
   // The accountant also types TINs the lookup cannot find (SPEC §5.3), sets credit terms, enters
   // the supplier prices of goods receipts (ADR-0033) and the products' e-Barimt data (ADR-0044).
@@ -249,9 +260,13 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'ebarimt.check.read',
     'ebarimt.check.edit',
     'ebarimt.check.settings',
+    // A record's status and who is liable for it (ADR-0172 #4).
+    'expiry.items.manage',
+    'expiry.liability.manage',
   ],
-  // Attendance (ADR-0131): the dashboard, the work sites, the schedule and the corrections.
-  HR: ['hr.attendance.view', 'hr.attendance.manage'],
+  // Attendance (ADR-0131): the dashboard, the work sites, the schedule and the corrections. Liability
+  // on the expiry register reads as pay (ADR-0172 #4).
+  HR: ['hr.attendance.view', 'hr.attendance.manage', 'expiry.liability.manage'],
   // Store staff request and receive transfers within the supermarket's write scope (ADR-0035).
   POS_CASHIER: ['inventory.transfers.manage', 'pos.till.operate'],
   // The senior cashier approves returns and drawer opens at the till (owner 2026-10-16).
@@ -260,6 +275,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'pos.till.operate',
     'pos.till.supervise',
     'pos.read',
+    // What happens to goods near their date on the shelves (ADR-0172 #4).
+    'expiry.items.manage',
   ],
   // The rep app only (ADR-0061 #5): not sales.orders.read/manage (other orders), not
   // partners.customers.read (credit data); /sales-rep/* serves what an order needs.

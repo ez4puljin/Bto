@@ -15,6 +15,7 @@ export const AI_GROUP_VIEWS: Readonly<Record<AiDataGroup, readonly string[]>> = 
     'stock_movements',
     'stock_documents',
     'receipt_lines',
+    'expiry_items',
   ],
   customers: ['customers', 'customer_addresses'],
   suppliers: ['suppliers', 'product_suppliers'],

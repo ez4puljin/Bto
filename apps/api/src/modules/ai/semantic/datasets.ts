@@ -254,6 +254,28 @@ export const AI_DATASETS: readonly AiDataset[] = [
     ],
   },
   {
+    name: 'expiry_items',
+    description:
+      'The expiry register (ADR-0172): dates people read off the goods and how many they counted then, one row per record. It observes the shelves and is not stock: never add these quantities to stock.on_hand. A product may have several records. Open records have a status other than ARCHIVED.',
+    columns: [
+      ...PRODUCT,
+      BASE_UNIT,
+      col('expiry_date', 'date', 'the date printed on the goods'),
+      col('days_left', 'integer', 'days from today to expiry_date; negative = already expired'),
+      col('qty_floor', 'numeric', 'counted on the sales floor, base units'),
+      col('qty_warehouse', 'numeric', 'counted in the warehouse, base units'),
+      col('qty_total', 'numeric', 'qty_floor + qty_warehouse'),
+      col(
+        'status',
+        'text',
+        "'REVIEW' being reviewed, 'CITY_RETURN' goes back to the supplier in the city, 'INTERNAL_SALE' sold at an internal discount, 'ARCHIVED' gone",
+      ),
+      col('note', 'text'),
+      col('created_at', 'timestamptz'),
+      col('created_by_name', 'text', 'who recorded it'),
+    ],
+  },
+  {
     name: 'customers',
     description:
       'Customers (shops and individuals); their orders are in sales_orders, their invoices in invoices, what they owe in customer_balances.',

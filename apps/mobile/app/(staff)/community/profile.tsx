@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type Profile, useMyProfile, useSaveProfile, useToday } from '../../../src/api/community';
 import { type AppProblem, problemFrom } from '../../../src/api/problem';
 import { FirstLoad } from '../../../src/community/parts';
+import { maskDate } from '../../../src/dates/mask';
 import { colors, fonts, radii, spacing, type } from '../../../src/theme/tokens';
 import { ChoiceChip, PillButton, Segmented } from '../../../src/ui/controls';
 import { TextField } from '../../../src/ui/field';
@@ -37,12 +38,6 @@ interface ChildDraft {
   name: string;
   gender: Gender | null;
   birthDate: string;
-}
-
-/** `19900521` as `1990-05-21` while typing: a phone's number pad has no dash. */
-function maskDate(text: string): string {
-  const digits = text.replace(/\D/g, '').slice(0, 8);
-  return [digits.slice(0, 4), digits.slice(4, 6), digits.slice(6, 8)].filter(Boolean).join('-');
 }
 
 /**

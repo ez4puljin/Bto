@@ -41,6 +41,8 @@ export function CameraScanner(props: {
   const video = useRef<HTMLVideoElement | null>(null);
   const [state, setState] = useState<CameraState>('starting');
   const onScan = useRef(props.onScan);
+  /** It closes because a code was read, not because the person gave up. */
+  const read = useRef(false);
   useEffect(() => {
     onScan.current = props.onScan;
   });
@@ -74,6 +76,7 @@ export function CameraScanner(props: {
             const found = await detector.detect(element).catch(() => []);
             const value = found[0]?.rawValue ?? null;
             if (value !== null && value === previous) {
+              read.current = true;
               onScan.current(value);
               return;
             }
@@ -98,7 +101,15 @@ export function CameraScanner(props: {
   const problem = state === 'starting' || state === 'scanning' ? null : MESSAGES[state];
   return (
     <Dialog open={props.open} onOpenChange={(open) => (open ? undefined : props.onClose())}>
-      <DialogContent closeLabel={t('common.close')} className="sm:max-w-lg">
+      <DialogContent
+        closeLabel={t('common.close')}
+        className="sm:max-w-lg"
+        onCloseAutoFocus={(event) => {
+          // A quick answer to the read has already put the cursor where the work goes on: it stays.
+          if (read.current && document.activeElement !== document.body) event.preventDefault();
+          read.current = false;
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{t('scan.camera')}</DialogTitle>
           <DialogDescription>

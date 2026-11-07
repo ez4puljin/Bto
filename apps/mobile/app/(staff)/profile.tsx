@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import {
   Bell,
   CalendarCheck,
+  CalendarClock,
   ChevronRight,
   Send,
   Server,
@@ -83,6 +84,16 @@ export default function ProfileScreen() {
             }
             title={t('mobile.attendance.title')}
             onPress={() => router.push('/attendance')}
+          />
+          <Row
+            minHeight={52}
+            icon={
+              <IconTile color={colors.tint.amber}>
+                <CalendarClock size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+              </IconTile>
+            }
+            title={t('mobile.expiry.title')}
+            onPress={() => router.push('/expiry')}
           />
           <Row
             minHeight={52}

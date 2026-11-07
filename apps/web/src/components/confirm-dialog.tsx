@@ -34,6 +34,10 @@ export function ConfirmDialog(props: {
   onClose: () => void;
   /** Details shown above the buttons (e.g. what a posting will change). */
   children?: ReactNode;
+  /** A second way forward, beside the main button (save and go on, or drop it and go on). */
+  alternative?: { label: string; onClick: () => void };
+  /** Once it has closed; preventing the event keeps the focus from going back to the opener. */
+  onCloseAutoFocus?: (event: Event) => void;
 }) {
   const { t } = useTranslation();
   const confirm = useRef<HTMLButtonElement>(null);
@@ -51,6 +55,7 @@ export function ConfirmDialog(props: {
           event.preventDefault();
           button.focus();
         }}
+        {...(props.onCloseAutoFocus ? { onCloseAutoFocus: props.onCloseAutoFocus } : {})}
       >
         <DialogHeader>
           <DialogTitle>{props.title}</DialogTitle>
@@ -59,6 +64,11 @@ export function ConfirmDialog(props: {
         {props.children}
         <ProblemAlert problem={props.problem} />
         <DialogFooter closeLabel={t('common.cancel')}>
+          {props.alternative ? (
+            <Button variant="destructive" onClick={props.alternative.onClick}>
+              {props.alternative.label}
+            </Button>
+          ) : null}
           <Button
             ref={confirm}
             variant={variant}
