@@ -32,6 +32,6 @@ That only reads, and prints how many values would change.
 node tools/ebarimt-carry/carry.mjs --write
 ```
 
-That writes them. Another session tried it on 2026-11-07 on a throwaway copy of `bto_main` with these tables emptied and its own API: it wrote the 11 files, 316 supplier values, 794 month values and 86 links in about a minute, and every figure, register, phone, remark and note then equalled `bto_main` in all 4,180 supplier-months. Running it again writes nothing, because only what differs from Bto is written. An old value of nothing never clears what is in Bto, but an old value that differs replaces what people typed in Bto, so run it before people start working in Bto, not after.
+That writes them. Another session tried it on 2026-11-07 on a throwaway copy of `bto_main` with these tables emptied and its own API: it wrote the 11 files, 316 supplier values, 794 month values, 332 employee changes and 86 links, and every figure, employee, register, phone, remark and note then equalled `bto_main` in all 4,180 supplier-months. Running it again writes nothing, because only what differs from Bto is written. An old value of nothing never clears what is in Bto, but an old value that differs replaces what people typed in Bto, so run it before people start working in Bto, not after.
 
 It signs in as `import` with the password from `tmp/dev-logins.txt` (`--login` picks another name; `CARRY_PASSWORD` overrides the file) and takes `--api` for another server. It prints counts only, never names or amounts.
