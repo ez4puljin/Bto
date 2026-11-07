@@ -5,6 +5,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MoneyInput } from '@/components/money-input';
 import { Input } from '@/components/ui/input';
+import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { amountText, diffStateOf, FOCUS_RING } from './helpers';
 
@@ -59,6 +60,26 @@ function useHoldsRow(editing: boolean, onEditing: ((editing: boolean) => void) |
 }
 
 /**
+ * A cell left with changes, by Back or a row gone from the report, says they were not saved: a save
+ * here could commit half a number, and saying nothing would lose it unseen.
+ */
+function useSaysIfLeft(editing: boolean, changed: boolean, label: string) {
+  const { t } = useTranslation();
+  const latest = useRef({ editing, changed, label, t });
+  useEffect(() => {
+    latest.current = { editing, changed, label, t };
+  });
+  useEffect(
+    () => () => {
+      const now = latest.current;
+      if (!now.editing || !now.changed) return;
+      toast.warning(now.t('ebarimtCheck.cells.notSaved', { label: now.label }));
+    },
+    [],
+  );
+}
+
+/**
  * A cell that reads as text until clicked: Enter or leaving saves, Esc gives up. Each edit starts from
  * the value of the moment, and nothing arriving while it is typed in touches what is typed; a save
  * says what the cell showed then, so a colleague's change since is reported, not written over. A value
@@ -96,6 +117,7 @@ export function InlineText(props: {
     if (editing) input.current?.select();
   }, [editing]);
   useHoldsRow(editing, props.onEditing);
+  useSaysIfLeft(editing, draft.trim() !== shown.current.trim(), props.label);
   const open = () => {
     finished.current = false;
     shown.current = props.value;
@@ -209,12 +231,14 @@ export function InlineAmount(props: {
   const finished = useRef(false);
   const shown = useRef(props.value);
   const signed = useRef(false);
+  const opened = useRef('');
   const input = useRef<HTMLInputElement>(null);
   const amount = new Decimal(props.value);
   useEffect(() => {
     if (editing) input.current?.select();
   }, [editing]);
   useHoldsRow(editing, props.onEditing);
+  useSaysIfLeft(editing, draft !== opened.current, props.label);
   if (!props.editable) {
     return (
       <span className={cn('font-mono', amount.isZero() ? 'text-muted-foreground' : 'text-warning')}>
@@ -315,7 +339,8 @@ export function InlineAmount(props: {
         setSignedShown(false);
         shown.current = props.value;
         setInvalid(false);
-        setDraft(amount.isZero() ? '' : amount.toString());
+        opened.current = amount.isZero() ? '' : amount.toString();
+        setDraft(opened.current);
         setEditing(true);
       }}
     >

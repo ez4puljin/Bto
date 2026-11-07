@@ -1051,7 +1051,16 @@ describe('ebarimt check', () => {
       .set(bearer(accountant))
       .send({ remark: 'Шинэ', previousRemark: '' })
       .expect(204);
-    expect(await stamp('202610')).not.toBe(after);
+    const withRemark = await stamp('202610');
+    expect(withRemark).not.toBe(after);
+    // An employee chosen in a later month leaves an earlier month's stamp alone.
+    await http()
+      .put('/api/v1/ebarimt-check/assignments')
+      .set(bearer(admin))
+      .send({ period: 202612, supplierIds: [beta], userId: staffTwoId })
+      .expect(200);
+    expect(await stamp('202610')).toBe(withRemark);
+    expect(await stamp('202612')).not.toBe(await stamp('202610'));
   });
 
   it('wants the value a write is about', async () => {

@@ -53,6 +53,17 @@ describe('readEbarimtSheet', () => {
     });
   });
 
+  it('takes «nan» in the register column for no register', async () => {
+    const sheet = await readEbarimtSheet(
+      await streamOf([
+        LINE,
+        [null, null, null, 'Нийт', 'nan', 1, 1, 2, null],
+        ['1', 'x', '2026-10-02', 'A', 'NaN', 1, 1, 2, null],
+      ]),
+    );
+    expect(sheet.rows).toHaveLength(1);
+  });
+
   it('finds the head row under a title, and skips a line without a register', async () => {
     const sheet = await readEbarimtSheet(
       await streamOf([LINE, [null, null, null, 'Нийт', null, 1, 1, 2, null]], {

@@ -445,11 +445,13 @@ describe('EbarimtPage', () => {
     });
     renderApp(PAGE, fetchMock);
     const user = userEvent.setup();
+    const mark = () =>
+      screen.queryByRole('button', { name: new RegExp(mn.ebarimtCheck.staleTitle) });
     await screen.findByRole('link', { name: 'Альфа' });
     await waitFor(() =>
       expect(calls(fetchMock, 'GET', '/api/v1/ebarimt-check/version').length).toBe(1),
     );
-    expect(screen.queryByText(mn.ebarimtCheck.staleTitle)).toBeNull();
+    expect(mark()).toBeNull();
     const reads = calls(fetchMock, 'GET', '/api/v1/ebarimt-check/report').length;
 
     // The poll is newer than the rows; a stamp read in the same instant counts as well.
@@ -459,11 +461,11 @@ describe('EbarimtPage', () => {
       focusManager.setFocused(false);
       focusManager.setFocused(true);
     });
-    expect(await screen.findByText(mn.ebarimtCheck.staleTitle)).toBeInTheDocument();
+    await waitFor(() => expect(mark()).toBeInTheDocument());
     expect(calls(fetchMock, 'GET', '/api/v1/ebarimt-check/report')).toHaveLength(reads);
 
-    await user.click(screen.getByRole('button', { name: mn.ebarimtCheck.staleReload }));
-    await waitFor(() => expect(screen.queryByText(mn.ebarimtCheck.staleTitle)).toBeNull());
+    await user.click(mark() as HTMLElement);
+    await waitFor(() => expect(mark()).toBeNull());
     expect(calls(fetchMock, 'GET', '/api/v1/ebarimt-check/report').length).toBeGreaterThan(reads);
     focusManager.setFocused(undefined);
   });
@@ -494,6 +496,21 @@ describe('EbarimtPage', () => {
       }),
     );
     expect(await screen.findByText(mn.ebarimtCheck.emptySearch)).toBeInTheDocument();
+  });
+
+  it('says a cell left with changes was not saved, and saves nothing', async () => {
+    const fetchMock = signedIn(ADMIN_ME, REPORT_ROUTES);
+    const { router } = renderApp(PAGE, fetchMock);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Альфа: НӨАТ чөлөөлөгдөх дүн/ }));
+    await user.type(screen.getByRole('textbox', { name: 'Альфа: НӨАТ чөлөөлөгдөх дүн' }), '25');
+    await act(async () => {
+      await router.navigate('/finance/customers');
+    });
+    expect(
+      await screen.findByText(/Альфа: НӨАТ чөлөөлөгдөх дүн: хадгалагдаагүй/),
+    ).toBeInTheDocument();
+    expect(calls(fetchMock, 'PUT', '/api/v1/ebarimt-check/month-values')).toHaveLength(0);
   });
 
   it('marks a purchase still waiting for its price check', async () => {

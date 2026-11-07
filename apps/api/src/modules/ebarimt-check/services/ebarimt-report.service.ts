@@ -534,28 +534,31 @@ export class EbarimtReportService {
    */
   async version(periods: readonly number[]): Promise<string> {
     const list = [...periods];
+    const last = Math.max(...list);
     const monthValues = ebarimtCheckMonthValues;
     const profiles = ebarimtCheckSupplierProfiles;
     const assignments = ebarimtCheckAssignments;
     const links = ebarimtCheckReceiptLinks;
     const files = ebarimtCheckFiles;
     const accounts = ebarimtCheckAccounts;
+    // A sum, not the latest: a slow save stamped before a quick one commits after it, and moves no
+    // maximum. An employee chosen later does not touch the months before it.
     const result = await this.db.execute<{ stamp: string }>(sql`
       SELECT concat_ws('|',
-        coalesce((SELECT max(${monthValues.updatedAt}) FROM ${monthValues}
-                  WHERE ${inArray(monthValues.period, list)})::text, ''),
-        coalesce((SELECT max(${profiles.updatedAt}) FROM ${profiles})::text, ''),
-        coalesce((SELECT max(${assignments.updatedAt}) FROM ${assignments})::text, ''),
-        coalesce((SELECT max(${links.createdAt}) FROM ${links}
-                  WHERE ${inArray(links.period, list)})::text, ''),
-        coalesce((SELECT max(${links.removedAt}) FROM ${links}
-                  WHERE ${inArray(links.period, list)})::text, ''),
-        coalesce((SELECT max(${files.uploadedAt}) FROM ${files}
-                  WHERE ${inArray(files.period, list)})::text, ''),
-        coalesce((SELECT max(${files.closedAt}) FROM ${files}
-                  WHERE ${inArray(files.period, list)})::text, ''),
-        coalesce((SELECT string_agg(${accounts.accountCode}, ',' ORDER BY ${accounts.accountCode})
-                  FROM ${accounts}), '')
+        (SELECT count(*) || ':' || coalesce(sum(extract(epoch FROM ${monthValues.updatedAt})), 0)
+           FROM ${monthValues} WHERE ${inArray(monthValues.period, list)}),
+        (SELECT count(*) || ':' || coalesce(sum(extract(epoch FROM ${profiles.updatedAt})), 0)
+           FROM ${profiles}),
+        (SELECT count(*) || ':' || coalesce(sum(extract(epoch FROM ${assignments.updatedAt})), 0)
+           FROM ${assignments} WHERE ${lte(assignments.period, last)}),
+        (SELECT count(*) || ':' || coalesce(sum(extract(epoch FROM ${links.createdAt})), 0)
+                || ':' || coalesce(sum(extract(epoch FROM ${links.removedAt})), 0)
+           FROM ${links} WHERE ${inArray(links.period, list)}),
+        (SELECT count(*) || ':' || coalesce(sum(extract(epoch FROM ${files.uploadedAt})), 0)
+                || ':' || coalesce(sum(extract(epoch FROM ${files.closedAt})), 0)
+           FROM ${files} WHERE ${inArray(files.period, list)}),
+        (SELECT coalesce(string_agg(${accounts.accountCode}, ',' ORDER BY ${accounts.accountCode}), '')
+           FROM ${accounts})
       ) AS stamp`);
     return result.rows[0]?.stamp ?? '';
   }

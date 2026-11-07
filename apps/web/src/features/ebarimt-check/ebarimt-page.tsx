@@ -55,7 +55,6 @@ import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { SelectionBar } from '@/components/selection-bar';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -756,6 +755,18 @@ export function EbarimtPage() {
             <ChevronRight />
           </Button>
         </div>
+        {othersChanged ? (
+          <Button
+            size="sm"
+            variant="outline"
+            aria-label={`${t('ebarimtCheck.staleTitle')} ${t('ebarimtCheck.staleReload')}`}
+            title={t('ebarimtCheck.staleTitle')}
+            onClick={refresh}
+          >
+            <TriangleAlert className="text-warning" />
+            {t('ebarimtCheck.staleReload')}
+          </Button>
+        ) : null}
         {noFile.length > 0 ? (
           <NoFileMark
             long={
@@ -852,34 +863,6 @@ export function EbarimtPage() {
         </div>
       </FilterBar>
 
-      {refusals.map((refusal) => (
-        <div key={refusal.key} role="alert" className="mb-3 flex items-start gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="mb-1 text-[0.8125rem] font-medium text-destructive">{refusal.label}</p>
-            <ProblemAlert problem={refusal.problem} />
-          </div>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            aria-label={t('ebarimtCheck.cells.refusedDismiss', { label: refusal.label })}
-            title={t('ebarimtCheck.cells.refusedDismiss', { label: refusal.label })}
-            onClick={() => setRefusals((list) => list.filter((entry) => entry.key !== refusal.key))}
-          >
-            <X />
-          </Button>
-        </div>
-      ))}
-      {othersChanged ? (
-        <Alert className="mb-3 border-transparent bg-warning-soft shadow-none!">
-          <TriangleAlert aria-hidden />
-          <AlertTitle>{t('ebarimtCheck.staleTitle')}</AlertTitle>
-          <AlertDescription>
-            <Button size="sm" variant="outline" onClick={refresh}>
-              {t('ebarimtCheck.staleReload')}
-            </Button>
-          </AlertDescription>
-        </Alert>
-      ) : null}
       <ProblemAlert problem={problemFromError(overview.error)} onRetry={overview.refetch} />
       <ProblemAlert problem={problemFromError(report.error)} onRetry={report.refetch} />
 
@@ -992,7 +975,7 @@ export function EbarimtPage() {
                   data-supplier={row.supplierId}
                   className={cn(
                     'group/row',
-                    ticked.has(row.supplierId) && 'bg-secondary hover:bg-secondary',
+                    canTick && ticked.has(row.supplierId) && 'bg-secondary hover:bg-secondary',
                   )}
                 >
                   <TableCell className="text-center text-xs text-muted-foreground">
@@ -1270,6 +1253,36 @@ export function EbarimtPage() {
             {t('ebarimtCheck.bulk.choose')}
           </Button>
         </SelectionBar>
+      ) : null}
+
+      {refusals.length > 0 ? (
+        <div className="fixed right-4 bottom-4 z-30 flex w-[min(28rem,calc(100%-2rem))] flex-col gap-2">
+          {refusals.map((refusal) => (
+            <div
+              key={refusal.key}
+              role="alert"
+              className="flex items-start gap-2 rounded-xl bg-card p-3 shadow-card ring-1 ring-black/[0.06]"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="mb-1 text-[0.8125rem] font-medium text-destructive">
+                  {refusal.label}
+                </p>
+                <ProblemAlert problem={refusal.problem} />
+              </div>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label={t('ebarimtCheck.cells.refusedDismiss', { label: refusal.label })}
+                title={t('ebarimtCheck.cells.refusedDismiss', { label: refusal.label })}
+                onClick={() =>
+                  setRefusals((list) => list.filter((entry) => entry.key !== refusal.key))
+                }
+              >
+                <X />
+              </Button>
+            </div>
+          ))}
+        </div>
       ) : null}
 
       {filesOpen ? <FilesDialog year={year} onClose={() => setFilesOpen(false)} /> : null}

@@ -320,6 +320,9 @@ function useFittedHeight(
     const observer =
       typeof ResizeObserver === 'undefined' || !main ? null : new ResizeObserver(measure);
     if (observer && main) observer.observe(main);
+    // The page's frame too: `main` keeps the window's height when what follows the card goes away.
+    const frame = main?.firstElementChild;
+    if (observer && frame) observer.observe(frame);
     return () => {
       window.removeEventListener('resize', measure);
       observer?.disconnect();

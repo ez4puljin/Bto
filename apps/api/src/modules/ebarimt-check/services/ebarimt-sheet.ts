@@ -197,8 +197,11 @@ export async function readEbarimtSheet(body: Readable): Promise<EbarimtSheet> {
     if (isUnreadable(ttdCell)) {
       throw new AppError('EBARIMT_FILE_ROW', `row ${rowNo} cannot be read`, { row: rowNo });
     }
-    const ttd = normalizeTaxId(cellText(ttdCell));
-    if (ttd === '' || ttd.toLowerCase() === 'nan') return;
+    // A total or an empty line: no register, or a spreadsheet's word for none.
+    const written = cellText(ttdCell).trim();
+    if (written.toLowerCase() === 'nan') return;
+    const ttd = normalizeTaxId(written);
+    if (ttd === '') return;
     if (rows.length >= EBARIMT_LIMITS.maxRows) {
       throw new AppError('EBARIMT_FILE_LIMIT', 'too many rows', { max: EBARIMT_LIMITS.maxRows });
     }
