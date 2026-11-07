@@ -64,12 +64,27 @@ const call = async (method, path, body, extra = {}) => {
 const counts = new Map();
 const count = (what, by = 1) => counts.set(what, (counts.get(what) ?? 0) + by);
 
-/** Each code's row of an old report: a code can stand on several rows, the first one speaks. */
+// Who held whom: the old names, mapped in a gitignored file, since the names are real people's.
+const employeesPath = join(OLD, 'employees.json');
+const employees = existsSync(employeesPath)
+  ? JSON.parse(readFileSync(employeesPath, 'utf8'))
+  : null;
+if (!employees) count('employee map missing, employees skipped');
+
+/**
+ * Each code's row of an old report: a code can stand on several rows and the first one speaks, but
+ * its employee is the first of those rows whose name is in the map.
+ */
 const oldRows = (period) => {
   const report = JSON.parse(readFileSync(join(OLD, `report-${period}.json`), 'utf8'));
   const byCode = new Map();
-  for (const row of report.rows ?? []) if (!byCode.has(row.code)) byCode.set(row.code, row);
-  return { byCode, links: report.receipt_links ?? [] };
+  const userOf = new Map();
+  for (const row of report.rows ?? []) {
+    if (!byCode.has(row.code)) byCode.set(row.code, row);
+    const userId = employees?.[row.employee];
+    if (userId && !userOf.has(row.code)) userOf.set(row.code, userId);
+  }
+  return { byCode, userOf, links: report.receipt_links ?? [] };
 };
 const reportOf = (period) => call('GET', `/ebarimt-check/report?periods=${period}`);
 
@@ -144,15 +159,8 @@ for (const [code, row] of oldRows(LATEST).byCode) {
   if (write) await call('PUT', `/ebarimt-check/suppliers/${supplier.supplierId}/profile`, body);
 }
 
-// Who held whom: the old names, mapped in a gitignored file, since the names are real people's.
-const employeesPath = join(OLD, 'employees.json');
-const employees = existsSync(employeesPath)
-  ? JSON.parse(readFileSync(employeesPath, 'utf8'))
-  : null;
-if (!employees) count('employee map missing, employees skipped');
-
 for (const period of PERIODS) {
-  const { byCode, links } = oldRows(period);
+  const { byCode, userOf, links } = oldRows(period);
   const now = await reportOf(period);
   const nowRows = new Map(now.rows.map((row) => [row.code, row]));
   const held = new Map();
@@ -179,7 +187,7 @@ for (const period of PERIODS) {
         });
       }
     }
-    const userId = employees?.[row.employee];
+    const userId = userOf.get(code);
     if (userId && supplier.employeeUserId !== userId) {
       held.set(userId, [...(held.get(userId) ?? []), supplier.supplierId]);
     }
