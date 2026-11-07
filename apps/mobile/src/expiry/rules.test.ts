@@ -8,12 +8,14 @@ import {
   daysLeftOf,
   daysWords,
   displayDate,
+  duplicateChoiceOf,
   EMPTY_EXPIRY_FORM,
   EXPIRY_CHIPS,
   type ExpiryForm,
   type ExpiryStanding,
   formOf,
   hasProblems,
+  isAwaitingRows,
   movesOf,
   patchOf,
   problemsOfEdit,
@@ -59,6 +61,24 @@ describe('the chips', () => {
   it('takes each chip’s count from the summary', () => {
     const counts = { active: 5, expired: 1, urgent: 2, soon: 3, archived: 4 };
     expect(EXPIRY_CHIPS.map((chip) => chipCount(counts, chip))).toEqual([5, 1, 2, 3, 4]);
+  });
+});
+
+describe('an empty list', () => {
+  const answered = { isLoading: false, isPlaceholderData: false };
+
+  it('waits on its first read and on an earlier empty answer kept in its place', () => {
+    expect(isAwaitingRows({ isLoading: true, isPlaceholderData: false }, 0)).toBe(true);
+    expect(isAwaitingRows({ isLoading: false, isPlaceholderData: true }, 0)).toBe(true);
+  });
+
+  it('says it is empty once its own answer came', () => {
+    expect(isAwaitingRows(answered, 0)).toBe(false);
+  });
+
+  it('never waits while there are rows to show, even kept ones', () => {
+    expect(isAwaitingRows({ isLoading: false, isPlaceholderData: true }, 3)).toBe(false);
+    expect(isAwaitingRows(answered, 3)).toBe(false);
   });
 });
 
@@ -129,6 +149,30 @@ describe('a new record', () => {
       note: 'тавиур 3',
       allowDuplicate: true,
     });
+  });
+});
+
+describe('the yes to a duplicate', () => {
+  const given = duplicateChoiceOf(7, form({ warehouse: '3' }));
+
+  it('stands while the product, the date and the counts as sent stand', () => {
+    expect(duplicateChoiceOf(7, form({ warehouse: '3' }))).toBe(given);
+    expect(duplicateChoiceOf(7, form({ floor: '012', warehouse: '03' }))).toBe(given);
+  });
+
+  it('stands when only the note changes', () => {
+    expect(duplicateChoiceOf(7, form({ warehouse: '3', note: 'тавиур 3' }))).toBe(given);
+  });
+
+  it('ends when the product, the date or a count changes', () => {
+    expect(duplicateChoiceOf(8, form({ warehouse: '3' }))).not.toBe(given);
+    expect(duplicateChoiceOf(7, form({ warehouse: '3', date: '2027-02-01' }))).not.toBe(given);
+    expect(duplicateChoiceOf(7, form({ warehouse: '3', floor: '13' }))).not.toBe(given);
+    expect(duplicateChoiceOf(7, form({ warehouse: '4' }))).not.toBe(given);
+  });
+
+  it('does not take one side’s count for the other’s', () => {
+    expect(duplicateChoiceOf(7, form({ floor: '3', warehouse: '12' }))).not.toBe(given);
   });
 });
 

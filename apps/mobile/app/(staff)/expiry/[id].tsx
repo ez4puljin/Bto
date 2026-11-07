@@ -283,10 +283,14 @@ function RecordBody({
         <View>
           <SectionHeader style={styles.head}>{t('mobile.expiry.record.liability')}</SectionHeader>
           <Group>
-            <Row
-              title={t(`expiry.liabilityType.${item.liability.type}`)}
-              subtitle={[liable, item.liability.note].filter(Boolean).join(' · ') || null}
-            />
+            {/* No line limit: this is the only place on the phone to read who is liable. */}
+            <View style={styles.liability}>
+              <Text style={type.row}>{t(`expiry.liabilityType.${item.liability.type}`)}</Text>
+              {liable ? <Text style={type.secondary}>{liable}</Text> : null}
+              {item.liability.note ? (
+                <Text style={type.secondary}>{item.liability.note}</Text>
+              ) : null}
+            </View>
           </Group>
           <Text style={[type.secondary, styles.hint]}>
             {t('mobile.expiry.record.liabilityHint')}
@@ -415,6 +419,14 @@ const styles = StyleSheet.create({
   head: { marginTop: spacing.xs },
   hint: { marginTop: spacing.sm, marginHorizontal: spacing.xs },
   manage: { gap: spacing.sm },
+  // A group's row in size, without its two-line limit.
+  liability: {
+    minHeight: 48,
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: spacing.lg,
+    gap: 1,
+  },
   loading: { marginTop: spacing.md },
   historyProblem: { marginTop: 0 },
   change: { paddingVertical: 10, paddingHorizontal: spacing.lg, gap: 2 },

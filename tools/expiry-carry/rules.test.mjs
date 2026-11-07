@@ -6,10 +6,14 @@ import {
   failureFields,
   failureText,
   findProductId,
+  idOfSku,
+  idOfSoleName,
   indexLookups,
   mapChange,
   mapRecord,
   normalizeCode,
+  normalizeName,
+  notFoundEntry,
   OLD_SYSTEM_NAME,
   oldLiableLabels,
   quantityText,
@@ -312,9 +316,9 @@ test('drops and counts a history row it cannot send, and keeps the record', () =
   }
 });
 
-test('finds a product by code as a SKU, by code as a barcode, then by each old barcode', async () => {
+test('finds a product by code as a SKU, as a barcode, by each old barcode, then by name', async () => {
   const asked = [];
-  const finders = (skus, barcodes) => ({
+  const finders = (skus, barcodes, names = {}) => ({
     bySku: async (code) => {
       asked.push(`sku ${code}`);
       return skus[code] ?? null;
@@ -323,8 +327,23 @@ test('finds a product by code as a SKU, by code as a barcode, then by each old b
       asked.push(`barcode ${code}`);
       return barcodes[code] ?? null;
     },
+    byName: async (name) => {
+      asked.push(`name ${name}`);
+      return names[name] ?? null;
+    },
   });
-  const row = oldRow({ product_code: '100200.0', product_barcode: '111,222' });
+  const row = oldRow({
+    product_code: '100200.0',
+    product_barcode: '111,222',
+    product_name: '  Жишээ   Бараа ',
+  });
+  const everyStep = [
+    'sku 100200',
+    'barcode 100200',
+    'barcode 111',
+    'barcode 222',
+    'name жишээ бараа',
+  ];
 
   assert.equal(await findProductId(row, finders({ 100200: 5 }, { 100200: 6, 111: 7 })), 5);
   assert.deepEqual(asked, ['sku 100200']);
@@ -335,16 +354,66 @@ test('finds a product by code as a SKU, by code as a barcode, then by each old b
 
   asked.length = 0;
   assert.equal(await findProductId(row, finders({}, { 222: 8 })), 8);
-  assert.deepEqual(asked, ['sku 100200', 'barcode 100200', 'barcode 111', 'barcode 222']);
+  assert.deepEqual(asked, everyStep.slice(0, 4));
+
+  asked.length = 0;
+  assert.equal(await findProductId(row, finders({}, {}, { 'жишээ бараа': 9 })), 9);
+  assert.deepEqual(asked, everyStep);
 
   asked.length = 0;
   assert.equal(await findProductId(row, finders({}, {})), null);
-  assert.equal(asked.length, 4);
+  assert.deepEqual(asked, everyStep);
 
   asked.length = 0;
-  const nothing = oldRow({ product_code: '', product_barcode: '' });
+  const nothing = oldRow({ product_code: '', product_barcode: '', product_name: '  ' });
   assert.equal(await findProductId(nothing, finders({}, {})), null);
   assert.deepEqual(asked, []);
+
+  asked.length = 0;
+  const onlyName = oldRow({ product_code: '', product_barcode: '' });
+  assert.equal(await findProductId(onlyName, finders({}, {}, { 'жишээ бараа': 9 })), 9);
+  assert.deepEqual(asked, ['name жишээ бараа']);
+});
+
+test('takes the exact SKU from the list, an inactive product too, and never a prefix', () => {
+  const rows = [
+    { id: 1, sku: '1002001', name: 'Өөр бараа', status: 'ACTIVE' },
+    { id: 2, sku: '100200', name: 'Жишээ бараа', status: 'INACTIVE' },
+  ];
+  assert.equal(idOfSku('100200', rows), 2);
+  assert.equal(idOfSku('10020', rows), null);
+  assert.equal(idOfSku('100200', []), null);
+});
+
+test('compares names after trimming, lower-casing and collapsing spaces', () => {
+  assert.equal(normalizeName('  Жишээ   БАРАА\t1л '), 'жишээ бараа 1л');
+  assert.equal(normalizeName(`Ab${String.fromCharCode(0xa0)}Cd`), 'ab cd');
+  for (const empty of ['', '   ', null, undefined, 5]) assert.equal(normalizeName(empty), '');
+});
+
+test('takes a name only when exactly one product has it', () => {
+  const name = normalizeName('Жишээ бараа');
+  const same = { id: 1, sku: '900', name: ' ЖИШЭЭ  бараа ', status: 'INACTIVE' };
+  const longer = { id: 2, sku: '901', name: 'Жишээ бараа 1л', status: 'ACTIVE' };
+  const twin = { id: 3, sku: '902', name: 'жишээ бараа', status: 'ACTIVE' };
+
+  assert.equal(idOfSoleName(name, [longer, same]), 1);
+  assert.equal(idOfSoleName(name, [same, longer, twin]), null);
+  assert.equal(idOfSoleName(name, [longer]), null);
+  assert.equal(idOfSoleName(name, []), null);
+});
+
+test('a row left unfound is listed by old id, code and status, and never by name', () => {
+  const entry = notFoundEntry(
+    oldRow({ id: 41, product_code: '100200.0', status: 'archived', notes: 'Жишээ тэмдэглэл' }),
+  );
+  assert.deepEqual(entry, { oldId: 41, oldCode: '100200', oldStatus: 'archived' });
+  assert.equal(JSON.stringify(entry).includes('Жишээ'), false);
+  assert.deepEqual(notFoundEntry(oldRow({ id: 42, product_code: null, status: 'review' })), {
+    oldId: 42,
+    oldCode: '',
+    oldStatus: 'review',
+  });
 });
 
 test('asks once per code, remembers «not found», and asks again after a failure', async () => {

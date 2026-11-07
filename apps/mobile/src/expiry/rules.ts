@@ -204,6 +204,28 @@ export function createBodyOf(
   };
 }
 
+/**
+ * What «Шинээр нэмэх» said yes to: the product, the date and the counts as they are sent. The yes
+ * stands while these do, so a retry after a lost answer sends the body its key already holds and the
+ * server replays the record instead of asking again (ADR-0172 #5); the note is free to change.
+ */
+export function duplicateChoiceOf(productId: number, form: ExpiryForm): string {
+  const { expiryDate, qtyFloor, qtyWarehouse } = createBodyOf(productId, form, false);
+  return [productId, expiryDate, qtyFloor, qtyWarehouse].join(' ');
+}
+
+/**
+ * Whether an empty list is still waiting for its answer: its first read, or an earlier empty answer
+ * kept in its place while the next chip's or search's read runs. Until then a screen must not say
+ * there is nothing.
+ */
+export function isAwaitingRows(
+  query: { isLoading: boolean; isPlaceholderData: boolean },
+  rows: number,
+): boolean {
+  return rows === 0 && (query.isLoading || query.isPlaceholderData);
+}
+
 /** What a record holds of the correctable fields. */
 export interface ExpiryStanding {
   expiryDate: string;

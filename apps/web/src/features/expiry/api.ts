@@ -20,7 +20,7 @@ export type ExpiryChange = Schemas['ExpiryChangeDto'];
 export type ExpiryRole = Schemas['ExpiryRoleDto'];
 export type ExpiryPerson = Schemas['ExpiryPersonDto'];
 export type ExpiryLiability = Schemas['ExpiryLiabilityDto'];
-type CreateBody = Schemas['ExpiryCreateRequestDto'];
+export type ExpiryCreateBody = Schemas['ExpiryCreateRequestDto'];
 type PatchBody = Schemas['ExpiryPatchRequestDto'];
 type LiabilityBody = Schemas['ExpiryLiabilityRequestDto'];
 
@@ -66,6 +66,24 @@ export function useExpiryFilters(view: ExpiryView) {
       unwrap(await api.GET('/api/v1/expiry/filters', { params: { query: { view } }, signal })),
     placeholderData: keepPreviousData,
   });
+}
+
+/**
+ * A supplier's or a warehouse's name out of any view's choices read so far: the view on screen need
+ * not hold the filter that is on, and the filter in the address is only an id.
+ */
+export function useExpiryFilterName() {
+  const queryClient = useQueryClient();
+  return (kind: 'suppliers' | 'warehouses', id: number): string | undefined => {
+    const views = queryClient.getQueriesData<Schemas['ExpiryFiltersDto']>({
+      queryKey: KEYS.filters,
+    });
+    for (const [, options] of views) {
+      const found = options?.[kind].find((option) => option.id === id);
+      if (found) return found.name;
+    }
+    return undefined;
+  };
 }
 
 export function useExpiryItems(filter: ExpiryFilter) {
@@ -202,7 +220,7 @@ export function useExpiryMutations() {
 
   return {
     create: useMutation({
-      mutationFn: async (input: { key: string; body: CreateBody }) =>
+      mutationFn: async (input: { key: string; body: ExpiryCreateBody }) =>
         unwrap(
           await api.POST('/api/v1/expiry/items', {
             params: { header: idempotencyKey(input.key) },

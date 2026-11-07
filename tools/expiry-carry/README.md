@@ -77,7 +77,7 @@ From the checkout that holds `tmp/` (a worktree has none), with the API running:
 node tools/expiry-carry/carry.mjs
 ```
 
-That signs in and looks up every product, posts nothing, and prints how many rows it would send.
+That signs in and looks up every product, posts nothing, and prints how many rows it would send. It does write `not-found.json` (below), so this run already shows which records would stay behind.
 
 ```bash
 node tools/expiry-carry/carry.mjs --write
@@ -94,7 +94,9 @@ That posts each record, one at a time, with a fresh `Idempotency-Key`.
 
 `CARRY_PASSWORD` overrides the logins file. The tool signs in again when its 15-minute token runs out and never prints a password or a token.
 
-**What it prints:** a progress line every 100 rows and a summary of counts: rows read, `CREATED`, `UPDATED`, `UNCHANGED`, `KEPT`, products not found, rows left out and why, liability rows, truncated notes. It prints no names, product names, quantities or notes, so its output can be pasted. A failed row is the one exception to counts: up to 20 lines name the old record's id, the HTTP status, the problem's code and the refused fields, and never a value. It goes on past a failed row and exits with code 1 if any failed.
+**What it prints:** a progress line every 100 rows and a summary of counts: rows read, `CREATED`, `UPDATED`, `UNCHANGED`, `KEPT`, rows found by name, products not found, rows left out and why, liability rows, truncated notes. It prints no names, product names, quantities or notes, so its output can be pasted. A failed row is the one exception to counts: up to 20 lines name the old record's id, the HTTP status, the problem's code and the refused fields, and never a value. It goes on past a failed row and exits with code 1 if any failed.
+
+**What it writes:** when rows stay unfound, `not-found.json` in the `--old` folder, and the summary says so. It is an array of `{ oldId, oldCode, oldStatus }`, one per row, with no names, and it is never printed. Those rows are not carried, so go through the file before the old page stops: give each product a code or barcode the row knows, then run again. Keep `--old` under `tmp/`, where this file and the dump are gitignored. A run that finds every product removes the file.
 
 ## Running it again
 
@@ -118,4 +120,11 @@ Running it again is safe, and that is the plan. The route is idempotent on the o
 - **Liability:** old roles and people have no sure Bto match, so no ids are sent. On a `specific` row their labels and names are appended to the liability note as «Хуучин: …», as the old page showed them. The old lookups leave out admin and inactive staff, so such a role shows its slug and such a person `#id`.
 - **Long text:** a note over 1000 characters or a liability note over 500 is truncated and counted.
 
-**Finding the product:** the old code, with a trailing `.0` stripped, as a SKU through `GET /products/lookup`; then the old code through `GET /barcodes/:code`; then each comma-separated old barcode. Each code is asked once a run. An ambiguous barcode (409) counts as not found. `lookup` answers active products only, so an inactive product with no current barcode counts as not found although the register could hold it. A row whose product is not found is not sent; a later run picks it up if the product appears.
+**Finding the product,** an inactive one too, since the register can hold it:
+
+1. The old code, with a trailing `.0` stripped, as an exact SKU through `GET /products?q=<code>&limit=30`.
+2. The old code through `GET /barcodes/:code`.
+3. Each comma-separated old barcode the same way.
+4. Last, the old name, for a product recoded in Bto whose old barcode is gone: every page of `GET /products?q=<name>`, compared after trimming, lower-casing and collapsing spaces, and taken only when exactly one product has that name. A name over the search's 100 characters is not tried.
+
+Each code and name is asked once a run. An ambiguous barcode (409) counts as not found. A row whose product is not found is not sent and goes in `not-found.json`; a later run picks it up if the product appears.

@@ -10,9 +10,9 @@ import {
   Plus,
   Printer,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useSearchParams } from 'react-router';
+import { Link, NavigationType, useNavigationType, useSearchParams } from 'react-router';
 import { ColumnChooser } from '@/components/column-chooser';
 import {
   ButtonRow,
@@ -37,10 +37,12 @@ import { hrefWithParam, useSetParam } from '@/lib/search-params';
 import { useCreateParam } from '@/lib/use-create-param';
 import { useDebounced } from '@/lib/use-debounced';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
+import { useMediaQuery } from '@/lib/use-media-query';
 import { cn } from '@/lib/utils';
 import {
   type ExpiryItem,
   type ExpirySummary,
+  useExpiryFilterName,
   useExpiryFilters,
   useExpiryItems,
   useExpirySummary,
@@ -51,6 +53,8 @@ import {
   EXPIRY_COLUMN_KEYS,
   EXPIRY_COLUMN_SPECS,
   type ExpiryColumnKey,
+  FULL_DEFAULT_HIDDEN_EXPIRY_COLUMNS,
+  FULL_SCREEN,
   isNumericColumn,
   LOCKED_EXPIRY_COLUMNS,
   WIDE_DEFAULT_HIDDEN_EXPIRY_COLUMNS,
@@ -63,6 +67,7 @@ import {
 } from './expiry-filter-panel';
 import { ExpiryRecordPanel } from './expiry-record-panel';
 import {
+  type ExpiryFilterOptions,
   expiryPrintHref,
   expiryRecordParams,
   isNarrowed,
@@ -70,6 +75,7 @@ import {
   positiveId,
   URGENCY_ROW,
   viewCount,
+  withChosenFilters,
 } from './helpers';
 import { DaysLeft, ExpiryStatusBadge, LiabilityBadge } from './parts';
 
@@ -77,6 +83,7 @@ import { DaysLeft, ExpiryStatusBadge, LiabilityBadge } from './parts';
 const COLUMNS_LIST = 'inventory.expiry';
 /** The search box's wait before it asks the server, as on the old page. */
 const SEARCH_WAIT_MS = 300;
+const NO_FILTER_OPTIONS: ExpiryFilterOptions = { suppliers: [], warehouses: [], creators: [] };
 
 /**
  * «Хугацааны хяналт» (ADR-0172 #8): the register of what expires, for every signed-in person. The
@@ -87,8 +94,14 @@ export function ExpiryPage() {
   const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
   const setParam = useSetParam();
+  const navigation = useNavigationType();
   const filter = parseExpiryFilter(params);
   const [search, setSearch] = useState(filter.q);
+  // The menu's own link carries no search, and Back brings an earlier one: the box follows. Its own
+  // typing replaces the address, so it never follows itself and no key is lost to a slow address.
+  useEffect(() => {
+    if (navigation !== NavigationType.Replace) setSearch(filter.q);
+  }, [navigation, filter.q]);
   const q = useDebounced(filter.q, SEARCH_WAIT_MS);
   const summary = useExpirySummary();
   const options = useExpiryFilters(filter.view);
@@ -98,12 +111,13 @@ export function ExpiryPage() {
   const itemId = positiveId(params.get('item'));
   const today = summary.data?.today;
 
+  const fullScreen = useMediaQuery(FULL_SCREEN);
   const columnState = useHiddenColumns(
     COLUMNS_LIST,
     EXPIRY_COLUMN_KEYS,
     LOCKED_EXPIRY_COLUMNS,
     DEFAULT_HIDDEN_EXPIRY_COLUMNS,
-    WIDE_DEFAULT_HIDDEN_EXPIRY_COLUMNS,
+    fullScreen ? FULL_DEFAULT_HIDDEN_EXPIRY_COLUMNS : WIDE_DEFAULT_HIDDEN_EXPIRY_COLUMNS,
   );
   const { hidden } = columnState;
   const columns = useMemo(() => EXPIRY_COLUMN_KEYS.filter((key) => !hidden.has(key)), [hidden]);
@@ -120,14 +134,20 @@ export function ExpiryPage() {
   };
   const change: SetExpiryFilter = (param, value) => setParam(param, value);
   const setView = (view: ExpiryView) => setParam('view', view === 'ACTIVE' ? '' : view);
-  const filterOptions = options.data ?? { suppliers: [], warehouses: [], creators: [] };
+  const filterName = useExpiryFilterName();
+  const filterOptions = options.data
+    ? withChosenFilters(
+        options.data,
+        filter,
+        (kind, id) => filterName(kind, id) ?? t('expiry.filters.chosen', { id }),
+      )
+    : NO_FILTER_OPTIONS;
   const failed = [items, summary, options].find((read) => read.error);
 
   return (
     <div>
       <PageHeader
         title={t('expiry.title')}
-        description={t('expiry.description')}
         meta={countLine(t, summary.data, filter.view, narrowed, rows.length, items.hasNextPage)}
         actions={
           <>
@@ -221,7 +241,8 @@ export function ExpiryPage() {
                 ))}
               </TableBody>
             </ListTable>
-            {!items.isPending && rows.length === 0 ? (
+            {/* A failed read says so above, and says nothing about what is there. */}
+            {!items.isPending && !items.isError && rows.length === 0 ? (
               <EmptyState
                 icon={CalendarX2}
                 title={t('expiry.empty')}
@@ -397,7 +418,7 @@ function ExpiryCell(props: { column: ExpiryColumnKey; item: ExpiryItem; href: st
       return <TableCell className="font-mono text-[0.8125rem]">{item.expiryDate}</TableCell>;
     case 'daysLeft':
       return (
-        <TableCell className="text-[0.8125rem]">
+        <TableCell className="text-[0.8125rem] leading-snug whitespace-normal">
           <DaysLeft daysLeft={item.daysLeft} urgency={item.urgency} />
         </TableCell>
       );

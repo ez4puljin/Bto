@@ -81703,6 +81703,7 @@
           "SELF_EDIT_FORBIDDEN",
           "ROLE_SYSTEM_READONLY",
           "ROLE_IN_USE",
+          "ROLE_NAMED_ON_RECORDS",
           "WAREHOUSE_KIND_NOT_ALLOWED",
           "SETTING_NOT_EDITABLE",
           "SETTING_MISSING",

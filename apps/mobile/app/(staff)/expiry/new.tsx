@@ -14,24 +14,26 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  type ExpiryCreate,
   useBaseUnitFractional,
   useCreateExpiryItem,
   useExpirySummary,
   useOpenExpiryItems,
-  useProductLookup,
+  useProductSearch,
 } from '../../../src/api/expiry';
 import { type AppProblem, problemFrom } from '../../../src/api/problem';
 import { useBarcodeLookup } from '../../../src/api/transfers';
+import { StatusPill } from '../../../src/community/parts';
 import { ExpiryFields, ExpiryRecordRow, HeaderSearch } from '../../../src/expiry/parts';
 import {
   type ChosenProduct,
   chosenFromBarcode,
   chosenFromLookup,
   createBodyOf,
+  duplicateChoiceOf,
   EMPTY_EXPIRY_FORM,
   type ExpiryForm,
   hasProblems,
+  isAwaitingRows,
   problemsOfNew,
 } from '../../../src/expiry/rules';
 import { useDebounced } from '../../../src/state/use-debounced';
@@ -75,10 +77,13 @@ export default function NewExpiryRecordScreen() {
   const [key, setKey] = useState(() => Crypto.randomUUID());
   const [saving, setSaving] = useState<After | null>(null);
   const [existing, setExisting] = useState<{ itemId: number; after: After } | null>(null);
+  // What «Шинээр нэмэх» said yes to, kept until the save succeeds (`duplicateChoiceOf`).
+  const [duplicateChoice, setDuplicateChoice] = useState<string | null>(null);
   const [problem, setProblem] = useState<AppProblem | null>(null);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
 
-  const results = useProductLookup(product ? '' : q);
+  const results = useProductSearch(product ? '' : q);
+  const found = results.data ?? [];
   const open = useOpenExpiryItems(product?.id ?? null);
   const fractional = useBaseUnitFractional(product?.id ?? null);
   const problems = problemsOfNew(form, today, fractional);
@@ -109,27 +114,32 @@ export default function NewExpiryRecordScreen() {
    * The form's key until it succeeds. A key the server says it saw with another body means an
    * earlier save did land although its answer never came, and the person has changed something
    * since: that needs a key of its own, and the server then tells of the record it already holds.
+   * A yes to a duplicate never goes with it: it was given before that record was known.
    */
-  const post = async (body: ExpiryCreate) => {
+  const post = async (productId: number, allowDuplicate: boolean) => {
     try {
-      await create.mutateAsync({ key, body });
+      await create.mutateAsync({ key, body: createBodyOf(productId, form, allowDuplicate) });
     } catch (error) {
       if (problemFrom(error).code !== 'IDEMPOTENCY_KEY_REUSED') throw error;
       const fresh = Crypto.randomUUID();
       setKey(fresh);
-      await create.mutateAsync({ key: fresh, body });
+      setDuplicateChoice(null);
+      await create.mutateAsync({ key: fresh, body: createBodyOf(productId, form, false) });
     }
   };
 
-  const save = async (after: After, allowDuplicate = false) => {
+  const save = async (after: After, addAnyway = false) => {
     if (!product) return;
     setChecked(true);
     setProblem(null);
     if (hasProblems(problems)) return;
     setSaving(after);
+    const choice = duplicateChoiceOf(product.id, form);
+    if (addAnyway) setDuplicateChoice(choice);
     try {
-      await post(createBodyOf(product.id, form, allowDuplicate));
+      await post(product.id, addAnyway || duplicateChoice === choice);
       setKey(Crypto.randomUUID());
+      setDuplicateChoice(null);
       toast.show({ message: t('mobile.expiry.new.saved') });
       if (after === 'back') {
         router.back();
@@ -279,20 +289,29 @@ export default function NewExpiryRecordScreen() {
                 onPress={() => setScanning(true)}
               />
             </>
-          ) : results.isLoading ? (
+          ) : isAwaitingRows(results, found.length) ? (
             <ActivityIndicator style={styles.loading} color={colors.primary} />
           ) : results.error ? (
             <ProblemText problem={problemFrom(results.error)} style={styles.searchProblem} />
-          ) : (results.data ?? []).length === 0 ? (
+          ) : found.length === 0 ? (
             <EmptyState title={t('mobile.expiry.new.noResults')} />
           ) : (
             <Group>
-              {(results.data ?? []).map((item) => (
+              {found.map((item) => (
                 <Row
                   key={item.id}
                   title={item.name}
                   subtitle={`${item.sku} · ${item.baseUnit.uomName}`}
                   minHeight={TOUCH + spacing.sm}
+                  right={
+                    item.status === 'INACTIVE' ? (
+                      <StatusPill
+                        label={t('catalog.products.status.INACTIVE')}
+                        background={colors.fill}
+                        color={colors.muted}
+                      />
+                    ) : null
+                  }
                   onPress={() => choose(chosenFromLookup(item))}
                 />
               ))}

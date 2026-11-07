@@ -14,7 +14,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type ExpiryItem, useExpiryItems, useExpirySummary } from '../../../src/api/expiry';
 import { problemFrom } from '../../../src/api/problem';
 import { ExpiryRecordRow, HeaderSearch } from '../../../src/expiry/parts';
-import { chipCount, EXPIRY_CHIPS, type ExpiryChip } from '../../../src/expiry/rules';
+import {
+  chipCount,
+  EXPIRY_CHIPS,
+  type ExpiryChip,
+  isAwaitingRows,
+} from '../../../src/expiry/rules';
 import { formatCount } from '../../../src/format/format';
 import { isRep } from '../../../src/state/phase';
 import { useSignedIn } from '../../../src/state/session';
@@ -54,6 +59,7 @@ export default function ExpiryHomeScreen() {
   const summary = useExpirySummary();
   const items = useExpiryItems(chip, q);
   const rows = useMemo(() => (items.data?.pages ?? []).flatMap((page) => page.data), [items.data]);
+  const awaiting = isAwaitingRows(items, rows.length);
 
   const renderItem = ({ item }: { item: ExpiryItem }) => (
     <ExpiryRecordRow item={item} onPress={() => router.push(`/expiry/${item.id}`)} />
@@ -79,6 +85,7 @@ export default function ExpiryHomeScreen() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chips}
         style={styles.chipRow}
+        keyboardShouldPersistTaps="handled"
       >
         {EXPIRY_CHIPS.map((entry) => {
           const label = t(`mobile.expiry.chips.${entry}`);
@@ -119,7 +126,7 @@ export default function ExpiryHomeScreen() {
         }}
         refreshControl={
           <RefreshControl
-            refreshing={items.isRefetching && !items.isFetchingNextPage}
+            refreshing={items.isRefetching && !items.isFetchingNextPage && !awaiting}
             onRefresh={() => {
               void summary.refetch();
               void items.refetch();
@@ -127,7 +134,7 @@ export default function ExpiryHomeScreen() {
           />
         }
         ListEmptyComponent={
-          items.isLoading ? (
+          awaiting ? (
             <ActivityIndicator style={styles.loading} color={colors.primary} />
           ) : items.error ? (
             <View style={styles.failed}>
@@ -187,7 +194,8 @@ export default function ExpiryHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  chipRow: { flexGrow: 0 },
+  // A ScrollView shrinks by default: beside a long list it lost its lower padding to the list.
+  chipRow: { flexGrow: 0, flexShrink: 0 },
   chips: { gap: spacing.sm, paddingHorizontal: 14, paddingVertical: spacing.md },
   list: { paddingHorizontal: 14 },
   separator: { height: spacing.sm },
@@ -202,7 +210,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: 14,
     paddingTop: spacing.md,
-    backgroundColor: colors.sheetBarFill,
+    // Opaque, the page's own colour: the rows pass behind it.
+    backgroundColor: colors.canvas,
   },
   action: { flex: 1, paddingHorizontal: spacing.md },
 });

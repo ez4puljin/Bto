@@ -133,6 +133,10 @@ export function ExpiryLiabilityDialog(props: { item: ExpiryItem; onClose: () => 
                   placeholder={t('expiry.liability.peopleFilter')}
                   value={filter}
                   onChange={(event) => setFilter(event.target.value)}
+                  // A search's Enter never saves the form around the box.
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') event.preventDefault();
+                  }}
                 />
                 <div className="max-h-44 overflow-y-auto rounded-lg border border-border p-2">
                   {shownPeople.length > 0 ? (

@@ -65,6 +65,37 @@ export function expiryPrintHref(filter: ExpiryFilter): string {
   return `/inventory/expiry/print?${query.toString()}`;
 }
 
+/** The filter panel's choices, taken from the records in the view (ADR-0172 #8). */
+export interface ExpiryFilterOptions {
+  suppliers: readonly { id: number; name: string }[];
+  warehouses: readonly { id: number; name: string }[];
+  creators: readonly string[];
+}
+
+/**
+ * The choices with a filter that is on kept among them: moving to a view whose records lack it
+ * leaves it on, and it shows ticked there and can be lifted there.
+ */
+export function withChosenFilters(
+  options: ExpiryFilterOptions,
+  filter: ExpiryFilter,
+  nameOf: (kind: 'suppliers' | 'warehouses', id: number) => string,
+): ExpiryFilterOptions {
+  const keep = (kind: 'suppliers' | 'warehouses', id: number | undefined) =>
+    id === undefined || options[kind].some((option) => option.id === id)
+      ? options[kind]
+      : [{ id, name: nameOf(kind, id) }, ...options[kind]];
+  const author = filter.createdByName;
+  return {
+    suppliers: keep('suppliers', filter.supplierId),
+    warehouses: keep('warehouses', filter.warehouseId),
+    creators:
+      author === undefined || options.creators.includes(author)
+        ? options.creators
+        : [author, ...options.creators],
+  };
+}
+
 /** A list address with a record's panel open: a create dialog gives way to it. */
 export function expiryRecordParams(params: URLSearchParams, id: number): URLSearchParams {
   const next = new URLSearchParams(params);
@@ -111,11 +142,17 @@ export function liabilityNames(t: TFunction, liability: ExpiryLiability): string
   ];
 }
 
-/** Who is liable in a few words: the type, or two names and how many more. */
+/**
+ * Who is liable in a few words: the type, or two names and how many more. A record carried from the
+ * old system may hold its names in the note alone (ADR-0172 #12): that one is the type's own word,
+ * and «Тогтоогоогүй» is for a record that names nobody at all, as on the old page.
+ */
 export function liabilityShort(t: TFunction, liability: ExpiryLiability): string {
   if (liability.type !== 'SPECIFIC') return t(`expiry.liabilityType.${liability.type}`);
   const names = liabilityNames(t, liability);
-  if (names.length === 0) return t('expiry.liability.unset');
+  if (names.length === 0) {
+    return liability.note ? t('expiry.liabilityType.SPECIFIC') : t('expiry.liability.unset');
+  }
   if (names.length <= SHORT_NAMES) return names.join(', ');
   return t('expiry.liability.more', {
     names: names.slice(0, SHORT_NAMES).join(', '),

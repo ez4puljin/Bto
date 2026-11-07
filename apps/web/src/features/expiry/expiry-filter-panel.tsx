@@ -9,13 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { FilterChoices, FilterOption, FilterSection } from '@/components/filter-panel';
 import { ListCard } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
-import type { ExpiryFilter } from './helpers';
-
-export interface ExpiryFilterOptions {
-  suppliers: readonly { id: number; name: string }[];
-  warehouses: readonly { id: number; name: string }[];
-  creators: readonly string[];
-}
+import type { ExpiryFilter, ExpiryFilterOptions } from './helpers';
 
 /** One way to change one filter; an empty value lifts it. */
 export type SetExpiryFilter = (

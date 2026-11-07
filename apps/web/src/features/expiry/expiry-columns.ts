@@ -41,19 +41,34 @@ export const WIDE_DEFAULT_HIDDEN_EXPIRY_COLUMNS: readonly ExpiryColumnKey[] = [
   'createdAt',
 ];
 
-/** The layout of each column (ADR-0119): a name 3, a note or a partner 2, short text 1. */
+/**
+ * Where the old page's supplier and author fit too, beside the filter panel: not yet at 1600px
+ * (about 66rem of room against the 75.5 they need), but from the root's last step (19px, index.css),
+ * which a 1920 screen is on with room to spare.
+ */
+export const FULL_SCREEN = '(min-width: 1900px)';
+export const FULL_DEFAULT_HIDDEN_EXPIRY_COLUMNS: readonly ExpiryColumnKey[] = [
+  'liability',
+  'createdAt',
+];
+
+/**
+ * The layout of each column (ADR-0119): a name 3, a note or a partner 2, short text 1. The days wrap
+ * in their cell («172 хоног / өнгөрсөн»), a row having two lines anyway; a cell of the status holds
+ * the longest pill. The sums are checked against the screens in `expiry-page.test.tsx`.
+ */
 export const EXPIRY_COLUMN_SPECS: Record<ExpiryColumnKey, ColumnSpec> = {
-  product: { key: 'product', kind: 'text', weight: 3, min: 13 },
-  supplier: { key: 'supplier', kind: 'text', weight: 2, min: 8 },
-  note: { key: 'note', kind: 'text', weight: 2, min: 9 },
+  product: { key: 'product', kind: 'text', weight: 3, min: 12 },
+  supplier: { key: 'supplier', kind: 'text', weight: 2, min: 7 },
+  note: { key: 'note', kind: 'text', weight: 2, min: 7 },
   expiryDate: { key: 'expiryDate', kind: 'date' },
-  daysLeft: { key: 'daysLeft', kind: 'status', width: 10 },
+  daysLeft: { key: 'daysLeft', kind: 'status', width: 8 },
   qtyFloor: { key: 'qtyFloor', kind: 'qty', width: 4.75 },
   qtyWarehouse: { key: 'qtyWarehouse', kind: 'qty', width: 5 },
   qtyTotal: { key: 'qtyTotal', kind: 'qty', width: 4.75 },
   status: { key: 'status', kind: 'status', width: 11.5 },
   liability: { key: 'liability', kind: 'text', weight: 2, min: 9 },
-  createdBy: { key: 'createdBy', kind: 'text', weight: 1, min: 7 },
+  createdBy: { key: 'createdBy', kind: 'text', weight: 1, min: 6 },
   createdAt: { key: 'createdAt', kind: 'datetime' },
 };
 

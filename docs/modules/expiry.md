@@ -8,7 +8,7 @@
 |---|---|---|
 | `expiry_items` | one record | `product_id` FK; `expiry_date date`; `qty_floor`, `qty_warehouse` `qty` NOT NULL DEFAULT 0, CHECK ≥ 0; `status` CHECK in `REVIEW`, `CITY_RETURN`, `INTERNAL_SALE`, `ARCHIVED`; `liability_type` CHECK in `NONE`, `SPECIFIC`, `ALL_STAFF`; `liability_note` (≤ 500, NULL when empty); `note` (≤ 1000, NULL when empty); `edit_version int` DEFAULT 1, bumped by date, quantity and note edits only; `created_at`, `created_by` FK NULL, `created_by_name` NOT NULL; `updated_at` NOT NULL, `updated_by` FK NULL (a carried row stays NULL until someone touches it in Bto); `archived_at`, `archived_by` FK NULL, `archived_by_name`; `legacy_id bigint` NULL with a partial unique index. CHECK `(status = 'ARCHIVED') = (archived_at IS NOT NULL)`. Indexes on `(expiry_date, id)`, `(status, expiry_date, id)`, `(product_id)`. `REVOKE DELETE, TRUNCATE FROM app`. |
 | `expiry_item_changes` | the quantity history | `item_id` FK; `kind` CHECK in `CREATE`, `UPDATE`; `qty_floor_old/new`, `qty_warehouse_old/new`; `changed_at`; `changed_by` FK NULL; `changed_by_name` NOT NULL; `legacy_id bigint` NULL with a partial unique index. `REVOKE UPDATE, DELETE, TRUNCATE FROM app`. |
-| `expiry_item_roles` | liable roles | `(item_id, role_id)` primary key, FK to `roles`. Replaced whole by a liability save. |
+| `expiry_item_roles` | liable roles | `(item_id, role_id)` primary key, FK to `roles` with no cascade (§7). Replaced whole by a liability save. |
 | `expiry_item_users` | liable staff | `(item_id, user_id)` primary key, FK to `users`. Replaced whole by a liability save. |
 
 Names are text on every row (ADR-0172 #12): the signed-in user's full name at the time, or the old system's username on carried rows.
@@ -60,6 +60,7 @@ What the tool must send: times with their zone (`2026-03-05T04:10:00Z`, `+08:00`
 
 - Stock never moves: this module imports nothing that posts, and its suite proves `expectReconciled` still holds.
 - A record is never deleted; a history row never changes.
+- A role a record names as liable, an archived record too, cannot be deleted: `DELETE /roles/:id` answers 409 `ROLE_NAMED_ON_RECORDS` from the foreign key's refusal. A holder of `expiry.liability.manage` takes it off each record first. The key never cascades, because that would erase who was held liable.
 - Every write is audited in its transaction.
 - A carried author's name is never turned into a Bto user.
 - Real records and names never enter the repo: the dump stays in gitignored `tmp/`.

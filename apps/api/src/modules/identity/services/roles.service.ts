@@ -14,6 +14,7 @@ import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError } from '../../../common/errors/app-error';
+import { databaseErrorOf } from '../../../common/errors/problem-details';
 import type { AuthContext } from '../auth-context';
 import {
   rolePermissionOverrides,
@@ -155,7 +156,17 @@ export class RolesService {
           userCount: assigned?.count ?? 0,
         });
       }
-      await tx.delete(roles).where(eq(roles.id, id));
+      try {
+        await tx.delete(roles).where(eq(roles.id, id));
+      } catch (error) {
+        // Holders are counted above and every other reference cascades, so what is left is an expiry
+        // record naming the role as liable (ADR-0172). Identity cannot read that table, and it must
+        // not cascade: that would erase who was held liable.
+        if (databaseErrorOf(error)?.code === '23503') {
+          throw new AppError('ROLE_NAMED_ON_RECORDS', `role ${id} is named on records`, { id });
+        }
+        throw error;
+      }
       await this.audit.record(tx, actor, {
         action: 'DELETE',
         entity: 'roles',

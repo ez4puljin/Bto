@@ -18,7 +18,10 @@ import { StoreTabBar } from '../../../src/ui/store-tab-bar';
  * store's seller (ADR-0116), «Хугацаа» (ADR-0172) and «Ирц» (ADR-0131) for everyone and «Профайл»,
  * on the flat bar without the scan button; a tab the person has no right to is hidden, and the
  * first one left opens. A rep reaches these screens from «Нүүр»: then the bar is not drawn and the
- * screens show the back arrow.
+ * screens show the back arrow. Back never passes through a tab the person has no right to (the
+ * default goes to the first route, the hidden «Бэлтгэл» with its 403): a rep's back leaves the menu
+ * and returns to where they came from; anyone else's goes to the tab they landed on, then out of
+ * the app.
  */
 export default function WorkTabsLayout() {
   const { t } = useTranslation();
@@ -37,6 +40,7 @@ export default function WorkTabsLayout() {
     );
   return (
     <Tabs
+      backBehavior={rep ? 'none' : 'initialRoute'}
       initialRouteName={picker ? 'picking' : seller ? 'transfers' : 'attendance'}
       tabBar={(props) => (rep ? null : <StoreTabBar {...props} scan={false} />)}
       screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.canvas } }}

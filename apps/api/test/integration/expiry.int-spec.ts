@@ -1013,6 +1013,44 @@ describe('expiry register', () => {
         userIds: [staffId],
       }).expect(200);
     });
+
+    it('refuses to delete a role a record names, with its own code, until it is taken off', async () => {
+      const role = (
+        await http()
+          .post('/api/v1/roles')
+          .set(bearer(admin))
+          .send({ name: 'Хариуцагч дүр', permissions: [] })
+          .expect(201)
+      ).body as { id: number };
+      const row = await record((await newProduct('Дүрийн хариуцлага')).id, addDays(today, 15));
+      await setLiability(row.id, { type: 'SPECIFIC', roleIds: [role.id], userIds: [] }).expect(200);
+      // Archiving lets nothing go: the record still says who was held liable.
+      await setStatus(row.id, 'ARCHIVED').expect(200);
+
+      const refused = await http()
+        .delete(`/api/v1/roles/${role.id}`)
+        .set(bearer(admin))
+        .expect(409);
+      expect(refused.body).toMatchObject({
+        code: 'ROLE_NAMED_ON_RECORDS',
+        params: { id: role.id },
+      });
+      expect((await getItem(row.id)).liability.roles).toEqual([
+        { id: role.id, code: null, name: 'Хариуцагч дүр' },
+      ]);
+      const audited = async () =>
+        (
+          await sql.query<{ action: string }>(
+            `SELECT action FROM audit_log WHERE entity = 'roles' AND entity_id = $1 ORDER BY id`,
+            [String(role.id)],
+          )
+        ).rows.map((entry) => entry.action);
+      expect(await audited()).toEqual(['CREATE']);
+
+      await setLiability(row.id, { type: 'NONE', roleIds: [], userIds: [] }).expect(200);
+      await http().delete(`/api/v1/roles/${role.id}`).set(bearer(admin)).expect(204);
+      expect(await audited()).toEqual(['CREATE', 'DELETE']);
+    });
   });
 
   describe('rights', () => {

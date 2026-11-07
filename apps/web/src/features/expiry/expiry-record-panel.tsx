@@ -1,5 +1,10 @@
 import type { ProblemDetails } from '@tugeel/api-client';
-import { EXPIRY_NOTE_MAX, type ExpiryStatus, expiryUrgency } from '@tugeel/shared/expiry';
+import {
+  EXPIRY_NOTE_MAX,
+  type ExpiryStatus,
+  expiryDateBounds,
+  expiryUrgency,
+} from '@tugeel/shared/expiry';
 import { daysBetween } from '@tugeel/shared/finance';
 import { isIsoDate } from '@tugeel/shared/time';
 import type { TFunction } from 'i18next';
@@ -51,7 +56,7 @@ const draftOf = (item: ExpiryItem): RecordDraft => ({
 
 /**
  * A record in the panel (`?item=`): its facts, the correction form, the status, the liability and
- * the history. Closing with something typed and not saved asks first.
+ * the history. Closing or archiving with something typed and not saved asks first.
  */
 export function ExpiryRecordPanel(props: {
   itemId: number | null;
@@ -65,27 +70,38 @@ export function ExpiryRecordPanel(props: {
   const mutations = useExpiryMutations();
   const statusAction = useAction();
   const [dirty, setDirty] = useState(false);
-  const [asking, setAsking] = useState(false);
+  const [asking, setAsking] = useState<'close' | 'archive' | null>(null);
+  /** A new form: the person said to drop what was typed, so a restore does not bring it back. */
+  const [formRound, setFormRound] = useState(0);
 
   const close = () => {
-    setAsking(false);
+    setAsking(null);
     setDirty(false);
     statusAction.clear();
     props.onClose();
   };
-  const changeStatus = (status: ExpiryStatus, message: string) => {
-    if (!item) return;
-    void statusAction.run(async () => {
+  const changeStatus = async (status: ExpiryStatus, message: string) =>
+    item !== undefined &&
+    statusAction.run(async () => {
       await mutations.setStatus.mutateAsync({ id: item.id, status });
       toast.success(message);
     });
+  const askStatus = (status: ExpiryStatus, message: string) => {
+    if (status === 'ARCHIVED' && dirty) setAsking('archive');
+    else void changeStatus(status, message);
+  };
+  const archiveDropping = async () => {
+    setAsking(null);
+    if (await changeStatus('ARCHIVED', t('expiry.panel.archivedToast'))) {
+      setFormRound((round) => round + 1);
+    }
   };
 
   return (
     <>
       <RecordSheet
         open={props.itemId !== null}
-        onClose={() => (dirty ? setAsking(true) : close())}
+        onClose={() => (dirty ? setAsking('close') : close())}
         title={item?.product.name ?? t('common.loading')}
         {...(item ? { description: `${item.product.sku} · ${item.product.baseUomName}` } : {})}
         badges={
@@ -105,7 +121,7 @@ export function ExpiryRecordPanel(props: {
             <StatusActions
               status={item.status}
               pending={mutations.setStatus.isPending}
-              onChange={changeStatus}
+              onChange={askStatus}
             />
           ) : null
         }
@@ -115,7 +131,7 @@ export function ExpiryRecordPanel(props: {
           <ProblemAlert problem={statusAction.problem} />
           {item ? (
             <RecordBody
-              key={item.id}
+              key={`${item.id}:${formRound}`}
               item={item}
               today={props.today}
               onReload={() => void query.refetch()}
@@ -125,12 +141,20 @@ export function ExpiryRecordPanel(props: {
         </div>
       </RecordSheet>
       <ConfirmDialog
-        open={asking}
+        open={asking === 'close'}
         title={t('common.discard.title')}
         description={t('common.discard.description')}
         confirmLabel={t('common.discard.confirm')}
         onConfirm={close}
-        onClose={() => setAsking(false)}
+        onClose={() => setAsking(null)}
+      />
+      <ConfirmDialog
+        open={asking === 'archive'}
+        title={t('expiry.panel.archiveDirtyTitle')}
+        description={t('expiry.panel.archiveDirtyDescription')}
+        confirmLabel={t('expiry.panel.archiveDirtyConfirm')}
+        onConfirm={() => void archiveDropping()}
+        onClose={() => setAsking(null)}
       />
     </>
   );
@@ -231,6 +255,10 @@ function RecordBody(props: {
   const form = useRecordDraft(item);
   const dirty = !archived && !isSameDraft(form.draft, form.read.values);
   useEffect(() => onDirty(dirty), [dirty, onDirty]);
+  /** A correction the archiving beat: the form goes, so the refusal and what was typed stay here. */
+  const [refusal, setRefusal] = useState<ProblemDetails | null>(null);
+  // A restore gives the form back, with what was typed in it: the refusal is over.
+  useEffect(() => (archived ? () => setRefusal(null) : undefined), [archived]);
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -238,7 +266,15 @@ function RecordBody(props: {
         <FactChips facts={factsOf(t, item)} />
         <PanelSection title={t('expiry.panel.formTitle')}>
           {archived ? (
-            <ArchivedValues item={item} />
+            <div className="flex flex-col gap-3">
+              {refusal ? (
+                <RefusedCorrection
+                  problem={refusal}
+                  typed={changedFields(form.draft, form.read.values)}
+                />
+              ) : null}
+              <ArchivedValues item={item} />
+            </div>
           ) : (
             <RecordForm
               item={item}
@@ -246,6 +282,7 @@ function RecordBody(props: {
               form={form}
               dirty={dirty}
               onReload={props.onReload}
+              onRefusedArchived={setRefusal}
             />
           )}
         </PanelSection>
@@ -281,17 +318,43 @@ function factsOf(t: TFunction, item: ExpiryItem) {
   ];
 }
 
+/**
+ * What was typed when the save met an archived record: nothing else on the screen holds it, and a
+ * person without the right to restore can only pass it on.
+ */
+function RefusedCorrection(props: { problem: ProblemDetails; typed: Partial<RecordDraft> }) {
+  const { t } = useTranslation();
+  const { typed } = props;
+  const parts = [
+    { label: t('expiry.columns.expiryDate'), value: typed.expiryDate },
+    { label: t('expiry.columns.qtyFloor'), value: typed.qtyFloor },
+    { label: t('expiry.columns.qtyWarehouse'), value: typed.qtyWarehouse },
+    { label: t('expiry.columns.note'), value: typed.note },
+  ].flatMap(({ label, value }) => (value === undefined ? [] : [`${label} ${value}`]));
+  return (
+    <div className="flex flex-col gap-2">
+      <ProblemAlert problem={props.problem} />
+      {parts.length > 0 ? (
+        <p className="text-[0.8125rem] font-medium break-words">
+          {t('expiry.panel.typed', { values: parts.join(' · ') })}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /** An archived record's values, read-only until it is restored (ADR-0172 #3). */
 function ArchivedValues({ item }: { item: ExpiryItem }) {
   const { t } = useTranslation();
+  const unit = item.product.baseUomName;
   return (
     <div className="flex flex-col gap-2">
       <p className="text-[0.8125rem] text-muted-foreground">{t('expiry.panel.archivedNote')}</p>
       <FactChips
         facts={[
           { label: t('expiry.columns.expiryDate'), value: item.expiryDate },
-          { label: t('expiry.columns.qtyFloor'), value: formatQty(item.qtyFloor) },
-          { label: t('expiry.columns.qtyWarehouse'), value: formatQty(item.qtyWarehouse) },
+          { label: t('expiry.fields.floor', { unit }), value: formatQty(item.qtyFloor) },
+          { label: t('expiry.fields.warehouse', { unit }), value: formatQty(item.qtyWarehouse) },
           ...(item.note ? [{ label: t('expiry.columns.note'), value: item.note }] : []),
         ]}
       />
@@ -305,10 +368,12 @@ function RecordForm(props: {
   form: ReturnType<typeof useRecordDraft>;
   dirty: boolean;
   onReload: () => void;
+  onRefusedArchived: (problem: ProblemDetails) => void;
 }) {
   const { t } = useTranslation();
   const { item, today, form, dirty } = props;
   const { draft, read } = form;
+  const unit = item.product.baseUomName;
   const mutations = useExpiryMutations();
   const [problem, setProblem] = useState<ProblemDetails | null>(null);
   const [conflicted, setConflicted] = useState(false);
@@ -334,6 +399,7 @@ function RecordForm(props: {
     } catch (error) {
       const refused = problemFromError(error);
       setProblem(refused);
+      if (refused?.code === 'EXPIRY_ITEM_ARCHIVED') props.onRefusedArchived(refused);
       if (refused?.code === 'EXPIRY_ITEM_CHANGED' || refused?.code === 'EXPIRY_ITEM_ARCHIVED') {
         form.refused();
         setConflicted(true);
@@ -371,10 +437,11 @@ function RecordForm(props: {
             id="expiry-item-date"
             value={draft.expiryDate}
             onChange={(value) => set('expiryDate', value)}
+            {...(today ? expiryDateBounds(today) : {})}
           />
         </FormField>
         <FormField
-          label={t('expiry.columns.qtyFloor')}
+          label={t('expiry.fields.floor', { unit })}
           htmlFor="expiry-item-floor"
           hint={standing(!sameQty(draft.qtyFloor, read.values.qtyFloor), read.values.qtyFloor)}
           error={shown ? problems.qtyFloor : undefined}
@@ -389,7 +456,7 @@ function RecordForm(props: {
           />
         </FormField>
         <FormField
-          label={t('expiry.columns.qtyWarehouse')}
+          label={t('expiry.fields.warehouse', { unit })}
           htmlFor="expiry-item-warehouse"
           hint={standing(
             !sameQty(draft.qtyWarehouse, read.values.qtyWarehouse),

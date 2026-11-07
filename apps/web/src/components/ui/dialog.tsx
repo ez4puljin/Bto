@@ -93,8 +93,9 @@ const WORK_CONTROLS =
 
 /**
  * What was typed in a dialog is not lost by accident (ADR-0151): once a field is used, a click
- * outside does nothing, and ✕, Esc and «Болих» ask first. A dialog that knows better passes `dirty`;
- * a question passes `guard={false}`. Saving closes the dialog as before.
+ * outside does nothing, and ✕, Esc and «Болих» ask first, as does any link or button marked
+ * `data-dialog-exit` (one that leads away from the dialog). A dialog that knows better passes
+ * `dirty`; a question passes `guard={false}`. Saving closes the dialog as before.
  */
 function useDiscardGuard(guard: boolean, dirty: boolean | undefined) {
   const [touched, setTouched] = React.useState(false)
@@ -120,12 +121,15 @@ function useDiscardGuard(guard: boolean, dirty: boolean | undefined) {
       if (!event.currentTarget.contains(target)) return
       if (passing.current) return
       if (target.closest(WORK_CONTROLS)) setTouched(true)
+      if (!active) return
       const button = target.closest("button")
-      if (!active || !button || button.type === "submit") return
-      if (button.textContent?.trim() !== cancelWord()) return
+      const cancels =
+        button && button.type !== "submit" && button.textContent?.trim() === cancelWord()
+      const exit = target.closest<HTMLElement>("[data-dialog-exit]") ?? (cancels ? button : null)
+      if (!exit) return
       event.preventDefault()
       event.stopPropagation()
-      pending.current = button
+      pending.current = exit
       setAsking(true)
     },
     /** «Хадгалаад шинэ» resets its form: what stays is not work to lose. */

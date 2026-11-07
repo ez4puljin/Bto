@@ -10,7 +10,9 @@ import { useSignedIn } from '../state/session';
 import { unwrap } from './problem';
 
 // «Хугацаа илрүүлэлт» (ADR-0172 #9): the register's reads and the writes a phone may make. Every
-// write refreshes `['expiry']`, so the list and its chips follow. Liability is assigned on the web.
+// write refreshes `['expiry']`, so the list and its chips follow, and does not wait for that: on bad
+// Wi-Fi the reads would hold a save's own answer back for half a minute with the buttons disabled.
+// Liability is assigned on the web.
 
 export type ExpiryItem = components['schemas']['ExpiryItemDto'];
 export type ExpiryChange = components['schemas']['ExpiryChangeDto'];
@@ -19,12 +21,11 @@ export type ExpiryView = components['schemas']['ExpiryView'];
 export type ExpiryCreate = components['schemas']['ExpiryCreateRequestDto'];
 export type ExpiryPatchBody = components['schemas']['ExpiryPatchRequestDto'];
 export type ExpiryRole = components['schemas']['ExpiryRoleDto'];
-export type ProductLookupItem = components['schemas']['ProductListItem'];
 
 const PAGE = 30;
 /** More open records of one product than anyone reads on a phone. */
 const OPEN_LIMIT = 20;
-const LOOKUP_LIMIT = 20;
+const SEARCH_LIMIT = 20;
 
 /** The counts and the server's business date: the phone never reads its own clock for this. */
 export function useExpirySummary() {
@@ -108,17 +109,21 @@ export function useExpiryHistory(id: number) {
   });
 }
 
-/** Names, codes and barcodes of active products; empty text asks nothing. */
-export function useProductLookup(q: string) {
+/**
+ * Names, codes and barcodes of every product, an inactive one too: its goods are still on the shelf
+ * (ADR-0172 #2), which is why this reads the product list and not `/products/lookup`, whose answer
+ * is active products only. The first page is enough for a picker. Empty text asks nothing.
+ */
+export function useProductSearch(q: string) {
   const { session } = useSignedIn();
   return useQuery({
     queryKey: ['expiry', 'products', q],
     queryFn: async () =>
       unwrap(
-        await session.client.GET('/api/v1/products/lookup', {
-          params: { query: { q, limit: LOOKUP_LIMIT } },
+        await session.client.GET('/api/v1/products', {
+          params: { query: { q, limit: SEARCH_LIMIT } },
         }),
-      ),
+      ).data,
     enabled: q !== '',
     placeholderData: keepPreviousData,
   });
@@ -126,7 +131,7 @@ export function useProductLookup(q: string) {
 
 /**
  * Whether the product's base unit takes decimals; null until known. Neither the barcode's answer
- * nor the lookup's carries it, so the product itself is read once.
+ * nor the search's carries it, so the product itself is read once.
  */
 export function useBaseUnitFractional(productId: number | null): boolean | null {
   const { session } = useSignedIn();
@@ -156,7 +161,9 @@ export function useCreateExpiryItem() {
           params: { header: { 'Idempotency-Key': key } },
         }),
       ),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['expiry'] }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['expiry'] });
+    },
   });
 }
 
@@ -173,7 +180,9 @@ export function usePatchExpiryItem() {
         }),
       ),
     onSuccess: (item) => queryClient.setQueryData(['expiry', 'item', item.id], item),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['expiry'] }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['expiry'] });
+    },
   });
 }
 
@@ -190,6 +199,8 @@ export function useSetExpiryStatus() {
         }),
       ),
     onSuccess: (item) => queryClient.setQueryData(['expiry', 'item', item.id], item),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['expiry'] }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['expiry'] });
+    },
   });
 }

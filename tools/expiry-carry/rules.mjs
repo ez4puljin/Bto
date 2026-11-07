@@ -196,8 +196,27 @@ export function cachedPerCode(find) {
   };
 }
 
-/** The Bto product of an old row: by code as a SKU, by code as a barcode, then by each old barcode. */
-export async function findProductId(row, { bySku, byBarcode }) {
+/** The product list's row with exactly this SKU, whatever its status; the list also holds prefixes. */
+export function idOfSku(code, rows) {
+  return rows.find((row) => row.sku === code)?.id ?? null;
+}
+
+/** A product name for comparing: outer spaces, runs of spaces and case do not count. */
+export function normalizeName(value) {
+  return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').toLowerCase() : '';
+}
+
+/** The id of the one row with this normalised name; null when no row has it or several do. */
+export function idOfSoleName(name, rows) {
+  const same = rows.filter((row) => normalizeName(row.name) === name);
+  return same.length === 1 ? same[0].id : null;
+}
+
+/**
+ * The Bto product of an old row: by code as a SKU, by code as a barcode, by each old barcode, and
+ * last by name, which a product recoded in Bto keeps after its old code and barcode are gone.
+ */
+export async function findProductId(row, { bySku, byBarcode, byName }) {
   const code = normalizeCode(row.product_code);
   if (code) {
     const found = (await bySku(code)) ?? (await byBarcode(code));
@@ -207,7 +226,13 @@ export async function findProductId(row, { bySku, byBarcode }) {
     const found = await byBarcode(barcode);
     if (found !== null) return found;
   }
-  return null;
+  const name = normalizeName(row.product_name);
+  return name ? byName(name) : null;
+}
+
+/** One line of `not-found.json`: enough to look the record up in the old system, and never a name. */
+export function notFoundEntry(row) {
+  return { oldId: row.id, oldCode: normalizeCode(row.product_code), oldStatus: row.status };
 }
 
 /**

@@ -67,8 +67,14 @@ export function expiryUrgency(daysLeft: number): ExpiryUrgency {
  */
 export function isExpiryDateInRange(date: string, today: string): boolean {
   if (!isIsoDate(date)) return false;
-  return (
-    date >= addMonths(today, -12 * EXPIRY_MAX_PAST_YEARS) &&
-    date <= addMonths(today, 12 * EXPIRY_MAX_FUTURE_YEARS)
-  );
+  const { min, max } = expiryDateBounds(today);
+  return date >= min && date <= max;
+}
+
+/** The first and last date a record may hold, for a date field's calendar and for the rule above. */
+export function expiryDateBounds(today: string): { min: string; max: string } {
+  return {
+    min: addMonths(today, -12 * EXPIRY_MAX_PAST_YEARS),
+    max: addMonths(today, 12 * EXPIRY_MAX_FUTURE_YEARS),
+  };
 }

@@ -1,6 +1,7 @@
 // Carries the old system's expiry records into Bto's register through its own API, so the audit is
 // real (ADR-0172 #12, docs/modules/expiry.md §5). Reads only a gitignored dump. Prints counts, never
 // names, product names, quantities or notes, because the repository is public and output gets pasted.
+// The rows whose product stays unfound go by old id and code to not-found.json beside the dump.
 //
 //   node tools/expiry-carry/carry.mjs              does every lookup, posts nothing
 //   node tools/expiry-carry/carry.mjs --write      posts each old record
@@ -8,7 +9,7 @@
 //       [--logins tmp/dev-logins.txt]
 //
 // CARRY_PASSWORD overrides the logins file. See README.md for the dump and for running it again.
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { EXPIRY_CARRY_OUTCOMES } from '@tugeel/shared/expiry';
 import { BtoApi, readLogin } from '../migration/bto-api.mjs';
@@ -17,8 +18,11 @@ import {
   failureFields,
   failureText,
   findProductId,
+  idOfSku,
+  idOfSoleName,
   indexLookups,
   mapRecord,
+  notFoundEntry,
 } from './rules.mjs';
 
 const ROOT = process.cwd();
@@ -37,6 +41,7 @@ const LOGINS = resolve(ROOT, option('logins', 'tmp/dev-logins.txt'));
 
 const PROGRESS_EVERY = 100;
 const FAILURE_LINES = 20;
+const NOT_FOUND_FILE = 'not-found.json';
 /** Answers that mean «this code names no one product»; anything else is a failed row. */
 const NOT_A_MATCH = new Set([400, 404, 409, 422]);
 
@@ -77,17 +82,30 @@ const orNull = async (call) => {
     throw error;
   }
 };
+const nameOwner = cachedPerCode((name) =>
+  orNull(async () =>
+    // Every page: one product on the first 30 does not say it is the only one with that name.
+    idOfSoleName(name, await api.all(`/api/v1/products?q=${encodeURIComponent(name)}`)),
+  ),
+);
 const finders = {
-  // The list's rank puts an exact code first, so a prefix match cannot push it out of the 30.
+  // The list and not the pickers' lookup, which answers active products only: an inactive product
+  // can still be recorded (ADR-0172 #2). Its rank puts an exact code first, so a prefix match cannot
+  // push it out of the 30.
   bySku: cachedPerCode((code) =>
     orNull(async () => {
-      const found = await api.get(`/api/v1/products/lookup?q=${encodeURIComponent(code)}&limit=30`);
-      return found.find((product) => product.sku === code)?.id ?? null;
+      const found = await api.get(`/api/v1/products?q=${encodeURIComponent(code)}&limit=30`);
+      return idOfSku(code, found.data);
     }),
   ),
   byBarcode: cachedPerCode((code) =>
     orNull(async () => (await api.get(`/api/v1/barcodes/${encodeURIComponent(code)}`)).product.id),
   ),
+  byName: async (name) => {
+    const found = await nameOwner(name);
+    if (found !== null) tally.byName += 1;
+    return found;
+  },
 };
 
 const count = (counts, what) => counts.set(what, (counts.get(what) ?? 0) + 1);
@@ -96,7 +114,9 @@ const wouldSend = new Map();
 const leftOut = new Map();
 const failed = new Map();
 const productsNotFound = new Set();
+const notFound = [];
 const tally = {
+  byName: 0,
   productRows: 0,
   historySent: 0,
   historyLeftOut: 0,
@@ -121,6 +141,7 @@ for (const row of items) {
     if (productId === null) {
       tally.productRows += 1;
       productsNotFound.add(row.product_id);
+      notFound.push(notFoundEntry(row));
       continue;
     }
     tally.historySent += mapped.body.history.length;
@@ -153,10 +174,15 @@ for (const row of items) {
   }
 }
 
+// Beside the dump, so as gitignored as the dump is. A run that finds everything leaves no old list.
+const notFoundFile = join(OLD, NOT_FOUND_FILE);
+if (notFound.length > 0) writeFileSync(notFoundFile, `${JSON.stringify(notFound, null, 2)}\n`);
+else rmSync(notFoundFile, { force: true });
+
 const sum = (counts) => [...counts.values()].reduce((total, by) => total + by, 0);
 const line = (what, by) => console.log(`  ${what}: ${by}`);
 
-console.log(write ? 'Done:' : 'Nothing written. It would do:');
+console.log(write ? 'Done:' : 'Nothing posted. It would do:');
 line('rows read', items.length);
 if (write) {
   for (const [outcome, by] of outcomes) line(outcome, by);
@@ -164,7 +190,9 @@ if (write) {
   line('rows it would send', sum(wouldSend));
   for (const [status, by] of wouldSend) line(`  ${status}`, by);
 }
+line('rows found by name', tally.byName);
 line('products not found', `${productsNotFound.size} (${tally.productRows} rows)`);
+if (notFound.length > 0) line('their rows written to the --old folder', NOT_FOUND_FILE);
 line('rows left out', sum(leftOut));
 for (const [why, by] of leftOut) line(`  ${why}`, by);
 line('history rows sent', tally.historySent);

@@ -5,9 +5,11 @@ import {
   EXPIRY_STATUSES,
   EXPIRY_URGENT_DAYS,
   EXPIRY_VIEWS,
+  expiryDateBounds,
   expiryUrgency,
   isExpiryDateInRange,
 } from '.';
+import { addDays } from '../time';
 
 describe('expiryUrgency', () => {
   it.each([
@@ -50,6 +52,27 @@ describe('isExpiryDateInRange', () => {
     'refuses %j, which is no calendar date',
     (date) => {
       expect(isExpiryDateInRange(date, today)).toBe(false);
+    },
+  );
+});
+
+describe('expiryDateBounds', () => {
+  it('gives the first and the last date a record may hold', () => {
+    expect(expiryDateBounds('2026-11-07')).toEqual({ min: '2021-11-07', max: '2041-11-07' });
+  });
+
+  it('counts from a leap day without slipping', () => {
+    expect(expiryDateBounds('2024-02-29')).toEqual({ min: '2019-02-28', max: '2039-02-28' });
+  });
+
+  it.each(['2026-11-07', '2024-02-29', '2026-01-01'])(
+    'draws the same line as isExpiryDateInRange from %s',
+    (today) => {
+      const { min, max } = expiryDateBounds(today);
+      expect(isExpiryDateInRange(min, today)).toBe(true);
+      expect(isExpiryDateInRange(addDays(min, -1), today)).toBe(false);
+      expect(isExpiryDateInRange(max, today)).toBe(true);
+      expect(isExpiryDateInRange(addDays(max, 1), today)).toBe(false);
     },
   );
 });
