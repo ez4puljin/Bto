@@ -6,8 +6,6 @@ import {
   FEEDBACK_STATUSES,
   type FeedbackCategory,
   type FeedbackStatus,
-  HR_EVENT_KINDS,
-  type HrEventKind,
   isEmployeeLeft,
   MESSAGE_KINDS,
   type MessageKind,
@@ -19,7 +17,7 @@ import {
 } from '@tugeel/shared/hr';
 import { Decimal } from '@tugeel/shared/money';
 import { addDays, businessDate, isIsoDate } from '@tugeel/shared/time';
-import { and, asc, count, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -33,6 +31,7 @@ import {
 } from '../../identity';
 import {
   hrEvents,
+  hrEventTypes,
   hrFeedback,
   hrLocationShares,
   hrMessageReads,
@@ -191,6 +190,14 @@ export interface PollAnswerInput {
   value?: number | null;
 }
 
+export interface EventTypeView {
+  id: number;
+  name: string;
+  color: string;
+  archivedAt: string | null;
+  events: number;
+}
+
 export interface CalendarItem {
   date: string;
   kind: CalendarItemKind;
@@ -203,6 +210,12 @@ export interface CalendarItem {
   photoUrl: string | null;
   /** The work anniversary's year count. */
   years: number | null;
+  /** The type HR gave an event; null on a birthday and an anniversary (ADR-0171). */
+  typeId: number | null;
+  typeName: string | null;
+  typeColor: string | null;
+  doneAt: string | null;
+  doneByName: string | null;
 }
 
 export interface FeedbackView {
@@ -1091,7 +1104,7 @@ export class EngagementService {
     ctx: AuthContext,
     id: number | null,
     input: {
-      kind: HrEventKind;
+      typeId: number;
       title: string;
       note?: string | null;
       fromDate: string;
@@ -1099,15 +1112,26 @@ export class EngagementService {
     },
   ): Promise<CalendarItem> {
     this.assertManage(ctx);
-    if (!HR_EVENT_KINDS.includes(input.kind)) {
-      throw invalid('kind', 'enum', HR_EVENT_KINDS.join(', '));
-    }
     const title = required('title', input.title, ENGAGEMENT_LIMITS.maxTitle);
     const note = optional('note', input.note, ENGAGEMENT_LIMITS.maxNote);
     const toDate = input.toDate ?? input.fromDate;
     checkedRange(input.fromDate, toDate);
-    const values = { kind: input.kind, title, note, fromDate: input.fromDate, toDate };
+    const values = { typeId: input.typeId, title, note, fromDate: input.fromDate, toDate };
+    const names = await this.staffNames();
     return inTransaction(this.db, async (tx) => {
+      const [type] = await tx.select().from(hrEventTypes).where(eq(hrEventTypes.id, input.typeId));
+      if (!type) throw invalid('typeId', 'exists', 'a calendar type');
+      // An archived type stays on the events it holds, and takes no more.
+      if (type.archivedAt) {
+        const [held] =
+          id === null
+            ? []
+            : await tx
+                .select({ typeId: hrEvents.typeId })
+                .from(hrEvents)
+                .where(eq(hrEvents.id, id));
+        if (held?.typeId !== type.id) throw invalid('typeId', 'active', 'an active calendar type');
+      }
       const [row] =
         id === null
           ? await tx
@@ -1122,8 +1146,135 @@ export class EngagementService {
         entityId: row.id,
         after: values,
       });
-      return this.eventItem(row);
+      return this.eventItem(row, type, names);
     });
+  }
+
+  /** Marks an event's work done or not; asking for what already stands changes nothing. */
+  async setEventDone(ctx: AuthContext, id: number, done: boolean): Promise<CalendarItem> {
+    const names = await this.staffNames();
+    return inTransaction(this.db, async (tx) => {
+      const changed = await tx
+        .update(hrEvents)
+        .set(
+          done
+            ? { doneAt: sql`now()`, doneBy: actorUserId(ctx) ?? ctx.userId }
+            : { doneAt: null, doneBy: null },
+        )
+        .where(
+          and(
+            eq(hrEvents.id, id),
+            isNull(hrEvents.archivedAt),
+            done ? isNull(hrEvents.doneAt) : isNotNull(hrEvents.doneAt),
+          ),
+        )
+        .returning({ id: hrEvents.id });
+      if (changed.length > 0) {
+        await this.audit.record(tx, ctx, {
+          action: 'UPDATE',
+          entity: 'hr_event',
+          entityId: id,
+          after: { done },
+        });
+      }
+      const [found] = await tx
+        .select({ event: hrEvents, type: hrEventTypes })
+        .from(hrEvents)
+        .innerJoin(hrEventTypes, eq(hrEventTypes.id, hrEvents.typeId))
+        .where(and(eq(hrEvents.id, id), isNull(hrEvents.archivedAt)));
+      if (!found) throw notFound('hr_event', id);
+      return this.eventItem(found.event, found.type, names);
+    });
+  }
+
+  // ── the calendar's types (ADR-0171) ────────────────────────────────────────
+
+  async eventTypes(includeArchived: boolean): Promise<EventTypeView[]> {
+    const rows = await this.db
+      .select({
+        id: hrEventTypes.id,
+        name: hrEventTypes.name,
+        color: hrEventTypes.color,
+        archivedAt: hrEventTypes.archivedAt,
+        events: sql<string>`count(${hrEvents.id})`,
+      })
+      .from(hrEventTypes)
+      .leftJoin(hrEvents, and(eq(hrEvents.typeId, hrEventTypes.id), isNull(hrEvents.archivedAt)))
+      .where(includeArchived ? undefined : isNull(hrEventTypes.archivedAt))
+      .groupBy(hrEventTypes.id)
+      .orderBy(asc(hrEventTypes.id));
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      color: row.color,
+      archivedAt: row.archivedAt?.toISOString() ?? null,
+      events: Number.parseInt(row.events, 10),
+    }));
+  }
+
+  async saveEventType(
+    ctx: AuthContext,
+    id: number | null,
+    input: { name: string; color: string },
+  ): Promise<EventTypeView> {
+    this.assertManage(ctx);
+    const name = required('name', input.name, ENGAGEMENT_LIMITS.maxEventTypeName);
+    if (!/^#[0-9a-fA-F]{6}$/.test(input.color)) throw invalid('color', 'pattern', '#rrggbb');
+    const savedId = await inTransaction(this.db, async (tx) => {
+      const [taken] = await tx
+        .select({ id: hrEventTypes.id })
+        .from(hrEventTypes)
+        .where(sql`lower(${hrEventTypes.name}) = lower(${name})`);
+      if (taken && taken.id !== id) {
+        throw new AppError('DUPLICATE_VALUE', 'a type of that name exists', { field: 'name' });
+      }
+      const values = { name, color: input.color };
+      const [row] =
+        id === null
+          ? await tx.insert(hrEventTypes).values(values).returning({ id: hrEventTypes.id })
+          : await tx
+              .update(hrEventTypes)
+              .set({ ...values, updatedAt: sql`now()` })
+              .where(eq(hrEventTypes.id, id))
+              .returning({ id: hrEventTypes.id });
+      if (!row) throw notFound('hr_event_type', id ?? 0);
+      await this.audit.record(tx, ctx, {
+        action: id === null ? 'CREATE' : 'UPDATE',
+        entity: 'hr_event_type',
+        entityId: row.id,
+        after: values,
+      });
+      return row.id;
+    });
+    return this.eventTypeView(savedId);
+  }
+
+  async setEventTypeArchived(
+    ctx: AuthContext,
+    id: number,
+    archived: boolean,
+  ): Promise<EventTypeView> {
+    this.assertManage(ctx);
+    await inTransaction(this.db, async (tx) => {
+      const rows = await tx
+        .update(hrEventTypes)
+        .set({ archivedAt: archived ? sql`now()` : null, updatedAt: sql`now()` })
+        .where(eq(hrEventTypes.id, id))
+        .returning({ id: hrEventTypes.id });
+      if (rows.length === 0) throw notFound('hr_event_type', id);
+      await this.audit.record(tx, ctx, {
+        action: archived ? 'ARCHIVE' : 'RESTORE',
+        entity: 'hr_event_type',
+        entityId: id,
+      });
+    });
+    return this.eventTypeView(id);
+  }
+
+  private async eventTypeView(id: number): Promise<EventTypeView> {
+    const view = (await this.eventTypes(true)).find((row) => row.id === id);
+    if (!view) throw notFound('hr_event_type', id);
+    return view;
   }
 
   async archiveEvent(ctx: AuthContext, id: number): Promise<void> {
@@ -1149,8 +1300,9 @@ export class EngagementService {
     const last = addDays(addMonth(first), -1);
     const [events, staff] = await Promise.all([
       this.db
-        .select()
+        .select({ event: hrEvents, type: hrEventTypes })
         .from(hrEvents)
+        .innerJoin(hrEventTypes, eq(hrEventTypes.id, hrEvents.typeId))
         .where(
           and(
             isNull(hrEvents.archivedAt),
@@ -1158,10 +1310,11 @@ export class EngagementService {
             gte(hrEvents.toDate, first),
           ),
         )
-        .orderBy(asc(hrEvents.fromDate)),
+        .orderBy(asc(hrEvents.fromDate), asc(hrEvents.id)),
       this.workforce.employees(),
     ]);
-    const items: CalendarItem[] = events.map((row) => this.eventItem(row));
+    const names = new Map(staff.map((person) => [person.userId, person.fullName]));
+    const items: CalendarItem[] = events.map((row) => this.eventItem(row.event, row.type, names));
     for (const person of staff) {
       if (isEmployeeLeft(person)) continue;
       const birthday = person.birthDate ? dayIn(month, person.birthDate) : null;
@@ -1176,6 +1329,11 @@ export class EngagementService {
           userId: person.userId,
           photoUrl: person.photoUrl,
           years: null,
+          typeId: null,
+          typeName: null,
+          typeColor: null,
+          doneAt: null,
+          doneByName: null,
         });
       }
       const anniversary = person.employedOn ? dayIn(month, person.employedOn) : null;
@@ -1192,6 +1350,11 @@ export class EngagementService {
             userId: person.userId,
             photoUrl: person.photoUrl,
             years,
+            typeId: null,
+            typeName: null,
+            typeColor: null,
+            doneAt: null,
+            doneByName: null,
           });
         }
       }
@@ -1199,10 +1362,14 @@ export class EngagementService {
     return items.sort((a, b) => a.date.localeCompare(b.date));
   }
 
-  private eventItem(row: typeof hrEvents.$inferSelect): CalendarItem {
+  private eventItem(
+    row: typeof hrEvents.$inferSelect,
+    type: typeof hrEventTypes.$inferSelect,
+    names: ReadonlyMap<number, string>,
+  ): CalendarItem {
     return {
       date: row.fromDate,
-      kind: row.kind,
+      kind: type.kind,
       title: row.title,
       note: row.note,
       eventId: row.id,
@@ -1210,7 +1377,16 @@ export class EngagementService {
       userId: null,
       photoUrl: null,
       years: null,
+      typeId: type.id,
+      typeName: type.name,
+      typeColor: type.color,
+      doneAt: row.doneAt?.toISOString() ?? null,
+      doneByName: row.doneBy === null ? null : (names.get(row.doneBy) ?? null),
     };
+  }
+
+  private async staffNames(): Promise<Map<number, string>> {
+    return new Map((await this.workforce.employees()).map((row) => [row.userId, row.fullName]));
   }
 
   // ── the staff app's first look ─────────────────────────────────────────────

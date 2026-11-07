@@ -32,6 +32,7 @@ import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
+import { EventTypesCard } from './community/event-types-card';
 import {
   type HrEmployee,
   type HrSchedule,
@@ -813,9 +814,9 @@ function EmployeesCard({ canManage }: { canManage: boolean }) {
 /* ------------------------------------------------------------------ page */
 
 /**
- * «Ирцийн тохиргоо» (ADR-0131): the work sites a phone must stand in to punch, the company's
- * hours and workdays, and each employee's own settings (tracked, own hours, own sites). Read-only
- * without hr.attendance.manage.
+ * «Хүний нөөцийн тохиргоо» (ADR-0131, ADR-0171): the work sites a phone must stand in to punch, the
+ * company's hours and workdays, the calendar's types, and each employee's own settings (tracked, own
+ * hours, own sites). Read-only without hr.attendance.manage.
  */
 export function AttendanceSetupPage() {
   const { t } = useTranslation();
@@ -831,6 +832,7 @@ export function AttendanceSetupPage() {
         <SitesCard canManage={canManage} />
         <ScheduleCard canManage={canManage} />
       </div>
+      <EventTypesCard canManage={canManage} />
       <EmployeesCard canManage={canManage} />
     </div>
   );

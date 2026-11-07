@@ -11,8 +11,6 @@ import {
   FEEDBACK_STATUSES,
   type FeedbackCategory,
   type FeedbackStatus,
-  HR_EVENT_KINDS,
-  type HrEventKind,
   JOB_LEVELS,
   type JobLevel,
   MARITAL_STATUSES,
@@ -463,6 +461,45 @@ export class HrCalendarItemDto {
   @ApiProperty({ type: Number, nullable: true }) userId: number | null;
   @ApiProperty({ type: String, nullable: true }) photoUrl: string | null;
   @ApiProperty({ type: Number, nullable: true }) years: number | null;
+  /** The type HR gave an event; null on a birthday and an anniversary (ADR-0171). */
+  @ApiProperty({ type: Number, nullable: true }) typeId: number | null;
+  @ApiProperty({ type: String, nullable: true }) typeName: string | null;
+  @ApiProperty({ type: String, nullable: true }) typeColor: string | null;
+  /** Null on a birthday and an anniversary too: only an event is marked done (ADR-0171 #8). */
+  @ApiProperty({ type: String, nullable: true }) doneAt: string | null;
+  @ApiProperty({ type: String, nullable: true }) doneByName: string | null;
+}
+
+@ApiSchema({ name: 'HrEventDoneRequest' })
+export class HrEventDoneRequestDto {
+  @ApiProperty() @IsBoolean() done: boolean;
+}
+
+@ApiSchema({ name: 'HrEventType' })
+export class HrEventTypeDto {
+  @ApiProperty() id: number;
+  @ApiProperty() name: string;
+  @ApiProperty() color: string;
+  @ApiProperty({ type: String, nullable: true }) archivedAt: string | null;
+  /** The events that stand on this type and are not archived. */
+  @ApiProperty() events: number;
+}
+
+@ApiSchema({ name: 'HrEventTypeRequest' })
+export class HrEventTypeRequestDto {
+  @ApiProperty()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(ENGAGEMENT_LIMITS.maxEventTypeName)
+  name: string;
+  @ApiProperty({ description: '#rrggbb' })
+  @Matches(/^#[0-9a-fA-F]{6}$/)
+  color: string;
+}
+
+@ApiSchema({ name: 'HrEventTypeArchiveRequest' })
+export class HrEventTypeArchiveRequestDto {
+  @ApiProperty() @IsBoolean() archived: boolean;
 }
 
 @ApiSchema({ name: 'HrCalendarQuery' })
@@ -472,9 +509,7 @@ export class HrCalendarQueryDto {
 
 @ApiSchema({ name: 'HrEventRequest' })
 export class HrEventRequestDto {
-  @ApiProperty({ enum: HR_EVENT_KINDS, enumName: 'HrEventKind' })
-  @IsIn(HR_EVENT_KINDS)
-  kind: HrEventKind;
+  @ApiProperty() @IsInt() @Min(1) typeId: number;
   @ApiProperty()
   @Transform(trimmed)
   @IsString()

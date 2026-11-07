@@ -17486,6 +17486,61 @@
         ]
       }
     },
+    "/api/v1/hr/events/{id}/done": {
+      "put": {
+        "operationId": "Engagement_setEventDone",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HrEventDoneRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrCalendarItem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
     "/api/v1/hr/calendar": {
       "get": {
         "operationId": "Engagement_calendar",
@@ -17510,6 +17565,99 @@
                   "items": {
                     "$ref": "#/components/schemas/HrCalendarItem"
                   }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/v1/hr/event-types": {
+      "get": {
+        "operationId": "Engagement_eventTypes",
+        "parameters": [
+          {
+            "name": "includeArchived",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HrEventType"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Open to every staff member: the calendar's legend reads it.",
+        "tags": [
+          "hr"
+        ]
+      },
+      "post": {
+        "operationId": "Engagement_createEventType",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HrEventTypeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrEventType"
                 }
               }
             }
@@ -18156,6 +18304,116 @@
                   "items": {
                     "$ref": "#/components/schemas/HrLocationShare"
                   }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/v1/hr/event-types/{id}": {
+      "put": {
+        "operationId": "Engagement_updateEventType",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HrEventTypeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrEventType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/v1/hr/event-types/{id}/archived": {
+      "put": {
+        "operationId": "Engagement_archiveEventType",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HrEventTypeArchiveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrEventType"
                 }
               }
             }
@@ -55474,6 +55732,17 @@
           "children"
         ]
       },
+      "HrEventDoneRequest": {
+        "type": "object",
+        "properties": {
+          "done": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "done"
+        ]
+      },
       "HrCalendarItemKind": {
         "type": "string",
         "enum": [
@@ -55523,6 +55792,28 @@
           "years": {
             "type": "number",
             "nullable": true
+          },
+          "typeId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The type HR gave an event; null on a birthday and an anniversary (ADR-0171)."
+          },
+          "typeName": {
+            "type": "string",
+            "nullable": true
+          },
+          "typeColor": {
+            "type": "string",
+            "nullable": true
+          },
+          "doneAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null on a birthday and an anniversary too: only an event is marked done (ADR-0171 #8)."
+          },
+          "doneByName": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -55534,7 +55825,41 @@
           "toDate",
           "userId",
           "photoUrl",
-          "years"
+          "years",
+          "typeId",
+          "typeName",
+          "typeColor",
+          "doneAt",
+          "doneByName"
+        ]
+      },
+      "HrEventType": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "events": {
+            "type": "number",
+            "description": "The events that stand on this type and are not archived."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "color",
+          "archivedAt",
+          "events"
         ]
       },
       "HrThanksEntry": {
@@ -55915,23 +56240,41 @@
           "status"
         ]
       },
-      "HrEventKind": {
-        "type": "string",
-        "enum": [
-          "EVENT",
-          "MEETING",
-          "HOLIDAY"
+      "HrEventTypeRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "description": "#rrggbb"
+          }
+        },
+        "required": [
+          "name",
+          "color"
+        ]
+      },
+      "HrEventTypeArchiveRequest": {
+        "type": "object",
+        "properties": {
+          "archived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "archived"
         ]
       },
       "HrEventRequest": {
         "type": "object",
         "properties": {
-          "kind": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HrEventKind"
-              }
-            ]
+          "typeId": {
+            "type": "number",
+            "minimum": 1
           },
           "title": {
             "type": "string",
@@ -55951,7 +56294,7 @@
           }
         },
         "required": [
-          "kind",
+          "typeId",
           "title",
           "fromDate"
         ]

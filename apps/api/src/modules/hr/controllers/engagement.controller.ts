@@ -22,6 +22,10 @@ import {
   HrAttendanceInsightsDto,
   HrCalendarItemDto,
   HrCalendarQueryDto,
+  HrEventDoneRequestDto,
+  HrEventTypeArchiveRequestDto,
+  HrEventTypeDto,
+  HrEventTypeRequestDto,
   HrEventRequestDto,
   HrFeedbackDecisionDto,
   HrFeedbackDto,
@@ -184,11 +188,31 @@ export class EngagementController {
 
   // ── open to every staff member ─────────────────────────────────────────────
 
+  /** As on the old calendar, whoever does the work marks it; who and when are kept (ADR-0171 #8). */
+  @Put('events/:id/done')
+  @Authenticated()
+  @ApiOkResponse({ type: HrCalendarItemDto })
+  setEventDone(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: HrEventDoneRequestDto,
+  ): Promise<HrCalendarItemDto> {
+    return this.engagement.setEventDone(ctx, id, body.done);
+  }
+
   @Get('calendar')
   @Authenticated()
   @ApiOkResponse({ type: [HrCalendarItemDto] })
   calendar(@Query() query: HrCalendarQueryDto): Promise<HrCalendarItemDto[]> {
     return this.engagement.calendar(query.month);
+  }
+
+  /** Open to every staff member: the calendar's legend reads it. */
+  @Get('event-types')
+  @Authenticated()
+  @ApiOkResponse({ type: [HrEventTypeDto] })
+  eventTypes(@Query('includeArchived') includeArchived?: string): Promise<HrEventTypeDto[]> {
+    return this.engagement.eventTypes(includeArchived === 'true');
   }
 
   @Get('thanks')
@@ -296,6 +320,38 @@ export class EngagementController {
   @ApiOkResponse({ type: [HrLocationShareDto] })
   locations(@Query() query: HrLocationSharesQueryDto): Promise<HrLocationShareDto[]> {
     return this.engagement.locations(query);
+  }
+
+  @Post('event-types')
+  @RequirePermission(ATTENDANCE_MANAGE)
+  @ApiCreatedResponse({ type: HrEventTypeDto })
+  createEventType(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: HrEventTypeRequestDto,
+  ): Promise<HrEventTypeDto> {
+    return this.engagement.saveEventType(ctx, null, body);
+  }
+
+  @Put('event-types/:id')
+  @RequirePermission(ATTENDANCE_MANAGE)
+  @ApiOkResponse({ type: HrEventTypeDto })
+  updateEventType(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: HrEventTypeRequestDto,
+  ): Promise<HrEventTypeDto> {
+    return this.engagement.saveEventType(ctx, id, body);
+  }
+
+  @Put('event-types/:id/archived')
+  @RequirePermission(ATTENDANCE_MANAGE)
+  @ApiOkResponse({ type: HrEventTypeDto })
+  archiveEventType(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: HrEventTypeArchiveRequestDto,
+  ): Promise<HrEventTypeDto> {
+    return this.engagement.setEventTypeArchived(ctx, id, body.archived);
   }
 
   @Post('events')

@@ -26,6 +26,8 @@ export type HrThanks = Schemas['HrThanks'];
 export type HrLocationShare = Schemas['HrLocationShare'];
 export type HrCalendarItem = Schemas['HrCalendarItem'];
 export type HrEventRequest = Schemas['HrEventRequest'];
+export type HrEventType = Schemas['HrEventType'];
+export type HrEventTypeRequest = Schemas['HrEventTypeRequest'];
 export type HrMoods = Schemas['HrMoods'];
 export type HrStaffDetailsRequest = Schemas['HrStaffDetailsRequest'];
 
@@ -109,6 +111,21 @@ export function useHrCalendar(month: string) {
   });
 }
 
+/** The calendar's types (ADR-0171), in the order HR made them. */
+export function useHrEventTypes(includeArchived = false) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...ENGAGEMENT_KEYS.calendar, 'types', includeArchived],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/hr/event-types', {
+          params: { query: { includeArchived: String(includeArchived) } },
+          signal,
+        }),
+      ),
+  });
+}
+
 export function useHrThanks(from: string, to: string) {
   const api = useApiClient();
   return useQuery({
@@ -170,6 +187,29 @@ export function useEngagementMutations() {
     archiveEvent: useMutation({
       mutationFn: async (id: number) =>
         unwrap(await api.DELETE('/api/v1/hr/events/{id}', path(id))),
+      onSuccess: refresh,
+    }),
+    setEventDone: useMutation({
+      mutationFn: async ({ id, done }: { id: number; done: boolean }) =>
+        unwrap(await api.PUT('/api/v1/hr/events/{id}/done', { ...path(id), body: { done } })),
+      // Refused too: the event may have been archived by now, so the list must catch up.
+      onSettled: refresh,
+    }),
+    saveEventType: useMutation({
+      mutationFn: async ({ id, ...body }: HrEventTypeRequest & { id: number | null }) =>
+        id === null
+          ? unwrap(await api.POST('/api/v1/hr/event-types', { body }))
+          : unwrap(await api.PUT('/api/v1/hr/event-types/{id}', { ...path(id), body })),
+      onSuccess: refresh,
+    }),
+    archiveEventType: useMutation({
+      mutationFn: async ({ id, archived }: { id: number; archived: boolean }) =>
+        unwrap(
+          await api.PUT('/api/v1/hr/event-types/{id}/archived', {
+            ...path(id),
+            body: { archived },
+          }),
+        ),
       onSuccess: refresh,
     }),
     saveDetails: useMutation({

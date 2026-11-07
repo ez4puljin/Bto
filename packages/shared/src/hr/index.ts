@@ -214,6 +214,10 @@ export type FeedbackCategory = (typeof FEEDBACK_CATEGORIES)[number];
 export const FEEDBACK_STATUSES = ['NEW', 'SEEN', 'DONE'] as const;
 export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number];
 
+/**
+ * What a staff app already installed knows how to draw (ADR-0171): every calendar type stands on one
+ * of these, so a type HR adds reaches an old app as `EVENT` rather than as a word it cannot read.
+ */
 export const HR_EVENT_KINDS = ['EVENT', 'MEETING', 'HOLIDAY'] as const;
 export type HrEventKind = (typeof HR_EVENT_KINDS)[number];
 
@@ -225,6 +229,7 @@ export type CalendarItemKind = (typeof CALENDAR_ITEM_KINDS)[number];
 export const MOOD_SCORES = [1, 2, 3, 4, 5] as const;
 
 export const ENGAGEMENT_LIMITS = {
+  maxEventTypeName: 40,
   maxTitle: 120,
   maxBody: 4000,
   maxNote: 500,

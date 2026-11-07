@@ -1,9 +1,17 @@
-import { CALENDAR_ITEM_KINDS, ENGAGEMENT_LIMITS, HR_EVENT_KINDS } from '@tugeel/shared/hr';
+import { ENGAGEMENT_LIMITS } from '@tugeel/shared/hr';
 import { businessDate } from '@tugeel/shared/time';
-import { Archive, CalendarDays, ChevronLeft, ChevronRight, Pencil, Plus } from 'lucide-react';
+import {
+  Archive,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  Plus,
+  Settings2,
+} from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DateInput } from '@/components/date-input';
@@ -13,10 +21,12 @@ import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { formatUbMinute } from '@/lib/dayjs';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
 import { toast } from '@/lib/toast';
@@ -25,16 +35,24 @@ import { useCreateParam } from '@/lib/use-create-param';
 import { cn } from '@/lib/utils';
 import {
   type HrCalendarItem,
-  type HrEventRequest,
   useEngagementMutations,
   useHrCalendar,
+  useHrEventTypes,
 } from '../engagement-api';
 import { Avatar } from '../hr-kit';
-import { CALENDAR_MARKS, isOnDay, monthOfDate, shiftMonth, thisMonth } from './community-helpers';
+import {
+  CALENDAR_MARKS,
+  isOnDay,
+  itemMark,
+  monthOfDate,
+  shiftMonth,
+  thisMonth,
+} from './community-helpers';
 import { MonthGrid } from './month-grid';
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
-type EventKind = HrEventRequest['kind'];
+/** The days the system works out itself; every other type is HR's own list (ADR-0171). */
+const PERSON_KINDS = ['BIRTHDAY', 'ANNIVERSARY'] as const;
 
 /** «Үйл явдал нэмэх» / «Үйл явдал засах»: one day, or from a day to a day. */
 function EventDialog(props: { item: HrCalendarItem | null; day: string; onClose: () => void }) {
@@ -42,9 +60,12 @@ function EventDialog(props: { item: HrCalendarItem | null; day: string; onClose:
   const mutations = useEngagementMutations();
   const action = useAction();
   const { item } = props;
-  const [kind, setKind] = useState<EventKind>(
-    item && item.kind !== 'BIRTHDAY' && item.kind !== 'ANNIVERSARY' ? item.kind : 'EVENT',
-  );
+  const types = useHrEventTypes();
+  const [picked, setPicked] = useState<number | null>(item?.typeId ?? null);
+  const typeId = picked ?? types.data?.[0]?.id ?? null;
+  // An archived type takes no new event, and stays selectable on the event that already holds it.
+  const keepsArchived =
+    item?.typeId != null && !(types.data ?? []).some((type) => type.id === item.typeId);
   const [title, setTitle] = useState(item?.title ?? '');
   const [note, setNote] = useState(item?.note ?? '');
   const [fromDate, setFromDate] = useState(item?.date ?? props.day);
@@ -57,11 +78,11 @@ function EventDialog(props: { item: HrCalendarItem | null; day: string; onClose:
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setTried(true);
-    if (title.trim() === '' || !fromDate || !toDate) return;
+    if (typeId === null || title.trim() === '' || !fromDate || !toDate) return;
     const ok = await action.run(() =>
       mutations.saveEvent.mutateAsync({
         id: item?.eventId ?? null,
-        kind,
+        typeId,
         title: title.trim(),
         note: note.trim() || null,
         fromDate,
@@ -83,15 +104,25 @@ function EventDialog(props: { item: HrCalendarItem | null; day: string; onClose:
         </DialogHeader>
         <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
           <ProblemAlert problem={action.problem} />
-          <FormField label={t('hr.community.calendar.fields.kind')} htmlFor="event-kind">
+          <ProblemAlert problem={problemFromError(types.error)} onRetry={types.refetch} />
+          <FormField
+            label={t('hr.community.calendar.fields.kind')}
+            htmlFor="event-kind"
+            hint={typeId === null && types.data ? t('hr.community.calendar.noTypes') : undefined}
+            error={tried && typeId === null ? 'validation.required' : undefined}
+          >
             <NativeSelect
               id="event-kind"
-              value={kind}
-              onChange={(event) => setKind(event.target.value as EventKind)}
+              disabled={types.isPending}
+              value={typeId ?? ''}
+              onChange={(event) => setPicked(Number.parseInt(event.target.value, 10))}
             >
-              {HR_EVENT_KINDS.map((value) => (
-                <option key={value} value={value}>
-                  {t(`hr.community.calendar.kinds.${value}`)}
+              {keepsArchived && item?.typeId != null ? (
+                <option value={item.typeId}>{item.typeName}</option>
+              ) : null}
+              {(types.data ?? []).map((type) => (
+                <option key={type.id} value={type.id}>
+                  {type.name}
                 </option>
               ))}
             </NativeSelect>
@@ -155,6 +186,9 @@ export function CalendarItemLine(props: {
   item: HrCalendarItem;
   onEdit?: (item: HrCalendarItem) => void;
   onArchive?: (item: HrCalendarItem) => void;
+  /** Marks the work done; without it the line only shows whether it is (ADR-0171 #8). */
+  onToggleDone?: (item: HrCalendarItem) => void;
+  doneDisabled?: boolean;
 }) {
   const { t } = useTranslation();
   const { item } = props;
@@ -167,22 +201,57 @@ export function CalendarItemLine(props: {
     <li className="flex items-start gap-2.5 py-2">
       {person ? (
         <Avatar name={item.title} src={item.photoUrl} className="size-7 text-[0.6875rem]" />
+      ) : props.onToggleDone ? (
+        <span className="grid size-7 shrink-0 place-items-center">
+          <Checkbox
+            aria-label={t('hr.community.calendar.doneFor', { title: item.title })}
+            checked={item.doneAt !== null}
+            disabled={props.doneDisabled}
+            onCheckedChange={() => props.onToggleDone?.(item)}
+          />
+        </span>
       ) : (
         <span aria-hidden className="grid size-7 shrink-0 place-items-center">
-          <span className={cn('size-2.5 rounded-full', CALENDAR_MARKS[item.kind])} />
+          <span
+            style={itemMark(item).style}
+            className={cn('size-2.5 rounded-full', itemMark(item).className)}
+          />
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <p className="truncate font-medium" title={item.title}>
+        <p
+          className={cn(
+            'truncate font-medium',
+            item.doneAt && 'text-muted-foreground line-through',
+          )}
+          title={item.title}
+        >
           {item.title}
         </p>
         <p className="text-[0.8125rem] text-muted-foreground">
+          {props.onToggleDone && !person ? (
+            <span
+              aria-hidden
+              style={itemMark(item).style}
+              className={cn('mr-1.5 inline-block size-2 rounded-full', itemMark(item).className)}
+            />
+          ) : null}
           {item.kind === 'ANNIVERSARY'
             ? t('hr.community.calendar.anniversaryYears', { years: item.years ?? 0 })
-            : t(`hr.community.calendar.kinds.${item.kind}`)}
+            : (item.typeName ?? t(`hr.community.calendar.kinds.${item.kind}`))}
           {span ? ` · ${span}` : ''}
         </p>
         {item.note ? <p className="mt-0.5 text-[0.8125rem]">{item.note}</p> : null}
+        {item.doneAt ? (
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {item.doneByName
+              ? t('hr.community.calendar.doneBy', {
+                  name: item.doneByName,
+                  at: formatUbMinute(item.doneAt),
+                })
+              : t('hr.community.calendar.doneAt', { at: formatUbMinute(item.doneAt) })}
+          </p>
+        ) : null}
       </div>
       {item.eventId !== null && props.onEdit && props.onArchive ? (
         <span className="flex shrink-0 gap-0.5">
@@ -219,8 +288,10 @@ export function CalendarPage() {
   const fallbackDay = monthOfDate(today) === month ? today : `${month}-01`;
   const day = monthOfDate(dayParam) === month ? dayParam : fallbackDay;
   const calendar = useHrCalendar(month);
+  const types = useHrEventTypes();
   const mutations = useEngagementMutations();
   const action = useAction();
+  const doneAction = useAction();
   const [creating, setCreating] = useCreateParam();
   const [editing, setEditing] = useState<HrCalendarItem | null>(null);
   const [archiving, setArchiving] = useState<HrCalendarItem | null>(null);
@@ -228,6 +299,7 @@ export function CalendarPage() {
   const onDay = items.filter((item) => isOnDay(item, day));
   const [year, monthNumber] = month.split('-');
   const go = (next: string) => {
+    doneAction.clear();
     setParams(
       (previous) => {
         const updated = new URLSearchParams(previous);
@@ -239,6 +311,33 @@ export function CalendarPage() {
       { replace: true },
     );
   };
+  const toggleDone = (item: HrCalendarItem) => {
+    const id = item.eventId;
+    if (id === null) return;
+    void doneAction.run(() =>
+      mutations.setEventDone.mutateAsync({ id, done: item.doneAt === null }),
+    );
+  };
+  // What the month holds per type, whatever the list says now: an archived type still has its events.
+  const typeRows = new Map(
+    (types.data ?? []).map((type) => [
+      type.id,
+      { id: type.id, name: type.name, color: type.color, total: 0, done: 0 },
+    ]),
+  );
+  for (const item of items) {
+    if (item.typeId === null) continue;
+    const row = typeRows.get(item.typeId) ?? {
+      id: item.typeId,
+      name: item.typeName ?? '',
+      color: item.typeColor ?? '',
+      total: 0,
+      done: 0,
+    };
+    row.total += 1;
+    if (item.doneAt) row.done += 1;
+    typeRows.set(item.typeId, row);
+  }
   const archive = async () => {
     if (archiving?.eventId == null) return;
     const id = archiving.eventId;
@@ -255,10 +354,18 @@ export function CalendarPage() {
         description={t('hr.community.calendar.description')}
         actions={
           canManage ? (
-            <Button size="sm" onClick={() => setCreating(true)}>
-              <Plus />
-              {t('hr.community.calendar.create')}
-            </Button>
+            <>
+              <Button asChild size="sm" variant="outline">
+                <Link to="/hr/setup">
+                  <Settings2 />
+                  {t('hr.community.calendar.types')}
+                </Link>
+              </Button>
+              <Button size="sm" onClick={() => setCreating(true)}>
+                <Plus />
+                {t('hr.community.calendar.create')}
+              </Button>
+            </>
           ) : null
         }
       />
@@ -300,10 +407,34 @@ export function CalendarPage() {
               items={items}
               selected={day}
               size="full"
-              onSelect={(next) => setParam('day', next)}
+              onSelect={(next) => {
+                doneAction.clear();
+                setParam('day', next);
+              }}
             />
             <ul className="flex flex-wrap gap-x-4 gap-y-1">
-              {CALENDAR_ITEM_KINDS.map((kind) => (
+              {[...typeRows.values()].map((type) => (
+                <li
+                  key={type.id}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                >
+                  <span
+                    aria-hidden
+                    className="size-2 rounded-full"
+                    style={{ backgroundColor: type.color }}
+                  />
+                  {type.name}
+                  {type.total > 0 ? (
+                    <span className="font-mono">
+                      {t('hr.community.calendar.progress', {
+                        done: type.done,
+                        total: type.total,
+                      })}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+              {PERSON_KINDS.map((kind) => (
                 <li key={kind} className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <span aria-hidden className={cn('size-2 rounded-full', CALENDAR_MARKS[kind])} />
                   {t(`hr.community.calendar.kinds.${kind}`)}
@@ -317,6 +448,7 @@ export function CalendarPage() {
             <CardTitle>{t('hr.community.calendar.dayTitle', { day })}</CardTitle>
           </CardHeader>
           <CardContent>
+            <ProblemAlert problem={doneAction.problem} />
             {calendar.data && onDay.length === 0 ? (
               <EmptyState
                 title={t('hr.community.calendar.dayEmpty')}
@@ -338,6 +470,8 @@ export function CalendarPage() {
                     item={item}
                     onEdit={canManage ? setEditing : undefined}
                     onArchive={canManage ? setArchiving : undefined}
+                    onToggleDone={item.eventId === null ? undefined : toggleDone}
+                    doneDisabled={mutations.setEventDone.isPending}
                   />
                 ))}
               </ul>

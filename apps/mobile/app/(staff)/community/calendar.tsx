@@ -5,6 +5,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Circle,
   type LucideIcon,
   PartyPopper,
   UsersRound,
@@ -12,7 +13,12 @@ import {
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { type CalendarItem, useCalendar, useToday } from '../../../src/api/community';
+import {
+  type CalendarItem,
+  useCalendar,
+  useSetEventDone,
+  useToday,
+} from '../../../src/api/community';
 import { Avatar, FirstLoad } from '../../../src/community/parts';
 import { monthGrid } from '../../../src/dates/calendar';
 import { monthOf, shiftMonth, shortDate } from '../../../src/dates/dates';
@@ -139,6 +145,7 @@ export default function CalendarScreen() {
   const [month, setMonth] = useState(() => monthOf(today));
   const [chosen, setChosen] = useState(today);
   const calendar = useCalendar(month);
+  const setDone = useSetEventDone();
   const items = useMemo(() => calendar.data ?? [], [calendar.data]);
   const day = useMemo(() => items.filter((item) => isOn(item, chosen)), [items, chosen]);
 
@@ -148,7 +155,9 @@ export default function CalendarScreen() {
   };
 
   const renderItem = (item: CalendarItem, index: number) => {
-    const { Icon, color } = KIND_STYLE[item.kind];
+    const { Icon, color: kindColor } = KIND_STYLE[item.kind];
+    const color = item.typeColor ?? kindColor;
+    const { eventId } = item;
     const person = item.kind === 'BIRTHDAY' || item.kind === 'ANNIVERSARY';
     const title =
       item.kind === 'BIRTHDAY'
@@ -157,7 +166,7 @@ export default function CalendarScreen() {
           ? t('mobile.community.calendar.anniversary', { name: item.title, years: item.years ?? 0 })
           : item.title;
     const lines = [
-      t(`mobile.community.calendar.kinds.${item.kind}`),
+      item.typeName ?? t(`mobile.community.calendar.kinds.${item.kind}`),
       item.toDate && item.toDate !== item.date
         ? t('mobile.community.calendar.range', {
             from: shortDate(item.date),
@@ -165,6 +174,7 @@ export default function CalendarScreen() {
           })
         : null,
       item.note,
+      item.doneAt ? t('mobile.community.calendar.done') : null,
     ];
     return (
       <Row
@@ -181,6 +191,20 @@ export default function CalendarScreen() {
         }
         title={title}
         subtitle={lines.filter(Boolean).join(' · ')}
+        {...(eventId === null
+          ? {}
+          : {
+              role: 'checkbox' as const,
+              chevron: false,
+              checked: item.doneAt !== null,
+              disabled: setDone.isPending,
+              accessibilityLabel: t('mobile.community.calendar.doneFor', { title }),
+              right:
+                item.doneAt === null ? (
+                  <Circle size={22} strokeWidth={1.8} color={colors.muted} />
+                ) : undefined,
+              onPress: () => setDone.mutate({ id: eventId, done: item.doneAt === null }),
+            })}
       />
     );
   };

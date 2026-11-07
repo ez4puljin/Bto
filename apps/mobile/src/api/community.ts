@@ -128,6 +128,22 @@ export function useCalendar(month: string) {
   });
 }
 
+/** Marks an event's work done, or not (ADR-0171 #8). */
+export function useSetEventDone() {
+  const { session } = useSignedIn();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, done }: { id: number; done: boolean }) =>
+      unwrap(
+        await session.client.PUT('/api/v1/hr/events/{id}/done', {
+          params: { path: { id } },
+          body: { done },
+        }),
+      ),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: KEY }),
+  });
+}
+
 export function useThanks(from: string, to: string) {
   const { session } = useSignedIn();
   return useQuery({

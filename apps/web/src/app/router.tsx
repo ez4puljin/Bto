@@ -857,7 +857,8 @@ function hrRoutes(): RouteObject[] {
     { path: 'hr/setup', handle: { width: 'reading' }, element: view(<AttendanceSetupPage />) },
     { path: 'hr/home', handle: { width: 'wide' }, element: view(<HrHomePage />) },
     { path: 'hr/insights', handle: { width: 'wide' }, element: view(<InsightsPage />) },
-    { path: 'hr/calendar', handle: { width: 'wide' }, element: view(<CalendarPage />) },
+    // Open to every staff member, like its API: whoever does the work ticks it (ADR-0171 #9).
+    { path: 'hr/calendar', handle: { width: 'wide' }, element: <CalendarPage /> },
     {
       path: 'hr/notices',
       handle: { width: 'wide' },

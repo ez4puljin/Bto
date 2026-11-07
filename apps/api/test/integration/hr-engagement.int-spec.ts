@@ -1,7 +1,7 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { addDays, businessDate } from '@tugeel/shared/time';
 import request from 'supertest';
-import { createHttpApp } from '../harness/apps';
+import { connectAs, createHttpApp } from '../harness/apps';
 import { idempotency } from '../harness/catalog';
 import { bearer, login, seedUser } from '../harness/identity';
 
@@ -364,12 +364,20 @@ describe('hr engagement', () => {
     await http()
       .post('/api/v1/hr/events')
       .set(bearer(staffB.token))
-      .send({ kind: 'EVENT', title: 'x', fromDate: today })
+      .send({ typeId: 1, title: 'x', fromDate: today })
       .expect(403);
+    // The migration's own rows do not outlive the harness's reset: the suite makes its type.
+    const meeting = (
+      await http()
+        .post('/api/v1/hr/event-types')
+        .set(bearer(hr))
+        .send({ name: 'Хурал', color: '#7c3aed' })
+        .expect(201)
+    ).body as { id: number };
     await http()
       .post('/api/v1/hr/events')
       .set(bearer(hr))
-      .send({ kind: 'MEETING', title: 'Нийт хурал', fromDate: today, toDate: today })
+      .send({ typeId: meeting.id, title: 'Нийт хурал', fromDate: today, toDate: today })
       .expect(201);
     const calendar = (
       await http().get('/api/v1/hr/calendar').query({ month }).set(bearer(staffB.token)).expect(200)
@@ -379,6 +387,188 @@ describe('hr engagement', () => {
     // The day only: no year of birth reaches a colleague.
     expect(JSON.stringify(birthday)).not.toContain('1990');
     expect(calendar.some((row) => row.title === 'Нийт хурал')).toBe(true);
+  });
+
+  it('keeps the calendar’s types as HR’s own list (ADR-0171)', async () => {
+    const month = today.slice(0, 7);
+    const typeBody = { name: 'Бараа буух', color: '#f97316' };
+    await http()
+      .post('/api/v1/hr/event-types')
+      .set(bearer(staffB.token))
+      .send(typeBody)
+      .expect(403);
+    const created = (
+      await http().post('/api/v1/hr/event-types').set(bearer(hr)).send(typeBody).expect(201)
+    ).body as { id: number; name: string; events: number; archivedAt: string | null };
+    expect(created).toMatchObject({ name: 'Бараа буух', events: 0, archivedAt: null });
+
+    // The same name in other letters' case is the same type.
+    const twin = await http()
+      .post('/api/v1/hr/event-types')
+      .set(bearer(hr))
+      .send({ name: 'БАРАА БУУХ', color: '#000000' });
+    expect(twin.status).toBe(409);
+    expect((twin.body as { code: string }).code).toBe('DUPLICATE_VALUE');
+    await http()
+      .post('/api/v1/hr/event-types')
+      .set(bearer(hr))
+      .send({ name: 'Өнгөгүй', color: 'red' })
+      .expect(422);
+
+    const event = (
+      await http()
+        .post('/api/v1/hr/events')
+        .set(bearer(hr))
+        .send({ typeId: created.id, title: 'Ачаа', fromDate: today, toDate: today })
+        .expect(201)
+    ).body as { eventId: number };
+    const items = async () =>
+      (await http().get('/api/v1/hr/calendar').query({ month }).set(bearer(hr)).expect(200))
+        .body as {
+        eventId: number | null;
+        kind: string;
+        typeId: number | null;
+        typeName: string | null;
+        typeColor: string | null;
+      }[];
+    // An installed staff app knows only the fixed kinds: a new type reaches it as an EVENT.
+    expect((await items()).find((row) => row.eventId === event.eventId)).toMatchObject({
+      kind: 'EVENT',
+      typeId: created.id,
+      typeName: 'Бараа буух',
+      typeColor: '#f97316',
+    });
+
+    await http()
+      .put(`/api/v1/hr/event-types/${created.id}`)
+      .set(bearer(hr))
+      .send({ name: 'Бараа ирэх', color: '#ea580c' })
+      .expect(200);
+    await http()
+      .put(`/api/v1/hr/event-types/${created.id}/archived`)
+      .set(bearer(staffB.token))
+      .send({ archived: true })
+      .expect(403);
+    await http()
+      .put(`/api/v1/hr/event-types/${created.id}/archived`)
+      .set(bearer(hr))
+      .send({ archived: true })
+      .expect(200);
+
+    // Archived: out of the list, closed to new events, still on the event that holds it.
+    const active = (await http().get('/api/v1/hr/event-types').set(bearer(hr)).expect(200))
+      .body as { id: number }[];
+    expect(active.some((type) => type.id === created.id)).toBe(false);
+    const all = (
+      await http()
+        .get('/api/v1/hr/event-types')
+        .query({ includeArchived: 'true' })
+        .set(bearer(hr))
+        .expect(200)
+    ).body as { id: number; events: number }[];
+    expect(all.find((type) => type.id === created.id)?.events).toBe(1);
+    await http()
+      .post('/api/v1/hr/events')
+      .set(bearer(hr))
+      .send({ typeId: created.id, title: 'Шинэ', fromDate: today, toDate: today })
+      .expect(422);
+    expect((await items()).find((row) => row.eventId === event.eventId)?.typeName).toBe(
+      'Бараа ирэх',
+    );
+    await http()
+      .put(`/api/v1/hr/events/${event.eventId}`)
+      .set(bearer(hr))
+      .send({ typeId: created.id, title: 'Ачаа ирэв', fromDate: today, toDate: today })
+      .expect(200);
+    await http()
+      .post('/api/v1/hr/events')
+      .set(bearer(hr))
+      .send({ typeId: 999999, title: 'Алга', fromDate: today, toDate: today })
+      .expect(422);
+
+    await http()
+      .put(`/api/v1/hr/event-types/${created.id}/archived`)
+      .set(bearer(hr))
+      .send({ archived: false })
+      .expect(200);
+    await http()
+      .post('/api/v1/hr/events')
+      .set(bearer(hr))
+      .send({ typeId: created.id, title: 'Дахин', fromDate: today, toDate: today })
+      .expect(201);
+  });
+
+  it('lets whoever does the work mark an event done, and keeps who and when (ADR-0171 #8)', async () => {
+    const month = today.slice(0, 7);
+    const type = (
+      await http()
+        .post('/api/v1/hr/event-types')
+        .set(bearer(hr))
+        .send({ name: 'Тооллого', color: '#8b5cf6' })
+        .expect(201)
+    ).body as { id: number };
+    const event = (
+      await http()
+        .post('/api/v1/hr/events')
+        .set(bearer(hr))
+        .send({ typeId: type.id, title: 'Заал тоолно', fromDate: today, toDate: today })
+        .expect(201)
+    ).body as { eventId: number; doneAt: string | null };
+    expect(event.doneAt).toBeNull();
+
+    const done = async (token: string, value: boolean) =>
+      (
+        await http()
+          .put(`/api/v1/hr/events/${event.eventId}/done`)
+          .set(bearer(token))
+          .send({ done: value })
+          .expect(200)
+      ).body as { doneAt: string | null; doneByName: string | null };
+    await http().put(`/api/v1/hr/events/${event.eventId}/done`).send({ done: true }).expect(401);
+
+    const first = await done(staffA.token, true);
+    expect(first.doneAt).not.toBeNull();
+    expect(first.doneByName).toBe('Тест хэрэглэгч');
+    // Asked again by someone else: the first mark stands, who and when with it.
+    const again = await done(staffB.token, true);
+    expect(again.doneAt).toBe(first.doneAt);
+    expect(again.doneByName).toBe(first.doneByName);
+
+    const shown = (
+      await http().get('/api/v1/hr/calendar').query({ month }).set(bearer(hr)).expect(200)
+    ).body as { eventId: number | null; doneAt: string | null }[];
+    expect(shown.find((row) => row.eventId === event.eventId)?.doneAt).toBe(first.doneAt);
+
+    // Editing the event does not touch the mark.
+    const edited = (
+      await http()
+        .put(`/api/v1/hr/events/${event.eventId}`)
+        .set(bearer(hr))
+        .send({ typeId: type.id, title: 'Заал тоолов', fromDate: today, toDate: today })
+        .expect(200)
+    ).body as { doneAt: string | null };
+    expect(edited.doneAt).toBe(first.doneAt);
+
+    expect(await done(staffB.token, false)).toMatchObject({ doneAt: null, doneByName: null });
+
+    // One audit row for each real change: the second tick above changed nothing and wrote none.
+    const sql = await connectAs('app');
+    const audit = await sql.query<{ after: { done?: boolean } }>(
+      `SELECT after FROM audit_log WHERE entity = 'hr_event' AND entity_id = $1 ORDER BY id`,
+      [String(event.eventId)],
+    );
+    await sql.end();
+    expect(audit.rows.map((row) => row.after.done).filter((value) => value !== undefined)).toEqual([
+      true,
+      false,
+    ]);
+
+    await http().delete(`/api/v1/hr/events/${event.eventId}`).set(bearer(hr)).expect(204);
+    await http()
+      .put(`/api/v1/hr/events/${event.eventId}/done`)
+      .set(bearer(staffA.token))
+      .send({ done: true })
+      .expect(404);
   });
 
   it('works out the dashboard’s figures, for HR only', async () => {

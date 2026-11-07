@@ -81,6 +81,14 @@ export const CALENDAR_MARKS: Record<HrCalendarItem['kind'], string> = {
   ANNIVERSARY: 'bg-[var(--series-4)]',
 };
 
+/** An item's dot: the colour HR gave its type, or a birthday's and an anniversary's token (ADR-0171). */
+export const itemMark = (
+  item: Pick<HrCalendarItem, 'kind' | 'typeColor'>,
+): { className?: string; style?: { backgroundColor: string } } =>
+  item.typeColor
+    ? { style: { backgroundColor: item.typeColor } }
+    : { className: CALENDAR_MARKS[item.kind] };
+
 export const monthOfDate = (date: string): string => date.slice(0, 7);
 export const thisMonth = (): string => monthOfDate(businessDate());
 export const shiftMonth = (month: string, by: number): string =>

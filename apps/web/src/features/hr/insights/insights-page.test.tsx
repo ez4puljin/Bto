@@ -139,6 +139,11 @@ const CALENDAR: Schemas['HrCalendarItem'][] = [
     userId: 3,
     photoUrl: null,
     years: null,
+    typeId: null,
+    typeName: null,
+    typeColor: null,
+    doneAt: null,
+    doneByName: null,
   },
   {
     date: '2026-11-20',
@@ -150,6 +155,11 @@ const CALENDAR: Schemas['HrCalendarItem'][] = [
     userId: 2,
     photoUrl: null,
     years: 3,
+    typeId: null,
+    typeName: null,
+    typeColor: null,
+    doneAt: null,
+    doneByName: null,
   },
 ];
 

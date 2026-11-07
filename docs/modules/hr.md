@@ -77,6 +77,8 @@ Refusals: `ATTENDANCE_NO_SITE` 409, `ATTENDANCE_OUT_OF_RANGE` 409 (`site`, `dist
 
 Web (`apps/web/src/features/hr/`, `docs/ui.md` «Attendance pages»), the top-bar module «Хүний нөөц» (ADR-0144): «Ажилтан» group — «Ажилтны бүртгэл» `/hr/staff` (the one staff list, ADR-0145; a row opens `/hr/staff/:id` with the card, the password reset, the roles and scopes, the devices; `/users` redirects here), «Алба хэлтэс» `/hr/divisions`, «Цагийн хуваарь» `/hr/schedules`, «Цагийн хүсэлт» `/hr/requests`; «Ирц» group — «Ирцийн самбар» `/hr/attendance`, «Цагийн тайлан» `/hr/report`, «Ирцийн бүртгэл» `/hr/attendance/days`, «Ирцийн тохиргоо» `/hr/setup`. Staff app (`docs/modules/mobile.md`): «Ирц» (`/attendance`) and «Миний ирц» (`/attendance/history`), «Цагийн хүсэлт» (`/attendance/requests`, ADR-0144); every staff member signs in since 0.11.0.
 
+ADR-0171: the calendar's types are `hr_event_types`, kept on `/hr/setup` with `hr.attendance.manage` (`GET /hr/event-types` is open to every staff member; `POST` and `PUT /hr/event-types`, `PUT /hr/event-types/:id/archived`). `hr_events.type_id` holds an event's type; `GET /hr/calendar` still answers a `kind` from the fixed set for installed apps, with `typeId`, `typeName`, `typeColor`. `PUT /hr/events/:id/done` is open to every staff member and keeps who and when (`done_at`, `done_by`).
+
 ADR-0146 adds, under «Хүний нөөц»: «Нүүр хуудас» `/hr/home`, «Хянах самбар» `/hr/insights`, «Үйл явдлын календарь» `/hr/calendar`, «Мэдэгдэл» `/hr/notices`, «Мэдээ» `/hr/news`, «Санал хураалт» `/hr/polls`, «Судалгаа» `/hr/surveys`, «Санал хүсэлт» `/hr/feedback`, «Илгээсэн байршил» `/hr/shares`, «Ажлын байршил» `/hr/sites`; the staff app's «Хамт олон» (`/community`).
 
 ## 8. The timely.mn import

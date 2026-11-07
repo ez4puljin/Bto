@@ -4275,6 +4275,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/hr/events/{id}/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Engagement_setEventDone"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/hr/calendar": {
         parameters: {
             query?: never;
@@ -4285,6 +4301,23 @@ export interface paths {
         get: operations["Engagement_calendar"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/event-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Open to every staff member: the calendar's legend reads it. */
+        get: operations["Engagement_eventTypes"];
+        put?: never;
+        post: operations["Engagement_createEventType"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4428,6 +4461,38 @@ export interface paths {
         };
         get: operations["Engagement_locations"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/event-types/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Engagement_updateEventType"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/event-types/{id}/archived": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Engagement_archiveEventType"];
         post?: never;
         delete?: never;
         options?: never;
@@ -14191,6 +14256,9 @@ export interface components {
             district?: string | null;
             children: components["schemas"]["HrChild"][];
         };
+        HrEventDoneRequest: {
+            done: boolean;
+        };
         /** @enum {string} */
         HrCalendarItemKind: "EVENT" | "MEETING" | "HOLIDAY" | "BIRTHDAY" | "ANNIVERSARY";
         HrCalendarItem: {
@@ -14203,6 +14271,21 @@ export interface components {
             userId: number | null;
             photoUrl: string | null;
             years: number | null;
+            /** @description The type HR gave an event; null on a birthday and an anniversary (ADR-0171). */
+            typeId: number | null;
+            typeName: string | null;
+            typeColor: string | null;
+            /** @description Null on a birthday and an anniversary too: only an event is marked done (ADR-0171 #8). */
+            doneAt: string | null;
+            doneByName: string | null;
+        };
+        HrEventType: {
+            id: number;
+            name: string;
+            color: string;
+            archivedAt: string | null;
+            /** @description The events that stand on this type and are not archived. */
+            events: number;
         };
         HrThanksEntry: {
             id: number;
@@ -14295,10 +14378,16 @@ export interface components {
             status: components["schemas"]["HrFeedbackStatus"];
             reply?: string | null;
         };
-        /** @enum {string} */
-        HrEventKind: "EVENT" | "MEETING" | "HOLIDAY";
+        HrEventTypeRequest: {
+            name: string;
+            /** @description #rrggbb */
+            color: string;
+        };
+        HrEventTypeArchiveRequest: {
+            archived: boolean;
+        };
         HrEventRequest: {
-            kind: components["schemas"]["HrEventKind"];
+            typeId: number;
             title: string;
             note?: string | null;
             fromDate: string;
@@ -31692,6 +31781,40 @@ export interface operations {
             };
         };
     };
+    Engagement_setEventDone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrEventDoneRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrCalendarItem"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Engagement_calendar: {
         parameters: {
             query: {
@@ -31710,6 +31833,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HrCalendarItem"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_eventTypes: {
+        parameters: {
+            query?: {
+                includeArchived?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrEventType"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_createEventType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrEventTypeRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrEventType"];
                 };
             };
             /** @description RFC 9457 problem details */
@@ -32096,6 +32281,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HrLocationShare"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_updateEventType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrEventTypeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrEventType"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_archiveEventType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrEventTypeArchiveRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrEventType"];
                 };
             };
             /** @description RFC 9457 problem details */

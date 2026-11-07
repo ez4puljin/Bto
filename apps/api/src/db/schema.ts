@@ -177,6 +177,7 @@ export {
   hrWorkSites,
   hrEmployeeChildren,
   hrEvents,
+  hrEventTypes,
   hrFeedback,
   hrLocationShares,
   hrMessageReads,

@@ -603,6 +603,20 @@
       "when": 1793999915337,
       "tag": "0087_ebarimt_history_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1794023186910,
+      "tag": "0088_hr_event_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1794026349372,
+      "tag": "0089_hr_event_done",
+      "breakpoints": true
     }
   ]
 }

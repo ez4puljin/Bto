@@ -280,12 +280,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: ChartPie,
         permission: 'hr.attendance.view',
       },
-      {
-        to: '/hr/calendar',
-        label: 'nav.hrCalendar',
-        icon: CalendarDays,
-        permission: 'hr.attendance.view',
-      },
+      // No right: every staff member sees the calendar and ticks their work (ADR-0171 #9).
+      { to: '/hr/calendar', label: 'nav.hrCalendar', icon: CalendarDays },
     ],
   },
   {

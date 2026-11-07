@@ -611,22 +611,49 @@ export const hrLocationShares = pgTable(
 );
 
 /** HR's own entry on the calendar (ADR-0146 #6). */
+/** The calendar's types, HR's own list (ADR-0171). Archived, never deleted: old events keep theirs. */
+export const hrEventTypes = pgTable(
+  'hr_event_types',
+  {
+    id: id(),
+    name: text('name').notNull(),
+    color: text('color').notNull(),
+    /** What an installed staff app draws for this type; a type HR adds is an `EVENT`. */
+    kind: text('kind', { enum: HR_EVENT_KINDS }).notNull().default('EVENT'),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('hr_event_types_name_key').on(sql`lower(${t.name})`),
+    check('hr_event_types_name', sql`length(btrim(${t.name})) BETWEEN 1 AND 40`),
+    check('hr_event_types_color', sql`${t.color} ~ '^#[0-9a-fA-F]{6}$'`),
+    check('hr_event_types_kind', sql`${t.kind} IN ('EVENT', 'MEETING', 'HOLIDAY')`),
+  ],
+);
+
 export const hrEvents = pgTable(
   'hr_events',
   {
     id: id(),
-    kind: text('kind', { enum: HR_EVENT_KINDS }).notNull().default('EVENT'),
+    typeId: bigint('type_id', { mode: 'number' })
+      .notNull()
+      .references(() => hrEventTypes.id),
     title: text('title').notNull(),
     note: text('note'),
     fromDate: date('from_date').notNull(),
     toDate: date('to_date').notNull(),
+    /** Who marked the work done, and when (ADR-0171 #8). */
+    doneAt: timestamp('done_at', { withTimezone: true }),
+    doneBy: userRef('done_by'),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdBy: userRef('created_by').notNull(),
     createdAt: createdAt(),
   },
   (t) => [
     index('hr_events_dates_idx').on(t.fromDate, t.toDate),
-    check('hr_events_kind', sql`${t.kind} IN ('EVENT', 'MEETING', 'HOLIDAY')`),
+    check('hr_events_done', sql`(${t.doneAt} IS NULL) = (${t.doneBy} IS NULL)`),
+    index('hr_events_type_idx').on(t.typeId),
     check('hr_events_dates', sql`${t.toDate} >= ${t.fromDate}`),
   ],
 );

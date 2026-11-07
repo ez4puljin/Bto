@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import type { HrCalendarItem } from '../engagement-api';
-import { CALENDAR_MARKS, isOnDay, monthOfDate, monthWeeks } from './community-helpers';
+import { isOnDay, itemMark, monthOfDate, monthWeeks } from './community-helpers';
 
 const WEEKDAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 
@@ -75,9 +75,21 @@ export function MonthGrid(props: {
                     >
                       <span
                         aria-hidden
-                        className={cn('size-1.5 shrink-0 rounded-full', CALENDAR_MARKS[item.kind])}
+                        style={itemMark(item).style}
+                        className={cn(
+                          'size-1.5 shrink-0 rounded-full',
+                          itemMark(item).className,
+                          item.doneAt && 'opacity-40',
+                        )}
                       />
-                      <span className="truncate">{item.title}</span>
+                      <span
+                        className={cn(
+                          'truncate',
+                          item.doneAt && 'text-muted-foreground line-through',
+                        )}
+                      >
+                        {item.title}
+                      </span>
                     </span>
                   ))}
                   {onDay.length > 3 ? (
@@ -91,7 +103,12 @@ export function MonthGrid(props: {
                   {onDay.slice(0, 3).map((item) => (
                     <span
                       key={`${item.kind}-${item.eventId ?? item.userId ?? item.title}`}
-                      className={cn('size-1.5 rounded-full', CALENDAR_MARKS[item.kind])}
+                      style={itemMark(item).style}
+                      className={cn(
+                        'size-1.5 rounded-full',
+                        itemMark(item).className,
+                        item.doneAt && 'opacity-40',
+                      )}
                     />
                   ))}
                 </span>

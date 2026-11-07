@@ -201,8 +201,18 @@ const routes = (extra: Record<string, Handler> = {}): Record<string, Handler> =>
         userId: null,
         photoUrl: null,
         years: null,
+        typeId: 1,
+        typeName: 'Хамт олон',
+        typeColor: '#0071e3',
+        doneAt: null,
+        doneByName: null,
       },
     ] satisfies Schemas['HrCalendarItem'][]),
+  'GET /api/v1/hr/event-types': () =>
+    json([
+      { id: 1, name: 'Хамт олон', color: '#0071e3', archivedAt: null, events: 1 },
+      { id: 2, name: 'Бараа буух', color: '#f97316', archivedAt: null, events: 0 },
+    ] satisfies Schemas['HrEventType'][]),
   ...extra,
 });
 
@@ -545,6 +555,52 @@ describe('the calendar', () => {
     await waitFor(() => expect(calls(fetchMock, 'DELETE', '/api/v1/hr/events/5')).toHaveLength(1));
   });
 
+  it('opens to a staff member without any HR right, who ticks and does not manage', async () => {
+    const user = userEvent.setup();
+    const month = businessDate().slice(0, 7);
+    const fetchMock = signedIn(
+      { ...HR_USER, id: 22, username: 'staff', permissions: [], roles: [] },
+      routes({
+        'PUT /api/v1/hr/events/5/done': () => json({}),
+      }),
+    );
+    renderApp(`/hr/calendar?day=${month}-15`, fetchMock);
+    await user.click(
+      await screen.findByRole('checkbox', {
+        name: texts.calendar.doneFor.replace('{{title}}', 'Хамт олны өдөр'),
+      }),
+    );
+    await waitFor(() =>
+      expect(calls(fetchMock, 'PUT', '/api/v1/hr/events/5/done')).toHaveLength(1),
+    );
+    expect(screen.queryByRole('button', { name: texts.calendar.create })).toBeNull();
+    expect(screen.queryByRole('link', { name: texts.calendar.types })).toBeNull();
+  });
+
+  it('marks an event done from its line', async () => {
+    const user = userEvent.setup();
+    const month = businessDate().slice(0, 7);
+    const fetchMock = signedIn(
+      HR_USER,
+      routes({
+        'PUT /api/v1/hr/events/5/done': async (request) =>
+          json({ ...((await request.clone().json()) as object) }),
+      }),
+    );
+    renderApp(`/hr/calendar?day=${month}-15`, fetchMock);
+    await user.click(
+      await screen.findByRole('checkbox', {
+        name: texts.calendar.doneFor.replace('{{title}}', 'Хамт олны өдөр'),
+      }),
+    );
+    await waitFor(() =>
+      expect(calls(fetchMock, 'PUT', '/api/v1/hr/events/5/done')).toHaveLength(1),
+    );
+    expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/hr/events/5/done')[0])).toEqual({
+      done: true,
+    });
+  });
+
   it('creates an event of two days', async () => {
     const user = userEvent.setup();
     const fetchMock = signedIn(
@@ -556,12 +612,15 @@ describe('the calendar', () => {
     );
     renderApp('/hr/calendar?new=1', fetchMock);
     const dialog = await screen.findByRole('dialog');
-    await user.selectOptions(within(dialog).getByLabelText(texts.calendar.fields.kind), 'MEETING');
+    await user.selectOptions(
+      within(dialog).getByLabelText(texts.calendar.fields.kind),
+      await within(dialog).findByRole('option', { name: 'Бараа буух' }),
+    );
     await user.type(within(dialog).getByLabelText(texts.calendar.fields.title), 'Жилийн хурал');
     await user.click(within(dialog).getByRole('button', { name: mn.common.create }));
     await waitFor(() => expect(calls(fetchMock, 'POST', '/api/v1/hr/events')).toHaveLength(1));
     expect(await bodyOf(calls(fetchMock, 'POST', '/api/v1/hr/events')[0])).toMatchObject({
-      kind: 'MEETING',
+      typeId: 2,
       title: 'Жилийн хурал',
       fromDate: businessDate(),
       toDate: businessDate(),
