@@ -18,7 +18,7 @@ export type BankUpload = Schemas['BankStatementUpload'];
 
 const ROOT = ['bank-statements'] as const;
 
-/** «Тооцоо хаах» (ADR-0169): how many statements each day of a month holds. */
+/** «Банкны хуулга хаах» (ADR-0169): how many statements each day of a month holds. */
 export function useBankCalendar(month: string) {
   const api = useApiClient();
   return useQuery({

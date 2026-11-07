@@ -151,7 +151,7 @@ export const FINANCE_LIMITS = {
 } as const;
 
 /**
- * «Тооцоо хаах» (ADR-0169): a bank statement's line is an ordinary one, a bank fee or a card
+ * «Банкны хуулга хаах» (ADR-0169): a bank statement's line is an ordinary one, a bank fee or a card
  * settlement; the last two are filled from the settings and stay locked on the line.
  */
 export const BANK_LINE_KINDS = ['NORMAL', 'FEE', 'SETTLEMENT'] as const;

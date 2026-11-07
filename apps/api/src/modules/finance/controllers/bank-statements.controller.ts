@@ -84,7 +84,7 @@ function detailDto(row: BankStatementDetail): BankStatementDetailDto {
 }
 
 /**
- * «Тооцоо хаах» (ADR-0169): the bank's statements by day, their lines filled and written to the books,
+ * «Банкны хуулга хаах» (ADR-0169): the bank's statements by day, their lines filled and written to the books,
  * Erkhet's import files, the rules.
  */
 @ApiTags('finance')

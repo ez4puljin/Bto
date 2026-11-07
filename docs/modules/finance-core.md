@@ -976,7 +976,7 @@ Consequences:
 | Waits | Until then | Then |
 |---|---|---|
 | Fixed-asset register and depreciation runs (§16.2) | the register in a spreadsheet, depreciation as a monthly manual entry, balances in the opening trial balance | after go-live |
-| Bank-statement import (§16.2) | **built early, 2026-11-07, ADR-0169** («Тооцоо хаах» in `modules/finance`, posting through the existing vouchers and entries); cash and bank vouchers can still be typed by hand | built |
+| Bank-statement import (§16.2) | **built early, 2026-11-07, ADR-0169** («Банкны хуулга хаах» in `modules/finance`, posting through the existing vouchers and entries); cash and bank vouchers can still be typed by hand | built |
 | Drafts with approval, soft close, override, the pending list, HELD (ADR-0071 #12, ADR-0075 #2, #6) | manual entries post at once and are audited; a closed month refuses | after go-live |
 | The rights beyond `periods.close` / `periods.reopen`, a per-company grant screen (ADR-0075 #7, #8) | today's finance permissions: `identity.user_company_roles` exists since P1 as a mirror of `user_roles` (ADR-0084 #2), so it grants exactly them | with the PMS |
 | ~~`finRead`, the scope setting, scoped services, the isolation tests (ADR-0076 #2–#4, #10), the TESTPMS fixture, A1, A2~~ **cancelled by ADR-0088** (each system its own books) | one company per installation | never (was: at the PMS kickoff), before the PMS posts |

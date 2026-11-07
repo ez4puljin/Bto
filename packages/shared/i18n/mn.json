@@ -137,7 +137,7 @@
     "hrShares": "Илгээсэн байршил",
     "hrSites": "Ажлын байршил",
     "transactions": "Гүйлгээ",
-    "bankStatements": "Тооцоо хаах",
+    "bankStatements": "Банкны хуулга хаах",
     "supplierCategories": "Нийлүүлэгчийн ангилал",
     "ebarimtCheck": "Ebarimt"
   },
@@ -6019,7 +6019,7 @@
       "ZAR": "Өмнөд Африкийн ранд"
     },
     "bankStatements": {
-      "title": "Тооцоо хаах",
+      "title": "Банкны хуулга хаах",
       "description": "Банкны хуулга боловсруулалт",
       "tabsLabel": "Хэсэг",
       "tabs": {

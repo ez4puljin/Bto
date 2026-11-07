@@ -292,7 +292,7 @@ export const financeReconcileRuns = pgTable(
 );
 
 /**
- * «Тооцоо хаах» (ADR-0169): one uploaded bank statement, its account as the bank wrote it. The money
+ * «Банкны хуулга хаах» (ADR-0169): one uploaded bank statement, its account as the bank wrote it. The money
  * account is worked out from the number; `money_account_id` holds the accountant's own link when the
  * number could not be recognised. Deleted (with its lines) only while nothing of it is in the books.
  */
@@ -384,7 +384,7 @@ export const bankStatementLines = pgTable(
 );
 
 /**
- * «Тооцоо хаах»'s rules, one row, absent until saved (ADR-0169 #5): what a card settlement and a bank
+ * «Банкны хуулга хаах»'s rules, one row, absent until saved (ADR-0169 #5): what a card settlement and a bank
  * fee are filled with, the accounts offered first, and the Erkhet party code of a line without a party.
  */
 export const bankStatementSettings = pgTable(
