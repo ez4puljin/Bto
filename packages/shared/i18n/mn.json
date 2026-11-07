@@ -4929,6 +4929,8 @@
       "take": "Бэлдэж эхлэх",
       "cardParts": "Агуулахын бэлтгэл",
       "cardProgress": "{{done}}/{{count}} бэлэн",
+      "cardExpand": "Агуулах бүрээр дэлгэх",
+      "cardCollapse": "Хураах",
       "card": {
         "OPEN": "Эхлээгүй",
         "PICKING": "Бэлдэж буй",

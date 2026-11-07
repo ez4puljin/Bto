@@ -6,7 +6,15 @@ import {
   PRINT_KINDS,
   type PrintKind,
 } from '@tugeel/shared/sales';
-import { AlertTriangle, ArrowRightLeft, CalendarDays, Ellipsis, Plus, Printer } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRightLeft,
+  CalendarDays,
+  Ellipsis,
+  Minus,
+  Plus,
+  Printer,
+} from 'lucide-react';
 import {
   type DragEvent,
   type MouseEvent,
@@ -567,52 +575,73 @@ function Card({
 }
 
 /**
- * The warehouses' parts of the picking (ADR-0126 #2): one row per warehouse with its tone, the
- * picker under the name, and how many of them are picked.
+ * The warehouses' parts of the picking (ADR-0126 #2): how many of them are picked, and behind the
+ * + button one row per warehouse with its tone and the picker under the name. Each card starts
+ * folded, so a column keeps its cards in view (owner, 2026-11-07).
  */
 function PickParts({ picks }: { picks: OrderCard['picks'] }) {
   const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
   const done = picks.filter((part) => part.status === 'DONE').length;
+  const toggle = t(open ? 'sales.pick.cardCollapse' : 'sales.pick.cardExpand');
   return (
     <section
       className="mt-2 overflow-hidden rounded-md border border-border/70"
       aria-label={t('sales.pick.cardParts')}
     >
-      <div className="flex items-center justify-between gap-2 px-2 pt-1 text-xs text-muted-foreground">
-        <span>{t('sales.pick.cardParts')}</span>
-        <span className={cn('font-medium', done === picks.length && 'text-success')}>
-          {t('sales.pick.cardProgress', { done, count: picks.length })}
+      <button
+        type="button"
+        className="block w-full px-2 pt-1 pb-1 text-left text-xs text-muted-foreground outline-none hover:text-foreground"
+        aria-expanded={open}
+        title={toggle}
+        onClick={() => setOpen((shown) => !shown)}
+      >
+        <span className="flex items-center gap-2">
+          <span className="min-w-0 flex-1 truncate">{t('sales.pick.cardParts')}</span>
+          <span className={cn('shrink-0 font-medium', done === picks.length && 'text-success')}>
+            {t('sales.pick.cardProgress', { done, count: picks.length })}
+          </span>
+          {open ? (
+            <Minus className="size-3.5 shrink-0" aria-hidden />
+          ) : (
+            <Plus className="size-3.5 shrink-0" aria-hidden />
+          )}
+          <span className="sr-only">{toggle}</span>
         </span>
-      </div>
-      <div className="mx-2 mt-1 mb-1 h-1 overflow-hidden rounded-full bg-fill" aria-hidden>
-        <div
-          className="h-full rounded-full bg-success transition-[width]"
-          style={{ width: `${picks.length === 0 ? 0 : Math.round((done / picks.length) * 100)}%` }}
-        />
-      </div>
-      <ul className="divide-y divide-border/60">
-        {picks.map((part) => {
-          const tone = PICK_TONES[part.status];
-          return (
-            <li
-              key={part.warehouseId}
-              className={cn('flex items-center gap-1.5 px-2 py-1 text-xs', tone.row)}
-              title={t(`sales.pick.status.${part.status}`, { name: part.pickerName ?? '' })}
-            >
-              <span className={cn('size-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate">{part.warehouseName}</span>
-                {part.pickerName ? (
-                  <span className="block truncate text-muted-foreground">{part.pickerName}</span>
-                ) : null}
-              </span>
-              <span className={cn('shrink-0 font-medium', tone.text)}>
-                {t(`sales.pick.card.${part.status}`)}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+        <span className="mt-1 block h-1 overflow-hidden rounded-full bg-fill" aria-hidden>
+          <span
+            className="block h-full rounded-full bg-success transition-[width]"
+            style={{
+              width: `${picks.length === 0 ? 0 : Math.round((done / picks.length) * 100)}%`,
+            }}
+          />
+        </span>
+      </button>
+      {open ? (
+        <ul className="divide-y divide-border/60">
+          {picks.map((part) => {
+            const tone = PICK_TONES[part.status];
+            return (
+              <li
+                key={part.warehouseId}
+                className={cn('flex items-center gap-1.5 px-2 py-1 text-xs', tone.row)}
+                title={t(`sales.pick.status.${part.status}`, { name: part.pickerName ?? '' })}
+              >
+                <span className={cn('size-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{part.warehouseName}</span>
+                  {part.pickerName ? (
+                    <span className="block truncate text-muted-foreground">{part.pickerName}</span>
+                  ) : null}
+                </span>
+                <span className={cn('shrink-0 font-medium', tone.text)}>
+                  {t(`sales.pick.card.${part.status}`)}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
     </section>
   );
 }
