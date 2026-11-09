@@ -8,6 +8,8 @@ import {
   isCancellable,
   isEditable,
   isFinished,
+  LINE_EDIT_LIMIT,
+  LINE_EDIT_STATUSES,
   MANAGER_EDITABLE_STATUSES,
   ORDER_LIMITS,
   type OrderChannel,
@@ -65,6 +67,7 @@ import {
   orderStatusEvents,
   salesBoards,
   salesOrderChanges,
+  salesOrderExcludedLines,
   salesOrderLineParts,
   salesOrderLines,
   salesOrders,
@@ -102,6 +105,23 @@ export interface OrderInput {
   paymentMethod: PaymentMethod;
   note: string | null;
   lines: readonly OrderLineInput[];
+}
+
+/**
+ * One «Засвар» save from the board (ADR-0175): quantities changed in place, lines taken off or
+ * put back, products added. Untouched lines keep everything; changed ones keep the order's prices.
+ */
+export interface LineEditInput {
+  /** The order's updatedAt as the dialog read it: required, a newer change answers ORDER_CHANGED. */
+  expectedUpdatedAt: string;
+  /** New quantities in the line's unit. */
+  lines: readonly { lineId: number; qty: Decimal }[];
+  /** Lines taken off (kept in red, ADR-0175 #2). */
+  exclude: readonly number[];
+  /** Taken-off lines put back, at their old quantity unless one is given. */
+  restore: readonly { excludedId: number; qty: Decimal | null }[];
+  /** Products added, each in its home warehouse at today's prices. */
+  add: readonly OrderLineInput[];
 }
 
 /** One line of the pick form (ADR-0056 #5): the quantity to pick and where from. */
@@ -374,6 +394,376 @@ export class SalesOrdersService implements OnModuleInit {
       await this.recordChange(tx, ctx, previous, await this.queries.detail(ctx, id, tx));
     });
     return this.queries.detail(ctx, id);
+  }
+
+  /**
+   * The board's «Засвар» (ADR-0175): a keeper changes the lines of the warehouses they write, the
+   * office every line, in place and while the order is reserved or being picked. A changed line
+   * keeps the order's prices (quoted again on its price date), an added one takes today's; a line
+   * taken off moves to `sales_order_excluded_lines` and can be put back with its frozen prices. A
+   * confirmed part is changed only by a lead or the office, its goods going back to their shelves
+   * first. Reservations are taken again for the parts not yet confirmed, the credit is checked when
+   * the total grows, and the save is a version of the order's history.
+   */
+  async editLines(ctx: AuthContext, id: number, input: LineEditInput): Promise<OrderDetail> {
+    await inTransaction(this.db, async (tx) => {
+      const { order } = await this.lockSeen(ctx, tx, id);
+      if (order.updatedAt.toISOString() !== new Date(input.expectedUpdatedAt).toISOString()) {
+        throw new AppError('ORDER_CHANGED', 'the order changed since it was read', {
+          updatedAt: order.updatedAt.toISOString(),
+        });
+      }
+      if (!LINE_EDIT_STATUSES.includes(order.status)) throw stateError(order, 'LINE_EDIT');
+      const office =
+        ctx.permissions.has('sales.orders.manage') || ctx.permissions.has('sales.boards.manage');
+      const lead = office || ctx.permissions.has('sales.orders.pickLead');
+      if (!office && !ctx.permissions.has('sales.orders.pick')) {
+        throw new AppError('FORBIDDEN', 'editing lines needs the right to pick', {
+          permission: 'sales.orders.pick',
+        });
+      }
+      const touches =
+        input.lines.length + input.exclude.length + input.restore.length + input.add.length;
+      if (touches === 0) throw invalid('lines', 'min', 'nothing to change');
+      if (touches > LINE_EDIT_LIMIT) throw invalid('lines', 'max', 'too many lines at once');
+
+      const before = await this.linesOf(tx, id);
+      const byId = new Map(before.map((line) => [line.id, line]));
+      const seen = new Set<number>();
+      const lineOf = (lineId: number, path: string): LineRow => {
+        const line = byId.get(lineId);
+        if (!line) throw notFound('sales order line', lineId);
+        if (seen.has(lineId)) throw invalid(path, 'unique', 'a line is changed once per save');
+        seen.add(lineId);
+        return line;
+      };
+      const changed = input.lines.map((change, index) => {
+        if (!change.qty.gt(0)) throw invalid(`lines.${index}.qty`, 'min', 'a positive quantity');
+        const line = lineOf(change.lineId, `lines.${index}`);
+        const qtyBase = change.qty.times(line.factorSnapshot).toDecimalPlaces(3);
+        if (!qtyBase.gt(0)) throw invalid(`lines.${index}.qty`, 'min', 'a positive quantity');
+        return { line, qty: change.qty, qtyBase };
+      });
+      const excluded = input.exclude.map((lineId, index) => lineOf(lineId, `exclude.${index}`));
+      const restoreIds = [...new Set(input.restore.map((entry) => entry.excludedId))];
+      if (restoreIds.length !== input.restore.length) {
+        throw invalid('restore', 'unique', 'a line is put back once per save');
+      }
+      const restoreRows =
+        restoreIds.length === 0
+          ? []
+          : await tx
+              .select()
+              .from(salesOrderExcludedLines)
+              .where(
+                and(
+                  eq(salesOrderExcludedLines.orderId, id),
+                  idIn(salesOrderExcludedLines.id, restoreIds),
+                  isNull(salesOrderExcludedLines.restoredAt),
+                ),
+              )
+              .for('update');
+      const restoreById = new Map(restoreRows.map((row) => [row.id, row]));
+      const restored = input.restore.map((entry, index) => {
+        const row = restoreById.get(entry.excludedId);
+        if (!row) throw notFound('excluded line', entry.excludedId);
+        if (entry.qty !== null && !entry.qty.gt(0)) {
+          throw invalid(`restore.${index}.qty`, 'min', 'a positive quantity');
+        }
+        const qty = entry.qty ?? row.qty;
+        const qtyBase = qty.times(row.factorSnapshot).toDecimalPlaces(3);
+        if (!qtyBase.gt(0)) throw invalid(`restore.${index}.qty`, 'min', 'a positive quantity');
+        return { row, qty, qtyBase, requote: !qty.equals(row.qty) };
+      });
+      const added = [];
+      for (const [index, line] of input.add.entries()) {
+        if (!line.qty.gt(0)) throw invalid(`add.${index}.qty`, 'min', 'a positive quantity');
+        added.push(await this.units.toBase(line.productUnitId, line.qty, tx));
+      }
+      const homes = await this.assertOrderable(
+        tx,
+        added.map((line) => line.productId),
+      );
+
+      // Whose lines: a keeper only the warehouses they write; a confirmed part a lead only.
+      const warehouses = new Set<number>([
+        ...changed.map((entry) => entry.line.warehouseId),
+        ...excluded.map((line) => line.warehouseId),
+        ...restored.map((entry) => entry.row.warehouseId),
+        ...added.map((line) => homes.get(line.productId) ?? 0),
+      ]);
+      if (!office) {
+        for (const warehouseId of warehouses) this.scope.assertCanWriteWarehouse(ctx, warehouseId);
+      }
+      const parts = (await this.picks.partsOfOrders([id], tx)).get(id) ?? [];
+      const done = parts.filter(
+        (part) => part.status === 'DONE' && warehouses.has(part.warehouseId),
+      );
+      const [firstDone] = done;
+      if (firstDone && !lead) {
+        throw new AppError(
+          'LINE_EDIT_PART_DONE',
+          `the part of warehouse ${firstDone.warehouseId} is confirmed`,
+          { warehouseId: firstDone.warehouseId, warehouse: firstDone.warehouseName },
+        );
+      }
+
+      const previous = await this.queries.detail(ctx, id, tx);
+      await this.picks.unpickInTx(
+        tx,
+        ctx,
+        order,
+        done.map((part) => part.warehouseId),
+      );
+      const totalBefore = order.total ?? new Decimal(0);
+
+      // Taken off: the line and its prices move to the excluded lines, the line goes.
+      for (const line of excluded) {
+        const frozen = await tx
+          .select()
+          .from(salesOrderLineParts)
+          .where(eq(salesOrderLineParts.lineId, line.id))
+          .orderBy(asc(salesOrderLineParts.partNo));
+        await tx.insert(salesOrderExcludedLines).values({
+          orderId: id,
+          productId: line.productId,
+          productUnitId: line.productUnitId,
+          qty: line.qty,
+          factorSnapshot: line.factorSnapshot,
+          qtyBase: line.qtyBase,
+          warehouseId: line.warehouseId,
+          subtotal: line.subtotal,
+          discountAmount: line.discountAmount,
+          total: line.total,
+          parts: frozen.map(frozenPart),
+          excludedBy: ctx.userId,
+        });
+        await tx.delete(salesOrderLineParts).where(eq(salesOrderLineParts.lineId, line.id));
+        await tx.delete(salesOrderLines).where(eq(salesOrderLines.id, line.id));
+      }
+
+      // Changed quantities, in place: the line keeps its id, unit and factor.
+      for (const entry of changed) {
+        await tx
+          .update(salesOrderLines)
+          .set({
+            qty: entry.qty,
+            qtyBase: entry.qtyBase,
+            qtyApproved: new Decimal(0),
+            qtyBackordered: new Decimal(0),
+          })
+          .where(eq(salesOrderLines.id, entry.line.id));
+      }
+
+      // Put back and added lines take the next numbers.
+      let lineNo = before.reduce((max, line) => Math.max(max, line.lineNo), 0);
+      const requote: { lineId: number; productUnitId: number; qty: Decimal; today: boolean }[] =
+        changed.map((entry) => ({
+          lineId: entry.line.id,
+          productUnitId: entry.line.productUnitId,
+          qty: entry.qty,
+          today: false,
+        }));
+      for (const entry of restored) {
+        lineNo += 1;
+        const [line] = await tx
+          .insert(salesOrderLines)
+          .values({
+            orderId: id,
+            lineNo,
+            productId: entry.row.productId,
+            productUnitId: entry.row.productUnitId,
+            qty: entry.qty,
+            factorSnapshot: entry.row.factorSnapshot,
+            qtyBase: entry.qtyBase,
+            warehouseId: entry.row.warehouseId,
+            subtotal: entry.requote ? null : entry.row.subtotal,
+            discountAmount: entry.requote ? null : entry.row.discountAmount,
+            total: entry.requote ? null : entry.row.total,
+          })
+          .returning({ id: salesOrderLines.id });
+        if (!line) throw new Error('a restored line was not written');
+        if (entry.requote) {
+          requote.push({
+            lineId: line.id,
+            productUnitId: entry.row.productUnitId,
+            qty: entry.qty,
+            today: false,
+          });
+        } else {
+          const frozen = entry.row.parts as FrozenPart[];
+          if (frozen.length > 0) {
+            await tx
+              .insert(salesOrderLineParts)
+              .values(frozen.map((part, index) => partRow(line.id, index + 1, part)));
+          }
+        }
+        await tx
+          .update(salesOrderExcludedLines)
+          .set({ restoredBy: ctx.userId, restoredAt: sql`now()` })
+          .where(eq(salesOrderExcludedLines.id, entry.row.id));
+      }
+      for (const [index, line] of added.entries()) {
+        lineNo += 1;
+        const qty = input.add[index]?.qty ?? line.qtyBase;
+        const [row] = await tx
+          .insert(salesOrderLines)
+          .values({
+            orderId: id,
+            lineNo,
+            productId: line.productId,
+            productUnitId: line.unitId,
+            qty,
+            factorSnapshot: line.factorSnapshot,
+            qtyBase: line.qtyBase,
+            warehouseId: homes.get(line.productId) ?? 0,
+          })
+          .returning({ id: salesOrderLines.id });
+        if (!row) throw new Error('an added line was not written');
+        requote.push({ lineId: row.id, productUnitId: line.unitId, qty, today: true });
+      }
+      const today = businessDate();
+      await this.freezePrices(tx, order, requote, order.priceDate ?? today, today);
+
+      const lines = await this.linesOf(tx, id);
+      if (lines.length === 0) throw invalid('lines', 'min', 'an order needs a line');
+      const sums = lines.reduce(
+        (acc, line) => ({
+          subtotal: acc.subtotal.plus(line.subtotal ?? 0),
+          discountTotal: acc.discountTotal.plus(line.discountAmount ?? 0),
+          total: acc.total.plus(line.total ?? 0),
+        }),
+        { subtotal: new Decimal(0), discountTotal: new Decimal(0), total: new Decimal(0) },
+      );
+      if (sums.total.gt(totalBefore)) {
+        const customer = await this.customers.lockForUpdate(tx, order.customerId);
+        await this.assertCredit(tx, customer, id, sums.total);
+      }
+      await tx
+        .update(salesOrders)
+        .set({ ...sums, updatedAt: sql`now()` })
+        .where(eq(salesOrders.id, id));
+
+      // Reservations again for every part not confirmed (a confirmed one's goods are in STAGING).
+      const confirmed = await this.picks.doneWarehousesInTx(tx, id);
+      const reserved = await this.reservations.replaceInTx(tx, {
+        docType: 'SO',
+        docId: id,
+        lines: lines
+          .filter((line) => !confirmed.has(line.warehouseId))
+          .map((line) => ({
+            lineId: line.id,
+            warehouseId: line.warehouseId,
+            productId: line.productId,
+            qtyBase: line.qtyBase,
+          })),
+      });
+      for (const entry of reserved) {
+        await tx
+          .update(salesOrderLines)
+          .set({ qtyApproved: entry.reserved, qtyBackordered: entry.backordered })
+          .where(eq(salesOrderLines.id, entry.lineId));
+      }
+      await this.picks.syncInTx(tx, id);
+      await this.audit.record(tx, ctx, {
+        action: 'UPDATE',
+        entity: 'sales_orders',
+        entityId: id,
+        after: {
+          lineEdit: true,
+          changed: changed.length,
+          excluded: excluded.length,
+          restored: restored.length,
+          added: added.length,
+          reopened: done.map((part) => part.warehouseId),
+          total: sums.total.toFixed(0),
+          backordered: reserved.filter((entry) => entry.backordered.gt(0)).length,
+        },
+      });
+      await this.recordChange(tx, ctx, previous, await this.queries.detail(ctx, id, tx));
+    });
+    return this.queries.detail(ctx, id);
+  }
+
+  /**
+   * Prices these lines and freezes the parts: a changed or restored line on the order's price date
+   * (its old prices), an added one today; a line with no price that day answers PRICE_MISSING.
+   */
+  private async freezePrices(
+    tx: Tx,
+    order: OrderRow,
+    lines: readonly { lineId: number; productUnitId: number; qty: Decimal; today: boolean }[],
+    priceDate: string,
+    today: string,
+  ): Promise<void> {
+    const groups: [string, typeof lines][] = [
+      [priceDate, lines.filter((line) => !line.today)],
+      [today, lines.filter((line) => line.today)],
+    ];
+    for (const [date, group] of groups) {
+      if (group.length === 0) continue;
+      const quote = await this.quotes.quote(
+        {
+          list: 'WHOLESALE',
+          date,
+          pipelineId: order.pipelineId,
+          lines: group.map((line) => ({ productUnitId: line.productUnitId, qty: line.qty })),
+        },
+        tx,
+      );
+      const unpriced = quote.lines.flatMap((quoted, index) =>
+        quoted.result.priced ? [] : [index],
+      );
+      if (unpriced.length > 0) {
+        throw new AppError('PRICE_MISSING', 'a line has no price', { count: unpriced.length });
+      }
+      await tx.delete(salesOrderLineParts).where(
+        idIn(
+          salesOrderLineParts.lineId,
+          group.map((line) => line.lineId),
+        ),
+      );
+      const parts: (typeof salesOrderLineParts.$inferInsert)[] = [];
+      for (const [index, line] of group.entries()) {
+        const result = quote.lines[index]?.result;
+        if (!result?.priced) continue;
+        await tx
+          .update(salesOrderLines)
+          .set({
+            subtotal: result.subtotal,
+            discountAmount: result.discountAmount,
+            total: result.total,
+          })
+          .where(eq(salesOrderLines.id, line.lineId));
+        result.parts.forEach((part, partIndex) => {
+          parts.push({
+            lineId: line.lineId,
+            partNo: partIndex + 1,
+            productUnitId: part.unitId,
+            uomName: part.uomName,
+            basis: part.basis,
+            qty: part.qty,
+            factorSnapshot: part.factorSnapshot,
+            qtyBase: part.qtyBase,
+            listPrice: part.listPrice,
+            unitPrice: part.unitPrice,
+            subtotal: part.subtotal,
+            discountAmount: part.discountAmount,
+            total: part.total,
+            applied: part.applied.map((applied) => ({
+              programId: applied.programId,
+              name: applied.name,
+              scope: applied.scope,
+              effect: applied.effect,
+              threshold: applied.threshold.toFixed(),
+              value: applied.value.toFixed(),
+              amount: applied.amount?.toFixed(0) ?? null,
+            })),
+          });
+        });
+      }
+      if (parts.length > 0) await tx.insert(salesOrderLineParts).values(parts);
+    }
   }
 
   /** The save's version (ADR-0147), under the order's lock; a save that changed nothing makes none. */
@@ -1581,4 +1971,60 @@ function stateError(order: OrderRow, expected: string): AppError {
     status: order.status,
     expected,
   });
+}
+
+/** A frozen price part as an excluded line keeps it (ADR-0175 #2): decimals as strings. */
+interface FrozenPart {
+  productUnitId: number;
+  uomName: string;
+  basis: (typeof salesOrderLineParts.$inferSelect)['basis'];
+  qty: string;
+  factorSnapshot: string;
+  qtyBase: string;
+  listPrice: string;
+  unitPrice: string;
+  subtotal: string;
+  discountAmount: string;
+  total: string;
+  applied: unknown;
+}
+
+function frozenPart(part: typeof salesOrderLineParts.$inferSelect): FrozenPart {
+  return {
+    productUnitId: part.productUnitId,
+    uomName: part.uomName,
+    basis: part.basis,
+    qty: part.qty.toFixed(),
+    factorSnapshot: part.factorSnapshot.toFixed(),
+    qtyBase: part.qtyBase.toFixed(),
+    listPrice: part.listPrice.toFixed(),
+    unitPrice: part.unitPrice.toFixed(),
+    subtotal: part.subtotal.toFixed(),
+    discountAmount: part.discountAmount.toFixed(),
+    total: part.total.toFixed(),
+    applied: part.applied,
+  };
+}
+
+function partRow(
+  lineId: number,
+  partNo: number,
+  part: FrozenPart,
+): typeof salesOrderLineParts.$inferInsert {
+  return {
+    lineId,
+    partNo,
+    productUnitId: part.productUnitId,
+    uomName: part.uomName,
+    basis: part.basis,
+    qty: new Decimal(part.qty),
+    factorSnapshot: new Decimal(part.factorSnapshot),
+    qtyBase: new Decimal(part.qtyBase),
+    listPrice: new Decimal(part.listPrice),
+    unitPrice: new Decimal(part.unitPrice),
+    subtotal: new Decimal(part.subtotal),
+    discountAmount: new Decimal(part.discountAmount),
+    total: new Decimal(part.total),
+    applied: part.applied,
+  };
 }

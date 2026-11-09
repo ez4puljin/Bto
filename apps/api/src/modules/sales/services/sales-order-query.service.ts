@@ -37,6 +37,7 @@ import { type CustomerOverdue, CustomersService } from '../../partners';
 import {
   orderStatusEvents,
   salesOrderChanges,
+  salesOrderExcludedLines,
   salesBoards,
   salesOrderLineParts,
   salesOrderLines,
@@ -89,6 +90,23 @@ export interface OrderLine {
   discountAmount: Decimal | null;
   total: Decimal | null;
   parts: OrderPart[];
+}
+
+/** A line taken off the order (ADR-0175 #2), shown in red until it is put back. */
+export interface ExcludedLine {
+  id: number;
+  productId: number;
+  productSku: string;
+  productName: string;
+  productUnitId: number;
+  unitName: string;
+  qty: Decimal;
+  qtyBase: Decimal;
+  baseUnitName: string;
+  warehouseId: number;
+  total: Decimal | null;
+  excludedByName: string | null;
+  excludedAt: Date;
 }
 
 /** One saved edit (ADR-0147), the lines only of the warehouses the caller sees. */
@@ -144,6 +162,8 @@ export interface OrderDetail extends Omit<
   lines: OrderLine[];
   /** Each warehouse's part of the picking (ADR-0126 #2), the caller's warehouses only. */
   picks: PickPart[];
+  /** The lines taken off (ADR-0175 #2), the caller's warehouses only. */
+  excludedLines: ExcludedLine[];
   events: OrderEvent[];
   moves: StageMove[];
   changes: OrderChange[];
@@ -223,6 +243,15 @@ export interface OrderCard {
   stageEnteredAt: Date;
   /** The warehouses' parts the caller sees (ADR-0126 #2, #3). */
   picks: CardPick[];
+  /** The lines taken off that the caller sees (ADR-0175 #2), the first few named. */
+  excluded: CardExcluded;
+}
+
+/** The red block of a card: how many lines were taken off, their sum and the first few. */
+export interface CardExcluded {
+  count: number;
+  total: Decimal;
+  lines: { productName: string; qty: Decimal; unitName: string }[];
 }
 
 /** A part as the card shows it. */
@@ -430,6 +459,10 @@ export class SalesOrderQueryService {
     );
     const parts = await this.picks.partsOfOrders(rows.map((row) => int(row.id)));
     const visible = access.lineWarehouses;
+    const excluded = await this.excludedOf(
+      rows.map((row) => int(row.id)),
+      visible,
+    );
     return stages.map((stage) => {
       const sums = totals.find((entry) => entry.stageId === stage.id);
       return {
@@ -465,6 +498,7 @@ export class SalesOrderQueryService {
                   status,
                   pickerName,
                 })),
+              excluded: cardExcluded(excluded.get(int(row.id)) ?? []),
               createdByName: createdBy === null ? null : (names.get(createdBy) ?? null),
               stageEnteredAt:
                 row.stage_entered_at instanceof Date
@@ -586,6 +620,62 @@ export class SalesOrderQueryService {
   }
 
   /** Full orders, batched: lines, parts, products, units, customers, events, moves, names. */
+  /** The lines still taken off these orders (ADR-0175 #2), of the warehouses the caller sees. */
+  async excludedOf(
+    orderIds: readonly number[],
+    visible: ReadonlySet<number> | null,
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, ExcludedLine[]>> {
+    const result = new Map<number, ExcludedLine[]>();
+    if (orderIds.length === 0) return result;
+    const rows = (
+      await executor
+        .select()
+        .from(salesOrderExcludedLines)
+        .where(
+          and(
+            idIn(salesOrderExcludedLines.orderId, orderIds),
+            isNull(salesOrderExcludedLines.restoredAt),
+          ),
+        )
+        .orderBy(asc(salesOrderExcludedLines.id))
+    ).filter((row) => visible === null || visible.has(row.warehouseId));
+    if (rows.length === 0) return result;
+    const products = new Map(
+      (await this.catalog.getMany([...new Set(rows.map((row) => row.productId))], executor)).map(
+        (product) => [product.id, product],
+      ),
+    );
+    const units = await this.units.describe(
+      [...new Set(rows.map((row) => row.productUnitId))],
+      executor,
+    );
+    const names = await this.names.namesOf(
+      rows.flatMap((row) => (row.excludedBy === null ? [] : [row.excludedBy])),
+    );
+    for (const row of rows) {
+      const product = products.get(row.productId);
+      const list = result.get(row.orderId) ?? [];
+      list.push({
+        id: row.id,
+        productId: row.productId,
+        productSku: product?.sku ?? '',
+        productName: product?.name ?? '',
+        productUnitId: row.productUnitId,
+        unitName: units.get(row.productUnitId)?.uomName ?? '',
+        qty: row.qty,
+        qtyBase: row.qtyBase,
+        baseUnitName: product?.baseUnit.uomName ?? '',
+        warehouseId: row.warehouseId,
+        total: row.total,
+        excludedByName: row.excludedBy === null ? null : (names.get(row.excludedBy) ?? null),
+        excludedAt: row.excludedAt,
+      });
+      result.set(row.orderId, list);
+    }
+    return result;
+  }
+
   async details(
     orders: readonly OrderRow[],
     access: Access,
@@ -698,6 +788,7 @@ export class SalesOrderQueryService {
     const picks = await this.picks.partsOfOrders(ids, executor);
     const visible = access.lineWarehouses;
     const seesWarehouse = (warehouseId: number) => visible === null || visible.has(warehouseId);
+    const excluded = await this.excludedOf(ids, visible, executor);
     return orders.map((order) => {
       const {
         createdBy,
@@ -727,6 +818,7 @@ export class SalesOrderQueryService {
           .filter((line) => line.orderId === order.id && seesWarehouse(line.warehouseId))
           .map((line) => lineView(line, products, units, parts, pickBins)),
         picks: (picks.get(order.id) ?? []).filter((part) => seesWarehouse(part.warehouseId)),
+        excludedLines: excluded.get(order.id) ?? [],
         moves: moves
           .filter((move) => move.orderId === order.id)
           .map((move) => ({
@@ -768,6 +860,19 @@ export class SalesOrderQueryService {
       };
     });
   }
+}
+
+/** The card's red block: the count, the sum and the first lines (ADR-0175 #2). */
+function cardExcluded(lines: readonly ExcludedLine[]): CardExcluded {
+  return {
+    count: lines.length,
+    total: lines.reduce((sum, line) => sum.plus(line.total ?? 0), new Decimal(0)),
+    lines: lines.slice(0, BOARD_LIMITS.excludedOnCard).map((line) => ({
+      productName: line.productName,
+      qty: line.qty,
+      unitName: line.unitName,
+    })),
+  };
 }
 
 function lineView(

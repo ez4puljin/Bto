@@ -631,6 +631,13 @@
       "when": 1794205039833,
       "tag": "0091_app_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1794252966687,
+      "tag": "0092_sales_excluded_lines",
+      "breakpoints": true
     }
   ]
 }

@@ -86,6 +86,8 @@ AI views (ADR-0045):
 
 ADR-0143 (migration `0068_sales_document_templates`): `sales_document_templates` (kind PICK_LIST / DELIVERY_NOTE, published `layout`, `draft`, `version`, one `is_default` per kind; `REVOKE TRUNCATE`), `sales_document_template_versions` (append-only), `sales_pipelines.pick_list_template_id` / `delivery_note_template_id` (null: the default).
 
+ADR-0175 (migration `0092_sales_excluded_lines`): `sales_order_excluded_lines` holds a line taken off a reserved order (product, unit, quantity, warehouse, totals, its frozen `parts` as JSON, `excluded_by` / `excluded_at`, `restored_by` / `restored_at`). The line leaves `sales_order_lines`, so no reader of an order's lines needs a filter. A restore stamps the row; `REVOKE DELETE, TRUNCATE`.
+
 ## 3. Public API (`modules/sales/index.ts`)
 
 | Export | Use |
@@ -171,6 +173,8 @@ Every board, pipeline and stage route carries `sales.orders.read`; the service c
 
 ADR-0143: `GET/POST /sales/document-templates`, `GET /:id`, `PUT /:id/draft`, `POST /:id/publish|discard|default`, `POST /:id/versions/:version/restore`, `DELETE /:id` [`sales.boards.manage`]; `GET /sales/document-templates/print-layouts?pipelineIds=` [`sales.orders.read`]; the pipeline body takes `pickListTemplateId` / `deliveryNoteTemplateId` (absent: kept).
 
+ADR-0175: `PATCH /sales-orders/:id/lines` [`sales.orders.read`; the service asks for `sales.orders.manage`, or `sales.orders.pick` with write scope on every touched warehouse] `{ expectedUpdatedAt, lines: [{lineId, qty}], exclude: [lineId], restore: [{excludedId, qty?}], add: [line] }` → the order's detail. The detail carries `excludedLines`, a board card `excluded { count, total, lines }` (the first `BOARD_LIMITS.excludedOnCard`), both limited to the caller's visible warehouses.
+
 ## 5. Rules worth knowing
 
 - **The apps' stock (ADR-0173).** Both apps show one number per product, the home warehouse's available (sellable on hand less reserved), and only when that warehouse is ticked for the app on «Апп → Аппын бараа» (`ShopScope.countedWarehouseIds`, none ticked = all); otherwise 0, «Дууссан», `stockBlocked`, and both apps' order routes refuse it. `PUT /app-settings` takes `stockWarehouses { customer, staff }` and `customerStockDisplay`, both optional (left out = unchanged). The phones hear every change through `…/stock/live` within about a second of the commit.
@@ -224,10 +228,13 @@ ADR-0143: `GET/POST /sales/document-templates`, `GET /:id`, `PUT /:id/draft`, `P
 - **Cancel** releases the order's ACTIVE reservations (`releaseInTx`) and records the reason.
 - **Backorders** stay on the line.
 - **Reconciliation:** the nightly check compares `warehouse_stock.reserved` with the ACTIVE reservations (level RESERVED).
+- **Line edits (ADR-0175):** only in `CONFIRMED`, `PICKING`, `PACKED`. Lines are changed in place (their ids survive). A changed or restored line is quoted on the order's `price_date`, an unchanged restore takes its frozen parts back, an added line is priced today. Reservations are replaced except for confirmed parts; a touched confirmed part is unpicked and reopened for the office or a lead, and refused to a keeper (`LINE_EDIT_PART_DONE`). Credit is checked only when the total grows. An order cannot be left without lines.
 
 ## 6. Error codes introduced
 
 `PRODUCT_NO_HOME`, `PRODUCT_NOT_SELLABLE`, `STAGE_IN_USE` (409, with the stage's id and name), `BOARD_NOT_EMPTY`, `PIPELINE_IN_USE`, `ORDER_NUMBER_TAKEN` (409), `PRODUCT_OUT_OF_APP_STOCK` (409, ADR-0173 #3: the product's home warehouse is not counted for the app, `params.productIds`), `PRODUCT_NOT_IN_APP` (409, ADR-0127 #1: an app order's product outside the assortment segment, `productIds`), `ORDER_CHANGED` (409, ADR-0130: a save whose `expectedUpdatedAt` is older than the order's `updated_at`; `params.updatedAt` carries the current one).
+
+`LINE_EDIT_PART_DONE` (409, ADR-0175 #6, `params.warehouse`).
 
 Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUSTOMER_INACTIVE`, `PRICE_MISSING`, `CREDIT_BLOCKED` / `CREDIT_NEEDS_APPROVAL` (delivery 3), `UNIT_SUPERSEDED`, `UNIT_FACTOR_INEXACT`, `VALIDATION_FAILED`, `NOT_FOUND`, `FORBIDDEN`.
 
@@ -370,6 +377,8 @@ ADR-0143: «Падааны загвар» `/sales/document-templates` (+ `/:id` 
 - `order-filters.test.ts`
 
 ADR-0143: `test/integration/sales-document-templates.int-spec.ts`, `packages/shared/src/sales/document-template.test.ts`, `features/sales/print-page.test.tsx` (the built-in layouts print as before).
+
+ADR-0175: `test/integration/sales-line-edits.int-spec.ts` (the old price on a changed quantity, take off / card / put back / add, a keeper refused on another warehouse, a stale save, an emptied order, a confirmed part refused to a keeper and reopened by a lead, stock reconciled).
 
 ## 10. Open items
 

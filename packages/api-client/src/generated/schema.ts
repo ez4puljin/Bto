@@ -4863,6 +4863,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales-orders/{id}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * The board's «Засвар» (ADR-0175): quantities changed, lines taken off or put back, products
+         *     added, in place. A keeper changes the warehouses they write (`sales.orders.pick`), the office
+         *     every line; a confirmed part only a lead or the office.
+         */
+        patch: operations["SalesOrders_editLines"];
+        trace?: never;
+    };
     "/api/v1/sales-orders/{id}/move": {
         parameters: {
             query?: never;
@@ -14931,6 +14952,24 @@ export interface components {
             /** Format: date-time */
             doneAt: string | null;
         };
+        SalesOrderExcludedLine: {
+            id: number;
+            productId: number;
+            productSku: string;
+            productName: string;
+            productUnitId: number;
+            unitName: string;
+            /** @description In the unit */
+            qty: string;
+            qtyBase: string;
+            baseUnitName: string;
+            warehouseId: number;
+            /** @description Its frozen total, whole MNT */
+            total: string | null;
+            excludedByName: string | null;
+            /** Format: date-time */
+            excludedAt: string;
+        };
         SalesOrderEvent: {
             /** @enum {string|null} */
             fromStatus: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED" | null;
@@ -15044,6 +15083,8 @@ export interface components {
             lines: components["schemas"]["SalesOrderLine"][];
             /** @description Each warehouse's part (ADR-0126) */
             picks: components["schemas"]["SalesOrderPickPart"][];
+            /** @description The lines taken off (ADR-0175), the caller’s warehouses only */
+            excludedLines: components["schemas"]["SalesOrderExcludedLine"][];
             events: components["schemas"]["SalesOrderEvent"][];
             moves: components["schemas"]["SalesOrderMove"][];
             changes: components["schemas"]["SalesOrderChange"][];
@@ -15091,6 +15132,34 @@ export interface components {
             paymentMethod: "CASH" | "BANK_TRANSFER" | "CREDIT";
             note?: string | null;
             lines: components["schemas"]["SalesOrderLineRequest"][];
+        };
+        SalesOrderLineQtyChange: {
+            lineId: number;
+            /**
+             * @description In the line's unit
+             * @example 40
+             */
+            qty: string;
+        };
+        SalesOrderLineRestore: {
+            excludedId: number;
+            /** @description A new quantity in the unit; null = the quantity it was taken off at */
+            qty?: string | null;
+        };
+        SalesOrderLineEditRequest: {
+            /**
+             * Format: date-time
+             * @description The order's updatedAt as read: a newer change answers 409 ORDER_CHANGED
+             */
+            expectedUpdatedAt: string;
+            /** @description New quantities */
+            lines: components["schemas"]["SalesOrderLineQtyChange"][];
+            /** @description Lines taken off (kept in red) */
+            exclude: number[];
+            /** @description Taken-off lines put back */
+            restore: components["schemas"]["SalesOrderLineRestore"][];
+            /** @description Products added, today's prices */
+            add: components["schemas"]["SalesOrderLineRequest"][];
         };
         SalesOrderMoveRequest: {
             /** @description A stage of the order's pipeline */
@@ -15239,6 +15308,19 @@ export interface components {
             status: "OPEN" | "PICKING" | "DONE";
             pickerName: string | null;
         };
+        SalesOrderCardExcludedLine: {
+            productName: string;
+            /** @description In the unit */
+            qty: string;
+            unitName: string;
+        };
+        SalesOrderCardExcluded: {
+            count: number;
+            /** @description Their frozen totals, whole MNT */
+            total: string;
+            /** @description The first 20 */
+            lines: components["schemas"]["SalesOrderCardExcludedLine"][];
+        };
         SalesOrderCard: {
             id: number;
             number: string | null;
@@ -15271,6 +15353,7 @@ export interface components {
             stageEnteredAt: string;
             /** @description The warehouses' parts the caller sees (ADR-0126 #2, #3) */
             picks: components["schemas"]["SalesOrderCardPick"][];
+            excluded: components["schemas"]["SalesOrderCardExcluded"];
         };
         SalesStageCards: {
             stageId: number;
@@ -21446,7 +21529,7 @@ export interface components {
             note?: string;
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "ROLE_NAMED_ON_RECORDS" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "SUPPLIER_CATEGORY_INACTIVE" | "SUPPLIER_CATEGORY_HAS_CHILDREN" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "PRODUCT_NOT_IN_APP" | "ORDER_BELOW_MINIMUM" | "PRODUCT_OUT_OF_APP_STOCK" | "ATTENDANCE_NO_SITE" | "ATTENDANCE_OUT_OF_RANGE" | "ATTENDANCE_LOCATION_IMPRECISE" | "ATTENDANCE_ALREADY_IN" | "ATTENDANCE_NOT_IN" | "ATTENDANCE_EVENT_ORDER" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "ISSUE_LINES_UNCHECKED" | "ISSUE_WAREHOUSE_CONFIRMED" | "ISSUE_PARTLY_POSTED" | "ISSUE_RECIPIENT_KIND" | "ISSUE_CORRECTION_OPEN" | "ISSUE_NOT_SENT" | "PO_NOT_ARCHIVABLE" | "PO_NOT_EDITABLE" | "PO_LOAD_OVER" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "TRANSFER_LINES_UNCOUNTED" | "TRANSFER_REQUEST_EMPTY" | "HR_POLL_CLOSED" | "HR_POLL_ANSWERED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "AI_DATA_FORBIDDEN" | "AI_BUDGET_REACHED" | "AI_USER_LIMIT_REACHED" | "AI_KEY_SECRET_MISSING" | "AI_PRICE_REQUIRED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "STAGE_SKIP" | "ORDER_CHANGED" | "EBARIMT_FILE_UNREADABLE" | "EBARIMT_FILE_COLUMNS" | "EBARIMT_FILE_EMPTY" | "EBARIMT_FILE_ROW" | "EBARIMT_FILE_MONTHS" | "EBARIMT_FILE_LIMIT" | "EBARIMT_CELL_CONFLICT" | "EBARIMT_FILE_CHANGED" | "PICK_INCOMPLETE" | "PICK_TAKEN" | "PICK_STATE_INVALID" | "PICKER_INVALID" | "PIPELINE_KIND_STAGE" | "PIPELINE_KIND_CHANNEL" | "PIPELINE_NO_TRANSFER_WAREHOUSE" | "PIPELINE_TRANSFER_STAGE_NEEDS_STORE" | "PIPELINE_TRANSFER_WAREHOUSE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "BANK_STATEMENT_UNREADABLE" | "BANK_STATEMENT_NO_ACCOUNT" | "BANK_STATEMENT_EMPTY" | "BANK_STATEMENT_POSTED" | "BANK_STATEMENT_UNLINKED" | "BANK_STATEMENT_CURRENCY" | "BANK_LINE_LOCKED" | "BANK_LINE_POSTED" | "BANK_LINE_INCOMPLETE" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_CASHIER_NOT_ON_TILL" | "POS_SUPERVISOR_NOT_ON_TILL" | "POS_PRODUCT_NOT_ON_TILL" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "EDGE_LINK_INVALID" | "EDGE_LINK_PEPPER_MISSING" | "EDGE_ALREADY_LINKED" | "EDGE_LINK_UNREACHABLE" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE" | "EXPIRY_ITEM_EXISTS" | "EXPIRY_ITEM_CHANGED" | "EXPIRY_ITEM_ARCHIVED";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "ROLE_NAMED_ON_RECORDS" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "SUPPLIER_CATEGORY_INACTIVE" | "SUPPLIER_CATEGORY_HAS_CHILDREN" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "PRODUCT_NOT_IN_APP" | "ORDER_BELOW_MINIMUM" | "PRODUCT_OUT_OF_APP_STOCK" | "ATTENDANCE_NO_SITE" | "ATTENDANCE_OUT_OF_RANGE" | "ATTENDANCE_LOCATION_IMPRECISE" | "ATTENDANCE_ALREADY_IN" | "ATTENDANCE_NOT_IN" | "ATTENDANCE_EVENT_ORDER" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "ISSUE_LINES_UNCHECKED" | "ISSUE_WAREHOUSE_CONFIRMED" | "ISSUE_PARTLY_POSTED" | "ISSUE_RECIPIENT_KIND" | "ISSUE_CORRECTION_OPEN" | "ISSUE_NOT_SENT" | "PO_NOT_ARCHIVABLE" | "PO_NOT_EDITABLE" | "PO_LOAD_OVER" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "TRANSFER_LINES_UNCOUNTED" | "TRANSFER_REQUEST_EMPTY" | "HR_POLL_CLOSED" | "HR_POLL_ANSWERED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "AI_DATA_FORBIDDEN" | "AI_BUDGET_REACHED" | "AI_USER_LIMIT_REACHED" | "AI_KEY_SECRET_MISSING" | "AI_PRICE_REQUIRED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "STAGE_SKIP" | "ORDER_CHANGED" | "EBARIMT_FILE_UNREADABLE" | "EBARIMT_FILE_COLUMNS" | "EBARIMT_FILE_EMPTY" | "EBARIMT_FILE_ROW" | "EBARIMT_FILE_MONTHS" | "EBARIMT_FILE_LIMIT" | "EBARIMT_CELL_CONFLICT" | "EBARIMT_FILE_CHANGED" | "PICK_INCOMPLETE" | "PICK_TAKEN" | "LINE_EDIT_PART_DONE" | "PICK_STATE_INVALID" | "PICKER_INVALID" | "PIPELINE_KIND_STAGE" | "PIPELINE_KIND_CHANNEL" | "PIPELINE_NO_TRANSFER_WAREHOUSE" | "PIPELINE_TRANSFER_STAGE_NEEDS_STORE" | "PIPELINE_TRANSFER_WAREHOUSE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "BANK_STATEMENT_UNREADABLE" | "BANK_STATEMENT_NO_ACCOUNT" | "BANK_STATEMENT_EMPTY" | "BANK_STATEMENT_POSTED" | "BANK_STATEMENT_UNLINKED" | "BANK_STATEMENT_CURRENCY" | "BANK_LINE_LOCKED" | "BANK_LINE_POSTED" | "BANK_LINE_INCOMPLETE" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_CASHIER_NOT_ON_TILL" | "POS_SUPERVISOR_NOT_ON_TILL" | "POS_PRODUCT_NOT_ON_TILL" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "EDGE_LINK_INVALID" | "EDGE_LINK_PEPPER_MISSING" | "EDGE_ALREADY_LINKED" | "EDGE_LINK_UNREACHABLE" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE" | "EXPIRY_ITEM_EXISTS" | "EXPIRY_ITEM_CHANGED" | "EXPIRY_ITEM_ARCHIVED";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -33697,6 +33780,40 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SalesOrderRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesOrders_editLines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesOrderLineEditRequest"];
             };
         };
         responses: {

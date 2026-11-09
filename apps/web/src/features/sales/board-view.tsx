@@ -2,6 +2,7 @@ import { Decimal } from '@tugeel/shared/money';
 import {
   BOARD_LIMITS,
   CARD_SORTS,
+  LINE_EDIT_STATUSES,
   type CardSort,
   PRINT_KINDS,
   type PrintKind,
@@ -12,6 +13,7 @@ import {
   CalendarDays,
   Ellipsis,
   Minus,
+  Pencil,
   Plus,
   Printer,
 } from 'lucide-react';
@@ -53,12 +55,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
-import { formatTugrik } from '@/lib/money';
+import { formatQty, formatTugrik } from '@/lib/money';
 import { usePrintFormat } from '@/lib/print-format';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { cn } from '@/lib/utils';
+import { LineEditDialog } from './line-edit-dialog';
 import { MoveDialogs } from './move-dialogs';
 import { OrderStatusBadge, PaymentLabel } from './order-badges';
 import { PICK_TONES } from './pick-tones';
@@ -113,6 +116,11 @@ export function BoardView({
 }) {
   const { t } = useTranslation();
   const cards = useStageCards(pipeline.id, filters);
+  // The «Засвар» of a card (ADR-0175): a keeper's own warehouse's lines, the office every line.
+  const picks = useHasPermission('sales.orders.pick');
+  const manages = useHasPermission('sales.orders.manage');
+  const canEditLines = picks || manages;
+  const [editing, setEditing] = useState<number | null>(null);
   const mover = useMover();
   const stages = pipeline.stages.filter((stage) => stage.archivedAt === null && stage.canView);
   // ADR-0129: neighbours only, unless the user holds the right to jump stages and boards.
@@ -264,6 +272,11 @@ export function BoardView({
                     targets={stages.filter((target) => canMoveTo(live, stage, target, moveAny))}
                     elsewhere={elsewhere}
                     onOpen={() => onOpen(card.id)}
+                    onEdit={
+                      canEditLines && LINE_EDIT_STATUSES.includes(card.status)
+                        ? () => setEditing(card.id)
+                        : null
+                    }
                     onMove={(target) => mover.start(card.id, target)}
                     onMoveElsewhere={(pipelineId) =>
                       setElsewhereTarget({ orderId: card.id, pipelineId })
@@ -288,6 +301,7 @@ export function BoardView({
         })}
       </div>
       <MoveDialogs mover={mover} />
+      <LineEditDialog orderId={editing} onClose={() => setEditing(null)} />
       <ElsewhereDialog
         target={elsewhereTarget}
         onClose={() => setElsewhereTarget(null)}
@@ -440,6 +454,7 @@ function Card({
   targets,
   elsewhere,
   onOpen,
+  onEdit,
   onMove,
   onMoveElsewhere,
   onDragStart,
@@ -451,6 +466,8 @@ function Card({
   /** The other pipelines, for the holder of the right; empty otherwise. */
   elsewhere: { id: number; name: string }[];
   onOpen: () => void;
+  /** «Засвар» (ADR-0175); null when the user may not change this order's lines. */
+  onEdit: (() => void) | null;
   onMove: (stage: SalesStage) => void;
   onMoveElsewhere: (pipelineId: number) => void;
   onDragStart: () => void;
@@ -485,45 +502,75 @@ function Card({
           <PaymentLabel method={card.paymentMethod} />
           <OrderStatusBadge status={card.status} />
         </div>
-        {targets.length > 0 || elsewhere.length > 0 ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="-mt-1 -mr-1 size-7 text-muted-foreground"
-                aria-label={`${t('sales.boards.move')}: ${title}`}
-                title={`${t('sales.boards.move')}: ${title}`}
-              >
-                <ArrowRightLeft />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {targets.map((target) => (
-                <DropdownMenuItem key={target.id} onSelect={() => onMove(target)}>
-                  {target.name}
-                </DropdownMenuItem>
-              ))}
-              {elsewhere.length > 0 ? (
-                <>
-                  {targets.length > 0 ? <DropdownMenuSeparator /> : null}
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
-                      {t('sales.boards.moveElsewhere')}
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
-                      {elsewhere.map((entry) => (
-                        <DropdownMenuItem key={entry.id} onSelect={() => onMoveElsewhere(entry.id)}>
-                          {entry.name}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                </>
+        <div className="-mt-1 -mr-1 flex shrink-0 items-center">
+          {onEdit ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                'relative h-7 gap-1 px-1.5 text-xs text-muted-foreground',
+                card.excluded.count > 0 && 'text-destructive',
+              )}
+              title={
+                card.excluded.count > 0
+                  ? t('sales.lineEdit.buttonTitleExcluded', { count: card.excluded.count })
+                  : t('sales.lineEdit.buttonTitle')
+              }
+              aria-label={`${t('sales.lineEdit.buttonTitle')}: ${title}`}
+              onClick={onEdit}
+            >
+              <Pencil className="size-3.5" />
+              {t('sales.lineEdit.button')}
+              {card.excluded.count > 0 ? (
+                <span className="rounded-full bg-danger-soft px-1.5 font-semibold text-destructive">
+                  {card.excluded.count}
+                </span>
               ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
+            </Button>
+          ) : null}
+          {targets.length > 0 || elsewhere.length > 0 ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="-mt-1 -mr-1 size-7 text-muted-foreground"
+                  aria-label={`${t('sales.boards.move')}: ${title}`}
+                  title={`${t('sales.boards.move')}: ${title}`}
+                >
+                  <ArrowRightLeft />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {targets.map((target) => (
+                  <DropdownMenuItem key={target.id} onSelect={() => onMove(target)}>
+                    {target.name}
+                  </DropdownMenuItem>
+                ))}
+                {elsewhere.length > 0 ? (
+                  <>
+                    {targets.length > 0 ? <DropdownMenuSeparator /> : null}
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        {t('sales.boards.moveElsewhere')}
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
+                        {elsewhere.map((entry) => (
+                          <DropdownMenuItem
+                            key={entry.id}
+                            onSelect={() => onMoveElsewhere(entry.id)}
+                          >
+                            {entry.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  </>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+        </div>
       </div>
       {/* The customer's whole name: it wraps rather than being cut. */}
       <div className="mt-1.5 flex items-start gap-1">
@@ -544,6 +591,7 @@ function Card({
           </span>
         ) : null}
       </div>
+      {card.excluded.count > 0 ? <ExcludedBlock excluded={card.excluded} /> : null}
       {PICKING_STATUSES.includes(card.status) && card.picks.length > 0 ? (
         <PickParts picks={card.picks} />
       ) : null}
@@ -641,6 +689,51 @@ function PickParts({ picks }: { picks: OrderCard['picks'] }) {
             );
           })}
         </ul>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * The lines taken off the order (ADR-0175 #2), in red under the customer: the count and their sum,
+ * the first six named with their quantity, the rest behind «+N бусад».
+ */
+function ExcludedBlock({ excluded }: { excluded: OrderCard['excluded'] }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const preview = 6;
+  const lines = open ? excluded.lines : excluded.lines.slice(0, preview);
+  const hidden = excluded.count - lines.length;
+  return (
+    <section
+      className="mt-2 rounded-md border-l-[3px] border-destructive bg-danger-soft px-2 py-1 text-xs text-destructive"
+      aria-label={t('sales.lineEdit.card.title', { count: excluded.count })}
+    >
+      <div className="flex items-center justify-between gap-2 font-semibold">
+        <span>{t('sales.lineEdit.card.title', { count: excluded.count })}</span>
+        <span className="font-mono">{`−${formatTugrik(excluded.total)}`}</span>
+      </div>
+      <ul className="mt-0.5 space-y-0.5">
+        {lines.map((line, index) => (
+          <li
+            key={`${line.productName}-${index}`}
+            className="flex items-baseline justify-between gap-2"
+          >
+            <span className="min-w-0 line-through break-words">{line.productName}</span>
+            <span className="shrink-0 font-mono font-semibold whitespace-nowrap">
+              {`${formatQty(line.qty)} ${line.unitName}`}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {hidden > 0 || open ? (
+        <button
+          type="button"
+          className="mt-0.5 font-medium underline-offset-2 outline-none hover:underline"
+          onClick={() => setOpen((shown) => !shown)}
+        >
+          {open ? t('sales.lineEdit.card.less') : t('sales.lineEdit.card.more', { count: hidden })}
+        </button>
       ) : null}
     </section>
   );

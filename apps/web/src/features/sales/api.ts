@@ -14,6 +14,8 @@ export type SalesOrder = Schemas['SalesOrderDetail'];
 export type SalesOrderLine = Schemas['SalesOrderLine'];
 export type SalesOrderSummary = Schemas['SalesOrderSummary'];
 export type SalesOrderRequest = Schemas['SalesOrderRequest'];
+export type SalesOrderLineEditRequest = Schemas['SalesOrderLineEditRequest'];
+export type SalesOrderExcludedLine = Schemas['SalesOrderExcludedLine'];
 export type ProductOrderInfo = Schemas['SalesOrderProductInfo'];
 export type OrderStatus = SalesOrder['status'];
 
@@ -100,6 +102,17 @@ export function useSalesOrderMutations() {
       onSuccess: () => changed(),
       // A save over a newer change (ORDER_CHANGED, ADR-0130): the order is read again under the
       // edits still typed, so the next save carries the fresh updatedAt.
+      onError: (error) => {
+        if (problemFromError(error)?.code === 'ORDER_CHANGED') void changed();
+      },
+    }),
+    /** The board's «Засвар» (ADR-0175): lines changed in place; a newer change reads again. */
+    editLines: useMutation({
+      mutationFn: async ({ id, body }: { id: number; body: SalesOrderLineEditRequest }) =>
+        unwrap(
+          await api.PATCH('/api/v1/sales-orders/{id}/lines', { params: { path: { id } }, body }),
+        ),
+      onSuccess: () => changed(),
       onError: (error) => {
         if (problemFromError(error)?.code === 'ORDER_CHANGED') void changed();
       },

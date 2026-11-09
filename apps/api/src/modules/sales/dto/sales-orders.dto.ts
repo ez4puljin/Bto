@@ -5,6 +5,7 @@ import {
   type Fulfilment,
   ORDER_CHANNELS,
   ORDER_LIMITS,
+  LINE_EDIT_LIMIT,
   ORDER_STATUSES,
   PICK_STATUSES,
   type PickStatus,
@@ -105,6 +106,83 @@ export class SalesOrderRequestDto {
   @ValidateNested({ each: true })
   @Type(() => SalesOrderLineRequestDto)
   lines: SalesOrderLineRequestDto[];
+}
+
+@ApiSchema({ name: 'SalesOrderLineQtyChange' })
+export class SalesOrderLineQtyChangeDto {
+  @ApiProperty() @IsInt() @Min(1) lineId: number;
+  @ApiProperty({ example: '40', description: "In the line's unit" })
+  @IsString()
+  @Matches(QTY)
+  qty: string;
+}
+
+@ApiSchema({ name: 'SalesOrderLineRestore' })
+export class SalesOrderLineRestoreDto {
+  @ApiProperty() @IsInt() @Min(1) excludedId: number;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'A new quantity in the unit; null = the quantity it was taken off at',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(QTY)
+  qty?: string | null;
+}
+
+/** The board's «Засвар» (ADR-0175): lines changed in place by a keeper or the office. */
+@ApiSchema({ name: 'SalesOrderLineEditRequest' })
+export class SalesOrderLineEditRequestDto {
+  @ApiProperty({
+    format: 'date-time',
+    description: "The order's updatedAt as read: a newer change answers 409 ORDER_CHANGED",
+  })
+  @IsString()
+  expectedUpdatedAt: string;
+  @ApiProperty({ type: [SalesOrderLineQtyChangeDto], description: 'New quantities' })
+  @IsArray()
+  @ArrayMaxSize(LINE_EDIT_LIMIT)
+  @ValidateNested({ each: true })
+  @Type(() => SalesOrderLineQtyChangeDto)
+  lines: SalesOrderLineQtyChangeDto[];
+  @ApiProperty({ type: [Number], description: 'Lines taken off (kept in red)' })
+  @IsArray()
+  @ArrayMaxSize(LINE_EDIT_LIMIT)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  exclude: number[];
+  @ApiProperty({ type: [SalesOrderLineRestoreDto], description: 'Taken-off lines put back' })
+  @IsArray()
+  @ArrayMaxSize(LINE_EDIT_LIMIT)
+  @ValidateNested({ each: true })
+  @Type(() => SalesOrderLineRestoreDto)
+  restore: SalesOrderLineRestoreDto[];
+  @ApiProperty({ type: [SalesOrderLineRequestDto], description: "Products added, today's prices" })
+  @IsArray()
+  @ArrayMaxSize(LINE_EDIT_LIMIT)
+  @ValidateNested({ each: true })
+  @Type(() => SalesOrderLineRequestDto)
+  add: SalesOrderLineRequestDto[];
+}
+
+/** A line taken off the order (ADR-0175 #2). */
+@ApiSchema({ name: 'SalesOrderExcludedLine' })
+export class SalesOrderExcludedLineDto {
+  @ApiProperty() id: number;
+  @ApiProperty() productId: number;
+  @ApiProperty() productSku: string;
+  @ApiProperty() productName: string;
+  @ApiProperty() productUnitId: number;
+  @ApiProperty() unitName: string;
+  @ApiProperty({ description: 'In the unit' }) qty: string;
+  @ApiProperty() qtyBase: string;
+  @ApiProperty() baseUnitName: string;
+  @ApiProperty() warehouseId: number;
+  @ApiProperty({ type: String, nullable: true, description: 'Its frozen total, whole MNT' })
+  total: string | null;
+  @ApiProperty({ type: String, nullable: true }) excludedByName: string | null;
+  @ApiProperty({ type: String, format: 'date-time' }) excludedAt: string;
 }
 
 @ApiSchema({ name: 'SalesOrderCancelRequest' })
@@ -411,6 +489,11 @@ export class SalesOrderDetailDto {
   @ApiProperty({ type: [SalesOrderLineDto] }) lines: SalesOrderLineDto[];
   @ApiProperty({ type: [SalesOrderPickPartDto], description: "Each warehouse's part (ADR-0126)" })
   picks: SalesOrderPickPartDto[];
+  @ApiProperty({
+    type: [SalesOrderExcludedLineDto],
+    description: 'The lines taken off (ADR-0175), the caller’s warehouses only',
+  })
+  excludedLines: SalesOrderExcludedLineDto[];
   @ApiProperty({ type: [SalesOrderEventDto] }) events: SalesOrderEventDto[];
   @ApiProperty({ type: [SalesOrderMoveDto] }) moves: SalesOrderMoveDto[];
   @ApiProperty({ type: [SalesOrderChangeDto] }) changes: SalesOrderChangeDto[];

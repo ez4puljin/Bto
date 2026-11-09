@@ -5,6 +5,7 @@ import {
   HttpCode,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Put,
   Query,
@@ -23,6 +24,7 @@ import {
   SalesOrderBatchQueryDto,
   SalesOrderCancelDto,
   SalesOrderDetailDto,
+  SalesOrderLineEditRequestDto,
   SalesOrderListQueryDto,
   SalesOrderMoveRequestDto,
   SalesOrderPageDto,
@@ -121,6 +123,21 @@ function toDetail(order: OrderDetail): SalesOrderDetailDto {
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
     picks: order.picks.map(partDto),
+    excludedLines: order.excludedLines.map((line) => ({
+      id: line.id,
+      productId: line.productId,
+      productSku: line.productSku,
+      productName: line.productName,
+      productUnitId: line.productUnitId,
+      unitName: line.unitName,
+      qty: line.qty.toString(),
+      qtyBase: line.qtyBase.toString(),
+      baseUnitName: line.baseUnitName,
+      warehouseId: line.warehouseId,
+      total: money(line.total),
+      excludedByName: line.excludedByName,
+      excludedAt: line.excludedAt.toISOString(),
+    })),
     lines: order.lines.map((line) => ({
       id: line.id,
       lineNo: line.lineNo,
@@ -318,6 +335,36 @@ export class SalesOrdersController {
     @Body() body: SalesOrderRequestDto,
   ): Promise<SalesOrderDetailDto> {
     return toDetail(await this.orders.update(ctx, id, inputOf(body)));
+  }
+
+  /**
+   * The board's «Засвар» (ADR-0175): quantities changed, lines taken off or put back, products
+   * added, in place. A keeper changes the warehouses they write (`sales.orders.pick`), the office
+   * every line; a confirmed part only a lead or the office.
+   */
+  @Patch(':id/lines')
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: SalesOrderDetailDto })
+  async editLines(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: SalesOrderLineEditRequestDto,
+  ): Promise<SalesOrderDetailDto> {
+    return toDetail(
+      await this.orders.editLines(ctx, id, {
+        expectedUpdatedAt: body.expectedUpdatedAt,
+        lines: body.lines.map((line) => ({ lineId: line.lineId, qty: new Decimal(line.qty) })),
+        exclude: body.exclude,
+        restore: body.restore.map((entry) => ({
+          excludedId: entry.excludedId,
+          qty: entry.qty ? new Decimal(entry.qty) : null,
+        })),
+        add: body.add.map((line) => ({
+          productUnitId: line.productUnitId,
+          qty: new Decimal(line.qty),
+        })),
+      }),
+    );
   }
 
   /** Moves the card to a stage of its board and runs the stage's action (ADR-0056 #3). */

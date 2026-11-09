@@ -101,6 +101,7 @@ export {
   salesChannelDefaults,
   salesOrderLineParts,
   salesOrderChanges,
+  salesOrderExcludedLines,
   salesOrderLines,
   salesOrderPicks,
   salesOrders,

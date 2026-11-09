@@ -20163,6 +20163,62 @@
         ]
       }
     },
+    "/api/v1/sales-orders/{id}/lines": {
+      "patch": {
+        "operationId": "SalesOrders_editLines",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesOrderLineEditRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The board's «Засвар» (ADR-0175): quantities changed, lines taken off or put back, products\nadded, in place. A keeper changes the warehouses they write (`sales.orders.pick`), the office\nevery line; a confirmed part only a lead or the office.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales-orders/{id}/move": {
       "post": {
         "operationId": "SalesOrders_move",
@@ -58416,6 +58472,70 @@
           "doneAt"
         ]
       },
+      "SalesOrderExcludedLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "productSku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "productUnitId": {
+            "type": "number"
+          },
+          "unitName": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "string",
+            "description": "In the unit"
+          },
+          "qtyBase": {
+            "type": "string"
+          },
+          "baseUnitName": {
+            "type": "string"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "total": {
+            "type": "string",
+            "nullable": true,
+            "description": "Its frozen total, whole MNT"
+          },
+          "excludedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "excludedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "productId",
+          "productSku",
+          "productName",
+          "productUnitId",
+          "unitName",
+          "qty",
+          "qtyBase",
+          "baseUnitName",
+          "warehouseId",
+          "total",
+          "excludedByName",
+          "excludedAt"
+        ]
+      },
       "SalesOrderEvent": {
         "type": "object",
         "properties": {
@@ -58867,6 +58987,13 @@
               "$ref": "#/components/schemas/SalesOrderPickPart"
             }
           },
+          "excludedLines": {
+            "description": "The lines taken off (ADR-0175), the caller’s warehouses only",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderExcludedLine"
+            }
+          },
           "events": {
             "type": "array",
             "items": {
@@ -58929,6 +59056,7 @@
           "updatedAt",
           "lines",
           "picks",
+          "excludedLines",
           "events",
           "moves",
           "changes"
@@ -59057,6 +59185,87 @@
           "deliveryDate",
           "paymentMethod",
           "lines"
+        ]
+      },
+      "SalesOrderLineQtyChange": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "qty": {
+            "type": "string",
+            "example": "40",
+            "description": "In the line's unit"
+          }
+        },
+        "required": [
+          "lineId",
+          "qty"
+        ]
+      },
+      "SalesOrderLineRestore": {
+        "type": "object",
+        "properties": {
+          "excludedId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "qty": {
+            "type": "string",
+            "nullable": true,
+            "description": "A new quantity in the unit; null = the quantity it was taken off at"
+          }
+        },
+        "required": [
+          "excludedId"
+        ]
+      },
+      "SalesOrderLineEditRequest": {
+        "type": "object",
+        "properties": {
+          "expectedUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The order's updatedAt as read: a newer change answers 409 ORDER_CHANGED"
+          },
+          "lines": {
+            "description": "New quantities",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderLineQtyChange"
+            }
+          },
+          "exclude": {
+            "description": "Lines taken off (kept in red)",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "restore": {
+            "description": "Taken-off lines put back",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderLineRestore"
+            }
+          },
+          "add": {
+            "description": "Products added, today's prices",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderLineRequest"
+            }
+          }
+        },
+        "required": [
+          "expectedUpdatedAt",
+          "lines",
+          "exclude",
+          "restore",
+          "add"
         ]
       },
       "SalesOrderMoveRequest": {
@@ -59602,6 +59811,50 @@
           "pickerName"
         ]
       },
+      "SalesOrderCardExcludedLine": {
+        "type": "object",
+        "properties": {
+          "productName": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "string",
+            "description": "In the unit"
+          },
+          "unitName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "productName",
+          "qty",
+          "unitName"
+        ]
+      },
+      "SalesOrderCardExcluded": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number"
+          },
+          "total": {
+            "type": "string",
+            "description": "Their frozen totals, whole MNT"
+          },
+          "lines": {
+            "description": "The first 20",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderCardExcludedLine"
+            }
+          }
+        },
+        "required": [
+          "count",
+          "total",
+          "lines"
+        ]
+      },
       "SalesOrderCard": {
         "type": "object",
         "properties": {
@@ -59708,6 +59961,9 @@
             "items": {
               "$ref": "#/components/schemas/SalesOrderCardPick"
             }
+          },
+          "excluded": {
+            "$ref": "#/components/schemas/SalesOrderCardExcluded"
           }
         },
         "required": [
@@ -59728,7 +59984,8 @@
           "lineCount",
           "createdByName",
           "stageEnteredAt",
-          "picks"
+          "picks",
+          "excluded"
         ]
       },
       "SalesStageCards": {
@@ -81973,6 +82230,7 @@
           "EBARIMT_FILE_CHANGED",
           "PICK_INCOMPLETE",
           "PICK_TAKEN",
+          "LINE_EDIT_PART_DONE",
           "PICK_STATE_INVALID",
           "PICKER_INVALID",
           "PIPELINE_KIND_STAGE",

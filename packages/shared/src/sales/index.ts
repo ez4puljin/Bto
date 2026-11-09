@@ -101,6 +101,8 @@ export const BOARD_LIMITS = {
   cardsPerStage: 200,
   /** Orders printed on one page. */
   maxPrint: 100,
+  /** Taken-off lines a card names (ADR-0175 #2); the dialog lists them all. */
+  excludedOnCard: 20,
 } as const;
 
 /** The states an order may be edited in (ADR-0056 #4): until picking starts. */
@@ -116,6 +118,15 @@ export const MANAGER_EDITABLE_STATUSES: readonly OrderStatus[] = [
   'PICKING',
   'PACKED',
 ];
+
+/**
+ * Where the «Засвар» of the board (ADR-0175) changes lines in place: reserved and picking orders,
+ * and packed ones for whoever may open a confirmed part again (a lead or the office).
+ */
+export const LINE_EDIT_STATUSES: readonly OrderStatus[] = ['CONFIRMED', 'PICKING', 'PACKED'];
+
+/** Lines one «Засвар» save may touch, added ones included. */
+export const LINE_EDIT_LIMIT = 200;
 
 export function isEditable(status: OrderStatus): boolean {
   return EDITABLE_STATUSES.includes(status);

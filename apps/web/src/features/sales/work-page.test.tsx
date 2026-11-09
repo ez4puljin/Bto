@@ -105,6 +105,7 @@ const CARD: Schemas['SalesOrderCard'] = {
   createdByName: 'Оффис Сараа',
   stageEnteredAt: STAMP,
   picks: [],
+  excluded: { count: 0, total: '0', lines: [] },
 };
 const CARDS: Schemas['SalesStageCards'][] = [
   { stageId: 1, count: 1, total: '0', cards: [CARD] },
@@ -176,6 +177,7 @@ const ORDER: Schemas['SalesOrderDetail'] = {
   events: [],
   picks: [],
   changes: [],
+  excludedLines: [],
   moves: [],
 };
 const ROW: Schemas['SalesOrderSummary'] = {

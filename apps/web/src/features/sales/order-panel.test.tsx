@@ -178,6 +178,7 @@ const ORDER: Schemas['SalesOrderDetail'] = {
   ],
   picks: [],
   changes: [],
+  excludedLines: [],
   moves: [
     {
       fromStageId: null,

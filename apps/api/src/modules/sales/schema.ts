@@ -290,6 +290,53 @@ export const salesOrderLineParts = pgTable(
 );
 
 /**
+ * A line a keeper or the office took off an order (ADR-0175 #2): out of `sales_order_lines`, so
+ * nothing reserves, picks, sells or invoices it, kept here to show in red and to put back with its
+ * frozen prices. A restore stamps the row and writes the line again; the row stays as history.
+ */
+export const salesOrderExcludedLines = pgTable(
+  'sales_order_excluded_lines',
+  {
+    id: id(),
+    orderId: ref('order_id')
+      .notNull()
+      .references(() => salesOrders.id),
+    productId: ref('product_id')
+      .notNull()
+      .references(() => products.id),
+    productUnitId: ref('product_unit_id')
+      .notNull()
+      .references(() => productUnits.id),
+    qty: qty('qty').notNull(),
+    factorSnapshot: factor('factor_snapshot').notNull(),
+    qtyBase: qty('qty_base').notNull(),
+    warehouseId: ref('warehouse_id')
+      .notNull()
+      .references(() => warehouses.id),
+    subtotal: money('subtotal'),
+    discountAmount: money('discount_amount'),
+    total: money('total'),
+    /** The line's price parts as they were frozen, written back on a restore. */
+    parts: jsonValue('parts').notNull(),
+    excludedBy: userRef('excluded_by'),
+    excludedAt: timestamp('excluded_at', { withTimezone: true }).notNull().defaultNow(),
+    restoredBy: userRef('restored_by'),
+    restoredAt: timestamp('restored_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('sales_order_excluded_lines_order_idx').on(t.orderId),
+    check(
+      'sales_order_excluded_lines_qty',
+      sql`${t.qty} > 0 AND ${t.qtyBase} > 0 AND ${t.factorSnapshot} > 0`,
+    ),
+    check(
+      'sales_order_excluded_lines_restored',
+      sql`${t.restoredAt} IS NULL OR ${t.restoredBy} IS NOT NULL`,
+    ),
+  ],
+);
+
+/**
  * One saved edit of an order (ADR-0147): its version, what changed and the total before and after.
  * Append-only: the order's history. The names are copied, so it still reads after a product is renamed.
  */

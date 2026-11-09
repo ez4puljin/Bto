@@ -131,6 +131,15 @@ export class SalesPipelinesController {
         subtotal: card.subtotal?.toFixed(0) ?? null,
         discountTotal: card.discountTotal?.toFixed(0) ?? null,
         customerOverdue: overdueDto(card.customerOverdue),
+        excluded: {
+          count: card.excluded.count,
+          total: card.excluded.total.toFixed(0),
+          lines: card.excluded.lines.map((line) => ({
+            productName: line.productName,
+            qty: line.qty.toString(),
+            unitName: line.unitName,
+          })),
+        },
         stageEnteredAt: card.stageEnteredAt.toISOString(),
       })),
     }));

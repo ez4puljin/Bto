@@ -317,6 +317,22 @@ export class SalesOrderCardPickDto {
   @ApiProperty({ type: String, nullable: true }) pickerName: string | null;
 }
 
+@ApiSchema({ name: 'SalesOrderCardExcludedLine' })
+export class SalesOrderCardExcludedLineDto {
+  @ApiProperty() productName: string;
+  @ApiProperty({ description: 'In the unit' }) qty: string;
+  @ApiProperty() unitName: string;
+}
+
+/** The lines taken off that the caller sees (ADR-0175 #2). */
+@ApiSchema({ name: 'SalesOrderCardExcluded' })
+export class SalesOrderCardExcludedDto {
+  @ApiProperty() count: number;
+  @ApiProperty({ description: 'Their frozen totals, whole MNT' }) total: string;
+  @ApiProperty({ type: [SalesOrderCardExcludedLineDto], description: 'The first 20' })
+  lines: SalesOrderCardExcludedLineDto[];
+}
+
 @ApiSchema({ name: 'SalesOrderCard' })
 export class SalesOrderCardDto {
   @ApiProperty() id: number;
@@ -349,6 +365,7 @@ export class SalesOrderCardDto {
     description: "The warehouses' parts the caller sees (ADR-0126 #2, #3)",
   })
   picks: SalesOrderCardPickDto[];
+  @ApiProperty({ type: SalesOrderCardExcludedDto }) excluded: SalesOrderCardExcludedDto;
 }
 
 @ApiSchema({ name: 'SalesStageCards' })
