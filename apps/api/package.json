@@ -13,7 +13,7 @@
     "start:worker": "node --enable-source-maps dist/worker.js",
     "start:edge": "node --enable-source-maps dist/edge.js",
     "dev": "nest start --watch",
-    "dev:worker": "nest start --watch --entryFile worker --path tsconfig.worker-dev.json",
+    "dev:worker": "node scripts/dev-worker.cjs",
     "edge:dev": "nest start --watch --entryFile edge --path tsconfig.edge-dev.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node scripts/jest.cjs --selectProjects unit",
