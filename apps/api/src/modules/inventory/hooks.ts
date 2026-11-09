@@ -43,6 +43,20 @@ export interface ReceiptCounterAccounts {
 
 export const RECEIPT_COUNTER_ACCOUNTS = Symbol('RECEIPT_COUNTER_ACCOUNTS');
 
+/** An account a count's difference may be booked to (ADR-0176 #7); finance's chart, by code. */
+export interface StockCountAccount {
+  code: string;
+  name: string;
+}
+
+export interface StockCountAccounts {
+  active(executor?: Db | Tx): Promise<StockCountAccount[]>;
+  /** Refuses a code that is not on the list (422 `accountCode`). */
+  assertUsable(tx: Tx, code: string): Promise<StockCountAccount>;
+}
+
+export const STOCK_COUNT_ACCOUNTS = Symbol('STOCK_COUNT_ACCOUNTS');
+
 /**
  * What inventory asks of pricing (ADR-0099 #5): a receipt line may carry a new warehouse price per
  * base unit, put in force by the receipt's posting from its business date, in the posting's
@@ -171,6 +185,12 @@ export interface StockBookLine {
   issueType?: string | null;
   /** A goods issue's expense type (its own account when finance maps one, ADR-0106 #3). */
   issueTypeId?: number | null;
+  /** A product count's chosen account (ADR-0176 #7); absent: the kind's own account. */
+  accountCode?: string | null;
+  /** A product count's party for this part of the difference (ADR-0176 #7). */
+  party?: StockBookParty;
+  /** A count's shortage charged to its party: the stock leaves as cost of sales (ADR-0176 #8). */
+  charged?: boolean;
   value: Decimal;
 }
 

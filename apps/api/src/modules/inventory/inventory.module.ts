@@ -15,6 +15,7 @@ import {
 import { ProductRegistrationsController } from './controllers/product-registrations.controller';
 import { ReceiptLinesController, ReceiptsController } from './controllers/receipts.controller';
 import { StockController } from './controllers/stock.controller';
+import { StockCountsController } from './controllers/stock-counts.controller';
 import { StocktakesController } from './controllers/stocktakes.controller';
 import { TransferRequestsController } from './controllers/transfer-requests.controller';
 import { TransferLinesController, TransfersController } from './controllers/transfers.controller';
@@ -33,6 +34,7 @@ import { StockPostingService } from './services/stock-posting.service';
 import { GoodsIssuesService } from './services/goods-issues.service';
 import { IssueExpenseTypesService } from './services/issue-expense-types.service';
 import { StockQueryService } from './services/stock-query.service';
+import { StockCountsService } from './services/stock-counts.service';
 import { StocktakesService } from './services/stocktakes.service';
 import { SystemBinsService } from './services/system-bins.service';
 import { TransferRequestsService } from './services/transfer-requests.service';
@@ -54,6 +56,7 @@ const CORE_SERVICES = [
   StockPostingService,
   StockQueryService,
   StocktakesService,
+  StockCountsService,
   SystemBinsService,
   TransfersService,
 ];
@@ -106,6 +109,7 @@ export class InventoryBootstrap implements OnApplicationBootstrap {
     AdjustmentLinesController,
     StockController,
     StocktakesController,
+    StockCountsController,
     TransferRequestsController,
     TransfersController,
     TransferLinesController,

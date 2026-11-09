@@ -1461,6 +1461,13 @@ export class IssueExpenseAccountRequestDto {
   accountId: number | null;
 }
 
+@ApiSchema({ name: 'StockCountAccount' })
+export class StockCountAccountDto {
+  @ApiProperty() accountId: number;
+  @ApiProperty({ example: '313011' }) code: string;
+  @ApiProperty() name: string;
+}
+
 @ApiSchema({ name: 'OpeningCheckQuery' })
 export class OpeningCheckQueryDto {
   @ApiPropertyOptional({

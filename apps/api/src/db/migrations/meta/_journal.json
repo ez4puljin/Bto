@@ -638,6 +638,13 @@
       "when": 1794252966687,
       "tag": "0092_sales_excluded_lines",
       "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1794256977843,
+      "tag": "0093_stock_counts",
+      "breakpoints": true
     }
   ]
 }

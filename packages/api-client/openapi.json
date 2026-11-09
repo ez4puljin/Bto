@@ -10694,6 +10694,1238 @@
         ]
       }
     },
+    "/api/v1/stock-counts": {
+      "get": {
+        "operationId": "StockCounts_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "COUNTING",
+                "REVIEW",
+                "APPROVED",
+                "CANCELLED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCountPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "operationId": "StockCounts_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockCountCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCountDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/open": {
+      "get": {
+        "operationId": "StockCounts_open",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OpenStockCount"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The counts a staff member may count now, with their own state on each.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/accounts": {
+      "get": {
+        "operationId": "StockCounts_accounts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StockCountAccountChoice"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The accounts a difference may be booked to (set up under finance).",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/variance": {
+      "get": {
+        "operationId": "StockCounts_variance",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Approval day, from; the count window (inventory.stocktakes.manage or .approve) only",
+            "schema": {
+              "maxLength": 10,
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "maxLength": 10,
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Name, code or barcode",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCountVariancePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The differences the approved counts posted, by approval day.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/{id}": {
+      "get": {
+        "operationId": "StockCounts_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCountDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/{id}/lines": {
+      "get": {
+        "operationId": "StockCounts_lines",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "filter",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "COUNTED",
+                "UNCOUNTED",
+                "DIFFERENT",
+                "MOVED"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Name, code or barcode",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCountLinePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/{id}/lines/{lineId}/entries": {
+      "get": {
+        "operationId": "StockCounts_lineEntries",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lineId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StockCountEntry"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Who counted a product, entry by entry.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/{id}/lines/{lineId}/moved": {
+      "get": {
+        "operationId": "StockCounts_lineMoved",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lineId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StockCountMovedDocument"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The documents that moved a product after it was counted.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/{id}/lines/{lineId}/settlement": {
+      "put": {
+        "operationId": "StockCounts_setLine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lineId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockCountLineSettlementRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCountDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A line's own account and party; a null settlement returns it to the count's default.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/{id}/defaults": {
+      "put": {
+        "operationId": "StockCounts_setDefaults",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockCountDefaultsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCountDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/{id}/session": {
+      "get": {
+        "operationId": "StockCounts_mine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyStockCount"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "operationId": "StockCounts_start",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyStockCount"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Starts counting; whoever starts has to send, even with nothing counted.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/{id}/session/entries": {
+      "post": {
+        "operationId": "StockCounts_addEntry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockCountEntryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCountProductInfo"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One count of a product; a repeat adds up and stays its own entry.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/{id}/session/entries/{entryId}/void": {
+      "post": {
+        "operationId": "StockCounts_voidEntry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "entryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCountProductInfo"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/{id}/session/send": {
+      "post": {
+        "operationId": "StockCounts_send",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyStockCount"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/{id}/products/{productId}": {
+      "get": {
+        "operationId": "StockCounts_product",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCountProductInfo"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "What the counter has on a product, and the stock when the count shows it.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/{id}/sessions/{sessionId}/send": {
+      "post": {
+        "operationId": "StockCounts_sendFor",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCountDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/{id}/close": {
+      "post": {
+        "operationId": "StockCounts_close",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCountDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Counting is over: the count goes to review; refused while a session is not sent.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/{id}/reopen": {
+      "post": {
+        "operationId": "StockCounts_reopen",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCountDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/{id}/cancel": {
+      "post": {
+        "operationId": "StockCounts_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCountDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/{id}/approve": {
+      "post": {
+        "operationId": "StockCounts_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockCountApproveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCountDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Books the differences and makes the warehouse's stock the counted quantity.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/transfer-requests/context": {
       "get": {
         "operationId": "TransferRequests_context",
@@ -24729,6 +25961,139 @@
           }
         ],
         "summary": "An admin-added type's own account from today; null sends it back to «бусад».",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/stock-count-accounts": {
+      "get": {
+        "operationId": "StockCountAccounts_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StockCountAccount"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/stock-count-accounts/{accountId}": {
+      "put": {
+        "operationId": "StockCountAccounts_add",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StockCountAccount"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      },
+      "delete": {
+        "operationId": "StockCountAccounts_remove",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StockCountAccount"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "tags": [
           "finance"
         ]
@@ -49758,6 +51123,1054 @@
           }
         }
       },
+      "StockCountSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "COUNTING",
+              "REVIEW",
+              "APPROVED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true,
+            "example": "ST-2026-000001"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "scopeMode": {
+            "enum": [
+              "ALL",
+              "SCANNED",
+              "SEGMENT",
+              "SUPPLIER",
+              "CATEGORY"
+            ],
+            "type": "string"
+          },
+          "scopeLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "showStock": {
+            "type": "boolean"
+          },
+          "startedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "postedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "effectiveDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "lines": {
+            "type": "number",
+            "description": "Products on the count"
+          },
+          "counted": {
+            "type": "number",
+            "description": "Products with a sent count"
+          }
+        },
+        "required": [
+          "id",
+          "warehouseId",
+          "warehouseName",
+          "status",
+          "number",
+          "note",
+          "scopeMode",
+          "scopeLabel",
+          "showStock",
+          "startedAt",
+          "postedAt",
+          "effectiveDate",
+          "lines",
+          "counted"
+        ]
+      },
+      "StockCountPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockCountSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "StockCountCreateRequest": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "scopeMode": {
+            "enum": [
+              "ALL",
+              "SCANNED",
+              "SEGMENT",
+              "SUPPLIER",
+              "CATEGORY"
+            ],
+            "type": "string",
+            "description": "ALL: every product of the warehouse; SCANNED: only what the counters scan"
+          },
+          "scopeIds": {
+            "maxItems": 50,
+            "description": "One segment, or the suppliers or categories of the mode",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "scopeLabel": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200
+          },
+          "showStock": {
+            "type": "boolean",
+            "description": "Counters see the stock and a mismatch notice"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "warehouseId",
+          "scopeMode"
+        ]
+      },
+      "StockCountParty": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "USER",
+              "CUSTOMER",
+              "SUPPLIER",
+              "OTHER"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "number",
+            "nullable": true,
+            "description": "Null for a typed name"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "name"
+        ]
+      },
+      "StockCountSettlement": {
+        "type": "object",
+        "properties": {
+          "accountCode": {
+            "type": "string",
+            "nullable": true,
+            "example": "313011",
+            "description": "Null: the loss and gain accounts"
+          },
+          "party": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StockCountParty"
+              }
+            ]
+          },
+          "charged": {
+            "type": "boolean",
+            "description": "A shortage its party pays for at the selling price"
+          }
+        },
+        "required": [
+          "accountCode",
+          "party",
+          "charged"
+        ]
+      },
+      "StockCountSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "userId": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sentAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Null: not sent"
+          },
+          "sentByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "entries": {
+            "type": "number",
+            "description": "Entries not taken back"
+          },
+          "products": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "name",
+          "startedAt",
+          "sentAt",
+          "sentByName",
+          "entries",
+          "products"
+        ]
+      },
+      "StockCountDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "COUNTING",
+              "REVIEW",
+              "APPROVED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true,
+            "example": "ST-2026-000001"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "scopeMode": {
+            "enum": [
+              "ALL",
+              "SCANNED",
+              "SEGMENT",
+              "SUPPLIER",
+              "CATEGORY"
+            ],
+            "type": "string"
+          },
+          "scopeLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "showStock": {
+            "type": "boolean"
+          },
+          "startedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "postedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "effectiveDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "lines": {
+            "type": "number",
+            "description": "Products on the count"
+          },
+          "counted": {
+            "type": "number",
+            "description": "Products with a sent count"
+          },
+          "scopeIds": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "uncounted": {
+            "nullable": true,
+            "enum": [
+              "ZERO",
+              "LEAVE"
+            ],
+            "type": "string"
+          },
+          "startedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "surplus": {
+            "$ref": "#/components/schemas/StockCountSettlement"
+          },
+          "shortage": {
+            "$ref": "#/components/schemas/StockCountSettlement"
+          },
+          "different": {
+            "type": "number",
+            "description": "Counted products that differ from their stock"
+          },
+          "uncountedLines": {
+            "type": "number",
+            "description": "Listed products nobody counted"
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockCountSession"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "warehouseId",
+          "warehouseName",
+          "status",
+          "number",
+          "note",
+          "scopeMode",
+          "scopeLabel",
+          "showStock",
+          "startedAt",
+          "postedAt",
+          "effectiveDate",
+          "lines",
+          "counted",
+          "scopeIds",
+          "uncounted",
+          "startedByName",
+          "surplus",
+          "shortage",
+          "different",
+          "uncountedLines",
+          "sessions"
+        ]
+      },
+      "OpenStockCount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "scopeMode": {
+            "enum": [
+              "ALL",
+              "SCANNED",
+              "SEGMENT",
+              "SUPPLIER",
+              "CATEGORY"
+            ],
+            "type": "string"
+          },
+          "scopeLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "showStock": {
+            "type": "boolean"
+          },
+          "startedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "mine": {
+            "enum": [
+              "NONE",
+              "OPEN",
+              "SENT"
+            ],
+            "type": "string",
+            "description": "OPEN: started and not sent yet"
+          }
+        },
+        "required": [
+          "id",
+          "warehouseId",
+          "warehouseName",
+          "note",
+          "scopeMode",
+          "scopeLabel",
+          "showStock",
+          "startedAt",
+          "mine"
+        ]
+      },
+      "StockCountAccountChoice": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "313011"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ]
+      },
+      "StockCountVarianceRow": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number"
+          },
+          "stocktakeId": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "effectiveDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unitName": {
+            "type": "string"
+          },
+          "expectedQty": {
+            "type": "string",
+            "nullable": true
+          },
+          "countedQty": {
+            "type": "string",
+            "nullable": true
+          },
+          "differenceQty": {
+            "type": "string",
+            "description": "What the approval posted"
+          },
+          "unitCost": {
+            "type": "string",
+            "nullable": true,
+            "description": "inventory.costs.manage only"
+          },
+          "settlement": {
+            "$ref": "#/components/schemas/StockCountSettlement"
+          },
+          "chargeAmount": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "lineId",
+          "stocktakeId",
+          "number",
+          "effectiveDate",
+          "warehouseId",
+          "warehouseName",
+          "productId",
+          "sku",
+          "name",
+          "unitName",
+          "expectedQty",
+          "countedQty",
+          "differenceQty",
+          "unitCost",
+          "settlement",
+          "chargeAmount"
+        ]
+      },
+      "StockCountVariancePage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockCountVarianceRow"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "StockCountCounter": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "string",
+            "example": "12",
+            "description": "Sent, base units"
+          },
+          "pendingQty": {
+            "type": "string",
+            "example": "0",
+            "description": "Counted but not sent yet"
+          }
+        },
+        "required": [
+          "userId",
+          "name",
+          "qty",
+          "pendingQty"
+        ]
+      },
+      "StockCountLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unitName": {
+            "type": "string"
+          },
+          "listed": {
+            "type": "boolean",
+            "description": "False: scanned outside the list"
+          },
+          "expectedQty": {
+            "type": "string",
+            "nullable": true,
+            "description": "The stock at the first count"
+          },
+          "countedQty": {
+            "type": "string",
+            "nullable": true
+          },
+          "pendingQty": {
+            "type": "string"
+          },
+          "differenceQty": {
+            "type": "string",
+            "nullable": true
+          },
+          "firstCountedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "counters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockCountCounter"
+            }
+          },
+          "movedDuring": {
+            "type": "string",
+            "description": "Moved by other documents after the first count, until approval"
+          },
+          "movedAfter": {
+            "type": "string",
+            "description": "Moved by other documents after the approval"
+          },
+          "settleOwn": {
+            "type": "boolean",
+            "description": "The line has its own account and party"
+          },
+          "settlement": {
+            "$ref": "#/components/schemas/StockCountSettlement"
+          },
+          "unitCost": {
+            "type": "string",
+            "nullable": true,
+            "description": "inventory.costs.manage only"
+          },
+          "chargeAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "MNT charged to the party"
+          }
+        },
+        "required": [
+          "id",
+          "productId",
+          "sku",
+          "name",
+          "unitName",
+          "listed",
+          "expectedQty",
+          "countedQty",
+          "pendingQty",
+          "differenceQty",
+          "firstCountedAt",
+          "counters",
+          "movedDuring",
+          "movedAfter",
+          "settleOwn",
+          "settlement",
+          "unitCost",
+          "chargeAmount"
+        ]
+      },
+      "StockCountLinePage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockCountLine"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "StockCountEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "sessionId": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "number"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "productUnitId": {
+            "type": "number"
+          },
+          "unitName": {
+            "type": "string"
+          },
+          "factor": {
+            "type": "string",
+            "example": "24"
+          },
+          "enteredQty": {
+            "type": "string",
+            "example": "2",
+            "description": "In the entry unit"
+          },
+          "qtyBase": {
+            "type": "string",
+            "example": "48",
+            "description": "Base units"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "voided": {
+            "type": "boolean",
+            "description": "Taken back by its counter"
+          },
+          "sent": {
+            "type": "boolean",
+            "description": "Its session was sent"
+          }
+        },
+        "required": [
+          "id",
+          "sessionId",
+          "productId",
+          "sku",
+          "name",
+          "userId",
+          "userName",
+          "productUnitId",
+          "unitName",
+          "factor",
+          "enteredQty",
+          "qtyBase",
+          "createdAt",
+          "voided",
+          "sent"
+        ]
+      },
+      "StockCountMovedDocument": {
+        "type": "object",
+        "properties": {
+          "docType": {
+            "type": "string",
+            "example": "CN"
+          },
+          "docId": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "qty": {
+            "type": "string",
+            "example": "3",
+            "description": "Net base units in the count warehouse"
+          },
+          "postedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effectiveDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "afterApproval": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "docType",
+          "docId",
+          "number",
+          "qty",
+          "postedAt",
+          "effectiveDate",
+          "afterApproval"
+        ]
+      },
+      "StockCountPartyInput": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "USER",
+              "CUSTOMER",
+              "SUPPLIER",
+              "OTHER"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "USER, CUSTOMER, SUPPLIER"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200,
+            "description": "OTHER"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "StockCountSettlementInput": {
+        "type": "object",
+        "properties": {
+          "accountCode": {
+            "type": "string",
+            "nullable": true,
+            "example": "313011"
+          },
+          "party": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StockCountPartyInput"
+              }
+            ]
+          },
+          "charged": {
+            "type": "boolean",
+            "description": "A shortage only: its party pays at the selling price"
+          }
+        }
+      },
+      "StockCountLineSettlementRequest": {
+        "type": "object",
+        "properties": {
+          "settlement": {
+            "nullable": true,
+            "description": "Null or absent: back to the count default",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StockCountSettlementInput"
+              }
+            ]
+          }
+        }
+      },
+      "StockCountDefaultsRequest": {
+        "type": "object",
+        "properties": {
+          "surplus": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StockCountSettlementInput"
+              }
+            ]
+          },
+          "shortage": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StockCountSettlementInput"
+              }
+            ]
+          }
+        }
+      },
+      "MyStockCountSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "startedAt"
+        ]
+      },
+      "MyStockCount": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "$ref": "#/components/schemas/OpenStockCount"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "COUNTING",
+              "REVIEW",
+              "APPROVED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "session": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MyStockCountSession"
+              }
+            ]
+          },
+          "entries": {
+            "description": "My entries, newest first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockCountEntry"
+            }
+          }
+        },
+        "required": [
+          "count",
+          "status",
+          "session",
+          "entries"
+        ]
+      },
+      "StockCountEntryRequest": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "productUnitId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The unit counted in: a piece, a box"
+          },
+          "qty": {
+            "type": "string",
+            "example": "10",
+            "description": "In that unit; 0 records a product found empty"
+          }
+        },
+        "required": [
+          "productId",
+          "productUnitId",
+          "qty"
+        ]
+      },
+      "StockCountProductInfo": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "listed": {
+            "type": "boolean"
+          },
+          "myQty": {
+            "type": "string",
+            "description": "My unsent quantity, base units"
+          },
+          "expectedQty": {
+            "type": "string",
+            "nullable": true,
+            "description": "Only when the count shows stock"
+          },
+          "countedQty": {
+            "type": "string",
+            "nullable": true,
+            "description": "Only when the count shows stock"
+          },
+          "entryId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The entry just written"
+          }
+        },
+        "required": [
+          "productId",
+          "listed",
+          "myQty",
+          "expectedQty",
+          "countedQty",
+          "entryId"
+        ]
+      },
+      "StockCountApproveRequest": {
+        "type": "object",
+        "properties": {
+          "uncounted": {
+            "enum": [
+              "ZERO",
+              "LEAVE"
+            ],
+            "type": "string",
+            "description": "Listed products nobody counted: ZERO takes their stock out, LEAVE keeps it"
+          }
+        },
+        "required": [
+          "uncounted"
+        ]
+      },
       "TransferRequestContext": {
         "type": "object",
         "properties": {
@@ -64603,6 +67016,26 @@
         },
         "required": [
           "accountId"
+        ]
+      },
+      "StockCountAccount": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "example": "313011"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "accountId",
+          "code",
+          "name"
         ]
       },
       "MoneyAccount": {
@@ -82229,6 +84662,8 @@
           "EBARIMT_CELL_CONFLICT",
           "EBARIMT_FILE_CHANGED",
           "PICK_INCOMPLETE",
+          "COUNT_SESSIONS_OPEN",
+          "COUNT_SESSION_REQUIRED",
           "PICK_TAKEN",
           "LINE_EDIT_PART_DONE",
           "PICK_STATE_INVALID",

@@ -11,6 +11,7 @@ import {
   RECEIPT_COUNTER_ACCOUNTS,
   RECEIPT_MONEY_ACCOUNTS,
   STOCK_BOOKS,
+  STOCK_COUNT_ACCOUNTS,
 } from '../inventory';
 import { CUSTOMER_DEBT_READER, PartnersModule } from '../partners';
 import { CREDIT_CHECKER, SALE_SINK } from '../sales';
@@ -35,6 +36,7 @@ import { SupplierBalancesController } from './controllers/payables.controller';
 import { PeriodsController } from './controllers/periods.controller';
 import { IssueExpenseAccountsController } from './controllers/issue-expense-accounts.controller';
 import { ReportsController } from './controllers/reports.controller';
+import { StockCountAccountsController } from './controllers/stock-count-accounts.controller';
 import { FinanceReconcileJob } from './jobs/reconcile.job';
 import { AllocationsService } from './services/allocations.service';
 import { ApLedgerService } from './services/ap-ledger.service';
@@ -65,6 +67,7 @@ import { PaymentsService } from './services/payments.service';
 import { ReceiptCounterAccountsService } from './services/receipt-counter-accounts.service';
 import { ReceiptMoneyAccountsService } from './services/receipt-money-accounts.service';
 import { StockBooksService } from './services/stock-books.service';
+import { StockCountAccountsService } from './services/stock-count-accounts.service';
 import { SupplierBillsService } from './services/supplier-bills.service';
 
 const SERVICES = [
@@ -96,6 +99,7 @@ const SERVICES = [
   ReportsService,
   LedgerReportsService,
   IssueExpenseAccountsService,
+  StockCountAccountsService,
   BankStatementsService,
 ];
 
@@ -125,6 +129,7 @@ const SERVICES = [
     { provide: RECEIPT_COUNTER_ACCOUNTS, useExisting: ReceiptCounterAccountsService },
     { provide: PURCHASE_BOOKS, useExisting: SupplierBillsService },
     { provide: STOCK_BOOKS, useExisting: StockBooksService },
+    { provide: STOCK_COUNT_ACCOUNTS, useExisting: StockCountAccountsService },
     { provide: CUSTOMER_DEBT_READER, useExisting: CustomerDebtsService },
   ],
   exports: [
@@ -135,6 +140,7 @@ const SERVICES = [
     RECEIPT_COUNTER_ACCOUNTS,
     PURCHASE_BOOKS,
     STOCK_BOOKS,
+    STOCK_COUNT_ACCOUNTS,
     CUSTOMER_DEBT_READER,
   ],
 })
@@ -152,6 +158,7 @@ export class FinanceModule {}
     PaymentsController,
     GlAccountsController,
     IssueExpenseAccountsController,
+    StockCountAccountsController,
     MoneyAccountsController,
     JournalController,
     LedgerReportsController,

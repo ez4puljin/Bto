@@ -694,6 +694,8 @@ export class StocktakesService {
     const filters: SQL[] = [];
     if (query.warehouseId) filters.push(eq(stocktakes.warehouseId, query.warehouseId));
     if (query.status) filters.push(eq(stocktakes.status, query.status));
+    // Product counts (ADR-0176) have their own service and screens.
+    filters.push(eq(stocktakes.kind, 'SHELF'));
     const after = decodeCursor(query.cursor);
     if (typeof after?.id === 'number') filters.push(lt(stocktakes.id, after.id));
     const rows = await this.db
@@ -722,7 +724,7 @@ export class StocktakesService {
   /** The header, its bins with their progress and, while open, what the differences are worth. */
   async get(id: number, executor: Db | Tx = this.db): Promise<StocktakeDetail> {
     const [header] = await executor.select().from(stocktakes).where(eq(stocktakes.id, id));
-    if (!header) throw notFound('stocktake', id);
+    if (!header || header.kind !== 'SHELF') throw notFound('stocktake', id);
     const binRows = await this.binsOf(executor, id);
     const open = header.status === 'COUNTING' || header.status === 'REVIEW';
     const [values] = open
@@ -1019,7 +1021,7 @@ export class StocktakesService {
 
   private async lockHeader(tx: Tx, id: number): Promise<StocktakeRow> {
     const [row] = await tx.select().from(stocktakes).where(eq(stocktakes.id, id)).for('update');
-    if (!row) throw notFound('stocktake', id);
+    if (!row || row.kind !== 'SHELF') throw notFound('stocktake', id);
     return row;
   }
 

@@ -39,7 +39,9 @@ import {
   bins,
   goodsReceipts,
   reconciliationRuns,
+  stockCountLines,
   stockReservations,
+  stocktakeLines,
   stocktakes,
   transfers,
 } from '../schema';
@@ -166,6 +168,19 @@ export interface PostingResult {
   numbers: Map<number, string>;
   /** Cost of each ledger row by `${docLineId}:${movementType}:${leg}`. */
   unitCosts: Map<string, Decimal>;
+}
+
+/** A document that moved a counted product after its count (ADR-0176 #9). */
+export interface CountMovedDocument {
+  docType: string;
+  docId: number;
+  number: string | null;
+  /** Net base quantity in the count's warehouse. */
+  qty: Decimal;
+  postedAt: Date;
+  effectiveDate: string;
+  /** Posted after the count was approved. */
+  afterApproval: boolean;
 }
 
 export interface CostedLine {
@@ -630,6 +645,8 @@ export class StockPostingService implements OnModuleInit {
         // The supplier's AP credit takes the stock out (F3, ADR-0091).
         if (issue.supplier) continue;
       }
+      // A product count's difference carries its line's account and party (ADR-0176 #7).
+      const settled = docType === 'ST' ? await this.countSettlements(tx, docId) : null;
       const sums = new Map<string, StockBookLine>();
       let neutral = ZERO;
       for (const { row } of entries) {
@@ -643,11 +660,24 @@ export class StockPostingService implements OnModuleInit {
           continue;
         }
         const code = kind === 'ISSUE' ? (issue?.code ?? null) : null;
-        const key = `${kind}:${code ?? ''}`;
+        const own = settled?.get(row.docLineId);
+        const key = own
+          ? [
+              kind,
+              own.accountCode ?? '',
+              own.party?.kind ?? '',
+              own.party?.id ?? '',
+              own.party?.name ?? '',
+              own.charged ? 1 : 0,
+            ].join('\u0000')
+          : `${kind}:${code ?? ''}`;
         const line = sums.get(key);
         sums.set(key, {
           kind,
           ...(kind === 'ISSUE' ? { issueType: code, issueTypeId: issue?.typeId ?? null } : {}),
+          ...(own?.accountCode ? { accountCode: own.accountCode } : {}),
+          ...(own?.party ? { party: own.party } : {}),
+          ...(own?.charged && kind === 'LOSS' ? { charged: true } : {}),
           value: (line?.value ?? ZERO).plus(value),
         });
       }
@@ -670,6 +700,148 @@ export class StockPostingService implements OnModuleInit {
       });
     }
     return facts;
+  }
+
+  /**
+   * A product count's settlement by correction row (ADR-0176 #7): the account, the party and the
+   * charge its count line was approved with; null for a shelf count (ADR-0038).
+   */
+  private async countSettlements(
+    tx: Db | Tx,
+    stocktakeId: number,
+  ): Promise<Map<
+    number,
+    { accountCode: string | null; party: StockBookParty | undefined; charged: boolean }
+  > | null> {
+    const [header] = await tx
+      .select({ kind: stocktakes.kind })
+      .from(stocktakes)
+      .where(eq(stocktakes.id, stocktakeId));
+    if (header?.kind !== 'PRODUCT') return null;
+    const rows = await tx
+      .select({
+        id: stocktakeLines.id,
+        accountCode: stockCountLines.accountCode,
+        partyKind: stockCountLines.partyKind,
+        partyId: stockCountLines.partyId,
+        partyName: stockCountLines.partyName,
+        charged: stockCountLines.charged,
+      })
+      .from(stocktakeLines)
+      .innerJoin(
+        stockCountLines,
+        and(
+          eq(stockCountLines.stocktakeId, stocktakeLines.stocktakeId),
+          eq(stockCountLines.productId, stocktakeLines.productId),
+        ),
+      )
+      .where(eq(stocktakeLines.stocktakeId, stocktakeId));
+    return new Map(
+      rows.map((row) => [
+        row.id,
+        {
+          accountCode: row.accountCode,
+          party: row.partyKind
+            ? { kind: row.partyKind, id: row.partyId, name: row.partyName ?? '' }
+            : undefined,
+          charged: row.charged,
+        },
+      ]),
+    );
+  }
+
+  /** The newest ledger row: what a count line marks when its product is first counted. */
+  async ledgerMark(tx: Tx): Promise<number> {
+    const [row] = await tx
+      .select({ id: sql<string>`coalesce(max(${stockLedger.id}), 0)::text` })
+      .from(stockLedger);
+    return Number.parseInt(row?.id ?? '0', 10);
+  }
+
+  /**
+   * What moved a product count's products after each was first counted (ADR-0176 #9), other than
+   * the count's own correction: the net quantity until the approval and after it, by product.
+   */
+  async countMovedSince(
+    stocktakeId: number,
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, { during: Decimal; after: Decimal }>> {
+    const result = await executor.execute<{
+      product_id: string;
+      during: string;
+      after: string;
+    }>(sql`
+      SELECT l.product_id::text AS product_id,
+        coalesce(sum(g.qty_base) FILTER (
+          WHERE s.posted_at IS NULL OR g.posted_at < s.posted_at), 0)::text AS during,
+        coalesce(sum(g.qty_base) FILTER (
+          WHERE s.posted_at IS NOT NULL AND g.posted_at >= s.posted_at), 0)::text AS after
+      FROM stock_count_lines l
+      JOIN stocktakes s ON s.id = l.stocktake_id
+      JOIN stock_ledger g ON g.product_id = l.product_id
+        AND g.warehouse_id = s.warehouse_id AND g.id > l.ledger_mark
+      WHERE l.stocktake_id = ${stocktakeId} AND l.ledger_mark IS NOT NULL
+        AND NOT (g.doc_type = 'ST' AND g.doc_id = s.id)
+      GROUP BY l.product_id`);
+    const moved = new Map<number, { during: Decimal; after: Decimal }>();
+    for (const row of result.rows) {
+      const during = new Decimal(row.during);
+      const after = new Decimal(row.after);
+      if (during.isZero() && after.isZero()) continue;
+      moved.set(Number.parseInt(row.product_id, 10), { during, after });
+    }
+    return moved;
+  }
+
+  /** The documents behind `countMovedSince` for one product, newest first (ADR-0176 #9). */
+  async countMovedDocuments(
+    stocktakeId: number,
+    productId: number,
+    executor: Db | Tx = this.db,
+  ): Promise<CountMovedDocument[]> {
+    const result = await executor.execute<{
+      doc_type: string;
+      doc_id: string;
+      number: string | null;
+      qty: string;
+      posted_at: Date | string;
+      effective_date: string;
+      after_approval: boolean;
+    }>(sql`
+      SELECT g.doc_type, g.doc_id::text AS doc_id, sum(g.qty_base)::text AS qty,
+        max(g.posted_at) AS posted_at, max(g.effective_date)::text AS effective_date,
+        bool_or(s.posted_at IS NOT NULL AND g.posted_at >= s.posted_at) AS after_approval,
+        CASE g.doc_type
+          WHEN 'GR' THEN (SELECT d.number FROM goods_receipts d WHERE d.id = g.doc_id)
+          WHEN 'BM' THEN (SELECT d.number FROM bin_moves d WHERE d.id = g.doc_id)
+          WHEN 'ADJ' THEN (SELECT d.number FROM adjustments d WHERE d.id = g.doc_id)
+          WHEN 'ST' THEN (SELECT d.number FROM stocktakes d WHERE d.id = g.doc_id)
+          WHEN 'TR' THEN (SELECT d.number FROM transfers d WHERE d.id = g.doc_id)
+          WHEN 'SO' THEN (SELECT d.number FROM sales_orders d WHERE d.id = g.doc_id)
+          WHEN 'CN' THEN (SELECT d.number FROM credit_notes d WHERE d.id = g.doc_id)
+          WHEN 'POS' THEN (SELECT d.number FROM pos_sales d WHERE d.id = g.doc_id)
+          WHEN 'GI' THEN (SELECT d.number FROM goods_issues d WHERE d.id = g.doc_id)
+        END AS number
+      FROM stock_count_lines l
+      JOIN stocktakes s ON s.id = l.stocktake_id
+      JOIN stock_ledger g ON g.product_id = l.product_id
+        AND g.warehouse_id = s.warehouse_id AND g.id > l.ledger_mark
+      WHERE l.stocktake_id = ${stocktakeId} AND l.product_id = ${productId}
+        AND l.ledger_mark IS NOT NULL
+        AND NOT (g.doc_type = 'ST' AND g.doc_id = s.id)
+      GROUP BY g.doc_type, g.doc_id
+      HAVING sum(g.qty_base) <> 0
+      ORDER BY max(g.id) DESC
+      LIMIT 200`);
+    return result.rows.map((row) => ({
+      docType: row.doc_type,
+      docId: Number.parseInt(row.doc_id, 10),
+      number: row.number,
+      qty: new Decimal(row.qty),
+      postedAt: new Date(row.posted_at),
+      effectiveDate: row.effective_date,
+      afterApproval: row.after_approval,
+    }));
   }
 
   /**

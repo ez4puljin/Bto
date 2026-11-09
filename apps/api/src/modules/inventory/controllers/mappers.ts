@@ -21,6 +21,18 @@ import type {
   ReceiptSummaryDto,
 } from '../dto/receipts.dto';
 import type {
+  MyStockCountDto,
+  OpenStockCountDto,
+  StockCountDetailDto,
+  StockCountEntryDto,
+  StockCountLineDto,
+  StockCountMovedDocumentDto,
+  StockCountProductInfoDto,
+  StockCountSettlementDto,
+  StockCountSummaryDto,
+  StockCountVarianceRowDto,
+} from '../dto/stock-counts.dto';
+import type {
   StocktakeBinDto,
   StocktakeDetailDto,
   StocktakeLineDto,
@@ -48,6 +60,18 @@ import type {
   ReceiptLine,
   ReceiptSummary,
 } from '../services/receipts.service';
+import type {
+  CountSettlement,
+  CountVarianceRow,
+  MyStockCount,
+  OpenStockCount,
+  StockCountDetail,
+  StockCountEntry,
+  StockCountLine,
+  StockCountProductInfo,
+  StockCountSummary,
+} from '../services/stock-counts.service';
+import type { CountMovedDocument } from '../services/stock-posting.service';
 import type {
   ScanResult,
   StocktakeBin,
@@ -606,5 +630,176 @@ export function toStocktakeScanResultDto(
       qtyBase: result.added.qtyBase.toFixed(),
     },
     bin: toStocktakeBinDto(result.bin, view),
+  };
+}
+
+// Product counts (ADR-0176)
+
+function toCountSettlementDto(settlement: CountSettlement): StockCountSettlementDto {
+  return {
+    accountCode: settlement.accountCode,
+    party: settlement.party
+      ? { kind: settlement.party.kind, id: settlement.party.id, name: settlement.party.name }
+      : null,
+    charged: settlement.charged,
+  };
+}
+
+export function toStockCountSummaryDto(count: StockCountSummary): StockCountSummaryDto {
+  return {
+    id: count.id,
+    warehouseId: count.warehouseId,
+    warehouseName: count.warehouseName,
+    status: count.status,
+    number: count.number,
+    note: count.note,
+    scopeMode: count.scopeMode,
+    scopeLabel: count.scopeLabel,
+    showStock: count.showStock,
+    startedAt: count.startedAt?.toISOString() ?? null,
+    postedAt: count.postedAt?.toISOString() ?? null,
+    effectiveDate: count.effectiveDate,
+    lines: count.lines,
+    counted: count.counted,
+  };
+}
+
+export function toStockCountDetailDto(count: StockCountDetail): StockCountDetailDto {
+  return {
+    ...toStockCountSummaryDto(count),
+    scopeIds: count.scopeIds,
+    uncounted: count.uncounted,
+    startedByName: count.startedByName,
+    surplus: toCountSettlementDto(count.surplus),
+    shortage: toCountSettlementDto(count.shortage),
+    different: count.different,
+    uncountedLines: count.uncountedLines,
+    sessions: count.sessions.map((session) => ({
+      id: session.id,
+      userId: session.userId,
+      name: session.name,
+      startedAt: session.startedAt.toISOString(),
+      sentAt: session.sentAt?.toISOString() ?? null,
+      sentByName: session.sentByName,
+      entries: session.entries,
+      products: session.products,
+    })),
+  };
+}
+
+export function toStockCountLineDto(line: StockCountLine): StockCountLineDto {
+  return {
+    id: line.id,
+    productId: line.productId,
+    sku: line.sku,
+    name: line.name,
+    unitName: line.unitName,
+    listed: line.listed,
+    expectedQty: line.expectedQty?.toFixed() ?? null,
+    countedQty: line.countedQty?.toFixed() ?? null,
+    pendingQty: line.pendingQty.toFixed(),
+    differenceQty: line.differenceQty?.toFixed() ?? null,
+    firstCountedAt: line.firstCountedAt?.toISOString() ?? null,
+    counters: line.counters.map((counter) => ({
+      userId: counter.userId,
+      name: counter.name,
+      qty: counter.qty.toFixed(),
+      pendingQty: counter.pendingQty.toFixed(),
+    })),
+    movedDuring: line.movedDuring.toFixed(),
+    movedAfter: line.movedAfter.toFixed(),
+    settleOwn: line.settleOwn,
+    settlement: toCountSettlementDto(line.settlement),
+    unitCost: line.unitCost?.toFixed() ?? null,
+    chargeAmount: line.chargeAmount?.toFixed(2) ?? null,
+  };
+}
+
+export function toStockCountEntryDto(entry: StockCountEntry): StockCountEntryDto {
+  return {
+    id: entry.id,
+    sessionId: entry.sessionId,
+    productId: entry.productId,
+    sku: entry.sku,
+    name: entry.name,
+    userId: entry.userId,
+    userName: entry.userName,
+    productUnitId: entry.productUnitId,
+    unitName: entry.unitName,
+    factor: entry.factor.toFixed(),
+    enteredQty: entry.enteredQty.toFixed(),
+    qtyBase: entry.qtyBase.toFixed(),
+    createdAt: entry.createdAt.toISOString(),
+    voided: entry.voided,
+    sent: entry.sent,
+  };
+}
+
+export function toStockCountMovedDto(moved: CountMovedDocument): StockCountMovedDocumentDto {
+  return {
+    docType: moved.docType,
+    docId: moved.docId,
+    number: moved.number,
+    qty: moved.qty.toFixed(),
+    postedAt: moved.postedAt.toISOString(),
+    effectiveDate: moved.effectiveDate,
+    afterApproval: moved.afterApproval,
+  };
+}
+
+export function toOpenStockCountDto(count: OpenStockCount): OpenStockCountDto {
+  return {
+    id: count.id,
+    warehouseId: count.warehouseId,
+    warehouseName: count.warehouseName,
+    note: count.note,
+    scopeMode: count.scopeMode,
+    scopeLabel: count.scopeLabel,
+    showStock: count.showStock,
+    startedAt: count.startedAt?.toISOString() ?? null,
+    mine: count.mine,
+  };
+}
+
+export function toMyStockCountDto(mine: MyStockCount): MyStockCountDto {
+  return {
+    count: toOpenStockCountDto(mine.count),
+    status: mine.status,
+    session: mine.session
+      ? { id: mine.session.id, startedAt: mine.session.startedAt.toISOString() }
+      : null,
+    entries: mine.entries.map(toStockCountEntryDto),
+  };
+}
+
+export function toStockCountProductInfoDto(info: StockCountProductInfo): StockCountProductInfoDto {
+  return {
+    productId: info.productId,
+    listed: info.listed,
+    myQty: info.myQty.toFixed(),
+    expectedQty: info.expectedQty?.toFixed() ?? null,
+    countedQty: info.countedQty?.toFixed() ?? null,
+    entryId: info.entryId,
+  };
+}
+
+export function toStockCountVarianceRowDto(row: CountVarianceRow): StockCountVarianceRowDto {
+  return {
+    lineId: row.lineId,
+    stocktakeId: row.stocktakeId,
+    number: row.number,
+    effectiveDate: row.effectiveDate,
+    warehouseId: row.warehouseId,
+    warehouseName: row.warehouseName,
+    productId: row.productId,
+    sku: row.sku,
+    name: row.name,
+    unitName: row.unitName,
+    expectedQty: row.expectedQty?.toFixed() ?? null,
+    countedQty: row.countedQty?.toFixed() ?? null,
+    differenceQty: row.differenceQty.toFixed(),
+    unitCost: row.unitCost?.toFixed() ?? null,
+    settlement: toCountSettlementDto(row.settlement),
+    chargeAmount: row.chargeAmount?.toFixed(2) ?? null,
   };
 }

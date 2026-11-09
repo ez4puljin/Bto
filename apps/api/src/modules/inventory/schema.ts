@@ -57,6 +57,14 @@ export const BIN_MOVE_STATUSES = ['DRAFT', 'POSTED'] as const;
 export const ADJUSTMENT_STATUSES = ['DRAFT', 'SUBMITTED', 'POSTED', 'CANCELLED'] as const;
 export { ISSUE_STATUSES };
 export const STOCKTAKE_STATUSES = ['DRAFT', 'COUNTING', 'REVIEW', 'APPROVED', 'CANCELLED'] as const;
+/** A shelf count (ADR-0038) or a product count by the staff's phones (ADR-0176). */
+export const STOCKTAKE_KINDS = ['SHELF', 'PRODUCT'] as const;
+/** How a product count's list was called up (ADR-0176 #1). */
+export const COUNT_SCOPE_MODES = ['ALL', 'SCANNED', 'SEGMENT', 'SUPPLIER', 'CATEGORY'] as const;
+/** What approval does with a listed product nobody counted (ADR-0176 #6). */
+export const COUNT_UNCOUNTED_MODES = ['ZERO', 'LEAVE'] as const;
+/** Who a count difference is booked against (the goods issues' kinds, ADR-0117). */
+export const COUNT_PARTY_KINDS = ['USER', 'CUSTOMER', 'SUPPLIER', 'OTHER'] as const;
 export const RESERVATION_STATUSES = ['ACTIVE', 'CONSUMED', 'RELEASED'] as const;
 export const RECONCILIATION_STATUSES = ['OK', 'DRIFT'] as const;
 
@@ -975,10 +983,44 @@ export const stocktakes = pgTable(
     note: text('note'),
     startedAt: timestamp('started_at', { withTimezone: true }),
     startedBy: userRef('started_by'),
+    kind: text('kind', { enum: STOCKTAKE_KINDS }).notNull().default('SHELF'),
+    /** A product count's list (ADR-0176 #1); NULL on a shelf count. */
+    scopeMode: text('scope_mode', { enum: COUNT_SCOPE_MODES }),
+    scopeIds: bigint('scope_ids', { mode: 'number' }).array(),
+    scopeLabel: text('scope_label'),
+    /** Whether the counters' phones see the stock and the mismatch (ADR-0176 #4). */
+    showStock: boolean('show_stock').notNull().default(false),
+    /** Where the surplus and the shortage go unless a line says otherwise (ADR-0176 #7). */
+    surplusAccountCode: text('surplus_account_code'),
+    surplusPartyKind: text('surplus_party_kind', { enum: COUNT_PARTY_KINDS }),
+    surplusPartyId: ref('surplus_party_id'),
+    surplusPartyName: text('surplus_party_name'),
+    shortageAccountCode: text('shortage_account_code'),
+    shortagePartyKind: text('shortage_party_kind', { enum: COUNT_PARTY_KINDS }),
+    shortagePartyId: ref('shortage_party_id'),
+    shortagePartyName: text('shortage_party_name'),
+    /** The shortage is the party's debt at the selling price (ADR-0176 #8). */
+    shortageCharged: boolean('shortage_charged').notNull().default(false),
+    uncounted: text('uncounted', { enum: COUNT_UNCOUNTED_MODES }),
     ...postingColumns(),
   },
   (t) => [
     unique('stocktakes_number_key').on(t.number),
+    check('stocktakes_kind', inList(t.kind, STOCKTAKE_KINDS)),
+    check(
+      'stocktakes_scope',
+      sql`(${t.kind} = 'PRODUCT') = (${t.scopeMode} IS NOT NULL)
+        AND (${t.scopeMode} IS NULL OR ${inList(t.scopeMode, COUNT_SCOPE_MODES)})
+        AND (${t.uncounted} IS NULL OR ${inList(t.uncounted, COUNT_UNCOUNTED_MODES)})`,
+    ),
+    check(
+      'stocktakes_parties',
+      sql`(${t.surplusPartyKind} IS NULL OR ${inList(t.surplusPartyKind, COUNT_PARTY_KINDS)})
+        AND (${t.shortagePartyKind} IS NULL OR ${inList(t.shortagePartyKind, COUNT_PARTY_KINDS)})
+        AND (${t.surplusPartyKind} IS NULL) = (${t.surplusPartyName} IS NULL)
+        AND (${t.shortagePartyKind} IS NULL) = (${t.shortagePartyName} IS NULL)
+        AND (NOT ${t.shortageCharged} OR ${t.shortagePartyKind} IS NOT NULL)`,
+    ),
     index('stocktakes_warehouse_idx').on(t.warehouseId, t.status, t.id),
     check('stocktakes_status', inList(t.status, STOCKTAKE_STATUSES)),
     check(
@@ -1054,6 +1096,116 @@ export const stocktakeLines = pgTable(
         AND (${t.unitCost} IS NULL OR ${t.unitCost} >= 0)`,
     ),
     check('stocktake_lines_counted', sql`${t.countedAt} IS NULL OR ${t.countedQty} IS NOT NULL`),
+  ],
+);
+
+/**
+ * A product count's lines (ADR-0176): one per product. `expected_qty` is the warehouse's on-hand
+ * when the product was first counted, `ledger_mark` the newest ledger row then: what moved after it
+ * is the count's «later change». `counted_qty` sums the sent entries.
+ */
+export const stockCountLines = pgTable(
+  'stock_count_lines',
+  {
+    id: id(),
+    stocktakeId: ref('stocktake_id')
+      .notNull()
+      .references(() => stocktakes.id),
+    productId: ref('product_id')
+      .notNull()
+      .references(() => products.id),
+    /** In the list the count was created with; false = scanned in although outside it. */
+    listed: boolean('listed').notNull().default(true),
+    expectedQty: qty('expected_qty'),
+    firstCountedAt: timestamp('first_counted_at', { withTimezone: true }),
+    ledgerMark: ref('ledger_mark'),
+    countedQty: qty('counted_qty'),
+    /** The line's own account and party; otherwise the count's default by the difference's sign. */
+    settleOwn: boolean('settle_own').notNull().default(false),
+    accountCode: text('account_code'),
+    partyKind: text('party_kind', { enum: COUNT_PARTY_KINDS }),
+    partyId: ref('party_id'),
+    partyName: text('party_name'),
+    charged: boolean('charged').notNull().default(false),
+    /** Frozen at approval: what was posted, at what cost, and the debt it made. */
+    differenceQty: qty('difference_qty'),
+    unitCost: cost('unit_cost'),
+    chargeAmount: money('charge_amount'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('stock_count_lines_key').on(t.stocktakeId, t.productId),
+    index('stock_count_lines_product_idx').on(t.productId, t.stocktakeId),
+    check(
+      'stock_count_lines_first',
+      sql`(${t.expectedQty} IS NULL) = (${t.firstCountedAt} IS NULL)
+        AND (${t.expectedQty} IS NULL) = (${t.ledgerMark} IS NULL)
+        AND (${t.expectedQty} IS NULL OR ${t.expectedQty} >= 0)
+        AND (${t.countedQty} IS NULL OR ${t.countedQty} >= 0)`,
+    ),
+    check(
+      'stock_count_lines_party',
+      sql`(${t.partyKind} IS NULL OR ${inList(t.partyKind, COUNT_PARTY_KINDS)})
+        AND (${t.partyKind} IS NULL) = (${t.partyName} IS NULL)
+        AND (NOT ${t.charged} OR ${t.partyKind} IS NOT NULL)`,
+    ),
+  ],
+);
+
+/** A staff member's turn at a count: started on the phone, closed by «Илгээх» (ADR-0176 #5). */
+export const stockCountSessions = pgTable(
+  'stock_count_sessions',
+  {
+    id: id(),
+    stocktakeId: ref('stocktake_id')
+      .notNull()
+      .references(() => stocktakes.id),
+    userId: userRef('user_id').notNull(),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    sentBy: userRef('sent_by'),
+  },
+  (t) => [
+    uniqueIndex('stock_count_sessions_open_key')
+      .on(t.stocktakeId, t.userId)
+      .where(sql`${t.sentAt} IS NULL`),
+    index('stock_count_sessions_stocktake_idx').on(t.stocktakeId, t.id),
+    check('stock_count_sessions_sent', sql`(${t.sentAt} IS NULL) = (${t.sentBy} IS NULL)`),
+  ],
+);
+
+/** One typed quantity: 10 and then 2 are two rows, never summed away (ADR-0176 #3). */
+export const stockCountEntries = pgTable(
+  'stock_count_entries',
+  {
+    id: id(),
+    sessionId: ref('session_id')
+      .notNull()
+      .references(() => stockCountSessions.id),
+    stocktakeId: ref('stocktake_id')
+      .notNull()
+      .references(() => stocktakes.id),
+    productId: ref('product_id')
+      .notNull()
+      .references(() => products.id),
+    userId: userRef('user_id').notNull(),
+    productUnitId: ref('product_unit_id')
+      .notNull()
+      .references(() => productUnits.id),
+    enteredQty: qty('entered_qty').notNull(),
+    factorSnapshot: factor('factor_snapshot').notNull(),
+    qtyBase: qty('qty_base').notNull(),
+    createdAt: createdAt(),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('stock_count_entries_session_idx').on(t.sessionId, t.id),
+    index('stock_count_entries_product_idx').on(t.stocktakeId, t.productId, t.id),
+    check(
+      'stock_count_entries_qty',
+      sql`${t.enteredQty} >= 0 AND ${t.qtyBase} >= 0 AND ${t.factorSnapshot} > 0`,
+    ),
   ],
 );
 

@@ -57,6 +57,8 @@ finance depends on these modules, always through their `index.ts`:
 
 **`pos` imports `finance`** (ADR-0063 #2, ADR-0064): `FinanceModule` (`apps/api/src/modules/pos/pos.module.ts:3,54`), `GlAccountsService`, `JournalService`, `MoneyAccountsService` and `PaymentsService` (`pos/services/pos-shifts.service.ts:11-17`), `MoneyAccountsService` (`pos/services/pos-settings.service.ts:8`); `pos/schema.ts:29` imports the finance tables for the FKs `pos_settings.handover_money_account_id`, `pos_shifts.journal_entry_id` and `pos_shifts.handover_payment_id` (`:62,263,265`). Inventory reads `credit_notes.number` by raw SQL for the movement history (`inventory/services/stock-posting.service.ts:717`), which ESLint cannot see. Sales does not import finance: it finds the two hooks through `ModuleRef` (`strict: false`) and runs without them when the module is absent (the worker, tests that load sales alone).
 
+**Status note (2026-11-10, ADR-0176).** Product counts: `StockCountAccountsService` keeps the accounts a count may post its differences to (posting key `COUNT_<code>`; `GET /finance/stock-count-accounts` [`finance.read`], `PUT` / `DELETE /finance/stock-count-accounts/:accountId` [`finance.settings.manage`]; a control account is refused, 422). `StockBooksService` books a count's difference to the line's account with its party, and a shortage charged to a person as a `DAMAGE_CHARGE` document (`count:<id>:…`, receivable at the selling price) beside the stock leaving at cost.
+
 ## 1. Owner's answers behind the design (2026-10-15 / 16)
 
 | Topic | Answer | Where |

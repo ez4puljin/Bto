@@ -20,6 +20,7 @@ import type {
 import { FinBooks } from './fin-books';
 import { FinPosting } from './fin-posting';
 import { controlTotal, intakeLines, type RoleLine } from './intake-lines';
+import { stockCountKey } from './stock-count-accounts.service';
 
 const ZERO = new Decimal(0);
 
@@ -99,7 +100,23 @@ export class StockBooksService implements StockBooks {
     for (const line of facts.lines) {
       stock = stock.plus(line.value);
       if (line.kind !== 'ISSUE') {
-        lines.push(opposite(ROLE_OF_KIND[line.kind], line.value));
+        // A product count's difference (ADR-0176 #7, #8): its chosen account by the account's own
+        // key, its party on the line; a shortage charged to a person leaves as a cost of sale.
+        const counter = opposite(
+          line.charged && line.kind === 'LOSS' ? 'COGS' : ROLE_OF_KIND[line.kind],
+          line.value,
+        );
+        const own = line.accountCode && !line.charged ? stockCountKey(line.accountCode) : null;
+        const keyed: RoleLine =
+          own !== null && ownKeys.has(own) ? { ...counter, key: own } : counter;
+        lines.push(
+          line.party
+            ? {
+                ...keyed,
+                extra: { ...keyed.extra, party: await this.partyIn(tx, actor, line.party) },
+              }
+            : keyed,
+        );
         continue;
       }
       const role = issueRoleOf(line.issueType);
@@ -238,7 +255,9 @@ export class StockBooksService implements StockBooks {
     facts: StockPostedFacts,
   ): Promise<ReadonlySet<string>> {
     const unseeded = facts.lines.some(
-      (line) => line.kind === 'ISSUE' && issueRoleOf(line.issueType) === null,
+      (line) =>
+        (line.kind === 'ISSUE' && issueRoleOf(line.issueType) === null) ||
+        (line.kind !== 'ISSUE' && Boolean(line.accountCode)),
     );
     if (!unseeded) return new Set();
     const rules = await this.chart.rules(
