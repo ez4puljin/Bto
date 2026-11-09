@@ -89,6 +89,10 @@ export const itemMark = (
     ? { style: { backgroundColor: item.typeColor } }
     : { className: CALENDAR_MARKS[item.kind] };
 
+/** What the calendar's type filter keys an item by: HR's type id, or a birthday's and an anniversary's kind. */
+export const calendarTypeKey = (item: Pick<HrCalendarItem, 'kind' | 'typeId'>): string =>
+  item.typeId === null ? item.kind : String(item.typeId);
+
 export const monthOfDate = (date: string): string => date.slice(0, 7);
 export const thisMonth = (): string => monthOfDate(businessDate());
 export const shiftMonth = (month: string, by: number): string =>

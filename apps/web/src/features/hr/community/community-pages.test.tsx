@@ -601,6 +601,56 @@ describe('the calendar', () => {
     });
   });
 
+  it('shows only the chosen types, kept in the address, and «Бүгд» brings the rest back', async () => {
+    const user = userEvent.setup();
+    const month = businessDate().slice(0, 7);
+    const unload: Schemas['HrCalendarItem'] = {
+      date: `${month}-15`,
+      kind: 'EVENT',
+      title: 'Тотал ундаа буух',
+      note: null,
+      eventId: 6,
+      toDate: null,
+      userId: null,
+      photoUrl: null,
+      years: null,
+      typeId: 2,
+      typeName: 'Бараа буух',
+      typeColor: '#f97316',
+      doneAt: null,
+      doneByName: null,
+    };
+    const fetchMock = signedIn(
+      HR_USER,
+      routes({
+        'GET /api/v1/hr/calendar': () =>
+          json([
+            { ...unload, eventId: 5, title: 'Хамт олны өдөр', typeId: 1, typeName: 'Хамт олон' },
+            unload,
+          ]),
+      }),
+    );
+    const view = renderApp(`/hr/calendar?day=${month}-15`, fetchMock);
+    const filter = await screen.findByRole('group', { name: texts.calendar.filter });
+    expect(await screen.findByRole('button', { name: 'Засах: Хамт олны өдөр' })).toBeTruthy();
+
+    await user.click(within(filter).getByRole('button', { name: /Бараа буух/ }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Засах: Хамт олны өдөр' })).toBeNull(),
+    );
+    expect(screen.getByRole('button', { name: 'Засах: Тотал ундаа буух' })).toBeTruthy();
+    expect(view.router.state.location.search).toContain('types=2');
+    expect(
+      within(filter)
+        .getByRole('button', { name: /Бараа буух/ })
+        .getAttribute('aria-pressed'),
+    ).toBe('true');
+
+    await user.click(within(filter).getByRole('button', { name: mn.common.all }));
+    expect(await screen.findByRole('button', { name: 'Засах: Хамт олны өдөр' })).toBeTruthy();
+    expect(view.router.state.location.search).not.toContain('types=');
+  });
+
   it('creates an event of two days', async () => {
     const user = userEvent.setup();
     const fetchMock = signedIn(
