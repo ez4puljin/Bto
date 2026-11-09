@@ -9,7 +9,7 @@ import {
   Plus,
   Settings2,
 } from 'lucide-react';
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
@@ -42,6 +42,7 @@ import {
 import { Avatar } from '../hr-kit';
 import {
   CALENDAR_MARKS,
+  calendarTypeKey,
   isOnDay,
   itemMark,
   monthOfDate,
@@ -272,9 +273,29 @@ export function CalendarItemLine(props: {
   );
 }
 
+/** One type above the month: the legend's dot and name, and a pill that shows only its kind. */
+function TypePill(props: { pressed: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={props.pressed}
+      className={cn(
+        'inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors duration-200 outline-none select-none focus-visible:ring-2 focus-visible:ring-ring',
+        props.pressed
+          ? 'border-transparent bg-secondary text-secondary-foreground'
+          : 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground',
+      )}
+      onClick={props.onClick}
+    >
+      {props.children}
+    </button>
+  );
+}
+
 /**
  * «Үйл явдлын календарь» (ADR-0146): HR's events, the staff's birthdays and work anniversaries on a
- * month; the month and the chosen day are in the address.
+ * month; the month, the chosen day and the chosen types (`?types=`, several at once) are in the
+ * address.
  */
 export function CalendarPage() {
   const { t } = useTranslation();
@@ -296,7 +317,6 @@ export function CalendarPage() {
   const [editing, setEditing] = useState<HrCalendarItem | null>(null);
   const [archiving, setArchiving] = useState<HrCalendarItem | null>(null);
   const items = calendar.data ?? [];
-  const onDay = items.filter((item) => isOnDay(item, day));
   const [year, monthNumber] = month.split('-');
   const go = (next: string) => {
     doneAction.clear();
@@ -338,6 +358,23 @@ export function CalendarPage() {
     if (item.doneAt) row.done += 1;
     typeRows.set(item.typeId, row);
   }
+  // The type filter: none chosen shows every kind; a key no pill carries (a type archived since) is
+  // dropped once the types are known, so the filter never hides the month behind an unseen pill.
+  const known = new Set<string>([...[...typeRows.keys()].map(String), ...PERSON_KINDS]);
+  const chosen = new Set(
+    (params.get('types') ?? '')
+      .split(',')
+      .filter((key) => key !== '' && (!types.data || known.has(key))),
+  );
+  const shown =
+    chosen.size === 0 ? items : items.filter((item) => chosen.has(calendarTypeKey(item)));
+  const onDay = shown.filter((item) => isOnDay(item, day));
+  const choose = (key: string | null) => {
+    doneAction.clear();
+    const next = new Set(key === null ? [] : chosen);
+    if (key !== null && !next.delete(key)) next.add(key);
+    setParam('types', [...next].join(','));
+  };
   const archive = async () => {
     if (archiving?.eventId == null) return;
     const id = archiving.eventId;
@@ -402,21 +439,19 @@ export function CalendarPage() {
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            <MonthGrid
-              month={month}
-              items={items}
-              selected={day}
-              size="full"
-              onSelect={(next) => {
-                doneAction.clear();
-                setParam('day', next);
-              }}
-            />
-            <ul className="flex flex-wrap gap-x-4 gap-y-1">
+            <div
+              role="group"
+              aria-label={t('hr.community.calendar.filter')}
+              className="flex flex-wrap gap-1.5"
+            >
+              <TypePill pressed={chosen.size === 0} onClick={() => choose(null)}>
+                {t('common.all')}
+              </TypePill>
               {[...typeRows.values()].map((type) => (
-                <li
+                <TypePill
                   key={type.id}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                  pressed={chosen.has(String(type.id))}
+                  onClick={() => choose(String(type.id))}
                 >
                   <span
                     aria-hidden
@@ -425,22 +460,32 @@ export function CalendarPage() {
                   />
                   {type.name}
                   {type.total > 0 ? (
-                    <span className="font-mono">
+                    <span className="font-mono font-normal opacity-80">
                       {t('hr.community.calendar.progress', {
                         done: type.done,
                         total: type.total,
                       })}
                     </span>
                   ) : null}
-                </li>
+                </TypePill>
               ))}
               {PERSON_KINDS.map((kind) => (
-                <li key={kind} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <TypePill key={kind} pressed={chosen.has(kind)} onClick={() => choose(kind)}>
                   <span aria-hidden className={cn('size-2 rounded-full', CALENDAR_MARKS[kind])} />
                   {t(`hr.community.calendar.kinds.${kind}`)}
-                </li>
+                </TypePill>
               ))}
-            </ul>
+            </div>
+            <MonthGrid
+              month={month}
+              items={shown}
+              selected={day}
+              size="full"
+              onSelect={(next) => {
+                doneAction.clear();
+                setParam('day', next);
+              }}
+            />
           </CardContent>
         </Card>
         <Card>
@@ -451,10 +496,18 @@ export function CalendarPage() {
             <ProblemAlert problem={doneAction.problem} />
             {calendar.data && onDay.length === 0 ? (
               <EmptyState
-                title={t('hr.community.calendar.dayEmpty')}
+                title={
+                  chosen.size > 0
+                    ? t('hr.community.calendar.dayEmptyFiltered')
+                    : t('hr.community.calendar.dayEmpty')
+                }
                 icon={CalendarDays}
                 action={
-                  canManage ? (
+                  chosen.size > 0 ? (
+                    <Button size="sm" variant="outline" onClick={() => choose(null)}>
+                      {t('common.clearFilters')}
+                    </Button>
+                  ) : canManage ? (
                     <Button size="sm" variant="outline" onClick={() => setCreating(true)}>
                       <Plus />
                       {t('hr.community.calendar.create')}
