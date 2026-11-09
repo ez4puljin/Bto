@@ -61,6 +61,8 @@ export default function StaffLayout() {
           <Stack.Screen name="expiry/index" />
           <Stack.Screen name="expiry/new" />
           <Stack.Screen name="expiry/[id]" />
+          <Stack.Screen name="counts/index" />
+          <Stack.Screen name="counts/[id]" />
           {/* «Хамт олон» (ADR-0146): every staff member's. */}
           <Stack.Screen name="community/index" />
           <Stack.Screen name="community/messages" />

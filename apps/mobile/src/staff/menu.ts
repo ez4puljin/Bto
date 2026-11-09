@@ -9,6 +9,7 @@ export type MenuKey =
   | 'picking'
   | 'transfers'
   | 'expiry'
+  | 'counts'
   | 'attendance'
   | 'attendanceRequests'
   | 'attendanceHistory'
@@ -50,6 +51,7 @@ export function menuOf(me: Rights): MenuGroup[] {
         ...(mayPick(me) ? [{ key: 'picking' as const, href: '/picking' }] : []),
         ...(mayRequestTransfers(me) ? [{ key: 'transfers' as const, href: '/transfers' }] : []),
         { key: 'expiry', href: '/expiry' },
+        { key: 'counts', href: '/counts' },
       ],
     },
     {

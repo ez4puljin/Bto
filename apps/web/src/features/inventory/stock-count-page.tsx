@@ -135,7 +135,7 @@ export function StockCountPage() {
   const mayCancel = (counting && manages) || (review && approves);
 
   return (
-    <div className="flex flex-col gap-4">
+    <>
       <PageHeader
         title={detail.number ?? t('inventory.stocktake.noNumber', { id: detail.id })}
         crumbs={[{ label: t('inventory.counts.title'), to: '/inventory/counts' }]}
@@ -160,114 +160,116 @@ export function StockCountPage() {
           </>
         }
       />
-      {detail.note ? <p className="text-sm text-muted-foreground">{detail.note}</p> : null}
-      <ProblemAlert problem={confirm ? null : action.problem} />
+      <div className="flex flex-col gap-4">
+        {detail.note ? <p className="text-sm text-muted-foreground">{detail.note}</p> : null}
+        <ProblemAlert problem={confirm ? null : action.problem} />
 
-      <SessionsCard detail={detail} mayForce={counting && manages} />
-      <DefaultsCard detail={detail} mayEdit={(counting || review) && approves} />
-      <LinesCard detail={detail} mayEdit={(counting || review) && approves} />
+        <SessionsCard detail={detail} mayForce={counting && manages} />
+        <DefaultsCard detail={detail} mayEdit={(counting || review) && approves} />
+        <LinesCard detail={detail} mayEdit={(counting || review) && approves} />
 
-      {(counting && manages) || (review && (manages || approves)) ? (
-        <StickyActions
-          summary={
-            counting
-              ? unsent.length > 0
-                ? t('inventory.counts.unsentSummary', { count: unsent.length })
-                : t('inventory.counts.allSent')
-              : t('inventory.counts.reviewSummary', {
-                  different: detail.different,
-                  uncounted: detail.uncountedLines,
-                })
-          }
-        >
-          {mayCancel ? (
-            <Button variant="ghost" onClick={() => ask('cancel')}>
-              {t('inventory.counts.cancel')}
-            </Button>
-          ) : null}
-          {review && manages ? (
-            <Button variant="outline" onClick={() => ask('reopen')}>
-              {t('inventory.counts.reopen')}
-            </Button>
-          ) : null}
-          {counting ? (
-            <Button onClick={() => ask('close')}>{t('inventory.counts.close')}</Button>
-          ) : null}
-          {review && approves ? (
-            <Button onClick={() => ask('approve')}>{t('inventory.counts.approve')}</Button>
-          ) : null}
-        </StickyActions>
-      ) : null}
-
-      <ConfirmDialog
-        open={confirm === 'close'}
-        variant="default"
-        title={t('inventory.counts.closeTitle')}
-        description={
-          unsent.length > 0
-            ? t('inventory.counts.closeBlocked', {
-                names: unsent.map((session) => session.name).join(', '),
-              })
-            : t('inventory.counts.closeText')
-        }
-        confirmLabel={t('inventory.counts.close')}
-        pending={pending}
-        disabled={unsent.length > 0}
-        problem={action.problem}
-        onConfirm={close}
-        onClose={() => setConfirm(null)}
-      />
-      <ConfirmDialog
-        open={confirm === 'reopen'}
-        variant="default"
-        title={t('inventory.counts.reopenTitle')}
-        description={t('inventory.counts.reopenText')}
-        confirmLabel={t('inventory.counts.reopen')}
-        pending={pending}
-        problem={action.problem}
-        onConfirm={reopen}
-        onClose={() => setConfirm(null)}
-      />
-      <ConfirmDialog
-        open={confirm === 'cancel'}
-        title={t('inventory.counts.cancelTitle')}
-        description={t('inventory.counts.cancelText')}
-        confirmLabel={t('inventory.counts.cancel')}
-        pending={pending}
-        problem={action.problem}
-        onConfirm={cancel}
-        onClose={() => setConfirm(null)}
-      />
-      <ConfirmDialog
-        open={confirm === 'approve'}
-        variant="default"
-        title={t('inventory.counts.approveTitle')}
-        description={t('inventory.counts.approveText', { count: detail.different })}
-        confirmLabel={t('inventory.counts.approve')}
-        pending={pending}
-        problem={action.problem}
-        onConfirm={approve}
-        onClose={() => setConfirm(null)}
-      >
-        {detail.uncountedLines > 0 ? (
-          <div className="flex flex-col gap-2 text-sm">
-            <span className="font-medium">
-              {t('inventory.counts.uncountedAsk', { count: detail.uncountedLines })}
-            </span>
-            <SegmentedControl
-              name={t('inventory.counts.uncountedName')}
-              options={UNCOUNTED}
-              value={uncounted}
-              label={(value) => t(`inventory.counts.uncounted.${value}`)}
-              onChange={setUncounted}
-            />
-            <span className="text-[0.8125rem] text-muted-foreground">
-              {t(`inventory.counts.uncountedHints.${uncounted}`)}
-            </span>
-          </div>
+        {(counting && manages) || (review && (manages || approves)) ? (
+          <StickyActions
+            summary={
+              counting
+                ? unsent.length > 0
+                  ? t('inventory.counts.unsentSummary', { count: unsent.length })
+                  : t('inventory.counts.allSent')
+                : t('inventory.counts.reviewSummary', {
+                    different: detail.different,
+                    uncounted: detail.uncountedLines,
+                  })
+            }
+          >
+            {mayCancel ? (
+              <Button variant="ghost" onClick={() => ask('cancel')}>
+                {t('inventory.counts.cancel')}
+              </Button>
+            ) : null}
+            {review && manages ? (
+              <Button variant="outline" onClick={() => ask('reopen')}>
+                {t('inventory.counts.reopen')}
+              </Button>
+            ) : null}
+            {counting ? (
+              <Button onClick={() => ask('close')}>{t('inventory.counts.close')}</Button>
+            ) : null}
+            {review && approves ? (
+              <Button onClick={() => ask('approve')}>{t('inventory.counts.approve')}</Button>
+            ) : null}
+          </StickyActions>
         ) : null}
-      </ConfirmDialog>
-    </div>
+
+        <ConfirmDialog
+          open={confirm === 'close'}
+          variant="default"
+          title={t('inventory.counts.closeTitle')}
+          description={
+            unsent.length > 0
+              ? t('inventory.counts.closeBlocked', {
+                  names: unsent.map((session) => session.name).join(', '),
+                })
+              : t('inventory.counts.closeText')
+          }
+          confirmLabel={t('inventory.counts.close')}
+          pending={pending}
+          disabled={unsent.length > 0}
+          problem={action.problem}
+          onConfirm={close}
+          onClose={() => setConfirm(null)}
+        />
+        <ConfirmDialog
+          open={confirm === 'reopen'}
+          variant="default"
+          title={t('inventory.counts.reopenTitle')}
+          description={t('inventory.counts.reopenText')}
+          confirmLabel={t('inventory.counts.reopen')}
+          pending={pending}
+          problem={action.problem}
+          onConfirm={reopen}
+          onClose={() => setConfirm(null)}
+        />
+        <ConfirmDialog
+          open={confirm === 'cancel'}
+          title={t('inventory.counts.cancelTitle')}
+          description={t('inventory.counts.cancelText')}
+          confirmLabel={t('inventory.counts.cancel')}
+          pending={pending}
+          problem={action.problem}
+          onConfirm={cancel}
+          onClose={() => setConfirm(null)}
+        />
+        <ConfirmDialog
+          open={confirm === 'approve'}
+          variant="default"
+          title={t('inventory.counts.approveTitle')}
+          description={t('inventory.counts.approveText', { count: detail.different })}
+          confirmLabel={t('inventory.counts.approve')}
+          pending={pending}
+          problem={action.problem}
+          onConfirm={approve}
+          onClose={() => setConfirm(null)}
+        >
+          {detail.uncountedLines > 0 ? (
+            <div className="flex flex-col gap-2 text-sm">
+              <span className="font-medium">
+                {t('inventory.counts.uncountedAsk', { count: detail.uncountedLines })}
+              </span>
+              <SegmentedControl
+                name={t('inventory.counts.uncountedName')}
+                options={UNCOUNTED}
+                value={uncounted}
+                label={(value) => t(`inventory.counts.uncounted.${value}`)}
+                onChange={setUncounted}
+              />
+              <span className="text-[0.8125rem] text-muted-foreground">
+                {t(`inventory.counts.uncountedHints.${uncounted}`)}
+              </span>
+            </div>
+          ) : null}
+        </ConfirmDialog>
+      </div>
+    </>
   );
 }
 
