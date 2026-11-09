@@ -168,6 +168,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'inventory.transfers.manage',
       },
       {
+        to: '/inventory/counts',
+        label: 'nav.stockCounts',
+        icon: ListChecks,
+        permission: 'inventory.stocktakes.manage',
+      },
+      {
         to: '/inventory/stocktakes',
         label: 'nav.stocktakes',
         icon: ClipboardCheck,

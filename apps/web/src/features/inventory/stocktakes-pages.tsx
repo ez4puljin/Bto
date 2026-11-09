@@ -4,7 +4,7 @@ import { Decimal } from '@tugeel/shared/money';
 import { ClipboardCheck, Plus, X } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { CheckboxGroup } from '@/components/checkbox-group';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -452,6 +452,8 @@ export function StocktakePage() {
   const warehouseName = useWarehouseName();
 
   const loadProblem = problemFromError(stocktake.error);
+  // A count by product has its own window (ADR-0176); the ledger links both as «ST».
+  if (loadProblem?.status === 404) return <Navigate replace to={`/inventory/counts/${id}`} />;
   if (loadProblem) return <ProblemAlert problem={loadProblem} />;
   if (!stocktake.data) {
     return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>;

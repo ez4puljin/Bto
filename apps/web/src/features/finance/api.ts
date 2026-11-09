@@ -711,6 +711,7 @@ const REPORT_KEYS = {
   yearClose: ['finance', 'year-close'] as const,
   openingCheck: ['finance', 'opening-check'] as const,
   issueExpenseAccounts: ['finance', 'issue-expense-accounts'] as const,
+  stockCountAccounts: ['finance', 'stock-count-accounts'] as const,
 };
 
 /** Balances per account × party at a date (default: the opening's), for the sign-off (ADR-0106). */
@@ -752,6 +753,38 @@ export function useIssueExpenseAccountMutation() {
         }),
       ),
     onSuccess: (rows) => queryClient.setQueryData(REPORT_KEYS.issueExpenseAccounts, rows),
+  });
+}
+
+export type StockCountAccount = Schemas['StockCountAccount'];
+
+/** The accounts a product count may post its differences to (ADR-0176 #7). */
+export function useStockCountAccounts(enabled = true) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: REPORT_KEYS.stockCountAccounts,
+    enabled,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/finance/stock-count-accounts', { signal })),
+  });
+}
+
+export function useStockCountAccountMutation() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ accountId, listed }: { accountId: number; listed: boolean }) => {
+      const params = { params: { path: { accountId } } };
+      return unwrap(
+        listed
+          ? await api.PUT('/api/v1/finance/stock-count-accounts/{accountId}', params)
+          : await api.DELETE('/api/v1/finance/stock-count-accounts/{accountId}', params),
+      );
+    },
+    onSuccess: (rows) => {
+      queryClient.setQueryData(REPORT_KEYS.stockCountAccounts, rows);
+      void queryClient.invalidateQueries({ queryKey: ['inventory', 'counts', 'accounts'] });
+    },
   });
 }
 

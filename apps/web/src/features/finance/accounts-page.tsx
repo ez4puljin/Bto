@@ -68,6 +68,7 @@ import {
 } from './api';
 import { SourceBadge } from './badges';
 import { IssueAccountsDialog } from './issue-accounts-dialog';
+import { StockCountAccountsDialog } from './stock-count-accounts-dialog';
 
 const CODE = /^[0-9A-Za-z][0-9A-Za-z._-]{0,15}$/;
 const isRole = (value: string): value is GlRole => GL_ROLES.some((role) => role === value);
@@ -223,6 +224,7 @@ export function AccountsPage() {
   const [editing, setEditing] = useState<GlAccount | null>(null);
   const [roling, setRoling] = useState<GlAccount | null>(null);
   const [issueAccounts, setIssueAccounts] = useState(false);
+  const [countAccounts, setCountAccounts] = useState(false);
   const accounts = useGlAccounts();
   const groups = useGlAccountGroups();
   const [search, setSearch] = useState('');
@@ -250,6 +252,9 @@ export function AccountsPage() {
             <Button variant="outline" onClick={() => setIssueAccounts(true)}>
               {t('finance.accounts.issueAccounts.open')}
             </Button>
+            <Button variant="outline" onClick={() => setCountAccounts(true)}>
+              {t('finance.accounts.countAccounts.open')}
+            </Button>
             {canEdit ? (
               <Button onClick={() => setCreating(true)}>
                 <Plus />
@@ -263,6 +268,11 @@ export function AccountsPage() {
         open={issueAccounts}
         accounts={rows}
         onClose={() => setIssueAccounts(false)}
+      />
+      <StockCountAccountsDialog
+        open={countAccounts}
+        accounts={rows}
+        onClose={() => setCountAccounts(false)}
       />
       <FilterBar>
         <SearchField

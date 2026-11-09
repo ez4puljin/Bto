@@ -31,6 +31,8 @@ import { ReceiptPrintPage } from '@/features/inventory/receipt-print-page';
 import { ReceiptPage, ReceiptsPage } from '@/features/inventory/receipts-pages';
 import { MovementsPage } from '@/features/inventory/movements-page';
 import { StockPage, StockProductPage } from '@/features/inventory/stock-pages';
+import { StockCountPage } from '@/features/inventory/stock-count-page';
+import { StockCountVariancePage, StockCountsPage } from '@/features/inventory/stock-counts-pages';
 import { StocktakePage, StocktakesPage } from '@/features/inventory/stocktakes-pages';
 import { ImportPage, ImportsPage } from '@/features/imports/imports-pages';
 import { AppNoticesPage } from '@/features/notifications/notice-pages';
@@ -661,6 +663,13 @@ export const routes: RouteObject[] = [
             handle: { width: 'wide' },
             element: <AdjustmentPage />,
           },
+          { path: 'inventory/counts', handle: { width: 'wide' }, element: <StockCountsPage /> },
+          {
+            path: 'inventory/counts/variance',
+            handle: { width: 'wide' },
+            element: <StockCountVariancePage />,
+          },
+          { path: 'inventory/counts/:id', handle: { width: 'wide' }, element: <StockCountPage /> },
           { path: 'inventory/stocktakes', handle: { width: 'wide' }, element: <StocktakesPage /> },
           {
             path: 'inventory/stocktakes/:id',

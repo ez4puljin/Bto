@@ -14,6 +14,7 @@ export const DISCOVER = {
   transfer: ['/api/v1/transfers', (row) => row.id],
   adjustment: ['/api/v1/adjustments', (row) => row.id],
   stocktake: ['/api/v1/stocktakes', (row) => row.id],
+  stockCount: ['/api/v1/stock-counts', (row) => row.id],
   expiryItem: ['/api/v1/expiry/items', (row) => row.id],
   profile: ['/api/v1/price-profiles', (row) => row.id],
   discount: ['/api/v1/discount-programs', (row) => row.id],
@@ -73,6 +74,10 @@ export const ROUTES = [
   { area: 'inventory', name: 'stocktakes', path: '/inventory/stocktakes' },
   { area: 'inventory', name: 'stocktakes-new', path: '/inventory/stocktakes?new=1', dialog: true },
   { area: 'inventory', name: 'stocktake', path: '/inventory/stocktakes/{stocktake}' },
+  { area: 'inventory', name: 'counts', path: '/inventory/counts' },
+  { area: 'inventory', name: 'counts-new', path: '/inventory/counts?new=1', dialog: true },
+  { area: 'inventory', name: 'counts-variance', path: '/inventory/counts/variance' },
+  { area: 'inventory', name: 'count', path: '/inventory/counts/{stockCount}' },
   { area: 'inventory', name: 'adjustments', path: '/inventory/adjustments' },
   {
     area: 'inventory',
