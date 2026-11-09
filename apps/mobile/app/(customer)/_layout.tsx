@@ -7,6 +7,7 @@ import {
 } from '../../src/api/customer-notifications';
 import { ThumbKeeperFor } from '../../src/images/thumb-keeper';
 import { PopupGate } from '../../src/notifications/popup-gate';
+import { useLiveStock } from '../../src/state/live-stock';
 import { useCustomer } from '../../src/state/session';
 import { ShopProvider, useShop } from '../../src/state/shop';
 import { colors } from '../../src/theme/tokens';
@@ -36,6 +37,8 @@ function StorePopupGate() {
  */
 export default function CustomerLayout() {
   const { session, server, accountId } = useCustomer();
+  // The shop's live stock (ADR-0173 #4): words, or numbers when the office shows them.
+  useLiveStock(session, 'CUSTOMER');
   return (
     <ShopProvider server={server} userId={accountId}>
       <ToastProvider>

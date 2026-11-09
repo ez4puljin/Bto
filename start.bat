@@ -75,10 +75,17 @@ echo Вэб сервер 3 минутад асаагүй. "Bto dev" цонхон
 goto :fail
 
 :ready
+rem The apps' download page on port 3302 (owner 2026-11-09, tools\apk-share): it serves the newest
+rem published APKs and keeps running while this PC is on; a failure here never stops Bto itself.
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\apk-share\start.ps1
+if errorlevel 1 echo Апп татах хуудас ^(3302^) асаагүй: tmp\apk-share.err.log-ийг харна уу.
 echo.
 echo Bto ажиллаж байна:
 echo   Энэ компьютерээс:  http://localhost:5173
-for /f "usebackq delims=" %%a in (`powershell -NoProfile -Command "Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq 'Up' } | ForEach-Object { $_.IPv4Address.IPAddress }"`) do echo   Өөр компьютерээс:  http://%%a:5173
+for /f "usebackq delims=" %%a in (`powershell -NoProfile -Command "Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq 'Up' } | ForEach-Object { $_.IPv4Address.IPAddress }"`) do (
+  echo   Өөр компьютерээс:  http://%%a:5173
+  echo   Апп татах ^(утаснаас^):  http://%%a:3302
+)
 echo.
 echo Өөр компьютерээс нээгдэхгүй бол: энэ компьютерийн сүлжээ "Private" байх, Windows Defender
 echo Firewall-д Node.js-ийг Private сүлжээнд зөвшөөрсөн байх хэрэгтэй.

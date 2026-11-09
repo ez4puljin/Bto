@@ -2,16 +2,17 @@
   "staff": {
     "name": "Bto",
     "slug": "bto-staff",
-    "version": "0.13.0",
+    "version": "0.15.0",
     "package": "mn.butenorgil.bto.staff",
     "assets": "./assets",
     "apkPrefix": "bto-staff",
-    "location": true
+    "location": true,
+    "selfUpdate": true
   },
   "customer": {
     "name": "Bto300",
     "slug": "bto300",
-    "version": "0.4.1",
+    "version": "0.5.0",
     "package": "mn.butenorgil.bto300",
     "assets": "./assets/customer",
     "apkPrefix": "bto300",

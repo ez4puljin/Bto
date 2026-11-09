@@ -14,10 +14,11 @@ export const SUMMARY_KEY = [...KEY, 'summary'] as const;
  * The running notices and the unread count (ADR-0062 #3): read at start and on return to the
  * foreground (the caller refetches), and every minute for the bell.
  */
-export function useNotificationSummary() {
+export function useNotificationSummary(enabled = true) {
   const { session } = useSignedIn();
   return useQuery({
     queryKey: SUMMARY_KEY,
+    enabled,
     queryFn: async () => unwrap(await session.client.GET('/api/v1/me/notifications/summary')),
     refetchInterval: 60_000,
     staleTime: 30_000,

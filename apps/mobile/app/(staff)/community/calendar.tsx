@@ -1,15 +1,5 @@
 import { useRouter } from 'expo-router';
-import {
-  Award,
-  Cake,
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  Circle,
-  type LucideIcon,
-  PartyPopper,
-  UsersRound,
-} from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Circle } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
@@ -19,29 +9,19 @@ import {
   useSetEventDone,
   useToday,
 } from '../../../src/api/community';
-import { Avatar, FirstLoad } from '../../../src/community/parts';
+import { isOnDay } from '../../../src/community/calendar-day';
+import { calendarItemTitle, CalendarItemIcon } from '../../../src/community/calendar-item';
+import { FirstLoad } from '../../../src/community/parts';
 import { monthGrid } from '../../../src/dates/calendar';
 import { monthOf, shiftMonth, shortDate } from '../../../src/dates/dates';
 import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme/tokens';
-import { Group, ICON_INSET, IconTile, Row } from '../../../src/ui/grouped';
+import { Group, ICON_INSET, Row } from '../../../src/ui/grouped';
 import { Page } from '../../../src/ui/layout';
 import { StoreHeader } from '../../../src/ui/store-header';
 import { Text } from '../../../src/ui/text';
 
 /** Monday first, as `MonthCalendar` draws the week. */
 const WEEK = [1, 2, 3, 4, 5, 6, 0] as const;
-
-const KIND_STYLE: Record<CalendarItem['kind'], { Icon: LucideIcon; color: string }> = {
-  EVENT: { Icon: CalendarDays, color: colors.tint.blue },
-  MEETING: { Icon: UsersRound, color: colors.tint.indigo },
-  HOLIDAY: { Icon: PartyPopper, color: colors.tint.red },
-  BIRTHDAY: { Icon: Cake, color: colors.tint.pink },
-  ANNIVERSARY: { Icon: Award, color: colors.tint.orange },
-};
-
-/** Whether an item falls on a day: HR's events can run over several days. */
-const isOn = (item: CalendarItem, day: string): boolean =>
-  item.date <= day && day <= (item.toDate ?? item.date);
 
 /**
  * The month in `MonthCalendar`'s look with a dot under the days that have items; the kit's calendar
@@ -99,7 +79,7 @@ function MarkedMonth({
         {monthGrid(month).map((cell) => {
           if (cell.kind === 'blank') return <View key={cell.key} style={styles.cell} />;
           const on = cell.date === chosen;
-          const marked = items.some((item) => isOn(item, cell.date));
+          const marked = items.some((item) => isOnDay(item, cell.date));
           const label = t(
             cell.date === today ? 'mobile.calendar.dayToday' : 'mobile.calendar.day',
             { month: monthNumber, day: cell.day },
@@ -147,7 +127,7 @@ export default function CalendarScreen() {
   const calendar = useCalendar(month);
   const setDone = useSetEventDone();
   const items = useMemo(() => calendar.data ?? [], [calendar.data]);
-  const day = useMemo(() => items.filter((item) => isOn(item, chosen)), [items, chosen]);
+  const day = useMemo(() => items.filter((item) => isOnDay(item, chosen)), [items, chosen]);
 
   const showMonth = (next: string) => {
     setMonth(next);
@@ -155,16 +135,8 @@ export default function CalendarScreen() {
   };
 
   const renderItem = (item: CalendarItem, index: number) => {
-    const { Icon, color: kindColor } = KIND_STYLE[item.kind];
-    const color = item.typeColor ?? kindColor;
     const { eventId } = item;
-    const person = item.kind === 'BIRTHDAY' || item.kind === 'ANNIVERSARY';
-    const title =
-      item.kind === 'BIRTHDAY'
-        ? t('mobile.community.calendar.birthday', { name: item.title })
-        : item.kind === 'ANNIVERSARY'
-          ? t('mobile.community.calendar.anniversary', { name: item.title, years: item.years ?? 0 })
-          : item.title;
+    const title = calendarItemTitle(t, item);
     const lines = [
       item.typeName ?? t(`mobile.community.calendar.kinds.${item.kind}`),
       item.toDate && item.toDate !== item.date
@@ -180,15 +152,7 @@ export default function CalendarScreen() {
       <Row
         key={`${item.kind}-${item.eventId ?? item.userId ?? index}`}
         minHeight={56}
-        icon={
-          person ? (
-            <Avatar name={item.title} photoUrl={item.photoUrl} size={30} />
-          ) : (
-            <IconTile color={color}>
-              <Icon size={16} strokeWidth={2.2} color={colors.primaryForeground} />
-            </IconTile>
-          )
-        }
+        icon={<CalendarItemIcon item={item} />}
         title={title}
         subtitle={lines.filter(Boolean).join(' · ')}
         {...(eventId === null

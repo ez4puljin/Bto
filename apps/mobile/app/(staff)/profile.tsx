@@ -1,4 +1,3 @@
-import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import {
   Bell,
@@ -27,6 +26,7 @@ import { Page } from '../../src/ui/layout';
 import { ActionSheet } from '../../src/ui/sheet';
 import { StoreHeader } from '../../src/ui/store-header';
 import { Text } from '../../src/ui/text';
+import { UpdateCheck } from '../../src/updates/update-check';
 
 /**
  * «Профайл» (the Profile board, ADR-0068; ADR-0062 #3; a page opened from the home's header since
@@ -49,7 +49,6 @@ export default function ProfileScreen() {
       .flatMap((board) => board.pipelines)
       .flatMap((pipeline) => pipeline.stages)
       .find((stage) => stage.id === stageId)?.name ?? t('mobile.profile.noStage');
-  const build = Constants.expoConfig?.android?.versionCode;
 
   return (
     <Page edges={[]}>
@@ -163,6 +162,9 @@ export default function ProfileScreen() {
           />
         </Group>
 
+        {/* The app's version and «Шинэчлэл шалгах» (ADR-0174 #10). */}
+        <UpdateCheck style={styles.group} />
+
         <Pressable
           accessibilityRole="button"
           onPress={() => setLeaving(true)}
@@ -172,12 +174,6 @@ export default function ProfileScreen() {
         </Pressable>
 
         <View style={styles.footer}>
-          <Text style={type.secondary}>
-            {t('mobile.profile.versionLine', {
-              version: Constants.expoConfig?.version ?? '',
-              build: build ?? '',
-            })}
-          </Text>
           <Text style={type.caption}>{t('mobile.profile.company')}</Text>
         </View>
       </ScrollView>

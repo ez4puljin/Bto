@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { components } from '@tugeel/api-client';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it } from 'vitest';
-import { bodyOf, calls } from '@/test/inventory-fixtures';
+import { bodyOf, calls, WH1 } from '@/test/inventory-fixtures';
 import { ADMIN_ME, findSidebar, json, type Me, renderApp, signedIn } from '@/test/render-app';
 
 type Schemas = components['schemas'];
@@ -17,6 +17,8 @@ const settings = (fields: Partial<Schemas['AppSettings']> = {}): Schemas['AppSet
   minOrderAmount: null,
   appName: null,
   appColor: null,
+  stockWarehouses: { customer: [], staff: [] },
+  customerStockDisplay: 'WORDS',
   updatedAt: null,
   ...fields,
 });
@@ -42,6 +44,28 @@ const CARS = segment({
   appShownCount: 2,
 });
 const SWEETS = segment({ id: 6, name: 'Чихэр' });
+const STORE: Schemas['Warehouse'] = {
+  ...WH1,
+  id: 2,
+  code: 'ST1',
+  name: 'Супермаркет',
+  kind: 'STORE',
+};
+const TRANSIT: Schemas['Warehouse'] = {
+  ...WH1,
+  id: 3,
+  code: 'TR',
+  name: 'Замд',
+  kind: 'TRANSIT',
+  branchId: null,
+};
+const CLOSED: Schemas['Warehouse'] = {
+  ...WH1,
+  id: 4,
+  code: 'OLD',
+  name: 'Хуучин',
+  status: 'INACTIVE',
+};
 const KEEPER: Me = {
   ...ADMIN_ME,
   id: 8,
@@ -69,6 +93,7 @@ const routes = (
   'GET /api/v1/app-settings': () => json(row),
   'PUT /api/v1/app-settings': saving,
   'GET /api/v1/segments': () => json({ data: [CARS, DRINKS, SWEETS], nextCursor: null }),
+  'GET /api/v1/warehouses': () => json({ data: [WH1, STORE, TRANSIT, CLOSED], nextCursor: null }),
   'GET /api/v1/customer/banners': () => json({ data: [], nextCursor: null }),
   'GET /api/v1/customer/attention': () => json({ activeAccounts: 3, ordersOpen: true }),
   ...extra,
@@ -428,5 +453,118 @@ describe('«Аппын бараа»: the staff app (ADR-0164)', () => {
     const card = await region(ROW.title);
     await user.click(card.getByRole('button', { name: new RegExp(ROW.title) }));
     expect(card.getByText(texts.gone.replace('{{n}}', '2'))).toBeInTheDocument();
+  });
+});
+
+describe('«Аппын бараа»: the stock each app shows (ADR-0173)', () => {
+  const texts = mn.appSettings.products.stock;
+  const box = (card: ReturnType<typeof within>, label: string) =>
+    card.getByRole('checkbox', { name: label });
+
+  it('ticks Bto300’s warehouses and the number, sending the staff app’s list as read', async () => {
+    const fetchMock = signedIn(
+      KEEPER,
+      routes(settings({ stockWarehouses: { customer: [], staff: [2] } })),
+    );
+    renderApp('/app/products', fetchMock);
+    const user = userEvent.setup();
+    const card = await region(texts.title);
+    const group = within(await card.findByRole('group', { name: texts.warehouses }));
+    // Transit and inactive warehouses are not offered.
+    expect(group.getAllByRole('checkbox')).toHaveLength(2);
+    expect(group.queryByText('TR · Замд')).toBeNull();
+    expect(group.queryByText('OLD · Хуучин')).toBeNull();
+    expect(box(group, 'WH1 · Төв агуулах')).not.toBeChecked();
+    expect(card.getByText(texts.allNow)).toBeInTheDocument();
+    const words = card.getByRole('radio', { name: texts.displays.WORDS });
+    expect(words).toBeChecked();
+    const save = card.getByRole('button', { name: mn.common.save });
+    expect(save).toBeDisabled();
+
+    await user.click(box(group, 'ST1 · Супермаркет'));
+    await user.click(card.getByRole('radio', { name: texts.displays.NUMBER }));
+    expect(card.queryByText(texts.allNow)).toBeNull();
+    await user.click(save);
+    await waitFor(() => expect(put(fetchMock)).toHaveLength(1));
+    expect(await bodyOf(put(fetchMock)[0])).toEqual({
+      assortmentSegmentId: null,
+      homeSections: { PROMOTIONS: true, DISCOUNTS: true, NEW: true },
+      minOrderAmount: null,
+      appName: null,
+      appColor: null,
+      stockWarehouses: { customer: [2], staff: [2] },
+      customerStockDisplay: 'NUMBER',
+    });
+    expect(await screen.findByRole('status')).toHaveTextContent(texts.saved);
+    // The saved row is what the card shows now: nothing left to save.
+    await waitFor(() => expect(card.getByRole('button', { name: mn.common.save })).toBeDisabled());
+    expect(card.getByRole('radio', { name: texts.displays.NUMBER })).toBeChecked();
+  });
+
+  it('keeps the staff app’s list on its own tab, without the words-or-number choice', async () => {
+    const fetchMock = signedIn(
+      KEEPER,
+      routes(
+        settings({
+          stockWarehouses: { customer: [1], staff: [1, 2] },
+          customerStockDisplay: 'NUMBER',
+        }),
+        {
+          'GET /api/v1/app-settings/staff-assortments': () => json({ data: [], nextCursor: null }),
+        },
+      ),
+    );
+    renderApp('/app/products?tab=staff', fetchMock);
+    const user = userEvent.setup();
+    const card = await region(texts.title);
+    const group = within(await card.findByRole('group', { name: texts.warehouses }));
+    expect(box(group, 'WH1 · Төв агуулах')).toBeChecked();
+    expect(box(group, 'ST1 · Супермаркет')).toBeChecked();
+    expect(card.queryByRole('radiogroup')).toBeNull();
+    await user.click(box(group, 'WH1 · Төв агуулах'));
+    await user.click(box(group, 'ST1 · Супермаркет'));
+    expect(card.getByText(texts.allNow)).toBeInTheDocument();
+    await user.click(card.getByRole('button', { name: mn.common.save }));
+    await waitFor(() => expect(put(fetchMock)).toHaveLength(1));
+    const body = (await bodyOf(put(fetchMock)[0])) as Schemas['AppSettingsRequest'];
+    expect(body.stockWarehouses).toEqual({ customer: [1], staff: [] });
+    // Only Bto300's card sends the display.
+    expect(body).not.toHaveProperty('customerStockDisplay');
+  });
+
+  it('shows a refusal of the server and keeps what was ticked', async () => {
+    const fetchMock = signedIn(
+      KEEPER,
+      routes(settings(), {
+        'PUT /api/v1/app-settings': () =>
+          json(
+            {
+              type: 'about:blank',
+              title: 'Validation failed',
+              status: 422,
+              code: 'VALIDATION_FAILED',
+              errors: [
+                {
+                  path: 'stockWarehouses.customer',
+                  constraint: 'warehouse',
+                  message: 'warehouse 1 is not a live warehouse',
+                },
+              ],
+            },
+            422,
+          ),
+      }),
+    );
+    renderApp('/app/products', fetchMock);
+    const user = userEvent.setup();
+    const card = await region(texts.title);
+    const group = within(await card.findByRole('group', { name: texts.warehouses }));
+    await user.click(box(group, 'WH1 · Төв агуулах'));
+    await user.click(card.getByRole('button', { name: mn.common.save }));
+    expect(
+      await card.findByText(mn.errors.fields.stockWarehouses.customer.warehouse),
+    ).toBeInTheDocument();
+    expect(box(group, 'WH1 · Төв агуулах')).toBeChecked();
+    expect(card.getByRole('button', { name: mn.common.save })).toBeEnabled();
   });
 });

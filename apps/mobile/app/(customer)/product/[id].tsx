@@ -23,7 +23,12 @@ import {
 import { problemFrom } from '../../../src/api/problem';
 import { lineOf } from '../../../src/cart/cart';
 import { DealNote } from '../../../src/customer/deal-note';
-import { FavouriteButton, StockPill, usePackText } from '../../../src/customer/product-card';
+import {
+  FavouriteButton,
+  StockPill,
+  usePackText,
+  useStockText,
+} from '../../../src/customer/product-card';
 import { StoreQtyKeypad } from '../../../src/customer/qty-keypad';
 import { priceNoteOf, storeLineOf } from '../../../src/customer/shop';
 import { useStoreLineQuote } from '../../../src/customer/shop-quote';
@@ -51,7 +56,7 @@ const HERO_HEIGHT = 250;
  * the unit switch, the unit's price, − n + (the keypad on the number), «Зарим нь хойшилж
  * магадгүй…» when the server says so, the line's total and «Сагсанд нэмэх». The product keeps one line in the cart, in the unit chosen here. A
  * scanned box opens in boxes (`?unit=`); from the camera (`?from=scan`) the button goes back to it.
- * No stock number anywhere.
+ * The stock number only when the office shows numbers (ADR-0173 #2).
  */
 export default function StoreProductScreen() {
   const { t } = useTranslation();
@@ -65,6 +70,7 @@ export default function StoreProductScreen() {
   const words = useUnitWords();
   const unitOptions = useUnitOptions();
   const packText = usePackText();
+  const stockText = useStockText();
   const categories = useStoreCategories();
   const favourite = useToggleFavourite();
   // Opened from a list, the page shows what the list holds at once; the server's answer follows.
@@ -215,7 +221,7 @@ export default function StoreProductScreen() {
             {product.name}
           </Text>
           <View style={styles.stockRow}>
-            <StockPill stock={product.stock} large />
+            <StockPill stock={product.stock} text={stockText(product, { page: true })} large />
             {pack ? <Text style={[type.secondary, styles.shrink]}>{pack}</Text> : null}
           </View>
           {product.deal ? <DealNote deal={product.deal} /> : null}

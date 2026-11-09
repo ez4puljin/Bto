@@ -1,20 +1,20 @@
-import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { Server, UsersRound } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { feedCount, useFeed } from '../../../src/api/community';
-import { initialsOf } from '../../../src/format/format';
-import { useRoleName } from '../../../src/state/role';
-import { useSignedIn } from '../../../src/state/session';
-import { colors, fonts, radii, spacing, type } from '../../../src/theme/tokens';
-import { CountBadge } from '../../../src/ui/controls';
-import { Group, ICON_INSET, IconTile, Row } from '../../../src/ui/grouped';
-import { Page } from '../../../src/ui/layout';
-import { ActionSheet } from '../../../src/ui/sheet';
-import { StoreHeader } from '../../../src/ui/store-header';
-import { Text } from '../../../src/ui/text';
+import { feedCount, useFeed } from '../../src/api/community';
+import { initialsOf } from '../../src/format/format';
+import { useRoleName } from '../../src/state/role';
+import { useSignedIn } from '../../src/state/session';
+import { colors, fonts, radii, spacing, type } from '../../src/theme/tokens';
+import { CountBadge } from '../../src/ui/controls';
+import { Group, ICON_INSET, IconTile, Row } from '../../src/ui/grouped';
+import { Page } from '../../src/ui/layout';
+import { ActionSheet } from '../../src/ui/sheet';
+import { StoreHeader } from '../../src/ui/store-header';
+import { Text } from '../../src/ui/text';
+import { UpdateCheck } from '../../src/updates/update-check';
 
 /**
  * «Профайл» of a store's seller (ADR-0116 #1) and of any staff member without the rep's context
@@ -28,11 +28,10 @@ export default function StoreProfileScreen() {
   const community = feedCount(useFeed().data);
   const roleName = useRoleName();
   const [leaving, setLeaving] = useState(false);
-  const build = Constants.expoConfig?.android?.versionCode;
 
   return (
     <Page edges={[]}>
-      <StoreHeader title={t('mobile.tabs.profile')} right={null} />
+      <StoreHeader title={t('mobile.tabs.profile')} onBack={() => router.back()} right={null} />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.user}>
           <View style={styles.avatar}>
@@ -80,6 +79,9 @@ export default function StoreProfileScreen() {
           />
         </Group>
 
+        {/* The app's version and «Шинэчлэл шалгах» (ADR-0174 #10). */}
+        <UpdateCheck style={styles.group} />
+
         <Pressable
           accessibilityRole="button"
           onPress={() => setLeaving(true)}
@@ -89,12 +91,6 @@ export default function StoreProfileScreen() {
         </Pressable>
 
         <View style={styles.footer}>
-          <Text style={type.secondary}>
-            {t('mobile.profile.versionLine', {
-              version: Constants.expoConfig?.version ?? '',
-              build: build ?? '',
-            })}
-          </Text>
           <Text style={type.caption}>{t('mobile.profile.company')}</Text>
         </View>
       </ScrollView>

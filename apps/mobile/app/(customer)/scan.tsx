@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { STORE_KEY } from '../../src/api/customer';
 import { type AppProblem, NETWORK, problemOf } from '../../src/api/problem';
+import { useStockText } from '../../src/customer/product-card';
 import { capitalised } from '../../src/customer/shop';
 import { formatMnt } from '../../src/format/format';
 import { ScanGate } from '../../src/scan/scan-gate';
@@ -53,6 +54,7 @@ export default function StoreScanScreen() {
   const queryClient = useQueryClient();
   const focused = useIsFocused();
   const words = useUnitWords();
+  const stockText = useStockText();
   const [permission, requestPermission] = useCameraPermissions();
   const gate = useRef(new ScanGate());
   const [torch, setTorch] = useState(false);
@@ -251,7 +253,7 @@ export default function StoreScanScreen() {
                             unit: words(unit).name,
                           })
                         : t('mobile.product.noPrice'),
-                      t(`sales.stockWords.${scanned.product.stock}`),
+                      stockText(scanned.product, { page: true }),
                     ].join(' · ')}
                   </Text>
                 </View>

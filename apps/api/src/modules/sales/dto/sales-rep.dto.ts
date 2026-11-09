@@ -482,7 +482,13 @@ export class SalesRepProductDto {
   @ApiProperty({ description: 'An order accepts it (active, complete, with a home warehouse)' })
   sellable: boolean;
   @ApiProperty({ type: Number, nullable: true }) homeWarehouseId: number | null;
-  @ApiProperty({ description: 'Base units free in the home warehouse' }) available: string;
+  @ApiProperty({ description: 'Base units free in the home warehouse; "0" when stockBlocked' })
+  available: string;
+  @ApiProperty({
+    description:
+      'The staff app does not count the home warehouse (ADR-0173 #1): «Дууссан», an app order refuses it',
+  })
+  stockBlocked: boolean;
   @ApiProperty({
     type: String,
     nullable: true,

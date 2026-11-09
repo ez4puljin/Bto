@@ -85,6 +85,8 @@ export const ErrorCode = {
   // the apps sell only the assortment segment's products (ADR-0127 #1) and above the minimum (#4)
   PRODUCT_NOT_IN_APP: 'PRODUCT_NOT_IN_APP',
   ORDER_BELOW_MINIMUM: 'ORDER_BELOW_MINIMUM',
+  // ADR-0173: an app order's product whose home warehouse the app's stock setting does not count
+  PRODUCT_OUT_OF_APP_STOCK: 'PRODUCT_OUT_OF_APP_STOCK',
   // ADR-0131: attendance from the staff app.
   ATTENDANCE_NO_SITE: 'ATTENDANCE_NO_SITE',
   ATTENDANCE_OUT_OF_RANGE: 'ATTENDANCE_OUT_OF_RANGE',

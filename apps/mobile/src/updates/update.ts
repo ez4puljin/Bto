@@ -30,3 +30,19 @@ export function percentOf(written: number, total: number): number {
 export function apkUrlOf(server: string, variant: string): string {
   return `${server}/api/v1/app-releases/${variant}/apk`;
 }
+
+/** What a press of «Шинэчлэл шалгах» found (ADR-0174 #10). */
+export type CheckOutcome = 'found' | 'latest' | 'offline';
+
+/**
+ * The answer to a check: a newer release is downloaded at once, the same or an older one means
+ * this is the newest, and a server that did not answer is said so (the phone is off its Wi-Fi).
+ */
+export function checkOutcomeOf(
+  answered: boolean,
+  release: AppRelease | null | undefined,
+  installedCode: number | null | undefined,
+): CheckOutcome {
+  if (!answered) return 'offline';
+  return updateOf(release, installedCode) ? 'found' : 'latest';
+}

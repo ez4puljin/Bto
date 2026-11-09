@@ -162,9 +162,16 @@ export class CustomerAppProductDto {
   @ApiProperty({
     enum: STOCK_WORDS,
     enumName: 'StockWord',
-    description: '«Байгаа», «Цөөхөн үлдсэн», «Дууссан»; never the number (ADR-0079 #4)',
+    description: '«Байгаа», «Цөөхөн үлдсэн», «Дууссан» (ADR-0079 #4)',
   })
   stock: StockWord;
+  @ApiProperty({
+    type: String,
+    required: false,
+    description:
+      'Base units free in the home warehouse, sent only when the office shows numbers (ADR-0173 #2)',
+  })
+  available?: string;
   @ApiProperty({ description: 'The store starred it' }) favourite: boolean;
   @ApiProperty({ type: String, nullable: true, description: 'One base unit in whole packs' })
   basePrice: string | null;

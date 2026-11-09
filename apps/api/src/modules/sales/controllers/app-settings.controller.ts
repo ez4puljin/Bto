@@ -13,7 +13,8 @@ import { SalesRepShopService } from '../services/sales-rep-shop.service';
 
 /**
  * The apps' settings (ADR-0127), the «Апп» pages' server: the assortment segment, the home's fixed
- * sections, the minimum order, the name and colour. Read and changed by the home's keepers
+ * sections, the minimum order, the name and colour, which warehouses' stock each app counts and
+ * how «Bto300» shows it (ADR-0173). Read and changed by the home's keepers
  * (`customer.home.manage`, ADR-0127 #5; the write is checked in the service too). `branding` is public: the
  * apps' sign-in screens show it before a token exists.
  */
@@ -50,6 +51,15 @@ export class AppSettingsController {
         minOrderAmount: body.minOrderAmount ? new Decimal(body.minOrderAmount) : null,
         appName: body.appName ?? null,
         appColor: body.appColor ?? null,
+        ...(body.stockWarehouses
+          ? {
+              stockWarehouses: {
+                CUSTOMER: body.stockWarehouses.customer,
+                STAFF: body.stockWarehouses.staff,
+              },
+            }
+          : {}),
+        ...(body.customerStockDisplay ? { customerStockDisplay: body.customerStockDisplay } : {}),
       }),
     );
   }
@@ -72,6 +82,11 @@ export class AppSettingsController {
       minOrderAmount: settings.minOrderAmount?.toFixed(0) ?? null,
       appName: settings.appName,
       appColor: settings.appColor,
+      stockWarehouses: {
+        customer: settings.stockWarehouses.CUSTOMER,
+        staff: settings.stockWarehouses.STAFF,
+      },
+      customerStockDisplay: settings.customerStockDisplay,
       updatedAt: settings.updatedAt?.toISOString() ?? null,
     };
   }

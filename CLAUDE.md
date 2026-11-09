@@ -12,7 +12,7 @@ Repo `tugeel`, packages `@tugeel/*`. On screen the system is called **Bto** (Б�
 
 Pace since 2026-10-29 (ADR-0120): build fast, the owner tests by hand on the development server, fix from what is seen; automated tests stay where stock, money or rights move.
 
-Direct mode since 2026-10-30 (owner): one chat works in the main checkout on `main` with `pnpm dev` running; the owner says the change, Claude edits at once and names the page to refresh, the owner checks in the browser; on the owner's «Болсон» run `pnpm typecheck && pnpm lint`, commit and push to `main` (CI runs the full check afterwards). Light changes need no branch, pull request, interview or ADR; a guarded change adds its integration suite before the push and migrates bto_main at once. A request that contradicts an Accepted ADR or the books is questioned before it is built.
+Direct mode since 2026-10-30 (owner): one chat works in the main checkout on `main` with `pnpm dev` running; the owner says the change, Claude edits at once and names the page to refresh, the owner checks in the browser. Since 2026-11-09 (owner «одоо commit болон шууд Push хий, цаашид ингэж мөрд») a change is committed and pushed to `main` as soon as it is built and `pnpm typecheck && pnpm lint` are green, without waiting for «Болсон»: work left uncommitted was lost to the next build once; the owner's check follows on the dev server and a fix is a new commit (CI runs the full check afterwards). Light changes need no branch, pull request, interview or ADR; a guarded change adds its integration suite before the push and migrates bto_main at once. A request that contradicts an Accepted ADR or the books is questioned before it is built.
 
 Parallel sessions (owner 2026-10-31, «энэ session шиг ажилдаг болго, надаас хэт хамааралтай байж болохгүй»): a session started from a chip works the same way on its own worktree branch — no interview round, no plan mode, no approval of the approach; it takes the recommended answers in its brief as decided, builds, runs the checks, opens the pull request and reports in Mongolian with the owner's click list. It asks the owner only for a real business unknown (`TODO-VERIFY`).
 
@@ -56,7 +56,7 @@ Confirmed 2026-10-10 from the npm registry (exact pins in every `package.json`; 
 | pdfmake, `@nestjs/throttler`, receipt-printer-encoder | `npm view <pkg> version` when first installed; pick a version older than 24 h | |
 
 Majors change only in dedicated sessions between deliveries.
-DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): production api 6, worker 3, pg-boss 2 per process, AI reader 2 (api only); staging 2 / 2 / 2 / 2 (architecture §10.2).
+DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): production api 6 + 1 live stock listener, worker 3, pg-boss 2 per process, AI reader 2 (api only); staging 2 (+1) / 2 / 2 / 2 (architecture §10.2; the listener `LISTEN`s on a direct connection, never through PgBouncer, ADR-0173).
 
 ## Commands
 
@@ -67,7 +67,7 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): producti
 | `pnpm db:provision` / `pnpm db:migrate` | roles (`app`, `migrator`, and `ai_reader` when `AI_DATABASE_URL` is set) + ICU database (admin URL in `apps/api/.env`) / drizzle migrations + pg-boss schema + `ai` grants + queues as `migrator` |
 | `pnpm db:generate --name=<module>` | generate SQL from `src/db/schema.ts`, then hand-edit CHECK / EXCLUDE / REVOKE / triggers (`--custom` for SQL-only) |
 | `pnpm dev` | builds packages, then watches shared + api + worker + web (http://localhost:5173; the api listens on `API_PORT`, 3300 locally, and Vite proxies `/api` there) |
-| `start.bat` / `stop.bat` | the owner's double-click start for testing from other PCs on the LAN: PostgreSQL (`tools/dev-db`), `pnpm db:migrate`, then `pnpm dev` in a «Bto dev» window with `DEV_LAN=1` (Vite on every interface; prints `http://<LAN address>:5173`) / stops that window, every node process of this repo and the local PostgreSQL — never other projects; neither runs docker |
+| `start.bat` / `stop.bat` | the owner's double-click start for testing from other PCs on the LAN: PostgreSQL (`tools/dev-db`), `pnpm db:migrate`, then `pnpm dev` in a «Bto dev» window with `DEV_LAN=1` (Vite on every interface; prints `http://<LAN address>:5173`), and the apps' download page on `:3302` (`tools/apk-share`, the newest published APKs) / stops that window, every node process of this repo and the local PostgreSQL — never other projects; neither runs docker |
 | `pnpm user:create-admin --username <name> --full-name "<name>"` | create (or recover) an ADMIN and print a 30-minute one-time code; the user sets the password at `/set-password` |
 | `pnpm catalog:reindex-search [--all]` / `pnpm partners:reindex-search [--all]` | recompute product / customer and supplier search keys after `SEARCH_KEYS_VERSION` changes (`--all`: every row; ADR-0028) |
 | `pnpm inventory:reconcile` / `pnpm inventory:rebuild-balances` | compare `bin_stock` / `warehouse_stock` with the ledger and record a run (exit 2 on drift) / recompute the cache quantities from the ledger, keeping averages, then reconcile (find the cause of a drift first; `docs/modules/inventory.md` §7) |

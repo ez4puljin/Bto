@@ -1,8 +1,9 @@
 import type { StockWord } from '@tugeel/shared/sales';
 import { colors } from '../theme/tokens';
 
-// «Байгаа», «Цөөхөн үлдсэн», «Дууссан» (ADR-0079 #4): the store sees a word, never the number. The
-// words are mn.json's `sales.stockWords.*`; the pill's colours are the boards' green, orange, red.
+// «Байгаа», «Цөөхөн үлдсэн», «Дууссан» (ADR-0079 #4): the store sees a word, and the number beside
+// it only when the office shows numbers (ADR-0173 #2). The words are mn.json's `sales.stockWords.*`;
+// the pill's colours are the boards' green, orange, red.
 
 export interface StockTone {
   background: string;

@@ -6,7 +6,7 @@ import { InventoryModule } from '../inventory';
 import { NotificationsModule } from '../notifications';
 import { PartnersModule } from '../partners';
 import { PricingModule } from '../pricing';
-import { SalesModule } from '../sales';
+import { SalesLiveModule, SalesModule } from '../sales';
 import { AppReleasesController } from './controllers/app-releases.controller';
 import {
   CustomerAppMoneyController,
@@ -19,6 +19,7 @@ import {
   CustomerAppHomeController,
   CustomerBannersController,
 } from './controllers/customer-home.controller';
+import { CustomerAppLiveStockController } from './controllers/customer-live-stock.controller';
 import { CustomerSettingsController } from './controllers/customer-settings.controller';
 import { SalesRepHomeController } from './controllers/sales-rep-home.controller';
 import { AppBannersService } from './services/app-banners.service';
@@ -44,6 +45,7 @@ import { CustomerShopService } from './services/customer-shop.service';
     InventoryModule,
     PricingModule,
     SalesModule,
+    SalesLiveModule,
     FinanceModule,
     NotificationsModule,
   ],
@@ -54,6 +56,7 @@ import { CustomerShopService } from './services/customer-shop.service';
     CustomerAppMoneyController,
     CustomerAppNotificationsController,
     CustomerAppHomeController,
+    CustomerAppLiveStockController,
     CustomerSettingsController,
     CustomerBannersController,
     SalesRepHomeController,

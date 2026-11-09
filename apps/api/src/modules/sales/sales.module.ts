@@ -30,6 +30,8 @@ import { CustomerOrdersService } from './services/customer-orders.service';
 import { SalesSettingsService } from './services/sales-settings.service';
 import { AppSettingsService } from './services/app-settings.service';
 import { AppSettingsController } from './controllers/app-settings.controller';
+import { SalesRepLiveStockController } from './controllers/live-stock.controller';
+import { LiveStockHub } from './services/live-stock.hub';
 
 /**
  * Sales (docs/modules/sales.md, ADR-0055, ADR-0056, ADR-0057): customer orders on boards,
@@ -73,9 +75,20 @@ import { AppSettingsController } from './controllers/app-settings.controller';
 })
 export class SalesModule {}
 
-/** The HTTP side of sales (api only). */
+/**
+ * The apps' live stock hub (ADR-0173 #4), api only: one LISTEN connection per api process. The
+ * HTTP modules of sales and customer import it, so the worker, the edge and the CLIs never hold it.
+ */
 @Module({
   imports: [SalesModule],
+  providers: [LiveStockHub],
+  exports: [LiveStockHub],
+})
+export class SalesLiveModule {}
+
+/** The HTTP side of sales (api only). */
+@Module({
+  imports: [SalesModule, SalesLiveModule],
   controllers: [
     SalesOrdersController,
     SalesBoardsController,
@@ -86,6 +99,7 @@ export class SalesModule {}
     AppSettingsController,
     StaffAppAssortmentsController,
     SalesRepController,
+    SalesRepLiveStockController,
     SalesPicksController,
   ],
 })

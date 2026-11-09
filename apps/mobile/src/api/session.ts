@@ -173,6 +173,24 @@ export abstract class MobileSession<P> {
   }
 
   /**
+   * The access token for a request outside the API client (the live stock stream, ADR-0173 #4):
+   * refreshed first when it is about to end, or when it is `rejected`, the token the server has
+   * just answered 401 to (a token another call has already replaced is not refreshed again). Null
+   * without a session, without a connection to refresh through, or when the server refused the
+   * refresh — which ends the session, as for any other call.
+   */
+  async streamToken(rejected?: string): Promise<string | null> {
+    if (!this.refreshToken) return null;
+    const stale = rejected !== undefined && rejected === this.accessToken;
+    if (stale || this.accessToken === null || this.now() > this.accessEndsAt - EARLY_MS) {
+      const outcome = await this.refresh();
+      if (outcome === 'rejected') await this.forget('expired');
+      if (outcome !== 'ok') return null;
+    }
+    return this.accessToken;
+  }
+
+  /**
    * A sign-in's answer (a password, or the office's code): the tokens are kept and stored, then
    * the session learns who signed in — from the answer itself or by asking. Null when signed in;
    * otherwise why not (wrong password, locked, no connection…).

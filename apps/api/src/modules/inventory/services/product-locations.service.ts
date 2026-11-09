@@ -18,6 +18,7 @@ import {
   ScopeService,
 } from '../../identity';
 import { bins, productLocations, warehouseStock } from '../schema';
+import { notifyStockChanged } from './stock-notify';
 import { advisoryLock, LOCKS } from './support';
 
 type LocationRow = typeof productLocations.$inferSelect;
@@ -283,6 +284,11 @@ export class ProductLocationsService {
           ON CONFLICT (warehouse_id, product_id) DO UPDATE SET is_home = true, updated_at = now()`);
       }
     }
+    // A moved home changes which warehouse the apps count (ADR-0173 #4).
+    await notifyStockChanged(
+      tx,
+      homes.map((home) => home.productId),
+    );
     for (let start = 0; start < fixed.length; start += CHUNK) {
       await tx.execute(sql`
         INSERT INTO product_locations (warehouse_id, product_id, default_bin_id)
@@ -361,6 +367,8 @@ export class ProductLocationsService {
           max_qty = COALESCE(excluded.max_qty, product_locations.max_qty),
           updated_at = now()`);
     }
+    // The minimum is where «Bto300»'s word turns LOW (ADR-0079 #4, ADR-0173 #4).
+    await notifyStockChanged(tx, productIds);
     await this.audit.recordMany(
       tx,
       actor,
@@ -414,6 +422,10 @@ export class ProductLocationsService {
       }
       restored.push(entry);
     }
+    await notifyStockChanged(
+      tx,
+      restored.map((entry) => entry.productId),
+    );
     await this.audit.recordMany(
       tx,
       actor,
@@ -458,6 +470,7 @@ export class ProductLocationsService {
       });
     const after = await this.find(tx, input.warehouseId, input.productId);
     if (!after) throw new Error('product location upsert returned no row');
+    if (input.minQty !== undefined) await notifyStockChanged(tx, [input.productId]);
     await this.audit.record(tx, actor, {
       action: before ? 'UPDATE' : 'CREATE',
       entity: 'product_locations',
@@ -557,6 +570,8 @@ export class ProductLocationsService {
           target: [productLocations.warehouseId, productLocations.productId],
           set: { isHome: true, updatedAt: sql`now()` },
         });
+      // A moved home changes which warehouse the apps count (ADR-0173 #4).
+      await notifyStockChanged(tx, changed);
       const stocked = new Set(withStock.map((row) => levelKey(row.warehouseId, row.productId)));
       const emptied = changed.flatMap((productId) => {
         const old = homes.get(productId);
@@ -651,6 +666,7 @@ export class ProductLocationsService {
           set: { isHome: true, updatedAt: sql`now()` },
         });
     }
+    await notifyStockChanged(tx, [productId]);
     await this.audit.record(tx, actor, {
       action: 'UPDATE',
       entity: 'product_locations',

@@ -7,9 +7,10 @@ import { colors } from '../../../src/theme/tokens';
 import { StoreTabBar } from '../../../src/ui/store-tab-bar';
 
 /**
- * «Нүүр», «Бараа», [баркод], «Сагс», «Захиалга» on «Bto300»'s flat bar (ADR-0100 on ADR-0095): the
- * barcode camera raised in the middle, the cart's count on «Сагс»; «Профайл» and the bell (with its
- * unread count, ADR-0062 #3) open from «Нүүр»'s header.
+ * «ХТ захиалга» (ADR-0174, opened from «Цэс»): «Нүүр», «Бараа», [баркод], «Сагс», «Захиалга» on
+ * «Bto300»'s flat bar (ADR-0100 on ADR-0095): the barcode camera raised in the middle, the cart's
+ * count on «Сагс»; «Профайл» and the bell (with its unread count, ADR-0062 #3) open from «Нүүр»'s
+ * header, and its arrow goes back to the staff's own «Нүүр».
  */
 export default function TabsLayout() {
   const { t } = useTranslation();
@@ -28,10 +29,7 @@ export default function TabsLayout() {
       tabBar={(props) => <StoreTabBar {...props} />}
       screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.canvas } }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{ title: t('mobile.tabs.home'), tabBarIcon: icon(House) }}
-      />
+      <Tabs.Screen name="rep" options={{ title: t('mobile.tabs.home'), tabBarIcon: icon(House) }} />
       <Tabs.Screen
         name="shop"
         options={{ title: t('mobile.tabs.shop'), tabBarIcon: icon(Package) }}

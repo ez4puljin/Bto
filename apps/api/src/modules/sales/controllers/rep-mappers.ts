@@ -22,6 +22,7 @@ export function toRepProductDto(product: RepShopProduct): SalesRepProductDto {
     sellable: product.sellable,
     homeWarehouseId: product.homeWarehouseId,
     available: product.available.toString(),
+    stockBlocked: product.stockBlocked,
     basePrice: repMoney(product.basePrice),
     basePriceBefore: repMoney(product.basePriceBefore),
     dealPrice: repMoney(product.dealPrice),

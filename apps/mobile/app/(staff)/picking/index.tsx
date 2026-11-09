@@ -18,15 +18,14 @@ import { Separator } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
 import { StoreHeader } from '../../../src/ui/store-header';
-import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 import { Text } from '../../../src/ui/text';
 
 /**
  * «Бэлтгэл» (ADR-0132): the keeper's parts from `GET /sales-picks`, in sections — to take, mine,
  * others', done today — each row the order's number and the part's pill, the customer, the
  * warehouse, «N бараа» and the delivery date; a tap opens the part. Pull to refresh; the list
- * re-reads every 15 s. A tab of the work menu; a rep opens it from «Нүүр» (the back arrow, the
- * initials to the profile).
+ * re-reads every 15 s. Opened from «Нүүр» or «Цэс» (ADR-0174); a rep has the initials to the
+ * profile.
  */
 export default function PickingHomeScreen() {
   const { t } = useTranslation();
@@ -34,7 +33,6 @@ export default function PickingHomeScreen() {
   const insets = useSafeAreaInsets();
   const { me } = useSignedIn();
   const rep = isRep(me);
-  const barInset = useStoreTabBarInset();
   const work = usePickWork();
   const sections = useMemo(() => workGroups(work.data ?? [], me.id), [work.data, me.id]);
 
@@ -90,7 +88,7 @@ export default function PickingHomeScreen() {
     <Page edges={[]}>
       <StoreHeader
         title={t('mobile.picking.title')}
-        {...(rep ? { onBack: () => router.back() } : {})}
+        onBack={() => router.back()}
         right={
           rep ? (
             <Pressable
@@ -111,7 +109,7 @@ export default function PickingHomeScreen() {
         stickySectionHeadersEnabled={false}
         contentContainerStyle={[
           styles.list,
-          { paddingBottom: rep ? Math.max(insets.bottom, spacing.md) : barInset },
+          { paddingBottom: Math.max(insets.bottom, spacing.md) },
         ]}
         renderSectionHeader={({ section }) => (
           <Text accessibilityRole="header" style={[type.sectionHeader, styles.sectionHeader]}>

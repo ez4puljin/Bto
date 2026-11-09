@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { CommunityPopupGate } from '../../src/community/popup-gate';
 import { ThumbKeeper } from '../../src/images/thumb-keeper';
 import { NoticePopupGate } from '../../src/notifications/popup-gate';
+import { useLiveStock } from '../../src/state/live-stock';
 import { isRep, mayPick, mayRequestTransfers } from '../../src/state/phase';
 import { useSignedIn } from '../../src/state/session';
 import { ShopProvider } from '../../src/state/shop';
@@ -10,17 +11,16 @@ import { colors } from '../../src/theme/tokens';
 import { ToastProvider } from '../../src/ui/toast';
 
 /**
- * The staff app (ADR-0061, ADR-0068, in «Bto300»'s look since ADR-0100): the tabs, and the screens
- * opened from them, for a rep. expo-router drops the guarded screens and opens the navigator on the
- * first one left, so the order below decides where each person lands: a warehouse keeper with the
- * picking right (ADR-0132) on «Бэлтгэл», a store's seller with only the transfer right (ADR-0116 #1)
- * on «Шилжүүлэг» (with the store profile beside it), and every other staff member on «Ирц»
- * (ADR-0131: the attendance is for all staff), which is never guarded and carries the profile row
- * and «Гарах» for them.
+ * The staff app (ADR-0061, ADR-0068, in «Bto300»'s look since ADR-0100): everyone lands on «Нүүр»
+ * with «Цэс» beside it (ADR-0174), and each screen opens over them. A guarded screen is out for
+ * who lacks its right: a rep's order tabs and their pages, a keeper's «Бэлтгэл» (ADR-0132), a
+ * seller's «Шилжүүлэг» (ADR-0116 #1). «Ирц» (ADR-0131) and «Хамт олон» (ADR-0146) are everyone's.
  */
 export default function StaffLayout() {
-  const { me, server } = useSignedIn();
+  const { me, server, session } = useSignedIn();
   const rep = isRep(me);
+  // The shop's live stock (ADR-0173 #4): only a rep has a shop, and only a rep may open the stream.
+  useLiveStock(session, 'STAFF', rep);
   const picker = mayPick(me);
   const seller = mayRequestTransfers(me);
   return (
@@ -34,29 +34,34 @@ export default function StaffLayout() {
         <Stack
           screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}
         >
+          {/* «Нүүр» and «Цэс» (ADR-0174): first, so everyone lands on them. */}
+          <Stack.Screen name="(work)" />
+          {/* «ХТ захиалга»: the rep's order tabs. */}
           <Stack.Protected guard={rep}>
             <Stack.Screen name="(tabs)" />
           </Stack.Protected>
-          {/* The work menu (picking, transfers, attendance, profile): first for everyone but a rep. */}
-          <Stack.Screen name="(work)" />
-          {/* The picking (ADR-0132): first for a keeper, opened from «Нүүр» by a rep. */}
+          {/* The picking (ADR-0132). */}
           <Stack.Protected guard={picker}>
+            <Stack.Screen name="picking/index" />
             <Stack.Screen name="picking/[id]" />
           </Stack.Protected>
-          {/* The transfers (ADR-0116): first for a seller, opened from «Нүүр» by a rep. */}
+          {/* The transfers (ADR-0116). */}
           <Stack.Protected guard={rep || seller}>
+            <Stack.Screen name="transfers/index" />
             <Stack.Screen name="transfers/new" />
             <Stack.Screen name="transfers/[id]/index" />
             <Stack.Screen name="transfers/[id]/receive" />
           </Stack.Protected>
-          {/* «Ирц» (ADR-0131): first for staff with neither right, a profile row for the rest. */}
+          {/* «Ирц» (ADR-0131): everyone's. */}
+          <Stack.Screen name="attendance/index" />
           <Stack.Screen name="attendance/history" />
           {/* «Цагийн хүсэлт» (ADR-0144): every staff member sends their own. */}
           <Stack.Screen name="attendance/requests" />
-          {/* «Хугацаа илрүүлэлт» (ADR-0172): every staff member records what is on the shelf. */}
+          {/* «Хугацаа илрүүлэлт» (ADR-0172, opened from «Цэс» since ADR-0174): every staff member records what is on the shelf. */}
+          <Stack.Screen name="expiry/index" />
           <Stack.Screen name="expiry/new" />
           <Stack.Screen name="expiry/[id]" />
-          {/* «Хамт олон» (ADR-0146): every staff member's, from their profile. */}
+          {/* «Хамт олон» (ADR-0146): every staff member's. */}
           <Stack.Screen name="community/index" />
           <Stack.Screen name="community/messages" />
           <Stack.Screen name="community/message/[id]" />
@@ -68,6 +73,7 @@ export default function StaffLayout() {
           <Stack.Screen name="community/location" />
           <Stack.Screen name="community/profile" />
           {/* The profile without the rep's context: a seller's and any other staff member's. */}
+          <Stack.Screen name="me" />
           <Stack.Protected guard={rep}>
             <Stack.Screen
               name="product/[id]"

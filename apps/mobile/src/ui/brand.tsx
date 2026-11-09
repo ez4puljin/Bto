@@ -5,10 +5,9 @@ import { Pressable, type StyleProp, StyleSheet, View, type ViewStyle } from 'rea
 import { Text } from './text';
 import orgilMark from '../../assets/customer/logo-mark.png';
 import orgilLogo from '../../assets/customer/logo.png';
-import splashIcon from '../../assets/splash-icon.png';
 import { APP } from '../config/app';
 import { serverHost } from '../server/server-url';
-import { colors, fonts, radii, shadows, type } from '../theme/tokens';
+import { colors, fonts, radii, type } from '../theme/tokens';
 
 /** The picture's own width to height (920 × 322). */
 const LOGO_RATIO = 920 / 322;
@@ -42,32 +41,22 @@ export function CompanyMark({ size, style }: { size: number; style?: StyleProp<V
   );
 }
 
-/** This build's name: «Bto», or «Bto300» for the stores (ADR-0079). */
+/** This build's name: «Ажилтны апп» (ADR-0174), or «Bto300» for the stores (ADR-0079). */
 export function useAppName(): string {
   const { t } = useTranslation();
-  return APP.variant === 'customer' ? t('mobile.customer.appName') : t('app.name');
+  return APP.variant === 'customer' ? t('mobile.customer.appName') : t('mobile.login.staffApp');
 }
 
 /**
- * The top of the server and offline screens: the company's logo in «Bto300» (ADR-0166), the staff
- * app's «B» tile and its name otherwise, each with the company.
+ * The top of the server and offline screens: the company's logo (ADR-0166, the staff app's too
+ * since ADR-0174), with «Ажилтны апп» and the company in the staff app.
  */
 export function BrandLockup({ style }: { style?: StyleProp<ViewStyle> }) {
   const { t } = useTranslation();
   const name = useAppName();
   return (
     <View style={[styles.lockup, style]}>
-      {APP.variant === 'customer' ? (
-        <CompanyLogo height={44} />
-      ) : (
-        <View
-          style={styles.logo}
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
-        >
-          <Image source={splashIcon} contentFit="contain" accessible={false} style={styles.image} />
-        </View>
-      )}
+      <CompanyLogo height={44} />
       <View style={styles.names}>
         {APP.variant === 'customer' ? null : (
           <Text accessibilityRole="header" style={type.wordmark}>
@@ -123,8 +112,6 @@ export function ServerChip({
 
 const styles = StyleSheet.create({
   lockup: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  logo: { width: 48, height: 48, borderRadius: radii.control, boxShadow: shadows.brand },
-  image: { width: 48, height: 48, borderRadius: radii.control },
   names: { flexShrink: 1 },
   fill: { width: '100%', height: '100%' },
   chip: {

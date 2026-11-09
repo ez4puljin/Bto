@@ -95,6 +95,7 @@ export { aiConversations, aiQuestions, aiReports, aiSettings, aiUsage } from '..
 export { segmentProducts, segments } from '../modules/segments/schema';
 export {
   appSettings,
+  appStockWarehouses,
   orderStatusEvents,
   salesBoards,
   salesChannelDefaults,

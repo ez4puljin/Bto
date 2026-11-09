@@ -93,6 +93,8 @@ const SETTINGS: Schemas['AppSettings'] = {
   minOrderAmount: null,
   appName: null,
   appColor: null,
+  stockWarehouses: { customer: [], staff: [] },
+  customerStockDisplay: 'WORDS',
   updatedAt: null,
 };
 

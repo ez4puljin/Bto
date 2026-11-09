@@ -1,6 +1,7 @@
 // Public API of the sales module (docs/modules/sales.md). Other modules import only this file;
 // named exports only (ESLint G2 rejects `export *`).
-export { SalesHttpModule, SalesModule } from './sales.module';
+export { SalesHttpModule, SalesLiveModule, SalesModule } from './sales.module';
+export { LiveStockHub, type LiveStockMessage, streamDuration } from './services/live-stock.hub';
 export {
   type BackorderedLine,
   CREDIT_CHECKER,

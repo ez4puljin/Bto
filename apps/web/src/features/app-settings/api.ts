@@ -8,6 +8,7 @@ type Schemas = components['schemas'];
 export type AppSettings = Schemas['AppSettings'];
 export type AppSettingsRequest = Schemas['AppSettingsRequest'];
 export type AppHomeSections = Schemas['AppHomeSections'];
+export type AppStockWarehouses = Schemas['AppStockWarehouses'];
 export type StaffAssortment = Schemas['StaffAppAssortment'];
 export type StaffAssortmentRequest = Schemas['StaffAppAssortmentRequest'];
 
@@ -29,7 +30,11 @@ export function useAppSettings() {
   });
 }
 
-/** The row's request part: what PUT takes back (every save sends the whole row). */
+/**
+ * The row's request part: what PUT takes back (every save sends the whole row). The stock settings
+ * (ADR-0173) are left out: the server keeps them when they are absent, so a page that did not
+ * change them never sends back a copy it read earlier; only the stock card adds them.
+ */
 export function requestOf(settings: AppSettings): AppSettingsRequest {
   return {
     assortmentSegmentId: settings.assortmentSegmentId,

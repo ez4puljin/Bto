@@ -203,6 +203,30 @@ describe('the staff app session (ADR-0061 #4)', () => {
     expect(session.getSnapshot()).toEqual({ status: 'anonymous' });
   });
 
+  it('hands the live stock stream a fresh token, refreshed near its end or once refused (ADR-0173)', async () => {
+    const { server, store, session } = setup();
+    expect(await session.streamToken()).toBeNull();
+    await session.login('rep', 'secret');
+    expect(await session.streamToken()).toBe('at-1');
+    expect(server.refreshes).toBe(0);
+    server.now += 890_000;
+    expect(await session.streamToken()).toBe('at-2');
+    expect(server.refreshes).toBe(1);
+    // The server refused at-2: one refresh; a token another call already replaced is not refreshed.
+    expect(await session.streamToken('at-2')).toBe('at-3');
+    expect(await session.streamToken('at-2')).toBe('at-3');
+    expect(server.refreshes).toBe(2);
+
+    server.offline = true;
+    expect(await session.streamToken('at-3')).toBeNull();
+    expect(session.getSnapshot()).toMatchObject({ status: 'signedIn' });
+    server.offline = false;
+    server.rejectRefresh = true;
+    expect(await session.streamToken('at-3')).toBeNull();
+    expect(session.getSnapshot()).toEqual({ status: 'anonymous', reason: 'expired' });
+    expect(store.value).toBeNull();
+  });
+
   it('logs out even without a connection: the stored token goes', async () => {
     const { server, store, session } = setup();
     await session.login('rep', 'secret');

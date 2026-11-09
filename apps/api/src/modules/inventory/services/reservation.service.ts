@@ -4,6 +4,7 @@ import { Decimal } from '@tugeel/shared/money';
 import { sql } from 'drizzle-orm';
 import type { Tx } from '../../../common/db/db.types';
 import { stockReservations } from '../schema';
+import { notifyStockChanged } from './stock-notify';
 import { StockQueryService } from './stock-query.service';
 
 const ZERO = new Decimal(0);
@@ -247,10 +248,16 @@ export class ReservationService {
     updates: readonly { id: string; qty: string }[],
   ): Promise<void> {
     if (updates.length === 0) return;
-    await tx.execute(sql`
+    const { rows } = await tx.execute<{ product_id: string }>(sql`
       UPDATE warehouse_stock ws SET reserved = ws.reserved + v.qty, updated_at = now()
         FROM unnest(${sql.param(updates.map((u) => u.id))}::bigint[],
                     ${sql.param(updates.map((u) => u.qty))}::numeric[]) AS v(id, qty)
-       WHERE ws.id = v.id`);
+       WHERE ws.id = v.id
+      RETURNING ws.product_id::text AS product_id`);
+    // What is free changed: the apps' live stock hears it at commit (ADR-0173 #4).
+    await notifyStockChanged(
+      tx,
+      rows.map((row) => Number.parseInt(row.product_id, 10)),
+    );
   }
 }

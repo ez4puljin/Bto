@@ -21,19 +21,13 @@ import {
   isAwaitingRows,
 } from '../../../src/expiry/rules';
 import { formatCount } from '../../../src/format/format';
-import { isRep } from '../../../src/state/phase';
-import { useSignedIn } from '../../../src/state/session';
 import { useDebounced } from '../../../src/state/use-debounced';
 import { colors, spacing } from '../../../src/theme/tokens';
 import { ChoiceChip, PillButton } from '../../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
 import { StoreHeader } from '../../../src/ui/store-header';
-import {
-  useKeyboardShown,
-  useStoreTabBarHeight,
-  useStoreTabBarInset,
-} from '../../../src/ui/store-tab-bar';
+import { useKeyboardShown } from '../../../src/ui/store-tab-bar';
 
 /** A 32 px chip pressed over 44 px: the row leaves that room above and below it. */
 const CHIP_SLOP = { top: 6, bottom: 6 };
@@ -41,17 +35,13 @@ const CHIP_SLOP = { top: 6, bottom: 6 };
 /**
  * «Хугацаа илрүүлэлт» (ADR-0172 #9): the search, the chips with the summary's counts, the records
  * soonest first (the date, the days in their colour, the two counts and the total, the status), and
- * «Скан хийх» or «Хайх» to write a new one. A tab of the work menu for everyone but a rep, who comes
- * from «Нүүр» or «Профайл» and has the back arrow.
+ * «Скан хийх» or «Хайх» to write a new one. Opened from «Нүүр» or «Цэс» by everyone (ADR-0174),
+ * with the back arrow.
  */
 export default function ExpiryHomeScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { me } = useSignedIn();
-  const rep = isRep(me);
-  const barInset = useStoreTabBarInset();
-  const barHeight = useStoreTabBarHeight();
   const keyboard = useKeyboardShown();
   const [chip, setChip] = useState<ExpiryChip>('ACTIVE');
   const [text, setText] = useState('');
@@ -67,11 +57,7 @@ export default function ExpiryHomeScreen() {
 
   return (
     <Page edges={[]}>
-      <StoreHeader
-        title={t('mobile.expiry.title')}
-        {...(rep ? { onBack: () => router.back() } : {})}
-        right={null}
-      >
+      <StoreHeader title={t('mobile.expiry.title')} onBack={() => router.back()} right={null}>
         <HeaderSearch
           value={text}
           onChangeText={setText}
@@ -118,7 +104,7 @@ export default function ExpiryHomeScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.list,
-          { paddingBottom: (rep ? Math.max(insets.bottom, spacing.md) : barInset) + 90 },
+          { paddingBottom: Math.max(insets.bottom, spacing.md) + 90 },
         ]}
         onEndReachedThreshold={0.5}
         onEndReached={() => {
@@ -166,14 +152,7 @@ export default function ExpiryHomeScreen() {
       />
 
       {keyboard ? null : (
-        <View
-          style={[
-            styles.footer,
-            rep
-              ? { paddingBottom: Math.max(insets.bottom, spacing.md) }
-              : { bottom: barHeight, paddingBottom: spacing.md },
-          ]}
-        >
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
           <PillButton
             title={t('mobile.expiry.scan')}
             icon={<ScanLine size={20} strokeWidth={2.2} color={colors.primaryForeground} />}

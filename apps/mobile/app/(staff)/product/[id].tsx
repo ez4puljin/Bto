@@ -29,6 +29,7 @@ import { baseQty, baseUnitOf, defaultUnitOf, packOf, shortBy } from '../../../sr
 import { useLineQuote } from '../../../src/shop/use-line-quote';
 import { useSignedIn } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
+import { useToast } from '../../../src/ui/toast';
 import { colors, fonts, spacing, tabular, type } from '../../../src/theme/tokens';
 import { PillButton, Segmented } from '../../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
@@ -44,7 +45,8 @@ const HERO_HEIGHT = 250;
  * free stock and the home warehouse, its discount program in words as «Bto300» says it (the owner,
  * 2026-10-23), the unit switch, the unit's price with − n + (the keypad on the number), what goes
  * short, the server's total and «Сагсанд нэмэх». The product keeps one line in the cart, in the unit
- * chosen here; 0 takes it out.
+ * chosen here; 0 takes it out. A product whose home warehouse the staff app does not count
+ * (ADR-0173 #1) reads «Дууссан» with the server's refusal, and «+» and the keypad only say so.
  */
 export default function ProductScreen() {
   const { t } = useTranslation();
@@ -55,6 +57,7 @@ export default function ProductScreen() {
   const productId = Number.parseInt(params.id ?? '', 10);
   const { server } = useSignedIn();
   const { cart, dispatch, pending } = useShop();
+  const toast = useToast();
   const words = useUnitWords();
   const unitOptions = useUnitOptions();
   const context = useRepContext();
@@ -111,13 +114,18 @@ export default function ProductScreen() {
   const base = baseUnitOf(product.units) ?? unit;
   const pack = packOf(product.units);
   const pieces = baseQty(qty, unit);
+  // A home warehouse the staff app does not count (ADR-0173 #1): «Дууссан», and an app order
+  // would be refused, so nothing is added; a line already in the cart can still be taken out.
+  const blocked = product.stockBlocked;
   const short = shortBy(pieces, product.available);
-  const out = new Decimal(product.available).lte(0);
+  const out = blocked || new Decimal(product.available).lte(0);
   const category = categories.data?.find((entry) => entry.id === product.categoryId)?.name;
   const home = context.data?.warehouses.find((entry) => entry.id === product.homeWarehouseId);
   const locked = pending !== null;
-  const canSell = product.sellable && unit.wholesale !== null && !locked;
+  const canSell = product.sellable && !blocked && unit.wholesale !== null && !locked;
+  const removing = blocked && qty === 0 && line !== undefined && !locked;
   const set = (next: number) => setQty(Math.max(0, Math.min(MAX_QTY, next)));
+  const refuse = () => toast.show({ message: t('errors.PRODUCT_OUT_OF_APP_STOCK') });
 
   const note = unit.isBase
     ? pack?.wholesale
@@ -286,7 +294,7 @@ export default function ProductScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t('mobile.product.typeQty', { n: qty })}
-                onPress={() => setKeypad(true)}
+                onPress={() => (blocked ? refuse() : setKeypad(true))}
                 style={styles.qtyBox}
               >
                 <Text style={styles.qtyText} accessibilityLiveRegion="polite">
@@ -296,15 +304,15 @@ export default function ProductScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t('mobile.product.more')}
-                onPress={() => set(qty + 1)}
-                style={styles.plus}
+                onPress={() => (blocked ? refuse() : set(qty + 1))}
+                style={[styles.plus, blocked && styles.faded]}
               >
                 <Plus size={20} strokeWidth={2.4} color={colors.primaryForeground} />
               </Pressable>
             </View>
           </View>
 
-          {short.gt(0) ? (
+          {!blocked && short.gt(0) ? (
             <View accessibilityRole="alert" style={styles.warning}>
               <TriangleAlert size={19} strokeWidth={2} color={colors.warningText} />
               <Text style={[type.body, styles.warningText]}>
@@ -320,6 +328,13 @@ export default function ProductScreen() {
             <View style={[styles.warning, styles.outBox]}>
               <TriangleAlert size={19} strokeWidth={2} color={colors.destructive} />
               <Text style={[type.body, styles.outText]}>{t('mobile.shop.notSellable')}</Text>
+            </View>
+          ) : blocked ? (
+            <View style={[styles.warning, styles.outBox]}>
+              <TriangleAlert size={19} strokeWidth={2} color={colors.destructive} />
+              <Text style={[type.body, styles.outText]}>
+                {t('errors.PRODUCT_OUT_OF_APP_STOCK')}
+              </Text>
             </View>
           ) : null}
 
@@ -351,7 +366,7 @@ export default function ProductScreen() {
                 : t('mobile.product.add')
           }
           icon={<ShoppingCart size={20} strokeWidth={2} color={colors.primaryForeground} />}
-          disabled={!canSell || (qty === 0 && !line) || quote.unpriced}
+          disabled={(!canSell && !removing) || (qty === 0 && !line) || quote.unpriced}
           onPress={save}
           height={50}
           style={styles.square}

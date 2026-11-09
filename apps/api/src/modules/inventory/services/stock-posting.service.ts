@@ -44,6 +44,7 @@ import {
   transfers,
 } from '../schema';
 import { bookKindOf } from './stock-book-kind';
+import { notifyStockChanged, notifyStockResync } from './stock-notify';
 import { advisoryLock, LOCKS } from './support';
 
 /** Inventory's own stock documents; other modules guard their documents themselves (ADR-0034 #5). */
@@ -530,6 +531,12 @@ export class StockPostingService implements OnModuleInit {
             )}) AS v (id, on_hand, sellable, avg_cost, consumed)
            WHERE ws.id = v.id`);
       }
+      // The apps' live stock (ADR-0173 #4): every product whose balance or reservation moved,
+      // announced at commit.
+      await notifyStockChanged(
+        tx,
+        [...warehouseRows.values()].map((row) => row.productId),
+      );
       const binUpdates = [...binDelta].flatMap(([key, delta]) => {
         const row = binRows.get(key);
         return row && !delta.isZero() ? [{ id: row.id, onHand: row.onHand.plus(delta) }] : [];
@@ -1326,6 +1333,8 @@ export class StockPostingService implements OnModuleInit {
          WHERE ws.id = w0.id
            AND (ws.on_hand IS DISTINCT FROM coalesce(k.on_hand, 0)
                 OR ws.sellable_on_hand IS DISTINCT FROM coalesce(k.sellable, 0))`);
+      // Any product may have moved: the apps refetch their stock (ADR-0173 #4).
+      await notifyStockResync(tx);
       return {
         binRows: bins.rowCount ?? 0,
         warehouseRows: warehouses.rowCount ?? 0,
@@ -1670,8 +1679,41 @@ export class StockPostingService implements OnModuleInit {
     return states;
   }
 
+  /**
+   * Creates the empty balance rows (warehouse and bin, lot-less) of these products on one bin, in
+   * the posting's own insert order, before any lock. A caller that locks balances before it posts
+   * an inbound document (the POS shortfall, ADR-0173) calls this first: otherwise its posting would
+   * insert a missing row after holding locks, and an inbound posting that inserted the same row
+   * first while waiting for one of those locks would deadlock with it.
+   */
+  async ensureBalanceRows(
+    tx: Tx,
+    warehouseId: number,
+    binId: number,
+    productIds: readonly number[],
+  ): Promise<void> {
+    await this.insertCacheRows(
+      tx,
+      productIds.map((productId) => ({ warehouseId, binId, productId, lotId: null })),
+    );
+  }
+
   private async ensureCacheRows(tx: Tx, movements: readonly Movement[]): Promise<void> {
-    const inbound = movements.filter((movement) => movement.qtyBase.gt(0));
+    await this.insertCacheRows(
+      tx,
+      movements.filter((movement) => movement.qtyBase.gt(0)),
+    );
+  }
+
+  private async insertCacheRows(
+    tx: Tx,
+    inbound: readonly {
+      warehouseId: number;
+      binId: number;
+      productId: number;
+      lotId?: number | null;
+    }[],
+  ): Promise<void> {
     if (inbound.length === 0) return;
     const warehouseKeys = uniqueBy(inbound, (m) => wsKey(m.warehouseId, m.productId, m.lotId)).sort(
       byWarehouseKey,

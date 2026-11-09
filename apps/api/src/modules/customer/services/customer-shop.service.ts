@@ -17,6 +17,7 @@ import {
 import type { AuthContext, CustomerContext } from '../../identity';
 import { type DealBook, PriceQuoteService, type ProductDeal, type Quote } from '../../pricing';
 import {
+  AppSettingsService,
   type RepProduct,
   type RepShopProduct,
   SalesPipelinesService,
@@ -27,7 +28,8 @@ import { customerFavourites } from '../schema';
 
 /**
  * A product as «Bto300» shows it (ADR-0079 #4, ADR-0092 #7): the wholesale unit prices, the stock
- * in three words (never the number), the store's ♡, and the badge of its discount program.
+ * in three words — and the number only when the office set «Тоогоор» (ADR-0173 #2) —, the store's
+ * ♡, and the badge of its discount program.
  */
 export interface CustomerProduct {
   id: number;
@@ -38,6 +40,11 @@ export interface CustomerProduct {
   images: ProductImageUrls[];
   isNew: boolean;
   stock: StockWord;
+  /**
+   * Base units free in the home warehouse, only when the display is NUMBER (ADR-0173 #2); null
+   * with WORDS, so a customer token never receives the number then.
+   */
+  available: Decimal | null;
   favourite: boolean;
   /** One base unit in whole packs, whole MNT; null without terms today. */
   basePrice: Decimal | null;
@@ -96,6 +103,7 @@ export class CustomerShopService {
     private readonly barcodes: BarcodeService,
     private readonly quotes: PriceQuoteService,
     private readonly pipelines: SalesPipelinesService,
+    private readonly settings: AppSettingsService,
   ) {}
 
   /**
@@ -109,6 +117,11 @@ export class CustomerShopService {
   /** The shop's universe in the NEW order (ADR-0093): every product «Bto300» lists. */
   async index(): Promise<ProductIndexRow[]> {
     return this.shop.index(await this.shop.customerScope());
+  }
+
+  /** «Bto300»'s scope: its segment and the warehouses it counts (ADR-0127 #1, ADR-0173 #1). */
+  scope(): Promise<ShopScope> {
+    return this.shop.customerScope();
   }
 
   /** A staff member's shop on the rep home (ADR-0164). */
@@ -220,12 +233,17 @@ export class CustomerShopService {
     return this.shop.withDeals(await this.listedIn(scope, ids), book);
   }
 
-  /** The cards of these rows: stock words, ♡, badges and the struck-through price, in order. */
+  /**
+   * The cards of these rows: stock words (and the number with NUMBER, ADR-0173 #2), ♡, badges and
+   * the struck-through price, in order.
+   */
   async decorate(
     rows: readonly RepProduct[],
     starred: ReadonlySet<number>,
     book: DealBook,
   ): Promise<CustomerProduct[]> {
+    if (rows.length === 0) return [];
+    const number = (await this.settings.customerStockDisplay()) === 'NUMBER';
     // The rep's cards carry the same badges (ADR-0093): one rule, sales' `withDeals`.
     return (await this.shop.withDeals(rows, book)).map((product) => ({
       id: product.id,
@@ -236,6 +254,7 @@ export class CustomerShopService {
       images: product.images,
       isNew: product.isNew,
       stock: wordOf(product),
+      available: number ? product.available : null,
       favourite: starred.has(product.id),
       basePrice: product.basePrice,
       dealPrice: product.dealPrice,
@@ -312,7 +331,8 @@ export class CustomerShopService {
    * The cart priced by the server (ADR-0079 #4, ADR-0006 #6): the WHOLESALE list today, as the
    * office's confirmation will price it again; each line's stock word and whether its quantity is
    * above what is free now («Зарим нь хойшилж магадгүй»), and what the order amount programs still
-   * need («500,000₮ хүрвэл 3%», ADR-0092 #3). The number itself never leaves.
+   * need («500,000₮ хүрвэл 3%», ADR-0092 #3). The number itself never leaves; a product whose home
+   * the app does not count is OUT (ADR-0173 #1).
    */
   async quote(lines: readonly { productUnitId: number; qty: Decimal }[]): Promise<CustomerQuote> {
     const today = businessDate();

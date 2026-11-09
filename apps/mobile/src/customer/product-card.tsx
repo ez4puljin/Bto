@@ -14,10 +14,43 @@ import { cardPriceOf } from './deals';
 import { canOrder, STOCK_TONES } from './stock';
 
 /**
- * «Байгаа», «Цөөхөн үлдсэн», «Дууссан» on the boards' coloured pill with its dot (ADR-0079 #4): a
- * store sees the word, never the number. `large` is the product page's.
+ * What a product's stock says to the store: the word «Байгаа», «Цөөхөн үлдсэн», «Дууссан»
+ * (ADR-0079 #4), or — when the office shows numbers and the server sent one (ADR-0173 #2) — the
+ * number in the base unit: «73 ш» on a card, «Үлдэгдэл 73 ширхэг» on the product's page
+ * (`page`). «Дууссан» stays a word either way.
  */
-export function StockPill({ stock, large = false }: { stock: StockWord; large?: boolean }) {
+export function useStockText() {
+  const { t } = useTranslation();
+  const words = useUnitWords();
+  return (
+    product: Pick<StoreProduct, 'stock' | 'available' | 'units'>,
+    { page = false }: { page?: boolean } = {},
+  ): string => {
+    const base = baseUnitOf(product.units);
+    if (product.available === undefined || product.stock === 'OUT' || !base) {
+      return t(`sales.stockWords.${product.stock}`);
+    }
+    const n = formatQty(product.available);
+    return page
+      ? t('mobile.product.stock', { n, unit: words(base).name })
+      : t('mobile.shop.cardStock', { n, unit: words(base).short });
+  };
+}
+
+/**
+ * The stock on the boards' coloured pill with its dot, green, orange or red by the word
+ * (ADR-0079 #4); `text` is the number when the office shows numbers (ADR-0173 #2). `large` is the
+ * product page's.
+ */
+export function StockPill({
+  stock,
+  text,
+  large = false,
+}: {
+  stock: StockWord;
+  text?: string;
+  large?: boolean;
+}) {
   const { t } = useTranslation();
   const tone = STOCK_TONES[stock];
   return (
@@ -27,7 +60,7 @@ export function StockPill({ stock, large = false }: { stock: StockWord; large?: 
         style={[large ? styles.pillTextLarge : styles.pillText, { color: tone.text }]}
         numberOfLines={1}
       >
-        {t(`sales.stockWords.${stock}`)}
+        {text ?? t(`sales.stockWords.${stock}`)}
       </Text>
     </View>
   );
@@ -96,7 +129,8 @@ export function FavouriteButton({
  * A product card of «Bto300» everywhere (ADR-0092 #7 in the E-mart structure of ADR-0095): a white
  * card with a hairline, the whole picture with ♡ in its corner, then the badges (a program's
  * label, «ШИНЭ»), the name on one line, the pack, the price per base unit (the old one struck
- * through beside a deal price), the stock word with its dot and the cart or the cart's quantity.
+ * through beside a deal price), the stock word (or number, ADR-0173 #2) with its dot and the cart
+ * or the cart's quantity.
  * The cart adds one of the default unit; the card opens the product. `width` sets a row's card
  * (164 on the home's rows); a grid's card fills its column.
  */
@@ -126,6 +160,7 @@ export function CustomerProductCard({
   const { t } = useTranslation();
   const words = useUnitWords();
   const packText = usePackText();
+  const stockText = useStockText();
   const base = baseUnitOf(product.units);
   const price = cardPriceOf(product);
   const tone = STOCK_TONES[product.stock];
@@ -174,7 +209,7 @@ export function CustomerProductCard({
           : null
       }
       noPrice={t('mobile.shop.noPrice')}
-      stock={{ text: t(`sales.stockWords.${product.stock}`), dot: tone.dot, color: tone.text }}
+      stock={{ text: stockText(product), dot: tone.dot, color: tone.text }}
       action={
         locked ? null : line ? (
           <CardQty

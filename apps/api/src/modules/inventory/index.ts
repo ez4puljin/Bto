@@ -141,6 +141,12 @@ export {
   type StocktakeStatus,
   type StocktakeSummary,
 } from './services/stocktakes.service';
+export {
+  notifyStockChanged,
+  notifyStockResync,
+  parseStockNotice,
+  STOCK_NOTICE_CHANNEL,
+} from './services/stock-notify';
 export { SystemBinsService } from './services/system-bins.service';
 export {
   MAX_TRANSFER_LINES,

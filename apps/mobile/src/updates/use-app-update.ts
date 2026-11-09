@@ -4,13 +4,19 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { getContentUriAsync } from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { STORE_KEY } from '../api/customer';
 import { unwrap } from '../api/problem';
 import { APP } from '../config/app';
-import { useCustomer } from '../state/session';
-import { apkUrlOf, type AppRelease, percentOf, updateOf } from './update';
+import { useSession } from '../state/session';
+import {
+  apkUrlOf,
+  type AppRelease,
+  type CheckOutcome,
+  checkOutcomeOf,
+  percentOf,
+  updateOf,
+} from './update';
 
-// «Bto300» updating itself (ADR-0166): the server's newest APK is asked for every two minutes, so a
+// An app updating itself (ADR-0166, the staff app too since ADR-0174): the server's newest APK is asked for every two minutes, so a
 // phone that comes back onto the server's Wi-Fi sees it soon after; a press downloads it to the
 // phone's cache and hands it to Android's installer. Android asks to allow this app once, then
 // installs it over the old one only if the same key signed it.
@@ -35,11 +41,23 @@ function clearDownloads() {
   }
 }
 
-/** The server's newer release of this app, or null; a server that does not answer offers nothing. */
-export function useAppUpdate(): AppRelease | null {
-  const { session } = useCustomer();
-  const query = useQuery({
-    queryKey: [...STORE_KEY, 'app-release'],
+/** Whichever session this variant has: the release's routes are public. */
+function useAppSession() {
+  const { session, server } = useSession();
+  if (!session || !server) throw new Error('an update asked for without a session');
+  return { session, server };
+}
+
+/** The build installed on this phone; unknown in a development run. */
+function installedCode(): number | undefined {
+  return Constants.expoConfig?.android?.versionCode;
+}
+
+/** The server's newest release of this app, asked every two minutes. */
+function useReleaseQuery() {
+  const { session } = useAppSession();
+  return useQuery({
+    queryKey: ['app-release', APP.variant],
     enabled: APP.selfUpdate,
     queryFn: async () =>
       unwrap(
@@ -51,12 +69,42 @@ export function useAppUpdate(): AppRelease | null {
     staleTime: 60_000,
     retry: false,
   });
-  const update = updateOf(query.data?.release, Constants.expoConfig?.android?.versionCode);
+}
+
+/** The server's newer release of this app, or null; a server that does not answer offers nothing. */
+export function useAppUpdate(): AppRelease | null {
+  const query = useReleaseQuery();
+  const update = updateOf(query.data?.release, installedCode());
   const nothingNew = query.isSuccess && update === null;
   useEffect(() => {
     if (nothingNew) clearDownloads();
   }, [nothingNew]);
   return update;
+}
+
+export type CheckState = { kind: 'idle' } | { kind: 'checking' } | { kind: CheckOutcome };
+
+/**
+ * «Шинэчлэл шалгах» (ADR-0174 #10): asks the server at once instead of waiting for the next two
+ * minutes. `found` counts up on every press that found a newer release, so the update card starts
+ * its download on that press, from the server over the shop's own network.
+ */
+export function useUpdateCheck(): {
+  state: CheckState;
+  found: number;
+  check: () => Promise<void>;
+} {
+  const { refetch } = useReleaseQuery();
+  const [state, setState] = useState<CheckState>({ kind: 'idle' });
+  const [found, setFound] = useState(0);
+  const check = useCallback(async () => {
+    setState({ kind: 'checking' });
+    const result = await refetch();
+    const outcome = checkOutcomeOf(result.isSuccess, result.data?.release, installedCode());
+    setState({ kind: outcome });
+    if (outcome === 'found') setFound((count) => count + 1);
+  }, [refetch]);
+  return { state, found, check };
 }
 
 export type UpdateStep =
@@ -67,7 +115,7 @@ export type UpdateStep =
 
 /** A release's download and install; leaving the screen stops a running download. */
 export function useUpdateInstaller(release: AppRelease) {
-  const { server } = useCustomer();
+  const { server } = useAppSession();
   const [step, setStep] = useState<UpdateStep>({ kind: 'idle' });
   const running = useRef<AbortController | null>(null);
 

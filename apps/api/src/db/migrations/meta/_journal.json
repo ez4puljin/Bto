@@ -624,6 +624,13 @@
       "when": 1794031243678,
       "tag": "0090_expiry",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1794205039833,
+      "tag": "0091_app_stock",
+      "breakpoints": true
     }
   ]
 }

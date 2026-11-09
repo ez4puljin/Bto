@@ -28,7 +28,8 @@ function packTextOf(
 }
 
 /**
- * «Үлдэгдэл 73 · хайрцагт 6», «Үлдэгдэл дууссан», «Захиалах боломжгүй» (`text`); `count` is the
+ * «Үлдэгдэл 73 · хайрцагт 6», «Үлдэгдэл дууссан» (also for a home warehouse the app does not
+ * count), «Захиалах боломжгүй» (`text`); `count` is the
  * card's short form beside its cart («73 ш», «Дууссан», «Боломжгүй»): a card is narrow on a 360 dp
  * phone, and the pack has its own line there.
  */
@@ -39,7 +40,8 @@ export function useStockLine() {
     if (!product.sellable) {
       return { text: t('mobile.shop.notSellable'), count: t('mobile.shop.cardBlocked'), out: true };
     }
-    if (new Decimal(product.available).lte(0)) {
+    // A home warehouse the staff app does not count reads «Дууссан» (ADR-0173 #1).
+    if (product.stockBlocked || new Decimal(product.available).lte(0)) {
       return { text: t('mobile.shop.outOfStock'), count: t('mobile.shop.cardOut'), out: true };
     }
     const n = formatQty(product.available);

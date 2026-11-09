@@ -17,10 +17,12 @@ import { useAction } from '@/lib/use-action';
 import { useSegments } from '@/features/segments/api';
 import { requestOf, useAppSettings, useSaveAppSettings } from './api';
 import { StaffAssortments } from './staff-assortments';
+import { AppStockCard } from './stock-settings';
 
 /**
  * «Апп» → «Аппын бараа», two tabs (ADR-0164, customer.home.manage): what «Bto300» sells, and which
- * products the staff app shows whom.
+ * products the staff app shows whom; each tab ends with the warehouses whose stock that app shows
+ * (ADR-0173).
  */
 export function AppProductsPage() {
   const { t } = useTranslation();
@@ -42,11 +44,13 @@ export function AppProductsPage() {
           <TabsTrigger value="bto300">{t('appSettings.products.tabs.bto300')}</TabsTrigger>
           <TabsTrigger value="staff">{t('appSettings.products.tabs.staff')}</TabsTrigger>
         </TabsList>
-        <TabsContent value="bto300">
+        <TabsContent value="bto300" className="flex flex-col gap-4">
           <CustomerAssortment />
+          <AppStockCard app="customer" />
         </TabsContent>
-        <TabsContent value="staff">
+        <TabsContent value="staff" className="flex flex-col gap-4">
           <StaffAssortments />
+          <AppStockCard app="staff" />
         </TabsContent>
       </Tabs>
     </div>

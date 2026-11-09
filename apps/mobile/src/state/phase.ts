@@ -13,17 +13,17 @@ export const PICK_LEAD_RIGHT = 'sales.orders.pickLead';
 export const EXPIRY_MANAGE_RIGHT = 'expiry.items.manage';
 
 /** A sales rep: the shop, the cart and the orders are theirs. */
-export function isRep(me: Me): boolean {
+export function isRep(me: Pick<Me, 'permissions'>): boolean {
   return me.permissions.includes(REP_RIGHT);
 }
 
 /** A store's seller (ADR-0116 #1): «Шилжүүлэг» is theirs; a rep may hold it too. */
-export function mayRequestTransfers(me: Me): boolean {
+export function mayRequestTransfers(me: Pick<Me, 'permissions'>): boolean {
   return me.permissions.includes(TRANSFER_RIGHT);
 }
 
 /** A warehouse keeper (ADR-0132): «Бэлтгэл» is theirs; a rep or a seller may hold it too. */
-export function mayPick(me: Me): boolean {
+export function mayPick(me: Pick<Me, 'permissions'>): boolean {
   return me.permissions.includes(PICK_RIGHT);
 }
 

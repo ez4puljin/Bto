@@ -1,6 +1,7 @@
 import { Decimal } from '@tugeel/shared/money';
 import { useRouter } from 'expo-router';
 import {
+  ArrowLeft,
   Bell,
   CalendarCheck,
   ScanLine,
@@ -63,8 +64,8 @@ const RECENT = 3;
 type HomeCategory = RepHome['categories'][number];
 
 /**
- * «Нүүр» (ADR-0068; «Bto300»'s shop window on top since ADR-0100 #9): the blue header with «Bto»,
- * the search field (it opens «Бараа» searching), the scanner, the bell and the initials (to
+ * The first tab of «ХТ захиалга» (ADR-0068; «Bto300»'s shop window on top since ADR-0100 #9;
+ * opened from «Цэс» since ADR-0174): the blue header with the way back, the search field (it opens «Бараа» searching), the scanner, the bell and the initials (to
  * «Профайл»), and the upper-case links (categories, discounts, new, the map, the orders); the
  * banners edge to edge; «АНГИЛЛЫН ЖАГСААЛТ ›» with 4×2 pictures; the sections (promotions, the
  * shown segments, discounts, new) as rows of the rep's cards. Below them the rep's own blocks with
@@ -229,9 +230,11 @@ export default function HomeScreen() {
     <Page white edges={[]}>
       <StoreHeaderBand>
         <View style={styles.bar}>
-          <Text accessibilityRole="header" style={storeType.wordmark}>
-            {t('app.name')}
-          </Text>
+          <HeaderIconButton
+            icon={<ArrowLeft size={22} strokeWidth={2} color={colors.primaryForeground} />}
+            label={t('common.back')}
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+          />
           <View style={styles.search}>
             <Pressable
               accessibilityRole="search"
@@ -549,14 +552,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingLeft: 14,
+    paddingLeft: 2,
     paddingRight: spacing.sm,
   },
   search: {
     flex: 1,
     minWidth: 0,
     height: 34,
-    marginLeft: spacing.xs,
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 17,

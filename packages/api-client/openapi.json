@@ -23257,6 +23257,44 @@
         ]
       }
     },
+    "/api/v1/sales-rep/stock/live": {
+      "get": {
+        "operationId": "SalesRepLiveStock_live",
+        "parameters": [
+          {
+            "name": "authorization",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server-sent events (ADR-0173 #4): ready, stock { items }, resync, ping; ends at the token expiry"
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales-picks": {
       "get": {
         "operationId": "SalesPicks_work",
@@ -33828,6 +33866,44 @@
           }
         ],
         "summary": "A category's page: its banners, subcategories, new products and deals of its subtree.",
+        "tags": [
+          "customer-app"
+        ]
+      }
+    },
+    "/api/v1/customer-app/stock/live": {
+      "get": {
+        "operationId": "CustomerAppLiveStock_live",
+        "parameters": [
+          {
+            "name": "authorization",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server-sent events (ADR-0173 #4): ready, stock { items }, resync, ping; ends at the token expiry"
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "customer": []
+          }
+        ],
         "tags": [
           "customer-app"
         ]
@@ -60261,6 +60337,41 @@
           "NEW"
         ]
       },
+      "AppStockWarehouses": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "uniqueItems": true,
+            "description": "«Bto300»; empty = every warehouse",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "staff": {
+            "uniqueItems": true,
+            "description": "The staff app; empty = every warehouse",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "required": [
+          "customer",
+          "staff"
+        ]
+      },
+      "CustomerStockDisplay": {
+        "type": "string",
+        "enum": [
+          "WORDS",
+          "NUMBER"
+        ],
+        "description": "«Bto300»: words or the number"
+      },
       "AppSettings": {
         "type": "object",
         "properties": {
@@ -60293,6 +60404,22 @@
             "nullable": true,
             "description": "#RRGGBB"
           },
+          "stockWarehouses": {
+            "description": "Live warehouses only (ADR-0173 #1)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AppStockWarehouses"
+              }
+            ]
+          },
+          "customerStockDisplay": {
+            "description": "«Bto300»: words or the number",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerStockDisplay"
+              }
+            ]
+          },
           "updatedAt": {
             "type": "string",
             "nullable": true,
@@ -60307,6 +60434,8 @@
           "minOrderAmount",
           "appName",
           "appColor",
+          "stockWarehouses",
+          "customerStockDisplay",
           "updatedAt"
         ]
       },
@@ -60335,6 +60464,22 @@
             "type": "string",
             "nullable": true,
             "description": "#RRGGBB"
+          },
+          "stockWarehouses": {
+            "description": "Absent = unchanged (ADR-0173 #1)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AppStockWarehouses"
+              }
+            ]
+          },
+          "customerStockDisplay": {
+            "description": "Absent = unchanged (ADR-0173 #2)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerStockDisplay"
+              }
+            ]
           }
         },
         "required": [
@@ -61510,7 +61655,11 @@
           },
           "available": {
             "type": "string",
-            "description": "Base units free in the home warehouse"
+            "description": "Base units free in the home warehouse; \"0\" when stockBlocked"
+          },
+          "stockBlocked": {
+            "type": "boolean",
+            "description": "The staff app does not count the home warehouse (ADR-0173 #1): «Дууссан», an app order refuses it"
           },
           "basePrice": {
             "type": "string",
@@ -61555,6 +61704,7 @@
           "sellable",
           "homeWarehouseId",
           "available",
+          "stockBlocked",
           "basePrice",
           "basePriceBefore",
           "dealPrice",
@@ -73040,7 +73190,7 @@
           "LOW",
           "OUT"
         ],
-        "description": "«Байгаа», «Цөөхөн үлдсэн», «Дууссан»; never the number (ADR-0079 #4)"
+        "description": "«Байгаа», «Цөөхөн үлдсэн», «Дууссан» (ADR-0079 #4)"
       },
       "CustomerAppDealThreshold": {
         "type": "object",
@@ -73231,12 +73381,16 @@
             "description": "«Шинэ»"
           },
           "stock": {
-            "description": "«Байгаа», «Цөөхөн үлдсэн», «Дууссан»; never the number (ADR-0079 #4)",
+            "description": "«Байгаа», «Цөөхөн үлдсэн», «Дууссан» (ADR-0079 #4)",
             "allOf": [
               {
                 "$ref": "#/components/schemas/StockWord"
               }
             ]
+          },
+          "available": {
+            "type": "string",
+            "description": "Base units free in the home warehouse, sent only when the office shows numbers (ADR-0173 #2)"
           },
           "favourite": {
             "type": "boolean",
@@ -81747,6 +81901,7 @@
           "CUSTOMER_APP_CLOSED",
           "PRODUCT_NOT_IN_APP",
           "ORDER_BELOW_MINIMUM",
+          "PRODUCT_OUT_OF_APP_STOCK",
           "ATTENDANCE_NO_SITE",
           "ATTENDANCE_OUT_OF_RANGE",
           "ATTENDANCE_LOCATION_IMPRECISE",

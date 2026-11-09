@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Decimal } from '../money';
 import {
   homeSectionKey,
+  homeStockCounts,
   parseHomeSectionKey,
   CUSTOMER_LOW_STOCK_BASE,
   CUSTOMER_ORDER_MAX_DAYS,
@@ -171,6 +172,15 @@ describe('the customer app (ADR-0079)', () => {
     expect(stockWord(d(11), d(0), d(12))).toBe('LOW');
     expect(stockWord(d('9.5'), null, null)).toBe('LOW');
     expect(stockWord(d(CUSTOMER_LOW_STOCK_BASE), null, null)).toBe('IN');
+  });
+
+  it('counts only the home warehouse, and every one when the app ticks none (ADR-0173)', () => {
+    expect(homeStockCounts(3, null)).toBe(true);
+    expect(homeStockCounts(3, [])).toBe(true);
+    expect(homeStockCounts(3, [1, 3])).toBe(true);
+    expect(homeStockCounts(3, [1, 2])).toBe(false);
+    expect(homeStockCounts(null, null)).toBe(false);
+    expect(homeStockCounts(null, [])).toBe(false);
   });
 
   it('puts every order status into exactly one customer word', () => {

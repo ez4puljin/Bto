@@ -39,6 +39,8 @@ export function productDto(product: CustomerProduct): CustomerAppProductDto {
     images: product.images,
     isNew: product.isNew,
     stock: product.stock,
+    // Only with NUMBER (ADR-0173 #2): with WORDS the field is absent, not null.
+    ...(product.available === null ? {} : { available: product.available.toString() }),
     favourite: product.favourite,
     basePrice: whole(product.basePrice),
     dealPrice: whole(product.dealPrice),

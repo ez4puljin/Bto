@@ -32,7 +32,6 @@ import { ChoiceChip, PillButton, Segmented } from '../../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
 import { StoreHeader } from '../../../src/ui/store-header';
-import { useStoreTabBarHeight, useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 import { Text } from '../../../src/ui/text';
 
 /**
@@ -47,8 +46,6 @@ export default function TransfersHomeScreen() {
   const insets = useSafeAreaInsets();
   const { me } = useSignedIn();
   const rep = isRep(me);
-  const barInset = useStoreTabBarInset();
-  const barHeight = useStoreTabBarHeight();
   const context = useTransferContext();
   const stores = useMemo(() => context.data?.storeWarehouses ?? [], [context.data]);
   const [storeId, setStoreId] = useState<number | null>(null);
@@ -114,7 +111,7 @@ export default function TransfersHomeScreen() {
     <Page edges={[]}>
       <StoreHeader
         title={t('mobile.transfers.title')}
-        {...(rep ? { onBack: () => router.back() } : {})}
+        onBack={() => router.back()}
         right={
           rep ? (
             <Pressable
@@ -185,7 +182,7 @@ export default function TransfersHomeScreen() {
             ItemSeparatorComponent={() => <View style={styles.separator} />}
             contentContainerStyle={[
               styles.list,
-              { paddingBottom: (rep ? Math.max(insets.bottom, spacing.md) : barInset) + 90 },
+              { paddingBottom: Math.max(insets.bottom, spacing.md) + 90 },
             ]}
             onEndReachedThreshold={0.5}
             onEndReached={() => {
@@ -221,14 +218,7 @@ export default function TransfersHomeScreen() {
               ) : null
             }
           />
-          <View
-            style={[
-              styles.footer,
-              rep
-                ? { paddingBottom: Math.max(insets.bottom, spacing.md) }
-                : { bottom: barHeight, paddingBottom: spacing.md },
-            ]}
-          >
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
             <PillButton
               title={t('mobile.transfers.home.newRequest')}
               icon={<Plus size={20} strokeWidth={2.4} color={colors.primaryForeground} />}

@@ -996,7 +996,10 @@ export class PosAcceptService {
   /**
    * The shortfall rule (ADR-0063 #5): the shelf's balances of the sold products are locked; what
    * the sale needs beyond them is adjusted in first (`POS_SHORTFALL`, one line per product), so the
-   * sale posts in full and the storekeeper sees exactly what was missing.
+   * sale posts in full and the storekeeper sees exactly what was missing. The store's warehouse
+   * balances of those products are locked before the shelf's bin rows, the posting's own order
+   * (architecture §5.3): taking the bin rows first deadlocked with a transfer or a bin move posting
+   * into the same SALESFLOOR.
    */
   private async fillShortfalls(
     tx: Tx,
@@ -1015,6 +1018,9 @@ export class PosAcceptService {
       if (!firstLine.has(line.productId)) firstLine.set(line.productId, line.id);
     }
     const productIds = [...needed.keys()].sort((a, b) => a - b);
+    // Missing rows first, then the locks: the posting's own order (insert, warehouse, bin).
+    await this.posting.ensureBalanceRows(tx, warehouseId, salesfloorId, productIds);
+    await this.stock.lockWarehouseBalances(tx, warehouseId, productIds);
     const onHand = await this.stock.lockOnHandInBin(tx, salesfloorId, productIds);
     const shorts: { productId: number; qtyBase: Decimal }[] = [];
     for (const productId of productIds) {

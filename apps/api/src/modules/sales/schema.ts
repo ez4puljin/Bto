@@ -2,6 +2,7 @@ import { PRICE_BASES } from '@tugeel/shared/pricing';
 import {
   BOARD_LIMITS,
   CARD_SORTS,
+  CUSTOMER_STOCK_DISPLAYS,
   DOCUMENT_TEMPLATE_KINDS,
   DOCUMENT_TEMPLATE_LIMITS,
   type DocumentLayout,
@@ -17,6 +18,7 @@ import {
   PIPELINE_VISIBILITIES,
   STAGE_ACTIONS,
   STAGE_RIGHTS,
+  STOCK_APPS,
 } from '@tugeel/shared/sales';
 import { type SQL, sql } from 'drizzle-orm';
 import {
@@ -517,6 +519,8 @@ export const appSettings = pgTable(
     minOrderAmount: money('min_order_amount'),
     appName: text('app_name'),
     appColor: text('app_color'),
+    /** How «Bto300» shows stock: the three words or the number (ADR-0173 #2). */
+    customerStockDisplay: text('customer_stock_display').notNull().default('WORDS'),
     updatedBy: userRef('updated_by'),
     updatedAt: updatedAt(),
   },
@@ -525,6 +529,25 @@ export const appSettings = pgTable(
     check('app_settings_min_order', sql`${t.minOrderAmount} IS NULL OR ${t.minOrderAmount} >= 0`),
     check('app_settings_name', sql`${t.appName} IS NULL OR length(${t.appName}) BETWEEN 1 AND 40`),
     check('app_settings_color', sql`${t.appColor} IS NULL OR ${t.appColor} ~ '^#[0-9a-fA-F]{6}$'`),
+    check('app_settings_stock_display', inList(t.customerStockDisplay, CUSTOMER_STOCK_DISPLAYS)),
+  ],
+);
+
+/**
+ * The warehouses whose stock an app counts (ADR-0173 #1): an app shows a product's home-warehouse
+ * stock only when that warehouse is listed for it; no row for an app = every warehouse counts. No
+ * foreign key (re-checked through the org directory on read, an archived warehouse drops out); the
+ * list is replaced as a whole, so its rows are deleted, never truncated.
+ */
+export const appStockWarehouses = pgTable(
+  'app_stock_warehouses',
+  {
+    app: text('app').notNull(),
+    warehouseId: ref('warehouse_id').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.app, t.warehouseId] }),
+    check('app_stock_warehouses_app', inList(t.app, STOCK_APPS)),
   ],
 );
 

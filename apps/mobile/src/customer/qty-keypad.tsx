@@ -5,6 +5,7 @@ import { formatMnt } from '../format/format';
 import { KeypadSheet } from '../shop/keypad-sheet';
 import { useUnitWords } from '../shop/unit-words';
 import { baseQty, baseUnitOf } from '../shop/units';
+import { useStockText } from './product-card';
 import { useStoreLineQuote } from './shop-quote';
 
 /**
@@ -32,6 +33,7 @@ export function StoreQtyKeypad({
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
+  const stockText = useStockText();
   const words = useUnitWords();
   const [unit, setUnit] = useState(unitId);
   const [digits, setDigits] = useState(String(qty));
@@ -63,7 +65,7 @@ export function StoreQtyKeypad({
       visible={visible}
       product={product}
       server={server}
-      subtitle={[product.sku, t(`sales.stockWords.${product.stock}`)].join(' · ')}
+      subtitle={[product.sku, stockText(product, { page: true })].join(' · ')}
       unit={chosen}
       digits={digits}
       onUnit={setUnit}

@@ -68,6 +68,7 @@ Finance answers two hooks of `sales/hooks.ts` (`CREDIT_CHECKER`, `SALE_SINK`; AD
 | `sales_settings` | one row (`id = 1`): `number_pattern`, `number_digits`, who changed it and when; no row = the shared defaults | pattern ends with a non-digit; digits 1–8; `REVOKE DELETE, TRUNCATE` |
 | `app_settings` (`0062_app_settings`, ADR-0127) | one row (`id = 1`), the two apps' settings: `assortment_segment_id` (the PRODUCT segment «Bto300» sells from, ADR-0164, no foreign key — re-checked through catalog's segment directory on every read; null = every sale-ready product), `home_promotions` / `home_discounts` / `home_new` (the fixed home sections, default on), `min_order_amount` (whole MNT the customer app's order must reach; null = none), `app_name` (≤ 40), `app_color` (`#RRGGBB`), who changed it and when; no row = the defaults | CHECKs on the amount (≥ 0), the name's length and the colour's shape; `REVOKE DELETE, TRUNCATE` |
 | `staff_app_assortments`, `staff_app_assortment_segments`, `staff_app_assortment_users` (`0082`, ADR-0164) | a setting of which products the staff app shows whom: title 1–120, soft `deleted_at`; any number of product segments (no foreign key, re-checked on read) and staff |
+| `app_stock_warehouses` (`0091_app_stock`, ADR-0173 #1) | per app (`CUSTOMER`, `STAFF`) the warehouses whose home-warehouse stock it counts; no row for an app = every warehouse; no foreign key (re-read through the org directory, an archived one drops out); `app_settings.customer_stock_display` (`WORDS` default, `NUMBER`) in the same migration | PK (app, warehouse); `REVOKE TRUNCATE` |
 
 `sales_orders` also carries:
 - `pipeline_id`, `stage_id`, `stage_entered_at` (all three or none; `(pipeline_id, stage_id)` → the stage of that pipeline);
@@ -151,6 +152,7 @@ Every board, pipeline and stage route carries `sales.orders.read`; the service c
 | `GET /app-settings`, `PUT /app-settings` [`customer.home.manage`] (ADR-0127) | the apps' settings: `assortmentSegmentId`, `assortment { segmentId, segmentName, broken }`, `shopProductCount` (what the customer app lists now), `homeSections { PROMOTIONS, DISCOUNTS, NEW }`, `minOrderAmount`, `appName`, `appColor`, `updatedAt`; PUT takes the whole row (a segment must be a live PRODUCT one, 422 at `assortmentSegmentId`; the colour `#RRGGBB`) |
 | `GET`, `POST`, `PUT /:id`, `DELETE /:id` under `/app-settings/staff-assortments` [`customer.home.manage`] (ADR-0164) | the staff app's settings: `title`, `segmentIds`, `userIds`, each list at least one; the answer names the live segments, `goneSegmentCount` and the staff |
 | `GET /app-settings/branding` [public] | `{ appName, appColor }` for the apps' sign-in screens, before a token |
+| `GET /sales-rep/stock/live` [`sales.orders.rep`], `GET /customer-app/stock/live` [customer token] (ADR-0173 #4) | server-sent events (`text/event-stream`, documented so the isolation checks cover them): `ready`, `stock` `{ items }` (staff: `productId`, `available`, `stockBlocked`; «Bto300»: `productId`, `stock` word, `available` only under NUMBER), `resync`, `ping` every 20 s; the stream ends at the token's expiry. `LiveStockHub` (api only) listens on `bto_stock` with one connection opened by the first stream |
 
 **The rep app** (`/sales-rep/*`, every route `sales.orders.rep`, ADR-0061 #5):
 
@@ -170,6 +172,8 @@ Every board, pipeline and stage route carries `sales.orders.read`; the service c
 ADR-0143: `GET/POST /sales/document-templates`, `GET /:id`, `PUT /:id/draft`, `POST /:id/publish|discard|default`, `POST /:id/versions/:version/restore`, `DELETE /:id` [`sales.boards.manage`]; `GET /sales/document-templates/print-layouts?pipelineIds=` [`sales.orders.read`]; the pipeline body takes `pickListTemplateId` / `deliveryNoteTemplateId` (absent: kept).
 
 ## 5. Rules worth knowing
+
+- **The apps' stock (ADR-0173).** Both apps show one number per product, the home warehouse's available (sellable on hand less reserved), and only when that warehouse is ticked for the app on «Апп → Аппын бараа» (`ShopScope.countedWarehouseIds`, none ticked = all); otherwise 0, «Дууссан», `stockBlocked`, and both apps' order routes refuse it. `PUT /app-settings` takes `stockWarehouses { customer, staff }` and `customerStockDisplay`, both optional (left out = unchanged). The phones hear every change through `…/stock/live` within about a second of the commit.
 
 - **Rights (ADR-0057 #2).**
   - A PUBLIC pipeline is open to every holder of `sales.orders.read`; a PRIVATE one to its VIEW roles. MANAGE and ALL_ORDERS imply VIEW; `sales.boards.manage` holders see and configure everything.
@@ -223,7 +227,7 @@ ADR-0143: `GET/POST /sales/document-templates`, `GET /:id`, `PUT /:id/draft`, `P
 
 ## 6. Error codes introduced
 
-`PRODUCT_NO_HOME`, `PRODUCT_NOT_SELLABLE`, `STAGE_IN_USE` (409, with the stage's id and name), `BOARD_NOT_EMPTY`, `PIPELINE_IN_USE`, `ORDER_NUMBER_TAKEN` (409), `PRODUCT_NOT_IN_APP` (409, ADR-0127 #1: an app order's product outside the assortment segment, `productIds`), `ORDER_CHANGED` (409, ADR-0130: a save whose `expectedUpdatedAt` is older than the order's `updated_at`; `params.updatedAt` carries the current one).
+`PRODUCT_NO_HOME`, `PRODUCT_NOT_SELLABLE`, `STAGE_IN_USE` (409, with the stage's id and name), `BOARD_NOT_EMPTY`, `PIPELINE_IN_USE`, `ORDER_NUMBER_TAKEN` (409), `PRODUCT_OUT_OF_APP_STOCK` (409, ADR-0173 #3: the product's home warehouse is not counted for the app, `params.productIds`), `PRODUCT_NOT_IN_APP` (409, ADR-0127 #1: an app order's product outside the assortment segment, `productIds`), `ORDER_CHANGED` (409, ADR-0130: a save whose `expectedUpdatedAt` is older than the order's `updated_at`; `params.updatedAt` carries the current one).
 
 Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUSTOMER_INACTIVE`, `PRICE_MISSING`, `CREDIT_BLOCKED` / `CREDIT_NEEDS_APPROVAL` (delivery 3), `UNIT_SUPERSEDED`, `UNIT_FACTOR_INEXACT`, `VALIDATION_FAILED`, `NOT_FOUND`, `FORBIDDEN`.
 

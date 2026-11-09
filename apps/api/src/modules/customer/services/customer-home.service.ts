@@ -142,6 +142,8 @@ interface Viewer<P> {
   } | null;
   /** The universe this viewer's shop lists, in the NEW order (ADR-0164: a rep's own). */
   index: () => Promise<ProductIndexRow[]>;
+  /** The warehouses this viewer's app counts (ADR-0173 #1); null = every one. */
+  counted: () => Promise<readonly number[] | null>;
   /** The cards of these listed products, in any order, priced with `book`'s programs. */
   cards: (ids: readonly number[], book: DealBook) => Promise<P[]>;
 }
@@ -232,6 +234,7 @@ export class CustomerHomeService {
         favourites: () => this.shop.favouriteIds(ctx),
       },
       index: () => this.shop.index(),
+      counted: async () => (await this.shop.scope()).countedWarehouseIds,
       cards: (ids, book) => this.shop.productsOf(ctx, ids, book),
     };
   }
@@ -242,6 +245,7 @@ export class CustomerHomeService {
     return {
       store: null,
       index: () => this.shop.repIndex(scope),
+      counted: () => Promise.resolve(scope.countedWarehouseIds),
       cards: (ids, book) => this.shop.repProductsOf(scope, ids, book),
     };
   }
@@ -378,7 +382,7 @@ export class CustomerHomeService {
       rows,
       rank: new Map(rows.map((row, index) => [row.id, index])),
       categoryOf: new Map(rows.map((row) => [row.id, row.categoryId])),
-      free: new Set(await this.stock.productIdsAvailableAtHome()),
+      free: new Set(await this.stock.productIdsAvailableAtHome(undefined, await viewer.counted())),
       book: await this.shop.dealBook(today),
     };
   }

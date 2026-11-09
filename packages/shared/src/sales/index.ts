@@ -322,6 +322,73 @@ export function stockWord(
 }
 
 /**
+ * The two apps whose stock the office narrows to chosen warehouses on «Апп → Аппын бараа»
+ * (ADR-0173 #1): CUSTOMER is «Bto300», STAFF the staff app.
+ */
+export const STOCK_APPS = ['CUSTOMER', 'STAFF'] as const;
+export type StockApp = (typeof STOCK_APPS)[number];
+
+/**
+ * How «Bto300» shows stock (ADR-0173 #2, superseding ADR-0079 #4's "never the number"): WORDS
+ * «Байгаа / Цөөхөн үлдсэн / Дууссан», or NUMBER, the available base units beside the word.
+ */
+export const CUSTOMER_STOCK_DISPLAYS = ['WORDS', 'NUMBER'] as const;
+export type CustomerStockDisplay = (typeof CUSTOMER_STOCK_DISPLAYS)[number];
+
+/**
+ * Whether an app counts a product's stock (ADR-0173 #1): only the home warehouse's stock is ever
+ * shown, and only when that warehouse is one the app's setting ticks; an empty or absent list
+ * counts every warehouse. A product the app does not count shows «Дууссан» (0) and cannot be
+ * ordered from the app.
+ */
+export function homeStockCounts(
+  homeWarehouseId: number | null,
+  counted: readonly number[] | null,
+): boolean {
+  return (
+    homeWarehouseId !== null &&
+    (counted === null || counted.length === 0 || counted.includes(homeWarehouseId))
+  );
+}
+
+/**
+ * The live stock stream's events (ADR-0173 #4, `GET …/stock/live`): `ready` once on connect (the
+ * client refetches its stock queries, a change between its last read and the connect is not
+ * lost), `stock` with the changed products, `resync` when everything may have changed (a
+ * setting, a balance rebuild, a lost listener: refetch every stock query), `ping` to keep proxies
+ * from closing an idle stream.
+ */
+export const LIVE_STOCK_EVENTS = ['ready', 'stock', 'resync', 'ping'] as const;
+export type LiveStockEvent = (typeof LIVE_STOCK_EVENTS)[number];
+
+/** Seconds between two `ping`s of the live stock stream. */
+export const LIVE_STOCK_PING_SECONDS = 20;
+
+/** One product in a staff app `stock` event: what `GET /sales-rep/products` would now say. */
+export interface LiveStockStaffItem {
+  productId: number;
+  /** Base units, a decimal string; "0" when `stockBlocked`. */
+  available: string;
+  /** The home warehouse is not one the staff app counts (ADR-0173 #1). */
+  stockBlocked: boolean;
+}
+
+/**
+ * One product in a «Bto300» `stock` event: the word always, the number only when the display is
+ * NUMBER; with WORDS a customer token never receives a number (ADR-0173 #2).
+ */
+export interface LiveStockCustomerItem {
+  productId: number;
+  stock: StockWord;
+  available?: string;
+}
+
+/** The `data` of a `stock` event. */
+export interface LiveStockPayload<T extends LiveStockStaffItem | LiveStockCustomerItem> {
+  items: T[];
+}
+
+/**
  * An order's progress in the customer's words (ADR-0079 #6): PENDING «Хүлээгдэж буй» until the
  * office confirms, CONFIRMED «Батлагдсан», PREPARING «Бэлтгэж буй», READY «Бэлэн», DELIVERED
  * «Хүргэгдсэн», CANCELLED «Цуцлагдсан».
@@ -422,6 +489,8 @@ export const APP_SETTINGS_LIMITS = {
   maxAppName: 40,
   /** A CSS hex colour, #RRGGBB. */
   colorPattern: /^#[0-9a-fA-F]{6}$/,
+  /** Warehouses one app may count (ADR-0173 #1); more would be every warehouse anyway. */
+  maxStockWarehouses: 100,
 } as const;
 
 /** A section's key in the routes: `recent`, …, or `segment-<id>`. */

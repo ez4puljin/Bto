@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { NEW_PRODUCT_DAYS } from '@tugeel/shared/catalog';
 import { Decimal } from '@tugeel/shared/money';
-import { REP_PRICE_SORT_MAX, type RepProductSort } from '@tugeel/shared/sales';
+import { homeStockCounts, REP_PRICE_SORT_MAX, type RepProductSort } from '@tugeel/shared/sales';
 import type { SegmentCondition, SegmentDefinition } from '@tugeel/shared/segments';
 import { businessDate, isIsoDate } from '@tugeel/shared/time';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
@@ -38,10 +38,18 @@ import { StaffAppAssortmentsService } from './staff-app-assortments.service';
 /**
  * Whose shop a read is for: the product segments it narrows to, null for every sale-ready product.
  * «Bto300» has one segment from «Апп → Бараа» (ADR-0127 #1); each staff member has what their
- * settings name (ADR-0164). Required on every read, so none can forget it.
+ * settings name (ADR-0164). Required on every read, so none can forget it. `countedWarehouseIds`
+ * is the app's stock setting (ADR-0173 #1): a product whose home warehouse is not among them shows
+ * nothing available and cannot be ordered from the app; null or empty counts every warehouse.
  */
 export interface ShopScope {
   segmentIds: readonly number[] | null;
+  countedWarehouseIds: readonly number[] | null;
+}
+
+/** An app's stock setting as a scope holds it: null when it counts every warehouse. */
+function counted(ids: readonly number[]): readonly number[] | null {
+  return ids.length === 0 ? null : ids;
 }
 
 /** What every given list holds; undefined when no list is given. */
@@ -73,8 +81,16 @@ export interface RepProduct {
   /** Active, complete and with a home warehouse: an order accepts it. */
   sellable: boolean;
   homeWarehouseId: number | null;
-  /** Base units free in the home warehouse (on hand, sellable, less what is reserved). */
+  /**
+   * Base units free in the home warehouse (on hand, sellable, less what is reserved); 0 when
+   * `stockBlocked`.
+   */
   available: Decimal;
+  /**
+   * The app's stock setting does not count the home warehouse (ADR-0173 #1): shown «Дууссан»,
+   * refused by the app's order (409 PRODUCT_OUT_OF_APP_STOCK).
+   */
+  stockBlocked: boolean;
   /** The home warehouse's minimum level (ADR-0039); null when none is set. */
   minLevel: Decimal | null;
   /** Base units of one whole pack, the unit the warehouse price is set in; null without one. */
@@ -241,8 +257,12 @@ export class SalesRepShopService {
 
   /** «Bto300»'s shop: the one segment of «Апп → Бараа», or everything (ADR-0127 #1). */
   async customerScope(): Promise<ShopScope> {
-    const segmentId = await this.settings.assortmentSegmentId();
-    return { segmentIds: segmentId === null ? null : [segmentId] };
+    const settings = await this.settings.current();
+    const { segmentId } = await this.settings.assortment(settings);
+    return {
+      segmentIds: segmentId === null ? null : [segmentId],
+      countedWarehouseIds: counted(settings.stockWarehouses.CUSTOMER),
+    };
   }
 
   /** A staff member's shop: what their settings name, or everything (ADR-0164). */
@@ -250,6 +270,7 @@ export class SalesRepShopService {
     const userId = actorUserId(ctx);
     return {
       segmentIds: userId === null ? null : await this.staffAssortments.segmentIdsOf(userId),
+      countedWarehouseIds: counted((await this.settings.stockWarehouses()).STAFF),
     };
   }
 
@@ -292,7 +313,9 @@ export class SalesRepShopService {
   ): Promise<{ data: RepProduct[]; nextCursor: string | null; total: number | null }> {
     const today = businessDate();
     const where = shopWhere(query);
-    const inStock = query.inStock ? await this.stock.productIdsAvailableAtHome() : undefined;
+    const inStock = query.inStock
+      ? await this.stock.productIdsAvailableAtHome(undefined, scope.countedWarehouseIds)
+      : undefined;
     const onlyIds = common([query.onlyIds, inStock, await this.scopeIds(scope)]);
     const base: ProductListQuery = {
       ...(query.q ? { q: query.q } : {}),
@@ -310,7 +333,7 @@ export class SalesRepShopService {
         ...(query.limit === undefined ? {} : { limit: query.limit }),
       });
       return {
-        data: await this.enrich(page.data, today),
+        data: await this.enrich(scope, page.data, today),
         nextCursor: page.nextCursor,
         total: page.total,
       };
@@ -340,7 +363,7 @@ export class SalesRepShopService {
     }));
     const items = await this.products.listItemsOf(page.data.map((row) => row.productId));
     return {
-      data: await this.enrich(items, today),
+      data: await this.enrich(scope, items, today),
       nextCursor: page.nextCursor,
       total: query.cursor === undefined ? total : null,
     };
@@ -360,6 +383,7 @@ export class SalesRepShopService {
     }
     const rows = await this.products.listItemsOf(await this.inScope(scope, ids));
     return this.enrich(
+      scope,
       rows.filter((row) => row.status === 'ACTIVE' && row.saleReadyAt !== null),
       businessDate(),
       priceBefore,
@@ -400,13 +424,39 @@ export class SalesRepShopService {
     }
   }
 
-  /** The same for order lines: the units' products must be in the scope. */
+  /**
+   * The same for order lines: the units' products must be in the scope, and their home warehouse
+   * one the app counts (ADR-0173 #1, 409 PRODUCT_OUT_OF_APP_STOCK naming the others).
+   */
   async assertUnitsListed(scope: ShopScope, unitIds: readonly number[]): Promise<void> {
     const units = await this.units.describe(unitIds);
-    await this.assertListed(
-      scope,
-      [...units.values()].map((unit) => unit.productId),
-    );
+    const productIds = [...new Set([...units.values()].map((unit) => unit.productId))];
+    await this.assertListed(scope, productIds);
+    await this.assertCounted(scope, productIds);
+  }
+
+  /**
+   * An app order carries only products whose stock the app counts (ADR-0173 #1): a product whose
+   * home warehouse the app's setting leaves out is refused with 409 PRODUCT_OUT_OF_APP_STOCK
+   * before anything is written. A product without a home stays PRODUCT_NO_HOME's, as before.
+   */
+  async assertCounted(scope: ShopScope, productIds: readonly number[]): Promise<void> {
+    const listed = scope.countedWarehouseIds;
+    if (listed === null || listed.length === 0 || productIds.length === 0) return;
+    const homes = await this.locations.homeOf([...new Set(productIds)]);
+    const blocked = [...new Set(productIds)]
+      .filter((id) => {
+        const home = homes.get(id);
+        return home !== undefined && !homeStockCounts(home, listed);
+      })
+      .sort((a, b) => a - b);
+    if (blocked.length > 0) {
+      throw new AppError(
+        'PRODUCT_OUT_OF_APP_STOCK',
+        `products ${blocked.join(', ')} have their stock outside the app's warehouses`,
+        { productIds: blocked.join(', ') },
+      );
+    }
   }
 
   /** What a scope's segments hold together; null when it narrows nothing. */
@@ -494,6 +544,7 @@ export class SalesRepShopService {
   }
 
   private async enrich(
+    scope: ShopScope,
     rows: readonly ProductListItem[],
     today: string,
     priceBefore?: string,
@@ -515,6 +566,11 @@ export class SalesRepShopService {
     const newSince = Date.now() - NEW_PRODUCT_DAYS * DAY_MS;
     return rows.map((row) => {
       const own = info.get(row.id);
+      const homeWarehouseId = own?.homeWarehouseId ?? null;
+      // A home the app does not count shows nothing free (ADR-0173 #1); `sellable` stays as the
+      // product is, the office may still order it.
+      const stockBlocked =
+        homeWarehouseId !== null && !homeStockCounts(homeWarehouseId, scope.countedWarehouseIds);
       const priced = prices.get(row.id);
       const table = new Map((priced?.units ?? []).map((unit) => [unit.unitId, unit]));
       return {
@@ -526,8 +582,9 @@ export class SalesRepShopService {
         images: images.get(row.id) ?? [],
         isNew: row.saleReadyAt !== null && row.saleReadyAt.getTime() >= newSince,
         sellable: own?.sellable === true && own.homeWarehouseId !== null,
-        homeWarehouseId: own?.homeWarehouseId ?? null,
-        available: own?.available ?? new Decimal(0),
+        homeWarehouseId,
+        available: stockBlocked ? new Decimal(0) : (own?.available ?? new Decimal(0)),
+        stockBlocked,
         minLevel: minLevels.get(row.id) ?? null,
         packBase: packBaseOf(row, terms.get(row.id)?.wholeUomId ?? null),
         basePrice: priced?.basePrice ?? null,

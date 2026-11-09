@@ -198,6 +198,32 @@ export class StockQueryService {
     return result;
   }
 
+  /**
+   * Locks the warehouse balances of these products in one warehouse, every lot, FOR UPDATE in the
+   * posting's key order (product, then lot with NULL first; architecture §5.3). A caller that
+   * locks bin rows before it posts (`lockOnHandInBin`, the POS shortfall) takes these first, so it
+   * holds warehouse_stock before bin_stock as `StockPostingService.post` does and cannot deadlock
+   * with a posting into the same bin. Products without a row lock nothing.
+   */
+  async lockWarehouseBalances(
+    tx: Tx,
+    warehouseId: number,
+    productIds: readonly number[],
+  ): Promise<void> {
+    if (productIds.length === 0) return;
+    await tx
+      .select({ id: warehouseStock.id })
+      .from(warehouseStock)
+      .where(
+        and(
+          eq(warehouseStock.warehouseId, warehouseId),
+          idIn(warehouseStock.productId, productIds),
+        ),
+      )
+      .orderBy(warehouseStock.productId, sql`${warehouseStock.lotId} NULLS FIRST`)
+      .for('update');
+  }
+
   async ofBin(binId: number): Promise<BinContent> {
     const bin = await this.bins.get(binId);
     const rows = await this.db
@@ -504,14 +530,24 @@ export class StockQueryService {
   /**
    * The products with stock available in their home warehouse, ascending: sellable on hand, lots
    * summed, less what is reserved, as `balances()` counts it — the rep app's «in stock» filter,
-   * the same quantity its shop shows (ADR-0068).
+   * the same quantity its shop shows (ADR-0068). `countedWarehouseIds` is the app's stock setting
+   * (ADR-0173 #1): a product whose home is not among them has nothing available; null or empty
+   * counts every warehouse.
    */
-  async productIdsAvailableAtHome(executor: Db | Tx = this.db): Promise<number[]> {
+  async productIdsAvailableAtHome(
+    executor: Db | Tx = this.db,
+    countedWarehouseIds: readonly number[] | null = null,
+  ): Promise<number[]> {
+    const counted =
+      countedWarehouseIds === null || countedWarehouseIds.length === 0
+        ? sql``
+        : sql`WHERE ${idIn(sql`ws.warehouse_id`, countedWarehouseIds)}`;
     const result = await executor.execute<{ product_id: string }>(sql`
       SELECT ws.product_id::text AS product_id
         FROM warehouse_stock ws
         JOIN product_locations l
           ON l.product_id = ws.product_id AND l.warehouse_id = ws.warehouse_id AND l.is_home
+       ${counted}
        GROUP BY ws.product_id
       HAVING sum(ws.sellable_on_hand) - sum(ws.reserved) > 0
        ORDER BY ws.product_id`);

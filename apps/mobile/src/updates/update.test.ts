@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { apkUrlOf, megabytesOf, percentOf, updateOf } from './update';
+import { apkUrlOf, checkOutcomeOf, megabytesOf, percentOf, updateOf } from './update';
 
 const release = { version: '0.4.0', versionCode: 500, sizeBytes: 78_643_200 };
 
@@ -27,6 +27,13 @@ describe('an app’s own update (ADR-0166)', () => {
     expect(percentOf(1000, 1000)).toBe(100);
     expect(percentOf(1200, 1000)).toBe(100);
     expect(percentOf(10, 0)).toBe(0);
+  });
+
+  it('answers a press of «Шинэчлэл шалгах» (ADR-0174 #10)', () => {
+    expect(checkOutcomeOf(true, release, 499)).toBe('found');
+    expect(checkOutcomeOf(true, release, 500)).toBe('latest');
+    expect(checkOutcomeOf(true, null, 500)).toBe('latest');
+    expect(checkOutcomeOf(false, release, 499)).toBe('offline');
   });
 
   it('builds the APK’s address', () => {

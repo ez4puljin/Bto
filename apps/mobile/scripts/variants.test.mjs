@@ -7,7 +7,7 @@ const variants = JSON.parse(readFileSync(path.join(appRoot, 'variants.json'), 'u
 const pkg = JSON.parse(readFileSync(path.join(appRoot, 'package.json'), 'utf8'));
 
 describe('the two apps of apps/mobile (ADR-0085)', () => {
-  it('keeps the staff app as it was', () => {
+  it('keeps the staff app as it was, updating itself since ADR-0174', () => {
     expect(variants.staff).toEqual({
       name: 'Bto',
       slug: 'bto-staff',
@@ -16,6 +16,7 @@ describe('the two apps of apps/mobile (ADR-0085)', () => {
       assets: './assets',
       apkPrefix: 'bto-staff',
       location: true,
+      selfUpdate: true,
     });
   });
 

@@ -82,6 +82,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-router',
     ['expo-camera', { recordAudioAndroid: false }],
     'expo-secure-store',
+    // The staff app's fingerprint sign-in (ADR-0174); Android's USE_BIOMETRIC comes with it.
+    'expo-local-authentication',
     ...(variant.location
       ? [
           [

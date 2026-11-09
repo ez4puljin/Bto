@@ -26,8 +26,6 @@ import {
   nextKind,
 } from '../../../src/attendance/status';
 import { ubDate, ubTime, weekdayOf } from '../../../src/dates/dates';
-import { isRep } from '../../../src/state/phase';
-import { useSignedIn } from '../../../src/state/session';
 import { colors, radii, spacing, tabular, type } from '../../../src/theme/tokens';
 import { PillButton } from '../../../src/ui/controls';
 import { Group, ICON_INSET, IconTile, Row } from '../../../src/ui/grouped';
@@ -35,7 +33,6 @@ import { ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
 import { StatRow } from '../../../src/ui/stat-row';
 import { StoreHeader } from '../../../src/ui/store-header';
-import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
 
@@ -48,17 +45,13 @@ const TICK_MS = 60_000;
  * «Ирц» (ADR-0131): today's state and figures, where the phone is against the person's work sites,
  * one big button — «ИРСЭН гэж дарах» or «ЯВСАН гэж дарах» — that the server accepts only from
  * inside a site's radius with a fix no looser than 200 m, today's punches and the month's figures.
- * Every signed-in staff member lands here when they hold neither the rep's nor the seller's right:
- * the header's initials then open the profile with «Гарах».
+ * Every signed-in staff member's; opened from «Нүүр» or «Цэс» (ADR-0174).
  */
 export default function AttendanceScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const { me } = useSignedIn();
-  const rep = isRep(me);
-  const barInset = useStoreTabBarInset();
   const attendance = useMyAttendance();
   const punch = usePunch();
   const [problem, setProblem] = useState<AppProblem | null>(null);
@@ -455,15 +448,11 @@ export default function AttendanceScreen() {
 
   return (
     <Page edges={[]}>
-      <StoreHeader
-        title={t('mobile.attendance.title')}
-        {...(rep ? { onBack: () => router.back() } : {})}
-        right={null}
-      />
+      <StoreHeader title={t('mobile.attendance.title')} onBack={() => router.back()} right={null} />
       <ScrollView
         contentContainerStyle={[
           styles.body,
-          { paddingBottom: (rep ? Math.max(insets.bottom, spacing.md) : barInset) + 24 },
+          { paddingBottom: Math.max(insets.bottom, spacing.md) + 24 },
         ]}
         refreshControl={
           <RefreshControl

@@ -1,5 +1,6 @@
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, View } from 'react-native';
+import { type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
 import { CompanyMark, useAppName } from '../ui/brand';
 import { colors, spacing, storeType, type } from '../theme/tokens';
 import { PillButton } from '../ui/controls';
@@ -11,17 +12,32 @@ import { useUpdateInstaller } from './use-app-update';
  * «Шинэ хувилбар» on top of «Мэдэгдэл» (ADR-0166): the version and the size, a press downloads it
  * from the server with its progress and opens Android's installer.
  */
-export function UpdateCard({ release }: { release: AppRelease }) {
+export function UpdateCard({
+  release,
+  autoStart = 0,
+  style,
+}: {
+  release: AppRelease;
+  /** Counts the presses of «Шинэчлэл шалгах» that found this release: each one starts it (ADR-0174 #10). */
+  autoStart?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
   const { t } = useTranslation();
   const appName = useAppName();
   const { step, start } = useUpdateInstaller(release);
+  const started = useRef(0);
+  useEffect(() => {
+    if (autoStart <= started.current) return;
+    started.current = autoStart;
+    void start();
+  }, [autoStart, start]);
   const line = t('mobile.customer.update.line', {
     app: appName,
     version: release.version,
     size: megabytesOf(release.sizeBytes),
   });
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, style]}>
       <View style={styles.head}>
         <CompanyMark size={40} />
         <View style={styles.text}>

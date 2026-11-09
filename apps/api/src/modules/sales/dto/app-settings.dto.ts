@@ -1,5 +1,10 @@
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
-import { APP_SETTINGS_LIMITS, STAFF_ASSORTMENT_LIMITS } from '@tugeel/shared/sales';
+import {
+  APP_SETTINGS_LIMITS,
+  CUSTOMER_STOCK_DISPLAYS,
+  type CustomerStockDisplay,
+  STAFF_ASSORTMENT_LIMITS,
+} from '@tugeel/shared/sales';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -7,6 +12,7 @@ import {
   ArrayUnique,
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
   IsNotEmpty,
@@ -41,6 +47,29 @@ export class AppAssortmentDto {
   broken: boolean;
 }
 
+/**
+ * The warehouses whose stock each app counts (ADR-0173 #1); empty = every warehouse. Only a
+ * product's home warehouse is ever counted: one whose home is not listed shows «Дууссан» (0) and
+ * cannot be ordered from that app.
+ */
+@ApiSchema({ name: 'AppStockWarehouses' })
+export class AppStockWarehousesDto {
+  @ApiProperty({ type: [Number], description: '«Bto300»; empty = every warehouse' })
+  @IsArray()
+  @ArrayMaxSize(APP_SETTINGS_LIMITS.maxStockWarehouses)
+  @ArrayUnique()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  customer: number[];
+  @ApiProperty({ type: [Number], description: 'The staff app; empty = every warehouse' })
+  @IsArray()
+  @ArrayMaxSize(APP_SETTINGS_LIMITS.maxStockWarehouses)
+  @ArrayUnique()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  staff: number[];
+}
+
 @ApiSchema({ name: 'AppSettings' })
 export class AppSettingsDto {
   @ApiProperty({
@@ -57,6 +86,14 @@ export class AppSettingsDto {
   minOrderAmount: string | null;
   @ApiProperty({ type: String, nullable: true }) appName: string | null;
   @ApiProperty({ type: String, nullable: true, description: '#RRGGBB' }) appColor: string | null;
+  @ApiProperty({ type: AppStockWarehousesDto, description: 'Live warehouses only (ADR-0173 #1)' })
+  stockWarehouses: AppStockWarehousesDto;
+  @ApiProperty({
+    enum: CUSTOMER_STOCK_DISPLAYS,
+    enumName: 'CustomerStockDisplay',
+    description: '«Bto300»: words or the number',
+  })
+  customerStockDisplay: CustomerStockDisplay;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) updatedAt: string | null;
 }
 
@@ -88,6 +125,24 @@ export class AppSettingsRequestDto {
   @IsString()
   @Matches(APP_SETTINGS_LIMITS.colorPattern)
   appColor: string | null;
+  @ApiProperty({
+    type: AppStockWarehousesDto,
+    required: false,
+    description: 'Absent = unchanged (ADR-0173 #1)',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AppStockWarehousesDto)
+  stockWarehouses?: AppStockWarehousesDto;
+  @ApiProperty({
+    enum: CUSTOMER_STOCK_DISPLAYS,
+    enumName: 'CustomerStockDisplay',
+    required: false,
+    description: 'Absent = unchanged (ADR-0173 #2)',
+  })
+  @IsOptional()
+  @IsIn(CUSTOMER_STOCK_DISPLAYS)
+  customerStockDisplay?: CustomerStockDisplay;
 }
 
 /** A setting of which products the staff app shows whom (ADR-0164), whole on every save. */
