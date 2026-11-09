@@ -34,7 +34,7 @@ Confirmed 2026-10-10 from the npm registry (exact pins in every `package.json`; 
 | NestJS | core/common/platform-express/testing 12.1.2, cli 12.0.8, schematics 12.0.6, swagger 12.0.2, config 12.0.1 | ESM-only packages, CommonJS app (ADR-0025) |
 | Drizzle ORM / drizzle-kit / pg | 0.45.4 / 0.31.11 / 8.23.1 | Drizzle 1.0 not adopted |
 | pg-boss | 12.37.1 (+ `@opentelemetry/api` 1.9.1); docs https://pgboss.io | schema v45, installed by `db:migrate` (ADR-0024) |
-| PostgreSQL | 18 (UTF-8, ICU `und`); local `postgres:18` on `127.0.0.1:15432` | |
+| PostgreSQL | 18 (UTF-8, ICU `und`); local: installed on Windows on `127.0.0.1:15432` (`tools/dev-db`, owner 2026-11-09), CI `postgres:18` | |
 | zod, decimal.js, dayjs | 4.6.5, 10.6.0, 1.11.23 | `Decimal` only from `@tugeel/shared/money` |
 | nestjs-pino, pino, pino-http | 5.3.1, 10.4.0, 11.0.0 | |
 | jest, ts-jest, supertest | 30.5.2, 29.4.14, 7.3.1 | Jest always via `apps/api/scripts/jest.cjs` (`--experimental-vm-modules`) |
@@ -62,12 +62,12 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): producti
 
 | Command | What it does |
 |---|---|
-| `docker compose up -d --wait` | local `postgres:18` (ICU) on `127.0.0.1:15432`; needed by `pnpm check` and `pnpm dev` |
+| `powershell -NoProfile -ExecutionPolicy Bypass -File tools\dev-db\dev-db.ps1 start` (`stop`, `status`) | the local PostgreSQL 18 on Windows (`%LOCALAPPDATA%\Bto\pg18`, `127.0.0.1:15432`; `tools/dev-db/README.md`); needed by `pnpm check` and `pnpm dev`; no Docker (`docker compose up -d --wait` remains for a PC without it) |
 | `pnpm install` | install the workspace (Node 26, pnpm 11); a pnpm `EPERM rmdir` on Windows: rerun `pnpm install`; stop `pnpm dev` before adding a package |
 | `pnpm db:provision` / `pnpm db:migrate` | roles (`app`, `migrator`, and `ai_reader` when `AI_DATABASE_URL` is set) + ICU database (admin URL in `apps/api/.env`) / drizzle migrations + pg-boss schema + `ai` grants + queues as `migrator` |
 | `pnpm db:generate --name=<module>` | generate SQL from `src/db/schema.ts`, then hand-edit CHECK / EXCLUDE / REVOKE / triggers (`--custom` for SQL-only) |
 | `pnpm dev` | builds packages, then watches shared + api + worker + web (http://localhost:5173; the api listens on `API_PORT`, 3300 locally, and Vite proxies `/api` there) |
-| `start.bat` / `stop.bat` | the owner's double-click start for testing from other PCs on the LAN: PostgreSQL, `pnpm db:migrate`, then `pnpm dev` in a «Bto dev» window with `DEV_LAN=1` (Vite on every interface; prints `http://<LAN address>:5173`) / stops that window, every node process of this repo and the tugeel PostgreSQL container — never other projects |
+| `start.bat` / `stop.bat` | the owner's double-click start for testing from other PCs on the LAN: PostgreSQL (`tools/dev-db`), `pnpm db:migrate`, then `pnpm dev` in a «Bto dev» window with `DEV_LAN=1` (Vite on every interface; prints `http://<LAN address>:5173`) / stops that window, every node process of this repo and the local PostgreSQL — never other projects; neither runs docker |
 | `pnpm user:create-admin --username <name> --full-name "<name>"` | create (or recover) an ADMIN and print a 30-minute one-time code; the user sets the password at `/set-password` |
 | `pnpm catalog:reindex-search [--all]` / `pnpm partners:reindex-search [--all]` | recompute product / customer and supplier search keys after `SEARCH_KEYS_VERSION` changes (`--all`: every row; ADR-0028) |
 | `pnpm inventory:reconcile` / `pnpm inventory:rebuild-balances` | compare `bin_stock` / `warehouse_stock` with the ledger and record a run (exit 2 on drift) / recompute the cache quantities from the ledger, keeping averages, then reconcile (find the cause of a drift first; `docs/modules/inventory.md` §7) |

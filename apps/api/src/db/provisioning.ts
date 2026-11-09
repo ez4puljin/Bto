@@ -105,6 +105,18 @@ export function aiReaderSettings(connectionLimit = AI_READER_CONNECTION_LIMIT): 
 }
 
 /**
+ * PostgreSQL on Windows rejects any non-zero `client_connection_check_interval` (it cannot watch a
+ * socket for a closed peer there). The owner's PC runs the development database on Windows
+ * (2026-11-09); the Linux servers of CI, staging and production keep the setting.
+ */
+export async function supportsConnectionCheck(client: Client): Promise<boolean> {
+  const { rows } = await client.query<{ windows: boolean }>(
+    `SELECT version() ILIKE '%windows%' AS windows`,
+  );
+  return rows[0]?.windows !== true;
+}
+
+/**
  * Applies aiReaderSettings, plus `temp_file_limit` (a superuser-only parameter) when the admin is a
  * superuser; on a managed cluster that limit is skipped (architecture §13.1 A6).
  */
@@ -112,14 +124,19 @@ export async function configureAiReader(
   admin: Client,
   connectionLimit = AI_READER_CONNECTION_LIMIT,
 ): Promise<string> {
-  for (const statement of aiReaderSettings(connectionLimit)) await admin.query(statement);
+  const connectionCheck = await supportsConnectionCheck(admin);
+  for (const statement of aiReaderSettings(connectionLimit)) {
+    if (!connectionCheck && statement.includes('client_connection_check_interval')) continue;
+    await admin.query(statement);
+  }
+  const note = connectionCheck ? '' : ', client_connection_check_interval skipped: Windows server';
   const { rows } = await admin.query<{ superuser: boolean }>(
     'SELECT rolsuper AS superuser FROM pg_roles WHERE rolname = current_user',
   );
   if (!rows[0]?.superuser)
-    return 'read-only defaults set (temp_file_limit skipped: not a superuser)';
+    return `read-only defaults set (temp_file_limit skipped: not a superuser${note})`;
   await admin.query(`ALTER ROLE ${escapeIdentifier(AI_READER_ROLE)} SET temp_file_limit = '256MB'`);
-  return 'read-only defaults set';
+  return note ? `read-only defaults set (${note.slice(2)})` : 'read-only defaults set';
 }
 
 async function roleExists(client: Client, name: string): Promise<boolean> {

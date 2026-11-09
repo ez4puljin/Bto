@@ -1,4 +1,6 @@
 # Local development only (docs/architecture.md §10.1). Staging/production stacks live in deploy/.
+# The owner's PC runs PostgreSQL on Windows instead (tools/dev-db, 2026-11-09): both use port 15432,
+# so never run this there while that server runs.
 name: tugeel
 services:
   postgres:

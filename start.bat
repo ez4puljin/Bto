@@ -1,6 +1,6 @@
 @echo off
 rem Bto (Tugeel) development servers for this PC and the local network (owner, 2026-10-13).
-rem Starts PostgreSQL (docker compose), applies pending migrations, then runs "pnpm dev" in its own
+rem Starts PostgreSQL (installed on Windows, tools\dev-db), applies pending migrations, then runs "pnpm dev" in its own
 rem window with Vite listening on every interface (DEV_LAN=1): another PC on the same network opens
 rem http://<this PC's address>:5173. stop.bat stops everything again.
 setlocal
@@ -14,20 +14,34 @@ if errorlevel 1 (
   goto :fail
 )
 
-rem This script never starts Docker Desktop (owner, 2026-11-07): it stops and says so.
-call :docker_running
-if errorlevel 1 (
-  echo Docker Desktop асаагүй байна. Bto-ийн өгөгдлийн сан Docker дотор ажилладаг.
-  echo Docker Desktop-ийг өөрөө асаагаад start.bat-ийг дахин ажиллуулна уу.
-  goto :fail
-)
-
+rem The database runs on Windows itself since 2026-11-09 (owner): no Docker, and this script never
+rem starts Docker Desktop. dev-db.ps1 says which of its exit codes means what.
 echo [1/4] Өгөгдлийн сан ^(PostgreSQL^) асааж байна...
-docker compose up -d --wait
-if errorlevel 1 (
-  echo Docker асахгүй байна. Docker Desktop-ийг асаагаад дахин оролдоно уу.
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\dev-db\dev-db.ps1 start
+rem Exact codes: "if errorlevel N" means N or more and lets a negative code (powershell failing) through.
+set "dbcode=%errorlevel%"
+if "%dbcode%"=="0" goto :db_ready
+if "%dbcode%"=="5" (
+  echo Өгөгдлийн сан асахгүй байна. Шалтгаан нь дээрх мөрүүдэд, бүтнээрээ pg_ctl.log файлд байна.
   goto :fail
 )
+if "%dbcode%"=="4" (
+  echo 15432 портыг өөр програм эзэлсэн байна. Ихэвчлэн хуучин Docker-ийн tugeel-postgres-1:
+  echo Docker Desktop дээр түүнийг зогсоогоод start.bat-ийг дахин ажиллуулна уу.
+  goto :fail
+)
+if "%dbcode%"=="3" (
+  echo PostgreSQL 18 суугаагүй байна ^(C:\Program Files\PostgreSQL\18^). tools\dev-db\README.md-ийг харна уу.
+  goto :fail
+)
+if "%dbcode%"=="2" (
+  echo Өгөгдлийн сангийн хавтас олдсонгүй ^(%LOCALAPPDATA%\Bto\pg18^). tools\dev-db\README.md-ийг харна уу.
+  goto :fail
+)
+echo Өгөгдлийн санг асаах скрипт ажилласангүй ^(код %dbcode%^). tools\dev-db\dev-db.ps1 байгаа эсэхийг шалгана уу.
+goto :fail
+
+:db_ready
 
 if exist node_modules (
   echo [2/4] Сангууд суусан байна.
@@ -72,12 +86,6 @@ echo Зогсоохдоо stop.bat-ийг ажиллуулна.
 echo.
 pause
 exit /b 0
-
-:docker_running
-rem Asks Windows, not docker: on 2026-11-07 Docker Desktop started right after a docker command, three
-rem times out of three, so any docker command here could bring it up by itself.
-tasklist /FI "IMAGENAME eq com.docker.backend.exe" /NH | findstr /I "com.docker.backend.exe" >nul
-exit /b %errorlevel%
 
 :listening
 netstat -ano | findstr /r /c:":%1 .*LISTENING" >nul

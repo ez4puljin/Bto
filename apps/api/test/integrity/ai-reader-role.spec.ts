@@ -1,5 +1,5 @@
 import type { Client } from 'pg';
-import { aiReaderSettings } from '../../src/db/provisioning';
+import { aiReaderSettings, supportsConnectionCheck } from '../../src/db/provisioning';
 import { connectAs, sqlStateOf } from '../harness/apps';
 
 /**
@@ -99,9 +99,17 @@ describe('integrity: the AI assistant reads only through ai_reader', () => {
         'statement_timeout=30s',
         'transaction_timeout=60s',
         'idle_in_transaction_session_timeout=10s',
-        'client_connection_check_interval=2s',
       ]),
     );
+    // Linux servers (CI, production) must carry it; a Windows server refuses any non-zero value, so
+    // there it is proved unavailable rather than silently missing.
+    if (await supportsConnectionCheck(migrator)) {
+      expect(rows[0]?.config).toContain('client_connection_check_interval=2s');
+    } else {
+      expect(await sqlStateOf(migrator.query(`SET client_connection_check_interval = '2s'`))).toBe(
+        '22023',
+      );
+    }
     const session = await reader.query<Record<string, string>>(
       `SELECT current_setting('default_transaction_read_only') AS read_only,
               current_setting('search_path') AS search_path,

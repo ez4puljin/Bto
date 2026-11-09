@@ -112,7 +112,7 @@ None: nothing imports `modules/ai`. Inside the module:
   4. `ROLLBACK`; the connection is destroyed.
 
   A timeout (57014) or a resource error (53xxx, 54xxx) is never sent back to the model for a repair.
-- **The role** `ai_reader` (provisioned): `default_transaction_read_only`, `search_path = ai`, `timezone = Asia/Ulaanbaatar`, `statement_timeout` 30 s, `transaction_timeout` 60 s, `idle_in_transaction_session_timeout` 10 s, `client_connection_check_interval` 2 s, `CONNECTION LIMIT 4`; `temp_file_limit` only where the provisioning user is a superuser.
+- **The role** `ai_reader` (provisioned): `default_transaction_read_only`, `search_path = ai`, `timezone = Asia/Ulaanbaatar`, `statement_timeout` 30 s, `transaction_timeout` 60 s, `idle_in_transaction_session_timeout` 10 s, `client_connection_check_interval` 2 s (not on a Windows server, which refuses it: the owner's development PC since 2026-11-09), `CONNECTION LIMIT 4`; `temp_file_limit` only where the provisioning user is a superuser.
 - **The prompt.**
   - The rules and the datasets, the glossary and examples from `mn.json`.
   - `current_date` instead of literal dates, so a saved report stays relative.

@@ -20,9 +20,9 @@ In-house ERP for a wholesale distribution center in Ulaanbaatar: product catalog
 
 ## Local development (Windows 11 or Linux)
 
-1. Install Node.js 26, Docker Desktop and pnpm 11 (`npm i -g pnpm@11.28.2`).
+1. Install Node.js 26, pnpm 11 (`npm i -g pnpm@11.28.2`) and PostgreSQL 18: on Windows the EDB installer plus `tools/dev-db/README.md`, elsewhere Docker with `docker-compose.yml`.
 2. `pnpm install`, then copy `apps/api/.env.example` to `apps/api/.env`.
-3. `docker compose up -d --wait` (PostgreSQL 18 on `127.0.0.1:15432`), `pnpm db:provision`, `pnpm db:migrate`.
+3. PostgreSQL 18 on `127.0.0.1:15432` (`tools\dev-db\dev-db.ps1 start` on Windows, `docker compose up -d --wait` elsewhere), `pnpm db:provision`, `pnpm db:migrate`.
 4. `pnpm dev` (http://localhost:5173) or `pnpm check` (everything CI runs).
 5. To test from another PC on the same network, double-click `start.bat` (it prints `http://<this PC>:5173`) and `stop.bat` afterwards. Windows Firewall must allow Node.js on private networks.
 
