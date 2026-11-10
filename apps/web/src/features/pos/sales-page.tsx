@@ -27,9 +27,17 @@ import { formatUbDateTime } from '@/lib/dayjs';
 import { formatCount, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { hrefWithParam, useSetParam } from '@/lib/search-params';
-import { type EbarimtStatus, type SaleKind, useSales, useTills } from './api';
+import {
+  type EbarimtStatus,
+  type SaleKind,
+  useCashiers,
+  useSales,
+  useSalesSummary,
+  useTills,
+} from './api';
 import { EbarimtBadge, SaleKindBadge } from './badges';
 import { SalePanel } from './sale-panel';
+import { SalesTotals } from './sales-totals';
 
 const isKind = (value: string | null): value is SaleKind =>
   SALE_KINDS.some((entry) => entry === value);
@@ -53,8 +61,9 @@ const COLUMNS: readonly ColumnSpec[] = [
 
 /**
  * «Кассын борлуулалт» (ADR-0063 #3): the tills' sales and returns as the edge replayed them; search
- * by number, ДДТД, TIN or buyer; filter by kind, receipt state, till and day. One opens in the
- * panel (`?sale=`); its number is the row's link for the keyboard.
+ * by number, ДДТД, TIN or buyer; filter by kind, receipt state, till, cashier and day, with the
+ * filters' totals in a banner (owner 2026-11-10). One opens in the panel (`?sale=`); its number
+ * is the row's link for the keyboard.
  */
 export function PosSalesPage() {
   const { t } = useTranslation();
@@ -67,15 +76,21 @@ export function PosSalesPage() {
   const ebarimtParam = params.get('ebarimt');
   const ebarimtStatus = isEbarimt(ebarimtParam) ? ebarimtParam : undefined;
   const tillId = Number.parseInt(params.get('tillId') ?? '', 10) || undefined;
+  const cashierUserId = Number.parseInt(params.get('cashierUserId') ?? '', 10) || undefined;
   const shiftId = Number.parseInt(params.get('shiftId') ?? '', 10) || undefined;
   const from = params.get('from') ?? undefined;
   const to = params.get('to') ?? undefined;
   const openId = Number.parseInt(params.get('sale') ?? '', 10);
   const tills = useTills();
-  const sales = useSales({ q, kind, ebarimtStatus, tillId, shiftId, from, to });
+  const cashiers = useCashiers();
+  const filter = { q, kind, ebarimtStatus, tillId, cashierUserId, shiftId, from, to };
+  const sales = useSales(filter);
+  const summary = useSalesSummary(filter);
   const rows = sales.data?.pages.flatMap((page) => page.data) ?? [];
   const total = sales.data?.pages[0]?.total ?? null;
-  const filtered = Boolean(q || kind || ebarimtStatus || tillId || shiftId || from || to);
+  const filtered = Boolean(
+    q || kind || ebarimtStatus || tillId || cashierUserId || shiftId || from || to,
+  );
   const clearFilters = () => {
     setSearch('');
     setParams(new URLSearchParams(), { replace: true });
@@ -143,6 +158,19 @@ export function PosSalesPage() {
             </option>
           ))}
         </NativeSelect>
+        <NativeSelect
+          variant="filter"
+          aria-label={t('pos.fields.cashier')}
+          value={cashierUserId ?? ''}
+          onChange={(event) => setParam('cashierUserId', event.target.value)}
+        >
+          <option value="">{t('pos.sales.allCashiers')}</option>
+          {(cashiers.data ?? []).map((cashier) => (
+            <option key={cashier.userId} value={cashier.userId}>
+              {cashier.fullName}
+            </option>
+          ))}
+        </NativeSelect>
         {/* The two days wrap as a pair: on a laptop they share the second row. */}
         <div className="flex flex-wrap items-center gap-2">
           <DateFilter
@@ -157,7 +185,9 @@ export function PosSalesPage() {
           />
         </div>
       </FilterBar>
+      <SalesTotals summary={summary.data} />
       <ProblemAlert problem={problemFromError(sales.error)} onRetry={sales.refetch} />
+      <ProblemAlert problem={problemFromError(summary.error)} onRetry={summary.refetch} />
       <ListCard scroll>
         <ListTable columns={COLUMNS}>
           <TableHeader>

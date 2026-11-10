@@ -188,7 +188,7 @@ export interface SaleDetail extends SaleSummary {
   returns: { id: number; number: string; soldAt: Date; total: Decimal }[];
 }
 
-export interface SaleQuery {
+export interface SaleFilterQuery {
   q?: string;
   edgeNodeId?: number;
   tillId?: number;
@@ -201,8 +201,27 @@ export interface SaleQuery {
   creditToCheck?: boolean;
   from?: string;
   to?: string;
+}
+
+export interface SaleQuery extends SaleFilterQuery {
   cursor?: string;
   limit?: number;
+}
+
+/** The sales list's totals under its filters (owner 2026-11-10): returns net out. */
+export interface SalesTotals {
+  salesCount: number;
+  returnsCount: number;
+  salesTotal: Decimal;
+  returnsTotal: Decimal;
+  /** Sales less returns. */
+  total: Decimal;
+  cash: Decimal;
+  card: Decimal;
+  transfer: Decimal;
+  credit: Decimal;
+  /** VOUCHER and POINTS tenders. */
+  other: Decimal;
 }
 
 export interface ShortfallQuery {
@@ -293,6 +312,76 @@ export class PosQueryService {
     total: number | null;
   }> {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
+    const filters = this.saleFilters(query);
+    const after = decodeCursor(query.cursor);
+    const paged = typeof after?.id === 'number' ? [lt(posSales.id, after.id)] : [];
+    const rows = await this.db
+      .select()
+      .from(posSales)
+      .where(and(...filters, ...paged))
+      .orderBy(desc(posSales.id))
+      .limit(limit + 1);
+    const page = toPage(rows, limit, (row) => ({ id: row.id }));
+    let total: number | null = null;
+    if (!query.cursor) {
+      const [counted] = await this.db
+        .select({ count: sql<string>`count(*)` })
+        .from(posSales)
+        .where(and(...filters));
+      total = Number.parseInt(counted?.count ?? '0', 10);
+    }
+    return { data: await this.saleSummaries(page.data), nextCursor: page.nextCursor, total };
+  }
+
+  /**
+   * The list's filters' totals over every matching sale and return, in SQL (the list's banner,
+   * owner 2026-11-10): the count of sales and of returns, the net amount and the net cash, card,
+   * transfer and credit tenders — a return's amounts subtract, as the shift's close nets its
+   * refunds; VOUCHER and POINTS tenders are `other`.
+   */
+  async summarizeSales(query: SaleFilterQuery): Promise<SalesTotals> {
+    const where = and(...this.saleFilters(query));
+    const [header] = await this.db
+      .select({
+        salesCount: sql<string>`count(*) FILTER (WHERE ${posSales.kind} = 'SALE')`,
+        returnsCount: sql<string>`count(*) FILTER (WHERE ${posSales.kind} = 'RETURN')`,
+        salesTotal: sql<string>`coalesce(sum(${posSales.total}) FILTER (WHERE ${posSales.kind} = 'SALE'), 0)`,
+        returnsTotal: sql<string>`coalesce(sum(${posSales.total}) FILTER (WHERE ${posSales.kind} = 'RETURN'), 0)`,
+      })
+      .from(posSales)
+      .where(where);
+    const tender = (kinds: readonly TenderKind[]) =>
+      sql<string>`coalesce(sum(CASE WHEN ${posSales.kind} = 'RETURN' THEN -${posTenders.amount} ELSE ${posTenders.amount} END) FILTER (WHERE ${inArray(posTenders.kind, [...kinds])}), 0)`;
+    const [tenders] = await this.db
+      .select({
+        cash: tender(['CASH']),
+        card: tender(['CARD']),
+        transfer: tender(['TRANSFER']),
+        credit: tender(['CREDIT']),
+        other: tender(['VOUCHER', 'POINTS']),
+      })
+      .from(posTenders)
+      .innerJoin(posSales, eq(posSales.id, posTenders.saleId))
+      .where(where);
+    const money = (value: string | undefined) => new Decimal(value ?? '0');
+    const salesTotal = money(header?.salesTotal);
+    const returnsTotal = money(header?.returnsTotal);
+    return {
+      salesCount: Number.parseInt(header?.salesCount ?? '0', 10),
+      returnsCount: Number.parseInt(header?.returnsCount ?? '0', 10),
+      salesTotal,
+      returnsTotal,
+      total: salesTotal.minus(returnsTotal),
+      cash: money(tenders?.cash),
+      card: money(tenders?.card),
+      transfer: money(tenders?.transfer),
+      credit: money(tenders?.credit),
+      other: money(tenders?.other),
+    };
+  }
+
+  /** The sales list's and its summary's filters: one set, so the banner matches the list. */
+  private saleFilters(query: SaleFilterQuery): SQL[] {
     const filters: SQL[] = [];
     if (query.edgeNodeId) filters.push(eq(posSales.edgeNodeId, query.edgeNodeId));
     if (query.tillId) filters.push(eq(posSales.tillId, query.tillId));
@@ -320,24 +409,7 @@ export class PosQueryService {
         ) as SQL,
       );
     }
-    const after = decodeCursor(query.cursor);
-    const paged = typeof after?.id === 'number' ? [lt(posSales.id, after.id)] : [];
-    const rows = await this.db
-      .select()
-      .from(posSales)
-      .where(and(...filters, ...paged))
-      .orderBy(desc(posSales.id))
-      .limit(limit + 1);
-    const page = toPage(rows, limit, (row) => ({ id: row.id }));
-    let total: number | null = null;
-    if (!query.cursor) {
-      const [counted] = await this.db
-        .select({ count: sql<string>`count(*)` })
-        .from(posSales)
-        .where(and(...filters));
-      total = Number.parseInt(counted?.count ?? '0', 10);
-    }
-    return { data: await this.saleSummaries(page.data), nextCursor: page.nextCursor, total };
+    return filters;
   }
 
   async getSale(id: number): Promise<SaleDetail> {

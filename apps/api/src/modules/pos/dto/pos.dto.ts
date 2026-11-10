@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, ApiSchema, OmitType } from '@nestjs/swagger';
 import {
   EBARIMT_STATUSES,
   type EbarimtStatus,
@@ -703,6 +703,25 @@ export class SalePageDto {
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
   @ApiProperty({ type: Number, nullable: true, description: 'On the first page only' })
   total: number | null;
+}
+
+/** The list's filters without a page: the banner's totals (owner 2026-11-10). */
+@ApiSchema({ name: 'PosSaleSummaryQuery' })
+export class SaleSummaryQueryDto extends OmitType(SaleListQueryDto, ['cursor', 'limit'] as const) {}
+
+@ApiSchema({ name: 'PosSalesSummary' })
+export class SalesSummaryDto {
+  @ApiProperty({ description: 'SALE documents' }) salesCount: number;
+  @ApiProperty({ description: 'RETURN documents' }) returnsCount: number;
+  @ApiProperty({ example: '125000.00' }) salesTotal: string;
+  @ApiProperty({ example: '5000.00' }) returnsTotal: string;
+  @ApiProperty({ example: '120000.00', description: 'Sales less returns' }) total: string;
+  @ApiProperty({ example: '60000.00', description: 'Net of refunds, as all the tenders below' })
+  cash: string;
+  @ApiProperty({ example: '40000.00' }) card: string;
+  @ApiProperty({ example: '10000.00' }) transfer: string;
+  @ApiProperty({ example: '10000.00' }) credit: string;
+  @ApiProperty({ example: '0.00', description: 'VOUCHER and POINTS tenders' }) other: string;
 }
 
 // ---------------------------------------------------------------- shortfalls, rejections, attention

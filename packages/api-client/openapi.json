@@ -30967,6 +30967,155 @@
         ]
       }
     },
+    "/api/v1/pos/sales/summary": {
+      "get": {
+        "operationId": "PosSales_summary",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Part of the number, ДДТД, TIN or buyer name",
+            "schema": {
+              "maxLength": 80,
+              "type": "string"
+            }
+          },
+          {
+            "name": "edgeNodeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "tillId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "shiftId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cashierUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SALE",
+                "RETURN"
+              ]
+            }
+          },
+          {
+            "name": "ebarimtStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NONE",
+                "PENDING",
+                "CONFIRMED",
+                "INDETERMINATE",
+                "ERROR",
+                "CANCELLED",
+                "UNCONFIRMED_RETURN"
+              ]
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "creditToCheck",
+            "required": false,
+            "in": "query",
+            "description": "Credit sales past their limit not checked yet",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosSalesSummary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The banner's totals over every sale and return the list's filters match (returns net out).",
+        "tags": [
+          "pos"
+        ]
+      }
+    },
     "/api/v1/pos/sales/{id}": {
       "get": {
         "operationId": "PosSales_get",
@@ -72218,6 +72367,66 @@
           "data",
           "nextCursor",
           "total"
+        ]
+      },
+      "PosSalesSummary": {
+        "type": "object",
+        "properties": {
+          "salesCount": {
+            "type": "number",
+            "description": "SALE documents"
+          },
+          "returnsCount": {
+            "type": "number",
+            "description": "RETURN documents"
+          },
+          "salesTotal": {
+            "type": "string",
+            "example": "125000.00"
+          },
+          "returnsTotal": {
+            "type": "string",
+            "example": "5000.00"
+          },
+          "total": {
+            "type": "string",
+            "example": "120000.00",
+            "description": "Sales less returns"
+          },
+          "cash": {
+            "type": "string",
+            "example": "60000.00",
+            "description": "Net of refunds, as all the tenders below"
+          },
+          "card": {
+            "type": "string",
+            "example": "40000.00"
+          },
+          "transfer": {
+            "type": "string",
+            "example": "10000.00"
+          },
+          "credit": {
+            "type": "string",
+            "example": "10000.00"
+          },
+          "other": {
+            "type": "string",
+            "example": "0.00",
+            "description": "VOUCHER and POINTS tenders"
+          }
+        },
+        "required": [
+          "salesCount",
+          "returnsCount",
+          "salesTotal",
+          "returnsTotal",
+          "total",
+          "cash",
+          "card",
+          "transfer",
+          "credit",
+          "other"
         ]
       },
       "PosSaleLine": {

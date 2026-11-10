@@ -7074,8 +7074,22 @@
       "searchPlaceholder": "Дугаар, ДДТД, ТТД, нэр",
       "allKinds": "Борлуулалт ба буцаалт",
       "allEbarimt": "Бүх баримт",
+      "allCashiers": "Бүх кассчин",
       "count": "{{count}} баримт",
       "empty": "Борлуулалт алга. Пос зарж эхлэхэд баримтууд энд ирнэ.",
+      "totals": {
+        "label": "Шүүлтийн нийлбэр",
+        "salesCount": "Нийт борлуулалт тоо",
+        "salesAmount": "Нийт борлуулалт дүн",
+        "cash": "Бэлэн мөнгө",
+        "transfer": "Шилжүүлэг",
+        "card": "Карт",
+        "credit": "Зээл",
+        "other": "Бусад",
+        "otherSub": "Купон, ваучер, оноо",
+        "returnsCount": "Буцаалт {{count}}",
+        "returnsAmount": "Буцаалт −{{amount}}"
+      },
       "panelTitle": "{{kind}} {{number}}",
       "sections": {
         "lines": "Бараа",
