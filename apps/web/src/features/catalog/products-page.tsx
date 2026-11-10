@@ -4,7 +4,7 @@ import {
   PRODUCT_LIST_COLUMNS,
 } from '@tugeel/shared/catalog';
 import { businessDate } from '@tugeel/shared/time';
-import { FileSpreadsheet, Package, Plus, Shapes } from 'lucide-react';
+import { FileSpreadsheet, Package, Plus, Shapes, Tags } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
@@ -33,6 +33,7 @@ import {
   useProductQuery,
 } from './api';
 import { categoryPaths, categoryTree } from './category-tree';
+import { labelsHref } from '@/features/pricing/price-labels';
 import { BulkActions } from './bulk-actions';
 import {
   DEFAULT_HIDDEN_PRODUCT_COLUMNS,
@@ -375,6 +376,14 @@ export function ProductsPage() {
       <SelectionBar count={selected.size} onClear={ticks.clear}>
         {matchingNote}
         {canExport ? exportButton : null}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => window.open(labelsHref([...selected]), '_blank', 'noopener')}
+        >
+          <Tags />
+          {t('pricing.labels.button')}
+        </Button>
         <BulkActions ids={[...selected]} rows={tickedRows} onDone={ticks.clear} />
         {canManageSegments ? (
           <SegmentActions

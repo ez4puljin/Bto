@@ -50,6 +50,28 @@ export interface ShopPrices {
   units: UnitPrices[];
 }
 
+/** What a supermarket shelf label says about one product (ADR-0182). */
+export interface PriceLabel {
+  productId: number;
+  sku: string;
+  name: string;
+  unitName: string;
+  /** The supermarket price of one base unit, whole MNT. */
+  retail: Decimal;
+  /** The supermarket bulk price of one base unit and the quantity it starts from. */
+  retailBulk: Decimal | null;
+  retailBulkMinQty: Decimal | null;
+}
+
+export interface PriceLabels {
+  date: string;
+  labels: PriceLabel[];
+  /** Asked for but without a price that day: no label. */
+  missing: number[];
+}
+
+const LABEL_CHUNK = 500;
+
 /** A product's current unit, as the price card and dialog need it. */
 export interface PricedUnit {
   productUnitId: number;
@@ -308,6 +330,58 @@ export class ProductPricesService {
       });
     }
     return result;
+  }
+
+  /**
+   * The supermarket shelf labels of these products on a day, in the order asked (ADR-0182): the
+   * base unit's supermarket price, and the bulk price with the quantity it starts from when the
+   * profile has one. A product without terms or without profile values that day is `missing`.
+   */
+  async labelsOf(
+    productIds: readonly number[],
+    date: string = businessDate(),
+  ): Promise<PriceLabels> {
+    const ids = [...new Set(productIds)];
+    const labels = new Map<number, PriceLabel>();
+    for (let at = 0; at < ids.length; at += LABEL_CHUNK) {
+      const part = ids.slice(at, at + LABEL_CHUNK);
+      const terms = await this.inForce(part, date);
+      if (terms.size === 0) continue;
+      const priced = [...terms.keys()];
+      const versions = await this.profiles.versionsInForce(
+        [...terms.values()].map((own) => own.profileId),
+        date,
+      );
+      const units = await this.units.currentUnits(priced);
+      const products = new Map(
+        (await this.catalog.getMany(priced)).map((product) => [product.id, product]),
+      );
+      for (const [productId, own] of terms) {
+        const profile = versions.get(own.profileId);
+        const product = products.get(productId);
+        const base = (units.get(productId) ?? []).find((unit) => unit.isBase);
+        if (!profile || !product || !base) continue;
+        const row = unitPriceTable(
+          { warehousePrice: own.warehousePrice, wholeUomId: own.wholeUomId, profile },
+          quoteUnitsOf(units.get(productId) ?? []),
+        ).find((unit) => unit.unitId === base.unitId);
+        if (!row) continue;
+        labels.set(productId, {
+          productId,
+          sku: product.sku,
+          name: product.name,
+          unitName: base.uomName,
+          retail: row.retail,
+          retailBulk: row.retailBulk,
+          retailBulkMinQty: row.retailBulk === null ? null : profile.retailBulkMinQty,
+        });
+      }
+    }
+    return {
+      date,
+      labels: ids.flatMap((id) => labels.get(id) ?? []),
+      missing: ids.filter((id) => !labels.has(id)),
+    };
   }
 
   /**

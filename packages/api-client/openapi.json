@@ -14365,6 +14365,53 @@
         ]
       }
     },
+    "/api/v1/product-prices/labels": {
+      "post": {
+        "operationId": "ProductPrices_labels",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceLabelsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceLabels"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The supermarket shelf labels of ticked products, today's prices (ADR-0182).",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
     "/api/v1/product-prices/bulk/profile": {
       "post": {
         "operationId": "ProductPrices_bulkProfile",
@@ -55138,6 +55185,94 @@
           "profileId",
           "profileName",
           "wholeUomId"
+        ]
+      },
+      "PriceLabelsRequest": {
+        "type": "object",
+        "properties": {
+          "productIds": {
+            "minItems": 1,
+            "maxItems": 5000,
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "required": [
+          "productIds"
+        ]
+      },
+      "PriceLabel": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unitName": {
+            "type": "string",
+            "example": "ш"
+          },
+          "retail": {
+            "type": "string",
+            "example": "2600",
+            "description": "Supermarket price of one base unit, whole MNT"
+          },
+          "retailBulk": {
+            "type": "string",
+            "nullable": true,
+            "example": "2400"
+          },
+          "retailBulkMinQty": {
+            "type": "string",
+            "nullable": true,
+            "example": "24",
+            "description": "Base units"
+          }
+        },
+        "required": [
+          "productId",
+          "sku",
+          "name",
+          "unitName",
+          "retail",
+          "retailBulk",
+          "retailBulkMinQty"
+        ]
+      },
+      "PriceLabels": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "The Ulaanbaatar business date of the prices"
+          },
+          "labels": {
+            "description": "In the order asked",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceLabel"
+            }
+          },
+          "missing": {
+            "description": "Without a price that day",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "date",
+          "labels",
+          "missing"
         ]
       },
       "BulkProfileRequest": {

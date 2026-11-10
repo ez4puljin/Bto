@@ -130,3 +130,7 @@ Shared (Vitest): `profile.test.ts` (rounding table, per-base prices, whole unit 
 - A menu badge with the number of waiting products (ADR-0044 follow-up).
 - Delivery 3: how e-Barimt lines carry `discountAmount`; the accountant's VAT answer.
 - Delivery 9: RETAIL at the POS.
+
+## Price labels (ADR-0182)
+
+`ProductPricesService.labelsOf(productIds, date)` → `POST /product-prices/labels` (`@Authenticated()`, ≤ 5,000 ids, the order asked): per product the base unit's supermarket price and bulk price from `unitPriceTable`, the bulk quantity from the profile version in force, `missing` for products without terms or profile values that day. The page is `apps/web/src/features/pricing/price-labels-page.tsx` (route `/pricing/labels/print`, outside the shell); the sheets are rows of `LABEL_SHEET_SPECS` in `price-labels.ts` (unit test beside it). No table.

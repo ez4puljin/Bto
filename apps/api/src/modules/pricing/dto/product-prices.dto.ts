@@ -113,6 +113,40 @@ export class CurrentTermsDto {
   @ApiProperty({ type: Number, nullable: true }) wholeUomId: number | null;
 }
 
+export const MAX_LABEL_PRODUCTS = 5000;
+
+@ApiSchema({ name: 'PriceLabelsRequest' })
+export class PriceLabelsRequestDto {
+  @ApiProperty({ type: [Number], maxItems: MAX_LABEL_PRODUCTS })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_LABEL_PRODUCTS)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  productIds: number[];
+}
+
+@ApiSchema({ name: 'PriceLabel' })
+export class PriceLabelDto {
+  @ApiProperty() productId: number;
+  @ApiProperty() sku: string;
+  @ApiProperty() name: string;
+  @ApiProperty({ example: 'ш' }) unitName: string;
+  @ApiProperty({ example: '2600', description: 'Supermarket price of one base unit, whole MNT' })
+  retail: string;
+  @ApiProperty({ type: String, nullable: true, example: '2400' }) retailBulk: string | null;
+  @ApiProperty({ type: String, nullable: true, example: '24', description: 'Base units' })
+  retailBulkMinQty: string | null;
+}
+
+@ApiSchema({ name: 'PriceLabels' })
+export class PriceLabelsDto {
+  @ApiProperty({ description: 'The Ulaanbaatar business date of the prices' }) date: string;
+  @ApiProperty({ type: [PriceLabelDto], description: 'In the order asked' })
+  labels: PriceLabelDto[];
+  @ApiProperty({ type: [Number], description: 'Without a price that day' }) missing: number[];
+}
+
 @ApiSchema({ name: 'SetPriceTermsRequest' })
 export class SetPriceTermsDto {
   @ApiProperty() @IsInt() @Min(1) productId: number;

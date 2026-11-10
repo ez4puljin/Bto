@@ -138,6 +138,7 @@ import { ReceiptTemplateEditorPage } from '@/features/pos/receipt-template-edito
 import { ReceiptTemplatesPage } from '@/features/pos/receipt-templates-page';
 import { PosSalesPage } from '@/features/pos/sales-page';
 import { PosSalePrintPage } from '@/features/pos/sale-print-page';
+import { PriceLabelsPage } from '@/features/pricing/price-labels-page';
 import { PosSettingsPage } from '@/features/pos/settings-page';
 import { PosShiftsPage } from '@/features/pos/shifts-page';
 import { PosTestTillPage } from '@/features/pos/test-till-page';
@@ -183,6 +184,16 @@ export const routes: RouteObject[] = [
         <RequirePermission permission="finance.read">
           <InvoicePrintPage />
         </RequirePermission>
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // Supermarket price labels of ticked products, without the shell (ADR-0182).
+    path: '/pricing/labels/print',
+    element: (
+      <RequireAuth>
+        <PriceLabelsPage />
       </RequireAuth>
     ),
     errorElement: <RouteErrorBoundary />,

@@ -46,6 +46,8 @@ import {
 import {
   CurrentPricesQueryDto,
   CurrentTermsDto,
+  PriceLabelsDto,
+  PriceLabelsRequestDto,
   ProductPricesQueryDto,
   BulkProfileDto,
   BulkProfileResultDto,
@@ -98,6 +100,28 @@ export class ProductPricesController {
       profileName: row.profileName,
       wholeUomId: row.wholeUomId,
     }));
+  }
+
+  /** The supermarket shelf labels of ticked products, today's prices (ADR-0182). */
+  @Post('labels')
+  @Authenticated()
+  @HttpCode(200)
+  @ApiOkResponse({ type: PriceLabelsDto })
+  async labels(@Body() body: PriceLabelsRequestDto): Promise<PriceLabelsDto> {
+    const result = await this.prices.labelsOf(body.productIds);
+    return {
+      date: result.date,
+      labels: result.labels.map((label) => ({
+        productId: label.productId,
+        sku: label.sku,
+        name: label.name,
+        unitName: label.unitName,
+        retail: label.retail.toFixed(0),
+        retailBulk: label.retailBulk?.toFixed(0) ?? null,
+        retailBulkMinQty: label.retailBulkMinQty?.toFixed() ?? null,
+      })),
+      missing: result.missing,
+    };
   }
 
   /** Changes the price profile of ticked products from a day on (ADR-0051 #1). */
