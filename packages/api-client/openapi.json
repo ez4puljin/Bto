@@ -21601,6 +21601,62 @@
         ]
       }
     },
+    "/api/v1/sales-orders/{id}/party": {
+      "patch": {
+        "operationId": "SalesOrders_changeParty",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesOrderPartyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The accountant's «Мэдээлэл» (ADR-0180): the order's customer and payment method, in any stage\nuntil the goods leave; a new customer passes the credit check.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales-orders/{id}/lines": {
       "patch": {
         "operationId": "SalesOrders_editLines",
@@ -42189,6 +42245,7 @@
           "sales.orders.pick",
           "sales.orders.pickLead",
           "sales.orders.moveAny",
+          "sales.orders.party",
           "sales.orders.rep",
           "finance.read",
           "finance.payments.record",
@@ -62119,6 +62176,39 @@
           "deliveryDate",
           "paymentMethod",
           "lines"
+        ]
+      },
+      "SalesOrderPartyRequest": {
+        "type": "object",
+        "properties": {
+          "expectedUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The order's updatedAt as read: a newer change answers 409 ORDER_CHANGED"
+          },
+          "customerId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "paymentMethod": {
+            "enum": [
+              "CASH",
+              "BANK_TRANSFER",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "addressId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "One of the new customer's addresses; required for a delivery when the customer changes"
+          }
+        },
+        "required": [
+          "expectedUpdatedAt",
+          "customerId",
+          "paymentMethod"
         ]
       },
       "SalesOrderLineQtyChange": {

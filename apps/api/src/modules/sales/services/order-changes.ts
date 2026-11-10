@@ -3,6 +3,7 @@ import type { Decimal } from '@tugeel/shared/money';
 /** A header field that changed; the values as stored, read by the screen. */
 export interface OrderFieldChange {
   field:
+    | 'customer'
     | 'fulfilment'
     | 'deliveryDate'
     | 'address'

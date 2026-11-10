@@ -177,6 +177,8 @@ ADR-0143: `GET/POST /sales/document-templates`, `GET /:id`, `PUT /:id/draft`, `P
 
 ADR-0175: `PATCH /sales-orders/:id/lines` [`sales.orders.read`; the service asks for `sales.orders.manage`, or `sales.orders.pick` with write scope on every touched warehouse] `{ expectedUpdatedAt, lines: [{lineId, qty}], exclude: [lineId], restore: [{excludedId, qty?}], add: [line] }` → the order's detail. The detail carries `excludedLines`, a board card `excluded { count, total, lines }` (the first `BOARD_LIMITS.excludedOnCard`), both limited to the caller's visible warehouses.
 
+ADR-0180: `PATCH /sales-orders/:id/party` [`sales.orders.party`] `{ expectedUpdatedAt, customerId, paymentMethod, addressId? }` → the order's detail, in `PARTY_EDIT_STATUSES` (DRAFT, CONFIRMED, PICKING, PACKED).
+
 ADR-0178: `SalesOrderLine.originalQty` and `SalesOrderExcludedLine.originalQty` (string in the unit, or null for a line added after the order).
 
 ## 5. Rules worth knowing
@@ -233,6 +235,7 @@ ADR-0178: `SalesOrderLine.originalQty` and `SalesOrderExcludedLine.originalQty` 
 - **Backorders** stay on the line.
 - **Reconciliation:** the nightly check compares `warehouse_stock.reserved` with the ACTIVE reservations (level RESERVED).
 - **Line edits (ADR-0175):** only in `CONFIRMED`, `PICKING`, `PACKED`. Lines are changed in place (their ids survive). A changed or restored line is quoted on the order's `price_date`, an unchanged restore takes its frozen parts back, an added line is priced today. Reservations are replaced except for confirmed parts; a touched confirmed part is unpicked and reopened for the office or a lead, and refused to a keeper (`LINE_EDIT_PART_DONE`). Credit is checked only when the total grows. An order cannot be left without lines.
+- **Customer and payment until the goods leave (ADR-0180):** the accountant's `sales.orders.party` changes them in any stage before the sale; a new customer must be active, takes one of its addresses for a delivery, clears the contact and, after the draft, passes the credit check with the order's total under its lock (order row, then customer); prices, lines, reservations and picks stay; the version records `customer` and `paymentMethod`.
 - **First ordered quantity (ADR-0178):** `original_qty` is written with the line and rewritten only while the order is a `DRAFT`; afterwards «Засвар» leaves it, a take-off and a restore carry it, an added line has `NULL`, the whole-order save carries it per unit and warehouse onto the first new line, `renewLinesInTx` copies it. It never feeds stock, prices or credit.
 
 ## 6. Error codes introduced
@@ -384,6 +387,8 @@ ADR-0143: «Падааны загвар» `/sales/document-templates` (+ `/:id` 
 ADR-0143: `test/integration/sales-document-templates.int-spec.ts`, `packages/shared/src/sales/document-template.test.ts`, `features/sales/print-page.test.tsx` (the built-in layouts print as before).
 
 ADR-0175: `test/integration/sales-line-edits.int-spec.ts` (the old price on a changed quantity, take off / card / put back / add, a keeper refused on another warehouse, a stale save, an emptied order, a confirmed part refused to a keeper and reopened by a lead, stock reconciled).
+
+ADR-0180: the same file, «lets the accountant change a reserved or picking order's customer and payment» (a keeper 403, a stale read 409, a customer on hold CREDIT_BLOCKED, the change kept with total and reservations, picking still allowed, a cancelled order refused).
 
 ADR-0178: the same file, «keeps every line’s first ordered quantity» (a draft rewrite sets it, 4 → 10 → 12 keeps 4, a take-off and a restore keep it, an added product has none, the office's whole-order save carries it over).
 
