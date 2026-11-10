@@ -125,6 +125,17 @@ export const MANAGER_EDITABLE_STATUSES: readonly OrderStatus[] = [
  */
 export const LINE_EDIT_STATUSES: readonly OrderStatus[] = ['CONFIRMED', 'PICKING', 'PACKED'];
 
+/**
+ * Where the accountant (`sales.orders.party`) changes an order's customer and payment method
+ * (ADR-0180): every state before the goods leave.
+ */
+export const PARTY_EDIT_STATUSES: readonly OrderStatus[] = [
+  'DRAFT',
+  'CONFIRMED',
+  'PICKING',
+  'PACKED',
+];
+
 /** Lines one «Засвар» save may touch, added ones included. */
 export const LINE_EDIT_LIMIT = 200;
 

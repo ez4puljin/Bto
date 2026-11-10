@@ -132,6 +132,29 @@ export class SalesOrderLineRestoreDto {
   qty?: string | null;
 }
 
+/** The accountant's change of an order's customer and payment method (ADR-0180). */
+@ApiSchema({ name: 'SalesOrderPartyRequest' })
+export class SalesOrderPartyRequestDto {
+  @ApiProperty({
+    format: 'date-time',
+    description: "The order's updatedAt as read: a newer change answers 409 ORDER_CHANGED",
+  })
+  @IsString()
+  expectedUpdatedAt: string;
+  @ApiProperty() @IsInt() @Min(1) customerId: number;
+  @ApiProperty({ enum: PAYMENT_METHODS }) @IsIn(PAYMENT_METHODS) paymentMethod: PaymentMethod;
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description:
+      "One of the new customer's addresses; required for a delivery when the customer changes",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  addressId?: number | null;
+}
+
 /** The board's «Засвар» (ADR-0175): lines changed in place by a keeper or the office. */
 @ApiSchema({ name: 'SalesOrderLineEditRequest' })
 export class SalesOrderLineEditRequestDto {

@@ -15,6 +15,7 @@ import {
   QUICK_GROUPS,
   SALE,
   SALE_ROW,
+  SALES_SUMMARY,
   SHIFT,
   TILL,
   VOID,
@@ -30,6 +31,7 @@ const routes = () => ({
   'GET /api/v1/pos/shifts/21': () => json(SHIFT),
   'GET /api/v1/pos/sales': () => json({ data: [SALE_ROW], nextCursor: null, total: 1 }),
   'GET /api/v1/pos/sales/51': () => json(SALE),
+  'GET /api/v1/pos/sales/summary': () => json(SALES_SUMMARY),
   'GET /api/v1/pos/voids': () =>
     json({ data: [VOID_ROW], nextCursor: null, total: 1, sum: '7000.00' }),
   'GET /api/v1/pos/voids/81': () => json(VOID),
@@ -272,6 +274,42 @@ describe('supermarket pages (ADR-0063 #8)', () => {
       'href',
       '/pos/sales/51/print?format=a4',
     );
+  });
+
+  it('filters by cashier and shows the totals of the filters in the banner', async () => {
+    const fetchMock = signedIn(undefined, routes());
+    renderApp('/pos/sales', fetchMock);
+    const banner = within(await screen.findByRole('region', { name: mn.pos.sales.totals.label }));
+    const tile = (label: string) => within(banner.getByRole('group', { name: label }));
+    expect(await tile(mn.pos.sales.totals.salesCount).findByText('2')).toBeInTheDocument();
+    expect(
+      tile(mn.pos.sales.totals.salesCount).getByText(
+        mn.pos.sales.totals.returnsCount.replace('{{count}}', '1'),
+      ),
+    ).toBeInTheDocument();
+    expect(tile(mn.pos.sales.totals.salesAmount).getByText('5,200₮')).toBeInTheDocument();
+    expect(tile(mn.pos.sales.totals.cash).getByText('3,600₮')).toBeInTheDocument();
+    expect(tile(mn.pos.sales.totals.card).getByText('1,600₮')).toBeInTheDocument();
+    expect(tile(mn.pos.sales.totals.transfer).getByText('0₮')).toBeInTheDocument();
+    expect(tile(mn.pos.sales.totals.credit).getByText('0₮')).toBeInTheDocument();
+    // No vouchers or points: no «Бусад» tile.
+    expect(banner.queryByRole('group', { name: mn.pos.sales.totals.other })).toBeNull();
+    // The cashier filter goes to the list and to the banner alike.
+    fireEvent.change(await screen.findByRole('combobox', { name: mn.pos.fields.cashier }), {
+      target: { value: String(CASHIER.userId) },
+    });
+    await waitFor(() =>
+      expect(
+        calls(fetchMock, 'GET', '/api/v1/pos/sales/summary').some(
+          (request) => new URL(request.url).searchParams.get('cashierUserId') === '7',
+        ),
+      ).toBe(true),
+    );
+    expect(
+      calls(fetchMock, 'GET', '/api/v1/pos/sales').some(
+        (request) => new URL(request.url).searchParams.get('cashierUserId') === '7',
+      ),
+    ).toBe(true);
   });
 
   it('shows and saves the settings', async () => {

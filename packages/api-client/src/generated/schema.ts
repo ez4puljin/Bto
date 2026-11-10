@@ -5248,6 +5248,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales-orders/{id}/party": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * The accountant's «Мэдээлэл» (ADR-0180): the order's customer and payment method, in any stage
+         *     until the goods leave; a new customer passes the credit check.
+         */
+        patch: operations["SalesOrders_changeParty"];
+        trace?: never;
+    };
     "/api/v1/sales-orders/{id}/lines": {
         parameters: {
             query?: never;
@@ -7540,6 +7560,23 @@ export interface paths {
             cookie?: never;
         };
         get: operations["PosSales_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/sales/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The banner's totals over every sale and return the list's filters match (returns net out). */
+        get: operations["PosSales_summary"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10330,7 +10367,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "inventory.issues.confirm" | "procurement.orders.read" | "procurement.orders.edit" | "procurement.orders.manage" | "procurement.prices.read" | "ebarimt.check.read" | "ebarimt.check.edit" | "ebarimt.check.assign" | "ebarimt.check.settings" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "ai.settings.manage" | "ai.data.catalog" | "ai.data.stock" | "ai.data.customers" | "ai.data.suppliers" | "ai.data.pricing" | "ai.data.sales" | "ai.data.finance" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.pickLead" | "sales.orders.moveAny" | "sales.orders.rep" | "sales.orders.load" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "pos.loyalty.manage" | "notifications.send" | "customer.home.manage" | "hr.attendance.view" | "hr.attendance.manage" | "reports.view" | "reports.margins.view" | "expiry.items.manage" | "expiry.liability.manage" | "expiry.items.carry";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "inventory.issues.confirm" | "procurement.orders.read" | "procurement.orders.edit" | "procurement.orders.manage" | "procurement.prices.read" | "ebarimt.check.read" | "ebarimt.check.edit" | "ebarimt.check.assign" | "ebarimt.check.settings" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "ai.settings.manage" | "ai.data.catalog" | "ai.data.stock" | "ai.data.customers" | "ai.data.suppliers" | "ai.data.pricing" | "ai.data.sales" | "ai.data.finance" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.pickLead" | "sales.orders.moveAny" | "sales.orders.party" | "sales.orders.rep" | "sales.orders.load" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "pos.loyalty.manage" | "notifications.send" | "customer.home.manage" | "hr.attendance.view" | "hr.attendance.manage" | "reports.view" | "reports.margins.view" | "expiry.items.manage" | "expiry.liability.manage" | "expiry.items.carry";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -16000,6 +16037,18 @@ export interface components {
             note?: string | null;
             lines: components["schemas"]["SalesOrderLineRequest"][];
         };
+        SalesOrderPartyRequest: {
+            /**
+             * Format: date-time
+             * @description The order's updatedAt as read: a newer change answers 409 ORDER_CHANGED
+             */
+            expectedUpdatedAt: string;
+            customerId: number;
+            /** @enum {string} */
+            paymentMethod: "CASH" | "BANK_TRANSFER" | "CREDIT";
+            /** @description One of the new customer's addresses; required for a delivery when the customer changes */
+            addressId?: number | null;
+        };
         SalesOrderLineQtyChange: {
             lineId: number;
             /**
@@ -18891,6 +18940,37 @@ export interface components {
             nextCursor: string | null;
             /** @description On the first page only */
             total: number | null;
+        };
+        PosSalesSummary: {
+            /** @description SALE documents */
+            salesCount: number;
+            /** @description RETURN documents */
+            returnsCount: number;
+            /** @example 125000.00 */
+            salesTotal: string;
+            /** @example 5000.00 */
+            returnsTotal: string;
+            /**
+             * @description Sales less returns
+             * @example 120000.00
+             */
+            total: string;
+            /**
+             * @description Net of refunds, as all the tenders below
+             * @example 60000.00
+             */
+            cash: string;
+            /** @example 40000.00 */
+            card: string;
+            /** @example 10000.00 */
+            transfer: string;
+            /** @example 10000.00 */
+            credit: string;
+            /**
+             * @description VOUCHER and POINTS tenders
+             * @example 0.00
+             */
+            other: string;
         };
         PosSaleLine: {
             id: number;
@@ -35516,6 +35596,40 @@ export interface operations {
             };
         };
     };
+    SalesOrders_changeParty: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesOrderPartyRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     SalesOrders_editLines: {
         parameters: {
             query?: never;
@@ -40927,6 +41041,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PosSalePage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosSales_summary: {
+        parameters: {
+            query?: {
+                /** @description Part of the number, ДДТД, TIN or buyer name */
+                q?: string;
+                edgeNodeId?: number;
+                tillId?: number;
+                shiftId?: number;
+                cashierUserId?: number;
+                kind?: "SALE" | "RETURN";
+                ebarimtStatus?: "NONE" | "PENDING" | "CONFIRMED" | "INDETERMINATE" | "ERROR" | "CANCELLED" | "UNCONFIRMED_RETURN";
+                customerId?: number;
+                /** @description Credit sales past their limit not checked yet */
+                creditToCheck?: boolean;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosSalesSummary"];
                 };
             };
             /** @description RFC 9457 problem details */

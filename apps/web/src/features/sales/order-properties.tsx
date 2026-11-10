@@ -4,6 +4,7 @@ import {
   type Fulfilment,
   isEditable,
   orderHeaderIssues,
+  PARTY_EDIT_STATUSES,
   PAYMENT_METHODS,
   type PaymentMethod,
 } from '@tugeel/shared/sales';
@@ -17,7 +18,9 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { useHasPermission } from '@/app/auth-context';
 import { useCustomer } from '@/features/partners/api';
+import { CustomerPicker, type PickedCustomer } from '@/features/partners/customer-picker';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { type SalesOrder, useSalesOrderMutations } from './api';
@@ -40,9 +43,45 @@ export function OrderProperties({
   const { t } = useTranslation();
   const contact = [order.contactName, order.contactPhone].filter(Boolean).join(' · ');
   return (
+    <div className="flex flex-col gap-4">
+      <PartyCard order={order} onDirty={onDirty} />
+      <DetailCard
+        title={t('sales.order.header')}
+        canEdit={order.canEdit && isEditable(order.status)}
+        view={
+          <FieldList
+            items={[
+              {
+                label: t('sales.order.fulfilment'),
+                value: t(`sales.fulfilments.${order.fulfilment}`),
+              },
+              { label: t('sales.order.deliveryDate'), value: order.deliveryDate },
+              ...(order.fulfilment === 'DELIVERY'
+                ? [{ label: t('sales.order.address'), value: order.addressText }]
+                : []),
+              { label: t('sales.order.contactName'), value: contact },
+              { label: t('sales.order.note'), value: order.note },
+            ]}
+          />
+        }
+        edit={(close) => <PropertiesForm order={order} onDone={close} onDirty={onDirty} />}
+      />
+    </div>
+  );
+}
+
+/**
+ * The order's customer and payment method (ADR-0180): the accountant (`sales.orders.party`)
+ * changes them in any stage until the goods leave; a new customer passes the credit check, and a
+ * delivery takes one of the new customer's addresses. Prices stay.
+ */
+function PartyCard({ order, onDirty }: { order: SalesOrder; onDirty: (dirty: boolean) => void }) {
+  const { t } = useTranslation();
+  const party = useHasPermission('sales.orders.party');
+  return (
     <DetailCard
-      title={t('sales.order.header')}
-      canEdit={order.canEdit && isEditable(order.status)}
+      title={t('sales.panel.party.title')}
+      canEdit={party && PARTY_EDIT_STATUSES.includes(order.status)}
       view={
         <FieldList
           items={[
@@ -51,24 +90,143 @@ export function OrderProperties({
               value: `${order.customerName} · ${order.customerCode}`,
             },
             {
-              label: t('sales.order.fulfilment'),
-              value: t(`sales.fulfilments.${order.fulfilment}`),
-            },
-            { label: t('sales.order.deliveryDate'), value: order.deliveryDate },
-            ...(order.fulfilment === 'DELIVERY'
-              ? [{ label: t('sales.order.address'), value: order.addressText }]
-              : []),
-            { label: t('sales.order.contactName'), value: contact },
-            {
               label: t('sales.order.paymentMethod'),
               value: <PaymentLabel method={order.paymentMethod} />,
             },
-            { label: t('sales.order.note'), value: order.note },
           ]}
         />
       }
-      edit={(close) => <PropertiesForm order={order} onDone={close} onDirty={onDirty} />}
+      edit={(close) => <PartyForm order={order} onDone={close} onDirty={onDirty} />}
     />
+  );
+}
+
+function PartyForm({
+  order,
+  onDone,
+  onDirty,
+}: {
+  order: SalesOrder;
+  onDone: () => void;
+  onDirty: (dirty: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const id = useId();
+  const mutations = useSalesOrderMutations();
+  const action = useAction();
+  const [customer, setCustomer] = useState<PickedCustomer | null>({
+    id: order.customerId,
+    code: order.customerCode,
+    name: order.customerName,
+  });
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(order.paymentMethod);
+  const [addressId, setAddressId] = useState<number | null>(null);
+  const [checked, setChecked] = useState(false);
+  const changedCustomer = customer !== null && customer.id !== order.customerId;
+  const delivery = order.fulfilment === 'DELIVERY' && changedCustomer;
+  const details = useCustomer(customer?.id ?? 0, { enabled: delivery }).data;
+
+  const dirty = customer?.id !== order.customerId || paymentMethod !== order.paymentMethod;
+  useEffect(() => onDirty(dirty), [dirty, onDirty]);
+  useEffect(() => () => onDirty(false), [onDirty]);
+  // A delivery takes the new customer's default address until one is chosen.
+  useEffect(() => {
+    if (!delivery || !details || addressId !== null) return;
+    const fallback = details.addresses.find((row) => row.isDefault) ?? details.addresses[0];
+    if (fallback) setAddressId(fallback.id);
+  }, [delivery, details, addressId]);
+
+  const missingAddress = delivery && addressId === null;
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    setChecked(true);
+    if (!customer || missingAddress) return;
+    void action.run(async () => {
+      await mutations.changeParty.mutateAsync({
+        id: order.id,
+        body: {
+          expectedUpdatedAt: order.updatedAt,
+          customerId: customer.id,
+          paymentMethod,
+          addressId: delivery ? addressId : null,
+        },
+      });
+      toast.success(t('sales.panel.party.saved'));
+      onDone();
+    });
+  };
+
+  return (
+    <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
+      <div className="grid gap-4 md:grid-cols-2">
+        <FormField
+          label={t('sales.order.customer')}
+          htmlFor={`${id}-customer`}
+          error={checked && !customer ? t('sales.create.customerRequired') : undefined}
+        >
+          <CustomerPicker
+            id={`${id}-customer`}
+            value={customer}
+            onChange={(next) => {
+              setCustomer(next);
+              setAddressId(null);
+            }}
+            invalid={checked && !customer}
+          />
+        </FormField>
+        <FormField label={t('sales.order.paymentMethod')} htmlFor={`${id}-payment`}>
+          <NativeSelect
+            id={`${id}-payment`}
+            value={paymentMethod}
+            onChange={(event) => {
+              const value = PAYMENT_METHODS.find((entry) => entry === event.target.value);
+              if (value) setPaymentMethod(value);
+            }}
+          >
+            {PAYMENT_METHODS.map((value) => (
+              <option key={value} value={value}>
+                {t(`sales.paymentMethods.${value}`)}
+              </option>
+            ))}
+          </NativeSelect>
+        </FormField>
+        {delivery ? (
+          <FormField
+            label={t('sales.order.address')}
+            htmlFor={`${id}-address`}
+            error={checked && missingAddress ? t('sales.issues.addressId.required') : undefined}
+            hint={details && details.addresses.length === 0 ? t('sales.order.noAddress') : null}
+          >
+            <NativeSelect
+              id={`${id}-address`}
+              value={addressId ?? ''}
+              onChange={(event) =>
+                setAddressId(event.target.value ? Number.parseInt(event.target.value, 10) : null)
+              }
+            >
+              <option value="">{t('sales.order.chooseAddress')}</option>
+              {(details?.addresses ?? []).map((row) => (
+                <option key={row.id} value={row.id}>
+                  {[row.label, row.address].filter(Boolean).join(' · ') || `#${row.id}`}
+                </option>
+              ))}
+            </NativeSelect>
+          </FormField>
+        ) : null}
+      </div>
+      {changedCustomer ? (
+        <p className="text-[0.8125rem] text-muted-foreground">{t('sales.panel.party.hint')}</p>
+      ) : null}
+      <ProblemAlert problem={action.problem} />
+      <FormFooter>
+        <Button type="button" variant="ghost" onClick={onDone}>
+          {t('common.cancel')}
+        </Button>
+        <Button type="submit" disabled={!dirty || mutations.changeParty.isPending}>
+          {t('common.save')}
+        </Button>
+      </FormFooter>
+    </form>
   );
 }
 

@@ -83,6 +83,8 @@ export const PERMISSIONS = [
   'sales.orders.pickLead',
   // ADR-0129: moves a card over stages and into another pipeline's stage (the admin always).
   'sales.orders.moveAny',
+  // ADR-0180: the accountant changes an order's customer and payment method before it leaves.
+  'sales.orders.party',
   // The sales-rep app (ADR-0061 #5): the rep's own orders only, through /sales-rep/*.
   'sales.orders.rep',
   // ADR-0179: a driver marks the picked orders they loaded onto their truck in the staff app.
@@ -245,6 +247,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'procurement.orders.read',
     'procurement.prices.read',
     'sales.orders.read',
+    // The order's customer and payment method, until the goods leave (ADR-0180).
+    'sales.orders.party',
     // Finance I (ADR-0060): invoices, payments, credit notes and the journal are the accountant's.
     'finance.read',
     'finance.payments.record',

@@ -15,6 +15,8 @@ import {
   SaleDetailDto,
   SaleListQueryDto,
   SalePageDto,
+  SaleSummaryQueryDto,
+  SalesSummaryDto,
   ShiftDto,
   ShiftListQueryDto,
   ShiftPageDto,
@@ -116,6 +118,26 @@ export class PosSalesController {
   async list(@Query() query: SaleListQueryDto): Promise<SalePageDto> {
     const page = await this.query.listSales(query);
     return { data: page.data.map(saleDto), nextCursor: page.nextCursor, total: page.total };
+  }
+
+  /** The banner's totals over every sale and return the list's filters match (returns net out). */
+  @Get('summary')
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: SalesSummaryDto })
+  async summary(@Query() query: SaleSummaryQueryDto): Promise<SalesSummaryDto> {
+    const totals = await this.query.summarizeSales(query);
+    return {
+      salesCount: totals.salesCount,
+      returnsCount: totals.returnsCount,
+      salesTotal: totals.salesTotal.toFixed(2),
+      returnsTotal: totals.returnsTotal.toFixed(2),
+      total: totals.total.toFixed(2),
+      cash: totals.cash.toFixed(2),
+      card: totals.card.toFixed(2),
+      transfer: totals.transfer.toFixed(2),
+      credit: totals.credit.toFixed(2),
+      other: totals.other.toFixed(2),
+    };
   }
 
   @Get(':id')

@@ -36,6 +36,7 @@ interface ExcludedJson {
   excludedByName: string | null;
 }
 interface ChangeJson {
+  fields?: { field: string; before: string | null; after: string | null }[];
   lines: { kind: string; productName: string }[];
 }
 type DetailJson = Omit<OrderJson, 'lines'> & {
@@ -490,5 +491,85 @@ describe('sales line edits from the board', () => {
       { product_id: String(juice.id), original_qty: null },
       { product_id: String(beer.id), original_qty: '3.000' },
     ]);
+  });
+
+  it("lets the accountant change a reserved or picking order's customer and payment, credit checked (ADR-0180)", async () => {
+    const accountant = (await login(app, await seedUser(app, { roles: ['ACCOUNTANT'] })))
+      .accessToken;
+    const partners = partnersApi(app, admin);
+    const other = await partners.customer({ name: 'Нягтлангийн дэлгүүр' });
+    const held = await partners.customer({ name: 'Хоригтой дэлгүүр' });
+    await http()
+      .put(`/api/v1/customers/${held.id}/credit`)
+      .set(bearer(accountant))
+      .send({
+        creditLimit: null,
+        settlementGroup: 'DAY_20',
+        creditHold: true,
+        creditHoldReason: 'Шалгалт',
+      })
+      .expect(200);
+    const party = (token: string, order: DetailJson, body: Record<string, unknown>) =>
+      http()
+        .patch(`/api/v1/sales-orders/${order.id}/party`)
+        .set(bearer(token))
+        .send({ expectedUpdatedAt: order.updatedAt, ...body });
+
+    let order = await reservedOrder('2', '1');
+    expect(order.status).toBe('CONFIRMED');
+    const total = order.total;
+    await party(keeperA, order, { customerId: other.id, paymentMethod: 'CASH' }).expect(403);
+    await party(
+      accountant,
+      { ...order, updatedAt: new Date(0).toISOString() },
+      {
+        customerId: other.id,
+        paymentMethod: 'CASH',
+      },
+    ).expect(409);
+    // A customer on hold refuses the order's total; nothing changes.
+    const blocked = (
+      await party(accountant, order, { customerId: held.id, paymentMethod: 'CASH' }).expect(409)
+    ).body as ProblemJson;
+    expect(blocked.code).toBe('CREDIT_BLOCKED');
+    expect((await detail(admin, order.id)).customerId).toBe(shop.id);
+
+    order = (
+      await party(accountant, order, {
+        customerId: other.id,
+        paymentMethod: 'BANK_TRANSFER',
+      }).expect(200)
+    ).body as DetailJson;
+    expect(order.customerId).toBe(other.id);
+    expect(order.paymentMethod).toBe('BANK_TRANSFER');
+    expect(order.total).toBe(total);
+    expect(await reserved(order.id, cola.id)).toBe('2.000');
+    const fields = order.changes.at(-1)?.fields?.map((entry) => entry.field) ?? [];
+    expect(fields).toEqual(expect.arrayContaining(['customer', 'paymentMethod']));
+
+    // Picking: the payment still changes; a cancelled order no longer does.
+    await move(admin, order.id, 'Бэлдэх').expect(200);
+    order = await detail(admin, order.id);
+    expect(order.status).toBe('PICKING');
+    order = (
+      await party(accountant, order, { customerId: other.id, paymentMethod: 'CASH' }).expect(200)
+    ).body as DetailJson;
+    expect(order.paymentMethod).toBe('CASH');
+    const draft = await salesApi(app, admin).draft(
+      orderBody(shop.id, [{ productUnitId: pcs(juice), qty: '1' }], { pipelineId: pipeline.id }),
+    );
+    await http()
+      .post(`/api/v1/sales-orders/${draft.id}/cancel`)
+      .set(bearer(admin))
+      .set(idempotency())
+      .send({ reason: 'Туршилт' })
+      .expect(200);
+    const cancelled = await detail(admin, draft.id);
+    const late = (
+      await party(accountant, cancelled, { customerId: other.id, paymentMethod: 'CASH' }).expect(
+        409,
+      )
+    ).body as ProblemJson;
+    expect(late.code).toBe('ORDER_STATE_INVALID');
   });
 });
