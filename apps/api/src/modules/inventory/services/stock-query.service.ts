@@ -14,7 +14,13 @@ import {
   encodeCursor,
   toPage,
 } from '../../../common/pagination/page';
-import { CatalogService, type ProductSummary, UnitConversionService } from '../../catalog';
+import {
+  CatalogService,
+  type ProductListQuery,
+  ProductQueryService,
+  type ProductSummary,
+  UnitConversionService,
+} from '../../catalog';
 import {
   binStock,
   bins,
@@ -40,6 +46,22 @@ export interface StockQuery {
   /** The quantities shown are this warehouse's (default: all warehouses). */
   warehouseId?: number;
   /** Without a search: only products with stock, by product id. */
+  inStock?: boolean;
+  cursor?: string;
+  limit?: number;
+}
+
+/**
+ * The stock list with the product list's filters (owner 2026-11-10): the catalog's search,
+ * category, stage, `where` conditions and a saved segment pick the products through the product
+ * query (ADR-0049 #4), in its order and with its count; `inStock` without a search narrows them to
+ * the products holding stock in the warehouse (or in any warehouse).
+ */
+export interface StockListQuery extends Pick<
+  ProductListQuery,
+  'q' | 'categoryId' | 'status' | 'saleReady' | 'where' | 'segmentId'
+> {
+  warehouseId?: number;
   inStock?: boolean;
   cursor?: string;
   limit?: number;
@@ -131,7 +153,40 @@ export class StockQueryService {
     private readonly posting: StockPostingService,
     private readonly units: UnitConversionService,
     private readonly org: OrgService,
+    private readonly productQuery: ProductQueryService,
   ) {}
+
+  /**
+   * One page of the filtered stock list and, on the first page, how many products it keeps. The
+   * products come from the product query in the catalog's order (by category without a search),
+   * so every filter narrows on the server and «Цааш үзэх» pages through the same set.
+   */
+  async list(
+    query: StockListQuery,
+  ): Promise<{ data: ProductStock[]; nextCursor: string | null; total: number | null }> {
+    const q = query.q?.trim();
+    const onlyIds = query.inStock && !q ? await this.idsHolding(query.warehouseId) : undefined;
+    const page = await this.productQuery.query({
+      ...(q ? { q } : { sort: 'CATEGORY' as const }),
+      ...(query.categoryId === undefined ? {} : { categoryId: query.categoryId }),
+      ...(query.status === undefined ? {} : { status: query.status }),
+      ...(query.saleReady === undefined ? {} : { saleReady: query.saleReady }),
+      ...(query.where === undefined ? {} : { where: query.where }),
+      ...(query.segmentId === undefined ? {} : { segmentId: query.segmentId }),
+      ...(onlyIds === undefined ? {} : { onlyIds }),
+      ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
+      limit: query.limit ?? DEFAULT_PAGE_LIMIT,
+    });
+    const balances = await this.balances(
+      page.data.map((product) => product.id),
+      query.warehouseId,
+    );
+    return {
+      data: page.data.map((product) => withTotals(product, balances.get(product.id) ?? [])),
+      nextCursor: page.nextCursor,
+      total: page.total,
+    };
+  }
 
   async overview(query: StockQuery): Promise<{ data: ProductStock[]; nextCursor: string | null }> {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
@@ -468,6 +523,18 @@ export class StockQueryService {
   }
 
   // -------------------------------------------------------------------------------------------
+
+  /** The products with stock on hand in one warehouse, or in any, ascending. */
+  private async idsHolding(warehouseId: number | undefined): Promise<number[]> {
+    const filters: SQL[] = [gt(warehouseStock.onHand, ZERO)];
+    if (warehouseId) filters.push(eq(warehouseStock.warehouseId, warehouseId));
+    const rows = await this.db
+      .selectDistinct({ productId: warehouseStock.productId })
+      .from(warehouseStock)
+      .where(and(...filters))
+      .orderBy(warehouseStock.productId);
+    return rows.map((row) => row.productId);
+  }
 
   /** Products holding stock (in one warehouse or any), paged by product id. */
   private async inStock(

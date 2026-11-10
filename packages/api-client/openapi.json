@@ -9613,6 +9613,53 @@
         ]
       }
     },
+    "/api/v1/stock/query": {
+      "post": {
+        "operationId": "Stock_query",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockQueryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockQueryPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The stock list with the product list's filters (owner 2026-11-10): category, stage, conditions\non the product and a saved segment, in the catalog's order, with the total on the first page.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/stock/movements": {
       "get": {
         "operationId": "Stock_movements",
@@ -50262,6 +50309,89 @@
         "required": [
           "data",
           "nextCursor"
+        ]
+      },
+      "StockQueryRequest": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "nextCursor of the previous page"
+          },
+          "limit": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "q": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Name, SKU or barcode, as in the catalog search"
+          },
+          "categoryId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Includes its subcategories"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "saleReady": {
+            "type": "boolean",
+            "description": "true: complete products; false: those waiting for prices (ADR-0044)"
+          },
+          "where": {
+            "description": "Conditions on the product, as the product list sends them",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SegmentDefinition"
+              }
+            ]
+          },
+          "segmentId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "A saved product segment; with where, both apply"
+          },
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Show this warehouse’s quantities only"
+          },
+          "inStock": {
+            "type": "boolean",
+            "description": "Without q: only products holding stock (in the warehouse, or in any)"
+          }
+        }
+      },
+      "StockQueryPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductStock"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number",
+            "nullable": true,
+            "description": "How many products the filters keep; on the first page only"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor",
+          "total"
         ]
       },
       "StockMovement": {

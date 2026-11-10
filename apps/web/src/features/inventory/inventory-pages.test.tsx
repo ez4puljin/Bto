@@ -56,7 +56,7 @@ describe('stock page', () => {
       '/inventory/stock',
       signedIn(WAREHOUSE_ME, {
         'GET /api/v1/warehouses': warehouses,
-        'GET /api/v1/stock': () => list([row]),
+        'POST /api/v1/stock/query': () => json({ data: [row], nextCursor: null, total: 1 }),
       }),
     );
     expect(await screen.findByRole('link', { name: COLA.name })).toBeInTheDocument();
@@ -64,19 +64,56 @@ describe('stock page', () => {
     expect(screen.queryByRole('columnheader', { name: mn.inventory.stock.value })).toBeNull();
   });
 
+  it('sends the product filters of the address to the server', async () => {
+    const fetchMock = signedIn(WAREHOUSE_ME, {
+      'GET /api/v1/warehouses': warehouses,
+      'POST /api/v1/stock/query': () => json({ data: [row], nextCursor: null, total: 1 }),
+    });
+    renderApp(
+      '/inventory/stock?warehouseId=1&category=5&status=ACTIVE&supplier=main:3&stock=low&all=1',
+      fetchMock,
+    );
+    expect(await screen.findByRole('link', { name: COLA.name })).toBeInTheDocument();
+    expect(screen.getByText('1 бараа')).toBeInTheDocument();
+    const [request] = calls(fetchMock, 'POST', '/api/v1/stock/query');
+    expect(await bodyOf(request)).toEqual({
+      warehouseId: 1,
+      categoryId: 5,
+      status: 'ACTIVE',
+      saleReady: true,
+      where: {
+        match: 'ALL',
+        groups: [
+          {
+            match: 'ALL',
+            conditions: [
+              { field: 'supplier', op: 'MAIN_IN', ids: [3] },
+              { field: 'stock', op: 'AT_OR_BELOW_MIN', warehouseId: 1 },
+            ],
+          },
+        ],
+      },
+      limit: 50,
+    });
+  });
+
   it('shows values to cost holders and the drift banner to admins', async () => {
     renderApp(
       '/inventory/stock',
       signedIn(ADMIN_ME, {
         'GET /api/v1/warehouses': warehouses,
-        'GET /api/v1/stock': () =>
-          list([
-            {
-              ...row,
-              value: '48000.00',
-              warehouses: [{ ...row.warehouses[0]!, avgCost: '1000', value: '48000.00' }],
-            },
-          ]),
+        'POST /api/v1/stock/query': () =>
+          json({
+            data: [
+              {
+                ...row,
+                value: '48000.00',
+                warehouses: [{ ...row.warehouses[0]!, avgCost: '1000', value: '48000.00' }],
+              },
+            ],
+            nextCursor: null,
+            total: 1,
+          }),
         'GET /api/v1/stock/reconciliation/latest': () =>
           json({
             lastRun: {
