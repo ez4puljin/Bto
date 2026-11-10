@@ -134,6 +134,94 @@ describe('finance reports and the year close', () => {
     expect(again.documents[0]?.number).not.toBe(closed.documents[0]?.number);
   });
 
+  it('builds СТ-1 and СТ-2 from the journal, a closed year keeping its result (ADR-0184)', async () => {
+    interface RowJson {
+      code: string;
+      opening: string | null;
+      amount: string | null;
+      accounts: { accountId: number; code: string; amount: string; linked: boolean }[];
+      result: { opening: string; amount: string } | null;
+    }
+    interface StatementJson {
+      rows: RowJson[];
+      difference: { opening: string; amount: string } | null;
+    }
+    const statement = async (kind: string, from: string, to: string) =>
+      (await get(accountant, `/finance/reports/statements/${kind}`, { from, to }).expect(200))
+        .body as StatementJson;
+    const row = (report: StatementJson, code: string) => {
+      const found = report.rows.find((entry) => entry.code === code);
+      if (!found) throw new Error(`no row ${code}`);
+      return found;
+    };
+    const yearStart = `${lastYear}-01-01`;
+    const yearEnd = `${lastYear}-12-31`;
+    // Last year is closed, yet its income statement still reads 1000 − 300.
+    const income = await statement('income', yearStart, yearEnd);
+    expect(row(income, 'I8').amount).toBe('1000.00');
+    expect(row(income, 'I12').amount).toBe('300.00');
+    expect(row(income, 'I22').amount).toBe('700.00');
+    expect(income.difference).toBeNull();
+    // Its balance sheet holds the result in retained earnings, nothing left unclosed.
+    const closed = await statement('balance', yearStart, yearEnd);
+    expect(row(closed, 'E_2').amount).toBe('-700.00');
+    expect(row(closed, 'E_3')).toMatchObject({
+      amount: '700.00',
+      result: { opening: '0.00', amount: '0.00' },
+    });
+    expect(closed.difference).toEqual({ opening: '0.00', amount: '0.00' });
+    // This year: input VAT 40 an asset, output VAT 100 a liability, the open loss of 60 in equity.
+    const now = await statement('balance', `${today.slice(0, 4)}-01-01`, today);
+    expect(row(now, 'A_T').amount).toBe('40.00');
+    expect(row(now, 'L1_2').amount).toBe('100.00');
+    expect(row(now, 'E_3')).toMatchObject({
+      opening: '700.00',
+      amount: '640.00',
+      result: { opening: '0.00', amount: '-60.00' },
+    });
+    expect(row(now, 'LE_T').amount).toBe('40.00');
+    expect(now.difference).toEqual({ opening: '0.00', amount: '0.00' });
+
+    // The accountant moves the expense account to the income-tax row and back.
+    const expense = row(income, 'I12').accounts[0];
+    if (!expense) throw new Error('no expense account');
+    const link = (token: string, rowCode: string | null) =>
+      http()
+        .put(`/api/v1/finance/statement-links/${expense.accountId}`)
+        .set(bearer(token))
+        .send({ rowCode });
+    await link(office, 'I19').expect(403);
+    await link(accountant, 'I1').expect(422);
+    await link(accountant, 'A1_1').expect(422);
+    await link(accountant, 'I19').expect(204);
+    const moved = await statement('income', yearStart, yearEnd);
+    expect(row(moved, 'I12').amount).toBe('0.00');
+    expect(row(moved, 'I18').amount).toBe('1000.00');
+    expect(row(moved, 'I19')).toMatchObject({
+      amount: '300.00',
+      accounts: [expect.objectContaining({ code: expense.code, linked: true })],
+    });
+    expect(row(moved, 'I22').amount).toBe('700.00');
+    await link(accountant, null).expect(204);
+    expect(row(await statement('income', yearStart, yearEnd), 'I12').amount).toBe('300.00');
+
+    const xlsx = await get(accountant, '/finance/reports/statements/balance/xlsx', {
+      from: yearStart,
+      to: yearEnd,
+    })
+      .buffer(true)
+      .expect(200);
+    expect(xlsx.headers['content-type']).toContain('spreadsheetml');
+    await get(accountant, '/finance/reports/statements/cash', {
+      from: yearStart,
+      to: yearEnd,
+    }).expect(422);
+    await get(accountant, '/finance/reports/statements/income', {
+      from: yearEnd,
+      to: yearStart,
+    }).expect(422);
+  });
+
   it('refuses a year that has not ended and a closed December', async () => {
     expect((await yearPost(accountant, today.slice(0, 4)).expect(409)).body).toMatchObject({
       code: 'FIN_PERIOD_NOT_ENDED',

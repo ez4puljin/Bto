@@ -7509,6 +7509,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/finance/reports/statements/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Statements_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/reports/statements/{kind}/xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Statements_xlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/statement-links/{accountId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Puts an account on a row of its statement, or back on the default row. */
+        put: operations["Statements_link"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pos/settings": {
         parameters: {
             query?: never;
@@ -18970,6 +19019,67 @@ export interface components {
         };
         RepCollectionRejectRequest: {
             reason: string;
+        };
+        StatementRowAccount: {
+            accountId: number;
+            /** @example 100101 */
+            code: string;
+            name: string;
+            /** @enum {string} */
+            kind: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
+            /** @description СТ-1: before the period */
+            opening: string | null;
+            /**
+             * @description Signed as the row counts it
+             * @example 1250000.00
+             */
+            amount: string;
+            /** @description Put on the row by the accountant, not by the default */
+            linked: boolean;
+        };
+        StatementRowResult: {
+            opening: string;
+            amount: string;
+        };
+        StatementRow: {
+            /** @example A1_1 */
+            code: string;
+            /**
+             * @description The row's number on the form
+             * @example 1.1.1
+             */
+            no: string;
+            /** @enum {string} */
+            type: "HEADING" | "LINE" | "TOTAL";
+            level: number;
+            opening: string | null;
+            /** @description Null on a heading */
+            amount: string | null;
+            accounts: components["schemas"]["StatementRowAccount"][];
+            /** @description СТ-1's retained earnings: the result not closed yet, inside the amounts */
+            result: components["schemas"]["StatementRowResult"] | null;
+        };
+        StatementDifference: {
+            opening: string;
+            amount: string;
+        };
+        Statement: {
+            /** @enum {string} */
+            kind: "BALANCE" | "INCOME";
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            rows: components["schemas"]["StatementRow"][];
+            /** @description СТ-1: assets minus liabilities and equity; zero when it balances */
+            difference: components["schemas"]["StatementDifference"] | null;
+        };
+        StatementLinkRequest: {
+            /**
+             * @description A row of the account's statement; null returns it to the default row
+             * @example I19
+             */
+            rowCode?: string | null;
         };
         PosSettings: {
             storeWarehouseId: number | null;
@@ -41274,6 +41384,104 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RepCollection"];
                 };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Statements_get: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Statement"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Statements_xlsx: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Statements_link: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatementLinkRequest"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description RFC 9457 problem details */
             default: {

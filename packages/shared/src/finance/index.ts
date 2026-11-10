@@ -426,3 +426,21 @@ export function accountKindOfCode(code: string): GlAccountKind | null {
   if (/^[6-9]/.test(code)) return 'EXPENSE';
   return null;
 }
+
+export {
+  BALANCE_ROWS,
+  balanceDifference,
+  buildStatement,
+  defaultRowOf,
+  INCOME_ROWS,
+  linkableRows,
+  STATEMENT_KINDS,
+  STATEMENT_ROWS,
+  type StatementAccount,
+  type StatementAccountKind,
+  type StatementKind,
+  statementOfKind,
+  type StatementRow,
+  type StatementRowAccount,
+  type StatementRowSpec,
+} from './statements';

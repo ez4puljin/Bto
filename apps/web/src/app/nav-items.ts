@@ -461,6 +461,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'finance.read',
       },
       {
+        to: '/finance/statements',
+        label: 'nav.statements',
+        icon: FileChartColumn,
+        permission: 'finance.read',
+      },
+      {
         to: '/finance/vat',
         label: 'nav.vatReport',
         icon: Percent,

@@ -17,6 +17,28 @@ const str = (value: unknown): string =>
 const int = (value: unknown): number => Number.parseInt(str(value), 10);
 const dec = (value: unknown): Decimal => new Decimal(str(value) || 0);
 
+/**
+ * One account for a financial statement (ADR-0184); every amount is debit minus credit. `period`
+ * leaves out the entries of the closing document types, so a closed year still shows its result;
+ * `opening` and `closing` are the balances as booked.
+ */
+export interface FinStatementBalance {
+  accountId: number;
+  code: string;
+  name: string;
+  kind: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'INCOME' | 'EXPENSE';
+  group: { code: string; name: string } | null;
+  /** Before `from`. */
+  opening: Decimal;
+  /** Within the dates, without the closing documents. */
+  period: Decimal;
+  /** At `to`. */
+  closing: Decimal;
+  /** What is on the account before `from` and at `to` with the closing documents left out. */
+  openingUnclosed: Decimal;
+  closingUnclosed: Decimal;
+}
+
 /** One account of the trial balance (ADR-0105 #2); a balance is debit minus credit. */
 export interface FinTrialBalanceRow {
   accountId: number;
@@ -257,6 +279,64 @@ export class FinReports {
       totals.closing = totals.closing.plus(closing);
     }
     return { from: query.from, to: query.to, rows, totals };
+  }
+
+  /**
+   * Each account's balances for the statements (ADR-0184): before `from`, within the dates and at
+   * `to`. Entries of `closingDocTypes` (the year close and its reversal) are left out of the
+   * period and of the two `…Unclosed` balances, which is what an income statement and the result
+   * of the year in a balance sheet read. Accounts without a line are left out.
+   */
+  async statementBalances(
+    ctx: FinCallContext,
+    query: { company: string; from: string; to: string; closingDocTypes: readonly string[] },
+    executor: FinExecutor = this.db,
+  ): Promise<FinStatementBalance[]> {
+    if (!ISO_DATE.test(query.from)) throw invalid('from');
+    if (!ISO_DATE.test(query.to) || query.to < query.from) throw invalid('to');
+    const scope = await this.scope(executor, ctx, query.company);
+    const types =
+      query.closingDocTypes.length === 0
+        ? sql`NULL`
+        : sql.join(
+            query.closingDocTypes.map((type) => sql`${type}`),
+            sql`, `,
+          );
+    const closing = sql`(e.source_doc_type IN (${types}) OR EXISTS (
+        SELECT 1 FROM fin.journal_entries r
+         WHERE r.company_id = e.company_id AND r.id = e.reverses_id
+           AND r.source_doc_type IN (${types})))`;
+    const amount = sql`l.debit - l.credit`;
+    const result = await executor.execute<Row>(sql`
+      SELECT a.id, a.code, a.name, a.kind, g.code AS group_code, g.name AS group_name,
+             coalesce(sum(${amount}) FILTER (WHERE e.entry_date < ${query.from}::date), 0)::text AS opening,
+             coalesce(sum(${amount}), 0)::text AS closing,
+             coalesce(sum(${amount}) FILTER (
+               WHERE e.entry_date >= ${query.from}::date AND NOT ${closing}), 0)::text AS period,
+             coalesce(sum(${amount}) FILTER (
+               WHERE e.entry_date < ${query.from}::date AND NOT ${closing}), 0)::text AS opening_unclosed,
+             coalesce(sum(${amount}) FILTER (WHERE NOT ${closing}), 0)::text AS closing_unclosed
+        FROM fin.accounts a
+        LEFT JOIN fin.account_groups g ON g.company_id = a.company_id AND g.id = a.group_id
+        JOIN fin.journal_lines l ON l.company_id = a.company_id AND l.account_id = a.id
+        JOIN fin.journal_entries e
+          ON e.company_id = l.company_id AND e.id = l.entry_id AND e.entry_date <= ${query.to}::date
+       WHERE a.company_id = ${scope.companyId}
+       GROUP BY a.id, g.code, g.name
+       ORDER BY a.code`);
+    return result.rows.map((row) => ({
+      accountId: int(row.id),
+      code: str(row.code),
+      name: str(row.name),
+      kind: str(row.kind) as FinStatementBalance['kind'],
+      group:
+        row.group_code === null ? null : { code: str(row.group_code), name: str(row.group_name) },
+      opening: dec(row.opening),
+      period: dec(row.period),
+      closing: dec(row.closing),
+      openingUnclosed: dec(row.opening_unclosed),
+      closingUnclosed: dec(row.closing_unclosed),
+    }));
   }
 
   /**

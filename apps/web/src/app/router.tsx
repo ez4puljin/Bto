@@ -94,6 +94,7 @@ import { FinanceSettingsPage } from '@/features/finance/finance-settings-page';
 import { InvoicesPage } from '@/features/finance/invoices-page';
 import { BankStatementsPage } from '@/features/finance/bank-statements-page';
 import { RepCollectionsPage } from '@/features/finance/collections-page';
+import { StatementPrintPage, StatementsPage } from '@/features/finance/statements-page';
 import { RepVisitsPage } from '@/features/sales/visits-page';
 import { TransactionsPage } from '@/features/finance/transactions-page';
 import { JournalPage } from '@/features/finance/journal-page';
@@ -262,6 +263,18 @@ export const routes: RouteObject[] = [
     element: (
       <RequireAuth>
         <StockCountPrintPage />
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // СТ-1 and СТ-2 for paper (ADR-0184).
+    path: '/finance/statements/print',
+    element: (
+      <RequireAuth>
+        <RequirePermission permission="finance.read">
+          <StatementPrintPage />
+        </RequirePermission>
       </RequireAuth>
     ),
     errorElement: <RouteErrorBoundary />,
@@ -1068,6 +1081,11 @@ function financeRoutes(): RouteObject[] {
       element: read(<TrialBalancePage />),
     },
     { path: 'finance/vat', handle: { width: 'wide' }, element: read(<VatReportPage />) },
+    {
+      path: 'finance/statements',
+      handle: { width: 'wide' },
+      element: read(<StatementsPage />),
+    },
     {
       path: 'finance/ebarimt',
       handle: { width: 'wide' },

@@ -407,7 +407,7 @@ The owner's answers (2026-10-23):
 - Vitest `reports-pages.test.tsx`.
 
 **Not built in F6:**
-- the statements СТ-1…СТ-4 and their row mapping (D17);
+- the statements СТ-3 and СТ-4 (D17; СТ-1 and СТ-2 came with ADR-0184: `FinReports.statementBalances` reads each account's balance before, within and at the end of the dates, the closing document types left out of the period);
 - the official VAT-return rows and the e-Barimt compare (D17, D25);
 - income tax (manual);
 - a base on the POS shift's VAT line.
@@ -1068,7 +1068,7 @@ On 2026-10-24 the owner adopted every suggested answer of the accountant questio
 | D12 | Hotel: revenue nightly or at checkout; VAT on a deposit, a forfeit and a refund; city tax at the resort (6331000 / 6313000); nightly VAT through a clearing account? | the PMS posting rules and RES's tax returns | Open (not in the questionnaire) |
 | D15 | Are Bto's daily `Н-` numbers acceptable as legal invoice numbers? What applies to the hotel? | numbering before go-live | **Decided by the owner 2026-10-24 (ADR-0106; 4.4):** the `Н-` numbers stand. Open to the accountant |
 | D16 | Erkhet's chart as it is? Which accounts are receivable, payable, advance, money or clearing (the POS cash and card-clearing accounts included)? Are today's seeded codes the same accounts in Erkhet? After how many days is a clearing balance reported on the DRAIN report, per account? | the chart import; which detail each line must carry; the drain report | **Codes decided by the owner 2026-10-24 (ADR-0106; 2.1–2.4):** Erkhet's chart as it is, 120101 receivable, today's money and seeded codes assumed equal to Erkhet's; the payable account and the drain days still from the accountant |
-| D17 | Which statements does the company file (the business СТ1–СТ4, or the NGO forms Erkhet is set up with)? The VAT-return row set? | the statement and VAT-return templates | Open: the owner chose not to build the statements now (2026-10-24, ADR-0106 #2) |
+| D17 | Which statements does the company file (the business СТ1–СТ4, or the NGO forms Erkhet is set up with)? The VAT-return row set? | the statement and VAT-return templates | Partly decided 2026-11-11 (ADR-0184): the business forms; СТ-1 and СТ-2 are built from the journal with rows as data and accounts linked on a screen. Open: the accountant checks the rows against the filed form, and says how СТ-3 and СТ-4 classify movements; the VAT-return rows |
 | D24 | Is wholesale revenue earned at the SALE stage or on delivery? | month-end cut-off for goods on the road | **Decided by the owner 2026-10-24 (ADR-0106; 4.5):** the «Борлуулалт» stage. Open to the accountant |
 | D25 | The VAT tax point per document type; how GL VAT is reconciled with e-Barimt each month | tax dates on lines; the monthly compare | **Tax point decided by the owner 2026-10-24 (ADR-0106; 3.3):** the document's date; the e-Barimt compare (3.4) comes with the e-Barimt module |
 | D26 | Receivables per branch? Inter-branch lines on cross-branch payments? | balance sheets per branch | **Decided by the owner 2026-10-24 (ADR-0106 #4; 4.6):** company level, the branch on every line; no inter-branch lines. Open to the accountant |

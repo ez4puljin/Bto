@@ -125,6 +125,13 @@ export const ROUTES = [
   { area: 'pricing', name: 'pending', path: '/catalog/pending' },
   { area: 'sales', name: 'rep-visits', path: '/sales/visits' },
   { area: 'sales', name: 'rep-visits-log', path: '/sales/visits?tab=log' },
+  { area: 'finance', name: 'statements', path: '/finance/statements?accounts=1' },
+  {
+    area: 'finance',
+    name: 'statements-income',
+    path: '/finance/statements?kind=INCOME&accounts=1',
+  },
+  { area: 'finance', name: 'statements-print', path: '/finance/statements/print?kind=BALANCE' },
   { area: 'finance', name: 'rep-collections', path: '/finance/collections?status=ALL' },
   { area: 'pricing', name: 'price-labels', path: '/pricing/labels/print?ids={labelIds}' },
   { area: 'pricing', name: 'profiles', path: '/pricing/profiles' },

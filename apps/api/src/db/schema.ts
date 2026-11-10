@@ -134,6 +134,7 @@ export {
   invoiceLines,
   invoices,
   repCollections,
+  statementRowLinks,
 } from '../modules/finance/schema';
 export {
   posCashiers,

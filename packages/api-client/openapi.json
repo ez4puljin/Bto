@@ -30823,6 +30823,182 @@
         ]
       }
     },
+    "/api/v1/finance/reports/statements/{kind}": {
+      "get": {
+        "operationId": "Statements_get",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-12-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Statement"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/reports/statements/{kind}/xlsx": {
+      "get": {
+        "operationId": "Statements_xlsx",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-12-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/statement-links/{accountId}": {
+      "put": {
+        "operationId": "Statements_link",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatementLinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Puts an account on a row of its statement, or back on the default row.",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
     "/api/v1/pos/settings": {
       "get": {
         "operationId": "PosSettings_get",
@@ -73022,6 +73198,201 @@
         "required": [
           "reason"
         ]
+      },
+      "StatementRowAccount": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "example": "100101"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "ASSET",
+              "LIABILITY",
+              "EQUITY",
+              "INCOME",
+              "EXPENSE"
+            ],
+            "type": "string"
+          },
+          "opening": {
+            "type": "string",
+            "nullable": true,
+            "description": "СТ-1: before the period"
+          },
+          "amount": {
+            "type": "string",
+            "example": "1250000.00",
+            "description": "Signed as the row counts it"
+          },
+          "linked": {
+            "type": "boolean",
+            "description": "Put on the row by the accountant, not by the default"
+          }
+        },
+        "required": [
+          "accountId",
+          "code",
+          "name",
+          "kind",
+          "opening",
+          "amount",
+          "linked"
+        ]
+      },
+      "StatementRowResult": {
+        "type": "object",
+        "properties": {
+          "opening": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "opening",
+          "amount"
+        ]
+      },
+      "StatementRow": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "A1_1"
+          },
+          "no": {
+            "type": "string",
+            "example": "1.1.1",
+            "description": "The row's number on the form"
+          },
+          "type": {
+            "enum": [
+              "HEADING",
+              "LINE",
+              "TOTAL"
+            ],
+            "type": "string"
+          },
+          "level": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "opening": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null on a heading"
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatementRowAccount"
+            }
+          },
+          "result": {
+            "nullable": true,
+            "description": "СТ-1's retained earnings: the result not closed yet, inside the amounts",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StatementRowResult"
+              }
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "no",
+          "type",
+          "level",
+          "opening",
+          "amount",
+          "accounts",
+          "result"
+        ]
+      },
+      "StatementDifference": {
+        "type": "object",
+        "properties": {
+          "opening": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "opening",
+          "amount"
+        ]
+      },
+      "Statement": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "BALANCE",
+              "INCOME"
+            ],
+            "type": "string"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatementRow"
+            }
+          },
+          "difference": {
+            "nullable": true,
+            "description": "СТ-1: assets minus liabilities and equity; zero when it balances",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StatementDifference"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "from",
+          "to",
+          "rows",
+          "difference"
+        ]
+      },
+      "StatementLinkRequest": {
+        "type": "object",
+        "properties": {
+          "rowCode": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 16,
+            "example": "I19",
+            "description": "A row of the account's statement; null returns it to the default row"
+          }
+        }
       },
       "PosSettings": {
         "type": "object",

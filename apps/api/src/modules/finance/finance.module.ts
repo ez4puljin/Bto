@@ -69,6 +69,8 @@ import {
   SalesRepCollectionsController,
 } from './controllers/rep-collections.controller';
 import { RepCollectionsService } from './services/rep-collections.service';
+import { StatementsController } from './controllers/statements.controller';
+import { StatementsService } from './services/statements.service';
 import { ReceiptCounterAccountsService } from './services/receipt-counter-accounts.service';
 import { ReceiptMoneyAccountsService } from './services/receipt-money-accounts.service';
 import { StockBooksService } from './services/stock-books.service';
@@ -107,6 +109,7 @@ const SERVICES = [
   StockCountAccountsService,
   BankStatementsService,
   RepCollectionsService,
+  StatementsService,
 ];
 
 /**
@@ -178,6 +181,7 @@ export class FinanceModule {}
     ReportsController,
     SalesRepCollectionsController,
     RepCollectionsController,
+    StatementsController,
   ],
 })
 export class FinanceHttpModule {}

@@ -457,3 +457,19 @@ export const repCollections = pgTable(
     ),
   ],
 );
+
+/**
+ * The accountant's own place for an account on the statements СТ-1 and СТ-2 (ADR-0184): the row's
+ * code of the shared template. An account without a row here lands by its code's prefix. The
+ * account is the Finance Core's (`fin.accounts.id`, no FK); a setting, so a row may be removed.
+ */
+export const statementRowLinks = pgTable(
+  'statement_row_links',
+  {
+    accountId: bigint('account_id', { mode: 'number' }).primaryKey(),
+    rowCode: text('row_code').notNull(),
+    updatedBy: userRef('updated_by'),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check('statement_row_links_row', sql`length(${t.rowCode}) BETWEEN 1 AND 16`)],
+);

@@ -79,6 +79,7 @@ export {
   type FinLedgerReportRow,
   FinReports,
   type FinResultBalance,
+  type FinStatementBalance,
   type FinTrialBalance,
   type FinTrialBalanceRow,
   type FinVatDocument,
