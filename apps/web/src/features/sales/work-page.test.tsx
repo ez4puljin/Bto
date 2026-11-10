@@ -242,6 +242,16 @@ describe('warehouse sales page', () => {
     expect(
       within(confirmed).queryByRole('button', { name: `${mn.sales.work.addHere}: Нярав Хяналт` }),
     ).toBeNull();
+    // The reserving stage is tinted and marked «Нөөцлөнө» with its hint; a plain one is not.
+    expect(confirmed).toHaveAttribute('data-action', 'CONFIRM');
+    expect(confirmed).toHaveClass('bg-info-soft');
+    expect(
+      within(confirmed).getByLabelText(
+        `${mn.sales.stageMarks.CONFIRM}: ${mn.sales.stageActionHints.CONFIRM}`,
+      ),
+    ).toBeInTheDocument();
+    expect(first).toHaveClass('bg-fill/60');
+    expect(within(first).queryByText(mn.sales.stageMarks.CONFIRM)).toBeNull();
     // Every card: how it is paid and who entered it (ADR-0058).
     expect(within(first).getByText(mn.sales.paymentMethods.CREDIT)).toBeInTheDocument();
     expect(within(confirmed).getByText(mn.sales.paymentMethods.CASH)).toBeInTheDocument();

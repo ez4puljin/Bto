@@ -174,6 +174,51 @@ describe('stock queries', () => {
     expect((browse.body as { data: StockJson[] }).data).toHaveLength(3);
   });
 
+  it('filters the list as the product list does, with the count and the pages', async () => {
+    type PageJson = { data: StockJson[]; nextCursor: string | null; total: number | null };
+    const query = async (body: Record<string, unknown>) =>
+      (await http().post('/api/v1/stock/query').set(bearer(worker)).send(body).expect(200))
+        .body as PageJson;
+    const ids = (page: PageJson) => page.data.map((row) => row.product.id);
+
+    // «Only in stock» pages through the products holding stock, the total on the first page.
+    const first = await query({ inStock: true, limit: 1 });
+    expect(first.total).toBe(2);
+    expect(first.data).toHaveLength(1);
+    const second = await query({ inStock: true, limit: 1, cursor: first.nextCursor });
+    expect(second.total).toBeNull();
+    expect([...ids(first), ...ids(second)].sort((a, b) => a - b)).toEqual(
+      [cola.id, rice.id].sort((a, b) => a - b),
+    );
+    expect(second.nextCursor).toBeNull();
+
+    // In one warehouse, its quantities.
+    const inWh2 = await query({ inStock: true, warehouseId: wh2.id });
+    expect(inWh2).toMatchObject({ total: 1, data: [{ onHand: '10' }] });
+    expect(ids(inWh2)).toEqual([rice.id]);
+
+    // A condition on stock in the chosen warehouse narrows every product, stock or not.
+    const outInWh1 = await query({
+      warehouseId: wh1.id,
+      where: {
+        match: 'ALL',
+        groups: [
+          {
+            match: 'ALL',
+            conditions: [{ field: 'stock', op: 'IN_STOCK', warehouseId: wh1.id }],
+          },
+        ],
+      },
+    });
+    expect(outInWh1.total).toBe(1);
+    expect(ids(outInWh1)).toEqual([cola.id]);
+
+    // The stage and the search narrow as in the catalog.
+    expect((await query({ status: 'INACTIVE' })).total).toBe(0);
+    expect(ids(await query({ q: 'кока', inStock: true }))).toEqual([cola.id]);
+    expect((await query({})).total).toBe(3);
+  });
+
   it('shows a product by bin and a bin by product', async () => {
     const product = await http()
       .get(`/api/v1/stock/products/${cola.id}`)

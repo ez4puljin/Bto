@@ -263,3 +263,14 @@ export function missingLabelKey(choice: MissingChoice) {
       return `catalog.products.filters.missingNone.${choice}` as const;
   }
 }
+
+/** The address with every filter field written from `next` (an empty one removed), the rest kept. */
+export function writeFilters(previous: URLSearchParams, next: ProductFilters): URLSearchParams {
+  const params = new URLSearchParams(previous);
+  for (const field of PRODUCT_FILTER_FIELDS) {
+    const value = filterParam(field, next);
+    if (value === null) params.delete(field);
+    else params.set(field, value);
+  }
+  return params;
+}

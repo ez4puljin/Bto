@@ -31,11 +31,28 @@ const toggled = (ids: readonly number[] | undefined, id: number) =>
 const sameDays = (filter: DateFilter | undefined, days: number) =>
   filter !== undefined && 'days' in filter && filter.days === days;
 
+/** The panel's sections: the category tree, the status, and one per filter of the address. */
+export type ProductPanelSection = 'category' | 'status' | ProductFilterField;
+const ALL_SECTIONS: readonly ProductPanelSection[] = [
+  'category',
+  'segment',
+  'status',
+  'supplier',
+  'home',
+  'profile',
+  'price',
+  'stock',
+  'created',
+  'updated',
+  'missing',
+];
+
 /**
  * The product list's left side, after erxes (owner 2026-11-06): the categories on top with their
  * counts, then every filter with its choices in sight. A filter whose choices cannot be listed
  * (suppliers, a price range, chosen dates) opens its dialog. It writes what the list already reads
- * from the address, so a link and «back» keep working.
+ * from the address, so a link and «back» keep working. Another list of products (the stock list,
+ * owner 2026-11-10) shows the sections that make sense for it, in this order.
  */
 export function ProductFilterPanel(props: {
   categories: readonly Category[];
@@ -46,6 +63,10 @@ export function ProductFilterPanel(props: {
   onStage: (stage: ProductStage | undefined) => void;
   filters: ProductFilters;
   onChange: (next: ProductFilters) => void;
+  /** The sections shown (default: all). */
+  sections?: readonly ProductPanelSection[];
+  /** false: the stock section's warehouse is the page's own, so no warehouse choice here. */
+  stockWarehouse?: boolean;
 }) {
   const { t } = useTranslation();
   const { filters } = props;
@@ -59,6 +80,7 @@ export function ProductFilterPanel(props: {
   const set = <F extends ProductFilterField>(field: F, value: ProductFilters[F] | undefined) =>
     props.onChange(withFilter(filters, field, value));
   const inUse = (field: ProductFilterField) => filterParam(field, filters) !== null;
+  const shown = new Set(props.sections ?? ALL_SECTIONS);
   const more = (field: ProductFilterField, label: string) => (
     <button
       type="button"
@@ -94,107 +116,135 @@ export function ProductFilterPanel(props: {
   return (
     <aside aria-label={t('catalog.products.panel.label')} className="hidden w-72 shrink-0 lg:block">
       <ListCard scroll beside>
-        <Section title={t('catalog.product.category')} defaultOpen>
-          <CategoryFilterTree
-            categories={props.categories}
-            selected={props.categoryId}
-            onPick={props.onCategory}
-          />
-        </Section>
-        <Section title={t('catalog.products.filters.fields.segment')} active={inUse('segment')}>
-          <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
-            {(segments.data ?? []).map((segment) => (
+        {shown.has('category') ? (
+          <Section title={t('catalog.product.category')} defaultOpen>
+            <CategoryFilterTree
+              categories={props.categories}
+              selected={props.categoryId}
+              onPick={props.onCategory}
+            />
+          </Section>
+        ) : null}
+        {shown.has('segment') ? (
+          <Section title={t('catalog.products.filters.fields.segment')} active={inUse('segment')}>
+            <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
+              {(segments.data ?? []).map((segment) => (
+                <Option
+                  key={segment.id}
+                  label={segment.name}
+                  active={filters.segment === segment.id}
+                  onClick={() =>
+                    set('segment', filters.segment === segment.id ? undefined : segment.id)
+                  }
+                />
+              ))}
+            </div>
+            <Link
+              to="/segments"
+              className="rounded-md px-2 py-1 text-[0.8125rem] font-medium text-link hover:bg-accent"
+            >
+              {t('catalog.products.panel.manageSegments')}
+            </Link>
+          </Section>
+        ) : null}
+        {shown.has('status') ? (
+          <Section
+            title={t('catalog.product.status')}
+            active={props.stage !== undefined}
+            defaultOpen
+          >
+            {props.stages.map((value) => (
               <Option
-                key={segment.id}
-                label={segment.name}
-                active={filters.segment === segment.id}
-                onClick={() =>
-                  set('segment', filters.segment === segment.id ? undefined : segment.id)
-                }
+                key={value}
+                label={t(`catalog.products.status.${value}`)}
+                active={props.stage === value}
+                onClick={() => props.onStage(props.stage === value ? undefined : value)}
               />
             ))}
-          </div>
-          <Link
-            to="/segments"
-            className="rounded-md px-2 py-1 text-[0.8125rem] font-medium text-link hover:bg-accent"
-          >
-            {t('catalog.products.panel.manageSegments')}
-          </Link>
-        </Section>
-        <Section title={t('catalog.product.status')} active={props.stage !== undefined} defaultOpen>
-          {props.stages.map((value) => (
-            <Option
-              key={value}
-              label={t(`catalog.products.status.${value}`)}
-              active={props.stage === value}
-              onClick={() => props.onStage(props.stage === value ? undefined : value)}
-            />
-          ))}
-        </Section>
-        <Section title={t('catalog.products.filters.fields.supplier')} active={inUse('supplier')}>
-          {more('supplier', t('catalog.products.panel.chooseSuppliers'))}
-        </Section>
-        <Section title={t('catalog.products.filters.fields.home')} active={inUse('home')}>
-          {selling.map((warehouse) => (
-            <Option
-              key={warehouse.id}
-              label={warehouse.name}
-              active={filters.home?.includes(warehouse.id) ?? false}
-              onClick={() => {
-                const next = toggled(filters.home, warehouse.id);
-                set('home', next.length > 0 ? next : undefined);
-              }}
-            />
-          ))}
-        </Section>
-        <Section title={t('catalog.products.filters.fields.profile')} active={inUse('profile')}>
-          {(profiles.data ?? []).map((profile) => (
-            <Option
-              key={profile.id}
-              label={profile.name}
-              active={filters.profile?.includes(profile.id) ?? false}
-              onClick={() => {
-                const next = toggled(filters.profile, profile.id);
-                set('profile', next.length > 0 ? next : undefined);
-              }}
-            />
-          ))}
-        </Section>
-        <Section title={t('catalog.products.filters.fields.price')} active={inUse('price')}>
-          {more('price', t('catalog.products.panel.choosePrice'))}
-        </Section>
-        <Section title={t('catalog.products.filters.fields.stock')} active={inUse('stock')}>
-          {STOCK_KINDS.map((kind) => (
-            <Option
-              key={kind}
-              label={t(`catalog.products.filters.stockKinds.${kind}`)}
-              active={filters.stock?.kind === kind}
-              onClick={() => set('stock', filters.stock?.kind === kind ? undefined : { kind })}
-            />
-          ))}
-          {more('stock', t('catalog.products.panel.chooseWarehouse'))}
-        </Section>
-        {dateSection('created')}
-        {dateSection('updated')}
-        <Section title={t('catalog.products.filters.fields.missing')} active={inUse('missing')}>
-          {MISSING_CHOICES.map((choice) => {
-            const chosen = filters.missing ?? [];
-            const active = chosen.includes(choice);
-            return (
+          </Section>
+        ) : null}
+        {shown.has('supplier') ? (
+          <Section title={t('catalog.products.filters.fields.supplier')} active={inUse('supplier')}>
+            {more('supplier', t('catalog.products.panel.chooseSuppliers'))}
+          </Section>
+        ) : null}
+        {shown.has('home') ? (
+          <Section title={t('catalog.products.filters.fields.home')} active={inUse('home')}>
+            {selling.map((warehouse) => (
               <Option
-                key={choice}
-                label={t(missingLabelKey(choice))}
-                active={active}
+                key={warehouse.id}
+                label={warehouse.name}
+                active={filters.home?.includes(warehouse.id) ?? false}
                 onClick={() => {
-                  const next = active
-                    ? chosen.filter((value) => value !== choice)
-                    : [...chosen, choice];
-                  set('missing', next.length > 0 ? next : undefined);
+                  const next = toggled(filters.home, warehouse.id);
+                  set('home', next.length > 0 ? next : undefined);
                 }}
               />
-            );
-          })}
-        </Section>
+            ))}
+          </Section>
+        ) : null}
+        {shown.has('profile') ? (
+          <Section title={t('catalog.products.filters.fields.profile')} active={inUse('profile')}>
+            {(profiles.data ?? []).map((profile) => (
+              <Option
+                key={profile.id}
+                label={profile.name}
+                active={filters.profile?.includes(profile.id) ?? false}
+                onClick={() => {
+                  const next = toggled(filters.profile, profile.id);
+                  set('profile', next.length > 0 ? next : undefined);
+                }}
+              />
+            ))}
+          </Section>
+        ) : null}
+        {shown.has('price') ? (
+          <Section title={t('catalog.products.filters.fields.price')} active={inUse('price')}>
+            {more('price', t('catalog.products.panel.choosePrice'))}
+          </Section>
+        ) : null}
+        {shown.has('stock') ? (
+          <Section
+            title={t('catalog.products.filters.fields.stock')}
+            active={inUse('stock')}
+            defaultOpen={props.stockWarehouse === false}
+          >
+            {STOCK_KINDS.map((kind) => (
+              <Option
+                key={kind}
+                label={t(`catalog.products.filters.stockKinds.${kind}`)}
+                active={filters.stock?.kind === kind}
+                onClick={() => set('stock', filters.stock?.kind === kind ? undefined : { kind })}
+              />
+            ))}
+            {props.stockWarehouse === false
+              ? null
+              : more('stock', t('catalog.products.panel.chooseWarehouse'))}
+          </Section>
+        ) : null}
+        {shown.has('created') ? dateSection('created') : null}
+        {shown.has('updated') ? dateSection('updated') : null}
+        {shown.has('missing') ? (
+          <Section title={t('catalog.products.filters.fields.missing')} active={inUse('missing')}>
+            {MISSING_CHOICES.map((choice) => {
+              const chosen = filters.missing ?? [];
+              const active = chosen.includes(choice);
+              return (
+                <Option
+                  key={choice}
+                  label={t(missingLabelKey(choice))}
+                  active={active}
+                  onClick={() => {
+                    const next = active
+                      ? chosen.filter((value) => value !== choice)
+                      : [...chosen, choice];
+                    set('missing', next.length > 0 ? next : undefined);
+                  }}
+                />
+              );
+            })}
+          </Section>
+        ) : null}
       </ListCard>
       {dialog ? (
         <ProductFilterDialog

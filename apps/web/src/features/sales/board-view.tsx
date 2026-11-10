@@ -79,14 +79,14 @@ import {
   useStageCards,
 } from './pipelines-api';
 import { canMoveTo } from './stage-moves';
+import { StageMark } from './stage-mark';
+import { PLAIN_COLUMN, STAGE_TONES } from './stage-tones';
 import { useMover } from './use-mover';
 
 const DRAG_TYPE = 'application/x-tugeel-order';
 /** Space kept under the board: the page's bottom padding (`pb-10`). */
 const BELOW_BOARD = 40;
 const INTERACTIVE = 'a, button, input, select, textarea, label, [role="menuitem"]';
-/** The stages that sell or transfer the goods: drawn apart from the plain ones (ADR-0129 #3). */
-const FINAL_ACTIONS: readonly SalesStage['action'][] = ['SALE', 'TRANSFER'];
 /** The orders whose parts are still worked on; afterwards the card drops them. */
 const PICKING_STATUSES: readonly OrderCard['status'][] = ['CONFIRMED', 'PICKING', 'PACKED'];
 
@@ -196,16 +196,17 @@ export function BoardView({
         {stages.map((stage) => {
           const column = cards.data?.find((entry) => entry.stageId === stage.id);
           const more = column ? column.count - column.cards.length : 0;
-          const final = FINAL_ACTIONS.includes(stage.action);
+          // ADR-0129 #3: the columns that hold or move stock are tinted, each action marked.
+          const tone = STAGE_TONES[stage.action];
           return (
             <section
               key={stage.id}
               aria-label={stage.name}
               data-over={over === stage.id ? 'true' : undefined}
-              data-final={final ? 'true' : undefined}
+              data-action={stage.action}
               className={cn(
                 'flex min-h-0 w-72 shrink-0 flex-col rounded-xl p-2 data-[over=true]:ring-2 data-[over=true]:ring-ring/40',
-                final ? 'border border-success/40 bg-success-soft/70' : 'bg-fill/60',
+                tone?.column || PLAIN_COLUMN,
               )}
               onDragOver={(event) => {
                 if (!stage.canMove || !dragging || !allows(dragging.stageId, stage)) return;
@@ -217,7 +218,7 @@ export function BoardView({
             >
               <header className="flex h-9 shrink-0 items-center justify-between gap-1 pr-0.5 pl-2">
                 <h2
-                  className={cn('min-w-0 truncate text-sm font-semibold', final && 'text-success')}
+                  className={cn('min-w-0 truncate text-sm font-semibold', tone?.title)}
                   title={stage.name}
                 >
                   {stage.name}
@@ -263,6 +264,11 @@ export function BoardView({
                   />
                 </div>
               </header>
+              {tone ? (
+                <div className="-mt-1 mb-1.5 flex shrink-0 px-2">
+                  <StageMark action={stage.action} />
+                </div>
+              ) : null}
               {/* overscroll-y only: shift + wheel chains sideways to the board (ADR-0129 #4). */}
               <div className="-mx-1 flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto overscroll-y-contain px-1 py-0.5 [scrollbar-width:thin]">
                 {(column?.cards ?? []).map((card) => (

@@ -42,6 +42,7 @@ import {
 } from './pipelines-api';
 import { useRoleOptions } from './role-options';
 import { StageDialog } from './stage-dialog';
+import { StageMark } from './stage-mark';
 import { DOCUMENT_TEMPLATE_KINDS } from '@tugeel/shared/sales';
 import { useHasPermission } from '@/app/auth-context';
 import { useDocumentTemplates } from './document-templates-api';
@@ -346,14 +347,17 @@ export function PipelineSheet({
                     <span className="w-5 font-mono text-muted-foreground">{index + 1}</span>
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium">{stage.name}</div>
-                      <div className="truncate text-xs text-muted-foreground">
-                        {[
-                          t(`sales.stageActions.${stage.action}`),
-                          stage.printPickList ? t('sales.printKinds.PICK_LIST') : null,
-                          stage.printDeliveryNote ? t('sales.printKinds.DELIVERY_NOTE') : null,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
+                      <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                        <StageMark action={stage.action} />
+                        <span className="truncate">
+                          {[
+                            t(`sales.stageActions.${stage.action}`),
+                            stage.printPickList ? t('sales.printKinds.PICK_LIST') : null,
+                            stage.printDeliveryNote ? t('sales.printKinds.DELIVERY_NOTE') : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </span>
                       </div>
                     </div>
                     <RowActions>
