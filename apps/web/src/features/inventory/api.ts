@@ -75,12 +75,22 @@ export const KEYS = {
 /** Idempotent routes take the key from the caller: one key per user intent (ADR-0004). */
 type Keyed<T> = T & { key: string };
 
+/**
+ * The stock list's filters: the search, the warehouse whose quantities show, «only in stock», and
+ * the product list's filters (category, stage, conditions, a segment; owner 2026-11-10).
+ */
 export interface StockFilter {
   q?: string;
   warehouseId?: number;
   inStock?: boolean;
+  categoryId?: number;
+  status?: Schemas['StockQueryRequest']['status'];
+  saleReady?: boolean;
+  where?: Schemas['StockQueryRequest']['where'];
+  segmentId?: number;
 }
 
+/** The stock list (`POST /stock/query`): rows in the catalog's order, the total on the first page. */
 export function useStock(filter: StockFilter) {
   const api = useApiClient();
   return useInfiniteQuery({
@@ -88,15 +98,18 @@ export function useStock(filter: StockFilter) {
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam, signal }) =>
       unwrap(
-        await api.GET('/api/v1/stock', {
-          params: {
-            query: {
-              q: filter.q || undefined,
-              warehouseId: filter.warehouseId,
-              inStock: filter.inStock,
-              cursor: pageParam,
-              limit: 50,
-            },
+        await api.POST('/api/v1/stock/query', {
+          body: {
+            ...(filter.q ? { q: filter.q } : {}),
+            ...(filter.warehouseId === undefined ? {} : { warehouseId: filter.warehouseId }),
+            ...(filter.inStock ? { inStock: true } : {}),
+            ...(filter.categoryId === undefined ? {} : { categoryId: filter.categoryId }),
+            ...(filter.status === undefined ? {} : { status: filter.status }),
+            ...(filter.saleReady === undefined ? {} : { saleReady: filter.saleReady }),
+            ...(filter.where === undefined ? {} : { where: filter.where }),
+            ...(filter.segmentId === undefined ? {} : { segmentId: filter.segmentId }),
+            ...(pageParam === undefined ? {} : { cursor: pageParam }),
+            limit: 50,
           },
           signal,
         }),

@@ -2358,6 +2358,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stock/query": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The stock list with the product list's filters (owner 2026-11-10): category, stage, conditions
+         *     on the product and a saved segment, in the catalog's order, with the total on the first page.
+         */
+        post: operations["Stock_query"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stock/movements": {
         parameters: {
             query?: never;
@@ -12636,6 +12656,34 @@ export interface components {
         ProductStockPage: {
             data: components["schemas"]["ProductStock"][];
             nextCursor: string | null;
+        };
+        StockQueryRequest: {
+            /** @description nextCursor of the previous page */
+            cursor?: string;
+            /** @default 50 */
+            limit: number;
+            /** @description Name, SKU or barcode, as in the catalog search */
+            q?: string;
+            /** @description Includes its subcategories */
+            categoryId?: number;
+            /** @enum {string} */
+            status?: "ACTIVE" | "INACTIVE";
+            /** @description true: complete products; false: those waiting for prices (ADR-0044) */
+            saleReady?: boolean;
+            /** @description Conditions on the product, as the product list sends them */
+            where?: components["schemas"]["SegmentDefinition"];
+            /** @description A saved product segment; with where, both apply */
+            segmentId?: number;
+            /** @description Show this warehouse’s quantities only */
+            warehouseId?: number;
+            /** @description Without q: only products holding stock (in the warehouse, or in any) */
+            inStock?: boolean;
+        };
+        StockQueryPage: {
+            data: components["schemas"]["ProductStock"][];
+            nextCursor: string | null;
+            /** @description How many products the filters keep; on the first page only */
+            total: number | null;
         };
         StockMovement: {
             id: number;
@@ -28328,6 +28376,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProductStockPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stock_query: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockQueryRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockQueryPage"];
                 };
             };
             /** @description RFC 9457 problem details */

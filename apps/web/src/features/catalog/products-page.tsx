@@ -27,7 +27,6 @@ import { useHiddenColumns } from '@/lib/use-hidden-columns';
 import {
   productQueryBody,
   type ProductQueryFilter,
-  type ProductStatus,
   useCategories,
   useExportProducts,
   useProductIds,
@@ -45,28 +44,18 @@ import { ProductFilterMenu } from './product-filter-menu';
 import { ProductFilterPanel } from './product-filter-panel';
 import {
   activeFilterFields,
-  filterParam,
-  PRODUCT_FILTER_FIELDS,
   type ProductFilters,
   readFilters,
   whereOf,
+  writeFilters,
 } from './product-filters';
-import { type ProductStage } from './product-stage';
+import { listStageOf, PRODUCT_STAGES, STAGE_FILTER } from './product-stage';
 import { type ProductSelection, ProductTable, type ProductTableContext } from './product-table';
 import { useProductSelection } from './use-product-selection';
 
 const positiveId = (value: string | null) => {
   const id = Number.parseInt(value ?? '', 10);
   return Number.isSafeInteger(id) && id > 0 ? id : undefined;
-};
-/** The status pill: complete, waiting for prices (ADR-0044) or not in use. */
-const STAGES: readonly ProductStage[] = ['ACTIVE', 'PENDING', 'INACTIVE'];
-const isStage = (value: string | null): value is ProductStage =>
-  STAGES.some((stage) => stage === value);
-const STAGE_FILTER: Record<ProductStage, { status: ProductStatus; saleReady?: boolean }> = {
-  ACTIVE: { status: 'ACTIVE', saleReady: true },
-  PENDING: { status: 'ACTIVE', saleReady: false },
-  INACTIVE: { status: 'INACTIVE' },
 };
 
 /** The list's name in the column-choice key (ADR-0050). */
@@ -104,8 +93,7 @@ export function ProductsPage() {
   const [search, setSearch] = useState(params.get('q') ?? '');
   const q = useDeferredValue(search.trim());
   const categoryId = positiveId(params.get('category'));
-  const stageParam = params.get('status');
-  const stage = isStage(stageParam) ? stageParam : undefined;
+  const stage = listStageOf(params.get('status'));
   const filters = useMemo(() => readFilters(params), [params]);
   const where = useMemo(() => whereOf(filters), [filters]);
   const filter: ProductQueryFilter = {
@@ -255,18 +243,7 @@ export function ProductsPage() {
     setParams(new URLSearchParams(), { replace: true });
   };
   const applyFilters = (next: ProductFilters) =>
-    setParams(
-      (previous) => {
-        const params = new URLSearchParams(previous);
-        for (const field of PRODUCT_FILTER_FIELDS) {
-          const value = filterParam(field, next);
-          if (value === null) params.delete(field);
-          else params.set(field, value);
-        }
-        return params;
-      },
-      { replace: true },
-    );
+    setParams((previous) => writeFilters(previous, next), { replace: true });
 
   return (
     <div>
@@ -295,7 +272,7 @@ export function ProductsPage() {
           categories={categories.data ?? []}
           categoryId={categoryId}
           onCategory={(id) => setParam('category', id === undefined ? '' : String(id))}
-          stages={STAGES}
+          stages={PRODUCT_STAGES}
           stage={stage}
           onStage={(value) => setParam('status', value ?? '')}
           filters={filters}
@@ -351,7 +328,7 @@ export function ProductsPage() {
               onChange={(event) => setParam('status', event.target.value)}
             >
               <option value="">{t('catalog.products.allStatuses')}</option>
-              {STAGES.map((value) => (
+              {PRODUCT_STAGES.map((value) => (
                 <option key={value} value={value}>
                   {t(`catalog.products.status.${value}`)}
                 </option>

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { type AuthContext, Authenticated, CurrentUser, RequirePermission } from '../../identity';
 import {
@@ -11,6 +11,8 @@ import {
   StockMovementPageDto,
   StockMovementQueryDto,
   StockQueryDto,
+  StockQueryPageDto,
+  StockQueryRequestDto,
 } from '../dto/stock.dto';
 import { StockQueryService } from '../services/stock-query.service';
 import {
@@ -42,6 +44,27 @@ export class StockController {
     return {
       data: page.data.map((row) => toProductStockDto(row, withCosts)),
       nextCursor: page.nextCursor,
+    };
+  }
+
+  /**
+   * The stock list with the product list's filters (owner 2026-11-10): category, stage, conditions
+   * on the product and a saved segment, in the catalog's order, with the total on the first page.
+   */
+  @Post('query')
+  @Authenticated()
+  @HttpCode(200)
+  @ApiOkResponse({ type: StockQueryPageDto })
+  async query(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: StockQueryRequestDto,
+  ): Promise<StockQueryPageDto> {
+    const page = await this.stock.list(body);
+    const withCosts = ctx.permissions.has(COSTS);
+    return {
+      data: page.data.map((row) => toProductStockDto(row, withCosts)),
+      nextCursor: page.nextCursor,
+      total: page.total,
     };
   }
 
