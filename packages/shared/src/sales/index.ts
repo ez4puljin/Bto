@@ -156,6 +156,29 @@ export function isFinished(status: OrderStatus): boolean {
 }
 
 /**
+ * The orders a driver may load onto a truck (ADR-0179 #1): picked (PACKED), or already sold from
+ * their picked counts — the company prints the sale before the truck leaves on some boards.
+ */
+export const LOADABLE_STATUSES: readonly OrderStatus[] = [
+  'PACKED',
+  'DELIVERED',
+  'INVOICED',
+  'CLOSED',
+];
+
+/** The sold states: a loaded order in one of them may ride to its pipeline's loaded stage. */
+export const SOLD_STATUSES: readonly OrderStatus[] = ['DELIVERED', 'INVOICED', 'CLOSED'];
+
+/**
+ * How far back the driver's list reaches (ADR-0179 #1): orders picked within this many days, so an
+ * old order never loaded (before «Ачилт», or picked up at the warehouse) does not stay on it.
+ */
+export const LOADING_WINDOW_DAYS = 14;
+
+/** Orders one «Ачсан» press may name. */
+export const LOADING_MAX_ORDERS = 100;
+
+/**
  * The company's order number format (ADR-0057 #3): literal characters and the tokens `{year}`,
  * `{month}`, `{day}`, rendered with the day the order is created, then a counter of `digits`
  * digits shared by every pipeline (`20261015_0001`). The pattern ends with a character that is

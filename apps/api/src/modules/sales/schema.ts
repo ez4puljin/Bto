@@ -449,6 +449,11 @@ export const salesPipelines = pgTable(
     deliveryNoteTemplateId: ref('delivery_note_template_id').references(
       () => salesDocumentTemplates.id,
     ),
+    /**
+     * ADR-0179 #3: the stage a sold order's card moves into when a driver loads it («Ачигдсан»);
+     * null: the card stays where it is.
+     */
+    loadedStageId: ref('loaded_stage_id'),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdBy: userRef('created_by'),
     createdAt: createdAt(),
@@ -467,6 +472,11 @@ export const salesPipelines = pgTable(
       'sales_pipelines_transfer_store',
       sql`(${t.kind} = 'TRANSFER') = (${t.transferWarehouseId} IS NOT NULL)`,
     ),
+    foreignKey({
+      name: 'sales_pipelines_loaded_stage_fk',
+      columns: [t.id, t.loadedStageId],
+      foreignColumns: [salesStages.pipelineId, salesStages.id],
+    }),
   ],
 );
 
@@ -663,7 +673,8 @@ export const salesStages = pgTable(
     id: id(),
     pipelineId: ref('pipeline_id')
       .notNull()
-      .references(() => salesPipelines.id),
+      // Typed: the pipeline names its loaded stage back (ADR-0179), a cycle TypeScript cannot infer.
+      .references((): AnyPgColumn => salesPipelines.id),
     name: text('name').notNull(),
     position: smallint('position').notNull(),
     action: text('action', { enum: STAGE_ACTIONS }).notNull().default('NONE'),
@@ -754,6 +765,36 @@ export const salesOrderPicks = pgTable(
     check('sales_order_picks_status', inList(t.status, PICK_STATUSES)),
     check('sales_order_picks_picker', sql`(${t.status} = 'OPEN') = (${t.pickerId} IS NULL)`),
     check('sales_order_picks_done', sql`(${t.status} = 'DONE') = (${t.doneAt} IS NOT NULL)`),
+  ],
+);
+
+/**
+ * A driver's loading of an order onto their truck (ADR-0179): who, when, and the card's move into
+ * the pipeline's loaded stage when it made one. At most one live loading per order; a loading
+ * taken back keeps its row with who undid it and when. Never deleted (migration 0096 revokes it).
+ */
+export const salesOrderLoads = pgTable(
+  'sales_order_loads',
+  {
+    id: id(),
+    orderId: ref('order_id')
+      .notNull()
+      .references(() => salesOrders.id),
+    driverId: userRef('driver_id').notNull(),
+    loadedAt: timestamp('loaded_at', { withTimezone: true }).notNull().defaultNow(),
+    /** The card's stage before the loading moved it; both null when the card stayed. */
+    fromStageId: ref('from_stage_id').references(() => salesStages.id),
+    toStageId: ref('to_stage_id').references(() => salesStages.id),
+    undoneAt: timestamp('undone_at', { withTimezone: true }),
+    undoneBy: userRef('undone_by'),
+  },
+  (t) => [
+    uniqueIndex('sales_order_loads_live')
+      .on(t.orderId)
+      .where(sql`${t.undoneAt} IS NULL`),
+    index('sales_order_loads_driver_idx').on(t.driverId, t.loadedAt),
+    check('sales_order_loads_undone', sql`(${t.undoneAt} IS NULL) = (${t.undoneBy} IS NULL)`),
+    check('sales_order_loads_moved', sql`(${t.toStageId} IS NULL OR ${t.fromStageId} IS NOT NULL)`),
   ],
 );
 

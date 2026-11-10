@@ -72,6 +72,8 @@ export interface PipelineInput {
   /** ADR-0143: the document templates; null: the default; absent: kept as they are. */
   pickListTemplateId?: number | null;
   deliveryNoteTemplateId?: number | null;
+  /** ADR-0179 #3: a saved stage of this pipeline running no action; null: none; absent: kept. */
+  loadedStageId?: number | null;
   roles: Record<PipelineRight, readonly number[]>;
   stages: readonly StageInput[];
 }
@@ -278,6 +280,7 @@ export class SalesPipelinesService {
           });
         }
       }
+      await this.applyLoadedStage(tx, id, input.loadedStageId, pipeline.loadedStageId);
       await this.audit.record(tx, ctx, {
         action: 'UPDATE',
         entity: 'sales_pipelines',
@@ -295,6 +298,47 @@ export class SalesPipelinesService {
       });
       if (entries.length > 0) await this.audit.recordMany(tx, ctx, entries);
     });
+  }
+
+  /**
+   * ADR-0179 #3: the loaded stage, after the stages are saved. A stage named in the request must be
+   * a live stage of the pipeline running no action; a kept one that was removed or now acts is
+   * simply cleared.
+   */
+  private async applyLoadedStage(
+    tx: Tx,
+    pipelineId: number,
+    requested: number | null | undefined,
+    current: number | null,
+  ): Promise<void> {
+    const wanted = requested === undefined ? current : requested;
+    let loadedStageId: number | null = null;
+    if (wanted !== null) {
+      const [stage] = await tx
+        .select({ id: salesStages.id })
+        .from(salesStages)
+        .where(
+          and(
+            eq(salesStages.id, wanted),
+            eq(salesStages.pipelineId, pipelineId),
+            isNull(salesStages.archivedAt),
+            eq(salesStages.action, 'NONE'),
+          ),
+        );
+      if (stage) loadedStageId = stage.id;
+      else if (requested !== undefined) {
+        throw invalid(
+          'loadedStageId',
+          'loadedStage',
+          'a live stage of the pipeline with no action',
+        );
+      }
+    }
+    if (loadedStageId === current) return;
+    await tx
+      .update(salesPipelines)
+      .set({ loadedStageId, updatedAt: sql`now()` })
+      .where(eq(salesPipelines.id, pipelineId));
   }
 
   /** ADR-0143: a pipeline's document templates are of their kinds. */
@@ -903,6 +947,7 @@ function summaryOf(input: PipelineInput, name: string) {
     transferWarehouseId: storeOf(input),
     pickListTemplateId: input.pickListTemplateId,
     deliveryNoteTemplateId: input.deliveryNoteTemplateId,
+    loadedStageId: input.loadedStageId,
     roles: rolesFor(input),
   };
 }

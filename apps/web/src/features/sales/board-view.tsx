@@ -16,6 +16,7 @@ import {
   Pencil,
   Plus,
   Printer,
+  Truck,
 } from 'lucide-react';
 import {
   type DragEvent,
@@ -55,6 +56,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
+import { formatUbMinute, formatUbTime } from '@/lib/dayjs';
 import { formatTugrik } from '@/lib/money';
 import { usePrintFormat } from '@/lib/print-format';
 import { problemFromError } from '@/lib/problem';
@@ -635,6 +637,23 @@ function Card({
           {t(`sales.channels.${card.channel}`)}
         </span>
       </div>
+      {card.loading ? (
+        <div
+          className="mt-1 flex items-center gap-1 text-xs font-medium text-success"
+          title={t('sales.boards.card.loadedTitle', {
+            name: card.loading.driverName ?? '',
+            at: formatUbMinute(card.loading.loadedAt),
+          })}
+        >
+          <Truck className="size-3.5" aria-hidden />
+          <span className="truncate">
+            {t('sales.boards.card.loaded', {
+              time: formatUbTime(card.loading.loadedAt),
+              name: card.loading.driverName ?? '',
+            })}
+          </span>
+        </div>
+      ) : null}
     </article>
   );
 }

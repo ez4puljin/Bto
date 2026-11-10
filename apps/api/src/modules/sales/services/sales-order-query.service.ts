@@ -46,6 +46,7 @@ import {
   salesStages,
 } from '../schema';
 import type { OrderFieldChange, OrderLineChange } from './order-changes';
+import { type OrderLoading, SalesLoadingService } from './sales-loading.service';
 import { type Access, SalesAccessService } from './sales-access.service';
 
 type OrderRow = typeof salesOrders.$inferSelect;
@@ -168,6 +169,8 @@ export interface OrderDetail extends Omit<
   picks: PickPart[];
   /** The lines taken off (ADR-0175 #2), the caller's warehouses only. */
   excludedLines: ExcludedLine[];
+  /** Who loaded the order onto a truck and when (ADR-0179); null when not loaded. */
+  loading: OrderLoading | null;
   events: OrderEvent[];
   moves: StageMove[];
   changes: OrderChange[];
@@ -249,6 +252,8 @@ export interface OrderCard {
   picks: CardPick[];
   /** The lines taken off that the caller sees (ADR-0175 #2), the first few named. */
   excluded: CardExcluded;
+  /** Who loaded the order onto a truck and when (ADR-0179); null when not loaded. */
+  loading: OrderLoading | null;
 }
 
 /** The red block of a card: how many lines were taken off, their sum and the first few. */
@@ -299,6 +304,7 @@ export class SalesOrderQueryService {
     private readonly bins: BinsService,
     private readonly names: UserNamesService,
     private readonly picks: SalesPicksService,
+    private readonly loadings: SalesLoadingService,
   ) {}
 
   /**
@@ -467,6 +473,7 @@ export class SalesOrderQueryService {
       rows.map((row) => int(row.id)),
       visible,
     );
+    const loadings = await this.loadings.loadingsOf(rows.map((row) => int(row.id)));
     return stages.map((stage) => {
       const sums = totals.find((entry) => entry.stageId === stage.id);
       return {
@@ -503,6 +510,7 @@ export class SalesOrderQueryService {
                   pickerName,
                 })),
               excluded: cardExcluded(excluded.get(int(row.id)) ?? []),
+              loading: loadings.get(int(row.id)) ?? null,
               createdByName: createdBy === null ? null : (names.get(createdBy) ?? null),
               stageEnteredAt:
                 row.stage_entered_at instanceof Date
@@ -798,6 +806,7 @@ export class SalesOrderQueryService {
     const visible = access.lineWarehouses;
     const seesWarehouse = (warehouseId: number) => visible === null || visible.has(warehouseId);
     const excluded = await this.excludedOf(ids, visible, executor);
+    const loadings = await this.loadings.loadingsOf(ids, executor);
     return orders.map((order) => {
       const {
         createdBy,
@@ -828,6 +837,7 @@ export class SalesOrderQueryService {
           .map((line) => lineView(line, products, units, parts, pickBins)),
         picks: (picks.get(order.id) ?? []).filter((part) => seesWarehouse(part.warehouseId)),
         excludedLines: excluded.get(order.id) ?? [],
+        loading: loadings.get(order.id) ?? null,
         moves: moves
           .filter((move) => move.orderId === order.id)
           .map((move) => ({

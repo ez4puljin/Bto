@@ -37,6 +37,7 @@ import {
   SalesPickAssignRequestDto,
 } from '../dto/sales-orders.dto';
 import { overdueDto } from '../overdue';
+import { loadingDto } from '../dto/sales-loading.dto';
 import { SalesOrderExportService } from '../services/sales-order-export.service';
 import { type OrderDetail, SalesOrderQueryService } from '../services/sales-order-query.service';
 import { type OrderInput, SalesOrdersService } from '../services/sales-orders.service';
@@ -124,6 +125,7 @@ function toDetail(order: OrderDetail): SalesOrderDetailDto {
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
     picks: order.picks.map(partDto),
+    loading: loadingDto(order.loading),
     excludedLines: order.excludedLines.map((line) => ({
       id: line.id,
       productId: line.productId,

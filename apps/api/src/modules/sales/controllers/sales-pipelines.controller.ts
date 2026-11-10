@@ -23,6 +23,7 @@ import {
 } from '../dto/sales-boards.dto';
 import { overdueDto } from '../overdue';
 import { READ } from '../services/sales-access.service';
+import { loadingDto } from '../dto/sales-loading.dto';
 import { SalesOrderQueryService } from '../services/sales-order-query.service';
 import { SalesOrdersService } from '../services/sales-orders.service';
 import {
@@ -44,6 +45,7 @@ export function toPipelineDto(detail: PipelineDetail): SalesPipelineDto {
     transferWarehouseId: pipeline.transferWarehouseId,
     pickListTemplateId: pipeline.pickListTemplateId,
     deliveryNoteTemplateId: pipeline.deliveryNoteTemplateId,
+    loadedStageId: pipeline.loadedStageId,
     archivedAt: pipeline.archivedAt?.toISOString() ?? null,
     createdAt: pipeline.createdAt.toISOString(),
     roles: pipeline.roles,
@@ -78,6 +80,7 @@ const inputOf = (body: SalesPipelineRequestDto): PipelineInput => ({
   ...(body.deliveryNoteTemplateId !== undefined
     ? { deliveryNoteTemplateId: body.deliveryNoteTemplateId }
     : {}),
+  ...(body.loadedStageId !== undefined ? { loadedStageId: body.loadedStageId } : {}),
   roles: body.roles,
   stages: body.stages.map((stage) => ({
     id: stage.id ?? null,
@@ -141,6 +144,7 @@ export class SalesPipelinesController {
           })),
         },
         stageEnteredAt: card.stageEnteredAt.toISOString(),
+        loading: loadingDto(card.loading),
       })),
     }));
   }

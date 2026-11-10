@@ -43,6 +43,7 @@ const pipeline = (fields: Partial<PipelineView> = {}): PipelineView => ({
   transferWarehouseId: null,
   pickListTemplateId: null,
   deliveryNoteTemplateId: null,
+  loadedStageId: null,
   visibility: 'PUBLIC',
   ownOrdersOnly: false,
   archivedAt: null,

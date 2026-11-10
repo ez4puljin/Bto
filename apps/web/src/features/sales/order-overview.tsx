@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useOrderInvoice } from '@/features/finance/api';
 import { SettlementBadge } from '@/features/finance/badges';
 import { useBranches } from '@/features/identity/api';
-import { formatUbDateTime } from '@/lib/dayjs';
+import { formatUbDateTime, formatUbMinute } from '@/lib/dayjs';
 import { formatTugrik } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import type { SalesOrder } from './api';
@@ -94,6 +94,17 @@ export function OrderOverview({
         at: formatUbDateTime(Date.parse(order.createdAt)),
       }),
     },
+    ...(order.loading
+      ? [
+          {
+            label: t('sales.order.loaded'),
+            value: t('sales.order.loadedValue', {
+              name: order.loading.driverName ?? t('sales.panel.activity.someone'),
+              at: formatUbMinute(order.loading.loadedAt),
+            }),
+          },
+        ]
+      : []),
     ...(invoiced
       ? [
           {

@@ -71,7 +71,7 @@ describe('usernames', () => {
 
 describe('system role permissions (ADR-0165)', () => {
   it('keeps the code set until an admin changes it', () => {
-    expect(systemRolePermissions('DRIVER', [])).toEqual([]);
+    expect(systemRolePermissions('DRIVER', [])).toEqual(['sales.orders.load']);
     expect([...systemRolePermissions('HR', [])].sort()).toEqual(
       [...SYSTEM_ROLE_PERMISSIONS.HR].sort(),
     );
@@ -90,7 +90,7 @@ describe('system role permissions (ADR-0165)', () => {
   it('ignores a code that left the catalog and never takes the locked rights from ADMIN', () => {
     expect(
       systemRolePermissions('DRIVER', [{ permissionCode: 'gone.right', granted: true }]),
-    ).toEqual([]);
+    ).toEqual(['sales.orders.load']);
     const admin = systemRolePermissions(
       'ADMIN',
       ADMIN_LOCKED_PERMISSIONS.map((permissionCode) => ({ permissionCode, granted: false })),

@@ -8,6 +8,8 @@ import { PricingModule } from '../pricing';
 import { SalesBoardsController } from './controllers/sales-boards.controller';
 import { SalesOrdersController } from './controllers/sales-orders.controller';
 import { SalesPicksController } from './controllers/sales-picks.controller';
+import { SalesLoadingController } from './controllers/sales-loading.controller';
+import { SalesLoadingService } from './services/sales-loading.service';
 import {
   SalesPipelinesController,
   SalesStagesController,
@@ -52,6 +54,7 @@ import { LiveStockHub } from './services/live-stock.hub';
     SalesOrderExportService,
     SalesOrdersService,
     SalesPicksService,
+    SalesLoadingService,
     SalesRepOrdersService,
     SalesRepShopService,
     CustomerOrdersService,
@@ -68,6 +71,7 @@ import { LiveStockHub } from './services/live-stock.hub';
     SalesOrderExportService,
     SalesOrdersService,
     SalesPicksService,
+    SalesLoadingService,
     SalesRepOrdersService,
     SalesRepShopService,
     CustomerOrdersService,
@@ -101,6 +105,7 @@ export class SalesLiveModule {}
     SalesRepController,
     SalesRepLiveStockController,
     SalesPicksController,
+    SalesLoadingController,
   ],
 })
 export class SalesHttpModule {}
