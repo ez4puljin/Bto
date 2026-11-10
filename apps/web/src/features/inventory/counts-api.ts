@@ -30,9 +30,21 @@ export type StockCountScope = StockCountCreate['scopeMode'];
 export type StockCountStatus = StockCountSummary['status'];
 export type StockCountUncounted = Schemas['StockCountApproveRequest']['uncounted'];
 export type StockCountAccountChoice = Schemas['StockCountAccountChoice'];
+export type StockCountSheet = Schemas['StockCountSheet'];
+export type StockCountSheetRow = Schemas['StockCountSheetRow'];
+export type StockCountSheetTotals = Schemas['StockCountSheetTotals'];
 
-export const COUNT_LINE_FILTERS = ['ALL', 'COUNTED', 'UNCOUNTED', 'DIFFERENT', 'MOVED'] as const;
-export type StockCountLineFilter = (typeof COUNT_LINE_FILTERS)[number];
+/** The count sheet's views (ADR-0177), the differences first as on the old sheet. */
+export const SHEET_FILTERS = ['DIFFERENT', 'MATCHED', 'UNLISTED', 'UNCOUNTED', 'ALL'] as const;
+export type StockCountSheetFilter = (typeof SHEET_FILTERS)[number];
+
+export interface StockCountSheetQuery {
+  filter: StockCountSheetFilter;
+  q?: string;
+  supplierId?: number;
+  categoryId?: number;
+  segmentId?: number;
+}
 
 const COUNTS = ['inventory', 'counts'] as const;
 
@@ -71,30 +83,21 @@ export function useStockCount(id: number) {
   });
 }
 
-export function useStockCountLines(
-  id: number,
-  filter: StockCountLineFilter,
-  q: string,
-  live: boolean,
-) {
+/** Every product of the count the filters keep, with the tiles over the whole count (ADR-0177). */
+export function useStockCountSheet(id: number, query: StockCountSheetQuery, live: boolean) {
   const api = useApiClient();
-  return useInfiniteQuery({
-    queryKey: [...COUNTS, id, 'lines', filter, q],
+  return useQuery({
+    queryKey: [...COUNTS, id, 'sheet', query],
     enabled: Number.isInteger(id),
-    initialPageParam: undefined as string | undefined,
     refetchInterval: live ? 15_000 : false,
-    queryFn: async ({ pageParam, signal }) =>
+    placeholderData: keepPreviousData,
+    queryFn: async ({ signal }) =>
       unwrap(
-        await api.GET('/api/v1/stock-counts/{id}/lines', {
-          params: {
-            path: { id },
-            query: { filter, q: q || undefined, cursor: pageParam, limit: 100 },
-          },
+        await api.GET('/api/v1/stock-counts/{id}/sheet', {
+          params: { path: { id }, query: { ...query, q: query.q || undefined } },
           signal,
         }),
       ),
-    getNextPageParam: (page) => page.nextCursor ?? undefined,
-    placeholderData: keepPreviousData,
   });
 }
 
@@ -244,6 +247,18 @@ export function useStockCountMutations() {
           }),
         ),
       onSuccess: changed,
+    }),
+    /** Why a product differs; an empty text clears it. */
+    reason: useMutation({
+      mutationFn: async ({ id, lineId, reason }: { id: number; lineId: number; reason: string }) =>
+        unwrap(
+          await api.PUT('/api/v1/stock-counts/{id}/lines/{lineId}/reason', {
+            params: { path: { id, lineId } },
+            body: { reason: reason.trim() === '' ? null : reason.trim() },
+          }),
+        ),
+      onSuccess: (_data, input) =>
+        queryClient.invalidateQueries({ queryKey: [...COUNTS, input.id, 'sheet'] }),
     }),
     sendFor: useMutation({
       mutationFn: async ({ id, sessionId }: { id: number; sessionId: number }) =>

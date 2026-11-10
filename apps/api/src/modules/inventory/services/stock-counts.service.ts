@@ -38,7 +38,7 @@ import {
   ScopeService,
   UserNamesService,
 } from '../../identity';
-import { CustomersService, SuppliersService } from '../../partners';
+import { CustomersService, ProductSuppliersService, SuppliersService } from '../../partners';
 import {
   SALE_PRICE_READER,
   type SalePriceReader,
@@ -80,7 +80,8 @@ type LineRow = typeof stockCountLines.$inferSelect;
 export type CountScopeMode = (typeof COUNT_SCOPE_MODES)[number];
 export type CountUncountedMode = (typeof COUNT_UNCOUNTED_MODES)[number];
 export type CountPartyKind = (typeof COUNT_PARTY_KINDS)[number];
-export type CountLineFilter = 'ALL' | 'COUNTED' | 'UNCOUNTED' | 'DIFFERENT' | 'MOVED';
+export type CountLineFilter =
+  'ALL' | 'COUNTED' | 'UNCOUNTED' | 'DIFFERENT' | 'MATCHED' | 'UNLISTED' | 'MOVED';
 
 const MANAGE = 'inventory.stocktakes.manage';
 const APPROVE = 'inventory.stocktakes.approve';
@@ -89,6 +90,9 @@ const COSTS = 'inventory.costs.manage';
 const COUNTED_KINDS = ['WHOLESALE', 'STORE'];
 const MAX_SCOPE_IDS = 50;
 const MAX_SEARCH_IDS = 500;
+/** The most rows the count sheet answers at once (ADR-0177). */
+const MAX_SHEET_ROWS = 10_000;
+const MAX_REASON = 500;
 const CHUNK = 1000;
 const ZERO = new Decimal(0);
 
@@ -199,6 +203,7 @@ export interface StockCountLine {
   settlement: CountSettlement;
   unitCost: Decimal | null;
   chargeAmount: Decimal | null;
+  reason: string | null;
 }
 
 export interface StockCountLineQuery {
@@ -206,6 +211,64 @@ export interface StockCountLineQuery {
   q?: string;
   cursor?: string;
   limit?: number;
+}
+
+export interface CountSheetQuery {
+  filter?: CountLineFilter;
+  q?: string;
+  supplierId?: number;
+  categoryId?: number;
+  segmentId?: number;
+}
+
+/** One product on the count sheet (ADR-0177): the difference in pieces and at the selling price. */
+export interface CountSheetRow {
+  lineId: number;
+  productId: number;
+  sku: string;
+  name: string;
+  unitName: string;
+  listed: boolean;
+  supplierId: number | null;
+  supplierName: string | null;
+  expectedQty: Decimal | null;
+  countedQty: Decimal | null;
+  pendingQty: Decimal;
+  differenceQty: Decimal | null;
+  salePrice: Decimal | null;
+  differenceAmount: Decimal | null;
+  reason: string | null;
+  movedDuring: Decimal;
+  movedAfter: Decimal;
+}
+
+/** The whole count, whatever the filter: the sheet's tiles. */
+export interface CountSheetTotals {
+  lines: number;
+  counted: number;
+  uncounted: number;
+  unlisted: number;
+  matched: number;
+  different: number;
+  surplusLines: number;
+  surplusQty: Decimal;
+  surplusAmount: Decimal;
+  shortageLines: number;
+  shortageQty: Decimal;
+  shortageAmount: Decimal;
+  netQty: Decimal;
+  netAmount: Decimal;
+  /** Differences whose product has no selling price: left out of the amounts. */
+  unpriced: number;
+}
+
+export interface CountSheet {
+  priceDate: string;
+  totals: CountSheetTotals;
+  /** The main suppliers of the count's products, by name: the sheet's filter. */
+  suppliers: { id: number; name: string }[];
+  rows: CountSheetRow[];
+  truncated: boolean;
 }
 
 export interface StockCountEntry {
@@ -381,6 +444,7 @@ export class StockCountsService implements OnModuleInit {
     private readonly org: OrgService,
     private readonly posting: StockPostingService,
     private readonly productQuery: ProductQueryService,
+    private readonly productSuppliers: ProductSuppliersService,
     private readonly scope: ScopeService,
     private readonly stock: StockQueryService,
     private readonly suppliers: SuppliersService,
@@ -660,6 +724,8 @@ export class StockCountsService implements OnModuleInit {
           : sql`${stockCountLines.countedQty} <> ${stockCountLines.expectedQty}`,
       );
     }
+    if (filter === 'MATCHED') filters.push(matchedSql(header));
+    if (filter === 'UNLISTED') filters.push(eq(stockCountLines.listed, false));
     if (filter === 'MOVED') {
       if (moved.size === 0) return { data: [], nextCursor: null };
       filters.push(inArray(stockCountLines.productId, [...moved.keys()]));
@@ -717,9 +783,185 @@ export class StockCountsService implements OnModuleInit {
               : { accountCode: null, party: null, charged: false },
         unitCost: seesCosts ? row.unitCost : null,
         chargeAmount: row.chargeAmount,
+        reason: row.reason,
       };
     });
     return { data, nextCursor: page.nextCursor };
+  }
+
+  /**
+   * The count sheet (ADR-0177): every product with its main supplier, the difference in pieces
+   * and at the warehouse selling price (on the approval day, today before it), the tiles over the
+   * whole count and the rows the filters keep, by supplier and name.
+   */
+  async sheet(id: number, query: CountSheetQuery): Promise<CountSheet> {
+    const header = await this.header(this.db, id);
+    const approved = header.status === 'APPROVED';
+    const lineRows = await this.db
+      .select()
+      .from(stockCountLines)
+      .where(eq(stockCountLines.stocktakeId, id))
+      .orderBy(asc(stockCountLines.id));
+    const productIds = lineRows.map((row) => row.productId);
+    const products = new Map<number, Awaited<ReturnType<CatalogService['getMany']>>[number]>();
+    const mainSupplier = new Map<number, number>();
+    for (const part of chunksOf(productIds)) {
+      for (const product of await this.catalog.getMany(part)) products.set(product.id, product);
+      for (const [productId, supplierId] of await this.productSuppliers.mainSupplierOf(part)) {
+        mainSupplier.set(productId, supplierId);
+      }
+    }
+    const supplierNames = new Map(
+      (await this.suppliers.getMany([...new Set(mainSupplier.values())])).map((row) => [
+        row.id,
+        row.name,
+      ]),
+    );
+    const priceDate = header.effectiveDate ?? businessDate();
+    const prices = new Map<number, Decimal>();
+    if (this.salePrices && productIds.length > 0) {
+      const reader = this.salePrices;
+      await inTransaction(this.db, async (tx) => {
+        for (const part of chunksOf(productIds)) {
+          for (const [productId, price] of await reader.warehousePricesInTx(tx, part, priceDate)) {
+            prices.set(productId, price);
+          }
+        }
+      });
+    }
+    const pending = await this.pendingOf(id);
+    const moved = await this.posting.countMovedSince(id);
+
+    const all = lineRows.map((row): CountSheetRow => {
+      const product = products.get(row.productId);
+      const supplierId = mainSupplier.get(row.productId) ?? null;
+      const difference = approved
+        ? row.differenceQty
+        : row.countedQty && row.expectedQty
+          ? row.countedQty.minus(row.expectedQty)
+          : null;
+      const price = prices.get(row.productId) ?? null;
+      return {
+        lineId: row.id,
+        productId: row.productId,
+        sku: product?.sku ?? '',
+        name: product?.name ?? '',
+        unitName: product?.baseUnit.uomName ?? '',
+        listed: row.listed,
+        supplierId,
+        supplierName: supplierId === null ? null : (supplierNames.get(supplierId) ?? null),
+        expectedQty: row.expectedQty,
+        countedQty: row.countedQty,
+        pendingQty: pending.get(row.productId) ?? ZERO,
+        differenceQty: difference,
+        salePrice: price,
+        differenceAmount:
+          difference === null || price === null ? null : toWholeMnt(price.times(difference)),
+        reason: row.reason,
+        movedDuring: moved.get(row.productId)?.during ?? ZERO,
+        movedAfter: moved.get(row.productId)?.after ?? ZERO,
+      };
+    });
+    const totals = sheetTotals(all);
+
+    let kept = all.filter((row) => keepsRow(row, query.filter ?? 'ALL', moved));
+    if (query.supplierId !== undefined) {
+      kept = kept.filter((row) => row.supplierId === query.supplierId);
+    }
+    const q = query.q?.trim();
+    if (q || query.categoryId !== undefined || query.segmentId !== undefined) {
+      const onlyIds = kept.map((row) => row.productId);
+      const found =
+        onlyIds.length === 0
+          ? { ids: [] }
+          : await this.productQuery.orderedIds(
+              {
+                onlyIds,
+                ...(q ? { q } : {}),
+                ...(query.segmentId === undefined ? {} : { segmentId: query.segmentId }),
+                ...(query.categoryId === undefined
+                  ? {}
+                  : {
+                      where: {
+                        match: 'ALL' as const,
+                        groups: [
+                          {
+                            match: 'ALL' as const,
+                            conditions: [
+                              { field: 'category', op: 'IN' as const, ids: [query.categoryId] },
+                            ],
+                          },
+                        ],
+                      },
+                    }),
+              },
+              onlyIds.length,
+            );
+      const keep = new Set(found.ids);
+      kept = kept.filter((row) => keep.has(row.productId));
+    }
+    kept.sort(bySupplierAndName);
+    const suppliers = [...supplierNames]
+      .map(([supplierId, name]) => ({ id: supplierId, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'mn'));
+    return {
+      priceDate,
+      totals,
+      suppliers,
+      rows: kept.slice(0, MAX_SHEET_ROWS),
+      truncated: kept.length > MAX_SHEET_ROWS,
+    };
+  }
+
+  /** Each product's unsent quantity: counted on a phone, not in the window yet. */
+  private async pendingOf(stocktakeId: number): Promise<Map<number, Decimal>> {
+    const rows = await this.db
+      .select({
+        productId: stockCountEntries.productId,
+        qty: sql<string>`sum(${stockCountEntries.qtyBase})::text`,
+      })
+      .from(stockCountEntries)
+      .innerJoin(stockCountSessions, eq(stockCountSessions.id, stockCountEntries.sessionId))
+      .where(
+        and(
+          eq(stockCountEntries.stocktakeId, stocktakeId),
+          isNull(stockCountEntries.voidedAt),
+          isNull(stockCountSessions.sentAt),
+        ),
+      )
+      .groupBy(stockCountEntries.productId);
+    return new Map(rows.map((row) => [row.productId, new Decimal(row.qty)]));
+  }
+
+  /** Why a product differs, written in the window until the count is approved (ADR-0177). */
+  async setReason(
+    ctx: AuthContext,
+    id: number,
+    lineId: number,
+    reason: string | null,
+  ): Promise<void> {
+    const text = optionalText(reason ?? undefined) ?? null;
+    if (text !== null && text.length > MAX_REASON) {
+      throw invalid('reason', 'maxLength', `at most ${MAX_REASON} characters`);
+    }
+    await inTransaction(this.db, async (tx) => {
+      const header = await this.lockCount(tx, id, 'update');
+      this.scope.assertCanWriteWarehouse(ctx, header.warehouseId);
+      assertState(header, 'COUNTING', 'REVIEW');
+      const line = await this.line(tx, id, lineId);
+      if (line.reason === text) return;
+      await tx
+        .update(stockCountLines)
+        .set({ reason: text, updatedAt: sql`now()` })
+        .where(eq(stockCountLines.id, lineId));
+      await this.audit.record(tx, ctx, {
+        action: 'UPDATE',
+        entity: 'stocktakes',
+        entityId: id,
+        before: { lineId, productId: line.productId, reason: line.reason },
+        after: { lineId, productId: line.productId, reason: text },
+      });
+    });
   }
 
   /** Who counted each product: sent and unsent quantities by counter. */
@@ -1814,6 +2056,93 @@ export class StockCountsService implements OnModuleInit {
       );
     return row ?? null;
   }
+}
+
+/** A line whose count equals the stock (before the approval) or that posted nothing (after). */
+function matchedSql(header: HeaderRow): SQL {
+  return header.status === 'APPROVED'
+    ? sql`${stockCountLines.differenceQty} = 0`
+    : sql`${stockCountLines.countedQty} = ${stockCountLines.expectedQty}`;
+}
+
+function keepsRow(
+  row: CountSheetRow,
+  filter: CountLineFilter,
+  moved: ReadonlyMap<number, unknown>,
+): boolean {
+  switch (filter) {
+    case 'ALL':
+      return true;
+    case 'COUNTED':
+      return row.countedQty !== null;
+    case 'UNCOUNTED':
+      return row.countedQty === null && row.listed;
+    case 'DIFFERENT':
+      return row.differenceQty !== null && !row.differenceQty.isZero();
+    case 'MATCHED':
+      return row.differenceQty !== null && row.differenceQty.isZero();
+    case 'UNLISTED':
+      return !row.listed;
+    case 'MOVED':
+      return moved.has(row.productId);
+  }
+}
+
+function sheetTotals(rows: readonly CountSheetRow[]): CountSheetTotals {
+  const totals: CountSheetTotals = {
+    lines: rows.length,
+    counted: 0,
+    uncounted: 0,
+    unlisted: 0,
+    matched: 0,
+    different: 0,
+    surplusLines: 0,
+    surplusQty: ZERO,
+    surplusAmount: ZERO,
+    shortageLines: 0,
+    shortageQty: ZERO,
+    shortageAmount: ZERO,
+    netQty: ZERO,
+    netAmount: ZERO,
+    unpriced: 0,
+  };
+  for (const row of rows) {
+    if (row.countedQty !== null) totals.counted += 1;
+    else if (row.listed) totals.uncounted += 1;
+    if (!row.listed) totals.unlisted += 1;
+    const difference = row.differenceQty;
+    if (difference === null) continue;
+    if (difference.isZero()) {
+      totals.matched += 1;
+      continue;
+    }
+    totals.different += 1;
+    const amount = row.differenceAmount ?? ZERO;
+    if (row.differenceAmount === null) totals.unpriced += 1;
+    if (difference.gt(0)) {
+      totals.surplusLines += 1;
+      totals.surplusQty = totals.surplusQty.plus(difference);
+      totals.surplusAmount = totals.surplusAmount.plus(amount);
+    } else {
+      totals.shortageLines += 1;
+      totals.shortageQty = totals.shortageQty.plus(difference);
+      totals.shortageAmount = totals.shortageAmount.plus(amount);
+    }
+    totals.netQty = totals.netQty.plus(difference);
+    totals.netAmount = totals.netAmount.plus(amount);
+  }
+  return totals;
+}
+
+/** By main supplier's name (products without one last), then by product name. */
+function bySupplierAndName(a: CountSheetRow, b: CountSheetRow): number {
+  if (a.supplierName !== b.supplierName) {
+    if (a.supplierName === null) return 1;
+    if (b.supplierName === null) return -1;
+    const bySupplier = a.supplierName.localeCompare(b.supplierName, 'mn');
+    if (bySupplier !== 0) return bySupplier;
+  }
+  return a.name.localeCompare(b.name, 'mn') || a.lineId - b.lineId;
 }
 
 export { MANAGE as STOCK_COUNT_MANAGE };

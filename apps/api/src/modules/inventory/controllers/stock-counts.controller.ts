@@ -30,8 +30,11 @@ import {
   StockCountDetailDto,
   StockCountEntryDto,
   StockCountLinePageDto,
+  StockCountLineReasonDto,
   StockCountLineSettlementDto,
   StockCountLinesQueryDto,
+  StockCountSheetDto,
+  StockCountSheetQueryDto,
   StockCountListQueryDto,
   StockCountMovedDocumentDto,
   StockCountPageDto,
@@ -48,6 +51,7 @@ import {
   toStockCountLineDto,
   toStockCountMovedDto,
   toStockCountProductInfoDto,
+  toStockCountSheetDto,
   toStockCountSummaryDto,
   toStockCountVarianceRowDto,
 } from './mappers';
@@ -177,6 +181,40 @@ export class StockCountsController {
       ...(query.limit === undefined ? {} : { limit: query.limit }),
     });
     return { data: page.data.map(toStockCountLineDto), nextCursor: page.nextCursor };
+  }
+
+  /** Every product of the count with its supplier and its difference at the selling price. */
+  @Get(':id/sheet')
+  @Authenticated()
+  @ApiOkResponse({ type: StockCountSheetDto })
+  async sheet(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: StockCountSheetQueryDto,
+  ): Promise<StockCountSheetDto> {
+    assertWindow(ctx);
+    return toStockCountSheetDto(
+      await this.counts.sheet(id, {
+        ...(query.filter === undefined ? {} : { filter: query.filter }),
+        ...(query.q === undefined ? {} : { q: query.q }),
+        ...(query.supplierId === undefined ? {} : { supplierId: query.supplierId }),
+        ...(query.categoryId === undefined ? {} : { categoryId: query.categoryId }),
+        ...(query.segmentId === undefined ? {} : { segmentId: query.segmentId }),
+      }),
+    );
+  }
+
+  /** Why a product differs; empty clears it. */
+  @Put(':id/lines/:lineId/reason')
+  @HttpCode(204)
+  @RequirePermission(APPROVE)
+  async setReason(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('lineId', ParseIntPipe) lineId: number,
+    @Body() dto: StockCountLineReasonDto,
+  ): Promise<void> {
+    await this.counts.setReason(ctx, id, lineId, dto.reason ?? null);
   }
 
   /** Who counted a product, entry by entry. */

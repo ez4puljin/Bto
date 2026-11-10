@@ -23,6 +23,7 @@ import { AdjustmentPage, AdjustmentsPage } from '@/features/inventory/adjustment
 import { BinsPage } from '@/features/inventory/bins-page';
 import { ExpiryPage } from '@/features/expiry/expiry-page';
 import { ExpiryPrintPage } from '@/features/expiry/expiry-print-page';
+import { StockCountPrintPage } from '@/features/inventory/stock-count-print-page';
 import { LowStockPage } from '@/features/inventory/low-stock-page';
 import { BinMovesPage } from '@/features/inventory/moves-page';
 import { IssueConfirmPage } from '@/features/inventory/issue-confirm-page';
@@ -238,6 +239,16 @@ export const routes: RouteObject[] = [
     element: (
       <RequireAuth>
         <ExpiryPrintPage />
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // The count sheet as its window's view shows it, on paper or as a PDF (ADR-0177).
+    path: '/inventory/counts/:id/print',
+    element: (
+      <RequireAuth>
+        <StockCountPrintPage />
       </RequireAuth>
     ),
     errorElement: <RouteErrorBoundary />,

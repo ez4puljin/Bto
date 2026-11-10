@@ -13,6 +13,8 @@ import {
 } from '@/lib/print-format';
 import { problemFromError } from '@/lib/problem';
 
+const LANDSCAPE_RULE = '@page { size: A4 landscape; margin: 10mm; }';
+
 /**
  * The paper of every printable page (ADR-0058; one frame since ADR-0066): `?format=` or this
  * computer's choice, its `@page`, an A4 sheet or an 80 mm strip on the screen. Above the paper,
@@ -20,24 +22,21 @@ import { problemFromError } from '@/lib/problem';
  * The browser's print dialog opens once, when the document is ready; a later render never cancels
  * the pending print.
  */
-export function PrintFrame({
-  ready,
-  error,
-  title,
-  printLabel,
-  children,
-}: {
+export function PrintFrame(props: {
   ready: boolean;
   error: unknown;
   title: string;
   /** The print button's name when the page names it itself («Хэвлэх» otherwise). */
   printLabel?: string;
+  /** A wide sheet: always A4 across, no 80 mm choice (the count sheet, ADR-0177). */
+  landscape?: boolean;
   children: (narrow: boolean) => ReactNode;
 }) {
+  const { ready, error, title, printLabel, children } = props;
   const { t } = useTranslation();
   const [search, setSearch] = useSearchParams();
   const [saved, choose] = usePrintFormat();
-  const format = parsePrintFormat(search.get('format')) ?? saved;
+  const format = props.landscape ? 'A4' : (parsePrintFormat(search.get('format')) ?? saved);
   const narrow = format === 'MM80';
   const printed = useRef(false);
   useEffect(() => {
@@ -64,9 +63,9 @@ export function PrintFrame({
   };
   return (
     <div className="p-6 text-foreground print:p-0">
-      <style>{PAGE_RULES[format]}</style>
+      <style>{props.landscape ? LANDSCAPE_RULE : PAGE_RULES[format]}</style>
       <div className="mx-auto mb-4 flex max-w-3xl flex-wrap items-center gap-2 print:hidden">
-        <PrintFormatToggle value={format} onChange={change} />
+        {props.landscape ? null : <PrintFormatToggle value={format} onChange={change} />}
         <Button disabled={!ready} onClick={() => window.print()}>
           {printLabel ?? t('common.print')}
         </Button>
@@ -80,9 +79,11 @@ export function PrintFrame({
       <div
         data-format={format}
         className={
-          narrow
-            ? 'mx-auto w-[80mm] max-w-full bg-background px-[4mm] py-[3mm] text-xs leading-snug shadow-card print:mx-0 print:w-full print:max-w-[80mm] print:shadow-none'
-            : 'mx-auto max-w-3xl bg-background p-6 text-sm print:max-w-none print:p-0'
+          props.landscape
+            ? 'mx-auto max-w-[277mm] bg-background p-6 text-xs shadow-card print:max-w-none print:p-0 print:shadow-none'
+            : narrow
+              ? 'mx-auto w-[80mm] max-w-full bg-background px-[4mm] py-[3mm] text-xs leading-snug shadow-card print:mx-0 print:w-full print:max-w-[80mm] print:shadow-none'
+              : 'mx-auto max-w-3xl bg-background p-6 text-sm print:max-w-none print:p-0'
         }
       >
         {children(narrow)}

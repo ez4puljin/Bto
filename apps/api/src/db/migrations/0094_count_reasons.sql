@@ -1,0 +1,2 @@
+ALTER TABLE "stock_count_lines" ADD COLUMN "reason" text;--> statement-breakpoint
+ALTER TABLE "stock_count_lines" ADD CONSTRAINT "stock_count_lines_reason" CHECK ("stock_count_lines"."reason" IS NULL OR char_length("stock_count_lines"."reason") BETWEEN 1 AND 500);

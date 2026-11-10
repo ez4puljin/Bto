@@ -78,6 +78,11 @@ export const ROUTES = [
   { area: 'inventory', name: 'counts-new', path: '/inventory/counts?new=1', dialog: true },
   { area: 'inventory', name: 'counts-variance', path: '/inventory/counts/variance' },
   { area: 'inventory', name: 'count', path: '/inventory/counts/{stockCount}' },
+  {
+    area: 'inventory',
+    name: 'count-print',
+    path: '/inventory/counts/{stockCount}/print?filter=ALL',
+  },
   { area: 'inventory', name: 'adjustments', path: '/inventory/adjustments' },
   {
     area: 'inventory',
