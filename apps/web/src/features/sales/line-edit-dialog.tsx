@@ -216,17 +216,24 @@ function Editor({ order, onClose }: { order: SalesOrder; onClose: () => void }) 
   ];
 
   const mine = (row: Row) => row.warehouseId !== null && writes(row.warehouseId);
+  // «Өөрчлөгдсөн»: an unsaved change, or a kept line that is no longer what was first ordered
+  // (another quantity, or added after the order; ADR-0178).
+  const differs = (row: Row) =>
+    row.changed ||
+    (row.kind === 'line' &&
+      !row.off &&
+      (row.originalQty === null || !sameQty(row.qty, row.originalQty)));
   const counts: Record<Filter, number> = {
     ALL: rows.length,
     EXCLUDED: rows.filter((row) => row.off).length,
     MINE: rows.filter(mine).length,
-    CHANGED: rows.filter((row) => row.changed).length,
+    CHANGED: rows.filter(differs).length,
   };
   const needle = search.trim().toLowerCase();
   const shown = rows.filter((row) => {
     if (filter === 'EXCLUDED' && !row.off) return false;
     if (filter === 'MINE' && !mine(row)) return false;
-    if (filter === 'CHANGED' && !row.changed) return false;
+    if (filter === 'CHANGED' && !differs(row)) return false;
     if (needle && !`${row.name} ${row.sku}`.toLowerCase().includes(needle)) return false;
     return true;
   });

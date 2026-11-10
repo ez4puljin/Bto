@@ -744,6 +744,8 @@ describe('sales boards', () => {
     expect(await ids({ deliveryFrom: day(2), deliveryTo: day(2) })).toEqual([c]);
     expect(await ids({ q: 'хүнсний' })).toEqual([b]);
     expect(await ids({ q: made[0]?.number ?? '' })).toEqual([a]);
+    // Up to four digits are the number's end (owner 2026-11-10).
+    expect(await ids({ q: (made[0]?.number ?? '').slice(-4) })).toEqual([a]);
     // 201 drafts in one stage: 200 cards, the count says 201.
     await sql.query(
       `INSERT INTO sales_orders (customer_id, fulfilment, delivery_date, payment_method, pipeline_id, stage_id, stage_entered_at)

@@ -55,7 +55,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
-import { formatQty, formatTugrik } from '@/lib/money';
+import { formatTugrik } from '@/lib/money';
 import { usePrintFormat } from '@/lib/print-format';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
@@ -180,6 +180,14 @@ export function BoardView({
     });
 
   const problem = problemFromError(cards.error) ?? (archiving ? null : action.problem);
+  // A search (customer, or the number's last digits) keeps only the stages it found cards in.
+  const searching = Boolean(filters.q);
+  const shownStages =
+    searching && cards.data
+      ? stages.filter(
+          (stage) => (cards.data.find((entry) => entry.stageId === stage.id)?.count ?? 0) > 0,
+        )
+      : stages;
 
   return (
     <>
@@ -193,7 +201,10 @@ export function BoardView({
         style={height === null ? undefined : { height }}
         className="flex gap-3 overflow-x-auto overscroll-x-contain pb-3"
       >
-        {stages.map((stage) => {
+        {searching && cards.data && shownStages.length === 0 ? (
+          <p className="px-2 py-6 text-sm text-muted-foreground">{t('sales.work.searchEmpty')}</p>
+        ) : null}
+        {shownStages.map((stage) => {
           const column = cards.data?.find((entry) => entry.stageId === stage.id);
           const more = column ? column.count - column.cards.length : 0;
           // ADR-0129 #3: the columns that hold or move stock are tinted, each action marked.
@@ -701,46 +712,18 @@ function PickParts({ picks }: { picks: OrderCard['picks'] }) {
 }
 
 /**
- * The lines taken off the order (ADR-0175 #2), in red under the customer: the count and their sum,
- * the first six named with their quantity, the rest behind «+N бусад».
+ * The lines taken off the order (ADR-0175 #2), in red under the customer: only their count and
+ * sum; the lines themselves are read in «Засвар» (owner 2026-11-10).
  */
 function ExcludedBlock({ excluded }: { excluded: OrderCard['excluded'] }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const preview = 6;
-  const lines = open ? excluded.lines : excluded.lines.slice(0, preview);
-  const hidden = excluded.count - lines.length;
   return (
     <section
-      className="mt-2 rounded-md border-l-[3px] border-destructive bg-danger-soft px-2 py-1 text-xs text-destructive"
+      className="mt-2 flex items-center justify-between gap-2 rounded-md border-l-[3px] border-destructive bg-danger-soft px-2 py-1 text-xs font-semibold text-destructive"
       aria-label={t('sales.lineEdit.card.title', { count: excluded.count })}
     >
-      <div className="flex items-center justify-between gap-2 font-semibold">
-        <span>{t('sales.lineEdit.card.title', { count: excluded.count })}</span>
-        <span className="font-mono">{`−${formatTugrik(excluded.total)}`}</span>
-      </div>
-      <ul className="mt-0.5 space-y-0.5">
-        {lines.map((line, index) => (
-          <li
-            key={`${line.productName}-${index}`}
-            className="flex items-baseline justify-between gap-2"
-          >
-            <span className="min-w-0 line-through break-words">{line.productName}</span>
-            <span className="shrink-0 font-mono font-semibold whitespace-nowrap">
-              {`${formatQty(line.qty)} ${line.unitName}`}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {hidden > 0 || open ? (
-        <button
-          type="button"
-          className="mt-0.5 font-medium underline-offset-2 outline-none hover:underline"
-          onClick={() => setOpen((shown) => !shown)}
-        >
-          {open ? t('sales.lineEdit.card.less') : t('sales.lineEdit.card.more', { count: hidden })}
-        </button>
-      ) : null}
+      <span>{t('sales.lineEdit.card.title', { count: excluded.count })}</span>
+      <span className="font-mono">{`−${formatTugrik(excluded.total)}`}</span>
     </section>
   );
 }
