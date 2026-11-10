@@ -7510,6 +7510,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pos/sales/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The banner's totals over every sale and return the list's filters match (returns net out). */
+        get: operations["PosSales_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pos/sales/{id}": {
         parameters: {
             query?: never;
@@ -18810,6 +18827,37 @@ export interface components {
             nextCursor: string | null;
             /** @description On the first page only */
             total: number | null;
+        };
+        PosSalesSummary: {
+            /** @description SALE documents */
+            salesCount: number;
+            /** @description RETURN documents */
+            returnsCount: number;
+            /** @example 125000.00 */
+            salesTotal: string;
+            /** @example 5000.00 */
+            returnsTotal: string;
+            /**
+             * @description Sales less returns
+             * @example 120000.00
+             */
+            total: string;
+            /**
+             * @description Net of refunds, as all the tenders below
+             * @example 60000.00
+             */
+            cash: string;
+            /** @example 40000.00 */
+            card: string;
+            /** @example 10000.00 */
+            transfer: string;
+            /** @example 10000.00 */
+            credit: string;
+            /**
+             * @description VOUCHER and POINTS tenders
+             * @example 0.00
+             */
+            other: string;
         };
         PosSaleLine: {
             id: number;
@@ -40753,6 +40801,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PosSalePage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosSales_summary: {
+        parameters: {
+            query?: {
+                /** @description Part of the number, ДДТД, TIN or buyer name */
+                q?: string;
+                edgeNodeId?: number;
+                tillId?: number;
+                shiftId?: number;
+                cashierUserId?: number;
+                kind?: "SALE" | "RETURN";
+                ebarimtStatus?: "NONE" | "PENDING" | "CONFIRMED" | "INDETERMINATE" | "ERROR" | "CANCELLED" | "UNCONFIRMED_RETURN";
+                customerId?: number;
+                /** @description Credit sales past their limit not checked yet */
+                creditToCheck?: boolean;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosSalesSummary"];
                 };
             };
             /** @description RFC 9457 problem details */

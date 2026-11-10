@@ -157,6 +157,19 @@ export const SALE_ROW: Schemas['PosSale'] = {
   createdAt: STAMP,
 };
 
+export const SALES_SUMMARY: Schemas['PosSalesSummary'] = {
+  salesCount: 2,
+  returnsCount: 1,
+  salesTotal: '6500.00',
+  returnsTotal: '1300.00',
+  total: '5200.00',
+  cash: '3600.00',
+  card: '1600.00',
+  transfer: '0.00',
+  credit: '0.00',
+  other: '0.00',
+};
+
 export const SALE: Schemas['PosSaleDetail'] = {
   ...SALE_ROW,
   consumerNo: null,

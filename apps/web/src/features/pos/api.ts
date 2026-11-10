@@ -24,6 +24,7 @@ export type Shift = Schemas['PosShift'];
 export type ShiftStatus = Shift['status'];
 export type Sale = Schemas['PosSale'];
 export type SaleDetail = Schemas['PosSaleDetail'];
+export type SalesSummary = Schemas['PosSalesSummary'];
 export type SaleKind = Sale['kind'];
 export type EbarimtStatus = Sale['ebarimtStatus'];
 export type Shortfall = Schemas['PosShortfall'];
@@ -179,6 +180,17 @@ export function useSales(filter: SaleFilter, options: { enabled?: boolean } = {}
         }),
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** The banner's totals over every sale and return the list's filters match (returns net out). */
+export function useSalesSummary(filter: SaleFilter) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...POS_KEYS.sales, 'summary', filter],
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/pos/sales/summary', { params: { query: filter }, signal })),
     placeholderData: keepPreviousData,
   });
 }

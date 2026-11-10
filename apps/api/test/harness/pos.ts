@@ -149,6 +149,8 @@ export function posApi(app: NestExpressApplication, token: string) {
         query,
       ),
     sale: (id: number) => get<SaleJson>(`/pos/sales/${id}`),
+    salesSummary: (query: Record<string, unknown> = {}) =>
+      get<Record<string, unknown>>('/pos/sales/summary', query),
     shortfalls: (query: Record<string, unknown> = {}) =>
       get<{ data: Record<string, unknown>[]; nextCursor: string | null }>('/pos/shortfalls', query),
     resolveShortfall: (id: number, note: string | null) =>
