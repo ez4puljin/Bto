@@ -5490,9 +5490,12 @@
       "tags": {
         "excluded": "Хасагдсан",
         "changed": "Өөрчлөгдсөн",
-        "added": "Шинэ"
+        "added": "Шинэ",
+        "addedLater": "Нэмэгдсэн"
       },
       "was": "өмнө {{qty}}",
+      "original": "анхны захиалга {{qty}} {{unit}}",
+      "addedLaterHint": "Захиалга өгсний дараа нэмэгдсэн бараа",
       "excludedBy": "{{name}} хассан",
       "addProduct": "Бараа нэмэх",
       "otherHome": "Энэ бараа «{{warehouse}}»-аас гардаг, та тэр агуулахад бичихгүй.",

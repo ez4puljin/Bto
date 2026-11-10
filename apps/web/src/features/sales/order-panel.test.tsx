@@ -80,6 +80,7 @@ const line = (
   productUnitId: 200 + id,
   unitName: 'хайрцаг',
   qty: '1',
+  originalQty: '1',
   factorSnapshot: '12',
   qtyBase: '12',
   baseUnitName: 'ш',

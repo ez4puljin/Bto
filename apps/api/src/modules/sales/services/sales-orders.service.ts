@@ -351,19 +351,16 @@ export class SalesOrdersService implements OnModuleInit {
         .update(salesOrders)
         .set({ ...header, updatedAt: sql`now()` })
         .where(eq(salesOrders.id, id));
+      const replaced = await this.linesOf(tx, id);
       await tx.delete(salesOrderLineParts).where(
         idIn(
           salesOrderLineParts.lineId,
-          (
-            await tx
-              .select({ id: salesOrderLines.id })
-              .from(salesOrderLines)
-              .where(eq(salesOrderLines.orderId, id))
-          ).map((line) => line.id),
+          replaced.map((line) => line.id),
         ),
       );
       await tx.delete(salesOrderLines).where(eq(salesOrderLines.orderId, id));
-      await this.writeLines(tx, id, input.lines);
+      // A draft's lines are its first order; after that the first quantities carry over (ADR-0178).
+      await this.writeLines(tx, id, input.lines, order.status === 'DRAFT' ? null : replaced);
       if (kept.length > 0) await this.keepPicked(tx, id, kept);
       let repriced: { total: string; backordered: number } | null = null;
       if (order.status === 'CONFIRMED' || picking) {
@@ -529,6 +526,7 @@ export class SalesOrdersService implements OnModuleInit {
           productId: line.productId,
           productUnitId: line.productUnitId,
           qty: line.qty,
+          originalQty: line.originalQty,
           factorSnapshot: line.factorSnapshot,
           qtyBase: line.qtyBase,
           warehouseId: line.warehouseId,
@@ -574,6 +572,7 @@ export class SalesOrdersService implements OnModuleInit {
             productId: entry.row.productId,
             productUnitId: entry.row.productUnitId,
             qty: entry.qty,
+            originalQty: entry.row.originalQty,
             factorSnapshot: entry.row.factorSnapshot,
             qtyBase: entry.qtyBase,
             warehouseId: entry.row.warehouseId,
@@ -614,6 +613,8 @@ export class SalesOrdersService implements OnModuleInit {
             productId: line.productId,
             productUnitId: line.unitId,
             qty,
+            // Added after the order was placed: no first quantity (ADR-0178).
+            originalQty: null,
             factorSnapshot: line.factorSnapshot,
             qtyBase: line.qtyBase,
             warehouseId: homes.get(line.productId) ?? 0,
@@ -1840,11 +1841,16 @@ export class SalesOrdersService implements OnModuleInit {
     }
   }
 
-  /** Lines in base units, each in its product's home warehouse. */
+  /**
+   * Lines in base units, each in its product's home warehouse. A new order's quantities are its
+   * first; an order rewritten after its draft takes each unit and warehouse's first quantity from
+   * the lines it replaced (the first such line, summed), a unit it did not hold has none (ADR-0178).
+   */
   private async writeLines(
     tx: Tx,
     orderId: number,
     lines: readonly OrderLineInput[],
+    replaced: readonly LineRow[] | null = null,
   ): Promise<void> {
     if (lines.length === 0) return;
     const converted = [];
@@ -1856,6 +1862,24 @@ export class SalesOrdersService implements OnModuleInit {
       tx,
       converted.map((line) => line.productId),
     );
+    const firsts = new Map<string, Decimal | null>();
+    for (const line of replaced ?? []) {
+      const key = `${line.productUnitId}:${line.warehouseId}`;
+      const seen = firsts.get(key);
+      firsts.set(
+        key,
+        line.originalQty === null
+          ? (seen ?? null)
+          : (seen ?? new Decimal(0)).plus(line.originalQty),
+      );
+    }
+    const original = (unitId: number, warehouseId: number, qty: Decimal): Decimal | null => {
+      if (replaced === null) return qty;
+      const key = `${unitId}:${warehouseId}`;
+      const first = firsts.get(key) ?? null;
+      firsts.delete(key);
+      return first;
+    };
     await tx.insert(salesOrderLines).values(
       converted.map((line, index) => ({
         orderId,
@@ -1863,6 +1887,11 @@ export class SalesOrdersService implements OnModuleInit {
         productId: line.productId,
         productUnitId: line.unitId,
         qty: lines[index]?.qty ?? line.qtyBase,
+        originalQty: original(
+          line.unitId,
+          homes.get(line.productId) ?? 0,
+          lines[index]?.qty ?? line.qtyBase,
+        ),
         factorSnapshot: line.factorSnapshot,
         qtyBase: line.qtyBase,
         warehouseId: homes.get(line.productId) ?? 0,

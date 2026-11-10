@@ -121,6 +121,7 @@ const LINE: Schemas['SalesOrderLine'] = {
   productUnitId: 70,
   unitName: 'ш',
   qty: '30',
+  originalQty: '30',
   factorSnapshot: '1',
   qtyBase: '30',
   baseUnitName: 'ш',

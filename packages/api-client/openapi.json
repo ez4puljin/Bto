@@ -61130,6 +61130,11 @@
             "type": "string",
             "description": "In the unit"
           },
+          "originalQty": {
+            "type": "string",
+            "nullable": true,
+            "description": "The first ordered quantity, in the unit (ADR-0178); null when added later"
+          },
           "factorSnapshot": {
             "type": "string"
           },
@@ -61198,6 +61203,7 @@
           "productUnitId",
           "unitName",
           "qty",
+          "originalQty",
           "factorSnapshot",
           "qtyBase",
           "baseUnitName",
@@ -61289,6 +61295,11 @@
             "type": "string",
             "description": "In the unit"
           },
+          "originalQty": {
+            "type": "string",
+            "nullable": true,
+            "description": "The first ordered quantity, in the unit (ADR-0178); null when added later"
+          },
           "qtyBase": {
             "type": "string"
           },
@@ -61320,6 +61331,7 @@
           "productUnitId",
           "unitName",
           "qty",
+          "originalQty",
           "qtyBase",
           "baseUnitName",
           "warehouseId",

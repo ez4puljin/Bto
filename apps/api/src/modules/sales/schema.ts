@@ -208,6 +208,11 @@ export const salesOrderLines = pgTable(
       .references(() => productUnits.id),
     /** In the line's unit. */
     qty: qty('qty').notNull(),
+    /**
+     * The quantity first ordered, in the line's unit (ADR-0178): the draft's quantity, kept through
+     * every edit after the order left its draft; null on a line added after that.
+     */
+    originalQty: qty('original_qty'),
     factorSnapshot: factor('factor_snapshot').notNull(),
     qtyBase: qty('qty_base').notNull(),
     warehouseId: ref('warehouse_id')
@@ -238,6 +243,7 @@ export const salesOrderLines = pgTable(
       'sales_order_lines_qty',
       sql`${t.qty} > 0 AND ${t.qtyBase} > 0 AND ${t.factorSnapshot} > 0`,
     ),
+    check('sales_order_lines_original', sql`${t.originalQty} IS NULL OR ${t.originalQty} > 0`),
     check(
       'sales_order_lines_split',
       sql`${t.qtyApproved} >= 0 AND ${t.qtyBackordered} >= 0 AND ${t.qtyApproved} + ${t.qtyBackordered} <= ${t.qtyBase}`,
@@ -308,6 +314,8 @@ export const salesOrderExcludedLines = pgTable(
       .notNull()
       .references(() => productUnits.id),
     qty: qty('qty').notNull(),
+    /** The line's first ordered quantity (ADR-0178), carried off and back with it. */
+    originalQty: qty('original_qty'),
     factorSnapshot: factor('factor_snapshot').notNull(),
     qtyBase: qty('qty_base').notNull(),
     warehouseId: ref('warehouse_id')
@@ -328,6 +336,10 @@ export const salesOrderExcludedLines = pgTable(
     check(
       'sales_order_excluded_lines_qty',
       sql`${t.qty} > 0 AND ${t.qtyBase} > 0 AND ${t.factorSnapshot} > 0`,
+    ),
+    check(
+      'sales_order_excluded_lines_original',
+      sql`${t.originalQty} IS NULL OR ${t.originalQty} > 0`,
     ),
     check(
       'sales_order_excluded_lines_restored',

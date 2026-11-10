@@ -15686,6 +15686,8 @@ export interface components {
             unitName: string;
             /** @description In the unit */
             qty: string;
+            /** @description The first ordered quantity, in the unit (ADR-0178); null when added later */
+            originalQty: string | null;
             factorSnapshot: string;
             qtyBase: string;
             /** @example ш */
@@ -15729,6 +15731,8 @@ export interface components {
             unitName: string;
             /** @description In the unit */
             qty: string;
+            /** @description The first ordered quantity, in the unit (ADR-0178); null when added later */
+            originalQty: string | null;
             qtyBase: string;
             baseUnitName: string;
             warehouseId: number;

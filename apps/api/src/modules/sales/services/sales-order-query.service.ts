@@ -75,6 +75,8 @@ export interface OrderLine {
   productUnitId: number;
   unitName: string;
   qty: Decimal;
+  /** The first ordered quantity, in the unit (ADR-0178); null when added after the order. */
+  originalQty: Decimal | null;
   factorSnapshot: Decimal;
   qtyBase: Decimal;
   baseUnitName: string;
@@ -101,6 +103,8 @@ export interface ExcludedLine {
   productUnitId: number;
   unitName: string;
   qty: Decimal;
+  /** The first ordered quantity, in the unit (ADR-0178); null when added after the order. */
+  originalQty: Decimal | null;
   qtyBase: Decimal;
   baseUnitName: string;
   warehouseId: number;
@@ -664,6 +668,7 @@ export class SalesOrderQueryService {
         productUnitId: row.productUnitId,
         unitName: units.get(row.productUnitId)?.uomName ?? '',
         qty: row.qty,
+        originalQty: row.originalQty,
         qtyBase: row.qtyBase,
         baseUnitName: product?.baseUnit.uomName ?? '',
         warehouseId: row.warehouseId,
@@ -892,6 +897,7 @@ function lineView(
     productUnitId: line.productUnitId,
     unitName: units.get(line.productUnitId)?.uomName ?? '',
     qty: line.qty,
+    originalQty: line.originalQty,
     factorSnapshot: line.factorSnapshot,
     qtyBase: line.qtyBase,
     baseUnitName: product?.baseUnit.uomName ?? '',
