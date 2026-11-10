@@ -12,6 +12,7 @@ import {
   LINE_EDIT_STATUSES,
   MANAGER_EDITABLE_STATUSES,
   ORDER_LIMITS,
+  PARTY_EDIT_STATUSES,
   type OrderChannel,
   orderHeaderIssues,
   type OrderStatus,
@@ -111,6 +112,16 @@ export interface OrderInput {
  * One «Засвар» save from the board (ADR-0175): quantities changed in place, lines taken off or
  * put back, products added. Untouched lines keep everything; changed ones keep the order's prices.
  */
+/** The accountant's change of an order's customer and payment method (ADR-0180). */
+export interface PartyInput {
+  /** The order's updatedAt as read: a newer change answers ORDER_CHANGED. */
+  expectedUpdatedAt: string;
+  customerId: number;
+  paymentMethod: PaymentMethod;
+  /** The delivery address, one of the customer's; required for a delivery when the customer changes. */
+  addressId: number | null;
+}
+
 export interface LineEditInput {
   /** The order's updatedAt as the dialog read it: required, a newer change answers ORDER_CHANGED. */
   expectedUpdatedAt: string;
@@ -387,6 +398,70 @@ export class SalesOrdersService implements OnModuleInit {
         entity: 'sales_orders',
         entityId: id,
         after: { ...header, lines: input.lines.length, ...(repriced ?? {}) },
+      });
+      await this.recordChange(tx, ctx, previous, await this.queries.detail(ctx, id, tx));
+    });
+    return this.queries.detail(ctx, id);
+  }
+
+  /**
+   * The accountant's «Мэдээлэл» (ADR-0180): the customer and the payment method of an order that
+   * has not left (`PARTY_EDIT_STATUSES`), whatever its stage. Prices stay (the wholesale list does
+   * not depend on the customer); a new customer of a confirmed order passes the credit check with
+   * the order's total under its lock, its address replaces the old one and the old contact goes.
+   */
+  async changeParty(ctx: AuthContext, id: number, input: PartyInput): Promise<OrderDetail> {
+    await inTransaction(this.db, async (tx) => {
+      const { order } = await this.lockSeen(ctx, tx, id);
+      if (order.updatedAt.toISOString() !== new Date(input.expectedUpdatedAt).toISOString()) {
+        throw new AppError('ORDER_CHANGED', 'the order changed since it was read', {
+          updatedAt: order.updatedAt.toISOString(),
+        });
+      }
+      if (!PARTY_EDIT_STATUSES.includes(order.status)) throw stateError(order, 'PARTY_EDIT');
+      const newCustomer = input.customerId !== order.customerId;
+      if (!newCustomer && input.paymentMethod === order.paymentMethod) {
+        throw invalid('customerId', 'unchanged', 'nothing to change');
+      }
+      const previous = await this.queries.detail(ctx, id, tx);
+      const set: Partial<typeof salesOrders.$inferInsert> = { paymentMethod: input.paymentMethod };
+      if (newCustomer) {
+        await this.customers.assertActive(tx, input.customerId);
+        set.customerId = input.customerId;
+        set.contactName = null;
+        set.contactPhone = null;
+        if (order.fulfilment === 'DELIVERY') {
+          const addresses = await this.addresses.ofCustomer(input.customerId, tx);
+          const found = addresses.find((row) => row.id === input.addressId);
+          if (!found) {
+            throw invalid('addressId', 'customerAddress', "not one of the customer's addresses");
+          }
+          set.addressId = found.id;
+          set.addressText = found.address;
+          set.addressLat = found.lat;
+          set.addressLng = found.lng;
+        }
+        // A confirmed order's total now weighs on the new customer (ADR-0060 #2).
+        if (order.status !== 'DRAFT') {
+          const customer = await this.customers.lockForUpdate(tx, input.customerId);
+          if (customer.status !== 'ACTIVE') {
+            throw new AppError('CUSTOMER_INACTIVE', `customer ${customer.id} is inactive`, {
+              id: customer.id,
+            });
+          }
+          await this.assertCredit(tx, customer, id, order.total ?? new Decimal(0));
+        }
+      }
+      await tx
+        .update(salesOrders)
+        .set({ ...set, updatedAt: sql`now()` })
+        .where(eq(salesOrders.id, id));
+      await this.audit.record(tx, ctx, {
+        action: 'UPDATE',
+        entity: 'sales_orders',
+        entityId: id,
+        before: { customerId: order.customerId, paymentMethod: order.paymentMethod },
+        after: { customerId: input.customerId, paymentMethod: input.paymentMethod },
       });
       await this.recordChange(tx, ctx, previous, await this.queries.detail(ctx, id, tx));
     });
@@ -776,6 +851,7 @@ export class SalesOrdersService implements OnModuleInit {
   ): Promise<void> {
     const facts = (order: OrderDetail) => ({
       header: {
+        customer: `${order.customerName} · ${order.customerCode}`,
         fulfilment: order.fulfilment,
         deliveryDate: order.deliveryDate,
         address: order.addressText,

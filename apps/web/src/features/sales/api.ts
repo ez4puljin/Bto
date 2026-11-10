@@ -15,6 +15,7 @@ export type SalesOrderLine = Schemas['SalesOrderLine'];
 export type SalesOrderSummary = Schemas['SalesOrderSummary'];
 export type SalesOrderRequest = Schemas['SalesOrderRequest'];
 export type SalesOrderLineEditRequest = Schemas['SalesOrderLineEditRequest'];
+export type SalesOrderPartyRequest = Schemas['SalesOrderPartyRequest'];
 export type SalesOrderExcludedLine = Schemas['SalesOrderExcludedLine'];
 export type ProductOrderInfo = Schemas['SalesOrderProductInfo'];
 export type OrderStatus = SalesOrder['status'];
@@ -111,6 +112,17 @@ export function useSalesOrderMutations() {
       mutationFn: async ({ id, body }: { id: number; body: SalesOrderLineEditRequest }) =>
         unwrap(
           await api.PATCH('/api/v1/sales-orders/{id}/lines', { params: { path: { id } }, body }),
+        ),
+      onSuccess: () => changed(),
+      onError: (error) => {
+        if (problemFromError(error)?.code === 'ORDER_CHANGED') void changed();
+      },
+    }),
+    /** The accountant's customer and payment method (ADR-0180); a newer change reads again. */
+    changeParty: useMutation({
+      mutationFn: async ({ id, body }: { id: number; body: SalesOrderPartyRequest }) =>
+        unwrap(
+          await api.PATCH('/api/v1/sales-orders/{id}/party', { params: { path: { id } }, body }),
         ),
       onSuccess: () => changed(),
       onError: (error) => {

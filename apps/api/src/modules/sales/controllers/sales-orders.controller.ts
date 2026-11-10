@@ -25,6 +25,7 @@ import {
   SalesOrderCancelDto,
   SalesOrderDetailDto,
   SalesOrderLineEditRequestDto,
+  SalesOrderPartyRequestDto,
   SalesOrderListQueryDto,
   SalesOrderMoveRequestDto,
   SalesOrderPageDto,
@@ -337,6 +338,28 @@ export class SalesOrdersController {
     @Body() body: SalesOrderRequestDto,
   ): Promise<SalesOrderDetailDto> {
     return toDetail(await this.orders.update(ctx, id, inputOf(body)));
+  }
+
+  /**
+   * The accountant's «Мэдээлэл» (ADR-0180): the order's customer and payment method, in any stage
+   * until the goods leave; a new customer passes the credit check.
+   */
+  @Patch(':id/party')
+  @RequirePermission('sales.orders.party')
+  @ApiOkResponse({ type: SalesOrderDetailDto })
+  async changeParty(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: SalesOrderPartyRequestDto,
+  ): Promise<SalesOrderDetailDto> {
+    return toDetail(
+      await this.orders.changeParty(ctx, id, {
+        expectedUpdatedAt: body.expectedUpdatedAt,
+        customerId: body.customerId,
+        paymentMethod: body.paymentMethod,
+        addressId: body.addressId ?? null,
+      }),
+    );
   }
 
   /**
