@@ -68,6 +68,8 @@ interface Row {
   sku: string;
   unitName: string;
   storedQty: string | null;
+  /** The quantity first ordered (ADR-0178); null on a product added after the order. */
+  originalQty: string | null;
   qty: string;
   /** Taken off when saved: a stored line marked, or a taken-off one not put back. */
   off: boolean;
@@ -164,6 +166,7 @@ function Editor({ order, onClose }: { order: SalesOrder; onClose: () => void }) 
         sku: line.productSku,
         unitName: line.unitName,
         storedQty: line.qty,
+        originalQty: line.originalQty,
         qty: value,
         off: lineOff,
         changed: lineOff || (typed !== undefined && !sameQty(typed, line.qty)),
@@ -183,6 +186,7 @@ function Editor({ order, onClose }: { order: SalesOrder; onClose: () => void }) 
         sku: line.productSku,
         unitName: line.unitName,
         storedQty: line.qty,
+        originalQty: line.originalQty,
         qty: typed ?? line.qty,
         off: typed === undefined,
         changed: typed !== undefined,
@@ -200,6 +204,7 @@ function Editor({ order, onClose }: { order: SalesOrder; onClose: () => void }) 
       sku: line.sku,
       unitName: '',
       storedQty: null,
+      originalQty: null,
       qty: line.qty,
       off: false,
       changed: true,
@@ -679,6 +684,14 @@ function LineRow({
               {t('sales.lineEdit.tags.changed')}
             </span>
           ) : null}
+          {row.kind !== 'added' && row.originalQty === null ? (
+            <span
+              className="rounded bg-info-soft px-1 text-link"
+              title={t('sales.lineEdit.addedLaterHint')}
+            >
+              {t('sales.lineEdit.tags.addedLater')}
+            </span>
+          ) : null}
           {row.excludedBy && row.off ? (
             <span>{t('sales.lineEdit.excludedBy', { name: row.excludedBy })}</span>
           ) : null}
@@ -730,14 +743,26 @@ function LineRow({
             <Plus />
           </Button>
         </div>
-        <div className="mt-0.5 flex items-center justify-center gap-1 text-xs text-muted-foreground">
+        <div className="mt-0.5 flex flex-wrap items-center justify-center gap-x-1 text-xs text-muted-foreground">
           {unit ?? <span>{row.unitName}</span>}
-          {row.storedQty !== null && row.changed && !row.off && !sameQty(row.qty, row.storedQty) ? (
+          {row.storedQty !== null &&
+          row.changed &&
+          !row.off &&
+          !sameQty(row.qty, row.storedQty) &&
+          (row.originalQty === null || !sameQty(row.storedQty, row.originalQty)) ? (
             <span className="text-warning">
               {t('sales.lineEdit.was', { qty: formatQty(row.storedQty) })}
             </span>
           ) : null}
         </div>
+        {row.originalQty !== null && (row.off || !sameQty(row.qty, row.originalQty)) ? (
+          <div className="text-center text-xs font-medium text-link">
+            {t('sales.lineEdit.original', {
+              qty: formatQty(row.originalQty),
+              unit: row.unitName,
+            })}
+          </div>
+        ) : null}
       </td>
       <td className="px-3 py-1.5 text-right font-mono">
         {row.off ? (

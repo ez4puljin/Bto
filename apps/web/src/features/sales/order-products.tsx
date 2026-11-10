@@ -476,6 +476,12 @@ export function OrderProducts({
                       ) : (
                         <span className="font-mono font-semibold">{formatQty(line.qty)}</span>
                       )}
+                      <OriginalQty
+                        order={order}
+                        stored={stored}
+                        unitId={line.unitId}
+                        qty={line.qty}
+                      />
                     </TableCell>
                     {confirmed ? (
                       <TableCell className="text-right font-mono">
@@ -662,6 +668,43 @@ export function OrderProducts({
           </div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The line's first ordered quantity under its quantity when it differs (ADR-0178), or that it was
+ * added after the order was placed. A draft has no first quantity yet: it is still being written.
+ */
+function OriginalQty({
+  order,
+  stored,
+  unitId,
+  qty,
+}: {
+  order: SalesOrder;
+  stored: SalesOrderLine | undefined;
+  unitId: number;
+  qty: string;
+}) {
+  const { t } = useTranslation();
+  if (!stored || order.status === 'DRAFT') return null;
+  if (stored.originalQty === null) {
+    return (
+      <div className="text-xs text-link" title={t('sales.lineEdit.addedLaterHint')}>
+        {t('sales.lineEdit.tags.addedLater')}
+      </div>
+    );
+  }
+  const same =
+    isQty(qty) && unitId === stored.productUnitId && new Decimal(qty).equals(stored.originalQty);
+  if (same) return null;
+  return (
+    <div className="text-xs font-medium text-link">
+      {t('sales.lineEdit.original', {
+        qty: formatQty(stored.originalQty),
+        unit: stored.unitName,
+      })}
     </div>
   );
 }

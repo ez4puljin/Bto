@@ -176,6 +176,12 @@ export class SalesOrderExcludedLineDto {
   @ApiProperty() productUnitId: number;
   @ApiProperty() unitName: string;
   @ApiProperty({ description: 'In the unit' }) qty: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'The first ordered quantity, in the unit (ADR-0178); null when added later',
+  })
+  originalQty: string | null;
   @ApiProperty() qtyBase: string;
   @ApiProperty() baseUnitName: string;
   @ApiProperty() warehouseId: number;
@@ -269,6 +275,12 @@ export class SalesOrderLineDto {
   @ApiProperty() productUnitId: number;
   @ApiProperty({ example: 'хайрцаг' }) unitName: string;
   @ApiProperty({ description: 'In the unit' }) qty: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'The first ordered quantity, in the unit (ADR-0178); null when added later',
+  })
+  originalQty: string | null;
   @ApiProperty() factorSnapshot: string;
   @ApiProperty() qtyBase: string;
   @ApiProperty({ example: 'ш' }) baseUnitName: string;

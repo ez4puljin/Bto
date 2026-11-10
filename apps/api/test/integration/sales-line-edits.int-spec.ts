@@ -31,6 +31,7 @@ interface ExcludedJson {
   id: number;
   productId: number;
   qty: string;
+  originalQty: string | null;
   total: string | null;
   excludedByName: string | null;
 }
@@ -46,6 +47,7 @@ type DetailJson = Omit<OrderJson, 'lines'> & {
     id: number;
     productId: number;
     qty: string;
+    originalQty: string | null;
     total: string | null;
     qtyPicked: string | null;
   }[];
@@ -392,5 +394,101 @@ describe('sales line edits from the board', () => {
     expect(byLead.picks.find((entry) => entry.warehouseId === whA.id)?.status).toBe('OPEN');
     expect(lineOf(byLead, cola).qtyPicked).toBeNull();
     expect(await reserved(order.id, cola.id)).toBe('2.000');
+  });
+
+  it('keeps every line’s first ordered quantity across edits, a take-off and a rewrite (ADR-0178)', async () => {
+    const sales = salesApi(app, admin);
+    const draft = await sales.draft(
+      orderBody(
+        shop.id,
+        [
+          { productUnitId: pcs(cola), qty: '5' },
+          { productUnitId: pcs(beer), qty: '3' },
+        ],
+        { pipelineId: pipeline.id },
+      ),
+    );
+    // A draft is still being written: its last quantities are the first order.
+    await sales
+      .update(
+        draft.id,
+        orderBody(
+          shop.id,
+          [
+            { productUnitId: pcs(cola), qty: '4' },
+            { productUnitId: pcs(beer), qty: '3' },
+          ],
+          { pipelineId: pipeline.id },
+        ),
+      )
+      .expect(200);
+    await move(admin, draft.id, 'Нөөцлөх').expect(200);
+    let order = await detail(keeperA, draft.id);
+    expect(lineOf(order, cola).originalQty).toBe('4');
+
+    // 4 → 10 → 12: the first order stays 4, also when the order is read again.
+    order = (
+      await edit(keeperA, order, { lines: [{ lineId: lineOf(order, cola).id, qty: '10' }] }).expect(
+        200,
+      )
+    ).body as DetailJson;
+    expect(lineOf(order, cola)).toMatchObject({ qty: '10', originalQty: '4' });
+    order = await detail(keeperA, order.id);
+    await edit(keeperA, order, { lines: [{ lineId: lineOf(order, cola).id, qty: '12' }] }).expect(
+      200,
+    );
+    order = await detail(admin, order.id);
+    expect(lineOf(order, cola)).toMatchObject({ qty: '12', originalQty: '4' });
+
+    // Taken off, the beer keeps its 3; a product added now has none.
+    order = (
+      await edit(admin, order, {
+        exclude: [lineOf(order, beer).id],
+        add: [{ productUnitId: pcs(juice), qty: '2' }],
+      }).expect(200)
+    ).body as DetailJson;
+    const [beerOff] = order.excludedLines;
+    expect(beerOff).toMatchObject({ productId: beer.id, originalQty: '3' });
+    expect(lineOf(order, juice).originalQty).toBeNull();
+
+    // Put back at 1, it is still the 3 first ordered.
+    order = (
+      await edit(admin, order, {
+        restore: [{ excludedId: beerOff?.id ?? 0, qty: '1' }],
+      }).expect(200)
+    ).body as DetailJson;
+    expect(lineOf(order, beer)).toMatchObject({ qty: '1', originalQty: '3' });
+
+    // The office's whole-order save rewrites the lines and carries the first quantities over.
+    const rewritten = (
+      await sales
+        .update(
+          order.id,
+          orderBody(
+            shop.id,
+            [
+              { productUnitId: pcs(cola), qty: '7' },
+              { productUnitId: pcs(beer), qty: '1' },
+              { productUnitId: pcs(juice), qty: '2' },
+            ],
+            { pipelineId: pipeline.id, expectedUpdatedAt: order.updatedAt },
+          ),
+        )
+        .expect(200)
+    ).body as DetailJson;
+    expect(lineOf(rewritten, cola)).toMatchObject({ qty: '7', originalQty: '4' });
+    expect(lineOf(rewritten, beer).originalQty).toBe('3');
+    expect(lineOf(rewritten, juice).originalQty).toBeNull();
+    const stored = await sql.query<{ product_id: string; original_qty: string | null }>(
+      `SELECT product_id::text, original_qty::text FROM sales_order_lines WHERE order_id = $1
+        ORDER BY product_id`,
+      [order.id],
+    );
+    // Cola, juice and beer were created in that order.
+    expect(stored.rows).toEqual([
+      { product_id: String(cola.id), original_qty: '4.000' },
+      { product_id: String(juice.id), original_qty: null },
+      { product_id: String(beer.id), original_qty: '3.000' },
+    ]);
   });
 });

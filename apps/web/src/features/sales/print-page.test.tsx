@@ -87,6 +87,7 @@ const line = (id: number, warehouseId: number, fields: Partial<Schemas['SalesOrd
     productUnitId: 200 + id,
     unitName: 'хайрцаг',
     qty: '1',
+    originalQty: '1',
     factorSnapshot: '12',
     qtyBase: '12',
     baseUnitName: 'ш',

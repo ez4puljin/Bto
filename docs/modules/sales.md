@@ -88,6 +88,8 @@ ADR-0143 (migration `0068_sales_document_templates`): `sales_document_templates`
 
 ADR-0175 (migration `0092_sales_excluded_lines`): `sales_order_excluded_lines` holds a line taken off a reserved order (product, unit, quantity, warehouse, totals, its frozen `parts` as JSON, `excluded_by` / `excluded_at`, `restored_by` / `restored_at`). The line leaves `sales_order_lines`, so no reader of an order's lines needs a filter. A restore stamps the row; `REVOKE DELETE, TRUNCATE`.
 
+ADR-0178 (migration `0095_sales_original_qty`): `sales_order_lines.original_qty` and `sales_order_excluded_lines.original_qty` (`NUMERIC(14,3)`, the line's unit, nullable, `> 0`): the quantity first ordered; existing rows backfilled from the change versions (ADR-0147).
+
 ## 3. Public API (`modules/sales/index.ts`)
 
 | Export | Use |
@@ -175,6 +177,8 @@ ADR-0143: `GET/POST /sales/document-templates`, `GET /:id`, `PUT /:id/draft`, `P
 
 ADR-0175: `PATCH /sales-orders/:id/lines` [`sales.orders.read`; the service asks for `sales.orders.manage`, or `sales.orders.pick` with write scope on every touched warehouse] `{ expectedUpdatedAt, lines: [{lineId, qty}], exclude: [lineId], restore: [{excludedId, qty?}], add: [line] }` → the order's detail. The detail carries `excludedLines`, a board card `excluded { count, total, lines }` (the first `BOARD_LIMITS.excludedOnCard`), both limited to the caller's visible warehouses.
 
+ADR-0178: `SalesOrderLine.originalQty` and `SalesOrderExcludedLine.originalQty` (string in the unit, or null for a line added after the order).
+
 ## 5. Rules worth knowing
 
 - **The apps' stock (ADR-0173).** Both apps show one number per product, the home warehouse's available (sellable on hand less reserved), and only when that warehouse is ticked for the app on «Апп → Аппын бараа» (`ShopScope.countedWarehouseIds`, none ticked = all); otherwise 0, «Дууссан», `stockBlocked`, and both apps' order routes refuse it. `PUT /app-settings` takes `stockWarehouses { customer, staff }` and `customerStockDisplay`, both optional (left out = unchanged). The phones hear every change through `…/stock/live` within about a second of the commit.
@@ -229,6 +233,7 @@ ADR-0175: `PATCH /sales-orders/:id/lines` [`sales.orders.read`; the service asks
 - **Backorders** stay on the line.
 - **Reconciliation:** the nightly check compares `warehouse_stock.reserved` with the ACTIVE reservations (level RESERVED).
 - **Line edits (ADR-0175):** only in `CONFIRMED`, `PICKING`, `PACKED`. Lines are changed in place (their ids survive). A changed or restored line is quoted on the order's `price_date`, an unchanged restore takes its frozen parts back, an added line is priced today. Reservations are replaced except for confirmed parts; a touched confirmed part is unpicked and reopened for the office or a lead, and refused to a keeper (`LINE_EDIT_PART_DONE`). Credit is checked only when the total grows. An order cannot be left without lines.
+- **First ordered quantity (ADR-0178):** `original_qty` is written with the line and rewritten only while the order is a `DRAFT`; afterwards «Засвар» leaves it, a take-off and a restore carry it, an added line has `NULL`, the whole-order save carries it per unit and warehouse onto the first new line, `renewLinesInTx` copies it. It never feeds stock, prices or credit.
 
 ## 6. Error codes introduced
 
@@ -379,6 +384,8 @@ ADR-0143: «Падааны загвар» `/sales/document-templates` (+ `/:id` 
 ADR-0143: `test/integration/sales-document-templates.int-spec.ts`, `packages/shared/src/sales/document-template.test.ts`, `features/sales/print-page.test.tsx` (the built-in layouts print as before).
 
 ADR-0175: `test/integration/sales-line-edits.int-spec.ts` (the old price on a changed quantity, take off / card / put back / add, a keeper refused on another warehouse, a stale save, an emptied order, a confirmed part refused to a keeper and reopened by a lead, stock reconciled).
+
+ADR-0178: the same file, «keeps every line’s first ordered quantity» (a draft rewrite sets it, 4 → 10 → 12 keeps 4, a take-off and a restore keep it, an added product has none, the office's whole-order save carries it over).
 
 ## 10. Open items
 
