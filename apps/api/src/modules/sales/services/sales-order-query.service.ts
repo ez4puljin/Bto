@@ -608,7 +608,11 @@ export class SalesOrderQueryService {
         op: 'CONTAINS',
         text: q,
       });
-      const byNumber = ilike(salesOrders.number, like(q));
+      // Up to four digits are the number's last ones («0003» finds 20261031_0003, owner
+      // 2026-11-10), not a date inside it; anything longer matches anywhere in the number.
+      const byNumber = /^\d{1,4}$/.test(q)
+        ? ilike(salesOrders.number, `%${q}`)
+        : ilike(salesOrders.number, like(q));
       where.push(
         customerIds.length > 0
           ? (or(byNumber, idIn(salesOrders.customerId, customerIds)) ?? byNumber)
