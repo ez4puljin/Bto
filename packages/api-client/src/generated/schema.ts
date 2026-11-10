@@ -2742,6 +2742,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stock-counts/{id}/sheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every product of the count with its supplier and its difference at the selling price. */
+        get: operations["StockCounts_sheet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock-counts/{id}/lines/{lineId}/reason": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Why a product differs; empty clears it. */
+        put: operations["StockCounts_setReason"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stock-counts/{id}/lines/{lineId}/entries": {
         parameters: {
             query?: never;
@@ -13133,10 +13167,68 @@ export interface components {
             unitCost: string | null;
             /** @description MNT charged to the party */
             chargeAmount: string | null;
+            reason: string | null;
         };
         StockCountLinePage: {
             data: components["schemas"]["StockCountLine"][];
             nextCursor: string | null;
+        };
+        StockCountSheetTotals: {
+            lines: number;
+            counted: number;
+            uncounted: number;
+            unlisted: number;
+            matched: number;
+            different: number;
+            surplusLines: number;
+            surplusQty: string;
+            surplusAmount: string;
+            shortageLines: number;
+            shortageQty: string;
+            shortageAmount: string;
+            netQty: string;
+            netAmount: string;
+            /** @description Differences without a selling price */
+            unpriced: number;
+        };
+        StockCountSheetSupplier: {
+            id: number;
+            name: string;
+        };
+        StockCountSheetRow: {
+            lineId: number;
+            productId: number;
+            sku: string;
+            name: string;
+            unitName: string;
+            /** @description False: counted although outside the list */
+            listed: boolean;
+            /** @description The main supplier */
+            supplierId: number | null;
+            supplierName: string | null;
+            expectedQty: string | null;
+            countedQty: string | null;
+            pendingQty: string;
+            differenceQty: string | null;
+            /** @description Warehouse price per base unit */
+            salePrice: string | null;
+            /** @description Difference × selling price, MNT */
+            differenceAmount: string | null;
+            reason: string | null;
+            movedDuring: string;
+            movedAfter: string;
+        };
+        StockCountSheet: {
+            /** Format: date */
+            priceDate: string;
+            totals: components["schemas"]["StockCountSheetTotals"];
+            suppliers: components["schemas"]["StockCountSheetSupplier"][];
+            rows: components["schemas"]["StockCountSheetRow"][];
+            truncated: boolean;
+        };
+        StockCountLineReasonDto: {
+            /** @description Empty or null clears it */
+            reason?: string | null;
         };
         StockCountEntry: {
             id: number;
@@ -29040,7 +29132,7 @@ export interface operations {
                 /** @description nextCursor of the previous page */
                 cursor?: string;
                 limit?: number;
-                filter?: "ALL" | "COUNTED" | "UNCOUNTED" | "DIFFERENT" | "MOVED";
+                filter?: "ALL" | "COUNTED" | "UNCOUNTED" | "DIFFERENT" | "MATCHED" | "UNLISTED" | "MOVED";
                 /** @description Name, code or barcode */
                 q?: string;
             };
@@ -29059,6 +29151,76 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["StockCountLinePage"];
                 };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StockCounts_sheet: {
+        parameters: {
+            query?: {
+                filter?: "ALL" | "COUNTED" | "UNCOUNTED" | "DIFFERENT" | "MATCHED" | "UNLISTED" | "MOVED";
+                /** @description Name, code or barcode */
+                q?: string;
+                supplierId?: number;
+                categoryId?: number;
+                segmentId?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockCountSheet"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StockCounts_setReason: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                lineId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockCountLineReasonDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description RFC 9457 problem details */
             default: {

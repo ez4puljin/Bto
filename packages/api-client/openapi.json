@@ -11095,6 +11095,8 @@
                 "COUNTED",
                 "UNCOUNTED",
                 "DIFFERENT",
+                "MATCHED",
+                "UNLISTED",
                 "MOVED"
               ]
             }
@@ -11137,6 +11139,163 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/{id}/sheet": {
+      "get": {
+        "operationId": "StockCounts_sheet",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "filter",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "COUNTED",
+                "UNCOUNTED",
+                "DIFFERENT",
+                "MATCHED",
+                "UNLISTED",
+                "MOVED"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Name, code or barcode",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "segmentId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCountSheet"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every product of the count with its supplier and its difference at the selling price.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock-counts/{id}/lines/{lineId}/reason": {
+      "put": {
+        "operationId": "StockCounts_setReason",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lineId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockCountLineReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Why a product differs; empty clears it.",
         "tags": [
           "inventory"
         ]
@@ -51789,6 +51948,10 @@
             "type": "string",
             "nullable": true,
             "description": "MNT charged to the party"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -51809,7 +51972,8 @@
           "settleOwn",
           "settlement",
           "unitCost",
-          "chargeAmount"
+          "chargeAmount",
+          "reason"
         ]
       },
       "StockCountLinePage": {
@@ -51830,6 +51994,221 @@
           "data",
           "nextCursor"
         ]
+      },
+      "StockCountSheetTotals": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "number"
+          },
+          "counted": {
+            "type": "number"
+          },
+          "uncounted": {
+            "type": "number"
+          },
+          "unlisted": {
+            "type": "number"
+          },
+          "matched": {
+            "type": "number"
+          },
+          "different": {
+            "type": "number"
+          },
+          "surplusLines": {
+            "type": "number"
+          },
+          "surplusQty": {
+            "type": "string"
+          },
+          "surplusAmount": {
+            "type": "string"
+          },
+          "shortageLines": {
+            "type": "number"
+          },
+          "shortageQty": {
+            "type": "string"
+          },
+          "shortageAmount": {
+            "type": "string"
+          },
+          "netQty": {
+            "type": "string"
+          },
+          "netAmount": {
+            "type": "string"
+          },
+          "unpriced": {
+            "type": "number",
+            "description": "Differences without a selling price"
+          }
+        },
+        "required": [
+          "lines",
+          "counted",
+          "uncounted",
+          "unlisted",
+          "matched",
+          "different",
+          "surplusLines",
+          "surplusQty",
+          "surplusAmount",
+          "shortageLines",
+          "shortageQty",
+          "shortageAmount",
+          "netQty",
+          "netAmount",
+          "unpriced"
+        ]
+      },
+      "StockCountSheetSupplier": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "StockCountSheetRow": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unitName": {
+            "type": "string"
+          },
+          "listed": {
+            "type": "boolean",
+            "description": "False: counted although outside the list"
+          },
+          "supplierId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The main supplier"
+          },
+          "supplierName": {
+            "type": "string",
+            "nullable": true
+          },
+          "expectedQty": {
+            "type": "string",
+            "nullable": true
+          },
+          "countedQty": {
+            "type": "string",
+            "nullable": true
+          },
+          "pendingQty": {
+            "type": "string"
+          },
+          "differenceQty": {
+            "type": "string",
+            "nullable": true
+          },
+          "salePrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "Warehouse price per base unit"
+          },
+          "differenceAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Difference × selling price, MNT"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "movedDuring": {
+            "type": "string"
+          },
+          "movedAfter": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "lineId",
+          "productId",
+          "sku",
+          "name",
+          "unitName",
+          "listed",
+          "supplierId",
+          "supplierName",
+          "expectedQty",
+          "countedQty",
+          "pendingQty",
+          "differenceQty",
+          "salePrice",
+          "differenceAmount",
+          "reason",
+          "movedDuring",
+          "movedAfter"
+        ]
+      },
+      "StockCountSheet": {
+        "type": "object",
+        "properties": {
+          "priceDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/StockCountSheetTotals"
+          },
+          "suppliers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockCountSheetSupplier"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockCountSheetRow"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "priceDate",
+          "totals",
+          "suppliers",
+          "rows",
+          "truncated"
+        ]
+      },
+      "StockCountLineReasonDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500,
+            "description": "Empty or null clears it"
+          }
+        }
       },
       "StockCountEntry": {
         "type": "object",

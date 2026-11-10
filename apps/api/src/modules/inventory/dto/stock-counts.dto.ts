@@ -28,7 +28,15 @@ type CountScopeMode = (typeof COUNT_SCOPE_MODES)[number];
 type CountUncountedMode = (typeof COUNT_UNCOUNTED_MODES)[number];
 type CountPartyKind = (typeof COUNT_PARTY_KINDS)[number];
 
-export const COUNT_LINE_FILTERS = ['ALL', 'COUNTED', 'UNCOUNTED', 'DIFFERENT', 'MOVED'] as const;
+export const COUNT_LINE_FILTERS = [
+  'ALL',
+  'COUNTED',
+  'UNCOUNTED',
+  'DIFFERENT',
+  'MATCHED',
+  'UNLISTED',
+  'MOVED',
+] as const;
 type CountLineFilter = (typeof COUNT_LINE_FILTERS)[number];
 const COUNT_MINE = ['NONE', 'OPEN', 'SENT'] as const;
 const ACCOUNT_CODE = /^[0-9A-Za-z.-]{1,20}$/;
@@ -141,12 +149,71 @@ export class StockCountLineDto {
   unitCost: string | null;
   @ApiProperty({ type: String, nullable: true, description: 'MNT charged to the party' })
   chargeAmount: string | null;
+  @ApiProperty({ type: String, nullable: true }) reason: string | null;
 }
 
 @ApiSchema({ name: 'StockCountLinePage' })
 export class StockCountLinePageDto {
   @ApiProperty({ type: [StockCountLineDto] }) data: StockCountLineDto[];
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
+}
+
+@ApiSchema({ name: 'StockCountSheetRow' })
+export class StockCountSheetRowDto {
+  @ApiProperty() lineId: number;
+  @ApiProperty() productId: number;
+  @ApiProperty() sku: string;
+  @ApiProperty() name: string;
+  @ApiProperty() unitName: string;
+  @ApiProperty({ description: 'False: counted although outside the list' }) listed: boolean;
+  @ApiProperty({ type: Number, nullable: true, description: 'The main supplier' })
+  supplierId: number | null;
+  @ApiProperty({ type: String, nullable: true }) supplierName: string | null;
+  @ApiProperty({ type: String, nullable: true }) expectedQty: string | null;
+  @ApiProperty({ type: String, nullable: true }) countedQty: string | null;
+  @ApiProperty() pendingQty: string;
+  @ApiProperty({ type: String, nullable: true }) differenceQty: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Warehouse price per base unit' })
+  salePrice: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Difference × selling price, MNT' })
+  differenceAmount: string | null;
+  @ApiProperty({ type: String, nullable: true }) reason: string | null;
+  @ApiProperty() movedDuring: string;
+  @ApiProperty() movedAfter: string;
+}
+
+@ApiSchema({ name: 'StockCountSheetTotals' })
+export class StockCountSheetTotalsDto {
+  @ApiProperty() lines: number;
+  @ApiProperty() counted: number;
+  @ApiProperty() uncounted: number;
+  @ApiProperty() unlisted: number;
+  @ApiProperty() matched: number;
+  @ApiProperty() different: number;
+  @ApiProperty() surplusLines: number;
+  @ApiProperty() surplusQty: string;
+  @ApiProperty() surplusAmount: string;
+  @ApiProperty() shortageLines: number;
+  @ApiProperty() shortageQty: string;
+  @ApiProperty() shortageAmount: string;
+  @ApiProperty() netQty: string;
+  @ApiProperty() netAmount: string;
+  @ApiProperty({ description: 'Differences without a selling price' }) unpriced: number;
+}
+
+@ApiSchema({ name: 'StockCountSheetSupplier' })
+export class StockCountSheetSupplierDto {
+  @ApiProperty() id: number;
+  @ApiProperty() name: string;
+}
+
+@ApiSchema({ name: 'StockCountSheet' })
+export class StockCountSheetDto {
+  @ApiProperty({ type: String, format: 'date' }) priceDate: string;
+  @ApiProperty({ type: StockCountSheetTotalsDto }) totals: StockCountSheetTotalsDto;
+  @ApiProperty({ type: [StockCountSheetSupplierDto] }) suppliers: StockCountSheetSupplierDto[];
+  @ApiProperty({ type: [StockCountSheetRowDto] }) rows: StockCountSheetRowDto[];
+  @ApiProperty() truncated: boolean;
 }
 
 @ApiSchema({ name: 'StockCountEntry' })
@@ -276,6 +343,30 @@ export class StockCountLinesQueryDto extends PageQueryDto {
   @IsString()
   @MaxLength(100)
   q?: string;
+}
+
+export class StockCountSheetQueryDto {
+  @ApiPropertyOptional({ enum: COUNT_LINE_FILTERS })
+  @IsOptional()
+  @IsIn(COUNT_LINE_FILTERS)
+  filter?: CountLineFilter;
+  @ApiPropertyOptional({ description: 'Name, code or barcode' })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) supplierId?: number;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) categoryId?: number;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) segmentId?: number;
+}
+
+export class StockCountLineReasonDto {
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'Empty or null clears it' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string | null;
 }
 
 export class StockCountVarianceQueryDto extends PageQueryDto {

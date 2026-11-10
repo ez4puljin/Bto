@@ -1127,6 +1127,8 @@ export const stockCountLines = pgTable(
     partyId: ref('party_id'),
     partyName: text('party_name'),
     charged: boolean('charged').notNull().default(false),
+    /** Why the product differs, written in the count window (ADR-0177). */
+    reason: text('reason'),
     /** Frozen at approval: what was posted, at what cost, and the debt it made. */
     differenceQty: qty('difference_qty'),
     unitCost: cost('unit_cost'),
@@ -1149,6 +1151,10 @@ export const stockCountLines = pgTable(
       sql`(${t.partyKind} IS NULL OR ${inList(t.partyKind, COUNT_PARTY_KINDS)})
         AND (${t.partyKind} IS NULL) = (${t.partyName} IS NULL)
         AND (NOT ${t.charged} OR ${t.partyKind} IS NOT NULL)`,
+    ),
+    check(
+      'stock_count_lines_reason',
+      sql`${t.reason} IS NULL OR char_length(${t.reason}) BETWEEN 1 AND 500`,
     ),
   ],
 );

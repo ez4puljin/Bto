@@ -446,6 +446,38 @@ describe('stock counts', () => {
     const pricing = pricingApi(app, admin);
     await pricing.terms(rice.id, '800', await pricing.profile('Тооллого ТО'), null);
 
+    // The sheet (ADR-0177): each difference at the selling price, the reason on its line.
+    const reason = (body: Record<string, unknown>, who = admin) =>
+      http().put(`${base}/${second.id}/lines/${riceLine.id}/reason`).set(bearer(who)).send(body);
+    await reason({ reason: 'Хагарсан' }, keeper).expect(403);
+    await reason({ reason: '  Хагарсан  ' }).expect(204);
+    const sheetOf = async (query: Record<string, string>) =>
+      (await http().get(`${base}/${second.id}/sheet`).query(query).set(bearer(admin)).expect(200))
+        .body as {
+        totals: Record<string, unknown>;
+        rows: { productId: number; listed: boolean; [key: string]: unknown }[];
+      };
+    const sheet = await sheetOf({ filter: 'DIFFERENT' });
+    expect(sheet.rows.find((row) => row.productId === rice.id)).toMatchObject({
+      differenceQty: '-3',
+      salePrice: '800.00',
+      differenceAmount: '-2400.00',
+      reason: 'Хагарсан',
+    });
+    expect(sheet.totals).toMatchObject({
+      different: 2,
+      shortageLines: 1,
+      shortageQty: '-3',
+      surplusLines: 1,
+      surplusQty: '2',
+      netQty: '-1',
+    });
+    const searched = await sheetOf({ q: rice.sku });
+    expect(searched.rows.map((row) => row.productId)).toEqual([rice.id]);
+    // A scanned count lists nothing beforehand: every product of it was added by a scan.
+    expect((await sheetOf({ filter: 'UNLISTED' })).rows).toHaveLength(2);
+    await http().get(`${base}/${second.id}/sheet`).set(bearer(counter1)).expect(403);
+
     const approved = (await act(admin, second.id, 'approve', { uncounted: 'ZERO' }).expect(200))
       .body as DetailJson;
     expect(approved.status).toBe('APPROVED');
@@ -453,7 +485,12 @@ describe('stock counts', () => {
     expect(await onHand(water.id)).toBe('7.000');
     // A scanned count lists nothing else, so nothing was zeroed.
     expect(await onHand(cola.id)).toBe('70.000');
-    expect(await lineOf(second.id, rice)).toMatchObject({ chargeAmount: '2400.00' });
+    expect(await lineOf(second.id, rice)).toMatchObject({
+      chargeAmount: '2400.00',
+      reason: 'Хагарсан',
+    });
+    // An approved count's reasons stay as they were.
+    await reason({ reason: 'Өөр' }).expect(409);
     // 3 rice left at 500 as a cost of sale; 2 waters came in at 200 against the chosen account.
     expect(await finLines('STOCK', `ST:${second.id}:%`)).toEqual({
       '140101': '-1100.00',

@@ -26,6 +26,7 @@ import type {
   StockCountDetailDto,
   StockCountEntryDto,
   StockCountLineDto,
+  StockCountSheetDto,
   StockCountMovedDocumentDto,
   StockCountProductInfoDto,
   StockCountSettlementDto,
@@ -62,6 +63,7 @@ import type {
 } from '../services/receipts.service';
 import type {
   CountSettlement,
+  CountSheet,
   CountVarianceRow,
   MyStockCount,
   OpenStockCount,
@@ -712,6 +714,52 @@ export function toStockCountLineDto(line: StockCountLine): StockCountLineDto {
     settlement: toCountSettlementDto(line.settlement),
     unitCost: line.unitCost?.toFixed() ?? null,
     chargeAmount: line.chargeAmount?.toFixed(2) ?? null,
+    reason: line.reason,
+  };
+}
+
+export function toStockCountSheetDto(sheet: CountSheet): StockCountSheetDto {
+  const t = sheet.totals;
+  return {
+    priceDate: sheet.priceDate,
+    totals: {
+      lines: t.lines,
+      counted: t.counted,
+      uncounted: t.uncounted,
+      unlisted: t.unlisted,
+      matched: t.matched,
+      different: t.different,
+      surplusLines: t.surplusLines,
+      surplusQty: t.surplusQty.toFixed(),
+      surplusAmount: t.surplusAmount.toFixed(2),
+      shortageLines: t.shortageLines,
+      shortageQty: t.shortageQty.toFixed(),
+      shortageAmount: t.shortageAmount.toFixed(2),
+      netQty: t.netQty.toFixed(),
+      netAmount: t.netAmount.toFixed(2),
+      unpriced: t.unpriced,
+    },
+    suppliers: sheet.suppliers,
+    rows: sheet.rows.map((row) => ({
+      lineId: row.lineId,
+      productId: row.productId,
+      sku: row.sku,
+      name: row.name,
+      unitName: row.unitName,
+      listed: row.listed,
+      supplierId: row.supplierId,
+      supplierName: row.supplierName,
+      expectedQty: row.expectedQty?.toFixed() ?? null,
+      countedQty: row.countedQty?.toFixed() ?? null,
+      pendingQty: row.pendingQty.toFixed(),
+      differenceQty: row.differenceQty?.toFixed() ?? null,
+      salePrice: row.salePrice?.toFixed(2) ?? null,
+      differenceAmount: row.differenceAmount?.toFixed(2) ?? null,
+      reason: row.reason,
+      movedDuring: row.movedDuring.toFixed(),
+      movedAfter: row.movedAfter.toFixed(),
+    })),
+    truncated: sheet.truncated,
   };
 }
 
