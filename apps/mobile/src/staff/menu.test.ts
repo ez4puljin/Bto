@@ -57,7 +57,7 @@ describe('the favourites', () => {
   const rep = menuOf(person(['sales.orders.rep']));
 
   it('starts with the person’s work and «Хамт олон»', () => {
-    expect(favouritesOf(null, rep).map((item) => item.key)).toEqual(['rep', 'community']);
+    expect(favouritesOf(null, rep).map((item) => item.key)).toEqual(['rep', 'visits', 'community']);
     expect(favouritesOf(null, menuOf(person([]))).map((item) => item.key)).toEqual(['community']);
   });
 

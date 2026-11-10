@@ -150,6 +150,16 @@ export const FINANCE_LIMITS = {
   maxCreditNoteLines: 200,
 } as const;
 
+/** How a rep took a store's money (ADR-0183): in hand, or a transfer the store showed. */
+export const COLLECTION_METHODS = ['CASH', 'TRANSFER'] as const;
+export type CollectionMethod = (typeof COLLECTION_METHODS)[number];
+
+/** A rep's report waits for the accountant, who records it as a voucher or refuses it. */
+export const COLLECTION_STATUSES = ['PENDING', 'RECORDED', 'REJECTED'] as const;
+export type CollectionStatus = (typeof COLLECTION_STATUSES)[number];
+
+export const COLLECTION_NOTE_MAX = 500;
+
 /**
  * «Банкны хуулга хаах» (ADR-0169): a bank statement's line is an ordinary one, a bank fee or a card
  * settlement; the last two are filled from the settings and stay locked on the line.

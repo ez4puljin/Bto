@@ -64,6 +64,11 @@ import { JournalRepostService } from './services/journal-repost.service';
 import { JournalService } from './services/journal.service';
 import { MoneyAccountsService } from './services/money-accounts.service';
 import { PaymentsService } from './services/payments.service';
+import {
+  RepCollectionsController,
+  SalesRepCollectionsController,
+} from './controllers/rep-collections.controller';
+import { RepCollectionsService } from './services/rep-collections.service';
 import { ReceiptCounterAccountsService } from './services/receipt-counter-accounts.service';
 import { ReceiptMoneyAccountsService } from './services/receipt-money-accounts.service';
 import { StockBooksService } from './services/stock-books.service';
@@ -101,6 +106,7 @@ const SERVICES = [
   IssueExpenseAccountsService,
   StockCountAccountsService,
   BankStatementsService,
+  RepCollectionsService,
 ];
 
 /**
@@ -170,6 +176,8 @@ export class FinanceModule {}
     SupplierBalancesController,
     PeriodsController,
     ReportsController,
+    SalesRepCollectionsController,
+    RepCollectionsController,
   ],
 })
 export class FinanceHttpModule {}

@@ -142,6 +142,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         also: ['/sales/orders'],
       },
       {
+        to: '/sales/visits',
+        label: 'nav.repVisits',
+        icon: MapPinned,
+        permission: 'sales.orders.read',
+      },
+      {
         to: '/sales/document-templates',
         label: 'nav.salesDocumentTemplates',
         icon: FileText,
@@ -398,6 +404,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'finance.read',
       },
       { to: '/finance/payments', label: 'nav.payments', icon: Coins, permission: 'finance.read' },
+      {
+        to: '/finance/collections',
+        label: 'nav.repCollections',
+        icon: HandCoins,
+        permission: 'finance.read',
+      },
       { to: '/finance/cash', label: 'nav.cash', icon: WalletCards, permission: 'finance.read' },
       {
         to: '/finance/customers',

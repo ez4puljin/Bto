@@ -41,6 +41,10 @@ export default function StaffLayout() {
           <Stack.Protected guard={rep}>
             <Stack.Screen name="(tabs)" />
           </Stack.Protected>
+          {/* The rep's visits and collected money (ADR-0183). */}
+          <Stack.Protected guard={rep}>
+            <Stack.Screen name="visits/index" />
+          </Stack.Protected>
           {/* The picking (ADR-0132). */}
           <Stack.Protected guard={picker}>
             <Stack.Screen name="picking/index" />

@@ -138,6 +138,14 @@ The arithmetic is in `src/counts/rules.ts` (tested), the hooks in `src/api/count
 - **«Өнөөдөр ачсан»** lists the driver's own loadings of today with the time; «Буцаах» takes one back (the order waits again).
 - The list re-reads every 30 s and on a pull. Grouping and the choice are pure in `src/loading/stores.ts` (tested), the hooks in `src/api/loading.ts`.
 
+## 1j. «Айлчлал», the rep's round and collected money (ADR-0183, 0.18.0, 2026-11-11)
+
+«Цэс» → «Ажил» → «Айлчлал» (`visits/index`) for the holder of `sales.orders.rep`, second among a rep's favourites.
+
+- **«Өнөөдөр»**: the weekday's stores from the office's plan, the open ones first, «N / M дэлгүүр»; a tap opens the visit sheet — four results as chips, a note; «Төлбөр авсан» asks the amount and cash or transfer and sends `POST /sales-rep/collections` before `POST /sales-rep/visits`, each with its own `Idempotency-Key`, kept until the sheet is opened anew so a retry never writes twice. «Өөр дэлгүүр нэмэх» searches the rep's customers for a store outside the round.
+- **«Төлбөр»**: the rep's own reports of 60 days with the state — waiting, recorded with the voucher's number, refused with the reason.
+- Pure parts in `src/visits/stops.ts` (tested), hooks in `src/api/visits.ts`.
+
 ## 2. Pins (2026-10-15)
 
 | Package | Version |

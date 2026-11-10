@@ -93,6 +93,8 @@ import { EbarimtPage } from '@/features/ebarimt-check/ebarimt-page';
 import { FinanceSettingsPage } from '@/features/finance/finance-settings-page';
 import { InvoicesPage } from '@/features/finance/invoices-page';
 import { BankStatementsPage } from '@/features/finance/bank-statements-page';
+import { RepCollectionsPage } from '@/features/finance/collections-page';
+import { RepVisitsPage } from '@/features/sales/visits-page';
 import { TransactionsPage } from '@/features/finance/transactions-page';
 import { JournalPage } from '@/features/finance/journal-page';
 import { PaymentsPage } from '@/features/finance/payments-page';
@@ -566,6 +568,15 @@ export const routes: RouteObject[] = [
             ),
           },
           {
+            path: 'sales/visits',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="sales.orders.read">
+                <RepVisitsPage />
+              </RequirePermission>
+            ),
+          },
+          {
             path: 'sales/document-templates',
             handle: { width: 'wide' },
             element: (
@@ -1008,6 +1019,11 @@ function financeRoutes(): RouteObject[] {
     { path: 'finance/invoices', handle: { width: 'wide' }, element: read(<InvoicesPage />) },
     { path: 'finance/payments', handle: { width: 'wide' }, element: read(<PaymentsPage />) },
     { path: 'finance/cash', handle: { width: 'wide' }, element: read(<CashPage />) },
+    {
+      path: 'finance/collections',
+      handle: { width: 'wide' },
+      element: read(<RepCollectionsPage />),
+    },
     {
       path: 'finance/customers',
       handle: { width: 'wide' },

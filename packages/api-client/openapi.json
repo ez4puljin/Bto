@@ -25196,6 +25196,541 @@
         ]
       }
     },
+    "/api/v1/sales-rep/visits/today": {
+      "get": {
+        "operationId": "SalesRepVisits_today",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepToday"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Today's stores: the weekday's plan, then what was visited outside it.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/visits": {
+      "post": {
+        "operationId": "SalesRepVisits_visit",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepVisitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepToday"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Айлчилсан»: a visit of the caller now; answers the day's list afterwards.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/plan": {
+      "get": {
+        "operationId": "SalesRepVisits_plan",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RepPlanDay"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The caller's own week.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/plan/{weekday}": {
+      "put": {
+        "operationId": "SalesRepVisits_setDay",
+        "parameters": [
+          {
+            "name": "weekday",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepPlanDayRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RepPlanDay"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The caller sets a weekday of their own round.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/rep-visits/reps": {
+      "get": {
+        "operationId": "RepVisits_reps",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RepRef"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/rep-visits/plans/{userId}": {
+      "get": {
+        "operationId": "RepVisits_plan",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RepPlanDay"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/rep-visits/plans/{userId}/{weekday}": {
+      "put": {
+        "operationId": "RepVisits_setDay",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "weekday",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepPlanDayRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RepPlanDay"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/rep-visits": {
+      "get": {
+        "operationId": "RepVisits_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepVisitPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/rep-visits/summary": {
+      "get": {
+        "operationId": "RepVisits_summary",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RepVisitSummaryRow"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/invoices": {
       "get": {
         "operationId": "Invoices_list",
@@ -29943,6 +30478,326 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/YearCloseStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/collections": {
+      "get": {
+        "operationId": "SalesRepCollections_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RepCollection"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      },
+      "post": {
+        "operationId": "SalesRepCollections_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepCollectionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A report only: the store's balance changes when the accountant records it.",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/rep-collections": {
+      "get": {
+        "operationId": "RepCollections_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "RECORDED",
+                "REJECTED"
+              ]
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepCollectionPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/rep-collections/{id}/record": {
+      "post": {
+        "operationId": "RepCollections_record",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepCollectionRecordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Орлого бичих»: the voucher and the report's mark in one transaction.",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/rep-collections/{id}/reject": {
+      "post": {
+        "operationId": "RepCollections_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepCollectionRejectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepCollection"
                 }
               }
             }
@@ -66111,6 +66966,327 @@
           "orderIds"
         ]
       },
+      "RepTodayVisit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "result": {
+            "enum": [
+              "ORDERED",
+              "NO_ORDER",
+              "CLOSED",
+              "PAYMENT"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "visitedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "result",
+          "note",
+          "visitedAt"
+        ]
+      },
+      "RepTodayStop": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "creditHold": {
+            "type": "boolean",
+            "description": "On the accountant's credit hold"
+          },
+          "planned": {
+            "type": "boolean",
+            "description": "On the weekday's plan"
+          },
+          "visit": {
+            "nullable": true,
+            "description": "The last visit of the day",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepTodayVisit"
+              }
+            ]
+          }
+        },
+        "required": [
+          "customerId",
+          "code",
+          "name",
+          "phone",
+          "address",
+          "creditHold",
+          "planned",
+          "visit"
+        ]
+      },
+      "RepToday": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "weekday": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 7
+          },
+          "stops": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepTodayStop"
+            }
+          }
+        },
+        "required": [
+          "date",
+          "weekday",
+          "stops"
+        ]
+      },
+      "RepVisitRequest": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "result": {
+            "enum": [
+              "ORDERED",
+              "NO_ORDER",
+              "CLOSED",
+              "PAYMENT"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "customerId",
+          "result"
+        ]
+      },
+      "RepVisitCustomer": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "creditHold": {
+            "type": "boolean",
+            "description": "On the accountant's credit hold"
+          }
+        },
+        "required": [
+          "customerId",
+          "code",
+          "name",
+          "phone",
+          "address",
+          "creditHold"
+        ]
+      },
+      "RepPlanDay": {
+        "type": "object",
+        "properties": {
+          "weekday": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 7,
+            "description": "1 = Monday"
+          },
+          "customers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepVisitCustomer"
+            }
+          }
+        },
+        "required": [
+          "weekday",
+          "customers"
+        ]
+      },
+      "RepPlanDayRequest": {
+        "type": "object",
+        "properties": {
+          "customerIds": {
+            "maxItems": 200,
+            "description": "In visiting order",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "required": [
+          "customerIds"
+        ]
+      },
+      "RepRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "fullName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "fullName"
+        ]
+      },
+      "RepVisit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "userId": {
+            "type": "number"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/RepVisitCustomer"
+          },
+          "visitedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "visitedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "result": {
+            "enum": [
+              "ORDERED",
+              "NO_ORDER",
+              "CLOSED",
+              "PAYMENT"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "userName",
+          "customer",
+          "visitedOn",
+          "visitedAt",
+          "result",
+          "note"
+        ]
+      },
+      "RepVisitPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepVisit"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "RepVisitSummaryRow": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "number"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "result": {
+            "enum": [
+              "ORDERED",
+              "NO_ORDER",
+              "CLOSED",
+              "PAYMENT"
+            ],
+            "type": "string"
+          },
+          "visits": {
+            "type": "number"
+          },
+          "stores": {
+            "type": "number",
+            "description": "Different stores among them"
+          }
+        },
+        "required": [
+          "userId",
+          "userName",
+          "result",
+          "visits",
+          "stores"
+        ]
+      },
       "Invoice": {
         "type": "object",
         "properties": {
@@ -71658,6 +72834,193 @@
           "income",
           "expense",
           "profit"
+        ]
+      },
+      "RepCollection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "userId": {
+            "type": "number"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "customerId": {
+            "type": "number"
+          },
+          "customerCode": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string",
+            "example": "500000.00"
+          },
+          "method": {
+            "enum": [
+              "CASH",
+              "TRANSFER"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "collectedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "RECORDED",
+              "REJECTED"
+            ],
+            "type": "string"
+          },
+          "paymentId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The voucher once recorded"
+          },
+          "paymentNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "decidedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "decidedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "decisionNote": {
+            "type": "string",
+            "nullable": true,
+            "description": "Why it was refused"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "userName",
+          "customerId",
+          "customerCode",
+          "customerName",
+          "amount",
+          "method",
+          "note",
+          "collectedOn",
+          "createdAt",
+          "status",
+          "paymentId",
+          "paymentNumber",
+          "decidedByName",
+          "decidedAt",
+          "decisionNote"
+        ]
+      },
+      "RepCollectionRequest": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "amount": {
+            "type": "string",
+            "example": "500000"
+          },
+          "method": {
+            "enum": [
+              "CASH",
+              "TRANSFER"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "customerId",
+          "amount",
+          "method"
+        ]
+      },
+      "RepCollectionPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepCollection"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "pendingCount": {
+            "type": "number",
+            "description": "Every pending report, whatever the filters"
+          },
+          "pendingAmount": {
+            "type": "string",
+            "example": "1500000.00"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor",
+          "pendingCount",
+          "pendingAmount"
+        ]
+      },
+      "RepCollectionRecordRequest": {
+        "type": "object",
+        "properties": {
+          "moneyAccountId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The cash or bank account the money went into"
+          },
+          "paidOn": {
+            "type": "string",
+            "format": "date",
+            "description": "Not in the future (Ulaanbaatar)"
+          }
+        },
+        "required": [
+          "moneyAccountId",
+          "paidOn"
+        ]
+      },
+      "RepCollectionRejectRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
         ]
       },
       "PosSettings": {

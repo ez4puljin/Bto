@@ -117,6 +117,8 @@ export {
   staffAppAssortmentSegments,
   staffAppAssortmentUsers,
   salesOrderLoads,
+  repVisitPlans,
+  repVisits,
   salesStageMoves,
   salesStageRoles,
   salesStages,
@@ -131,6 +133,7 @@ export {
   financeSettings,
   invoiceLines,
   invoices,
+  repCollections,
 } from '../modules/finance/schema';
 export {
   posCashiers,

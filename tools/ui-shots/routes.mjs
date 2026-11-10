@@ -123,6 +123,9 @@ export const ROUTES = [
   { area: 'catalog', name: 'ebarimt', path: '/catalog/ebarimt' },
 
   { area: 'pricing', name: 'pending', path: '/catalog/pending' },
+  { area: 'sales', name: 'rep-visits', path: '/sales/visits' },
+  { area: 'sales', name: 'rep-visits-log', path: '/sales/visits?tab=log' },
+  { area: 'finance', name: 'rep-collections', path: '/finance/collections?status=ALL' },
   { area: 'pricing', name: 'price-labels', path: '/pricing/labels/print?ids={labelIds}' },
   { area: 'pricing', name: 'profiles', path: '/pricing/profiles' },
   { area: 'pricing', name: 'profiles-new', path: '/pricing/profiles?new=1', dialog: true },

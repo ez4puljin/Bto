@@ -19,6 +19,7 @@ import {
   STAGE_ACTIONS,
   STAGE_RIGHTS,
   STOCK_APPS,
+  VISIT_RESULTS,
 } from '@tugeel/shared/sales';
 import { type SQL, sql } from 'drizzle-orm';
 import {
@@ -813,4 +814,50 @@ export const salesStageMoves = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index('sales_stage_moves_order_idx').on(t.orderId, t.id)],
+);
+
+/**
+ * A rep's weekly round (ADR-0183): the stores of each weekday, 1 = Monday. Replaced as a whole per
+ * rep and weekday; the rows' order is the visiting order.
+ */
+export const repVisitPlans = pgTable(
+  'rep_visit_plans',
+  {
+    id: id(),
+    userId: userRef('user_id').notNull(),
+    weekday: smallint('weekday').notNull(),
+    customerId: ref('customer_id')
+      .notNull()
+      .references(() => customers.id),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('rep_visit_plans_key').on(t.userId, t.weekday, t.customerId),
+    index('rep_visit_plans_customer_idx').on(t.customerId),
+    check('rep_visit_plans_weekday', sql`${t.weekday} BETWEEN 1 AND 7`),
+  ],
+);
+
+/** A rep's visit to a store (ADR-0183): written once, never changed or removed. */
+export const repVisits = pgTable(
+  'rep_visits',
+  {
+    id: id(),
+    userId: userRef('user_id').notNull(),
+    customerId: ref('customer_id')
+      .notNull()
+      .references(() => customers.id),
+    /** The Ulaanbaatar business date of the visit. */
+    visitedOn: date('visited_on', { mode: 'string' }).notNull(),
+    visitedAt: timestamp('visited_at', { withTimezone: true }).notNull().defaultNow(),
+    result: text('result', { enum: VISIT_RESULTS }).notNull(),
+    note: text('note'),
+  },
+  (t) => [
+    index('rep_visits_user_idx').on(t.userId, t.visitedOn),
+    index('rep_visits_customer_idx').on(t.customerId, t.visitedOn),
+    check('rep_visits_result', inList(t.result, VISIT_RESULTS)),
+    check('rep_visits_note', sql`${t.note} IS NULL OR char_length(${t.note}) BETWEEN 1 AND 500`),
+  ],
 );

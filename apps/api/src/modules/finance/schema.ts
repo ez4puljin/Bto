@@ -2,6 +2,8 @@ import {
   BANK_EXPORT_TYPES,
   BANK_LINE_ACTIONS,
   BANK_LINE_KINDS,
+  COLLECTION_METHODS,
+  COLLECTION_STATUSES,
   FINANCE_LIMITS,
   INVOICE_STATUSES,
 } from '@tugeel/shared/finance';
@@ -407,4 +409,51 @@ export const bankStatementSettings = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [check('bank_statement_settings_single', sql`${t.id} = 1`)],
+);
+
+/**
+ * Money a rep says a store handed over (ADR-0183). A report changes nothing in the books; the
+ * accountant records it as a customer payment voucher (`payment_id`, the Finance Core's document,
+ * no FK) or refuses it with `decision_note`. Never changed after the decision, never removed.
+ */
+export const repCollections = pgTable(
+  'rep_collections',
+  {
+    id: id(),
+    userId: userRef('user_id').notNull(),
+    customerId: ref('customer_id')
+      .notNull()
+      .references(() => customers.id),
+    amount: money('amount').notNull(),
+    method: text('method', { enum: COLLECTION_METHODS }).notNull(),
+    note: text('note'),
+    /** The Ulaanbaatar business date the rep reported it. */
+    collectedOn: date('collected_on', { mode: 'string' }).notNull(),
+    createdAt: createdAt(),
+    status: text('status', { enum: COLLECTION_STATUSES }).notNull().default('PENDING'),
+    paymentId: ref('payment_id'),
+    paymentNumber: text('payment_number'),
+    decidedBy: userRef('decided_by'),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    decisionNote: text('decision_note'),
+  },
+  (t) => [
+    index('rep_collections_status_idx').on(t.status, t.id),
+    index('rep_collections_user_idx').on(t.userId, t.id),
+    index('rep_collections_customer_idx').on(t.customerId, t.id),
+    uniqueIndex('rep_collections_payment_key')
+      .on(t.paymentId)
+      .where(sql`${t.paymentId} IS NOT NULL`),
+    check('rep_collections_amount', sql`${t.amount} > 0`),
+    check('rep_collections_method', inList(t.method, COLLECTION_METHODS)),
+    check('rep_collections_status', inList(t.status, COLLECTION_STATUSES)),
+    check(
+      'rep_collections_decided',
+      sql`(${t.status} = 'PENDING') = (${t.decidedBy} IS NULL)
+        AND (${t.decidedBy} IS NULL) = (${t.decidedAt} IS NULL)
+        AND (${t.status} = 'RECORDED') = (${t.paymentId} IS NOT NULL)
+        AND (${t.paymentId} IS NULL) = (${t.paymentNumber} IS NULL)
+        AND (${t.status} = 'REJECTED') = (${t.decisionNote} IS NOT NULL)`,
+    ),
+  ],
 );

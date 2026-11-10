@@ -622,5 +622,23 @@ export function orderHeaderIssues(
   return issues;
 }
 
+/** What a rep's visit to a store came to (ADR-0183). */
+export const VISIT_RESULTS = ['ORDERED', 'NO_ORDER', 'CLOSED', 'PAYMENT'] as const;
+export type VisitResult = (typeof VISIT_RESULTS)[number];
+
+/** The days of a rep's weekly round, ISO: 1 = Monday … 7 = Sunday. */
+export const WEEKDAYS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
+
+/** Stores one weekday of a rep's round may name. */
+export const VISIT_PLAN_MAX = 200;
+
+export const VISIT_NOTE_MAX = 500;
+
+/** The ISO weekday (1 = Monday … 7 = Sunday) of a business date `YYYY-MM-DD`. */
+export function isoWeekdayOf(date: string): number {
+  const day = new Date(`${date}T00:00:00Z`).getUTCDay();
+  return day === 0 ? 7 : day;
+}
+
 // The wholesale documents' templates (ADR-0143).
 export * from './document-template';

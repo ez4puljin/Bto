@@ -6,6 +6,7 @@ import type { Me } from '../api/session';
 
 export type MenuKey =
   | 'rep'
+  | 'visits'
   | 'picking'
   | 'loading'
   | 'transfers'
@@ -49,6 +50,7 @@ export function menuOf(me: Rights): MenuGroup[] {
       key: 'work',
       items: [
         ...(rep ? [{ key: 'rep' as const, href: '/rep' }] : []),
+        ...(rep ? [{ key: 'visits' as const, href: '/visits' }] : []),
         ...(mayPick(me) ? [{ key: 'picking' as const, href: '/picking' }] : []),
         ...(mayLoad(me) ? [{ key: 'loading' as const, href: '/loading' }] : []),
         ...(mayRequestTransfers(me) ? [{ key: 'transfers' as const, href: '/transfers' }] : []),
@@ -97,6 +99,7 @@ export function menuOf(me: Rights): MenuGroup[] {
 /** Before the person has chosen any: their work first, then the company's side. */
 const FIRST_FAVOURITES: readonly MenuKey[] = [
   'rep',
+  'visits',
   'picking',
   'loading',
   'transfers',

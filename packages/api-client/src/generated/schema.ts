@@ -6196,6 +6196,154 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales-rep/visits/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Today's stores: the weekday's plan, then what was visited outside it. */
+        get: operations["SalesRepVisits_today"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/visits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** «Айлчилсан»: a visit of the caller now; answers the day's list afterwards. */
+        post: operations["SalesRepVisits_visit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's own week. */
+        get: operations["SalesRepVisits_plan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/plan/{weekday}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** The caller sets a weekday of their own round. */
+        put: operations["SalesRepVisits_setDay"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rep-visits/reps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RepVisits_reps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rep-visits/plans/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RepVisits_plan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rep-visits/plans/{userId}/{weekday}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["RepVisits_setDay"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rep-visits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RepVisits_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rep-visits/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RepVisits_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/invoices": {
         parameters: {
             query?: never;
@@ -7289,6 +7437,72 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["Reports_revertYear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/collections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRepCollections_mine"];
+        put?: never;
+        /** A report only: the store's balance changes when the accountant records it. */
+        post: operations["SalesRepCollections_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rep-collections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RepCollections_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rep-collections/{id}/record": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** «Орлого бичих»: the voucher and the report's mark in one transaction. */
+        post: operations["RepCollections_record"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rep-collections/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RepCollections_reject"];
         delete?: never;
         options?: never;
         head?: never;
@@ -17057,6 +17271,87 @@ export interface components {
             /** @description The orders loaded, 1…100 */
             orderIds: number[];
         };
+        RepTodayVisit: {
+            id: number;
+            /** @enum {string} */
+            result: "ORDERED" | "NO_ORDER" | "CLOSED" | "PAYMENT";
+            note: string | null;
+            /** Format: date-time */
+            visitedAt: string;
+        };
+        RepTodayStop: {
+            customerId: number;
+            code: string;
+            name: string;
+            phone: string | null;
+            address: string | null;
+            /** @description On the accountant's credit hold */
+            creditHold: boolean;
+            /** @description On the weekday's plan */
+            planned: boolean;
+            /** @description The last visit of the day */
+            visit: components["schemas"]["RepTodayVisit"] | null;
+        };
+        RepToday: {
+            /** Format: date */
+            date: string;
+            weekday: number;
+            stops: components["schemas"]["RepTodayStop"][];
+        };
+        RepVisitRequest: {
+            customerId: number;
+            /** @enum {string} */
+            result: "ORDERED" | "NO_ORDER" | "CLOSED" | "PAYMENT";
+            note?: string | null;
+        };
+        RepVisitCustomer: {
+            customerId: number;
+            code: string;
+            name: string;
+            phone: string | null;
+            address: string | null;
+            /** @description On the accountant's credit hold */
+            creditHold: boolean;
+        };
+        RepPlanDay: {
+            /** @description 1 = Monday */
+            weekday: number;
+            customers: components["schemas"]["RepVisitCustomer"][];
+        };
+        RepPlanDayRequest: {
+            /** @description In visiting order */
+            customerIds: number[];
+        };
+        RepRef: {
+            id: number;
+            fullName: string;
+        };
+        RepVisit: {
+            id: number;
+            userId: number;
+            userName: string;
+            customer: components["schemas"]["RepVisitCustomer"];
+            /** Format: date */
+            visitedOn: string;
+            /** Format: date-time */
+            visitedAt: string;
+            /** @enum {string} */
+            result: "ORDERED" | "NO_ORDER" | "CLOSED" | "PAYMENT";
+            note: string | null;
+        };
+        RepVisitPage: {
+            data: components["schemas"]["RepVisit"][];
+            nextCursor: string | null;
+        };
+        RepVisitSummaryRow: {
+            userId: number;
+            userName: string;
+            /** @enum {string} */
+            result: "ORDERED" | "NO_ORDER" | "CLOSED" | "PAYMENT";
+            visits: number;
+            /** @description Different stores among them */
+            stores: number;
+        };
         Invoice: {
             id: number;
             /** @example Н-20261016-0001 */
@@ -18620,6 +18915,61 @@ export interface components {
              * @example 200000.00
              */
             profit: string;
+        };
+        RepCollection: {
+            id: number;
+            userId: number;
+            userName: string;
+            customerId: number;
+            customerCode: string;
+            customerName: string;
+            /** @example 500000.00 */
+            amount: string;
+            /** @enum {string} */
+            method: "CASH" | "TRANSFER";
+            note: string | null;
+            /** Format: date */
+            collectedOn: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** @enum {string} */
+            status: "PENDING" | "RECORDED" | "REJECTED";
+            /** @description The voucher once recorded */
+            paymentId: number | null;
+            paymentNumber: string | null;
+            decidedByName: string | null;
+            /** Format: date-time */
+            decidedAt: string | null;
+            /** @description Why it was refused */
+            decisionNote: string | null;
+        };
+        RepCollectionRequest: {
+            customerId: number;
+            /** @example 500000 */
+            amount: string;
+            /** @enum {string} */
+            method: "CASH" | "TRANSFER";
+            note?: string | null;
+        };
+        RepCollectionPage: {
+            data: components["schemas"]["RepCollection"][];
+            nextCursor: string | null;
+            /** @description Every pending report, whatever the filters */
+            pendingCount: number;
+            /** @example 1500000.00 */
+            pendingAmount: string;
+        };
+        RepCollectionRecordRequest: {
+            /** @description The cash or bank account the money went into */
+            moneyAccountId: number;
+            /**
+             * Format: date
+             * @description Not in the future (Ulaanbaatar)
+             */
+            paidOn: string;
+        };
+        RepCollectionRejectRequest: {
+            reason: string;
         };
         PosSettings: {
             storeWarehouseId: number | null;
@@ -37865,6 +38215,296 @@ export interface operations {
             };
         };
     };
+    SalesRepVisits_today: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepToday"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRepVisits_visit: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepVisitRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepToday"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRepVisits_plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepPlanDay"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRepVisits_setDay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                weekday: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepPlanDayRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepPlanDay"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RepVisits_reps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepRef"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RepVisits_plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepPlanDay"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RepVisits_setDay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: number;
+                weekday: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepPlanDayRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepPlanDay"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RepVisits_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                userId?: number;
+                customerId?: number;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepVisitPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RepVisits_summary: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                userId?: number;
+                customerId?: number;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepVisitSummaryRow"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Invoices_list: {
         parameters: {
             query?: {
@@ -40462,6 +41102,177 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["YearCloseStatus"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRepCollections_mine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepCollection"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRepCollections_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepCollectionRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepCollection"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RepCollections_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                status?: "PENDING" | "RECORDED" | "REJECTED";
+                userId?: number;
+                customerId?: number;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepCollectionPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RepCollections_record: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepCollectionRecordRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepCollection"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RepCollections_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepCollectionRejectRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepCollection"];
                 };
             };
             /** @description RFC 9457 problem details */

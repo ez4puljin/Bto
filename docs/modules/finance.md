@@ -211,3 +211,7 @@ Also: the home tile «Хугацаа хэтэрсэн авлагатай хар�
 - CLOSED orders when their invoice is paid; reminders.
 - Cost of goods sold postings (stock value out of inventory at the sale), customer statements, VAT reports and supplier bills: Finance Core work before go-live now (ADR-0077), supplier bills before procurement (delivery 8).
 - Lots on credit-note returns (returned goods go back without a lot).
+
+## Rep collections (ADR-0183)
+
+`rep_collections` (migration `0098_rep_visits`, `REVOKE DELETE`): money a rep reports from a store — `PENDING`, then `RECORDED` with `payment_id` / `payment_number` or `REJECTED` with `decision_note`, decided once. `RepCollectionsService`: `create` and `mine` for the rep (`/sales-rep/collections`, `sales.orders.rep`), `list` with the pending totals (`GET /rep-collections`, `finance.read`), `record` — the report `FOR UPDATE`, then `PaymentsService.recordInTx` (a `CUSTOMER_PAYMENT`, `collectedBy` = the rep, key `rep-collection:<id>`) and the mark, one transaction — and `reject` (`finance.payments.record`). A report never changes a balance. Screen `/finance/collections`. Covered by `test/integration/rep-visits.int-spec.ts`.
