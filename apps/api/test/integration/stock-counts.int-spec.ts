@@ -581,4 +581,47 @@ describe('stock counts', () => {
     await send(counter1, fourth.id).expect(409);
     void accountant;
   });
+
+  it('takes a counted quantity typed in the window in place of the entries (ADR-0181)', async () => {
+    const fifth = await create({ scopeMode: 'SCANNED' });
+    await start(counter1, fifth.id).expect(200);
+    await count(counter1, fifth.id, cola, 'PCS', '5').expect(201);
+    await send(counter1, fifth.id).expect(200);
+    const rowOf = async () => {
+      const sheet = (await http().get(`${base}/${fifth.id}/sheet`).set(bearer(admin)).expect(200))
+        .body as { rows: { lineId: number; productId: number; [key: string]: unknown }[] };
+      const row = sheet.rows.find((line) => line.productId === cola.id);
+      if (!row) throw new Error('no cola row');
+      return row;
+    };
+    const line = await rowOf();
+    expect(line).toMatchObject({ countedQty: '5', corrected: false, differenceQty: '-65' });
+    const correct = (who: string, qty: string) =>
+      http().put(`${base}/${fifth.id}/lines/${line.lineId}/counted`).set(bearer(who)).send({ qty });
+    await correct(keeper, '68').expect(403);
+    await correct(admin, '-1').expect(422);
+    await correct(admin, '68').expect(204);
+    expect(await rowOf()).toMatchObject({ countedQty: '68', corrected: true, differenceQty: '-2' });
+    // The counter's entry stays, struck out; the correction is an entry of its own.
+    const entries = (
+      await http()
+        .get(`${base}/${fifth.id}/lines/${line.lineId}/entries`)
+        .set(bearer(admin))
+        .expect(200)
+    ).body as { qtyBase: string; voided: boolean; correction: boolean }[];
+    expect(entries.map((entry) => [entry.qtyBase, entry.voided, entry.correction])).toEqual([
+      ['68', false, true],
+      ['5', true, false],
+    ]);
+    // What a counter sends afterwards is added to the corrected quantity.
+    await start(counter2, fifth.id).expect(200);
+    await count(counter2, fifth.id, cola, 'PCS', '1').expect(201);
+    await send(counter2, fifth.id).expect(200);
+    expect(await rowOf()).toMatchObject({ countedQty: '69', corrected: true });
+    await act(keeper, fifth.id, 'close').expect(200);
+    await correct(admin, '67').expect(204);
+    await act(admin, fifth.id, 'approve', { uncounted: 'LEAVE' }).expect(200);
+    expect(await onHand(cola.id)).toBe('67.000');
+    await correct(admin, '66').expect(409);
+  });
 });

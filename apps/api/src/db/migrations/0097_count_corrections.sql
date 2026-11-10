@@ -1,0 +1,1 @@
+ALTER TABLE "stock_count_entries" ADD COLUMN "correction" boolean DEFAULT false NOT NULL;

@@ -260,6 +260,17 @@ export function useStockCountMutations() {
       onSuccess: (_data, input) =>
         queryClient.invalidateQueries({ queryKey: [...COUNTS, input.id, 'sheet'] }),
     }),
+    /** The counted quantity typed in the window, in base units (ADR-0181). */
+    counted: useMutation({
+      mutationFn: async ({ id, lineId, qty }: { id: number; lineId: number; qty: string }) =>
+        unwrap(
+          await api.PUT('/api/v1/stock-counts/{id}/lines/{lineId}/counted', {
+            params: { path: { id, lineId } },
+            body: { qty },
+          }),
+        ),
+      onSuccess: changed,
+    }),
     sendFor: useMutation({
       mutationFn: async ({ id, sessionId }: { id: number; sessionId: number }) =>
         unwrap(

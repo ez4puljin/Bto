@@ -2796,6 +2796,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stock-counts/{id}/lines/{lineId}/counted": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** The counted quantity typed in the window: the entries before it are struck out. */
+        put: operations["StockCounts_correctLine"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stock-counts/{id}/lines/{lineId}/entries": {
         parameters: {
             query?: never;
@@ -13338,6 +13355,8 @@ export interface components {
             /** @description Difference × selling price, MNT */
             differenceAmount: string | null;
             reason: string | null;
+            /** @description The counted quantity was typed in the window */
+            corrected: boolean;
             movedDuring: string;
             movedAfter: string;
         };
@@ -13352,6 +13371,13 @@ export interface components {
         StockCountLineReasonDto: {
             /** @description Empty or null clears it */
             reason?: string | null;
+        };
+        StockCountLineCountedRequest: {
+            /**
+             * @description The counted quantity in base units
+             * @example 12
+             */
+            qty: string;
         };
         StockCountEntry: {
             id: number;
@@ -13381,6 +13407,8 @@ export interface components {
             voided: boolean;
             /** @description Its session was sent */
             sent: boolean;
+            /** @description Typed in the count window in place of the entries before it */
+            correction: boolean;
         };
         StockCountMovedDocument: {
             /** @example CN */
@@ -29458,6 +29486,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["StockCountLineReasonDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StockCounts_correctLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                lineId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockCountLineCountedRequest"];
             };
         };
         responses: {

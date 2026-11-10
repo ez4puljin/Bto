@@ -178,6 +178,8 @@ export class StockCountSheetRowDto {
   @ApiProperty({ type: String, nullable: true, description: 'Difference × selling price, MNT' })
   differenceAmount: string | null;
   @ApiProperty({ type: String, nullable: true }) reason: string | null;
+  @ApiProperty({ description: 'The counted quantity was typed in the window' })
+  corrected: boolean;
   @ApiProperty() movedDuring: string;
   @ApiProperty() movedAfter: string;
 }
@@ -233,6 +235,8 @@ export class StockCountEntryDto {
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
   @ApiProperty({ description: 'Taken back by its counter' }) voided: boolean;
   @ApiProperty({ description: 'Its session was sent' }) sent: boolean;
+  @ApiProperty({ description: 'Typed in the count window in place of the entries before it' })
+  correction: boolean;
 }
 
 @ApiSchema({ name: 'StockCountMovedDocument' })
@@ -367,6 +371,14 @@ export class StockCountLineReasonDto {
   @IsString()
   @MaxLength(500)
   reason?: string | null;
+}
+
+@ApiSchema({ name: 'StockCountLineCountedRequest' })
+export class StockCountLineCountedDto {
+  @ApiProperty({ example: '12', description: 'The counted quantity in base units' })
+  @IsString()
+  @Matches(QTY)
+  qty: string;
 }
 
 export class StockCountVarianceQueryDto extends PageQueryDto {

@@ -11348,6 +11348,63 @@
         ]
       }
     },
+    "/api/v1/stock-counts/{id}/lines/{lineId}/counted": {
+      "put": {
+        "operationId": "StockCounts_correctLine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lineId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockCountLineCountedRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The counted quantity typed in the window: the entries before it are struck out.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/stock-counts/{id}/lines/{lineId}/entries": {
       "get": {
         "operationId": "StockCounts_lineEntries",
@@ -52622,6 +52679,10 @@
             "type": "string",
             "nullable": true
           },
+          "corrected": {
+            "type": "boolean",
+            "description": "The counted quantity was typed in the window"
+          },
           "movedDuring": {
             "type": "string"
           },
@@ -52645,6 +52706,7 @@
           "salePrice",
           "differenceAmount",
           "reason",
+          "corrected",
           "movedDuring",
           "movedAfter"
         ]
@@ -52693,6 +52755,19 @@
             "description": "Empty or null clears it"
           }
         }
+      },
+      "StockCountLineCountedRequest": {
+        "type": "object",
+        "properties": {
+          "qty": {
+            "type": "string",
+            "example": "12",
+            "description": "The counted quantity in base units"
+          }
+        },
+        "required": [
+          "qty"
+        ]
       },
       "StockCountEntry": {
         "type": "object",
@@ -52749,6 +52824,10 @@
           "sent": {
             "type": "boolean",
             "description": "Its session was sent"
+          },
+          "correction": {
+            "type": "boolean",
+            "description": "Typed in the count window in place of the entries before it"
           }
         },
         "required": [
@@ -52766,7 +52845,8 @@
           "qtyBase",
           "createdAt",
           "voided",
-          "sent"
+          "sent",
+          "correction"
         ]
       },
       "StockCountMovedDocument": {

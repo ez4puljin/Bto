@@ -30,6 +30,7 @@ import {
   StockCountDetailDto,
   StockCountEntryDto,
   StockCountLinePageDto,
+  StockCountLineCountedDto,
   StockCountLineReasonDto,
   StockCountLineSettlementDto,
   StockCountLinesQueryDto,
@@ -215,6 +216,19 @@ export class StockCountsController {
     @Body() dto: StockCountLineReasonDto,
   ): Promise<void> {
     await this.counts.setReason(ctx, id, lineId, dto.reason ?? null);
+  }
+
+  /** The counted quantity typed in the window: the entries before it are struck out. */
+  @Put(':id/lines/:lineId/counted')
+  @HttpCode(204)
+  @RequirePermission(APPROVE)
+  async correctLine(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('lineId', ParseIntPipe) lineId: number,
+    @Body() dto: StockCountLineCountedDto,
+  ): Promise<void> {
+    await this.counts.correctLine(ctx, id, lineId, new Decimal(dto.qty));
   }
 
   /** Who counted a product, entry by entry. */

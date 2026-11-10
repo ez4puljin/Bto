@@ -238,6 +238,8 @@ export interface CountSheetRow {
   salePrice: Decimal | null;
   differenceAmount: Decimal | null;
   reason: string | null;
+  /** The counted quantity was typed in the window (ADR-0181). */
+  corrected: boolean;
   movedDuring: Decimal;
   movedAfter: Decimal;
 }
@@ -287,6 +289,7 @@ export interface StockCountEntry {
   createdAt: Date;
   voided: boolean;
   sent: boolean;
+  correction: boolean;
 }
 
 /** A count as a counter's phone lists it. */
@@ -831,6 +834,20 @@ export class StockCountsService implements OnModuleInit {
     }
     const pending = await this.pendingOf(id);
     const moved = await this.posting.countMovedSince(id);
+    const corrected = new Set(
+      (
+        await this.db
+          .selectDistinct({ productId: stockCountEntries.productId })
+          .from(stockCountEntries)
+          .where(
+            and(
+              eq(stockCountEntries.stocktakeId, id),
+              eq(stockCountEntries.correction, true),
+              isNull(stockCountEntries.voidedAt),
+            ),
+          )
+      ).map((row) => row.productId),
+    );
 
     const all = lineRows.map((row): CountSheetRow => {
       const product = products.get(row.productId);
@@ -858,6 +875,7 @@ export class StockCountsService implements OnModuleInit {
         differenceAmount:
           difference === null || price === null ? null : toWholeMnt(price.times(difference)),
         reason: row.reason,
+        corrected: corrected.has(row.productId),
         movedDuring: moved.get(row.productId)?.during ?? ZERO,
         movedAfter: moved.get(row.productId)?.after ?? ZERO,
       };
@@ -964,6 +982,81 @@ export class StockCountsService implements OnModuleInit {
     });
   }
 
+  /**
+   * The counted quantity typed in the window (ADR-0181): the sent entries of the product are struck
+   * out, never deleted, and one correcting entry in base units takes their place. What a counter
+   * sends afterwards is added to it.
+   */
+  async correctLine(ctx: AuthContext, id: number, lineId: number, qty: Decimal): Promise<void> {
+    if (qty.isNegative()) throw invalid('qty', 'min', 'not below zero');
+    await inTransaction(this.db, async (tx) => {
+      const header = await this.lockCount(tx, id, 'share');
+      this.scope.assertCanWriteWarehouse(ctx, header.warehouseId);
+      assertState(header, 'COUNTING', 'REVIEW');
+      const found = await this.line(tx, id, lineId);
+      const [line] = await tx
+        .select()
+        .from(stockCountLines)
+        .where(eq(stockCountLines.id, found.id))
+        .for('update');
+      if (!line) throw notFound('stock count line', lineId);
+      if (line.countedQty !== null && line.countedQty.eq(qty)) return;
+      const unit = (await this.units.baseUnits([line.productId], tx)).get(line.productId);
+      if (!unit) throw new Error(`product ${line.productId} has no base unit`);
+      const converted = await this.units.toBase(unit.unitId, qty, tx);
+      if (line.firstCountedAt === null) {
+        await this.stock.lockWarehouseBalances(tx, header.warehouseId, [line.productId]);
+        const onHand = await this.onHandOf(tx, header.warehouseId, line.productId);
+        await tx
+          .update(stockCountLines)
+          .set({
+            expectedQty: onHand.lt(0) ? ZERO : onHand,
+            ledgerMark: await this.posting.ledgerMark(tx),
+            firstCountedAt: sql`now()`,
+          })
+          .where(eq(stockCountLines.id, line.id));
+      }
+      await tx.execute(sql`
+        UPDATE stock_count_entries e
+           SET voided_at = now()
+          FROM stock_count_sessions s
+         WHERE s.id = e.session_id AND s.sent_at IS NOT NULL
+           AND e.stocktake_id = ${id} AND e.product_id = ${line.productId}
+           AND e.voided_at IS NULL`);
+      const [session] = await tx
+        .insert(stockCountSessions)
+        .values({ stocktakeId: id, userId: ctx.userId, sentAt: sql`now()`, sentBy: ctx.userId })
+        .returning({ id: stockCountSessions.id });
+      if (!session) throw new Error('stock count session was not created');
+      await tx.insert(stockCountEntries).values({
+        sessionId: session.id,
+        stocktakeId: id,
+        productId: line.productId,
+        userId: ctx.userId,
+        productUnitId: converted.unitId,
+        enteredQty: qty,
+        factorSnapshot: converted.factorSnapshot,
+        qtyBase: converted.qtyBase,
+        correction: true,
+      });
+      await tx
+        .update(stockCountLines)
+        .set({ countedQty: converted.qtyBase, updatedAt: sql`now()` })
+        .where(eq(stockCountLines.id, line.id));
+      await this.audit.record(tx, ctx, {
+        action: 'UPDATE',
+        entity: 'stocktakes',
+        entityId: id,
+        before: {
+          lineId,
+          productId: line.productId,
+          countedQty: line.countedQty?.toFixed() ?? null,
+        },
+        after: { lineId, productId: line.productId, countedQty: converted.qtyBase.toFixed() },
+      });
+    });
+  }
+
   /** Who counted each product: sent and unsent quantities by counter. */
   private async countersOf(
     stocktakeId: number,
@@ -1057,6 +1150,7 @@ export class StockCountsService implements OnModuleInit {
       createdAt: entry.createdAt,
       voided: entry.voidedAt !== null,
       sent: sentAt !== null,
+      correction: entry.correction,
     }));
   }
 

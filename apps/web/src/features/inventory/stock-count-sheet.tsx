@@ -477,6 +477,9 @@ function SheetRow(props: {
         <span className="font-medium">{row.name}</span>
         <span className="ml-2 inline-flex flex-wrap gap-1 align-middle">
           {row.listed ? null : <Badge variant="outline">{t('inventory.counts.sheet.added')}</Badge>}
+          {row.corrected ? (
+            <Badge variant="secondary">{t('inventory.counts.sheet.corrected')}</Badge>
+          ) : null}
           {isZero(row.movedDuring) ? null : (
             <Badge variant="secondary">
               {t('inventory.counts.lines.movedDuring', { qty: signedQty(row.movedDuring) })}
@@ -492,8 +495,21 @@ function SheetRow(props: {
       <TableCell {...open} className={cn(open.className, NUM)}>
         {row.expectedQty === null ? '' : formatQty(row.expectedQty)}
       </TableCell>
-      <TableCell {...open} className={cn(open.className, NUM)}>
-        {row.countedQty === null ? '' : formatQty(row.countedQty)}
+      <TableCell
+        {...(props.mayEdit ? {} : open)}
+        className={cn(props.mayEdit ? 'py-1' : open.className, NUM)}
+      >
+        {props.mayEdit ? (
+          <CountedInput
+            key={`${row.lineId}:${row.countedQty ?? ''}`}
+            countId={props.countId}
+            row={row}
+          />
+        ) : row.countedQty === null ? (
+          ''
+        ) : (
+          formatQty(row.countedQty)
+        )}
         {isZero(row.pendingQty) ? null : (
           <span className="block text-[0.75rem] text-muted-foreground">
             {t('inventory.counts.lines.pending', { qty: formatQty(row.pendingQty) })}
@@ -524,6 +540,51 @@ function SheetRow(props: {
         )}
       </TableCell>
     </TableRow>
+  );
+}
+
+const COUNTED = /^\d{1,10}(\.\d{1,3})?$/;
+
+/** The counted quantity, corrected when the box is left with another number (ADR-0181). */
+function CountedInput({ countId, row }: { countId: number; row: StockCountSheetRow }) {
+  const { t } = useTranslation();
+  const mutations = useStockCountMutations();
+  const shown = row.countedQty === null ? '' : formatQty(row.countedQty);
+  const [value, setValue] = useState(shown);
+  const [failed, setFailed] = useState(false);
+  const save = () => {
+    const typed = value.trim().replaceAll(',', '');
+    if (typed === '' || typed === shown.replaceAll(',', '')) {
+      setValue(shown);
+      setFailed(false);
+      return;
+    }
+    if (!COUNTED.test(typed)) {
+      setFailed(true);
+      return;
+    }
+    setFailed(false);
+    mutations.counted.mutate(
+      { id: countId, lineId: row.lineId, qty: typed },
+      { onError: () => setFailed(true) },
+    );
+  };
+  return (
+    <Input
+      aria-label={t('inventory.counts.sheet.countedFor', { name: row.name })}
+      aria-invalid={failed || undefined}
+      title={failed ? t('inventory.counts.sheet.countedFailed') : undefined}
+      className="ml-auto h-8 w-24 text-right tabular-nums"
+      inputMode="decimal"
+      value={value}
+      onChange={(event) => setValue(event.target.value)}
+      onFocus={(event) => event.currentTarget.select()}
+      onBlur={save}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') event.currentTarget.blur();
+        if (event.key === 'Escape') setValue(shown);
+      }}
+    />
   );
 }
 
@@ -702,6 +763,11 @@ function ProductReportDialog(props: {
                       {formatQty(entry.qtyBase)}
                     </TableCell>
                     <TableCell>
+                      {entry.correction ? (
+                        <Badge variant="secondary" className="mr-1">
+                          {t('inventory.counts.sheet.corrected')}
+                        </Badge>
+                      ) : null}
                       {entry.voided ? (
                         <Badge variant="outline">{t('inventory.counts.line.voided')}</Badge>
                       ) : entry.sent ? null : (

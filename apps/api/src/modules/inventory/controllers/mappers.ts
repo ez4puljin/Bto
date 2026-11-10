@@ -756,6 +756,7 @@ export function toStockCountSheetDto(sheet: CountSheet): StockCountSheetDto {
       salePrice: row.salePrice?.toFixed(2) ?? null,
       differenceAmount: row.differenceAmount?.toFixed(2) ?? null,
       reason: row.reason,
+      corrected: row.corrected,
       movedDuring: row.movedDuring.toFixed(),
       movedAfter: row.movedAfter.toFixed(),
     })),
@@ -780,6 +781,7 @@ export function toStockCountEntryDto(entry: StockCountEntry): StockCountEntryDto
     createdAt: entry.createdAt.toISOString(),
     voided: entry.voided,
     sent: entry.sent,
+    correction: entry.correction,
   };
 }
 

@@ -1204,6 +1204,8 @@ export const stockCountEntries = pgTable(
     qtyBase: qty('qty_base').notNull(),
     createdAt: createdAt(),
     voidedAt: timestamp('voided_at', { withTimezone: true }),
+    /** Typed in the count window in place of the counters' entries (ADR-0181). */
+    correction: boolean('correction').notNull().default(false),
   },
   (t) => [
     index('stock_count_entries_session_idx').on(t.sessionId, t.id),

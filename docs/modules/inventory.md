@@ -202,6 +202,7 @@ ADR-0176, `/stock-counts` (counting `@Authenticated()`; the window `inventory.st
 - **Advisory locks.** `72_028_001` system bins, `72_028_002` product home (per product).
 
 - **Product counts (ADR-0176):** `StockCountsService`. A line's expected quantity is the warehouse on-hand at its first entry; counted = the sum of non-voided entries of sent sessions; the approval inserts `stocktake_lines` and posts `COUNT_CORRECTION` (ledger `ST`, the count's id) for counted − expected, so movements during the count stay. `uncounted` `ZERO` counts listed lines without entries as 0, `LEAVE` skips them. «Moved during» = ledger rows of the product in the warehouse between the first entry and the approval; «moved after» = rows posted after the approval with an effective date on or before the count's day. The shelf services answer 404 for a product count. The sheet (ADR-0177) prices a difference at the warehouse selling price of the approval day (today before it) for display only; the posting stays at cost.
+- **Count corrections (ADR-0181):** `StockCountsService.correctLine` (`PUT /stock-counts/:id/lines/:lineId/counted`, `inventory.stocktakes.approve`, COUNTING or REVIEW): the product's entries of sent sessions get `voided_at`, one entry with `correction = true` in base units is written in a session sent at once, `counted_qty` becomes it; an uncounted line takes its expected quantity then; later sent entries add to it. Covered by `test/integration/stock-counts.int-spec.ts` (the last case).
 
 ## 6. Error codes introduced
 
