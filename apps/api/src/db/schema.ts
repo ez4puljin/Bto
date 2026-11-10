@@ -116,6 +116,7 @@ export {
   staffAppAssortments,
   staffAppAssortmentSegments,
   staffAppAssortmentUsers,
+  salesOrderLoads,
   salesStageMoves,
   salesStageRoles,
   salesStages,

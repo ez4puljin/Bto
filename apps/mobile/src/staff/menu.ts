@@ -1,4 +1,4 @@
-import { isRep, mayPick, mayRequestTransfers } from '../state/phase';
+import { isRep, mayLoad, mayPick, mayRequestTransfers } from '../state/phase';
 import type { Me } from '../api/session';
 
 // «Цэс» of the staff app (ADR-0174): every screen the app has, by the person's rights, and the
@@ -7,6 +7,7 @@ import type { Me } from '../api/session';
 export type MenuKey =
   | 'rep'
   | 'picking'
+  | 'loading'
   | 'transfers'
   | 'expiry'
   | 'counts'
@@ -49,6 +50,7 @@ export function menuOf(me: Rights): MenuGroup[] {
       items: [
         ...(rep ? [{ key: 'rep' as const, href: '/rep' }] : []),
         ...(mayPick(me) ? [{ key: 'picking' as const, href: '/picking' }] : []),
+        ...(mayLoad(me) ? [{ key: 'loading' as const, href: '/loading' }] : []),
         ...(mayRequestTransfers(me) ? [{ key: 'transfers' as const, href: '/transfers' }] : []),
         { key: 'expiry', href: '/expiry' },
         { key: 'counts', href: '/counts' },
@@ -93,7 +95,13 @@ export function menuOf(me: Rights): MenuGroup[] {
 }
 
 /** Before the person has chosen any: their work first, then the company's side. */
-const FIRST_FAVOURITES: readonly MenuKey[] = ['rep', 'picking', 'transfers', 'community'];
+const FIRST_FAVOURITES: readonly MenuKey[] = [
+  'rep',
+  'picking',
+  'loading',
+  'transfers',
+  'community',
+];
 
 /**
  * The favourites to draw: what the person chose, in that order, without what they may no longer

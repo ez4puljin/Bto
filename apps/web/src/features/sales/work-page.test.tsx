@@ -73,6 +73,7 @@ const PIPELINE: Schemas['SalesPipeline'] = {
   transferWarehouseId: null,
   pickListTemplateId: null,
   deliveryNoteTemplateId: null,
+  loadedStageId: null,
   kind: 'SALES',
   archivedAt: null,
   createdAt: STAMP,
@@ -106,6 +107,7 @@ const CARD: Schemas['SalesOrderCard'] = {
   stageEnteredAt: STAMP,
   picks: [],
   excluded: { count: 0, total: '0', lines: [] },
+  loading: null,
 };
 const CARDS: Schemas['SalesStageCards'][] = [
   { stageId: 1, count: 1, total: '0', cards: [CARD] },
@@ -178,6 +180,7 @@ const ORDER: Schemas['SalesOrderDetail'] = {
   picks: [],
   changes: [],
   excludedLines: [],
+  loading: null,
   moves: [],
 };
 const ROW: Schemas['SalesOrderSummary'] = {

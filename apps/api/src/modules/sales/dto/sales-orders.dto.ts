@@ -29,6 +29,7 @@ import {
 } from 'class-validator';
 import { PageQueryDto } from '../../../common/pagination/page';
 import { SalesCustomerOverdueDto, SalesOrderFiltersQueryDto } from './sales-boards.dto';
+import { SalesOrderLoadingDto } from './sales-loading.dto';
 
 /** Up to 11 whole digits and 3 decimals, as the quantity columns hold. */
 const QTY = /^\d{1,11}(\.\d{1,3})?$/;
@@ -506,6 +507,12 @@ export class SalesOrderDetailDto {
     description: 'The lines taken off (ADR-0175), the caller’s warehouses only',
   })
   excludedLines: SalesOrderExcludedLineDto[];
+  @ApiProperty({
+    type: SalesOrderLoadingDto,
+    nullable: true,
+    description: 'Who loaded the order onto a truck and when (ADR-0179)',
+  })
+  loading: SalesOrderLoadingDto | null;
   @ApiProperty({ type: [SalesOrderEventDto] }) events: SalesOrderEventDto[];
   @ApiProperty({ type: [SalesOrderMoveDto] }) moves: SalesOrderMoveDto[];
   @ApiProperty({ type: [SalesOrderChangeDto] }) changes: SalesOrderChangeDto[];

@@ -24889,6 +24889,153 @@
         ]
       }
     },
+    "/api/v1/sales-loading": {
+      "get": {
+        "operationId": "SalesLoading_work",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesLoadingOrder"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The picked orders waiting for a truck, then the caller's own loadings of today.",
+        "tags": [
+          "sales"
+        ]
+      },
+      "post": {
+        "operationId": "SalesLoading_load",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesLoadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesLoadingOrder"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Ачсан»: the named orders onto the caller's truck now; answers the list afterwards.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-loading/{orderId}/undo": {
+      "post": {
+        "operationId": "SalesLoading_undo",
+        "parameters": [
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesLoadingOrder"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A loading taken back: the driver (`sales.orders.load`) the same day, the board's admin\n(`sales.boards.manage`) at any time; either right is enough, so the service checks them.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/invoices": {
       "get": {
         "operationId": "Invoices_list",
@@ -42190,6 +42337,7 @@
           "sales.orders.pickLead",
           "sales.orders.moveAny",
           "sales.orders.rep",
+          "sales.orders.load",
           "finance.read",
           "finance.payments.record",
           "finance.invoices.manage",
@@ -61470,6 +61618,31 @@
           "excludedAt"
         ]
       },
+      "SalesOrderLoading": {
+        "type": "object",
+        "properties": {
+          "loadId": {
+            "type": "number"
+          },
+          "driverId": {
+            "type": "number"
+          },
+          "driverName": {
+            "type": "string",
+            "nullable": true
+          },
+          "loadedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "loadId",
+          "driverId",
+          "driverName",
+          "loadedAt"
+        ]
+      },
       "SalesOrderEvent": {
         "type": "object",
         "properties": {
@@ -61928,6 +62101,16 @@
               "$ref": "#/components/schemas/SalesOrderExcludedLine"
             }
           },
+          "loading": {
+            "nullable": true,
+            "description": "Who loaded the order onto a truck and when (ADR-0179)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesOrderLoading"
+              }
+            ]
+          },
           "events": {
             "type": "array",
             "items": {
@@ -61991,6 +62174,7 @@
           "lines",
           "picks",
           "excludedLines",
+          "loading",
           "events",
           "moves",
           "changes"
@@ -62669,6 +62853,11 @@
             "type": "number",
             "nullable": true
           },
+          "loadedStageId": {
+            "type": "number",
+            "nullable": true,
+            "description": "ADR-0179 #3: the stage a loaded, sold order moves into"
+          },
           "archivedAt": {
             "type": "string",
             "nullable": true,
@@ -62708,6 +62897,7 @@
           "transferWarehouseId",
           "pickListTemplateId",
           "deliveryNoteTemplateId",
+          "loadedStageId",
           "archivedAt",
           "createdAt",
           "roles",
@@ -62898,6 +63088,16 @@
           },
           "excluded": {
             "$ref": "#/components/schemas/SalesOrderCardExcluded"
+          },
+          "loading": {
+            "nullable": true,
+            "description": "Who loaded the order onto a truck and when (ADR-0179)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesOrderLoading"
+              }
+            ]
           }
         },
         "required": [
@@ -62919,7 +63119,8 @@
           "createdByName",
           "stageEnteredAt",
           "picks",
-          "excluded"
+          "excluded",
+          "loading"
         ]
       },
       "SalesStageCards": {
@@ -63039,6 +63240,12 @@
             "nullable": true,
             "minimum": 1,
             "description": "ADR-0143: as above"
+          },
+          "loadedStageId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "ADR-0179 #3: the saved stage, running no action, a loaded sold order moves into; null: none; absent: kept"
           },
           "roles": {
             "$ref": "#/components/schemas/SalesPipelineRoles"
@@ -65325,6 +65532,129 @@
         "required": [
           "id",
           "fullName"
+        ]
+      },
+      "SalesLoadingOrder": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "number"
+          },
+          "orderNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVAL_PENDING",
+              "CONFIRMED",
+              "PICKING",
+              "PACKED",
+              "DISPATCHED",
+              "DELIVERED",
+              "DELIVERY_FAILED",
+              "INVOICED",
+              "CLOSED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "customerId": {
+            "type": "number"
+          },
+          "customerCode": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "customerPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "addressText": {
+            "type": "string",
+            "nullable": true
+          },
+          "contactPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveryDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "paymentMethod": {
+            "enum": [
+              "CASH",
+              "BANK_TRANSFER",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "total": {
+            "type": "string",
+            "nullable": true,
+            "description": "Whole MNT"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "pickedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "pipelineName": {
+            "type": "string",
+            "nullable": true
+          },
+          "loading": {
+            "nullable": true,
+            "description": "Null while waiting; the caller's own loading of today otherwise",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesOrderLoading"
+              }
+            ]
+          }
+        },
+        "required": [
+          "orderId",
+          "orderNumber",
+          "status",
+          "customerId",
+          "customerCode",
+          "customerName",
+          "customerPhone",
+          "addressText",
+          "contactPhone",
+          "deliveryDate",
+          "paymentMethod",
+          "total",
+          "lineCount",
+          "pickedAt",
+          "pipelineName",
+          "loading"
+        ]
+      },
+      "SalesLoadRequest": {
+        "type": "object",
+        "properties": {
+          "orderIds": {
+            "minItems": 1,
+            "description": "The orders loaded, 1…100",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "required": [
+          "orderIds"
         ]
       },
       "Invoice": {
@@ -85174,6 +85504,9 @@
           "ORDER_STATE_INVALID",
           "STAGE_SKIP",
           "ORDER_CHANGED",
+          "ORDER_ALREADY_LOADED",
+          "ORDER_NOT_LOADABLE",
+          "LOAD_UNDO_FORBIDDEN",
           "EBARIMT_FILE_UNREADABLE",
           "EBARIMT_FILE_COLUMNS",
           "EBARIMT_FILE_EMPTY",

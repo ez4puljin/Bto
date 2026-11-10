@@ -4,7 +4,7 @@ import { CommunityPopupGate } from '../../src/community/popup-gate';
 import { ThumbKeeper } from '../../src/images/thumb-keeper';
 import { NoticePopupGate } from '../../src/notifications/popup-gate';
 import { useLiveStock } from '../../src/state/live-stock';
-import { isRep, mayPick, mayRequestTransfers } from '../../src/state/phase';
+import { isRep, mayLoad, mayPick, mayRequestTransfers } from '../../src/state/phase';
 import { useSignedIn } from '../../src/state/session';
 import { ShopProvider } from '../../src/state/shop';
 import { colors } from '../../src/theme/tokens';
@@ -23,6 +23,7 @@ export default function StaffLayout() {
   useLiveStock(session, 'STAFF', rep);
   const picker = mayPick(me);
   const seller = mayRequestTransfers(me);
+  const driver = mayLoad(me);
   return (
     <ShopProvider server={server} userId={me.id}>
       <ToastProvider>
@@ -44,6 +45,10 @@ export default function StaffLayout() {
           <Stack.Protected guard={picker}>
             <Stack.Screen name="picking/index" />
             <Stack.Screen name="picking/[id]" />
+          </Stack.Protected>
+          {/* The driver's loading (ADR-0179). */}
+          <Stack.Protected guard={driver}>
+            <Stack.Screen name="loading/index" />
           </Stack.Protected>
           {/* The transfers (ADR-0116). */}
           <Stack.Protected guard={rep || seller}>

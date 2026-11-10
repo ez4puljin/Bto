@@ -95,6 +95,10 @@ export function PipelineSheet({
   const [deliveryNoteTemplateId, setDeliveryNoteTemplateId] = useState<number | null>(
     pipeline?.deliveryNoteTemplateId ?? null,
   );
+  // ADR-0179 #3: the stage a loaded, sold order moves into (a saved stage running no action).
+  const [loadedStageId, setLoadedStageId] = useState<number | null>(
+    pipeline?.loadedStageId ?? null,
+  );
   const warehouses = useWarehouses();
   const stores = (warehouses.data ?? []).filter(
     (entry) =>
@@ -127,9 +131,14 @@ export function PipelineSheet({
     transferWarehouseId,
     pickListTemplateId,
     deliveryNoteTemplateId,
+    loadedStageId,
     roles,
     stages: stages.map(({ key: _key, ...stage }) => stage),
   });
+  const loadedOptions = stages.filter((stage) => stage.id != null && stage.action === 'NONE');
+  const loadedValue = loadedOptions.some((stage) => stage.id === loadedStageId)
+    ? loadedStageId
+    : null;
   const [initial] = useState(snapshot);
   const [leaving, setLeaving] = useState(false);
   const requestClose = () => {
@@ -157,6 +166,7 @@ export function PipelineSheet({
         kind,
         transferWarehouseId: kind === 'TRANSFER' ? transferWarehouseId : null,
         ...(canTemplates ? { pickListTemplateId, deliveryNoteTemplateId } : {}),
+        ...(pipeline ? { loadedStageId: kind === 'SALES' ? loadedValue : null } : {}),
         roles: {
           VIEW: visibility === 'PRIVATE' ? roles.VIEW : [],
           MANAGE: roles.MANAGE,
@@ -265,6 +275,28 @@ export function PipelineSheet({
                     {stores.map((entry) => (
                       <option key={entry.id} value={entry.id}>
                         {entry.name}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </FormField>
+              ) : null}
+              {kind === 'SALES' && pipeline ? (
+                <FormField
+                  label={t('sales.pipelines.loadedStage')}
+                  htmlFor="pipeline-loaded-stage"
+                  hint={t('sales.pipelines.loadedStageHint')}
+                >
+                  <NativeSelect
+                    id="pipeline-loaded-stage"
+                    value={loadedValue ?? ''}
+                    onChange={(event) =>
+                      setLoadedStageId(Number.parseInt(event.target.value, 10) || null)
+                    }
+                  >
+                    <option value="">{t('sales.pipelines.loadedStageNone')}</option>
+                    {loadedOptions.map((stage) => (
+                      <option key={stage.key} value={stage.id ?? ''}>
+                        {stage.name}
                       </option>
                     ))}
                   </NativeSelect>

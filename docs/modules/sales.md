@@ -90,6 +90,8 @@ ADR-0175 (migration `0092_sales_excluded_lines`): `sales_order_excluded_lines` h
 
 ADR-0178 (migration `0095_sales_original_qty`): `sales_order_lines.original_qty` and `sales_order_excluded_lines.original_qty` (`NUMERIC(14,3)`, the line's unit, nullable, `> 0`): the quantity first ordered; existing rows backfilled from the change versions (ADR-0147).
 
+ADR-0179 (migration `0096_sales_loading`): `sales_order_loads` is a driver's loading of an order (`driver_id`, `loaded_at`, `from_stage_id` / `to_stage_id` when the card moved, `undone_at` / `undone_by` when taken back; one live row per order by a partial unique index; `REVOKE DELETE, TRUNCATE`). `sales_pipelines.loaded_stage_id` (composite FK to the pipeline's own stage) is the stage a loaded, sold order moves into; the migration set it on SALES pipelines with a no-action stage named «Ачигдсан…».
+
 ## 3. Public API (`modules/sales/index.ts`)
 
 | Export | Use |
@@ -179,6 +181,8 @@ ADR-0175: `PATCH /sales-orders/:id/lines` [`sales.orders.read`; the service asks
 
 ADR-0178: `SalesOrderLine.originalQty` and `SalesOrderExcludedLine.originalQty` (string in the unit, or null for a line added after the order).
 
+ADR-0179 (`SalesLoadingService`, the staff app's «Ачилт»): `GET /sales-loading` [`sales.orders.load`] the picked orders waiting for a truck (PACKED or sold, not archived, SALES pipeline or none, no live loading, picked in the last `LOADING_WINDOW_DAYS`), then the caller's own loadings of today; `POST /sales-loading { orderIds }` [`sales.orders.load`, Idempotency-Key, ≤ 100] loads them all or none and answers the list; `POST /sales-loading/:orderId/undo` [authenticated; the driver the same UB day or `sales.boards.manage`]. The order detail and the board card carry `loading { loadId, driverId, driverName, loadedAt } | null`; the pipeline carries and takes `loadedStageId` (absent: kept).
+
 ## 5. Rules worth knowing
 
 - **The apps' stock (ADR-0173).** Both apps show one number per product, the home warehouse's available (sellable on hand less reserved), and only when that warehouse is ticked for the app on «Апп → Аппын бараа» (`ShopScope.countedWarehouseIds`, none ticked = all); otherwise 0, «Дууссан», `stockBlocked`, and both apps' order routes refuse it. `PUT /app-settings` takes `stockWarehouses { customer, staff }` and `customerStockDisplay`, both optional (left out = unchanged). The phones hear every change through `…/stock/live` within about a second of the commit.
@@ -233,6 +237,7 @@ ADR-0178: `SalesOrderLine.originalQty` and `SalesOrderExcludedLine.originalQty` 
 - **Backorders** stay on the line.
 - **Reconciliation:** the nightly check compares `warehouse_stock.reserved` with the ACTIVE reservations (level RESERVED).
 - **Line edits (ADR-0175):** only in `CONFIRMED`, `PICKING`, `PACKED`. Lines are changed in place (their ids survive). A changed or restored line is quoted on the order's `price_date`, an unchanged restore takes its frozen parts back, an added line is priced today. Reservations are replaced except for confirmed parts; a touched confirmed part is unpicked and reopened for the office or a lead, and refused to a keeper (`LINE_EDIT_PART_DONE`). Credit is checked only when the total grows. An order cannot be left without lines.
+- **Loading (ADR-0179):** a loading changes no status and no stock; the sale stays the SALE stage. The card moves into the pipeline's loaded stage only forward and only over NONE / CONFIRM / PICK stages, or a SALE stage once the order is sold; the move is a `sales_stage_moves` row by the driver (no one-stage rule). Lock order: the orders FOR UPDATE by id, then their live loadings. Audit `LOAD` / `UNLOAD` on `sales_orders`.
 - **First ordered quantity (ADR-0178):** `original_qty` is written with the line and rewritten only while the order is a `DRAFT`; afterwards «Засвар» leaves it, a take-off and a restore carry it, an added line has `NULL`, the whole-order save carries it per unit and warehouse onto the first new line, `renewLinesInTx` copies it. It never feeds stock, prices or credit.
 
 ## 6. Error codes introduced
@@ -240,6 +245,8 @@ ADR-0178: `SalesOrderLine.originalQty` and `SalesOrderExcludedLine.originalQty` 
 `PRODUCT_NO_HOME`, `PRODUCT_NOT_SELLABLE`, `STAGE_IN_USE` (409, with the stage's id and name), `BOARD_NOT_EMPTY`, `PIPELINE_IN_USE`, `ORDER_NUMBER_TAKEN` (409), `PRODUCT_OUT_OF_APP_STOCK` (409, ADR-0173 #3: the product's home warehouse is not counted for the app, `params.productIds`), `PRODUCT_NOT_IN_APP` (409, ADR-0127 #1: an app order's product outside the assortment segment, `productIds`), `ORDER_CHANGED` (409, ADR-0130: a save whose `expectedUpdatedAt` is older than the order's `updated_at`; `params.updatedAt` carries the current one).
 
 `LINE_EDIT_PART_DONE` (409, ADR-0175 #6, `params.warehouse`).
+
+`ORDER_ALREADY_LOADED` (409, ADR-0179: `number`, `driver`), `ORDER_NOT_LOADABLE` (409: `number`), `LOAD_UNDO_FORBIDDEN` (403: `number`).
 
 Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUSTOMER_INACTIVE`, `PRICE_MISSING`, `CREDIT_BLOCKED` / `CREDIT_NEEDS_APPROVAL` (delivery 3), `UNIT_SUPERSEDED`, `UNIT_FACTOR_INEXACT`, `VALIDATION_FAILED`, `NOT_FOUND`, `FORBIDDEN`.
 

@@ -17,6 +17,7 @@ import {
   Newspaper,
   PackageCheck,
   Send,
+  Truck,
   ShoppingBag,
   UserRound,
   UsersRound,
@@ -43,6 +44,7 @@ import {
 export const MENU_LOOK: Record<MenuKey, { Icon: LucideIcon; color: string }> = {
   rep: { Icon: ShoppingBag, color: colors.tint.blue },
   picking: { Icon: PackageCheck, color: colors.tint.orange },
+  loading: { Icon: Truck, color: colors.tint.brown },
   transfers: { Icon: ArrowLeftRight, color: colors.tint.teal },
   expiry: { Icon: CalendarClock, color: colors.tint.red },
   counts: { Icon: ClipboardList, color: colors.tint.purple },

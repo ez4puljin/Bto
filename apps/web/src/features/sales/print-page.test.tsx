@@ -58,6 +58,7 @@ const order = (id: number, fields: Partial<Schemas['SalesOrderDetail']> = {}) =>
     picks: [],
     changes: [],
     excludedLines: [],
+    loading: null,
     moves: [],
     ...fields,
   }) satisfies Schemas['SalesOrderDetail'];

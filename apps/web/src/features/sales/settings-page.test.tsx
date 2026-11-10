@@ -44,6 +44,7 @@ const PIPELINE: Schemas['SalesPipeline'] = {
   transferWarehouseId: null,
   pickListTemplateId: null,
   deliveryNoteTemplateId: null,
+  loadedStageId: null,
   kind: 'SALES',
   archivedAt: null,
   createdAt: STAMP,

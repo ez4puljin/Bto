@@ -44,6 +44,13 @@ describe('the staff menu', () => {
     expect(keysOf(['inventory.transfers.manage'])).toContain('transfers');
     expect(keysOf(['inventory.transfers.manage'])).not.toContain('picking');
   });
+
+  it('gives a driver «Ачилт» (ADR-0179), first among their favourites', () => {
+    expect(keysOf(['sales.orders.load'])).toContain('loading');
+    expect(keysOf(['sales.orders.pick'])).not.toContain('loading');
+    const driver = menuOf(person(['sales.orders.load']));
+    expect(favouritesOf(null, driver).map((item) => item.key)).toEqual(['loading', 'community']);
+  });
 });
 
 describe('the favourites', () => {

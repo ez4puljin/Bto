@@ -54,6 +54,8 @@ export interface PipelineView {
   /** ADR-0143: the document templates its orders print with; null: the default of the kind. */
   pickListTemplateId: number | null;
   deliveryNoteTemplateId: number | null;
+  /** ADR-0179 #3: the stage a loaded, sold order moves into; null: none. */
+  loadedStageId: number | null;
   archivedAt: Date | null;
   createdBy: number | null;
   createdAt: Date;
@@ -275,6 +277,7 @@ export class SalesAccessService {
         transferWarehouseId: row.transferWarehouseId,
         pickListTemplateId: row.pickListTemplateId,
         deliveryNoteTemplateId: row.deliveryNoteTemplateId,
+        loadedStageId: row.loadedStageId,
         archivedAt: row.archivedAt,
         createdBy: row.createdBy,
         createdAt: row.createdAt,

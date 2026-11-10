@@ -9,6 +9,8 @@ export const TRANSFER_RIGHT = 'inventory.transfers.manage';
 /** The warehouse keeper's right (ADR-0126 #2): «Бэлтгэл» on the phone (ADR-0132). */
 export const PICK_RIGHT = 'sales.orders.pick';
 export const PICK_LEAD_RIGHT = 'sales.orders.pickLead';
+/** The driver's right (ADR-0179): «Ачилт», the picked orders loaded onto their truck. */
+export const LOAD_RIGHT = 'sales.orders.load';
 /** Status and archive of an expiry record (ADR-0172 #4); recording and correcting are everyone's. */
 export const EXPIRY_MANAGE_RIGHT = 'expiry.items.manage';
 
@@ -25,6 +27,11 @@ export function mayRequestTransfers(me: Pick<Me, 'permissions'>): boolean {
 /** A warehouse keeper (ADR-0132): «Бэлтгэл» is theirs; a rep or a seller may hold it too. */
 export function mayPick(me: Pick<Me, 'permissions'>): boolean {
   return me.permissions.includes(PICK_RIGHT);
+}
+
+/** A driver (ADR-0179): «Ачилт» is theirs. */
+export function mayLoad(me: Pick<Me, 'permissions'>): boolean {
+  return me.permissions.includes(LOAD_RIGHT);
 }
 
 /** The warehouse lead (ADR-0126 #2): sees and confirms every warehouse's part. */

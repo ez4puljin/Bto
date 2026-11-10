@@ -192,6 +192,7 @@ const ORDER: Schemas['SalesOrderDetail'] = {
   picks: [],
   changes: [],
   excludedLines: [],
+  loading: null,
   moves: [],
   lines: [LINE],
   events: [

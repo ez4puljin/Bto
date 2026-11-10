@@ -21,6 +21,7 @@ import {
   type StageAction,
 } from '@tugeel/shared/sales';
 import { Transform, Type } from 'class-transformer';
+import { SalesOrderLoadingDto } from './sales-loading.dto';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -192,6 +193,16 @@ export class SalesPipelineRequestDto {
   @IsInt()
   @Min(1)
   deliveryNoteTemplateId?: number | null;
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description:
+      'ADR-0179 #3: the saved stage, running no action, a loaded sold order moves into; null: none; absent: kept',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  loadedStageId?: number | null;
   @ApiProperty({ type: SalesPipelineRolesDto })
   @ValidateNested()
   @Type(() => SalesPipelineRolesDto)
@@ -251,6 +262,12 @@ export class SalesPipelineDto {
   @ApiProperty({ type: Number, nullable: true, description: 'ADR-0143; null: the default' })
   pickListTemplateId: number | null;
   @ApiProperty({ type: Number, nullable: true }) deliveryNoteTemplateId: number | null;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'ADR-0179 #3: the stage a loaded, sold order moves into',
+  })
+  loadedStageId: number | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) archivedAt: string | null;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
   @ApiProperty({ type: SalesPipelineRolesDto }) roles: SalesPipelineRolesDto;
@@ -366,6 +383,12 @@ export class SalesOrderCardDto {
   })
   picks: SalesOrderCardPickDto[];
   @ApiProperty({ type: SalesOrderCardExcludedDto }) excluded: SalesOrderCardExcludedDto;
+  @ApiProperty({
+    type: SalesOrderLoadingDto,
+    nullable: true,
+    description: 'Who loaded the order onto a truck and when (ADR-0179)',
+  })
+  loading: SalesOrderLoadingDto | null;
 }
 
 @ApiSchema({ name: 'SalesStageCards' })

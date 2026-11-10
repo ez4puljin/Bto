@@ -129,6 +129,15 @@ Since 0.15.0 (ADR-0174, §1g) the list is `expiry/index`, opened from «Нүүр
 
 The arithmetic is in `src/counts/rules.ts` (tested), the hooks in `src/api/counts.ts` (every write refreshes `['counts']`). `docs/modules/inventory.md` is the server's side.
 
+## 1i. «Ачилт», the driver's loading (ADR-0179, 0.17.0, 2026-11-10)
+
+«Цэс» → «Ажил» → «Ачилт» (`loading/index`) for the holder of `sales.orders.load` (the `DRIVER` role), first among a driver's favourites on «Нүүр».
+
+- **«Ачих дэлгүүр»** lists the picked orders by store (name, address, the stores' sum; each order's number, lines, delivery date, payment and «Баримт хэвлээгүй» while PACKED). A tick takes every waiting order of that store.
+- **«Ачсан (N дэлгүүр)»** asks once, then `POST /sales-loading` with an `Idempotency-Key` (a new key after every attempt that reached the server); the driver and the time are the server's. A refusal (another driver loaded it meanwhile, the pick reopened) shows in red and the list re-reads.
+- **«Өнөөдөр ачсан»** lists the driver's own loadings of today with the time; «Буцаах» takes one back (the order waits again).
+- The list re-reads every 30 s and on a pull. Grouping and the choice are pure in `src/loading/stores.ts` (tested), the hooks in `src/api/loading.ts`.
+
 ## 2. Pins (2026-10-15)
 
 | Package | Version |

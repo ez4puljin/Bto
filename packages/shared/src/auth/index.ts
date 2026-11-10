@@ -85,6 +85,8 @@ export const PERMISSIONS = [
   'sales.orders.moveAny',
   // The sales-rep app (ADR-0061 #5): the rep's own orders only, through /sales-rep/*.
   'sales.orders.rep',
+  // ADR-0179: a driver marks the picked orders they loaded onto their truck in the staff app.
+  'sales.orders.load',
   // Finance (ADR-0060): reading invoices, balances and books; recording money; voiding invoices
   // and crediting returns; manual journal entries and accounts; numbering, money accounts, roles.
   'finance.read',
@@ -281,7 +283,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
   // The rep app only (ADR-0061 #5): not sales.orders.read/manage (other orders), not
   // partners.customers.read (credit data); /sales-rep/* serves what an order needs.
   SALES_REP: ['sales.orders.rep'],
-  DRIVER: [],
+  // The staff app's «Ачилт» only (ADR-0179): the picked orders to load, no other order data.
+  DRIVER: ['sales.orders.load'],
 };
 
 /** One admin's tick on a system role, kept as a difference from the code (ADR-0165 #2). */

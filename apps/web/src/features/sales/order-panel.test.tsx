@@ -51,6 +51,7 @@ const PIPELINE: Schemas['SalesPipeline'] = {
   transferWarehouseId: null,
   pickListTemplateId: null,
   deliveryNoteTemplateId: null,
+  loadedStageId: null,
   kind: 'SALES',
   archivedAt: null,
   createdAt: STAMP,
@@ -180,6 +181,7 @@ const ORDER: Schemas['SalesOrderDetail'] = {
   picks: [],
   changes: [],
   excludedLines: [],
+  loading: null,
   moves: [
     {
       fromStageId: null,
