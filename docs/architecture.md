@@ -142,12 +142,15 @@ tugeel/                       (repo root; packages are @tugeel/*)
   tools/dev-db/               the local PostgreSQL 18 on Windows: start/stop/status script and setup notes (2026-11-09)
   tools/lint-guards/          node:test self-test proving every ESLint guard fires (+ fixtures/)
   tools/finance-core/         the Finance Core whitelist, core:standalone and the fin. SQL scan (P0b)
+  tools/store-seed/           how `pnpm store:seed` (apps/api/src/db/store-seed) fills an empty database with master data only (ADR-0186)
+  tools/store-backup/         pull.ps1: the store PC's nightly backups pulled to the owner's PC over SSH (ADR-0186)
   ci/                         compose.ci.yml + rehearse.sh: the CI check job in Linux Docker (`pnpm ci:rehearse`)
   deploy/
     docker-compose.prod.yml   caddy, api, worker
     docker-compose.staging.yml  api-staging, worker-staging, postgres-staging (local container)
     Caddyfile  .env.example  runbook.md (deploy, rollback, restore drill, rotate secrets, Tailscale pattern)
     ebarimt-box/              mini-PC checklist: Ubuntu, PosService .deb, posapi.ini, tailscale, ACL, health
+    store/                    the centre on the store's Ubuntu PC until the external server (ADR-0186, §10.7): compose, Caddyfile.store, setup.sh, backup.sh, restore-drill.sh, housekeeping.sh
     pos-agent/                install script + runbook for the POS print agent (delivery 9, ADR-0022)
   .github/workflows/          ci.yml (pnpm check + postgres:18 service); deploy.yml (GHCR -> SSH compose up) in the go-live phase
   docs/
@@ -842,7 +845,7 @@ Keyboard-wedge first everywhere (web global keydown detector; mobile hidden Text
 
 ## 10. Environments and deploy
 
-### 10.1 Local (Windows 11): the only environment until go-live (ADR-0026)
+### 10.1 Local (Windows 11): the development environment (ADR-0026; the centre for the pilot runs on the store PC, §10.7)
 
 Docker Desktop (WSL2) runs `postgres:18` only (`docker-compose.yml`, `127.0.0.1:15432`); `pnpm dev` runs api, worker, web. The staff app's APKs (ADR-0061; built with `pnpm mobile:apk`, never during `pnpm check`) and the POS print agent (delivery 9) reach the API at the machine's LAN address over the office Wi-Fi, in cleartext HTTP until go-live. Every delivery is accepted here with real data imported locally. The staging PosAPI on the office box is reached over Tailscale (the dev machine joins the tailnet as `tag:dev`); files use `STORAGE_DRIVER=local` (`.data/storage/`, ADR-0014, ADR-0030). `pnpm docker:build` plus the staging stack behind the edge Caddy (`http://staging.localhost:8080`) rehearses the deploy. No mailpit and no email feature until a feature needs one (F11). The store edge (ADR-0067) runs beside it as its own Docker stack (`pnpm edge:up`: `deploy/edge/docker-compose.edge.yml` with its PostgreSQL, the edge and the kiosk on port 7400, replaying to the dev api at `host.docker.internal:3300`), or as `pnpm --filter @tugeel/api edge:dev` on port 3400 with `apps/api/.env.edge`. The AI assistant stays off until the owner puts `LLM_PROVIDER`, `LLM_MODEL` and `LLM_API_KEY` in `apps/api/.env`; `AI_DATABASE_URL` and `AI_POOL_MAX` come from `.env.example`, and `pnpm db:provision` creates `ai_reader` (ADR-0045).
 
@@ -899,7 +902,7 @@ Primary pattern: `tailscaled` runs on the droplet host; api and worker receive `
 `pnpm check` on every PR: `tsc --noEmit` (all packages), eslint (boundaries + the rules in §12), prettier check, `ts:single-version`, jest unit + integration (postgres:18 service, full migrations), vitest (web, shared), `drizzle-kit check` (schema vs migrations), `gen:api` staleness, web build.
 
 - **One database per Jest worker** (ADR-0024): `globalSetup` provisions the roles, migrates a template `tugeel_test_<project>_tpl` once and clones `_w1 … _wN` (N = `maxWorkers`); a setup file points each worker at `_w${JEST_WORKER_ID}`; every test file starts by truncating `public` tables and `pgboss.job`. Jest always runs as `node --experimental-vm-modules` (`apps/api/scripts/jest.cjs`) because NestJS 12 and pg-boss 12 are ESM-only (ADR-0025).
-- **Jobs** in `.github/workflows/ci.yml` (runner `ubuntu-24.04`): `check` (`pnpm check` + generated files committed), `images` (both Dockerfiles build), `deploy-config` (`docker compose config` + `caddy validate`). `pnpm ci:rehearse` runs the `check` job in Linux Docker against HEAD before a push.
+- **Jobs** in `.github/workflows/ci.yml` (runner `ubuntu-24.04`): `check` (`pnpm check` + generated files committed), `images` (both Dockerfiles build), `deploy-config` (`docker compose config` + `caddy validate` for the production, staging, edge and store stacks, `bash -n` for the store scripts). `pnpm ci:rehearse` runs the `check` job in Linux Docker against HEAD before a push.
 - **AI assistant** (ADR-0045): `globalSetup` creates `ai_reader` before migrating the template, every worker gets an `AI_DATABASE_URL` for its own database, and the harness deletes every `LLM_*` variable; the question flow is tested with a scripted fake `LLM_CLIENT`.
 - **Integrity suite** (`test/integrity/*`) is its own Jest project run with `--runInBand` and `statement_timeout = 5s` so deadlocks fail fast and loudly: concurrent postings over the same stock, overdraw rejection, idempotent re-post, bin-move net-zero, COUNTING bin rejection, concurrent `reserve()` never oversells, concurrent credit confirmations, supersede keeps barcode/price/default, ledger REVOKE/trigger guard, lottery/qrData never logged, Σ payments = total = Σ sub-receipts. **No `jest.retryTimes`, no retries anywhere in CI.**
 - **Locale assertion**: the managed cluster and the local containers are created with UTF-8 and the ICU collation `und-x-icu`; the harness runs `SELECT lower('ӨҮЁ') = 'өүё'` at startup and fails if false; search still uses the app-maintained `search_text` column.
@@ -913,6 +916,22 @@ Primary pattern: `tailscaled` runs on the droplet host; api and worker receive `
 
 No code change: resize the droplet; a second `worker` container; Managed PG to 2–4 GiB (Standard caps at 4 GiB with no standby from 2026-10/11; Advanced from $130 if HA is ever needed). Launch ≈ $45–60/mo (droplet $24, PG $15.15, Spaces $5, domain) + Tailscale Starter (budgeted, §13) + EAS Starter $19 from the customer-app launch + one-off mini-PC. Full rollout ≈ $90–130/mo; verify prices at creation.
 
+### 10.7 The store PC as the centre until the external server (ADR-0186)
+
+Owner, 2026-11-11: until the droplet of §10.2 exists, the centre runs on the store's Ubuntu PC (`bto-edge@192.168.1.152`: i3-10100, 7.1 GB, one 233 GB disk, Docker) beside the store edge, so the supermarket can pilot one real till and the wholesale e-Barimt (ADR-0185) reaches the store's PosAPI on the same LAN. It is the first production footprint; §10.2 stays the go-live target, and the move there is a dump and restore of this database.
+
+| Stack | Services | Database | Pool sizes |
+|---|---|---|---|
+| the centre (`deploy/store/docker-compose.store.yml`, project `bto-store`) | `postgres`, `api`, `worker`, `web` (the web image with `Caddyfile.store`: the pages, `/api` and `/health` on port 80), one-off `provision` and `migrate` | `postgres:18` container, database `bto` on the volume `bto-store_pg`; `shared_buffers` 512 MB, `max_connections` 40, memory limit 1.5 GB | api 6 + 1 live stock listener, worker 2, pg-boss 2 per process, the AI reader 2 → 15 of 40 |
+| the edge (`deploy/edge`, project `bto-edge`, unchanged) | `edge-db`, `edge`, `kiosk` on port 7400 | its own `postgres:18`, database `tugeel_edge` | `EDGE_DB_POOL_MAX` 5 |
+
+- **Addresses.** Staff: `http://<the box>` (`STORE_HTTP_PORT`, 80). Tills: `http://<the box>:7400`. PostgreSQL: the box's loopback only (`STORE_PG_PORT`, 15433). **LAN-only plain HTTP**: no port forwarded, no domain, no certificate, no Tailscale; `COOKIE_SECURE=false`; the staff app works on the store's Wi-Fi with a build for this server; Bto300 stays on the test server; the browser's camera scanner needs HTTPS and waits for the external server.
+- **Images** are built on the box from the checkout (`bto-api:store-local`, `bto-web:store-local`), as the edge's are; there is no registry and no `deploy.yml`. An update is `git pull` and `bash deploy/store/setup.sh`, the centre before the edge.
+- **Environment.** `deploy/store/.env` (mode 600, written by `setup.sh` on the box with fresh random secrets, never printed; `deploy/store/.env.example` names the variables): `POSTGRES_PASSWORD` (seen only by `provision`), `APP_DB_PASSWORD`, `MIGRATOR_DB_PASSWORD`, `AI_DB_PASSWORD` (the compose file builds the three connection URLs from them), `JWT_SECRET`, `AUTH_PEPPER`, `POS_PIN_PEPPER`, `AI_KEY_SECRET`, the optional `LLM_*`, `STORE_HTTP_PORT`, `STORE_PG_PORT`, `LOG_LEVEL`, and the backup's `BACKUP_DIR`, `BACKUP_KEEP_DAYS`, `BACKUP_USB_DIR`, `BACKUP_USB_KEEP_DAYS`. The compose file names every variable a container reads; `STORAGE_DRIVER=local` on the volume `bto-store_storage`.
+- **The edge beside it** reaches the centre at `http://host.docker.internal` (the host's port 80; `ufw allow 80/tcp`), linked with a one-time code (ADR-0136); `deploy/store/docker-compose.edge-link.yml` joins the two Docker networks as the fallback (`http://api:3000`).
+- **The start database** is migrated and then filled with master data only by `pnpm store:seed` (`apps/api/src/db/store-seed`): every table is listed as copied, left empty or not decided; the target must be on the same migrations, never started and empty; one read-only snapshot of the source, one transaction on the target as `migrator`, plain INSERTs in foreign-key order with every guard in force; tokens, codes, PINs, sessions and the sealed AI key never travel. Stock and the books start empty (ADR-0186 #8; T41).
+- **Backups** (one disk): `deploy/store/backup.sh` nightly by a systemd timer: `pg_dump` archives of the centre and the edge with every table's row count, the roles, both `.env` files and checksums in `/var/backups/bto/daily/<date>` (14 days), a mirror of the uploaded files, a copy to a USB disk mounted at `/mnt/bto-backup` (90 days), and a pull from the owner's PC over SSH (`tools/store-backup/pull.ps1`). `restore-drill.sh` restores a night into a scratch database and compares the counts; `housekeeping.sh` prunes Docker's build cache. The steps are in `docs/runbooks/store-install.md`.
+
 ---
 
 ## 11. Observability and backups
@@ -924,7 +943,8 @@ No code change: resize the droplet; a second `worker` container; Managed PG to 2
 - `/health` returns `{ status: ok|degraded, db: up|down, pgboss: up|down, version }` (HTTP 503 when degraded) from delivery 1; delivery 3 adds `ebarimt: { status, lastSentDate, leftLotteries, version, checkedAt }`; the `ebarimt.monitor` job refreshes the ebarimt block every 5 minutes from `GET /rest/info`, so the public health endpoint reflects the private box without exposing it (F7). `/health/ebarimt` returns the same block with detail for the admin banner.
 - UptimeRobot probes only public endpoints: `https://api.<domain>/health` and the admin; it cannot see the tailnet. DO alerts on CPU, disk and DB connections.
 - Backups: DO daily backups + PITR; weekly `pg_dump` to Spaces (independent of DO's backups) by a worker cron job with a verification script; Spaces versioning on POD photos; quarterly restore drill per `deploy/runbook.md`, performed once on staging in the go-live phase before production data is imported (ADR-0026).
-- Runbooks: deploy/rollback, restore, rotate secrets, add warehouse/vehicle, e-Barimt outage (sendData backlog, leftLotteries, three-network dependency until the store has its own PosAPI), month-end checklist.
+- Until the external server (ADR-0186, §10.7): the store PC backs itself up every night with `deploy/store/backup.sh` (both databases, the files, the secrets; a USB disk and a pull from the owner's PC as the copies off the machine) and is drilled with `deploy/store/restore-drill.sh`; there is no Sentry or UptimeRobot there, the admin's `/system/status`, the containers' logs and `last-run.txt` are where a failure shows.
+- Runbooks: the store PC (`docs/runbooks/store-install.md`: install, master data, edge move, backups, pilot day, update, roll-back, a dead box), deploy/rollback, restore, rotate secrets, add warehouse/vehicle, e-Barimt outage (sendData backlog, leftLotteries, three-network dependency until the store has its own PosAPI), month-end checklist.
 
 ---
 
@@ -1045,5 +1065,6 @@ Business and external unknowns only; tooling is decided. Owner = the person who 
 | T38 | — | A sample Khan Bank statement in Excel; how Erkhet exports its chart, closing trial balance, party balances and asset register for the opening import | Owner, accountant | the bank import; the chart and opening import (go-live) | §5.8, §5.13; ADR-0077 |
 | T39 | 47 | The customer app's Android package id (`mn.butenorgil.bto300`, permanent once handed out), its logo and release key; which centre's products a customer sees once Kharkhorin joins | Owner | handing the app to customers; Kharkhorin joining | ADR-0079 #4, #10; §8 |
 | T40 | 31 | The staff app's Android package id (`mn.butenorgil.bto.staff`, permanent once handed out), who keeps the release signing key, how APKs reach the reps, the app's logo, the reps' phones (Android version) | Owner | before reps get the app | `apps/mobile/app.config.ts`, `docs/modules/mobile.md` §11 (ADR-0061) |
+| T41 | 48 | The supermarket's pilot before the cut-over (ADR-0186 #8): pilot sales post into Bto's books from the first sale while Erkhet stays the official books. How is the pilot period treated at the cut-over (kept and reconciled against Erkhet, or the opening taken after it), and are the pilot till's sales also entered into Erkhet as today? Default in force: nothing is decided; the books start empty and post what happens | Accountant | the pilot day; the cut-over | §5.13; ADR-0102, ADR-0186 |
 
 Resolved answers are moved from this register into the relevant section with a dated note; the register in `docs/STATUS.md` tracks who is chasing each item.

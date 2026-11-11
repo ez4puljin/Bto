@@ -1,6 +1,6 @@
 # Tugeel deploy runbook
 
-Operational steps for the DigitalOcean droplet (docs/architecture.md §10, ADR-0012, ADR-0023, ADR-0024). **Nothing here is used before the go-live phase** (ADR-0026: development is local-only and production is deployed once, after delivery 11); until then rehearse locally with `pnpm docker:build` and the staging stack behind the edge Caddy (`http://staging.localhost:8080`). Commands run on the droplet in `/opt/tugeel` unless stated. Never paste secrets into this file or any other file in the repository: it is public.
+Operational steps for the DigitalOcean droplet (docs/architecture.md §10, ADR-0012, ADR-0023, ADR-0024). Until that server exists the centre runs on the store's Ubuntu PC beside the store edge (ADR-0186): that stack is `deploy/store/` and its runbook is `docs/runbooks/store-install.md` (install, master data, backups, restore, updates), not this file. **Nothing here is used before the go-live phase** (ADR-0026: development is local-only and production is deployed once, after delivery 11); until then rehearse locally with `pnpm docker:build` and the staging stack behind the edge Caddy (`http://staging.localhost:8080`). Commands run on the droplet in `/opt/tugeel` unless stated. Never paste secrets into this file or any other file in the repository: it is public.
 
 ## 1. Topology
 

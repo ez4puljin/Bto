@@ -4,7 +4,7 @@ Tugeel is an in-house ERP for the wholesale distribution of Бүтэн-Орги�
 multi-warehouse stock with bins on an append-only ledger, customer orders (web, the customer app «Bto300» — ADR-0079, sales reps), picking,
 zone-based delivery by company drivers (pre-packed orders only, no van sales), receivables with credit control, cash and
 bank-transfer payments (no QPay, ADR-0080), mandatory e-Barimt receipts, one supermarket branch with a POS and a bank card terminal, procurement,
-reporting, an AI assistant answering questions from the company's own data (ADR-0045), HR/payroll. One owner-developer builds it with Claude Code, one module per session, and maintains it alone. Development is local-only: every delivery is accepted on the owner's machine and production is deployed once, after the last delivery (ADR-0026).
+reporting, an AI assistant answering questions from the company's own data (ADR-0045), HR/payroll. One owner-developer builds it with Claude Code, one module per session, and maintains it alone. Development is local-only: every delivery is accepted on the owner's machine and production is deployed once, after the last delivery (ADR-0026); until that external server exists, the centre for the supermarket's pilot runs on the store's Ubuntu PC beside the store edge (`deploy/store`, ADR-0186, `docs/runbooks/store-install.md`).
 Finance is being carved into the **Finance Core** (decided 2026-10-18, ADR-0069 … ADR-0077; the P0b scaffold built the same day; P1, the organisation, built 2026-10-20, ADR-0084: schema `fin`, company BO, `modules/fin-bridge`, «Компани»; F1's ledger, ADR-0089, and F2's intake and open items, ADR-0090, the same day — Bto's receivables, vouchers and journal post through `submitInTx`): one finance engine for several of the owner's systems, Bto being its first source system and a resort PMS (a separate company and repository) the next; its books replace Erkhet on the go-live day (`docs/modules/finance-core.md`).
 Repo `tugeel`, packages `@tugeel/*`. On screen the system is called **Bto** (Бүтэн-Оргил ХХК's internal system, owner 2026-10-13, ADR-0042 #11); code names stay `tugeel`. UI is Mongolian only; code, schema, API and every document except `docs/SPEC.md` are English.
 
@@ -56,7 +56,7 @@ Confirmed 2026-10-10 from the npm registry (exact pins in every `package.json`; 
 | pdfmake, `@nestjs/throttler`, receipt-printer-encoder | `npm view <pkg> version` when first installed; pick a version older than 24 h | |
 
 Majors change only in dedicated sessions between deliveries.
-DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): production api 6 + 1 live stock listener, worker 3, pg-boss 2 per process, AI reader 2 (api only); staging 2 (+1) / 2 / 2 / 2 (architecture §10.2; the listener `LISTEN`s on a direct connection, never through PgBouncer, ADR-0173).
+DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): production api 6 + 1 live stock listener, worker 3, pg-boss 2 per process, AI reader 2 (api only); staging 2 (+1) / 2 / 2 / 2; the store PC until the external server: api 6 (+1), worker 2, pg-boss 2, AI reader 2 against its own PostgreSQL with `max_connections` 40 (ADR-0186, architecture §10.7) (architecture §10.2; the listener `LISTEN`s on a direct connection, never through PgBouncer, ADR-0173).
 
 ## Commands
 
@@ -74,6 +74,8 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): producti
 | `pnpm finance:reconcile` | the Finance Core's reconcile (party balances against open items — rewritten —, items against allocations, items against the control lines) and the invoices' open amounts against their items; records the runs (exit 2 on drift; `docs/modules/finance.md` §7, ADR-0090) |
 | `pnpm edge:up` / `pnpm edge:down` / `pnpm edge:logs` | the store edge in Docker (ADR-0067; `deploy/edge/.env` from `.env.example`): its PostgreSQL, the edge replaying to the dev api, the till kiosk on `http://<LAN address>:7400`; never touches the tugeel PostgreSQL container |
 | `pnpm --filter @tugeel/api db:migrate:edge` / `edge:dev` | the edge without Docker (`apps/api/.env.edge`): migrate its database / watch it on port 3400; the kiosk is then `http://localhost:5173/pos.html` (not started by `pnpm dev`) |
+| `pnpm store:seed [--apply] [--files-list <file>]` | master data only from the dev database into an empty, migrated and never started database (`SEED_TARGET_DATABASE_URL`, role `migrator`); a dry run without `--apply`; refuses a target that is not empty (ADR-0186, `tools/store-seed/README.md`) |
+| `bash deploy/store/setup.sh` (on the store PC) | the centre on the store's Ubuntu PC: secrets made on the box, build, provision, migrate, start; `backup.sh`, `restore-drill.sh`, `housekeeping.sh` beside it; `tools\store-backup\pull.ps1` pulls the backups to the owner's PC (`docs/runbooks/store-install.md`) |
 | `pnpm core:standalone` | the Finance Core compiled alone, its file list checked against `tools/finance-core/whitelist.mjs` (ADR-0069 #8); part of `pnpm check` |
 | `pnpm check:quick` | build packages → typecheck → eslint → unit (Jest + Vitest): the check before a pull request (ADR-0120); CI runs the full `pnpm check` |
 | `pnpm check` | ts:single-version → prettier → build packages → eslint → lint-guard self-test → typecheck → core:standalone → gen:api freshness → drizzle-kit check → unit (Jest + Vitest) → integration → integrity (`--runInBand`) → build |
@@ -139,6 +141,6 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): producti
 | `docs/modules/<module>.md` | the module's contract (owned tables, public services, invariants, status); created with the module |
 | `docs/modules/finance-core.md` | before any finance work: the planned Finance Core (data model, intake contract, phases, tests, the accountant's open questions) |
 | `docs/ui.md` | before building or changing a screen: tokens, building blocks, page patterns, do/don't, test notes (ADR-0042) |
-| `deploy/runbook.md`, `deploy/ebarimt-box/`, `docs/runbooks/` | deploy, rollback, restore, secret rotation, Tailscale pattern, mini-PC setup, e-Barimt outages (written from delivery 1 on) |
+| `deploy/runbook.md`, `deploy/ebarimt-box/`, `docs/runbooks/` | deploy, rollback, restore, secret rotation, Tailscale pattern, mini-PC setup, e-Barimt outages (written from delivery 1 on); `docs/runbooks/store-install.md` (`.mn.md`) for the centre on the store PC (ADR-0186) |
 
 `CLAUDE.local.md` is gitignored and holds personal settings (local paths, tailnet addresses, preferences); it never overrides the rules in this file.

@@ -1,0 +1,16 @@
+# Fallback only (ADR-0186 #10): joins the store edge to the centre's Docker network when the edge
+# cannot reach the centre through the host (http://host.docker.internal). The centre's address in
+# «Төв системтэй холбох» is then http://api:3000. Used together with the edge's own file:
+#
+#   docker compose -f deploy/edge/docker-compose.edge.yml -f deploy/store/docker-compose.edge-link.yml \
+#     --env-file deploy/edge/.env up -d
+#
+# An edge started this way is updated with the same two files, not with deploy/edge/setup.sh alone.
+services:
+  edge:
+    networks: [default, centre]
+
+networks:
+  centre:
+    name: bto-store_default
+    external: true
