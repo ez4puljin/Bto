@@ -159,9 +159,7 @@
         "edge_devices_token_hash_key": {
           "name": "edge_devices_token_hash_key",
           "nullsNotDistinct": false,
-          "columns": [
-            "token_hash"
-          ]
+          "columns": ["token_hash"]
         }
       },
       "policies": {},
@@ -382,10 +380,7 @@
         "edge_outbox_kind_client_key": {
           "name": "edge_outbox_kind_client_key",
           "nullsNotDistinct": false,
-          "columns": [
-            "kind",
-            "client_id"
-          ]
+          "columns": ["kind", "client_id"]
         }
       },
       "policies": {},
@@ -742,12 +737,8 @@
           "name": "edge_receipts_owner_client_id_edge_sales_client_id_fk",
           "tableFrom": "edge_receipts",
           "tableTo": "edge_sales",
-          "columnsFrom": [
-            "owner_client_id"
-          ],
-          "columnsTo": [
-            "client_id"
-          ],
+          "columnsFrom": ["owner_client_id"],
+          "columnsTo": ["client_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -934,11 +925,7 @@
         "edge_relay_ops_attempt": {
           "name": "edge_relay_ops_attempt",
           "nullsNotDistinct": false,
-          "columns": [
-            "receipt_id",
-            "op",
-            "attempt"
-          ]
+          "columns": ["receipt_id", "op", "attempt"]
         }
       },
       "policies": {},
@@ -1186,12 +1173,8 @@
           "name": "edge_sales_shift_client_id_edge_shifts_client_id_fk",
           "tableFrom": "edge_sales",
           "tableTo": "edge_shifts",
-          "columnsFrom": [
-            "shift_client_id"
-          ],
-          "columnsTo": [
-            "client_id"
-          ],
+          "columnsFrom": ["shift_client_id"],
+          "columnsTo": ["client_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1201,9 +1184,7 @@
         "edge_sales_number_key": {
           "name": "edge_sales_number_key",
           "nullsNotDistinct": false,
-          "columns": [
-            "number"
-          ]
+          "columns": ["number"]
         }
       },
       "policies": {},
@@ -1251,10 +1232,7 @@
       "compositePrimaryKeys": {
         "edge_sequences_key_day_pk": {
           "name": "edge_sequences_key_day_pk",
-          "columns": [
-            "key",
-            "day"
-          ]
+          "columns": ["key", "day"]
         }
       },
       "uniqueConstraints": {},
@@ -1364,9 +1342,7 @@
         "edge_shifts_number_key": {
           "name": "edge_shifts_number_key",
           "nullsNotDistinct": false,
-          "columns": [
-            "number"
-          ]
+          "columns": ["number"]
         }
       },
       "policies": {},
@@ -1672,12 +1648,8 @@
           "name": "edge_voucher_uses_sale_client_id_edge_sales_client_id_fk",
           "tableFrom": "edge_voucher_uses",
           "tableTo": "edge_sales",
-          "columnsFrom": [
-            "sale_client_id"
-          ],
-          "columnsTo": [
-            "client_id"
-          ],
+          "columnsFrom": ["sale_client_id"],
+          "columnsTo": ["client_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
