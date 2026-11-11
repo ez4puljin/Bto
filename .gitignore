@@ -41,3 +41,6 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# graphify (the local code graph, rebuilt by its git hooks; never committed)
+graphify-out/
