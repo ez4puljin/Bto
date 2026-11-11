@@ -132,6 +132,7 @@ export const ROUTES = [
     path: '/finance/statements?kind=INCOME&accounts=1',
   },
   { area: 'finance', name: 'statements-print', path: '/finance/statements/print?kind=BALANCE' },
+  { area: 'finance', name: 'ebarimt-receipts', path: '/finance/ebarimt-receipts' },
   { area: 'finance', name: 'rep-collections', path: '/finance/collections?status=ALL' },
   { area: 'pricing', name: 'price-labels', path: '/pricing/labels/print?ids={labelIds}' },
   { area: 'pricing', name: 'profiles', path: '/pricing/profiles' },
