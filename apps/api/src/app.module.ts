@@ -8,6 +8,7 @@ import { HealthModule } from './health/health.module';
 import { LlmModule } from './integrations/llm';
 import { AiHttpModule } from './modules/ai';
 import { CatalogHttpModule } from './modules/catalog';
+import { EbarimtHttpModule } from './modules/ebarimt';
 import { EbarimtCheckHttpModule } from './modules/ebarimt-check';
 import { CustomerHttpModule } from './modules/customer';
 import { ExpiryHttpModule } from './modules/expiry';
@@ -55,6 +56,7 @@ import { SegmentsHttpModule } from './modules/segments';
     ProcurementHttpModule,
     EbarimtCheckHttpModule,
     ExpiryHttpModule,
+    EbarimtHttpModule,
   ],
 })
 export class AppModule {}

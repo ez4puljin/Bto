@@ -682,6 +682,8 @@ export const salesStages = pgTable(
     cardSort: text('card_sort', { enum: CARD_SORTS }).notNull().default('NEWEST'),
     printPickList: boolean('print_pick_list').notNull().default(false),
     printDeliveryNote: boolean('print_delivery_note').notNull().default(false),
+    /** ADR-0185: a sale on this SALE stage prepares the invoice's e-Barimt receipt; the owner ticks it. */
+    ebarimt: boolean('ebarimt').notNull().default(false),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -695,6 +697,7 @@ export const salesStages = pgTable(
     ),
     check('sales_stages_position', sql`${t.position} >= 0`),
     check('sales_stages_action', inList(t.action, STAGE_ACTIONS)),
+    check('sales_stages_ebarimt', sql`NOT ${t.ebarimt} OR ${t.action} = 'SALE'`),
     check('sales_stages_card_sort', inList(t.cardSort, CARD_SORTS)),
   ],
 );

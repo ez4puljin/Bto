@@ -23,6 +23,7 @@ import { creditNotes, invoiceLines, invoices } from '../schema';
 import { FinBooks } from './fin-books';
 import { FinPosting } from './fin-posting';
 import { FinanceSettingsService } from './finance-settings.service';
+import { InvoiceEbarimtService } from './invoice-ebarimt.service';
 import { controlTotal, intakeLines, type RoleLine } from './intake-lines';
 import { type InvoiceDetail, InvoiceQueryService } from './invoice-query.service';
 
@@ -56,6 +57,7 @@ export class InvoicingService implements SaleSink {
     private readonly posting: FinPosting,
     private readonly books: FinBooks,
     private readonly parties: FinPartiesBridge,
+    private readonly ebarimt: InvoiceEbarimtService,
   ) {}
 
   async onSold(
@@ -151,6 +153,8 @@ export class InvoicingService implements SaleSink {
         dueDate,
       },
     });
+    // ADR-0185: the stage asked for the e-Barimt receipt; the store edge issues it after the commit.
+    if (snapshot.ebarimt) await this.ebarimt.prepareInTx(tx, actor, invoice.id);
     return { invoiceId: invoice.id, number, total: totals.total };
   }
 
@@ -216,6 +220,8 @@ export class InvoicingService implements SaleSink {
         before: { status: 'ISSUED', openAmount: invoice.openAmount.toFixed(2) },
         after: { status: 'VOID', reason: trimmed, reversal: reversal?.journalNo ?? null },
       });
+      // ADR-0185 #7: a receipt already issued is cancelled at PosAPI through the store edge.
+      await this.ebarimt.cancelInTx(tx, ctx, id, trimmed);
     });
     return this.query.get(id);
   }

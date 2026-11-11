@@ -90,6 +90,8 @@ export interface SaleSnapshot {
   deliveryDate: string;
   paymentMethod: PaymentMethod;
   note: string | null;
+  /** ADR-0185: the SALE stage asks for the invoice’s e-Barimt receipt («e-Barimt гаргах»). */
+  ebarimt: boolean;
   lines: SoldLine[];
 }
 

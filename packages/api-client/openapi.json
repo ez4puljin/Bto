@@ -25922,6 +25922,52 @@
         ]
       }
     },
+    "/api/v1/invoices/{id}/ebarimt": {
+      "post": {
+        "operationId": "Invoices_prepareReceipt",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Дахин бэлтгэх» (ADR-0185): an invoice's e-Barimt receipt in ERROR is built again from the\ninvoice and waits for the store edge. Not idempotent-keyed: it creates no document.",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
     "/api/v1/invoices/{id}/void": {
       "post": {
         "operationId": "Invoices_void",
@@ -34911,6 +34957,91 @@
         ]
       }
     },
+    "/api/v1/pos/sync/ebarimt/claim": {
+      "post": {
+        "operationId": "PosSync_ebarimtClaim",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "edge-token": []
+          }
+        ],
+        "summary": "ADR-0185: the wholesale e-Barimt relay. The centre cannot call the store, so the edge asks:\none receipt operation (ISSUE or CANCEL) for the store PosAPI, or none. The row is SENDING for\nthis node from here on; `RelayClaimResponse` of @tugeel/shared/mn.",
+        "tags": [
+          "pos-sync"
+        ]
+      }
+    },
+    "/api/v1/pos/sync/ebarimt/result": {
+      "post": {
+        "operationId": "PosSync_ebarimtResult",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbarimtRelayResult"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtRelayResultResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "edge-token": []
+          }
+        ],
+        "summary": "What the store PosAPI answered to a claimed operation, repeated by the edge until acknowledged\n(idempotent by receipt and attempt). The body may carry the lottery and the QR data: they go\nto the api's memory for one print and are never stored or logged (ADR-0185 #6).",
+        "tags": [
+          "pos-sync"
+        ]
+      }
+    },
     "/api/v1/pos/sync/heartbeat": {
       "post": {
         "operationId": "PosSync_heartbeat",
@@ -43358,6 +43489,347 @@
         ],
         "tags": [
           "expiry"
+        ]
+      }
+    },
+    "/api/v1/ebarimt/receipts": {
+      "get": {
+        "operationId": "EbarimtReceipts_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "SENDING",
+                "CONFIRMED",
+                "ERROR",
+                "INDETERMINATE",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "cancelOpen",
+            "required": false,
+            "in": "query",
+            "description": "Cancellations asked and not done",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "B2C",
+                "B2B"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Document or order number, buyer, TIN or ДДТД",
+            "schema": {
+              "maxLength": 80,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtReceiptPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt"
+        ]
+      }
+    },
+    "/api/v1/ebarimt/receipts/attention": {
+      "get": {
+        "operationId": "EbarimtReceipts_attention",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtReceiptAttention"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt"
+        ]
+      }
+    },
+    "/api/v1/ebarimt/receipts/{id}": {
+      "get": {
+        "operationId": "EbarimtReceipts_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtReceiptDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt"
+        ]
+      }
+    },
+    "/api/v1/ebarimt/receipts/{id}/print": {
+      "post": {
+        "operationId": "EbarimtReceipts_print",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtPrintableReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The receipt to print. A POST: the first call hands out the lottery and the QR data and forgets\nthem (ADR-0185 #6); every later one answers a copy. Never cached.",
+        "tags": [
+          "ebarimt"
+        ]
+      }
+    },
+    "/api/v1/ebarimt/receipts/{id}/resolve": {
+      "post": {
+        "operationId": "EbarimtReceipts_resolve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbarimtReceiptResolve"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtReceiptDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt"
+        ]
+      }
+    },
+    "/api/v1/ebarimt/receipts/{id}/cancel-resolve": {
+      "post": {
+        "operationId": "EbarimtReceipts_resolveCancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbarimtCancelResolve"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtReceiptDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt"
         ]
       }
     }
@@ -64245,6 +64717,9 @@
           "printDeliveryNote": {
             "type": "boolean"
           },
+          "ebarimt": {
+            "type": "boolean"
+          },
           "cardSort": {
             "enum": [
               "NEWEST",
@@ -64284,6 +64759,7 @@
           "action",
           "printPickList",
           "printDeliveryNote",
+          "ebarimt",
           "cardSort",
           "archivedAt",
           "roles",
@@ -64666,6 +65142,10 @@
           },
           "printDeliveryNote": {
             "type": "boolean"
+          },
+          "ebarimt": {
+            "type": "boolean",
+            "description": "ADR-0185: a sale here prepares an e-Barimt receipt"
           },
           "roles": {
             "$ref": "#/components/schemas/SalesStageRoles"
@@ -67834,6 +68314,179 @@
           "total"
         ]
       },
+      "EbarimtReceipt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "sourceSystem": {
+            "type": "string"
+          },
+          "sourceDocType": {
+            "type": "string",
+            "example": "SALES_INVOICE"
+          },
+          "sourceDocId": {
+            "type": "string",
+            "description": "The source document id (an invoice id)"
+          },
+          "docNumber": {
+            "type": "string"
+          },
+          "orderNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "buyerName": {
+            "type": "string"
+          },
+          "receiptType": {
+            "enum": [
+              "B2C",
+              "B2B"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "SENDING",
+              "CONFIRMED",
+              "ERROR",
+              "INDETERMINATE",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "errorCode": {
+            "nullable": true,
+            "enum": [
+              "TIN_PENDING",
+              "NO_LINES",
+              "TAX_PRODUCT_CODE_MISSING",
+              "CLASSIFICATION_CODE_INVALID",
+              "CUSTOMER_TIN_INVALID",
+              "PAYMENTS_MISMATCH",
+              "POSAPI_REFUSED",
+              "EDGE_BUILD"
+            ],
+            "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerTin": {
+            "type": "string",
+            "nullable": true
+          },
+          "consumerNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "string",
+            "example": "5500.00"
+          },
+          "vatTotal": {
+            "type": "string",
+            "example": "500.00"
+          },
+          "cityTaxTotal": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "attempt": {
+            "type": "number"
+          },
+          "claimedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "claimedNodeCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "ddtd": {
+            "type": "string",
+            "nullable": true
+          },
+          "posapiDate": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-11-11 10:00:00"
+          },
+          "issuedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "cancelStatus": {
+            "nullable": true,
+            "enum": [
+              "PENDING",
+              "SENDING",
+              "DONE",
+              "ERROR",
+              "INDETERMINATE"
+            ],
+            "type": "string"
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelledAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "printable": {
+            "type": "boolean",
+            "description": "The next print still carries the lottery and the QR code"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "sourceSystem",
+          "sourceDocType",
+          "sourceDocId",
+          "docNumber",
+          "orderNumber",
+          "buyerName",
+          "receiptType",
+          "status",
+          "errorCode",
+          "message",
+          "customerTin",
+          "consumerNo",
+          "total",
+          "vatTotal",
+          "cityTaxTotal",
+          "attempt",
+          "claimedAt",
+          "claimedNodeCode",
+          "ddtd",
+          "posapiDate",
+          "issuedAt",
+          "cancelStatus",
+          "cancelReason",
+          "cancelMessage",
+          "cancelledAt",
+          "printable",
+          "createdAt"
+        ]
+      },
       "InvoiceDetail": {
         "type": "object",
         "properties": {
@@ -67985,6 +68638,16 @@
             "items": {
               "$ref": "#/components/schemas/InvoiceCreditNoteRef"
             }
+          },
+          "ebarimt": {
+            "nullable": true,
+            "description": "ADR-0185: its e-Barimt receipt; null when the sale asked for none",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EbarimtReceipt"
+              }
+            ]
           }
         },
         "required": [
@@ -68021,7 +68684,8 @@
           "voidJournalEntryId",
           "lines",
           "allocations",
-          "creditNotes"
+          "creditNotes",
+          "ebarimt"
         ]
       },
       "VoidRequest": {
@@ -77990,6 +78654,102 @@
           "serverTime"
         ]
       },
+      "EbarimtRelayResult": {
+        "type": "object",
+        "properties": {
+          "receiptId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "attempt": {
+            "type": "number",
+            "minimum": 1
+          },
+          "op": {
+            "enum": [
+              "ISSUE",
+              "CANCEL"
+            ],
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "ISSUED",
+              "CANCELLED",
+              "REFUSED",
+              "NOT_SENT",
+              "INDETERMINATE"
+            ],
+            "type": "string"
+          },
+          "ddtd": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
+          },
+          "posapiDate": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40,
+            "description": "PosAPI’s date, verbatim"
+          },
+          "merchantTin": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 20
+          },
+          "merchantName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          },
+          "errorCode": {
+            "nullable": true,
+            "enum": [
+              "POSAPI_REFUSED",
+              "EDGE_BUILD"
+            ],
+            "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 600
+          },
+          "lottery": {
+            "type": "string",
+            "nullable": true,
+            "description": "In memory for one print, never stored or logged (ADR-0185 #6).",
+            "maxLength": 200
+          },
+          "qrData": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "receiptId",
+          "attempt",
+          "op",
+          "outcome"
+        ]
+      },
+      "EbarimtRelayResultResponse": {
+        "type": "object",
+        "properties": {
+          "acknowledged": {
+            "type": "boolean"
+          },
+          "applied": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "acknowledged",
+          "applied"
+        ]
+      },
       "PosPosapiInfo": {
         "type": "object",
         "properties": {
@@ -87614,6 +88374,433 @@
           "type",
           "roleIds",
           "userIds"
+        ]
+      },
+      "EbarimtReceiptPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtReceipt"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "EbarimtReceiptAttention": {
+        "type": "object",
+        "properties": {
+          "pending": {
+            "type": "number"
+          },
+          "error": {
+            "type": "number"
+          },
+          "indeterminate": {
+            "type": "number"
+          },
+          "cancelOpen": {
+            "type": "number"
+          },
+          "relaySeenAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When a store edge last asked for work (since the api started)"
+          },
+          "relayNodeCode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "pending",
+          "error",
+          "indeterminate",
+          "cancelOpen",
+          "relaySeenAt",
+          "relayNodeCode"
+        ]
+      },
+      "EbarimtReceiptLine": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "barCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "barCodeType": {
+            "enum": [
+              "GS1",
+              "ISBN",
+              "UNDEFINED"
+            ],
+            "type": "string"
+          },
+          "classificationCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "taxType": {
+            "enum": [
+              "VAT_ABLE",
+              "VAT_FREE",
+              "VAT_ZERO",
+              "NO_VAT"
+            ],
+            "type": "string"
+          },
+          "taxProductCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "measureUnit": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "string",
+            "example": "2.000"
+          },
+          "total": {
+            "type": "string",
+            "example": "5500.00"
+          },
+          "vat": {
+            "type": "string",
+            "example": "500.00"
+          },
+          "cityTax": {
+            "type": "string",
+            "example": "0.00"
+          }
+        },
+        "required": [
+          "name",
+          "barCode",
+          "barCodeType",
+          "classificationCode",
+          "taxType",
+          "taxProductCode",
+          "measureUnit",
+          "qty",
+          "total",
+          "vat",
+          "cityTax"
+        ]
+      },
+      "EbarimtReceiptPayment": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "enum": [
+              "CASH",
+              "PAYMENT_CARD",
+              "BANK_TRANSFER"
+            ],
+            "type": "string"
+          },
+          "amount": {
+            "type": "string",
+            "example": "5500.00"
+          }
+        },
+        "required": [
+          "code",
+          "amount"
+        ]
+      },
+      "EbarimtReceiptDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "sourceSystem": {
+            "type": "string"
+          },
+          "sourceDocType": {
+            "type": "string",
+            "example": "SALES_INVOICE"
+          },
+          "sourceDocId": {
+            "type": "string",
+            "description": "The source document id (an invoice id)"
+          },
+          "docNumber": {
+            "type": "string"
+          },
+          "orderNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "buyerName": {
+            "type": "string"
+          },
+          "receiptType": {
+            "enum": [
+              "B2C",
+              "B2B"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "SENDING",
+              "CONFIRMED",
+              "ERROR",
+              "INDETERMINATE",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "errorCode": {
+            "nullable": true,
+            "enum": [
+              "TIN_PENDING",
+              "NO_LINES",
+              "TAX_PRODUCT_CODE_MISSING",
+              "CLASSIFICATION_CODE_INVALID",
+              "CUSTOMER_TIN_INVALID",
+              "PAYMENTS_MISMATCH",
+              "POSAPI_REFUSED",
+              "EDGE_BUILD"
+            ],
+            "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerTin": {
+            "type": "string",
+            "nullable": true
+          },
+          "consumerNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "string",
+            "example": "5500.00"
+          },
+          "vatTotal": {
+            "type": "string",
+            "example": "500.00"
+          },
+          "cityTaxTotal": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "attempt": {
+            "type": "number"
+          },
+          "claimedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "claimedNodeCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "ddtd": {
+            "type": "string",
+            "nullable": true
+          },
+          "posapiDate": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-11-11 10:00:00"
+          },
+          "issuedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "cancelStatus": {
+            "nullable": true,
+            "enum": [
+              "PENDING",
+              "SENDING",
+              "DONE",
+              "ERROR",
+              "INDETERMINATE"
+            ],
+            "type": "string"
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelledAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "printable": {
+            "type": "boolean",
+            "description": "The next print still carries the lottery and the QR code"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtReceiptLine"
+            }
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtReceiptPayment"
+            }
+          },
+          "merchantTin": {
+            "type": "string",
+            "nullable": true
+          },
+          "merchantName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "sourceSystem",
+          "sourceDocType",
+          "sourceDocId",
+          "docNumber",
+          "orderNumber",
+          "buyerName",
+          "receiptType",
+          "status",
+          "errorCode",
+          "message",
+          "customerTin",
+          "consumerNo",
+          "total",
+          "vatTotal",
+          "cityTaxTotal",
+          "attempt",
+          "claimedAt",
+          "claimedNodeCode",
+          "ddtd",
+          "posapiDate",
+          "issuedAt",
+          "cancelStatus",
+          "cancelReason",
+          "cancelMessage",
+          "cancelledAt",
+          "printable",
+          "createdAt",
+          "lines",
+          "payments",
+          "merchantTin",
+          "merchantName"
+        ]
+      },
+      "EbarimtPrintSecrets": {
+        "type": "object",
+        "properties": {
+          "lottery": {
+            "type": "string",
+            "nullable": true
+          },
+          "qrData": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "lottery",
+          "qrData"
+        ]
+      },
+      "EbarimtPrintableReceipt": {
+        "type": "object",
+        "properties": {
+          "receipt": {
+            "$ref": "#/components/schemas/EbarimtReceiptDetail"
+          },
+          "secrets": {
+            "nullable": true,
+            "description": "Only on the one print while the api still holds them; never stored",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EbarimtPrintSecrets"
+              }
+            ]
+          },
+          "copy": {
+            "type": "boolean",
+            "description": "«ХУУЛБАР»: printed before, or the secrets are gone"
+          }
+        },
+        "required": [
+          "receipt",
+          "secrets",
+          "copy"
+        ]
+      },
+      "EbarimtReceiptResolve": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "enum": [
+              "ISSUED",
+              "NOT_ISSUED"
+            ],
+            "type": "string"
+          },
+          "ddtd": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40,
+            "description": "ISSUED: the ДДТД"
+          },
+          "posapiDate": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 19,
+            "example": "2026-11-11 10:00:00"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "EbarimtCancelResolve": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "enum": [
+              "RETRY",
+              "CANCELLED"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome"
         ]
       },
       "ErrorCode": {

@@ -715,6 +715,14 @@ export class EbarimtService implements OnApplicationBootstrap {
     };
   }
 
+  /**
+   * PosAPI's one merchant and its own number, as `GET /rest/info` named them; null while PosAPI
+   * cannot be asked. The wholesale relay builds its receipts with the same facts (ADR-0185).
+   */
+  merchantFacts(): Promise<{ tin: string; name: string; posNo: string | null } | null> {
+    return this.merchantOrNull();
+  }
+
   private async merchantOrNull(): Promise<{
     tin: string;
     name: string;

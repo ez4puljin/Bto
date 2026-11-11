@@ -47,6 +47,8 @@ services:
       POSAPI_URL: ${POSAPI_URL:-}
       EBARIMT_BRANCH_NO: ${EBARIMT_BRANCH_NO:-}
       EBARIMT_LOOKUP_URL: ${EBARIMT_LOOKUP_URL:-https://api.ebarimt.mn}
+      # ADR-0185: also issue the wholesale centre's receipts at the store PosAPI (off by default).
+      EBARIMT_WHOLESALE_RELAY: ${EBARIMT_WHOLESALE_RELAY:-false}
       APP_VERSION: ${APP_VERSION:-local}
     # Lets the container reach the dev api on the owner's PC.
     extra_hosts: ['host.docker.internal:host-gateway']

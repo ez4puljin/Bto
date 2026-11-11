@@ -180,6 +180,7 @@ export const STORE_SEED_TABLES: Record<string, SeedRule> = {
   'public.bank_statements': empty(DOCUMENT),
   'public.bank_statement_lines': empty(DOCUMENT),
   'public.finance_reconcile_runs': empty(HISTORY),
+  'public.ebarimt_receipts': empty(DOCUMENT),
 
   // --- the supermarket's tills
   'public.pos_settings': copy(),

@@ -6376,6 +6376,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/invoices/{id}/ebarimt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * «Дахин бэлтгэх» (ADR-0185): an invoice's e-Barimt receipt in ERROR is built again from the
+         *     invoice and waits for the store edge. Not idempotent-keyed: it creates no document.
+         */
+        post: operations["Invoices_prepareReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/invoices/{id}/void": {
         parameters: {
             query?: never;
@@ -8540,6 +8560,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pos/sync/ebarimt/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * ADR-0185: the wholesale e-Barimt relay. The centre cannot call the store, so the edge asks:
+         *     one receipt operation (ISSUE or CANCEL) for the store PosAPI, or none. The row is SENDING for
+         *     this node from here on; `RelayClaimResponse` of @tugeel/shared/mn.
+         */
+        post: operations["PosSync_ebarimtClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/sync/ebarimt/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * What the store PosAPI answered to a claimed operation, repeated by the edge until acknowledged
+         *     (idempotent by receipt and attempt). The body may carry the lottery and the QR data: they go
+         *     to the api's memory for one print and are never stored or logged (ADR-0185 #6).
+         */
+        post: operations["PosSync_ebarimtResult"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pos/sync/heartbeat": {
         parameters: {
             query?: never;
@@ -10573,6 +10635,106 @@ export interface paths {
         get?: never;
         put: operations["Expiry_setLiability"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ebarimt/receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EbarimtReceipts_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ebarimt/receipts/attention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EbarimtReceipts_attention"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ebarimt/receipts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EbarimtReceipts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ebarimt/receipts/{id}/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The receipt to print. A POST: the first call hands out the lottery and the QR data and forgets
+         *     them (ADR-0185 #6); every later one answers a copy. Never cached.
+         */
+        post: operations["EbarimtReceipts_print"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ebarimt/receipts/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["EbarimtReceipts_resolve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ebarimt/receipts/{id}/cancel-resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["EbarimtReceipts_resolveCancel"];
         delete?: never;
         options?: never;
         head?: never;
@@ -16516,6 +16678,7 @@ export interface components {
             action: "NONE" | "CONFIRM" | "PICK" | "SALE" | "TRANSFER" | "CANCEL";
             printPickList: boolean;
             printDeliveryNote: boolean;
+            ebarimt: boolean;
             /** @enum {string} */
             cardSort: "NEWEST" | "OLDEST" | "DELIVERY" | "TOTAL" | "WAITING";
             /** Format: date-time */
@@ -16630,6 +16793,8 @@ export interface components {
             action: "NONE" | "CONFIRM" | "PICK" | "SALE" | "TRANSFER" | "CANCEL";
             printPickList: boolean;
             printDeliveryNote: boolean;
+            /** @description ADR-0185: a sale here prepares an e-Barimt receipt */
+            ebarimt?: boolean;
             roles: components["schemas"]["SalesStageRoles"];
         };
         SalesPipelineRequest: {
@@ -17518,6 +17683,51 @@ export interface components {
             /** @example 20000.00 */
             total: string;
         };
+        EbarimtReceipt: {
+            id: number;
+            sourceSystem: string;
+            /** @example SALES_INVOICE */
+            sourceDocType: string;
+            /** @description The source document id (an invoice id) */
+            sourceDocId: string;
+            docNumber: string;
+            orderNumber: string | null;
+            buyerName: string;
+            /** @enum {string} */
+            receiptType: "B2C" | "B2B";
+            /** @enum {string} */
+            status: "PENDING" | "SENDING" | "CONFIRMED" | "ERROR" | "INDETERMINATE" | "CANCELLED";
+            /** @enum {string|null} */
+            errorCode: "TIN_PENDING" | "NO_LINES" | "TAX_PRODUCT_CODE_MISSING" | "CLASSIFICATION_CODE_INVALID" | "CUSTOMER_TIN_INVALID" | "PAYMENTS_MISMATCH" | "POSAPI_REFUSED" | "EDGE_BUILD" | null;
+            message: string | null;
+            customerTin: string | null;
+            consumerNo: string | null;
+            /** @example 5500.00 */
+            total: string;
+            /** @example 500.00 */
+            vatTotal: string;
+            /** @example 0.00 */
+            cityTaxTotal: string;
+            attempt: number;
+            /** Format: date-time */
+            claimedAt: string | null;
+            claimedNodeCode: string | null;
+            ddtd: string | null;
+            /** @example 2026-11-11 10:00:00 */
+            posapiDate: string | null;
+            /** Format: date-time */
+            issuedAt: string | null;
+            /** @enum {string|null} */
+            cancelStatus: "PENDING" | "SENDING" | "DONE" | "ERROR" | "INDETERMINATE" | null;
+            cancelReason: string | null;
+            cancelMessage: string | null;
+            /** Format: date-time */
+            cancelledAt: string | null;
+            /** @description The next print still carries the lottery and the QR code */
+            printable: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
         InvoiceDetail: {
             id: number;
             /** @example Н-20261016-0001 */
@@ -17568,6 +17778,8 @@ export interface components {
             lines: components["schemas"]["InvoiceLine"][];
             allocations: components["schemas"]["InvoiceAllocation"][];
             creditNotes: components["schemas"]["InvoiceCreditNoteRef"][];
+            /** @description ADR-0185: its e-Barimt receipt; null when the sale asked for none */
+            ebarimt: components["schemas"]["EbarimtReceipt"] | null;
         };
         VoidRequest: {
             reason: string;
@@ -20453,6 +20665,29 @@ export interface components {
             /** Format: date-time */
             serverTime: string;
         };
+        EbarimtRelayResult: {
+            receiptId: number;
+            attempt: number;
+            /** @enum {string} */
+            op: "ISSUE" | "CANCEL";
+            /** @enum {string} */
+            outcome: "ISSUED" | "CANCELLED" | "REFUSED" | "NOT_SENT" | "INDETERMINATE";
+            ddtd?: string | null;
+            /** @description PosAPI’s date, verbatim */
+            posapiDate?: string | null;
+            merchantTin?: string | null;
+            merchantName?: string | null;
+            /** @enum {string|null} */
+            errorCode?: "POSAPI_REFUSED" | "EDGE_BUILD" | null;
+            message?: string | null;
+            /** @description In memory for one print, never stored or logged (ADR-0185 #6). */
+            lottery?: string | null;
+            qrData?: string | null;
+        };
+        EbarimtRelayResultResponse: {
+            acknowledged: boolean;
+            applied: boolean;
+        };
         PosPosapiInfo: {
             version?: string | null;
             /** @example 2026-10-26 16:27:07 */
@@ -23049,6 +23284,119 @@ export interface components {
             userIds: number[];
             /** @description NONE clears it */
             note?: string;
+        };
+        EbarimtReceiptPage: {
+            data: components["schemas"]["EbarimtReceipt"][];
+            nextCursor: string | null;
+        };
+        EbarimtReceiptAttention: {
+            pending: number;
+            error: number;
+            indeterminate: number;
+            cancelOpen: number;
+            /**
+             * Format: date-time
+             * @description When a store edge last asked for work (since the api started)
+             */
+            relaySeenAt: string | null;
+            relayNodeCode: string | null;
+        };
+        EbarimtReceiptLine: {
+            name: string;
+            barCode: string | null;
+            /** @enum {string} */
+            barCodeType: "GS1" | "ISBN" | "UNDEFINED";
+            classificationCode: string | null;
+            /** @enum {string} */
+            taxType: "VAT_ABLE" | "VAT_FREE" | "VAT_ZERO" | "NO_VAT";
+            taxProductCode: string | null;
+            measureUnit: string;
+            /** @example 2.000 */
+            qty: string;
+            /** @example 5500.00 */
+            total: string;
+            /** @example 500.00 */
+            vat: string;
+            /** @example 0.00 */
+            cityTax: string;
+        };
+        EbarimtReceiptPayment: {
+            /** @enum {string} */
+            code: "CASH" | "PAYMENT_CARD" | "BANK_TRANSFER";
+            /** @example 5500.00 */
+            amount: string;
+        };
+        EbarimtReceiptDetail: {
+            id: number;
+            sourceSystem: string;
+            /** @example SALES_INVOICE */
+            sourceDocType: string;
+            /** @description The source document id (an invoice id) */
+            sourceDocId: string;
+            docNumber: string;
+            orderNumber: string | null;
+            buyerName: string;
+            /** @enum {string} */
+            receiptType: "B2C" | "B2B";
+            /** @enum {string} */
+            status: "PENDING" | "SENDING" | "CONFIRMED" | "ERROR" | "INDETERMINATE" | "CANCELLED";
+            /** @enum {string|null} */
+            errorCode: "TIN_PENDING" | "NO_LINES" | "TAX_PRODUCT_CODE_MISSING" | "CLASSIFICATION_CODE_INVALID" | "CUSTOMER_TIN_INVALID" | "PAYMENTS_MISMATCH" | "POSAPI_REFUSED" | "EDGE_BUILD" | null;
+            message: string | null;
+            customerTin: string | null;
+            consumerNo: string | null;
+            /** @example 5500.00 */
+            total: string;
+            /** @example 500.00 */
+            vatTotal: string;
+            /** @example 0.00 */
+            cityTaxTotal: string;
+            attempt: number;
+            /** Format: date-time */
+            claimedAt: string | null;
+            claimedNodeCode: string | null;
+            ddtd: string | null;
+            /** @example 2026-11-11 10:00:00 */
+            posapiDate: string | null;
+            /** Format: date-time */
+            issuedAt: string | null;
+            /** @enum {string|null} */
+            cancelStatus: "PENDING" | "SENDING" | "DONE" | "ERROR" | "INDETERMINATE" | null;
+            cancelReason: string | null;
+            cancelMessage: string | null;
+            /** Format: date-time */
+            cancelledAt: string | null;
+            /** @description The next print still carries the lottery and the QR code */
+            printable: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            lines: components["schemas"]["EbarimtReceiptLine"][];
+            payments: components["schemas"]["EbarimtReceiptPayment"][];
+            merchantTin: string | null;
+            merchantName: string | null;
+        };
+        EbarimtPrintSecrets: {
+            lottery: string | null;
+            qrData: string | null;
+        };
+        EbarimtPrintableReceipt: {
+            receipt: components["schemas"]["EbarimtReceiptDetail"];
+            /** @description Only on the one print while the api still holds them; never stored */
+            secrets: components["schemas"]["EbarimtPrintSecrets"] | null;
+            /** @description «ХУУЛБАР»: printed before, or the secrets are gone */
+            copy: boolean;
+        };
+        EbarimtReceiptResolve: {
+            /** @enum {string} */
+            outcome: "ISSUED" | "NOT_ISSUED";
+            /** @description ISSUED: the ДДТД */
+            ddtd?: string | null;
+            /** @example 2026-11-11 10:00:00 */
+            posapiDate?: string | null;
+        };
+        EbarimtCancelResolve: {
+            /** @enum {string} */
+            outcome: "RETRY" | "CANCELLED";
         };
         /** @enum {string} */
         ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "ROLE_NAMED_ON_RECORDS" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "SUPPLIER_CATEGORY_INACTIVE" | "SUPPLIER_CATEGORY_HAS_CHILDREN" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "PRODUCT_NOT_IN_APP" | "ORDER_BELOW_MINIMUM" | "PRODUCT_OUT_OF_APP_STOCK" | "ATTENDANCE_NO_SITE" | "ATTENDANCE_OUT_OF_RANGE" | "ATTENDANCE_LOCATION_IMPRECISE" | "ATTENDANCE_ALREADY_IN" | "ATTENDANCE_NOT_IN" | "ATTENDANCE_EVENT_ORDER" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "ISSUE_LINES_UNCHECKED" | "ISSUE_WAREHOUSE_CONFIRMED" | "ISSUE_PARTLY_POSTED" | "ISSUE_RECIPIENT_KIND" | "ISSUE_CORRECTION_OPEN" | "ISSUE_NOT_SENT" | "PO_NOT_ARCHIVABLE" | "PO_NOT_EDITABLE" | "PO_LOAD_OVER" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "TRANSFER_LINES_UNCOUNTED" | "TRANSFER_REQUEST_EMPTY" | "HR_POLL_CLOSED" | "HR_POLL_ANSWERED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "AI_DATA_FORBIDDEN" | "AI_BUDGET_REACHED" | "AI_USER_LIMIT_REACHED" | "AI_KEY_SECRET_MISSING" | "AI_PRICE_REQUIRED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "STAGE_SKIP" | "ORDER_CHANGED" | "ORDER_ALREADY_LOADED" | "ORDER_NOT_LOADABLE" | "LOAD_UNDO_FORBIDDEN" | "EBARIMT_FILE_UNREADABLE" | "EBARIMT_FILE_COLUMNS" | "EBARIMT_FILE_EMPTY" | "EBARIMT_FILE_ROW" | "EBARIMT_FILE_MONTHS" | "EBARIMT_FILE_LIMIT" | "EBARIMT_CELL_CONFLICT" | "EBARIMT_FILE_CHANGED" | "PICK_INCOMPLETE" | "COUNT_SESSIONS_OPEN" | "COUNT_SESSION_REQUIRED" | "PICK_TAKEN" | "LINE_EDIT_PART_DONE" | "PICK_STATE_INVALID" | "PICKER_INVALID" | "PIPELINE_KIND_STAGE" | "PIPELINE_KIND_CHANNEL" | "PIPELINE_NO_TRANSFER_WAREHOUSE" | "PIPELINE_TRANSFER_STAGE_NEEDS_STORE" | "PIPELINE_TRANSFER_WAREHOUSE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "BANK_STATEMENT_UNREADABLE" | "BANK_STATEMENT_NO_ACCOUNT" | "BANK_STATEMENT_EMPTY" | "BANK_STATEMENT_POSTED" | "BANK_STATEMENT_UNLINKED" | "BANK_STATEMENT_CURRENCY" | "BANK_LINE_LOCKED" | "BANK_LINE_POSTED" | "BANK_LINE_INCOMPLETE" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_CASHIER_NOT_ON_TILL" | "POS_SUPERVISOR_NOT_ON_TILL" | "POS_PRODUCT_NOT_ON_TILL" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "EDGE_LINK_INVALID" | "EDGE_LINK_PEPPER_MISSING" | "EDGE_ALREADY_LINKED" | "EDGE_LINK_UNREACHABLE" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE" | "EXPIRY_ITEM_EXISTS" | "EXPIRY_ITEM_CHANGED" | "EXPIRY_ITEM_ARCHIVED";
@@ -38688,6 +39036,36 @@ export interface operations {
             };
         };
     };
+    Invoices_prepareReceipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtReceipt"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Invoices_void: {
         parameters: {
             query?: never;
@@ -43786,6 +44164,68 @@ export interface operations {
             };
         };
     };
+    PosSync_ebarimtClaim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosSync_ebarimtResult: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EbarimtRelayResult"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtRelayResultResponse"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     PosSync_heartbeat: {
         parameters: {
             query?: never;
@@ -48281,6 +48721,200 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExpiryItemDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtReceipts_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                status?: "PENDING" | "SENDING" | "CONFIRMED" | "ERROR" | "INDETERMINATE" | "CANCELLED";
+                /** @description Cancellations asked and not done */
+                cancelOpen?: boolean;
+                type?: "B2C" | "B2B";
+                /** @description Document or order number, buyer, TIN or ДДТД */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtReceiptPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtReceipts_attention: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtReceiptAttention"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtReceipts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtReceiptDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtReceipts_print: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtPrintableReceipt"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtReceipts_resolve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EbarimtReceiptResolve"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtReceiptDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtReceipts_resolveCancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EbarimtCancelResolve"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtReceiptDetail"];
                 };
             };
             /** @description RFC 9457 problem details */

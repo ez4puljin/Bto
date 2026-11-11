@@ -117,6 +117,7 @@ export function PipelineSheet({
         action: stage.action,
         printPickList: stage.printPickList,
         printDeliveryNote: stage.printDeliveryNote,
+        ebarimt: stage.ebarimt,
         roles: stage.roles,
       })),
   );
@@ -386,6 +387,7 @@ export function PipelineSheet({
                             t(`sales.stageActions.${stage.action}`),
                             stage.printPickList ? t('sales.printKinds.PICK_LIST') : null,
                             stage.printDeliveryNote ? t('sales.printKinds.DELIVERY_NOTE') : null,
+                            stage.ebarimt ? t('sales.boards.ebarimtMark') : null,
                           ]
                             .filter(Boolean)
                             .join(' · ')}

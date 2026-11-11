@@ -8,6 +8,7 @@ import {
   edgeOutbox,
   edgePinAttempts,
   edgeReceipts,
+  edgeRelayOps,
   edgeSales,
   edgeSequences,
   edgeShifts,
@@ -24,6 +25,7 @@ const schema = {
   edgeOutbox,
   edgePinAttempts,
   edgeReceipts,
+  edgeRelayOps,
 };
 
 export const EDGE_DB = Symbol('EDGE_DB');

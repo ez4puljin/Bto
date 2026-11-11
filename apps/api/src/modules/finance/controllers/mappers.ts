@@ -1,4 +1,5 @@
 import type { Decimal } from '@tugeel/shared/money';
+import { type ReceiptView, toReceiptDto } from '../../ebarimt';
 import type {
   AccountLedgerLineDto,
   CreditNoteDetailDto,
@@ -46,8 +47,12 @@ export const invoiceDto = (invoice: InvoiceSummary): InvoiceDto => ({
   createdAt: iso(invoice.createdAt),
 });
 
-export const invoiceDetailDto = (invoice: InvoiceDetail): InvoiceDetailDto => ({
+export const invoiceDetailDto = (
+  invoice: InvoiceDetail,
+  ebarimt: ReceiptView | null,
+): InvoiceDetailDto => ({
   ...invoiceDto(invoice),
+  ebarimt: ebarimt ? toReceiptDto(ebarimt) : null,
   note: invoice.note,
   journalEntryId: invoice.journalEntryId,
   journalNumber: invoice.journalNumber,

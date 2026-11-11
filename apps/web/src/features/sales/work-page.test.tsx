@@ -55,6 +55,7 @@ const stage = (
   action: 'NONE',
   printPickList: false,
   printDeliveryNote: false,
+  ebarimt: false,
   cardSort: 'NEWEST',
   archivedAt: null,
   roles: { VIEW: [], EDIT: [], MOVE: [] },

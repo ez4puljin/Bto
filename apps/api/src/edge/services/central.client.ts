@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { RelayClaimResponse, RelayResultResponse, RelayResultWire } from '@tugeel/shared/mn';
 import type {
   CreditCheckRequestWire,
   CreditCheckResponseWire,
@@ -68,6 +69,19 @@ export class CentralClient {
       request,
       this.creditTimeoutMs,
     );
+  }
+
+  /** ADR-0185: one wholesale receipt operation for the store PosAPI, or none. */
+  ebarimtClaim(): Promise<RelayClaimResponse> {
+    return this.call<RelayClaimResponse>('POST', '/ebarimt/claim', {});
+  }
+
+  /**
+   * ADR-0185: what PosAPI answered to a claimed operation. The body may carry the lottery and the
+   * QR data for the centre's one print: it is never logged here.
+   */
+  ebarimtResult(result: RelayResultWire): Promise<RelayResultResponse> {
+    return this.call<RelayResultResponse>('POST', '/ebarimt/result', result);
   }
 
   snapshot(since: string | null): Promise<SnapshotResponseWire> {

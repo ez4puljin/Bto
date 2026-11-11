@@ -51,14 +51,17 @@ const MODULE_DEPS = {
   imports: ['identity', 'catalog', 'partners', 'inventory', 'pricing', 'finance'],
   // ADR-0099 #5: pricing binds inventory's RECEIPT_SALE_PRICES (a receipt's new sale prices).
   pricing: ['identity', 'catalog', 'partners', 'inventory'],
-  sales: ['identity', 'catalog', 'partners', 'pricing', 'inventory', 'ebarimt'],
+  sales: ['identity', 'catalog', 'partners', 'pricing', 'inventory'],
   // ADR-0060: sales only for its hook tokens and snapshot types; finance never reads a sales table.
   // ADR-0089: fin-bridge for the Finance Core's call contexts and the customers' parties.
   finance: ['identity', 'catalog', 'partners', 'inventory', 'sales', 'ebarimt', 'fin-bridge'],
-  ebarimt: ['identity', 'catalog'],
+  // ADR-0185: the wholesale receipts; identity for the audit and the rights, nothing else: the
+  // callers pass receipt requests by value (ADR-0074 #3). finance prepares, pos relays.
+  ebarimt: ['identity'],
   // ADR-0063: the supermarket POS posts stock through inventory and money through finance;
   // ADR-0109: a credit sale locks its customer (partners) and counts its open orders (sales).
-  pos: ['identity', 'catalog', 'pricing', 'inventory', 'finance', 'partners', 'sales'],
+  // ADR-0185: the store edge's sync routes relay the wholesale e-Barimt receipts (ebarimt).
+  pos: ['identity', 'catalog', 'pricing', 'inventory', 'finance', 'partners', 'sales', 'ebarimt'],
   delivery: ['identity', 'partners', 'sales', 'inventory', 'finance', 'notifications'],
   procurement: ['identity', 'partners', 'catalog', 'inventory', 'finance'],
   // ADR-0168: suppliers, posted receipts and each supplier's orderer; only reads them, nobody imports it.

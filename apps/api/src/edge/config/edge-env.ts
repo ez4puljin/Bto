@@ -61,6 +61,12 @@ export const EdgeEnvSchema = z.object({
       .regex(/^[0-9]{1,6}$/)
       .optional(),
   ),
+  /**
+   * ADR-0185: this edge also issues the wholesale centre's e-Barimt receipts at the store PosAPI,
+   * pulling them from the centre one at a time. Off by default; runs only with the posapi provider.
+   * A receipt it issues is a real tax receipt.
+   */
+  EBARIMT_WHOLESALE_RELAY: z.stringbool().default(false),
   /** How long the till waits for PosAPI's answer before the receipt is left to be checked. */
   POSAPI_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(20_000),
   /** The public taxpayer lookup (Mongolian addresses only) for a company's name at the till. */

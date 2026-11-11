@@ -410,6 +410,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: HandCoins,
         permission: 'finance.read',
       },
+      {
+        to: '/finance/ebarimt-receipts',
+        label: 'nav.ebarimtReceipts',
+        icon: ReceiptText,
+        permission: 'finance.read',
+      },
       { to: '/finance/cash', label: 'nav.cash', icon: WalletCards, permission: 'finance.read' },
       {
         to: '/finance/customers',

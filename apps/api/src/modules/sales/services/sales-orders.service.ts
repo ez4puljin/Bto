@@ -947,7 +947,7 @@ export class SalesOrdersService implements OnModuleInit {
           break;
         case 'SALE':
           await this.assertPacked(tx, order);
-          await this.saleInTx(tx, ctx, order);
+          await this.saleInTx(tx, ctx, order, stage.ebarimt);
           break;
         case 'TRANSFER':
           await this.assertPacked(tx, order);
@@ -1379,7 +1379,7 @@ export class SalesOrdersService implements OnModuleInit {
    * and the order ends INVOICED in the same transaction; the sale listener hears of it last
    * (ADR-0062 #4).
    */
-  private async saleInTx(tx: Tx, actor: Actor, order: OrderRow): Promise<void> {
+  private async saleInTx(tx: Tx, actor: Actor, order: OrderRow, ebarimt: boolean): Promise<void> {
     const id = order.id;
     const lines = await this.linesOf(tx, id);
     const products = new Map(
@@ -1434,7 +1434,11 @@ export class SalesOrdersService implements OnModuleInit {
       .where(eq(salesOrders.id, id));
     await this.event(tx, actor, id, 'PACKED', 'DELIVERED', null);
     const invoice = this.saleSink
-      ? await this.saleSink.onSold(tx, actor, await this.snapshotOf(tx, order, lines, products))
+      ? await this.saleSink.onSold(
+          tx,
+          actor,
+          await this.snapshotOf(tx, order, lines, products, ebarimt),
+        )
       : null;
     if (invoice) {
       await tx
@@ -1550,6 +1554,7 @@ export class SalesOrdersService implements OnModuleInit {
     order: OrderRow,
     lines: readonly LineRow[],
     products: ReadonlyMap<number, ProductSummary>,
+    ebarimt: boolean,
   ): Promise<SaleSnapshot> {
     const parts =
       lines.length === 0
@@ -1587,6 +1592,7 @@ export class SalesOrdersService implements OnModuleInit {
       deliveryDate: order.deliveryDate,
       paymentMethod: order.paymentMethod,
       note: order.note,
+      ebarimt,
       lines: lines.map((line) => {
         const product = products.get(line.productId);
         return {
