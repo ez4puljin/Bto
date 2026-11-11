@@ -23,6 +23,8 @@ import {
   VoidRequestDto,
 } from '../dto/finance.dto';
 import { CreditNotesService } from '../services/credit-notes.service';
+import { EbarimtReceiptDto, toReceiptDto } from '../../ebarimt';
+import { InvoiceEbarimtService } from '../services/invoice-ebarimt.service';
 import { InvoiceQueryService } from '../services/invoice-query.service';
 import { InvoicingService } from '../services/invoicing.service';
 import { PaymentsService } from '../services/payments.service';
@@ -46,6 +48,7 @@ export class InvoicesController {
   constructor(
     private readonly query: InvoiceQueryService,
     private readonly invoicing: InvoicingService,
+    private readonly ebarimt: InvoiceEbarimtService,
   ) {}
 
   @Get()
@@ -63,7 +66,22 @@ export class InvoicesController {
   @RequirePermission(READ)
   @ApiOkResponse({ type: InvoiceDetailDto })
   async get(@Param('id', ParseIntPipe) id: number): Promise<InvoiceDetailDto> {
-    return invoiceDetailDto(await this.query.get(id));
+    return invoiceDetailDto(await this.query.get(id), await this.ebarimt.stateOf(id));
+  }
+
+  /**
+   * «Дахин бэлтгэх» (ADR-0185): an invoice's e-Barimt receipt in ERROR is built again from the
+   * invoice and waits for the store edge. Not idempotent-keyed: it creates no document.
+   */
+  @Post(':id/ebarimt')
+  @HttpCode(200)
+  @RequirePermission(INVOICES)
+  @ApiOkResponse({ type: EbarimtReceiptDto })
+  async prepareReceipt(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<EbarimtReceiptDto> {
+    return toReceiptDto(await this.ebarimt.retry(ctx, id));
   }
 
   @Post(':id/void')
@@ -76,7 +94,8 @@ export class InvoicesController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: VoidRequestDto,
   ): Promise<InvoiceDetailDto> {
-    return invoiceDetailDto(await this.invoicing.void(ctx, id, body.reason));
+    const invoice = await this.invoicing.void(ctx, id, body.reason);
+    return invoiceDetailDto(invoice, await this.ebarimt.stateOf(id));
   }
 }
 

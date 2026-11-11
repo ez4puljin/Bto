@@ -57,6 +57,13 @@
       "when": 1793679027423,
       "tag": "0007_link",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794350368588,
+      "tag": "0008_wholesale_relay",
+      "breakpoints": true
     }
   ]
 }

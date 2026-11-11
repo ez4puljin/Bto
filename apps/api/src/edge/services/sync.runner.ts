@@ -10,6 +10,7 @@ import { EdgeConfig } from '../config/edge-env';
 import { EDGE_DB, type EdgeDb } from '../db/edge-db';
 import { edgeState } from '../db/schema';
 import { EbarimtService } from '../ebarimt/ebarimt.service';
+import { WholesaleRelayService } from '../ebarimt/wholesale-relay.service';
 import { CentralClient, CentralError } from './central.client';
 import { CustomerStore } from './customer.store';
 import { LoyaltyStore } from './loyalty.store';
@@ -22,6 +23,9 @@ const HEARTBEAT_MS = 30_000;
 /** The store PosAPI: due receipts every 10 s, its own facts every 5 minutes (ADR-0065). */
 const EBARIMT_MS = 10_000;
 const POSAPI_INFO_MS = 5 * 60_000;
+/** The wholesale relay (ADR-0185): asks the centre every 5 s, sooner after work, later when it is away. */
+const RELAY_MS = 5_000;
+const RELAY_AWAY_MS = 15_000;
 const DEFAULT_PULL_MS = 60_000;
 /** After a failed call: wait longer each time, up to a minute. */
 const MAX_BACKOFF_MS = 60_000;
@@ -55,6 +59,7 @@ export class SyncRunner implements OnApplicationBootstrap, OnApplicationShutdown
     private readonly customers: CustomerStore,
     private readonly vouchers: VoucherStore,
     private readonly loyalty: LoyaltyStore,
+    private readonly relay: WholesaleRelayService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -85,6 +90,11 @@ export class SyncRunner implements OnApplicationBootstrap, OnApplicationShutdown
     this.loop('ebarimt', 3_000, async () => {
       const tried = await this.ebarimt.runDue();
       return tried > 0 ? 1_000 : EBARIMT_MS;
+    });
+    if (!this.relay.enabled) return;
+    this.loop('ebarimt-relay', 4_000, async () => {
+      const step = await this.relay.runOnce();
+      return step === 'worked' ? 500 : step === 'failed' ? RELAY_AWAY_MS : RELAY_MS;
     });
   }
 

@@ -59,6 +59,7 @@ export function toPipelineDto(detail: PipelineDetail): SalesPipelineDto {
       action: stage.action,
       printPickList: stage.printPickList,
       printDeliveryNote: stage.printDeliveryNote,
+      ebarimt: stage.ebarimt,
       cardSort: stage.cardSort,
       archivedAt: stage.archivedAt?.toISOString() ?? null,
       roles: stage.roles,
@@ -88,6 +89,7 @@ const inputOf = (body: SalesPipelineRequestDto): PipelineInput => ({
     action: stage.action,
     printPickList: stage.printPickList,
     printDeliveryNote: stage.printDeliveryNote,
+    ...(stage.ebarimt === undefined ? {} : { ebarimt: stage.ebarimt }),
     roles: stage.roles,
   })),
 });

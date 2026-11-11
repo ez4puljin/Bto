@@ -1,4 +1,9 @@
-import type { EbarimtPaymentCode, EbarimtTaxType } from '@tugeel/shared/mn';
+import type {
+  EbarimtPaymentCode,
+  EbarimtTaxType,
+  RelayOperation,
+  RelayOutcome,
+} from '@tugeel/shared/mn';
 import type {
   EdgeCartLine,
   EdgeReceipt,
@@ -423,4 +428,52 @@ export const edgeDayCounts = pgTable(
     countedAt: timestamp('counted_at', { withTimezone: true }).notNull(),
   },
   (t) => [index('edge_day_counts_till_day_idx').on(t.tillCode, t.day, t.countedAt)],
+);
+
+export const EDGE_RELAY_STATUSES = ['CLAIMED', 'CALLING', 'DONE'] as const;
+export type EdgeRelayStatus = (typeof EDGE_RELAY_STATUSES)[number];
+
+/**
+ * A wholesale receipt operation the centre handed this edge (ADR-0185): stored BEFORE the store
+ * PosAPI is called (CLAIMED, then CALLING), with what PosAPI answered after (DONE with its
+ * outcome), and reported to the centre until it acknowledges (`reported_at`). One row per receipt,
+ * operation and attempt, so an operation is never called twice; a row found CALLING at boot may
+ * have reached PosAPI and is reported INDETERMINATE. Never a lottery or QR data.
+ */
+export const edgeRelayOps = pgTable(
+  'edge_relay_ops',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+    /** The centre's `ebarimt_receipts.id`. */
+    receiptId: bigint('receipt_id', { mode: 'number' }).notNull(),
+    attempt: integer('attempt').notNull(),
+    op: text('op', { enum: EDGE_RECEIPT_OPS }).notNull(),
+    docNumber: text('doc_number').notNull(),
+    /** The operation as claimed: the business request (ISSUE) or the ДДТД and date (CANCEL). */
+    request: jsonValue('request').$type<RelayOperation>().notNull(),
+    status: text('status', { enum: EDGE_RELAY_STATUSES }).notNull().default('CLAIMED'),
+    outcome: text('outcome').$type<RelayOutcome>(),
+    errorCode: text('error_code').$type<'POSAPI_REFUSED' | 'EDGE_BUILD'>(),
+    ddtd: text('ddtd'),
+    /** PosAPI's `date` verbatim. */
+    posapiDate: text('posapi_date'),
+    merchantTin: text('merchant_tin'),
+    merchantName: text('merchant_name'),
+    message: text('message'),
+    createdAt: createdAt(),
+    calledAt: timestamp('called_at', { withTimezone: true }),
+    settledAt: timestamp('settled_at', { withTimezone: true }),
+    reportedAt: timestamp('reported_at', { withTimezone: true }),
+  },
+  (t) => [
+    unique('edge_relay_ops_attempt').on(t.receiptId, t.op, t.attempt),
+    index('edge_relay_ops_open_idx').on(t.status, t.id),
+    check('edge_relay_ops_op', sql`${t.op} IN ('ISSUE', 'CANCEL')`),
+    check('edge_relay_ops_status', sql`${t.status} IN ('CLAIMED', 'CALLING', 'DONE')`),
+    check(
+      'edge_relay_ops_outcome',
+      sql`(${t.status} = 'DONE') = (${t.outcome} IS NOT NULL) AND (${t.outcome} IS NULL OR ${t.outcome} IN ('ISSUED', 'CANCELLED', 'REFUSED', 'NOT_SENT', 'INDETERMINATE'))`,
+    ),
+    check('edge_relay_ops_reported', sql`${t.reportedAt} IS NULL OR ${t.status} = 'DONE'`),
+  ],
 );

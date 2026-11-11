@@ -34,6 +34,14 @@ export interface PosCatalogueProduct {
   }[];
 }
 
+/** What a receipt needs of a sold product and unit (ADR-0185): the codes PosAPI asks for. */
+export interface EbarimtAttributes {
+  /** By product: its own classification code, else its nearest category's default; the tax code. */
+  products: Map<number, { classificationCode: string | null; taxProductCode: string | null }>;
+  /** By product unit: its first barcode as printed. */
+  barcodes: Map<number, string>;
+}
+
 /** Rows per `IN (…)` list, well under PostgreSQL's 65,535 bind parameters. */
 const IN_CHUNK = 10_000;
 
@@ -165,6 +173,62 @@ export class CatalogService {
       });
     }
     return [...byProduct.values()];
+  }
+
+  /**
+   * The e-Barimt attributes of the given products and units (ADR-0185), by the rule the store's
+   * snapshot uses: a product's own classification code, else its nearest category's default.
+   */
+  async ebarimtAttributes(
+    productIds: readonly number[],
+    unitIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<EbarimtAttributes> {
+    const result: EbarimtAttributes = { products: new Map(), barcodes: new Map() };
+    if (productIds.length === 0) return result;
+    const rows = await executor
+      .select({
+        id: products.id,
+        categoryId: products.categoryId,
+        classificationCode: products.classificationCode,
+        taxProductCode: products.taxProductCode,
+      })
+      .from(products)
+      .where(inArray(products.id, [...new Set(productIds)]));
+    const categoryRows = await executor
+      .select({
+        id: categories.id,
+        parentId: categories.parentId,
+        code: categories.defaultClassificationCode,
+      })
+      .from(categories);
+    const categoryOf = new Map(categoryRows.map((row) => [row.id, row]));
+    const inherited = (categoryId: number): string | null => {
+      const seen = new Set<number>();
+      for (let at = categoryOf.get(categoryId); at && !seen.has(at.id);) {
+        if (at.code) return at.code;
+        seen.add(at.id);
+        at = at.parentId === null ? undefined : categoryOf.get(at.parentId);
+      }
+      return null;
+    };
+    for (const row of rows) {
+      result.products.set(row.id, {
+        classificationCode: row.classificationCode ?? inherited(row.categoryId),
+        taxProductCode: row.taxProductCode,
+      });
+    }
+    if (unitIds.length > 0) {
+      const barcodeRows = await executor
+        .select({ unitId: productBarcodes.productUnitId, code: productBarcodes.code })
+        .from(productBarcodes)
+        .where(inArray(productBarcodes.productUnitId, [...new Set(unitIds)]))
+        .orderBy(asc(productBarcodes.id));
+      for (const row of barcodeRows) {
+        if (!result.barcodes.has(row.unitId)) result.barcodes.set(row.unitId, row.code);
+      }
+    }
+    return result;
   }
 
   search(query: ProductQuery) {

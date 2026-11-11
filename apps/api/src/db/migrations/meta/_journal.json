@@ -687,6 +687,13 @@
       "when": 1794331006528,
       "tag": "0099_statement_links",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1794350230242,
+      "tag": "0100_ebarimt_receipts",
+      "breakpoints": true
     }
   ]
 }

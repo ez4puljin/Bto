@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, Post, Query, UseGuards } from '@nestjs
 import { ApiOkResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../../common/auth/public.decorator';
 import { systemActor } from '../../identity';
+import type { RelayClaimResponse } from '@tugeel/shared/mn';
 import { Decimal } from '@tugeel/shared/money';
 import type {
   CreditCheckResponseWire,
@@ -18,6 +19,11 @@ import {
   SyncBatchDto,
   SyncResponseDto,
 } from '../dto/pos.dto';
+import {
+  EbarimtRelayResultDto,
+  EbarimtRelayResultResponseDto,
+  EbarimtRelayService,
+} from '../../ebarimt';
 import { CurrentEdge, EdgeTokenGuard } from '../guards/edge-token.guard';
 import { PosAcceptService } from '../services/pos-accept.service';
 import { PosCustomersService } from '../services/pos-customers.service';
@@ -49,6 +55,7 @@ export class PosSyncController {
     private readonly customers: PosCustomersService,
     private readonly vouchers: PosVouchersService,
     private readonly loyalty: PosLoyaltyService,
+    private readonly relay: EbarimtRelayService,
   ) {}
 
   /**
@@ -134,6 +141,55 @@ export class PosSyncController {
     }
     await this.nodes.touchPush(node.id);
     return { results, serverTime: new Date().toISOString() };
+  }
+
+  /**
+   * ADR-0185: the wholesale e-Barimt relay. The centre cannot call the store, so the edge asks:
+   * one receipt operation (ISSUE or CANCEL) for the store PosAPI, or none. The row is SENDING for
+   * this node from here on; `RelayClaimResponse` of @tugeel/shared/mn.
+   */
+  @Post('ebarimt/claim')
+  @HttpCode(200)
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  async ebarimtClaim(@CurrentEdge() node: EdgeNode): Promise<RelayClaimResponse> {
+    const operation = await this.relay.claim(
+      { id: node.id, code: node.code },
+      systemActor(`edge:${node.code}`),
+    );
+    return { operation };
+  }
+
+  /**
+   * What the store PosAPI answered to a claimed operation, repeated by the edge until acknowledged
+   * (idempotent by receipt and attempt). The body may carry the lottery and the QR data: they go
+   * to the api's memory for one print and are never stored or logged (ADR-0185 #6).
+   */
+  @Post('ebarimt/result')
+  @HttpCode(200)
+  @ApiOkResponse({ type: EbarimtRelayResultResponseDto })
+  async ebarimtResult(
+    @CurrentEdge() node: EdgeNode,
+    @Body() body: EbarimtRelayResultDto,
+  ): Promise<EbarimtRelayResultResponseDto> {
+    const applied = await this.relay.result(
+      { id: node.id, code: node.code },
+      systemActor(`edge:${node.code}`),
+      {
+        receiptId: body.receiptId,
+        attempt: body.attempt,
+        op: body.op,
+        outcome: body.outcome,
+        ddtd: body.ddtd ?? null,
+        posapiDate: body.posapiDate ?? null,
+        merchantTin: body.merchantTin ?? null,
+        merchantName: body.merchantName ?? null,
+        errorCode: body.errorCode ?? null,
+        message: body.message ?? null,
+        lottery: body.lottery ?? null,
+        qrData: body.qrData ?? null,
+      },
+    );
+    return { acknowledged: true, applied };
   }
 
   @Post('heartbeat')

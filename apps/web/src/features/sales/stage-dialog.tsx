@@ -49,7 +49,15 @@ export function StageDialog({
         className="flex flex-col gap-4"
         onSubmit={(event) => {
           event.preventDefault();
-          if (form.name.trim()) onSave({ ...form, name: form.name.trim() });
+          if (form.name.trim()) {
+            // Only a SALE stage carries the e-Barimt switch (ADR-0185).
+            const { ebarimt, ...rest } = form;
+            onSave({
+              ...rest,
+              name: form.name.trim(),
+              ...(form.action === 'SALE' ? { ebarimt: ebarimt === true } : {}),
+            });
+          }
         }}
       >
         <FormField label={t('sales.boards.name')} htmlFor="stage-name">
@@ -104,6 +112,22 @@ export function StageDialog({
             </Label>
           </div>
         </fieldset>
+        {form.action === 'SALE' ? (
+          // ADR-0185: only a sale can ask for the invoice's e-Barimt receipt; off until ticked.
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="stage-ebarimt"
+                checked={form.ebarimt === true}
+                onCheckedChange={(next) => patch({ ebarimt: next === true })}
+              />
+              <Label htmlFor="stage-ebarimt" className="font-normal">
+                {t('sales.boards.ebarimt')}
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">{t('sales.boards.ebarimtHint')}</p>
+          </div>
+        ) : null}
         <p className="text-xs text-muted-foreground">{t('sales.boards.stageRolesHint')}</p>
         {STAGE_RIGHTS.map((right) => (
           <fieldset key={right} className="flex flex-col gap-2">

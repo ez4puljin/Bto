@@ -43,6 +43,7 @@ export {
   InvoiceQueryService,
   type InvoiceSummary,
 } from './services/invoice-query.service';
+export { InvoiceEbarimtService } from './services/invoice-ebarimt.service';
 export { InvoicingService } from './services/invoicing.service';
 export {
   type PosCreditLine,

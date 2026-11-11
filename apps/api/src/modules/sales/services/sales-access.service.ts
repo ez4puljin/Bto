@@ -35,6 +35,8 @@ export interface StageView {
   action: StageAction;
   printPickList: boolean;
   printDeliveryNote: boolean;
+  /** ADR-0185: a sale on this stage prepares an e-Barimt receipt (SALE stages only). */
+  ebarimt: boolean;
   cardSort: CardSort;
   archivedAt: Date | null;
   roles: Record<StageRight, number[]>;
@@ -297,6 +299,7 @@ export class SalesAccessService {
               action: stage.action,
               printPickList: stage.printPickList,
               printDeliveryNote: stage.printDeliveryNote,
+              ebarimt: stage.ebarimt,
               cardSort: stage.cardSort,
               archivedAt: stage.archivedAt,
               roles: own,

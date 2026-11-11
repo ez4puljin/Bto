@@ -54,6 +54,8 @@ export interface StageInput {
   action: StageAction;
   printPickList: boolean;
   printDeliveryNote: boolean;
+  /** ADR-0185: «e-Barimt гаргах», kept only on a SALE stage; absent = as it was (false when new). */
+  ebarimt?: boolean;
   roles: Record<StageRight, readonly number[]>;
   /** Only when copying: the source stage's card sort. */
   cardSort?: CardSort;
@@ -253,6 +255,7 @@ export class SalesPipelinesService {
             action: stage.action,
             printPickList: stage.printPickList,
             printDeliveryNote: stage.printDeliveryNote,
+            ebarimt: stageEbarimt(stage, before),
             updatedAt: sql`now()`,
           })
           .where(eq(salesStages.id, stage.id));
@@ -467,6 +470,7 @@ export class SalesPipelinesService {
             action: stage.action,
             printPickList: stage.printPickList,
             printDeliveryNote: stage.printDeliveryNote,
+            ebarimt: stage.ebarimt,
             roles: stage.roles,
             cardSort: stage.cardSort,
           })),
@@ -864,6 +868,7 @@ export class SalesPipelinesService {
           action: stage.action,
           printPickList: stage.printPickList,
           printDeliveryNote: stage.printDeliveryNote,
+          ebarimt: stageEbarimt(stage, undefined),
           ...(stage.cardSort ? { cardSort: stage.cardSort } : {}),
         })
         .returning({ id: salesStages.id });
@@ -958,8 +963,14 @@ function stageSummary(stage: StageInput | StageView | undefined) {
     action: stage?.action,
     printPickList: stage?.printPickList,
     printDeliveryNote: stage?.printDeliveryNote,
+    ebarimt: stage?.ebarimt,
     roles: stage?.roles,
   };
+}
+
+/** ADR-0185: the e-Barimt switch as saved: only a SALE stage keeps it; absent = what the stage had. */
+function stageEbarimt(stage: StageInput, before: { ebarimt: boolean } | undefined): boolean {
+  return stage.action === 'SALE' && (stage.ebarimt ?? before?.ebarimt ?? false);
 }
 
 function sameRoles(
@@ -977,6 +988,7 @@ function changed(before: StageView, after: StageInput, position: number): boolea
     before.action !== after.action ||
     before.printPickList !== after.printPickList ||
     before.printDeliveryNote !== after.printDeliveryNote ||
+    before.ebarimt !== stageEbarimt(after, before) ||
     before.position !== position ||
     !sameRoles(before.roles, after.roles)
   );

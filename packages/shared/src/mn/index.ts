@@ -45,6 +45,32 @@ export {
 } from './ebarimt';
 export { NUMBER_DEFAULTS, type NumberFormat } from './numbers';
 export {
+  buildRelayReceipt,
+  checkRelayReceipt,
+  RELAY_OUTCOMES,
+  RELAY_STALE_MS,
+  type RelayCancelOperation,
+  type RelayClaimResponse,
+  type RelayIssueOperation,
+  type RelayOperation,
+  type RelayOutcome,
+  type RelayPayment,
+  type RelayReceiptLine,
+  type RelayReceiptRequest,
+  type RelayResultResponse,
+  type RelayResultWire,
+  type RelayStoreFacts,
+  WHOLESALE_CANCEL_STATUSES,
+  WHOLESALE_ERROR_CODES,
+  WHOLESALE_RECEIPT_STATUSES,
+  type WholesaleBuyer,
+  type WholesaleCancelStatus,
+  type WholesaleErrorCode,
+  wholesalePaymentCode,
+  type WholesaleReceiptStatus,
+  wholesaleReceiptType,
+} from './relay';
+export {
   type CityTaxCode,
   cityTaxCode,
   TAX_KINDS,
