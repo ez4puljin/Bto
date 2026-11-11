@@ -48,6 +48,7 @@
     "mobile:publish": "pnpm --filter @tugeel/mobile run publish-apk",
     "docker:build": "docker build -f apps/api/Dockerfile -t ghcr.io/ez4puljin/bto-api:local . && docker build -f apps/web/Dockerfile -t ghcr.io/ez4puljin/bto-web:local .",
     "user:create-admin": "pnpm run build:packages && pnpm --filter @tugeel/api run user:create-admin",
+    "store:seed": "pnpm --filter @tugeel/api run store:seed",
     "catalog:reindex-search": "pnpm run build:packages && pnpm --filter @tugeel/api run catalog:reindex-search",
     "partners:reindex-search": "pnpm run build:packages && pnpm --filter @tugeel/api run partners:reindex-search",
     "inventory:reconcile": "pnpm run build:packages && pnpm --filter @tugeel/api run inventory:reconcile",

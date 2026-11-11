@@ -4,7 +4,7 @@ Mongolian version with the update steps: [edge-install.mn.md](edge-install.mn.md
 
 The store edge (`deploy/edge/docker-compose.edge.yml`: `edge-db`, `edge`, `kiosk`) runs in Docker, so the PC needs only Docker and git — no Node or pnpm. A setup script writes `deploy/edge/.env` with fresh local secrets and starts the edge; the edge is then linked to the centre from its own kiosk page with a one-time code. Nobody copies a token or the PIN key by hand.
 
-Until the centre goes live (S5, ADR-0026) the centre is the owner's dev server (`start.bat` on the owner's PC: `http://192.168.1.215:5173` or the api at `:3300`). This is a test setup: the scripts set `EBARIMT_PROVIDER=fake` and nothing reaches the tax office until the owner says otherwise.
+Until the centre runs on the store's Ubuntu PC (ADR-0186, `store-install.md`) the centre is the owner's dev server (`start.bat` on the owner's PC: `http://192.168.1.215:5173` or the api at `:3300`). This is a test setup: the scripts set `EBARIMT_PROVIDER=fake` and nothing reaches the tax office until the owner says otherwise.
 
 ## Overview
 
@@ -71,4 +71,4 @@ Five wrong codes void the code in force; take a new one. If the centre's answer 
 - **A new token issued by hand** («Шинэ токен») stops a code-linked edge: its kiosk shows «Төв системтэй холбох» again (before a till is paired) — link it with a new code, to the same edge server.
 - **The centre is off:** the tills keep selling; the sales wait in the edge's outbox and replay when the centre answers again.
 - **The edge on the centre's own PC:** the address is `http://host.docker.internal:3300` (the container's name for the PC it runs on).
-- **The real centre:** a linked edge does not move to another centre. When the real centre goes live, close the shifts, wait for backlog 0, remove the test edge with its data (`… down -v`), run the setup script again and link with a code from the real centre. Or fill `CENTRAL_API_URL`, `EDGE_NODE_TOKEN` and `POS_PIN_PEPPER` in `deploy/edge/.env` the old way, which overrides the kiosk's link.
+- **The real centre:** a linked edge does not move to another centre. When the real centre goes live, close the shifts, wait for backlog 0, give the edge a fresh database by renaming the old one inside its own PostgreSQL (nothing is deleted and `-v` is never used: `store-install.md` §5, ADR-0186), run the setup script again and link with a code from the real centre. Or fill `CENTRAL_API_URL`, `EDGE_NODE_TOKEN` and `POS_PIN_PEPPER` in `deploy/edge/.env` the old way, which overrides the kiosk's link.

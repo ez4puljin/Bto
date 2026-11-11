@@ -27,6 +27,7 @@
     "db:migrate:edge": "tsx src/edge/db/migrate.ts",
     "openapi:export": "nest build && node dist/openapi/export-openapi.js ../../packages/api-client/openapi.json",
     "user:create-admin": "tsx src/modules/identity/cli/create-admin.ts",
+    "store:seed": "tsx src/db/store-seed/cli.ts",
     "catalog:reindex-search": "tsx src/modules/catalog/cli/reindex-search.ts",
     "partners:reindex-search": "tsx src/modules/partners/cli/reindex-search.ts",
     "inventory:reconcile": "tsx src/modules/inventory/cli/reconcile.ts",
