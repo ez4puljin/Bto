@@ -196,7 +196,7 @@ docker compose -f deploy/edge/docker-compose.edge.yml -f deploy/store/docker-com
 
 ## 7. Update after a push to main
 
-Outside opening hours, the centre first:
+The owner's rule (2026-11-11, «Push бүрийн дараа»): every pushed code change goes onto the box at once, the centre first; a docs-only push needs no update. A session does it over SSH without sudo (`git pull --ff-only && bash deploy/store/setup.sh && bash deploy/edge/setup.sh`). The office's screens pause for a minute or two and the tills for a minute, so a large change is still best pushed at a quiet moment. Before the nightly timer exists, the backup line below is `BACKUP_DIR=$HOME/bto-backups bash deploy/store/backup.sh` (no sudo; without the file mirror).
 
 ```bash
 cd ~/bto
