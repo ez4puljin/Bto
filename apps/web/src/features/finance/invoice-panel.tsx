@@ -33,6 +33,7 @@ import { randomUuid } from '@/lib/uuid';
 import { type InvoiceAllocation, type InvoiceDetail, useFinanceMutations, useInvoice } from './api';
 import { SettlementBadge } from './badges';
 import { CreditNoteDialog } from './credit-note-dialog';
+import { EbarimtStatusBadges } from './ebarimt-receipts-page';
 import { FactChips, PanelSection, RecordSheet, TotalsGrid } from './panel';
 import { VoidDialog } from './void-dialog';
 
@@ -182,6 +183,25 @@ function InvoiceBody({ invoice }: { invoice: InvoiceDetail }) {
           {
             label: t('finance.fields.createdBy'),
             value: `${invoice.createdByName} · ${formatUbDateTime(Date.parse(invoice.createdAt))}`,
+          },
+        ]
+      : []),
+    ...(invoice.ebarimt
+      ? [
+          {
+            // ADR-0185: the invoice's e-Barimt receipt and where the accountant handles it.
+            label: t('finance.ebarimtReceipts.onInvoice'),
+            value: (
+              <span className="inline-flex flex-wrap items-center gap-1.5">
+                <EbarimtStatusBadges receipt={invoice.ebarimt} />
+                <Link
+                  className="text-link underline-offset-2 hover:underline"
+                  to={`/finance/ebarimt-receipts?q=${encodeURIComponent(invoice.number)}`}
+                >
+                  {t('finance.ebarimtReceipts.open')}
+                </Link>
+              </span>
+            ),
           },
         ]
       : []),

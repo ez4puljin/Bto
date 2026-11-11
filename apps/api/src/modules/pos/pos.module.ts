@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CatalogModule } from '../catalog';
+import { EbarimtModule } from '../ebarimt';
 import { FinanceModule } from '../finance';
 import { IdentityModule } from '../identity';
 import { InventoryModule } from '../inventory';
@@ -93,6 +94,7 @@ const SERVICES = [
     FinanceModule,
     PartnersModule,
     SalesModule,
+    EbarimtModule,
   ],
   providers: [...SERVICES, EdgeTokenGuard],
   exports: SERVICES,
@@ -101,7 +103,7 @@ export class PosModule {}
 
 /** The HTTP side (api only): the admin routes, the edge's sync routes and the test till. */
 @Module({
-  imports: [PosModule],
+  imports: [PosModule, EbarimtModule],
   controllers: [
     PosSettingsController,
     PosEdgeLinkController,

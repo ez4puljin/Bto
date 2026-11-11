@@ -11,6 +11,7 @@ import { EbarimtService } from './ebarimt/ebarimt.service';
 import { PosapiClient } from './ebarimt/posapi.client';
 import { PrintableCache } from './ebarimt/printable.cache';
 import { TaxpayerClient } from './ebarimt/taxpayer.client';
+import { WholesaleRelayService } from './ebarimt/wholesale-relay.service';
 import { KioskGuard } from './guards/kiosk.guard';
 import { CentralClient } from './services/central.client';
 import { EdgeLinkService } from './services/edge-link.service';
@@ -96,6 +97,7 @@ export class EdgeModule {
         TaxpayerClient,
         PrintableCache,
         EbarimtService,
+        WholesaleRelayService,
         KioskGuard,
       ],
     };

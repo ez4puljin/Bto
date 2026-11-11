@@ -99,6 +99,8 @@ import { RepVisitsPage } from '@/features/sales/visits-page';
 import { TransactionsPage } from '@/features/finance/transactions-page';
 import { JournalPage } from '@/features/finance/journal-page';
 import { PaymentsPage } from '@/features/finance/payments-page';
+import { EbarimtReceiptPrintPage } from '@/features/finance/ebarimt-receipt-print-page';
+import { EbarimtReceiptsPage } from '@/features/finance/ebarimt-receipts-page';
 import { InvoicePrintPage, PaymentPrintPage } from '@/features/finance/print-pages';
 import { AgingPage, AgingPrintPage } from '@/features/reports/aging-page';
 import { MoneyLedgerPage, PartyLedgerPage } from '@/features/reports/books/ledger-pages';
@@ -316,6 +318,18 @@ export const routes: RouteObject[] = [
   },
   // The management reports for paper (ADR-0108).
   ...reportPrintRoutes(),
+  {
+    // A wholesale e-Barimt receipt for paper, without the shell (ADR-0185).
+    path: '/finance/ebarimt-receipts/:id/print',
+    element: (
+      <RequireAuth>
+        <RequirePermission permission="finance.read">
+          <EbarimtReceiptPrintPage />
+        </RequirePermission>
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
   {
     path: '/finance/payments/:id/print',
     element: (
@@ -1036,6 +1050,11 @@ function financeRoutes(): RouteObject[] {
       path: 'finance/collections',
       handle: { width: 'wide' },
       element: read(<RepCollectionsPage />),
+    },
+    {
+      path: 'finance/ebarimt-receipts',
+      handle: { width: 'wide' },
+      element: read(<EbarimtReceiptsPage />),
     },
     {
       path: 'finance/customers',

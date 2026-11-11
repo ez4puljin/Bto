@@ -59,6 +59,7 @@ import {
 } from 'class-validator';
 import { PageQueryDto } from '../../../common/pagination/page';
 import { VAT_TYPES, type VatType } from '../../catalog';
+import { EbarimtReceiptDto } from '../../ebarimt';
 
 const MONEY = /^\d{1,12}(\.\d{1,2})?$/;
 const QTY = /^\d{1,11}(\.\d{1,3})?$/;
@@ -738,6 +739,12 @@ export class InvoiceDetailDto extends InvoiceDto {
   @ApiProperty({ type: [InvoiceLineDto] }) lines: InvoiceLineDto[];
   @ApiProperty({ type: [InvoiceAllocationDto] }) allocations: InvoiceAllocationDto[];
   @ApiProperty({ type: [InvoiceCreditNoteRefDto] }) creditNotes: InvoiceCreditNoteRefDto[];
+  @ApiProperty({
+    type: () => EbarimtReceiptDto,
+    nullable: true,
+    description: 'ADR-0185: its e-Barimt receipt; null when the sale asked for none',
+  })
+  ebarimt: EbarimtReceiptDto | null;
 }
 
 @ApiSchema({ name: 'InvoiceListQuery' })

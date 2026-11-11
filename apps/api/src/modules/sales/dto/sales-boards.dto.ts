@@ -149,6 +149,10 @@ export class SalesStageInputDto {
   @ApiProperty({ enum: STAGE_ACTIONS }) @IsIn(STAGE_ACTIONS) action: StageAction;
   @ApiProperty() @IsBoolean() printPickList: boolean;
   @ApiProperty() @IsBoolean() printDeliveryNote: boolean;
+  @ApiPropertyOptional({ description: 'ADR-0185: a sale here prepares an e-Barimt receipt' })
+  @IsOptional()
+  @IsBoolean()
+  ebarimt?: boolean;
   @ApiProperty({ type: SalesStageRolesDto })
   @ValidateNested()
   @Type(() => SalesStageRolesDto)
@@ -236,6 +240,7 @@ export class SalesStageDto {
   @ApiProperty({ enum: STAGE_ACTIONS }) action: StageAction;
   @ApiProperty() printPickList: boolean;
   @ApiProperty() printDeliveryNote: boolean;
+  @ApiProperty() ebarimt: boolean;
   @ApiProperty({ enum: CARD_SORTS }) cardSort: CardSort;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) archivedAt: string | null;
   @ApiProperty({ type: SalesStageRolesDto }) roles: SalesStageRolesDto;

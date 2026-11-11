@@ -28,6 +28,7 @@ const stage = (fields: Partial<StageView> = {}): StageView => ({
   action: 'NONE',
   printPickList: false,
   printDeliveryNote: false,
+  ebarimt: false,
   cardSort: 'NEWEST',
   archivedAt: null,
   roles: { VIEW: [], EDIT: [], MOVE: [] },

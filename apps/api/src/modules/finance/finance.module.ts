@@ -3,6 +3,7 @@ import { JobWorkerService } from '../../common/jobs/worker/job-worker.service';
 import { JobsWorkerModule } from '../../common/jobs/worker/jobs-worker.module';
 import { FinanceCoreModule } from '../../finance-core';
 import { CatalogModule } from '../catalog';
+import { EbarimtModule } from '../ebarimt';
 import { FinBridgeModule } from '../fin-bridge';
 import { IdentityModule } from '../identity';
 import {
@@ -59,6 +60,7 @@ import { FinanceSettingsService } from './services/finance-settings.service';
 import { GlAccountsService } from './services/gl-accounts.service';
 import { InvoiceQueryService } from './services/invoice-query.service';
 import { IssueExpenseAccountsService } from './services/issue-expense-accounts.service';
+import { InvoiceEbarimtService } from './services/invoice-ebarimt.service';
 import { InvoicingService } from './services/invoicing.service';
 import { JournalRepostService } from './services/journal-repost.service';
 import { JournalService } from './services/journal.service';
@@ -90,6 +92,7 @@ const SERVICES = [
   CreditControlService,
   CustomerDebtsService,
   InvoiceQueryService,
+  InvoiceEbarimtService,
   InvoicingService,
   MoneyAccountsService,
   PaymentsService,
@@ -129,6 +132,7 @@ const SERVICES = [
     InventoryModule,
     FinanceCoreModule,
     FinBridgeModule,
+    EbarimtModule,
   ],
   providers: [
     ...SERVICES,

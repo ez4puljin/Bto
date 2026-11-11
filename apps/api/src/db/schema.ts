@@ -244,6 +244,7 @@ export {
   ebarimtCheckReceiptLinks,
   ebarimtCheckSupplierProfiles,
 } from '../modules/ebarimt-check/schema';
+export { ebarimtReceipts } from '../modules/ebarimt/schema';
 export {
   expiryItemChanges,
   expiryItemRoles,

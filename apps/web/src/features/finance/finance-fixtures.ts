@@ -78,6 +78,7 @@ export const INVOICE: Schemas['InvoiceDetail'] = {
     },
   ],
   creditNotes: [],
+  ebarimt: null,
 };
 
 export const INVOICE_ROW: Schemas['Invoice'] = {

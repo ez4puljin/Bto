@@ -161,6 +161,9 @@ export function financeApi(app: NestExpressApplication, token: string) {
       const page = await this.invoices({ orderId });
       return page.data[0] ? this.invoice(page.data[0].id) : null;
     },
+    /** ADR-0185: «Дахин бэлтгэх» of an invoice's e-Barimt receipt in ERROR. */
+    prepareReceipt: (id: number) =>
+      http().post(`/api/v1/invoices/${id}/ebarimt`).set(auth).send({}),
     voidInvoice: (id: number, reason: string) =>
       http().post(`/api/v1/invoices/${id}/void`).set(auth).set(idempotency()).send({ reason }),
     payment: (body: Record<string, unknown>) =>
@@ -263,6 +266,7 @@ export interface StageJson {
   id: number;
   name: string;
   action: string;
+  ebarimt?: boolean;
   archivedAt: string | null;
 }
 
@@ -274,19 +278,26 @@ export interface PipelineJson {
 }
 
 const STAGE_ROLES = { VIEW: [], EDIT: [], MOVE: [] };
-const stageBody = (name: string, action: string) => ({
+const stageBody = (name: string, action: string, extra: Record<string, unknown> = {}) => ({
   name,
   action,
   printPickList: false,
   printDeliveryNote: false,
   roles: STAGE_ROLES,
+  ...extra,
 });
 
 /**
  * A pipeline with the stage actions, a stocked and priced product factory and the office's way of
  * selling: create, confirm, pick, sell (ADR-0056). `prefix` keeps codes unique per test file.
  */
-export async function salesFlow(app: NestExpressApplication, admin: string, prefix: string) {
+export async function salesFlow(
+  app: NestExpressApplication,
+  admin: string,
+  prefix: string,
+  /** ADR-0185: «e-Barimt гаргах» ticked on the SALE stage. */
+  options: { ebarimt?: boolean } = {},
+) {
   const http = () => request(app.getHttpServer());
   const auth = bearer(admin);
   const inventory = inventoryApi(app, admin);
@@ -320,7 +331,7 @@ export async function salesFlow(app: NestExpressApplication, admin: string, pref
           stageBody('Захиалга', 'NONE'),
           stageBody('Хяналт', 'CONFIRM'),
           stageBody('Бэлдэх', 'PICK'),
-          stageBody('Борлуулалт', 'SALE'),
+          stageBody('Борлуулалт', 'SALE', options.ebarimt ? { ebarimt: true } : {}),
           stageBody('Цуцалсан', 'CANCEL'),
         ],
       })
