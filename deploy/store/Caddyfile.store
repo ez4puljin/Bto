@@ -50,6 +50,46 @@
 		-Server
 	}
 
+	# ADR-0192: the two apps' routes go to the app replicas and the reports to the report replicas,
+	# when the PC runs them (STORE_API_REPLICA_ROUTES=true beside the replica counts): Docker's DNS
+	# lists the running ones under the service's name and the least busy one takes the request; a
+	# replica that stops answering is passed over, and with none left the primary answers. Switched
+	# off (the default) these two matchers never match and the primary answers everything, as
+	# before. Neither group of routes keeps anything in a process's memory.
+	@apps {
+		path /api/v1/sales-rep/* /api/v1/customer-app/*
+		expression {$STORE_API_REPLICA_ROUTES:false}
+	}
+	handle @apps {
+		reverse_proxy api:3000 {
+			dynamic a {
+				name api-apps
+				port 3000
+				refresh 5s
+			}
+			lb_policy least_conn
+			lb_try_duration 10s
+			fail_duration 10s
+		}
+	}
+
+	@reports {
+		path /api/v1/reports/* /api/v1/finance/reports/* /api/v1/hr/reports/*
+		expression {$STORE_API_REPLICA_ROUTES:false}
+	}
+	handle @reports {
+		reverse_proxy api:3000 {
+			dynamic a {
+				name api-reports
+				port 3000
+				refresh 5s
+			}
+			lb_policy least_conn
+			lb_try_duration 10s
+			fail_duration 10s
+		}
+	}
+
 	@backend path /api/* /health /health/*
 	handle @backend {
 		reverse_proxy api:3000 {

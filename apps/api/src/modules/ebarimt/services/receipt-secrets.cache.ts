@@ -14,7 +14,9 @@ const MAX_ENTRIES = 500;
 /**
  * The only place the centre holds a wholesale receipt's lottery and QR data (ADR-0185 #6): the api
  * process's memory, for one print within `SECRETS_TTL_MS`. The store edge hands them over inside
- * its result call; nothing here reaches the database, the audit or a log. A restart, the time
+ * its result call; nothing here reaches the database, the audit or a log. Where api replicas run
+ * (ADR-0192) the edge's sync and the receipts' routes both stay on the primary, so the result and
+ * the print meet in this one process. A restart, the time
  * limit or the first print forgets them: every later print is a copy («ХУУЛБАР»).
  */
 @Injectable()

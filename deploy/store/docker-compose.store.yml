@@ -35,6 +35,27 @@ x-app-env: &app-env
   STORAGE_DRIVER: local
   STORAGE_LOCAL_DIR: /data/storage
 
+# What every api process reads besides: the primary and, when the PC runs them, the replicas for
+# the apps and for the reports (ADR-0192). The pool size is each service's own.
+x-api-env: &api-env
+  <<: *app-env
+  ROLE: api
+  AI_POOL_MAX: '2'
+  AI_DATABASE_URL: postgres://ai_reader:${AI_DB_PASSWORD:?set AI_DB_PASSWORD in deploy/store/.env}@postgres:5432/bto
+  JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in deploy/store/.env}
+  AUTH_PEPPER: ${AUTH_PEPPER:?set AUTH_PEPPER in deploy/store/.env}
+  # The tills' PIN key (ADR-0063 #6): the centre hands it to the edge at the link (ADR-0136 #4).
+  POS_PIN_PEPPER: ${POS_PIN_PEPPER:?set POS_PIN_PEPPER in deploy/store/.env}
+  # Plain HTTP on the store's LAN: a Secure cookie would never come back.
+  COOKIE_SECURE: 'false'
+  # The AI assistant (ADR-0045, ADR-0162): the key is typed on «Тохиргоо → AI» and sealed with
+  # AI_KEY_SECRET; LLM_* stay empty unless the owner sets them here.
+  AI_KEY_SECRET: ${AI_KEY_SECRET:?set AI_KEY_SECRET in deploy/store/.env}
+  LLM_PROVIDER: ${LLM_PROVIDER:-}
+  LLM_MODEL: ${LLM_MODEL:-}
+  LLM_API_KEY: ${LLM_API_KEY:-}
+  LLM_BASE_URL: ${LLM_BASE_URL:-}
+
 services:
   postgres:
     image: postgres:18
@@ -80,35 +101,53 @@ services:
     mem_limit: ${STORE_PG_MEMORY:-1536m}
     logging: *logging
 
+  # The primary api: everything that is not sent to a replica below, and everything that keeps
+  # state in the process (sign-in limits, the e-Barimt print's secrets, the server panel).
   api:
     <<: *app
     environment:
-      <<: *app-env
-      ROLE: api
+      <<: *api-env
       # Pool budget (docs/architecture.md §10.2): api 6 + 1 live stock listener, pg-boss 2, the
       # AI reader 2. A long report holds a connection for its whole run: when every one is busy,
       # other requests wait 5 s and fail (the load test of 2026-11-13), so a bigger PC gives more.
       DB_POOL_MAX: '${STORE_API_DB_POOL_MAX:-6}'
-      AI_POOL_MAX: '2'
+      # The primary alone applies the migrations at its start (the entrypoint), as `migrator`.
       MIGRATOR_DATABASE_URL: postgres://migrator:${MIGRATOR_DB_PASSWORD:?set MIGRATOR_DB_PASSWORD in deploy/store/.env}@postgres:5432/bto
-      AI_DATABASE_URL: postgres://ai_reader:${AI_DB_PASSWORD:?set AI_DB_PASSWORD in deploy/store/.env}@postgres:5432/bto
-      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in deploy/store/.env}
-      AUTH_PEPPER: ${AUTH_PEPPER:?set AUTH_PEPPER in deploy/store/.env}
-      # The tills' PIN key (ADR-0063 #6): the centre hands it to the edge at the link (ADR-0136 #4).
-      POS_PIN_PEPPER: ${POS_PIN_PEPPER:?set POS_PIN_PEPPER in deploy/store/.env}
-      # Plain HTTP on the store's LAN: a Secure cookie would never come back.
-      COOKIE_SECURE: 'false'
-      # The AI assistant (ADR-0045, ADR-0162): the key is typed on «Тохиргоо → AI» and sealed with
-      # AI_KEY_SECRET; LLM_* stay empty unless the owner sets them here.
-      AI_KEY_SECRET: ${AI_KEY_SECRET:?set AI_KEY_SECRET in deploy/store/.env}
-      LLM_PROVIDER: ${LLM_PROVIDER:-}
-      LLM_MODEL: ${LLM_MODEL:-}
-      LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_BASE_URL: ${LLM_BASE_URL:-}
     # Node takes about half of the limit as its heap.
     mem_limit: ${STORE_API_MEMORY:-1024m}
     depends_on:
       postgres: { condition: service_healthy }
+
+  # ADR-0192: more api processes of the same image, so the PC's other threads do work too. The
+  # web's Caddy sends them only what keeps nothing in a process's memory: the two apps' routes to
+  # `api-apps`, the reports to `api-reports`. No replicas (the default) = the primary answers
+  # everything, as before. They start after the primary, which writes what a first start writes.
+  api-apps:
+    <<: *app
+    environment:
+      <<: *api-env
+      DB_POOL_MAX: '${STORE_APPS_DB_POOL_MAX:-6}'
+      # A replica never migrates and never sees the migrator's password.
+      RUN_MIGRATIONS: 'false'
+    mem_limit: ${STORE_APPS_MEMORY:-1024m}
+    deploy:
+      replicas: ${STORE_APPS_REPLICAS:-0}
+    depends_on:
+      postgres: { condition: service_healthy }
+      api: { condition: service_healthy }
+
+  api-reports:
+    <<: *app
+    environment:
+      <<: *api-env
+      DB_POOL_MAX: '${STORE_REPORTS_DB_POOL_MAX:-6}'
+      RUN_MIGRATIONS: 'false'
+    mem_limit: ${STORE_REPORTS_MEMORY:-1024m}
+    deploy:
+      replicas: ${STORE_REPORTS_REPLICAS:-0}
+    depends_on:
+      postgres: { condition: service_healthy }
+      api: { condition: service_healthy }
 
   worker:
     <<: *app
@@ -137,6 +176,8 @@ services:
       # name no request carries. Only callers from these countries are answered under it.
       STORE_PUBLIC_HOST: ${STORE_PUBLIC_HOST:-outside.invalid}
       STORE_PUBLIC_COUNTRIES: ${STORE_PUBLIC_COUNTRIES:-MN}
+      # true when the PC runs api replicas (ADR-0192): the apps' and the reports' routes go to them.
+      STORE_API_REPLICA_ROUTES: ${STORE_API_REPLICA_ROUTES:-false}
     # Every interface of the box: the store's LAN. The router forwards nothing to it; the outside
     # name arrives through `cloudflared` on this PC.
     ports: ['${STORE_HTTP_PORT:-80}:80']

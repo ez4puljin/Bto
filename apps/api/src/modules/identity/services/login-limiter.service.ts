@@ -18,7 +18,8 @@ export const DEFAULT_LOGIN_LIMITS: LoginLimits = {
 /**
  * Counts failed logins and failed code redemptions per IP + username and per IP over a rolling
  * window (ADR-0027 #9). Only failures count, so legitimate logins never lock anyone out. In memory:
- * one api process serves all requests (docs/architecture.md §10.2).
+ * every sign-in route is served by the one primary api process, also where replicas run for other
+ * routes (ADR-0192; docs/architecture.md §10.2, §10.8).
  */
 @Injectable()
 export class LoginLimiter {
