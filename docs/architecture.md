@@ -934,7 +934,7 @@ Owner, 2026-11-11: until the droplet of §10.2 exists, the centre runs on the st
 
 ### 10.8 One Ubuntu PC for development and the real system (ADR-0187)
 
-Owner, 2026-11-12: development and the stacks of §10.7 run on one PC on the store's LAN, `nvme-server@192.168.1.250` (Ubuntu 26.04, a Xeon with 24 threads, 30 GB, a 238 GB NVMe disk; no automatic suspend); the owner's laptop is a terminal (`ssh bto-server`) and the store box `192.168.1.152` is no longer the centre. §10.7 reads with this PC as «the box»; its sizes and its LAN-only plain HTTP are unchanged.
+Owner, 2026-11-12: development and the stacks of §10.7 run on one PC on the store's LAN, `nvme-server@192.168.1.250` (Ubuntu 26.04, a Xeon with 24 threads, 30 GB, one 238 GB NVMe disk; no automatic suspend); the owner's laptop is a terminal (`ssh bto-server`) and the store box `192.168.1.152` is no longer the centre. §10.7 reads with this PC as «the box»; its sizes and its LAN-only plain HTTP are unchanged.
 
 | | Development | The real system |
 |---|---|---|
@@ -947,7 +947,7 @@ Owner, 2026-11-12: development and the stacks of §10.7 run on one PC on the sto
 - **Never crossing.** No development `.env` names 15433; no `docker compose … down -v` and no volume removed on this PC; `pnpm edge:up` and `edge:down` are not run in `~/bto-dev` (they name the real `bto-edge` project); a development edge is `edge:dev` on port 3400.
 - **Updates.** A pushed code change: `cd ~/bto && git pull --ff-only && bash deploy/store/setup.sh && bash deploy/edge/setup.sh`.
 - **Firewall** (`ufw`): 22, 5173, 80, 7400, and the old ERP's 8000, 8080, 8100, which with its tunnel is not Bto's.
-- **Backups** are §10.7's timer on the same disk until the owner chooses the second place (a USB disk at `/mnt/bto-backup`, `tools/store-backup/pull.ps1 -Server nvme-server@192.168.1.250`, or the second SSD).
+- **Backups** are §10.7's timer on the PC's one disk until the USB disk the owner chose (2026-11-12) is mounted at `/mnt/bto-backup`; `tools/store-backup/pull.ps1 -Server nvme-server@192.168.1.250` stays possible beside it.
 - **APKs** are built here: Ubuntu's JDK 17 and the SDK in `~/Android` (`docs/modules/mobile.md` §9); long builds wait for closing time once the pilot sells.
 
 ---
