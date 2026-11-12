@@ -20,6 +20,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/server": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ServerMetrics_server"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/company": {
         parameters: {
             query?: never;
@@ -10757,6 +10773,88 @@ export interface components {
             pgboss: "up" | "down";
             /** @example sha-0a1b2c3 */
             version: string;
+        };
+        ServerHost: {
+            /** @example Linux 7.0.0-43-generic */
+            system: string;
+            /** @example x64 */
+            arch: string;
+            /** @example Intel(R) Xeon(R) CPU E5-4657L v2 @ 2.40GHz */
+            cpuModel: string;
+            /** @description logical processors */
+            cpuThreads: number;
+            /** @description since the machine started */
+            uptimeSeconds: number;
+        };
+        ServerCpu: {
+            /** @description busy share of every processor together, 0–100, one decimal */
+            percent: number;
+            /** @description the same per logical processor */
+            perCore: number[];
+            /** @description load average of 1 minute (0 on Windows) */
+            load1: number;
+            load5: number;
+            load15: number;
+        };
+        ServerMemory: {
+            totalBytes: number;
+            /** @description total minus what programs can still be given */
+            usedBytes: number;
+            availableBytes: number;
+            /** @description buffers and file cache; given back on demand */
+            cachedBytes: number;
+            swapTotalBytes: number;
+            swapUsedBytes: number;
+            /** @description usedBytes of totalBytes, 0–100, one decimal */
+            percent: number;
+        };
+        ServerDisk: {
+            totalBytes: number;
+            usedBytes: number;
+            /** @description what a program may still write */
+            freeBytes: number;
+            /** @description used of used plus free, as df counts it */
+            percent: number;
+        };
+        ServerDatabase: {
+            sizeBytes: number;
+            /** @description open connections to this database */
+            connections: number;
+            maxConnections: number;
+        };
+        ServerProcess: {
+            /** @example v26.7.0 */
+            nodeVersion: string;
+            /** @description since the api started */
+            uptimeSeconds: number;
+            /** @description of one processor; may pass 100 */
+            cpuPercent: number;
+            rssBytes: number;
+            heapUsedBytes: number;
+            /** @description the container's memory limit */
+            limitBytes: number | null;
+        };
+        ServerSample: {
+            /** @description epoch milliseconds */
+            t: number;
+            /** @description processor percent */
+            cpu: number;
+            /** @description memory percent */
+            mem: number;
+        };
+        ServerMetrics: {
+            /** Format: date-time */
+            sampledAt: string;
+            /** @description seconds between two points of the history */
+            intervalSeconds: number;
+            host: components["schemas"]["ServerHost"];
+            cpu: components["schemas"]["ServerCpu"];
+            memory: components["schemas"]["ServerMemory"];
+            disk: components["schemas"]["ServerDisk"] | null;
+            database: components["schemas"]["ServerDatabase"] | null;
+            process: components["schemas"]["ServerProcess"];
+            /** @description up to one hour, oldest first; only the points after `since` when it is given */
+            history: components["schemas"]["ServerSample"][];
         };
         CompanyTaxRegistration: {
             /** @example VAT */
@@ -23458,6 +23556,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ServerMetrics_server: {
+        parameters: {
+            query?: {
+                /** @description epoch milliseconds of the newest point the caller holds: only later ones return */
+                since?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerMetrics"];
                 };
             };
             /** @description RFC 9457 problem details */

@@ -361,7 +361,7 @@ export const routes: RouteObject[] = [
           ...posRoutes(),
           ...appRoutes(),
           ...hrRoutes(),
-          { path: 'system/status', handle: { width: 'reading' }, element: <SystemStatusPage /> },
+          { path: 'system/status', handle: { width: 'wide' }, element: <SystemStatusPage /> },
           { path: 'account', handle: { width: 'reading' }, element: <AccountPage /> },
           { path: 'catalog/products', handle: { width: 'wide' }, element: <ProductsPage /> },
           {

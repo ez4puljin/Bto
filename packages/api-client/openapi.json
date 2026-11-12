@@ -42,6 +42,52 @@
         ]
       }
     },
+    "/api/v1/system/server": {
+      "get": {
+        "operationId": "ServerMetrics_server",
+        "parameters": [
+          {
+            "name": "since",
+            "required": false,
+            "in": "query",
+            "description": "epoch milliseconds of the newest point the caller holds: only later ones return",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerMetrics"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "health"
+        ]
+      }
+    },
     "/api/v1/company": {
       "get": {
         "operationId": "Company_get",
@@ -43891,6 +43937,273 @@
           "db",
           "pgboss",
           "version"
+        ]
+      },
+      "ServerHost": {
+        "type": "object",
+        "properties": {
+          "system": {
+            "type": "string",
+            "example": "Linux 7.0.0-43-generic"
+          },
+          "arch": {
+            "type": "string",
+            "example": "x64"
+          },
+          "cpuModel": {
+            "type": "string",
+            "example": "Intel(R) Xeon(R) CPU E5-4657L v2 @ 2.40GHz"
+          },
+          "cpuThreads": {
+            "type": "number",
+            "description": "logical processors"
+          },
+          "uptimeSeconds": {
+            "type": "number",
+            "description": "since the machine started"
+          }
+        },
+        "required": [
+          "system",
+          "arch",
+          "cpuModel",
+          "cpuThreads",
+          "uptimeSeconds"
+        ]
+      },
+      "ServerCpu": {
+        "type": "object",
+        "properties": {
+          "percent": {
+            "type": "number",
+            "description": "busy share of every processor together, 0–100, one decimal"
+          },
+          "perCore": {
+            "description": "the same per logical processor",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "load1": {
+            "type": "number",
+            "description": "load average of 1 minute (0 on Windows)"
+          },
+          "load5": {
+            "type": "number"
+          },
+          "load15": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "percent",
+          "perCore",
+          "load1",
+          "load5",
+          "load15"
+        ]
+      },
+      "ServerMemory": {
+        "type": "object",
+        "properties": {
+          "totalBytes": {
+            "type": "number"
+          },
+          "usedBytes": {
+            "type": "number",
+            "description": "total minus what programs can still be given"
+          },
+          "availableBytes": {
+            "type": "number"
+          },
+          "cachedBytes": {
+            "type": "number",
+            "description": "buffers and file cache; given back on demand"
+          },
+          "swapTotalBytes": {
+            "type": "number"
+          },
+          "swapUsedBytes": {
+            "type": "number"
+          },
+          "percent": {
+            "type": "number",
+            "description": "usedBytes of totalBytes, 0–100, one decimal"
+          }
+        },
+        "required": [
+          "totalBytes",
+          "usedBytes",
+          "availableBytes",
+          "cachedBytes",
+          "swapTotalBytes",
+          "swapUsedBytes",
+          "percent"
+        ]
+      },
+      "ServerDisk": {
+        "type": "object",
+        "properties": {
+          "totalBytes": {
+            "type": "number"
+          },
+          "usedBytes": {
+            "type": "number"
+          },
+          "freeBytes": {
+            "type": "number",
+            "description": "what a program may still write"
+          },
+          "percent": {
+            "type": "number",
+            "description": "used of used plus free, as df counts it"
+          }
+        },
+        "required": [
+          "totalBytes",
+          "usedBytes",
+          "freeBytes",
+          "percent"
+        ]
+      },
+      "ServerDatabase": {
+        "type": "object",
+        "properties": {
+          "sizeBytes": {
+            "type": "number"
+          },
+          "connections": {
+            "type": "number",
+            "description": "open connections to this database"
+          },
+          "maxConnections": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "sizeBytes",
+          "connections",
+          "maxConnections"
+        ]
+      },
+      "ServerProcess": {
+        "type": "object",
+        "properties": {
+          "nodeVersion": {
+            "type": "string",
+            "example": "v26.7.0"
+          },
+          "uptimeSeconds": {
+            "type": "number",
+            "description": "since the api started"
+          },
+          "cpuPercent": {
+            "type": "number",
+            "description": "of one processor; may pass 100"
+          },
+          "rssBytes": {
+            "type": "number"
+          },
+          "heapUsedBytes": {
+            "type": "number"
+          },
+          "limitBytes": {
+            "type": "number",
+            "nullable": true,
+            "description": "the container's memory limit"
+          }
+        },
+        "required": [
+          "nodeVersion",
+          "uptimeSeconds",
+          "cpuPercent",
+          "rssBytes",
+          "heapUsedBytes",
+          "limitBytes"
+        ]
+      },
+      "ServerSample": {
+        "type": "object",
+        "properties": {
+          "t": {
+            "type": "number",
+            "description": "epoch milliseconds"
+          },
+          "cpu": {
+            "type": "number",
+            "description": "processor percent"
+          },
+          "mem": {
+            "type": "number",
+            "description": "memory percent"
+          }
+        },
+        "required": [
+          "t",
+          "cpu",
+          "mem"
+        ]
+      },
+      "ServerMetrics": {
+        "type": "object",
+        "properties": {
+          "sampledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "intervalSeconds": {
+            "type": "number",
+            "description": "seconds between two points of the history"
+          },
+          "host": {
+            "$ref": "#/components/schemas/ServerHost"
+          },
+          "cpu": {
+            "$ref": "#/components/schemas/ServerCpu"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/ServerMemory"
+          },
+          "disk": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ServerDisk"
+              }
+            ]
+          },
+          "database": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ServerDatabase"
+              }
+            ]
+          },
+          "process": {
+            "$ref": "#/components/schemas/ServerProcess"
+          },
+          "history": {
+            "description": "up to one hour, oldest first; only the points after `since` when it is given",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServerSample"
+            }
+          }
+        },
+        "required": [
+          "sampledAt",
+          "intervalSeconds",
+          "host",
+          "cpu",
+          "memory",
+          "disk",
+          "database",
+          "process",
+          "history"
         ]
       },
       "CompanyTaxRegistration": {
