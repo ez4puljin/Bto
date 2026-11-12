@@ -43,21 +43,23 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/store/.env}
       POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale-provider=icu --icu-locale=und'
-    # Sized for a 7 GB box shared with the edge stack: a quarter of what PostgreSQL may use goes to
-    # shared_buffers, and 40 connections cover the pool budget below (15) with room for the
-    # migrator, the nightly dump, the seed and psql.
+    # The defaults are sized for a 7 GB box shared with the edge stack: a quarter of what PostgreSQL
+    # may use goes to shared_buffers, and 40 connections cover the default pool budget below (15)
+    # with room for the migrator, the nightly dump, the seed and psql. A bigger PC raises them in
+    # deploy/store/.env (ADR-0191, architecture §10.7): STORE_PG_* here, STORE_API_* and
+    # STORE_WORKER_* below; max_connections must stay above the sum of the pools.
     command:
       - postgres
       - -c
-      - shared_buffers=512MB
+      - shared_buffers=${STORE_PG_SHARED_BUFFERS:-512MB}
       - -c
-      - effective_cache_size=2GB
+      - effective_cache_size=${STORE_PG_EFFECTIVE_CACHE:-2GB}
       - -c
       - work_mem=8MB
       - -c
       - maintenance_work_mem=128MB
       - -c
-      - max_connections=40
+      - max_connections=${STORE_PG_MAX_CONNECTIONS:-40}
       - -c
       - wal_compression=on
       - -c
@@ -75,7 +77,7 @@ services:
       retries: 30
       start_period: 10s
     shm_size: 256mb
-    mem_limit: 1536m
+    mem_limit: ${STORE_PG_MEMORY:-1536m}
     logging: *logging
 
   api:
@@ -84,8 +86,9 @@ services:
       <<: *app-env
       ROLE: api
       # Pool budget (docs/architecture.md §10.2): api 6 + 1 live stock listener, pg-boss 2, the
-      # AI reader 2.
-      DB_POOL_MAX: '6'
+      # AI reader 2. A long report holds a connection for its whole run: when every one is busy,
+      # other requests wait 5 s and fail (the load test of 2026-11-13), so a bigger PC gives more.
+      DB_POOL_MAX: '${STORE_API_DB_POOL_MAX:-6}'
       AI_POOL_MAX: '2'
       MIGRATOR_DATABASE_URL: postgres://migrator:${MIGRATOR_DB_PASSWORD:?set MIGRATOR_DB_PASSWORD in deploy/store/.env}@postgres:5432/bto
       AI_DATABASE_URL: postgres://ai_reader:${AI_DB_PASSWORD:?set AI_DB_PASSWORD in deploy/store/.env}@postgres:5432/bto
@@ -102,7 +105,8 @@ services:
       LLM_MODEL: ${LLM_MODEL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_BASE_URL: ${LLM_BASE_URL:-}
-    mem_limit: 1024m
+    # Node takes about half of the limit as its heap.
+    mem_limit: ${STORE_API_MEMORY:-1024m}
     depends_on:
       postgres: { condition: service_healthy }
 
@@ -112,8 +116,8 @@ services:
       <<: *app-env
       ROLE: worker
       # worker 2 + pg-boss 2; health on loopback only, no published port.
-      DB_POOL_MAX: '2'
-    mem_limit: 768m
+      DB_POOL_MAX: '${STORE_WORKER_DB_POOL_MAX:-2}'
+    mem_limit: ${STORE_WORKER_MEMORY:-768m}
     depends_on:
       postgres: { condition: service_healthy }
       api: { condition: service_healthy }

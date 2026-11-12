@@ -56,7 +56,7 @@ Confirmed 2026-10-10 from the npm registry (exact pins in every `package.json`; 
 | pdfmake, `@nestjs/throttler`, receipt-printer-encoder | `npm view <pkg> version` when first installed; pick a version older than 24 h | |
 
 Majors change only in dedicated sessions between deliveries.
-DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): production api 6 + 1 live stock listener, worker 3, pg-boss 2 per process, AI reader 2 (api only); staging 2 (+1) / 2 / 2 / 2; the store PC until the external server: api 6 (+1), worker 2, pg-boss 2, AI reader 2 against its own PostgreSQL with `max_connections` 40 (ADR-0186, architecture §10.7) (architecture §10.2; the listener `LISTEN`s on a direct connection, never through PgBouncer, ADR-0173).
+DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): production api 6 + 1 live stock listener, worker 3, pg-boss 2 per process, AI reader 2 (api only); staging 2 (+1) / 2 / 2 / 2; the centre until the external server: by default api 6 (+1), worker 2, pg-boss 2, AI reader 2 against its own PostgreSQL with `max_connections` 40 (ADR-0186, architecture §10.7), and on the 30 GB PC, from its `deploy/store/.env`, api 20 (+1), worker 4 and `max_connections` 100 (ADR-0191) (architecture §10.2; the listener `LISTEN`s on a direct connection, never through PgBouncer, ADR-0173).
 
 ## Commands
 
@@ -109,6 +109,7 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): producti
 ## ALWAYS
 
 - Pass `tx` explicitly through service calls that must be atomic; enqueue side effects with pg-boss in the same tx.
+- Write a transaction's work so it can run twice: `inTransaction` runs it again when PostgreSQL ends it to break a deadlock (ADR-0190), so it returns its outcome and never counts or collects into anything outside itself.
 - Re-run the price resolver at SUBMIT and freeze prices, rates and `factor_snapshot` on the lines.
 - Lock the customer row before a credit check; lock stock rows in the order documented in architecture §5.3.
 - Write integration tests against real Postgres for every service that touches stock or money; keep the integrity suite green.

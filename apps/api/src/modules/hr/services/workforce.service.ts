@@ -584,7 +584,9 @@ export class WorkforceService implements OnApplicationBootstrap {
             ownerId: null,
           })
         : null;
-      await inTransaction(this.db, async (tx) => {
+      // The transaction may run again after a deadlock (ADR-0190): it returns what it did, and
+      // the counting happens once, outside.
+      const done = await inTransaction(this.db, async (tx) => {
         const divisionId = record.division ? await this.divisionByName(tx, record.division) : null;
         const [known] = await tx
           .select({ userId: hrEmployees.userId })
@@ -611,13 +613,15 @@ export class WorkforceService implements OnApplicationBootstrap {
             .where(eq(hrEmployees.userId, ensured.userId));
           if (current?.photoFileId == null) {
             await this.attachPhoto(tx, actor, ensured.userId, photo.id);
-            result.photos += 1;
+            return { ...ensured, photoAttached: true };
           }
         }
-        result.userIds.set(record.externalRef, ensured.userId);
-        if (ensured.created) result.created += 1;
-        else result.updated += 1;
+        return { ...ensured, photoAttached: false };
       });
+      if (done.photoAttached) result.photos += 1;
+      result.userIds.set(record.externalRef, done.userId);
+      if (done.created) result.created += 1;
+      else result.updated += 1;
     }
     return result;
   }
