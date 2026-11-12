@@ -261,6 +261,33 @@ bash deploy/edge/setup.sh       # дараа нь edge ба кассын хуу�
    Эвдэрсэн компьютерийн edge төв рүү илгээж амжаагүй, шөнийн нөөцөд ч ороогүй борлуулалтыг баримтаас нь дахин оруулна.
 7. 4-р хэсгийг дахин хийнэ: цагийн тохиргоо, нэг удаагийн нөөцлөлт, сэргээх сургуулилт.
 
+## 10. Ажилчдын апп гаднаас холбогдох (ADR-0188)
+
+Ажилчдын апп гар утасны дата-аар нэг хаягаар дамжин API-д холбогдоно. Энэ нь PC дээр аль хэдийн ажиллаж буй эзэмшигчийн Cloudflare tunnel-ээр явна. Тэр хаягаар зөвхөн `/api` ба `/health` хариулна; админы вэб хуудсууд болон касс дотоод сүлжээнд үлдэнэ.
+
+1. **Эхлээд:** энгийн нууц үг бүрийг солино, хамгийн түрүүнд админуудынхыг (хаяг нээгдмэгц интернэтээс хэн ч утасны дугаар, нууц үг туршиж болно).
+2. **Эзэмшигч, Cloudflare-ийн самбарт** (Zero Trust → Networks → Tunnels → `bto.puljika.site`-г зөөдөг tunnel → «Public Hostname» → «Add a public hostname»): subdomain `app`, domain `puljika.site`, type `HTTP`, URL `localhost:80`. Хадгална. PC дээр юу ч суулгахгүй, хуучин ERP-ийн мөрийг хөндөхгүй.
+3. **PC дээр** хаягийг төвийн тохиргоонд бичээд (нууц биш) төвийг дахин асаана:
+
+   ```bash
+   cd ~/bto
+   grep -q '^STORE_PUBLIC_HOST=' deploy/store/.env \
+     && sed -i 's/^STORE_PUBLIC_HOST=.*/STORE_PUBLIC_HOST=app.puljika.site/' deploy/store/.env \
+     || echo 'STORE_PUBLIC_HOST=app.puljika.site' >> deploy/store/.env
+   bash deploy/store/setup.sh
+   ```
+
+4. **Гаднаас шалгах** (дата-тай утас эсвэл өөр компьютер):
+
+   ```bash
+   curl -s https://app.puljika.site/health            # {"status":"ok",…}
+   curl -s -o /dev/null -w '%{http_code}\n' https://app.puljika.site/   # 404: гаднаас хуудас гарахгүй
+   ```
+
+5. **Утаснууд:** ажилчдын апп дээр «Серверийн хаяг» → `https://app.puljika.site`; эсвэл `BTO_SERVER=https://app.puljika.site pnpm mobile:apk`-аар бүтээсэн аппыг тараана. Дэлгүүрийн Wi-Fi дээр интернэт тасарсан үед хаяг нь `http://192.168.1.250`.
+
+**Хаах:** Cloudflare-ийн самбараас public hostname-ийг устгана (тэр дороо), эсвэл `STORE_PUBLIC_HOST`-ыг хоосолж `setup.sh` ажиллуулна.
+
 ## Алдаа гарвал
 
 - **Хуулах үед «the target is not empty».** Төв систем хуулахаас өмнө ассан байна (api анх асахдаа эрхийн жагсаалтыг бичдэг). Жинхэнэ өгөгдөл ороогүй компьютер дээр: `$S stop api worker web`, дараа нь 9-р хэсгийн 3-р алхмын `dropdb`, `createdb` мөрүүд, `$S run --rm provision`, `$S run --rm migrate`, тэгээд дахин хуулна. Хэн нэгэн ажилласан систем дээр хэзээ ч бүү хий.

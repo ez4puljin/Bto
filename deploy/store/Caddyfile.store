@@ -1,12 +1,31 @@
 # The centre on the store's Ubuntu PC (ADR-0186): the admin's pages and /api on one port of the
 # store's LAN, plain HTTP. No certificate, no HSTS: the external server brings HTTPS (ADR-0026).
+# ADR-0188: the staff app also reaches /api from outside, under the name STORE_PUBLIC_HOST, through
+# the owner's Cloudflare tunnel (HTTPS ends at Cloudflare; `cloudflared` on this PC calls this port).
 {
 	admin off
 	persist_config off
 	auto_https off
+	servers {
+		# Only the hop from this PC itself (cloudflared and the edge, which arrive through Docker's
+		# bridge, 172.16.0.0/12) may say who the caller is in X-Forwarded-For; the api's sign-in limits
+		# count by that address. The store's LAN is not in this range, so a LAN client cannot forge one.
+		trusted_proxies static 172.16.0.0/12
+		trusted_proxies_strict
+	}
 }
 
 :80 {
+	# The outside name serves the api only: no page of the admin's web is answered there (ADR-0188).
+	# Unset, the name is one no request carries.
+	@outsidePage {
+		host {$STORE_PUBLIC_HOST:outside.invalid}
+		not path /api/* /health
+	}
+	handle @outsidePage {
+		respond 404
+	}
+
 	# The apps' live stock streams (ADR-0173 #4, text/event-stream) are never compressed: an encoder
 	# buffers, and every event must reach the phone at once.
 	@compressible not path */stock/live

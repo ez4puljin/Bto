@@ -245,6 +245,33 @@ What is lost: everything since the last backup that left the box. The store's Po
    Sales the dead box's edge had not sent to the centre and that are not in the night's dump are re-entered from the receipts.
 7. §4 again: the timer, one run, the drill.
 
+## 10. The staff app from outside (ADR-0188)
+
+The staff app reaches the api from mobile data under one name, through the owner's Cloudflare tunnel that already runs on the PC. Only `/api` and `/health` answer under that name; the admin's pages and the tills stay on the LAN.
+
+1. **First:** every simple password is changed, the admins' before all (anyone on the internet can try a phone number and a password once the name exists).
+2. **The owner, in the Cloudflare dashboard** (Zero Trust → Networks → Tunnels → the tunnel that carries `bto.puljika.site` → «Public Hostname» → «Add a public hostname»): subdomain `app`, domain `puljika.site`, type `HTTP`, URL `localhost:80`. Save. Nothing is installed on the PC and the old ERP's row is left as it is.
+3. **On the PC**, the name goes into the centre's settings (not a secret) and the centre is started again:
+
+   ```bash
+   cd ~/bto
+   grep -q '^STORE_PUBLIC_HOST=' deploy/store/.env \
+     && sed -i 's/^STORE_PUBLIC_HOST=.*/STORE_PUBLIC_HOST=app.puljika.site/' deploy/store/.env \
+     || echo 'STORE_PUBLIC_HOST=app.puljika.site' >> deploy/store/.env
+   bash deploy/store/setup.sh
+   ```
+
+4. **Check from outside** (a phone on mobile data, or any PC):
+
+   ```bash
+   curl -s https://app.puljika.site/health            # {"status":"ok",…}
+   curl -s -o /dev/null -w '%{http_code}\n' https://app.puljika.site/   # 404: no page outside
+   ```
+
+5. **The phones:** in the staff app, «Серверийн хаяг» → `https://app.puljika.site`; or hand out a build made with `BTO_SERVER=https://app.puljika.site pnpm mobile:apk`. On the store's Wi-Fi with the internet down, the address is `http://192.168.1.250`.
+
+**Switching it off:** delete the public hostname in the Cloudflare dashboard (at once), or empty `STORE_PUBLIC_HOST` and run `setup.sh`.
+
 ## Troubleshooting
 
 - **«the target is not empty» at the seed.** The centre was started before the seed (the api writes the permissions at its first start). On a box that holds nothing real yet: `$S stop api worker web`, then the `dropdb` / `createdb` lines of §9 step 3, `$S run --rm provision`, `$S run --rm migrate`, and the seed again. Never on a system somebody has worked in.
