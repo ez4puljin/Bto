@@ -55,6 +55,7 @@ chmod 600 "$ENV_FILE"
 ensure_var STORE_HTTP_PORT 80
 ensure_var STORE_PG_PORT 15433
 ensure_var STORE_PUBLIC_HOST ""
+ensure_var STORE_PUBLIC_COUNTRIES MN
 ensure_var LOG_LEVEL info
 ensure_var POSTGRES_PASSWORD "$(random_hex 24)"
 ensure_var APP_DB_PASSWORD "$(random_hex 24)"

@@ -263,7 +263,7 @@ bash deploy/edge/setup.sh       # дараа нь edge ба кассын хуу�
 
 ## 10. Ажилчдын апп гаднаас холбогдох (ADR-0188)
 
-Ажилчдын апп гар утасны дата-аар нэг хаягаар дамжин API-д холбогдоно. Энэ нь PC дээр аль хэдийн ажиллаж буй эзэмшигчийн Cloudflare tunnel-ээр явна. Тэр хаягаар зөвхөн `/api` ба `/health` хариулна; админы вэб хуудсууд болон касс дотоод сүлжээнд үлдэнэ.
+Ажилчдын апп болон (ADR-0189-өөс хойш) оффисын вэб гаднаас нэг хаягаар нээгдэнэ. Энэ нь PC дээр аль хэдийн ажиллаж буй эзэмшигчийн Cloudflare tunnel-ээр явна. Хаяг нь зөвхөн `deploy/store/.env`-ийн `STORE_PUBLIC_COUNTRIES`-д бичсэн улсаас (анхдагч `MN`; олон бол `MN|KR`; дараа нь `bash deploy/store/setup.sh`) ирсэн хүсэлтэд хариулна: бусад нь 403 авна, гадаадад яваа ажилтны апп ч мөн адил. Касс дотоод сүлжээнд үлдэнэ. Нэмэлт хамгаалалт Cloudflare дээр: Security → WAF → Custom rules → `(http.host eq "app.puljika.site" and ip.src.country ne "MN")` → Block.
 
 1. **Эхлээд:** энгийн нууц үг бүрийг солино, хамгийн түрүүнд админуудынхыг (хаяг нээгдмэгц интернэтээс хэн ч утасны дугаар, нууц үг туршиж болно).
 2. **Эзэмшигч, Cloudflare-ийн самбарт** (Zero Trust → Networks → Tunnels → `bto.puljika.site`-г зөөдөг tunnel → «Public Hostname» → «Add a public hostname»): subdomain `app`, domain `puljika.site`, type `HTTP`, URL `localhost:80`. Хадгална. PC дээр юу ч суулгахгүй, хуучин ERP-ийн мөрийг хөндөхгүй.
@@ -281,7 +281,7 @@ bash deploy/edge/setup.sh       # дараа нь edge ба кассын хуу�
 
    ```bash
    curl -s https://app.puljika.site/health            # {"status":"ok",…}
-   curl -s -o /dev/null -w '%{http_code}\n' https://app.puljika.site/   # 404: гаднаас хуудас гарахгүй
+   curl -s -o /dev/null -w '%{http_code}\n' https://app.puljika.site/   # Монголоос 200, гадаадаас 403
    ```
 
 5. **Утаснууд:** ажилчдын апп дээр «Серверийн хаяг» → `https://app.puljika.site`; эсвэл `BTO_SERVER=https://app.puljika.site pnpm mobile:apk`-аар бүтээсэн аппыг тараана. Дэлгүүрийн Wi-Fi дээр интернэт тасарсан үед хаяг нь `http://192.168.1.250`.

@@ -1,7 +1,8 @@
 # The centre on the store's Ubuntu PC (ADR-0186): the admin's pages and /api on one port of the
 # store's LAN, plain HTTP. No certificate, no HSTS: the external server brings HTTPS (ADR-0026).
-# ADR-0188: the staff app also reaches /api from outside, under the name STORE_PUBLIC_HOST, through
-# the owner's Cloudflare tunnel (HTTPS ends at Cloudflare; `cloudflared` on this PC calls this port).
+# ADR-0188, ADR-0189: the staff app and the office's web are also reached from outside, under the name
+# STORE_PUBLIC_HOST, through the owner's Cloudflare tunnel (HTTPS ends at Cloudflare; `cloudflared`
+# on this PC calls this port), and only from the countries of STORE_PUBLIC_COUNTRIES.
 {
 	admin off
 	persist_config off
@@ -16,14 +17,25 @@
 }
 
 :80 {
-	# The outside name serves the api only: no page of the admin's web is answered there (ADR-0188).
-	# Unset, the name is one no request carries.
-	@outsidePage {
+	# The outside name (ADR-0189). Unset, the name is one no request carries.
+	# Only callers Cloudflare places in an allowed country are answered: the header is Cloudflare's
+	# (`CF-IPCountry`, two letters; XX unknown, T1 Tor), a list is written MN|KR. A request without
+	# the header did not come through Cloudflare and is refused too.
+	@outsideForeign {
 		host {$STORE_PUBLIC_HOST:outside.invalid}
-		not path /api/* /health
+		not header_regexp CF-IPCountry ^({$STORE_PUBLIC_COUNTRIES:MN})$
 	}
-	handle @outsidePage {
-		respond 404
+	handle @outsideForeign {
+		respond "Not available in your country." 403
+	}
+
+	# Plain HTTP at Cloudflare's edge is sent to HTTPS: the web's sign-in cookie is `Secure` there.
+	@outsideHttp {
+		host {$STORE_PUBLIC_HOST:outside.invalid}
+		header X-Forwarded-Proto http
+	}
+	handle @outsideHttp {
+		redir https://{host}{uri} 308
 	}
 
 	# The apps' live stock streams (ADR-0173 #4, text/event-stream) are never compressed: an encoder

@@ -10,6 +10,7 @@ import {
   DEFAULT_PASSWORD,
   issueCode,
   login,
+  loginOf,
   refreshCookieOf,
   SAME_ORIGIN,
   seedUser,
@@ -64,6 +65,25 @@ describe('authentication (ADR-0027)', () => {
       const maxAge = Number.parseInt(/Max-Age=(\d+)/.exec(cookie)?.[1] ?? '0', 10);
       expect(maxAge).toBeGreaterThan(12 * 3600 - 60);
       expect(maxAge).toBeLessThanOrEqual(12 * 3600);
+    });
+
+    it('marks the cookie Secure on a sign-in that came over HTTPS (the outside name, ADR-0189)', async () => {
+      const user = await seedUser(app);
+      const signIn = (proto?: string) => {
+        const call = http()
+          .post('/api/v1/auth/login')
+          .set(SAME_ORIGIN)
+          .set('X-Forwarded-For', testIp());
+        return (proto ? call.set('X-Forwarded-Proto', proto) : call)
+          .send({ login: loginOf(user), password: user.password })
+          .expect(200);
+      };
+      const cookieOf = (response: { headers: Record<string, unknown> }) =>
+        (response.headers['set-cookie'] as string[])[0] ?? '';
+      expect(cookieOf(await signIn('https'))).toContain('; Secure');
+      // The LAN's plain HTTP keeps its cookie as it was.
+      expect(cookieOf(await signIn('http'))).not.toContain('Secure');
+      expect(cookieOf(await signIn())).not.toContain('Secure');
     });
 
     it('answers wrong password, unknown user and a user without password identically', async () => {

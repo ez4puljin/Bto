@@ -129,8 +129,10 @@ services:
       api: { condition: service_healthy }
     volumes: ['./Caddyfile.store:/etc/caddy/Caddyfile:ro']
     environment:
-      # The name the staff app uses from outside (ADR-0188); none = a name no request carries.
+      # The name the staff app and the office's web use from outside (ADR-0188, ADR-0189); none = a
+      # name no request carries. Only callers from these countries are answered under it.
       STORE_PUBLIC_HOST: ${STORE_PUBLIC_HOST:-outside.invalid}
+      STORE_PUBLIC_COUNTRIES: ${STORE_PUBLIC_COUNTRIES:-MN}
     # Every interface of the box: the store's LAN. The router forwards nothing to it; the outside
     # name arrives through `cloudflared` on this PC.
     ports: ['${STORE_HTTP_PORT:-80}:80']

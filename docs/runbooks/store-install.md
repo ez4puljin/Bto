@@ -247,7 +247,7 @@ What is lost: everything since the last backup that left the box. The store's Po
 
 ## 10. The staff app from outside (ADR-0188)
 
-The staff app reaches the api from mobile data under one name, through the owner's Cloudflare tunnel that already runs on the PC. Only `/api` and `/health` answer under that name; the admin's pages and the tills stay on the LAN.
+The staff app and, since ADR-0189, the office's web are reached from outside under one name, through the owner's Cloudflare tunnel that already runs on the PC. The name answers only callers from the countries of `STORE_PUBLIC_COUNTRIES` in `deploy/store/.env` (default `MN`; several as `MN|KR`; then `bash deploy/store/setup.sh`): everyone else gets 403, the staff app abroad too. The tills stay on the LAN. Optional extra at Cloudflare's edge: Security → WAF → Custom rules → `(http.host eq "app.puljika.site" and ip.src.country ne "MN")` → Block.
 
 1. **First:** every simple password is changed, the admins' before all (anyone on the internet can try a phone number and a password once the name exists).
 2. **The owner, in the Cloudflare dashboard** (Zero Trust → Networks → Tunnels → the tunnel that carries `bto.puljika.site` → «Public Hostname» → «Add a public hostname»): subdomain `app`, domain `puljika.site`, type `HTTP`, URL `localhost:80`. Save. Nothing is installed on the PC and the old ERP's row is left as it is.
@@ -265,7 +265,7 @@ The staff app reaches the api from mobile data under one name, through the owner
 
    ```bash
    curl -s https://app.puljika.site/health            # {"status":"ok",…}
-   curl -s -o /dev/null -w '%{http_code}\n' https://app.puljika.site/   # 404: no page outside
+   curl -s -o /dev/null -w '%{http_code}\n' https://app.puljika.site/   # 200 from Mongolia, 403 from abroad
    ```
 
 5. **The phones:** in the staff app, «Серверийн хаяг» → `https://app.puljika.site`; or hand out a build made with `BTO_SERVER=https://app.puljika.site pnpm mobile:apk`. On the store's Wi-Fi with the internet down, the address is `http://192.168.1.250`.

@@ -164,12 +164,21 @@ export class AuthController {
     return loginResponseOf(this.access, issued, requestIdOf(request));
   }
 
+  /**
+   * `Secure` when the environment says so, and always on a request that reached us over HTTPS (the
+   * outside name, ADR-0189: `X-Forwarded-Proto` of the trusted hops), so a cookie set there never
+   * travels in the clear; the LAN's plain HTTP keeps its cookie without it.
+   */
+  private cookieSecure(response: Response): boolean {
+    return this.config.get('COOKIE_SECURE') || response.req.secure;
+  }
+
   private setRefreshCookie(response: Response, issued: IssuedSession): void {
     if (!issued.refreshCookie) return;
     response.cookie(REFRESH_COOKIE, issued.refreshCookie, {
       httpOnly: true,
       sameSite: 'strict',
-      secure: this.config.get('COOKIE_SECURE'),
+      secure: this.cookieSecure(response),
       path: REFRESH_COOKIE_PATH,
       maxAge: Math.max(0, issued.sessionExpiresAt.getTime() - Date.now()),
     });
@@ -179,7 +188,7 @@ export class AuthController {
     response.clearCookie(REFRESH_COOKIE, {
       httpOnly: true,
       sameSite: 'strict',
-      secure: this.config.get('COOKIE_SECURE'),
+      secure: this.cookieSecure(response),
       path: REFRESH_COOKIE_PATH,
     });
   }
