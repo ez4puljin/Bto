@@ -1,5 +1,9 @@
 # The development database on Windows
 
+> Since 2026-11-12 (ADR-0187) Bto is developed on the Ubuntu PC, where the development PostgreSQL is
+> the repository's `docker-compose.yml` again (`tools/dev-server/README.md`). This folder is for a
+> Windows PC only.
+
 Since 2026-11-09 (owner) the development PostgreSQL runs on Windows itself instead of in Docker
 Desktop: Docker Desktop's Linux VM held 2–5 GB of the PC's 16 GB. Nothing else changed for the code:
 the same PostgreSQL 18 with UTF-8 and the ICU `und` collation, the same port `127.0.0.1:15432`, the

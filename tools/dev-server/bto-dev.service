@@ -1,0 +1,19 @@
+[Unit]
+Description=Bto development server (pnpm dev, http://<LAN address>:5173)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/bto-dev
+Environment=PATH=%h/.local/opt/node/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=DEV_LAN=1
+ExecStartPre=%h/.local/opt/node/bin/pnpm db:migrate
+ExecStart=%h/.local/opt/node/bin/pnpm dev
+Restart=on-failure
+RestartSec=10
+KillMode=control-group
+TimeoutStartSec=600
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target

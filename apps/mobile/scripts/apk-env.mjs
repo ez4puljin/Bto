@@ -20,6 +20,25 @@ export function javaMajor(output) {
 /** AGP 8.12 and Kotlin 2.1.20 run on JDK 17 or 21 (not the JDK 25 Android Studio bundles). */
 export const JAVA_MAJORS = [17, 21];
 
+/**
+ * Where the build's tools, its mirror and Gradle's cache live: `C:\Android` on Windows, `~/Android`
+ * on Linux (ADR-0187). No spaces in either: the NDK refuses them.
+ */
+export function toolsDirOf(platform, home) {
+  return platform === 'win32' ? 'C:\\Android' : `${home}/Android`;
+}
+
+/** Folders where Linux distributions install their JDKs. */
+export const LINUX_JVM_DIRS = ['/usr/lib/jvm'];
+
+/**
+ * Is a folder named like a JDK 17 or 21 (`jdk-17.0.16+8`, Ubuntu's `java-17-openjdk-amd64`)? The
+ * name only picks candidates: `java -version` decides.
+ */
+export function isJdkFolder(name) {
+  return /^jdk-?(17|21)/i.test(name) || /^(java|temurin|zulu|openjdk)-(1\.)?(17|21)\b/i.test(name);
+}
+
 /** A version code that only grows between builds: minutes since 2026-01-01 UTC. */
 export function versionCodeAt(date) {
   return Math.floor((date.getTime() - Date.UTC(2026, 0, 1)) / 60_000);
@@ -27,12 +46,13 @@ export function versionCodeAt(date) {
 
 const PRIVATE_V4 = /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/;
 const VIRTUAL =
-  /vethernet|wsl|docker|virtualbox|vmware|hyper-v|loopback|tailscale|bluetooth|zerotier/i;
-const PREFERRED = [/wi-?fi|wlan|wireless/i, /ethernet/i];
+  /vethernet|wsl|docker|virtualbox|vmware|hyper-v|loopback|tailscale|bluetooth|zerotier|^(br-|veth|virbr|tun|tap|wg)/i;
+const PREFERRED = [/wi-?fi|wlan|wireless|^wl/i, /ethernet|^en|^eth/i];
 
 /**
  * The PC's address on the office network from `os.networkInterfaces()`: a private IPv4 address of a
- * real adapter, Wi-Fi first, then Ethernet; null when there is none.
+ * real adapter, Wi-Fi first, then Ethernet; null when there is none. Linux names them `wlp2s0` and
+ * `enp7s0`, and Docker's bridges (`br-…`, private addresses too) are never the office network.
  */
 export function lanAddressOf(interfaces) {
   const candidates = [];
@@ -76,6 +96,34 @@ export const MIRROR_SKIP = [
 /** robocopy's exit codes 0–7 report what it copied; 8 and up are failures. */
 export function robocopyFailed(status) {
   return status === null || status >= 8;
+}
+
+/**
+ * The command that makes `to` a mirror of the workspace `from` without the skipped folders, which
+ * stay as they are in the mirror: robocopy on Windows, rsync elsewhere.
+ */
+export function mirrorCommandOf(platform, from, to) {
+  if (platform === 'win32') {
+    return {
+      command: 'robocopy',
+      args: [from, to, '/MIR', '/XD', ...MIRROR_SKIP, '/NFL', '/NDL', '/NJH', '/NJS', '/NP'],
+    };
+  }
+  return {
+    command: 'rsync',
+    args: [
+      '-a',
+      '--delete',
+      ...MIRROR_SKIP.map((name) => `--exclude=${name}/`),
+      `${from}/`,
+      `${to}/`,
+    ],
+  };
+}
+
+/** Did the mirror command fail? rsync answers 0 or an error; robocopy counts what it copied. */
+export function mirrorFailed(platform, status) {
+  return platform === 'win32' ? robocopyFailed(status) : status !== 0;
 }
 
 /**

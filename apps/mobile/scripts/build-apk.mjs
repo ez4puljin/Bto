@@ -1,27 +1,41 @@
-// `pnpm mobile:apk`: builds an app's APK on the owner's PC (ADR-0061 #2, ADR-0085, docs/modules/mobile.md).
+// `pnpm mobile:apk`: builds an app's APK on the development PC, Windows or Linux (ADR-0061 #2,
+// ADR-0085, ADR-0187, docs/modules/mobile.md).
 //   1. JDK 17 or 21 and the Android SDK packages are found (one-time setup: docs/modules/mobile.md).
-//   2. The workspace is mirrored to a short folder without spaces (C:\Android\m) and installed
-//      there: the repository's own path holds spaces and is long, which the NDK's CMake and Ninja do
-//      not survive, and a drive letter (`subst`) mixes two roots that React Native's codegen refuses.
+//   2. The workspace is mirrored to a short folder without spaces (C:\Android\m, ~/Android/m on
+//      Linux) and installed there: on Windows the repository's own path holds spaces and is long,
+//      which the NDK's CMake and Ninja do not survive, and a drive letter (`subst`) mixes two roots
+//      that React Native's codegen refuses; on Linux the mirror keeps the generated android folder
+//      and the production install out of the checkout `pnpm dev` is serving.
 //   3. `expo prebuild --clean` generates apps/mobile/android in the mirror, then Gradle builds.
 //   4. The APK is copied to apps/mobile/build/apk/ in the repository.
 // Options: --variant staff|customer (variants.json; the staff app unless named), --debug (a debug
 // APK instead of release). Environment: BTO_SERVER (the address the app
-// starts with, default http://<this PC's Wi-Fi address>:3300), BTO_ABIS (the native ABIs, default
+// starts with, default http://<this PC's office-network address>:3300), BTO_ABIS (the native ABIs, default
 // arm64-v8a,armeabi-v7a; x86_64 for the Android emulator), BTO_JAVA_HOME, ANDROID_HOME.
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
   JAVA_MAJORS,
+  LINUX_JVM_DIRS,
   apkFileName,
   apkOptionsOf,
-  MIRROR_SKIP,
   SDK_PACKAGES,
+  isJdkFolder,
   javaMajor,
   lanAddressOf,
-  robocopyFailed,
+  mirrorCommandOf,
+  mirrorFailed,
+  toolsDirOf,
   versionCodeAt,
 } from './apk-env.mjs';
 import { EXPO_ENV } from './expo.mjs';
@@ -29,8 +43,9 @@ import { EXPO_ENV } from './expo.mjs';
 const appRoot = path.resolve(import.meta.dirname, '..');
 const workspaceRoot = path.resolve(appRoot, '../..');
 const { variant: variantName, debug } = apkOptionsOf(process.argv.slice(2));
+const WINDOWS = process.platform === 'win32';
 /** Tools and the build mirror live in a folder without spaces: the NDK refuses paths with spaces. */
-const TOOLS = 'C:\\Android';
+const TOOLS = toolsDirOf(process.platform, os.homedir());
 /** Short on purpose: C++ object paths repeat it (Windows tools stop at 260 characters). */
 const MIRROR = path.join(TOOLS, 'm');
 
@@ -44,7 +59,7 @@ function step(message) {
 }
 
 function javaVersionOf(home) {
-  const java = path.join(home, 'bin', 'java.exe');
+  const java = path.join(home, 'bin', WINDOWS ? 'java.exe' : 'java');
   if (!existsSync(java)) return null;
   const result = spawnSync(java, ['-version'], { encoding: 'utf8' });
   return javaMajor(`${result.stderr ?? ''}${result.stdout ?? ''}`);
@@ -52,16 +67,19 @@ function javaVersionOf(home) {
 
 function findJavaHome() {
   const candidates = [process.env.BTO_JAVA_HOME, process.env.JAVA_HOME];
-  if (existsSync(TOOLS)) {
-    for (const entry of readdirSync(TOOLS)) {
-      if (/^jdk-?(17|21)/i.test(entry)) candidates.push(path.join(TOOLS, entry));
+  for (const folder of WINDOWS ? [TOOLS] : [TOOLS, ...LINUX_JVM_DIRS]) {
+    if (!existsSync(folder)) continue;
+    for (const entry of readdirSync(folder)) {
+      if (isJdkFolder(entry)) candidates.push(path.join(folder, entry));
     }
   }
   for (const home of candidates) {
     if (home && JAVA_MAJORS.includes(javaVersionOf(home) ?? 0)) return home;
   }
+  const looked = ['BTO_JAVA_HOME', 'JAVA_HOME', path.join(TOOLS, 'jdk-17…')];
+  if (!WINDOWS) looked.push(...LINUX_JVM_DIRS);
   return fail(
-    `JDK ${JAVA_MAJORS.join(' or ')} not found (BTO_JAVA_HOME, JAVA_HOME, ${TOOLS}\\jdk-17…). ` +
+    `JDK ${JAVA_MAJORS.join(' or ')} not found (${looked.join(', ')}). ` +
       'See docs/modules/mobile.md, "One-time setup".',
   );
 }
@@ -89,7 +107,9 @@ function withJava(env, javaHome) {
   return { ...env, [key]: `${path.join(javaHome, 'bin')}${path.delimiter}${env[key] ?? ''}` };
 }
 
-if (process.platform !== 'win32') fail("This script builds on the owner's Windows PC only.");
+if (!WINDOWS && process.platform !== 'linux') {
+  fail('This script builds on Windows or Linux only.');
+}
 
 step('Checking Java and the Android SDK');
 const javaHome = findJavaHome();
@@ -109,12 +129,11 @@ console.log(
 
 step(`Mirroring the workspace to ${MIRROR}`);
 mkdirSync(MIRROR, { recursive: true });
-const copied = spawnSync(
-  'robocopy',
-  [workspaceRoot, MIRROR, '/MIR', '/XD', ...MIRROR_SKIP, '/NFL', '/NDL', '/NJH', '/NJS', '/NP'],
-  { stdio: 'inherit' },
-);
-if (robocopyFailed(copied.status)) fail(`robocopy failed (${copied.status})`);
+const mirror = mirrorCommandOf(process.platform, workspaceRoot, MIRROR);
+const copied = spawnSync(mirror.command, mirror.args, { stdio: 'inherit' });
+if (mirrorFailed(process.platform, copied.status)) {
+  fail(`${mirror.command} failed (${copied.status})`);
+}
 
 const env = withJava(
   {
@@ -137,7 +156,8 @@ step('pnpm install in the mirror (from the shared store: seconds after the first
 run('pnpm', ['install', '--frozen-lockfile'], {
   cwd: MIRROR,
   env: { ...env, NODE_ENV: 'development' },
-  shell: true,
+  // Windows finds pnpm.cmd only through the shell.
+  shell: WINDOWS,
 });
 
 const mirrorApp = path.join(MIRROR, 'apps', 'mobile');
@@ -161,8 +181,10 @@ run(
 const task = debug ? 'assembleDebug' : 'assembleRelease';
 step(`Gradle ${task} (the first build downloads Gradle and its libraries: 15–30 minutes)`);
 // The full path: cmd does not look in the working folder (NoDefaultCurrentDirectoryInExePath).
+const gradlew = path.join(mirrorApp, 'android', WINDOWS ? 'gradlew.bat' : 'gradlew');
+if (!WINDOWS) chmodSync(gradlew, 0o755);
 run(
-  path.join(mirrorApp, 'android', 'gradlew.bat'),
+  gradlew,
   // No daemons left behind: Gradle's and Kotlin's would keep 3–4 GB of RAM after the build.
   [
     task,
@@ -170,7 +192,7 @@ run(
     '-Pkotlin.compiler.execution.strategy=in-process',
     `-PreactNativeArchitectures=${process.env.BTO_ABIS ?? 'arm64-v8a,armeabi-v7a'}`,
   ],
-  { cwd: path.join(mirrorApp, 'android'), env, shell: true },
+  { cwd: path.join(mirrorApp, 'android'), env, shell: WINDOWS },
 );
 
 const buildType = debug ? 'debug' : 'release';
