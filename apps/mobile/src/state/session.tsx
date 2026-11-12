@@ -19,6 +19,7 @@ import {
   StaffSession,
 } from '../api/session';
 import { APP } from '../config/app';
+import { clientUserAgent } from '../device/install';
 import { readJson, SERVER_KEY, secureTokenStore, writeJson } from '../device/storage';
 
 interface SessionValue {
@@ -42,7 +43,11 @@ function sessionOn(server: string): AnySession {
   const options: SessionOptions = {
     server,
     store: secureTokenStore,
-    fetch: (request, init) => fetch(request, init),
+    // Every call says which app and phone it comes from: a sign-in's session row keeps it.
+    fetch: async (request, init) => {
+      request.headers.set('User-Agent', await clientUserAgent());
+      return fetch(request, init);
+    },
     randomUUID: Crypto.randomUUID,
   };
   return APP.variant === 'customer' ? new CustomerSession(options) : new StaffSession(options);

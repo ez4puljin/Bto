@@ -1089,6 +1089,15 @@
             "schema": {
               "type": "number"
             }
+          },
+          {
+            "name": "history",
+            "required": false,
+            "in": "query",
+            "description": "true: the sign-in trail (ended sessions too, kept 90 days), newest first, at most 200",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -45148,11 +45157,35 @@
           },
           "userAgent": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "What the client called itself; our apps say app, version, system, phone and an install id"
           },
           "ip": {
             "type": "string",
             "nullable": true
+          },
+          "endedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When it was signed out, revoked or ran out; null while it is live"
+          },
+          "endReason": {
+            "nullable": true,
+            "enum": [
+              "LOGOUT",
+              "LOGOUT_ALL",
+              "ADMIN",
+              "PASSWORD_CHANGED",
+              "USER_DISABLED",
+              "TOKEN_REUSE",
+              "PHONE_CHANGED",
+              "ACCOUNT_DISABLED",
+              "CUSTOMER_INACTIVE",
+              "EXPIRED"
+            ],
+            "type": "string",
+            "description": "Why it ended; null while it is live"
           }
         },
         "required": [
@@ -45161,7 +45194,9 @@
           "lastUsedAt",
           "expiresAt",
           "userAgent",
-          "ip"
+          "ip",
+          "endedAt",
+          "endReason"
         ]
       },
       "SessionList": {
@@ -45176,7 +45211,7 @@
           "nextCursor": {
             "type": "string",
             "nullable": true,
-            "description": "Always null: live sessions only"
+            "description": "Always null: one page"
           }
         },
         "required": [

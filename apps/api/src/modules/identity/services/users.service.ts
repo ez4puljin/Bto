@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { usernameFromPhone } from '@tugeel/shared/auth';
 import { normalizeMnPhone } from '@tugeel/shared/phone';
-import { and, asc, eq, gt, ilike, inArray, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, ilike, inArray, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
 import { AppConfig } from '../../../common/config/app-config';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -9,7 +9,16 @@ import { inTransaction } from '../../../common/db/transaction';
 import { AppError } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import type { AuthContext } from '../auth-context';
-import { authSessions, branches, roles, userRoles, userScopes, users, warehouses } from '../schema';
+import {
+  authSessions,
+  branches,
+  roles,
+  type SessionRevokeReason,
+  userRoles,
+  userScopes,
+  users,
+  warehouses,
+} from '../schema';
 import { AuditService } from './audit.service';
 import { AuthService } from './auth.service';
 import { mirrorCompanyRoles } from './company-roles';
@@ -67,7 +76,14 @@ export interface SessionView {
   expiresAt: Date;
   userAgent: string | null;
   ip: string | null;
+  /** When it stopped being usable: signed out, revoked or run out; null while it is live. */
+  endedAt: Date | null;
+  /** Why: a revoke reason, or EXPIRED; null while it is live. */
+  endReason: SessionRevokeReason | 'EXPIRED' | null;
 }
+
+/** How many sign-ins of the trail one answer carries (the newest ones). */
+export const SESSION_HISTORY_LIMIT = 200;
 
 function invalid(path: string, constraint: string, message: string): AppError {
   return new AppError('VALIDATION_FAILED', message, undefined, [{ path, constraint, message }]);
@@ -267,9 +283,15 @@ export class UsersService {
     });
   }
 
-  async sessions(id: number): Promise<SessionView[]> {
+  /**
+   * The devices signed in to the account now, oldest first; with `history`, the sign-in trail
+   * instead: every session identity still keeps (90 days after it ended), ended ones too, newest
+   * first, with when and why each ended.
+   */
+  async sessions(id: number, history = false): Promise<SessionView[]> {
     await this.get(id);
-    return this.db
+    const live = and(isNull(authSessions.revokedAt), gt(authSessions.expiresAt, sql`now()`));
+    const rows = await this.db
       .select({
         id: authSessions.id,
         createdAt: authSessions.createdAt,
@@ -277,16 +299,19 @@ export class UsersService {
         expiresAt: authSessions.expiresAt,
         userAgent: authSessions.userAgent,
         ip: authSessions.ip,
+        revokedAt: authSessions.revokedAt,
+        revokedReason: authSessions.revokedReason,
+        expired: sql<boolean>`${authSessions.expiresAt} <= now()`,
       })
       .from(authSessions)
-      .where(
-        and(
-          eq(authSessions.userId, id),
-          isNull(authSessions.revokedAt),
-          gt(authSessions.expiresAt, sql`now()`),
-        ),
-      )
-      .orderBy(asc(authSessions.createdAt));
+      .where(history ? eq(authSessions.userId, id) : and(eq(authSessions.userId, id), live))
+      .orderBy(history ? desc(authSessions.createdAt) : asc(authSessions.createdAt))
+      .limit(SESSION_HISTORY_LIMIT);
+    return rows.map(({ revokedAt, revokedReason, expired, ...row }) => ({
+      ...row,
+      endedAt: revokedAt ?? (expired ? row.expiresAt : null),
+      endReason: revokedAt ? (revokedReason ?? 'ADMIN') : expired ? 'EXPIRED' : null,
+    }));
   }
 
   /** Revokes one device (sessionId) or every device of a user. */

@@ -1,3 +1,4 @@
+import { describeClient } from '@tugeel/shared/device';
 import { LogOut } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,6 +25,7 @@ import {
   useBranches,
   useIdentityMutations,
   useRoles,
+  useUserSessionHistory,
   useUserSessions,
   useWarehouses,
 } from './api';
@@ -134,12 +136,97 @@ function AccessFacts({ user }: { user: UserDetail }) {
 
 type Asking = 'all' | { sessionId: string } | null;
 
-/** The devices signed in to the account; each signed out after asking. */
+/**
+ * A session's device in words: our apps say their phone («samsung SM-A546E · Android 14 · Bto-staff
+ * 0.19.0 · суулгац 3f2a9c1e»), a browser its name and system; anything else is shown as it came.
+ */
+function useDeviceText(): (userAgent: string | null) => string {
+  const { t } = useTranslation();
+  return (userAgent) => {
+    const client = describeClient(userAgent);
+    switch (client.kind) {
+      case 'app':
+        return t('users.detail.appOn', {
+          device: client.device,
+          os: client.os,
+          app: client.app,
+          version: client.appVersion,
+          install: client.installId,
+        });
+      case 'browser':
+        return client.os
+          ? t('users.detail.browserOn', { browser: client.browser, os: client.os })
+          : client.browser;
+      case 'legacyApp':
+        return t('users.detail.oldApp');
+      case 'other':
+        return client.raw;
+      default:
+        return t('users.detail.unknownDevice');
+    }
+  };
+}
+
+type EndReason = NonNullable<ReturnType<typeof useUserSessionHistory>['data']>[number]['endReason'];
+
+/** The sign-in trail of the last 90 days, opened on demand under the live devices. */
+function SessionHistory({ userId }: { userId: number }) {
+  const { t } = useTranslation();
+  const history = useUserSessionHistory(userId, true);
+  const deviceText = useDeviceText();
+  const reason = (value: EndReason): string =>
+    value === null
+      ? t('users.detail.live')
+      : t(`users.detail.endReasons.${value}`, { defaultValue: value });
+  if (history.isPending) {
+    return (
+      <p role="status" className="px-4 py-3 text-sm text-muted-foreground">
+        {t('common.loading')}
+      </p>
+    );
+  }
+  if (!history.data?.length) {
+    return <p className="px-4 py-3 text-sm text-muted-foreground">{t('users.detail.noHistory')}</p>;
+  }
+  return (
+    <Table aria-label={t('users.detail.history')}>
+      <TableHeader>
+        <TableRow>
+          <TableHead>{t('users.detail.device')}</TableHead>
+          <TableHead>{t('users.detail.address')}</TableHead>
+          <TableHead>{t('users.detail.started')}</TableHead>
+          <TableHead>{t('users.detail.ended')}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {history.data.map((session) => (
+          <TableRow key={session.id}>
+            <TruncateCell text={deviceText(session.userAgent)} />
+            <TableCell className="font-mono">{session.ip ?? t('common.none')}</TableCell>
+            <TableCell className="font-mono">{when(session.createdAt)}</TableCell>
+            <TableCell>
+              {session.endedAt === null
+                ? reason(null)
+                : `${when(session.endedAt)} · ${reason(session.endReason)}`}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+/**
+ * The devices signed in to the account, each signed out after asking; «Түүх харах» opens the
+ * sign-in trail under them.
+ */
 export function UserSessionsCard({ userId }: { userId: number }) {
   const { t } = useTranslation();
   const sessions = useUserSessions(userId, true);
   const mutations = useIdentityMutations();
   const [asking, setAsking] = useState<Asking>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const deviceText = useDeviceText();
   const confirm = () => {
     if (asking === null) return;
     mutations.revokeSession.mutate(
@@ -151,13 +238,21 @@ export function UserSessionsCard({ userId }: { userId: number }) {
     <Card>
       <CardHeader>
         <CardTitle>{t('users.detail.sessions')}</CardTitle>
-        {sessions.data?.length ? (
-          <CardAction>
+        <CardAction className="flex flex-wrap justify-end gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-expanded={showHistory}
+            onClick={() => setShowHistory((shown) => !shown)}
+          >
+            {showHistory ? t('users.detail.hideHistory') : t('users.detail.showHistory')}
+          </Button>
+          {sessions.data?.length ? (
             <Button size="sm" variant="outline" onClick={() => setAsking('all')}>
               {t('users.detail.revokeAll')}
             </Button>
-          </CardAction>
-        ) : null}
+          ) : null}
+        </CardAction>
       </CardHeader>
       {/* The table runs to the card's edges: its first column lines up with the title. */}
       <CardContent className={sessions.data?.length ? 'px-0' : undefined}>
@@ -178,7 +273,7 @@ export function UserSessionsCard({ userId }: { userId: number }) {
               {sessions.data.map((session) => (
                 <TableRow key={session.id}>
                   <TruncateCell
-                    text={`${session.ip ?? t('common.none')}${session.userAgent ? ` · ${session.userAgent}` : ''}`}
+                    text={`${deviceText(session.userAgent)} · ${session.ip ?? t('common.none')}`}
                   />
                   <TableCell className="font-mono">{when(session.createdAt)}</TableCell>
                   <TableCell className="font-mono">{when(session.lastUsedAt)}</TableCell>
@@ -199,6 +294,14 @@ export function UserSessionsCard({ userId }: { userId: number }) {
           <p className="text-sm text-muted-foreground">{t('users.detail.noSessions')}</p>
         )}
       </CardContent>
+      {showHistory ? (
+        <CardContent className="border-t border-border/80 px-0">
+          <p className="px-4 py-2 text-[0.75rem] text-muted-foreground">
+            {t('users.detail.historyHint')}
+          </p>
+          <SessionHistory userId={userId} />
+        </CardContent>
+      ) : null}
       <ConfirmDialog
         open={asking !== null}
         title={asking === 'all' ? t('users.detail.revokeAllTitle') : t('users.detail.revokeTitle')}

@@ -13,6 +13,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { PageQueryDto } from '../../../common/pagination/page';
+import { SESSION_REVOKE_REASONS, type SessionRevokeReason } from '../schema';
 
 const USER_STATUSES = ['ACTIVE', 'DISABLED'] as const;
 
@@ -165,14 +166,34 @@ export class SessionDto {
   @ApiProperty({ format: 'date-time' }) createdAt: string;
   @ApiProperty({ format: 'date-time' }) lastUsedAt: string;
   @ApiProperty({ format: 'date-time' }) expiresAt: string;
-  @ApiProperty({ type: String, nullable: true }) userAgent: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'What the client called itself; our apps say app, version, system, phone and an install id',
+  })
+  userAgent: string | null;
   @ApiProperty({ type: String, nullable: true }) ip: string | null;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'When it was signed out, revoked or ran out; null while it is live',
+  })
+  endedAt: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    enum: [...SESSION_REVOKE_REASONS, 'EXPIRED'],
+    description: 'Why it ended; null while it is live',
+  })
+  endReason: SessionRevokeReason | 'EXPIRED' | null;
 }
 
 @ApiSchema({ name: 'SessionList' })
 export class SessionListDto {
   @ApiProperty({ type: [SessionDto] }) data: SessionDto[];
-  @ApiProperty({ type: String, nullable: true, description: 'Always null: live sessions only' })
+  @ApiProperty({ type: String, nullable: true, description: 'Always null: one page' })
   nextCursor: null;
 }
 

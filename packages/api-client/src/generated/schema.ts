@@ -11142,12 +11142,23 @@ export interface components {
             lastUsedAt: string;
             /** Format: date-time */
             expiresAt: string;
+            /** @description What the client called itself; our apps say app, version, system, phone and an install id */
             userAgent: string | null;
             ip: string | null;
+            /**
+             * Format: date-time
+             * @description When it was signed out, revoked or ran out; null while it is live
+             */
+            endedAt: string | null;
+            /**
+             * @description Why it ended; null while it is live
+             * @enum {string|null}
+             */
+            endReason: "LOGOUT" | "LOGOUT_ALL" | "ADMIN" | "PASSWORD_CHANGED" | "USER_DISABLED" | "TOKEN_REUSE" | "PHONE_CHANGED" | "ACCOUNT_DISABLED" | "CUSTOMER_INACTIVE" | "EXPIRED" | null;
         };
         SessionList: {
             data: components["schemas"]["Session"][];
-            /** @description Always null: live sessions only */
+            /** @description Always null: one page */
             nextCursor: string | null;
         };
         PermissionInfo: {
@@ -24334,7 +24345,10 @@ export interface operations {
     };
     Users_sessions: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description true: the sign-in trail (ended sessions too, kept 90 days), newest first, at most 200 */
+                history?: string;
+            };
             header?: never;
             path: {
                 id: number;

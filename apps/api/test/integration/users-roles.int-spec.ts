@@ -7,7 +7,7 @@ import type { Db } from '../../src/common/db/db.types';
 import { inTransaction } from '../../src/common/db/transaction';
 import { syncAccessCatalog } from '../../src/modules/identity/reference-data';
 import { connectAs, createHttpApp } from '../harness/apps';
-import { bearer, login, seedUser, testIp, uniquePhone } from '../harness/identity';
+import { bearer, login, loginOf, seedUser, testIp, uniquePhone } from '../harness/identity';
 
 interface RoleBody {
   id: number;
@@ -256,6 +256,65 @@ describe('users and roles API (SPEC §5.1, ADR-0027)', () => {
         .send({ status: 'DISABLED' })
         .expect(200);
       await http().get('/api/v1/auth/me').set(bearer(accessToken)).expect(401);
+    });
+
+    it('keeps the device of a sign-in: on the live list, in the trail after it ends, in the audit', async () => {
+      const user = await seedUser(app);
+      const device = 'Bto-staff/0.19.0 (Android 14; samsung SM-A546E; id 3f2a9c1e)';
+      const signIn = await http()
+        .post('/api/v1/auth/login')
+        .set('User-Agent', device)
+        .set('X-Forwarded-For', '203.0.113.77')
+        .send({ login: loginOf(user), password: user.password })
+        .expect(200);
+      type Row = {
+        id: string;
+        userAgent: string;
+        ip: string;
+        endedAt: string | null;
+        endReason: string | null;
+      };
+      const listed = async (query = ''): Promise<Row[]> =>
+        (
+          (await http().get(`/api/v1/users/${user.id}/sessions${query}`).set(asAdmin()).expect(200))
+            .body as { data: Row[] }
+        ).data;
+
+      const [live] = await listed();
+      expect(live).toMatchObject({ userAgent: device, endedAt: null, endReason: null });
+      expect(live?.ip).toContain('203.0.113.77');
+
+      // A second sign-in, then the first is signed out by the admin: the live list forgets it,
+      // the trail keeps it with when and why, newest first.
+      const second = await login(app, user);
+      await http()
+        .delete(`/api/v1/users/${user.id}/sessions/${live?.id ?? ''}`)
+        .set(asAdmin())
+        .expect(204);
+      expect((await listed()).map((row) => row.id)).not.toContain(live?.id);
+      const trail = await listed('?history=true');
+      expect(trail).toHaveLength(2);
+      expect(trail[0]?.endedAt).toBeNull();
+      expect(trail[1]).toMatchObject({ id: live?.id, userAgent: device, endReason: 'ADMIN' });
+      expect(Date.parse(trail[1]?.endedAt ?? '')).toBeGreaterThan(0);
+      await http().get('/api/v1/auth/me').set(bearer(second.accessToken)).expect(200);
+
+      // A session that ran out says so.
+      await sql.query(
+        `UPDATE auth_sessions SET created_at = now() - interval '2 hours', last_used_at = now() - interval '1 hour', expires_at = now() - interval '1 minute' WHERE user_id = $1 AND revoked_at IS NULL`,
+        [user.id],
+      );
+      const ranOut = (await listed('?history=true')).find((row) => row.id !== live?.id);
+      expect(ranOut).toMatchObject({ endReason: 'EXPIRED' });
+      expect(ranOut?.endedAt).not.toBeNull();
+
+      // The audit row of the sign-in keeps the device for good.
+      const audit = await sql.query<{ after: { userAgent: string; ip: string } }>(
+        `SELECT after FROM audit_log WHERE action = 'LOGIN' AND entity = 'auth_sessions' AND entity_id = $1`,
+        [live?.id],
+      );
+      expect(audit.rows[0]?.after).toMatchObject({ userAgent: device });
+      expect(signIn.body.accessToken).toBeTruthy();
     });
 
     it('lists and revokes devices, and unlocks a locked account', async () => {

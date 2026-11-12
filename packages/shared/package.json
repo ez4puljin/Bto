@@ -42,6 +42,11 @@
       "types": "./dist/phone/index.d.ts",
       "default": "./dist/phone/index.js"
     },
+    "./device": {
+      "@tugeel/source": "./src/device/index.ts",
+      "types": "./dist/device/index.d.ts",
+      "default": "./dist/device/index.js"
+    },
     "./text": {
       "@tugeel/source": "./src/text/index.ts",
       "types": "./dist/text/index.d.ts",

@@ -437,6 +437,8 @@ export class AuthService {
       action: 'LOGIN',
       entity: 'auth_sessions',
       entityId: session.id,
+      // The audit keeps the device for good; the session row goes 90 days after it ends.
+      after: { userAgent: client.userAgent, ip: client.ip },
     });
     return { sessionId: session.id, token, expiresAt: session.expiresAt };
   }

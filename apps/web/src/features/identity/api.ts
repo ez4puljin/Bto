@@ -79,6 +79,22 @@ export function useUserSessions(id: number, enabled: boolean) {
   });
 }
 
+/** The sign-in trail: ended sessions too (kept 90 days), newest first. Under the sessions' key. */
+export function useUserSessionHistory(id: number, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.users, id, 'sessions', 'history'],
+    enabled,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/users/{id}/sessions', {
+          params: { path: { id }, query: { history: 'true' } },
+          signal,
+        }),
+      ).data,
+  });
+}
+
 export function useRoles() {
   const api = useApiClient();
   return useQuery({

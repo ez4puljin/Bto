@@ -12,7 +12,13 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCreatedResponse,
+  ApiNoContentResponse,
+  ApiOkResponse,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { AuthContext } from '../auth-context';
 import { Authenticated, CurrentUser, RequirePermission } from '../decorators/access.decorators';
 import { UserNamesService } from '../services/user-names.service';
@@ -70,6 +76,8 @@ function toSessionDto(session: SessionView): SessionDto {
     expiresAt: session.expiresAt.toISOString(),
     userAgent: session.userAgent,
     ip: session.ip,
+    endedAt: session.endedAt?.toISOString() ?? null,
+    endReason: session.endReason,
   };
 }
 
@@ -152,9 +160,19 @@ export class UsersController {
 
   @Get(':id/sessions')
   @RequirePermission('identity.users.manage')
+  @ApiQuery({
+    name: 'history',
+    required: false,
+    description:
+      'true: the sign-in trail (ended sessions too, kept 90 days), newest first, at most 200',
+  })
   @ApiOkResponse({ type: SessionListDto })
-  async sessions(@Param('id', ParseIntPipe) id: number): Promise<SessionListDto> {
-    return { data: (await this.users.sessions(id)).map(toSessionDto), nextCursor: null };
+  async sessions(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('history') history?: string,
+  ): Promise<SessionListDto> {
+    const rows = await this.users.sessions(id, history === 'true');
+    return { data: rows.map(toSessionDto), nextCursor: null };
   }
 
   @Delete(':id/sessions/:sessionId')
