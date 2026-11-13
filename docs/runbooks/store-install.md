@@ -206,9 +206,23 @@ bash deploy/store/setup.sh      # builds, applies the migrations, restarts (the 
 bash deploy/edge/setup.sh       # then the edge and the kiosk (the tills pause for a minute)
 ```
 
+Since ADR-0196 the update also: asks what CI said about this commit and stops on a red one (`--no-ci-check` goes on anyway); keeps the images that were running as `:store-previous`, so `rollback.sh` below is half a minute; and replaces the four `api-apps` replicas one at a time, so «Bto300» and the staff app keep answering while the rest of the stack restarts.
+
 `http://192.168.1.152/system/status` shows the new version. Logs: `$S logs -f --tail 100 api` (or `worker`, `web`, `postgres`).
 
 ## 8. Roll back
+
+**The fast way (ADR-0196), when an update has just gone wrong:**
+
+```bash
+cd ~/bto
+bash deploy/store/rollback.sh      # the images of the previous update, back in about half a minute
+curl -s http://127.0.0.1/health    # the version it now reports
+```
+
+It moves the running system only: the checkout stays on the newer commit, so the next `setup.sh` builds that code again — fix forward and push. It refuses when a migration stands between the two versions (`--force` goes on anyway), because the older code may not fit the changed tables; the night's backup (§9) is the answer then.
+
+**By hand, when there is no kept image (the first update on a box):**
 
 - **The code**, when the update applied no migration (`git diff --stat <old> <new> -- apps/api/src/db/migrations` is empty): `git checkout <old commit>`, both setup scripts again, and `git checkout main` when the fix is in.
 - **After a migration** the old code may not fit the new tables. Fix forward (a new commit on main, §7). The last resort is the data of last night: §9 from step 3 on the same box. Everything typed since that backup is lost, so it is the owner's decision.

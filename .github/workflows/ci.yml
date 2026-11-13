@@ -106,3 +106,5 @@ jobs:
           for script in deploy/store/*.sh; do bash -n "$script"; done
           # The watchman's memory (ADR-0195): when a problem is said, repeated and closed.
           bash deploy/store/watch.test.sh
+          # The deploy library's decisions (ADR-0196): CI verdicts, the kept versions, the roll.
+          bash deploy/store/deploy-lib.test.sh
