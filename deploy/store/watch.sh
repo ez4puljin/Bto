@@ -27,7 +27,12 @@ REMIND_HOURS=$(store_setting STORE_ALERT_REMIND_HOURS 6)
 DISK_PERCENT=$(store_setting STORE_ALERT_DISK_PERCENT 85)
 BACKUP_HOURS=$(store_setting STORE_ALERT_BACKUP_HOURS 26)
 ERROR_COUNT=$(store_setting STORE_ALERT_ERROR_COUNT 10)
-LOG_WINDOW=10m
+LOG_WINDOW_SECONDS=600
+# Newest lines read from each process's log; a busier minute than this is a bigger worry than
+# the count being exact.
+LOG_TAIL=2000
+# What is read instead when the long read stops at a hole (see log_recent).
+LOG_TAIL_SHORT=200
 case "$REMIND_HOURS$DISK_PERCENT$BACKUP_HOURS$ERROR_COUNT" in
   *[!0-9]* | "") echo "the STORE_ALERT_* numbers must be whole numbers" >&2; exit 64 ;;
 esac
@@ -148,17 +153,57 @@ check_backup() {
   esac
 }
 
+# The `"time"` (milliseconds) of the last timestamped line of a read, or 0.
+newest_time() {
+  printf '%s\n' "$1" | grep -oE '"time":[0-9]+' | tail -n 1 | cut -d: -f2 | grep -E '^[0-9]+$' || echo 0
+}
+
+# The end of a container's log, and whether it had to be read short to get there.
+#
+# The lines are taken from the END (`--tail`), not from a window (`--since`): a power cut leaves a
+# hole of unwritten bytes in the log file, and Docker's reader, which parses from the start, stops
+# at it. On 2026-11-13 `--since` answered «nothing» for two containers that were serving all the
+# while, which would have made this check quietly blind. A read long enough to cross the hole
+# degrades the same way, so when the long read brings nothing recent, a short one is tried: if it
+# comes back newer, the log has a hole, and what it holds is counted instead of nothing.
+# Sets LOG_TEXT and LOG_DAMAGED; not a value to capture, because `$(…)` would lose the second.
+LOG_TEXT=""
+LOG_DAMAGED=""
+read_log() {
+  local name=$1 since=$2 short
+  LOG_DAMAGED=""
+  LOG_TEXT=$(docker logs --tail "$LOG_TAIL" "$name" 2>&1 || true)
+  [ "$(newest_time "$LOG_TEXT")" -lt "$since" ] || return 0
+  short=$(docker logs --tail "$LOG_TAIL_SHORT" "$name" 2>&1 || true)
+  if [ "$(newest_time "$short")" -gt "$(newest_time "$LOG_TEXT")" ]; then
+    LOG_DAMAGED=$name
+    LOG_TEXT=$short
+  fi
+}
+
+count_since() {
+  printf '%s\n' "$1" | grep -E "$3" |
+    awk -v since="$2" -F'"time":' '{ split($2, t, ","); if (t[1] + 0 >= since) n++ } END { print n + 0 }'
+}
+
 # The last minutes of the api processes' logs: server errors, and reports the gate refused
 # (ADR-0193: a sign that its numbers are too small for the day's work).
 check_logs() {
-  local names name errors=0 refused=0 log
+  local names name errors=0 refused=0 since damaged=""
+  since=$((($(now) - LOG_WINDOW_SECONDS) * 1000))
   names=$(docker ps --filter label=com.docker.compose.project=bto-store --format '{{.Names}}|{{.Label "com.docker.compose.service"}}' 2>/dev/null) || return 0
+  # A here-string, not a pipe: the counts and LOG_DAMAGED are read in this shell.
   while IFS='|' read -r name service; do
     case "$service" in api | api-apps | api-reports | worker) ;; *) continue ;; esac
-    log=$(docker logs --since "$LOG_WINDOW" "$name" 2>&1 || true)
-    errors=$((errors + $(printf '%s\n' "$log" | grep -cE '"level":(50|60)')))
-    refused=$((refused + $(printf '%s\n' "$log" | grep -c 'report refused')))
+    read_log "$name" "$since"
+    [ -z "$LOG_DAMAGED" ] || damaged="$damaged ${LOG_DAMAGED#bto-store-}"
+    errors=$((errors + $(count_since "$LOG_TEXT" "$since" '"level":(50|60)')))
+    refused=$((refused + $(count_since "$LOG_TEXT" "$since" 'report refused')))
   done <<<"$names"
+  if [ -n "$damaged" ]; then
+    found logs 2 "🟡 Логийн файл эвдэрсэн тул бүрэн уншигдахгүй байна:$damaged
+Тог тасарсны дараа ийм болдог. Контейнерийг дахин үүсгэвэл засагдана (bash deploy/store/setup.sh)."
+  fi
   if [ "$errors" -ge "$ERROR_COUNT" ]; then
     found errors 1 "🟠 Сүүлийн 10 минутад $errors алдаа бүртгэгдлээ. «Системийн төлөв» хуудсыг шалгана уу."
   fi
