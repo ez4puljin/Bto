@@ -13,11 +13,14 @@ cd "$(dirname "$0")/../.."
 COMPOSE_FILE=deploy/store/docker-compose.store.yml
 ENV_FILE=deploy/store/.env
 START_EMPTY=no
+CI_CHECK=yes
 for arg in "$@"; do
   case "$arg" in
     --start) START_EMPTY=yes ;;
+    # CI has not seen this commit, or its answer is not to be waited for: deploy anyway.
+    --no-ci-check) CI_CHECK=no ;;
     *)
-      echo "Танигдаагүй сонголт: $arg (зөвхөн --start)" >&2
+      echo "Танигдаагүй сонголт: $arg (--start, --no-ci-check)" >&2
       exit 64
       ;;
   esac
@@ -35,6 +38,9 @@ fi
 DOCKER=(docker)
 if ! docker info >/dev/null 2>&1; then DOCKER=(sudo docker); fi
 COMPOSE=("${DOCKER[@]}" compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE")
+# The way back, the rolling of the app replicas and what CI said (ADR-0196); needs DOCKER, COMPOSE.
+# shellcheck source=deploy/store/deploy-lib.sh
+. "$(dirname "$0")/deploy-lib.sh"
 
 random_hex() { head -c "$1" /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 random_base64() { head -c "$1" /dev/urandom | base64 | tr -d '\n'; }
@@ -86,6 +92,22 @@ fi
 APP_VERSION=$(git rev-parse --short HEAD 2>/dev/null || echo local)
 export APP_VERSION
 
+if [ "$CI_CHECK" = "yes" ]; then
+  case "$(ci_verdict)" in
+    success) echo "== CI энэ хувилбарыг шалгасан: ногоон" ;;
+    failure)
+      echo "ЗОГСЛОО: CI энэ хувилбар дээр алдаа олсон ($APP_VERSION)." >&2
+      echo "Засвар хийгээд дахин push хийнэ үү. Заавал тавих бол:  bash deploy/store/setup.sh --no-ci-check" >&2
+      exit 1
+      ;;
+    pending) echo "== АНХААР: CI энэ хувилбарыг шалгаж дуусаагүй байна. Үргэлжлүүлж байна." ;;
+    *) echo "== CI-ийн хариу мэдэгдэхгүй (GitHub-д нэвтрээгүй эсвэл ажиллаагүй). Үргэлжлүүлж байна." ;;
+  esac
+fi
+
+# What runs now is kept as :store-previous, so rollback.sh is a retag instead of a rebuild.
+keep_previous_images
+
 echo "== Image-үүдийг бүтээж байна (эхний удаа 10-20 минут) — хувилбар $APP_VERSION"
 "${COMPOSE[@]}" build api web
 
@@ -112,8 +134,15 @@ EOF
   exit 0
 fi
 
+# The two apps keep answering while the centre is updated (ADR-0196): their processes are
+# replaced one at a time, before the rest of the stack restarts together.
+echo "== Аппын процессуудыг ээлжлэн солиж байна"
+roll_service api-apps
+roll_service api-reports
+
 echo "== Төв системийг асааж байна"
 "${COMPOSE[@]}" up -d --wait
+record_deployed "$APP_VERSION"
 
 if command -v ufw >/dev/null 2>&1 && sudo -n true 2>/dev/null &&
   sudo ufw status 2>/dev/null | grep -q '^Status: active'; then
@@ -141,5 +170,6 @@ cat <<EOF
 Зөвхөн дэлгүүрийн дотоод сүлжээнээс нээгдэнэ. Посын хуудас хэвээр: http://${IP:-<IP>}:7400
 Нөөцлөлтийг нэг удаа тохируулна:  sudo bash deploy/store/install-backup-timer.sh
 Утас руу сэрэмжлүүлгийг нэг удаа тохируулна:  bash deploy/store/alerts-setup.sh
+Ямар нэг зүйл эвдэрвэл өмнөх хувилбар руу буцаах:  bash deploy/store/rollback.sh
 Заавар: docs/runbooks/store-install.mn.md
 EOF
