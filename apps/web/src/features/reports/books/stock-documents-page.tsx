@@ -117,6 +117,7 @@ export function StockDocumentsPage() {
           title={title}
           actions={
             <BookActions
+              views="stock-documents"
               ready={state.query !== null && report.data !== undefined}
               period={state.query}
               onPrompt={openPrompt}

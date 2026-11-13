@@ -57,6 +57,7 @@ import {
   RefreshControl,
   SummaryTile,
 } from './report-kit';
+import { ReportViews } from './report-views';
 
 const isFilter = (value: string | null): value is StockFilterKind =>
   STOCK_FILTERS.some((filter) => filter === value);
@@ -236,6 +237,7 @@ export function StockReportPage() {
         description={t('reports.stock.description')}
         actions={
           <>
+            <ReportViews page="stock" />
             <RefreshControl />
             <ExcelButton
               disabled={downloads.stock.isPending}

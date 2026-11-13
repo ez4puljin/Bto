@@ -52,6 +52,7 @@ import {
 } from './api';
 import { idParam, marginText, NONE, reportHref, useRange } from './report-helpers';
 import { AmountCell, ExcelButton, PrintHeading, PrintLink, RefreshControl } from './report-kit';
+import { ReportViews } from './report-views';
 
 const isGrouping = (value: string | null): value is ProfitGrouping =>
   PROFIT_GROUPINGS.some((by) => by === value);
@@ -464,6 +465,7 @@ export function ProfitPage() {
         }
         actions={
           <>
+            <ReportViews page="profit" />
             <RefreshControl />
             <ExcelButton
               disabled={!valid || downloads.profit.isPending}

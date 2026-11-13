@@ -47,6 +47,11 @@
       "types": "./dist/device/index.d.ts",
       "default": "./dist/device/index.js"
     },
+    "./reports": {
+      "@tugeel/source": "./src/reports/index.ts",
+      "types": "./dist/reports/index.d.ts",
+      "default": "./dist/reports/index.js"
+    },
     "./text": {
       "@tugeel/source": "./src/text/index.ts",
       "types": "./dist/text/index.d.ts",

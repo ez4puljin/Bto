@@ -244,6 +244,7 @@ export function ProductSalesPage() {
           title={title}
           actions={
             <BookActions
+              views="product-sales"
               ready={state.query !== null && report !== null}
               period={state.query}
               onPrompt={openPrompt}

@@ -40180,6 +40180,207 @@
         ]
       }
     },
+    "/api/v1/reports/views": {
+      "get": {
+        "operationId": "ReportViews_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "party-ledger",
+                "money-ledger",
+                "stock-balance",
+                "product-sales",
+                "stock-documents",
+                "aging",
+                "profit",
+                "stock",
+                "suppliers"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportViewList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      },
+      "post": {
+        "operationId": "ReportViews_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportViewCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/views/{id}": {
+      "patch": {
+        "operationId": "ReportViews_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportViewUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      },
+      "delete": {
+        "operationId": "ReportViews_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
     "/api/v1/purchase-orders/{id}/suppliers/{supplierId}/invoice-checks": {
       "get": {
         "operationId": "PurchaseOrders_invoiceChecksOf",
@@ -84958,6 +85159,185 @@
           "data"
         ]
       },
+      "ReportViewAuthor": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "fullName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "fullName"
+        ]
+      },
+      "ReportView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "page": {
+            "enum": [
+              "party-ledger",
+              "money-ledger",
+              "stock-balance",
+              "product-sales",
+              "stock-documents",
+              "aging",
+              "profit",
+              "stock",
+              "suppliers"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string",
+            "description": "Address parameters, without the dates when `period` is set"
+          },
+          "period": {
+            "nullable": true,
+            "enum": [
+              "thisMonth",
+              "lastMonth",
+              "thisQuarter",
+              "thisYear"
+            ],
+            "type": "string"
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "mine": {
+            "type": "boolean",
+            "description": "The caller made it"
+          },
+          "editable": {
+            "type": "boolean",
+            "description": "The caller may change it"
+          },
+          "removable": {
+            "type": "boolean",
+            "description": "The caller may delete it"
+          },
+          "createdBy": {
+            "$ref": "#/components/schemas/ReportViewAuthor"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "page",
+          "name",
+          "query",
+          "period",
+          "shared",
+          "mine",
+          "editable",
+          "removable",
+          "createdBy",
+          "updatedAt"
+        ]
+      },
+      "ReportViewList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportView"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ReportViewCreateRequest": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "enum": [
+              "party-ledger",
+              "money-ledger",
+              "stock-balance",
+              "product-sales",
+              "stock-documents",
+              "aging",
+              "profit",
+              "stock",
+              "suppliers"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "The page’s address parameters as the browser writes them"
+          },
+          "period": {
+            "nullable": true,
+            "enum": [
+              "thisMonth",
+              "lastMonth",
+              "thisQuarter",
+              "thisYear"
+            ],
+            "type": "string",
+            "description": "A period that moves with the calendar; null keeps the dates of `query`"
+          },
+          "shared": {
+            "type": "boolean",
+            "description": "Shown to everyone who may open the page"
+          }
+        },
+        "required": [
+          "page",
+          "name",
+          "query",
+          "period",
+          "shared"
+        ]
+      },
+      "ReportViewUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "period": {
+            "nullable": true,
+            "enum": [
+              "thisMonth",
+              "lastMonth",
+              "thisQuarter",
+              "thisYear"
+            ],
+            "type": "string"
+          },
+          "shared": {
+            "type": "boolean"
+          }
+        }
+      },
       "PurchaseOrderInvoiceCheckLine": {
         "type": "object",
         "properties": {
@@ -89168,6 +89548,7 @@
           "SERVICE_UNAVAILABLE",
           "QUERY_TIMEOUT",
           "REPORTS_BUSY",
+          "REPORT_VIEW_LIMIT",
           "IDEMPOTENCY_KEY_REQUIRED",
           "IDEMPOTENCY_KEY_REUSED",
           "IDEMPOTENCY_KEY_IN_PROGRESS",

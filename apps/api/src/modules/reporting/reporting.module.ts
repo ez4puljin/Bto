@@ -3,6 +3,7 @@ import { JobsWorkerModule } from '../../common/jobs/worker/jobs-worker.module';
 import { JobWorkerService } from '../../common/jobs/worker/job-worker.service';
 import { IdentityModule } from '../identity';
 import { BookReportsController } from './controllers/book-reports.controller';
+import { ReportViewsController } from './controllers/report-views.controller';
 import { ReportsController } from './controllers/reports.controller';
 import { ReportingRefreshJob } from './jobs/refresh.job';
 import { AgingService } from './services/aging.service';
@@ -12,6 +13,7 @@ import { ProductSalesService } from './services/product-sales.service';
 import { ProfitService } from './services/profit.service';
 import { RefreshService } from './services/refresh.service';
 import { ReportContext } from './services/report-context';
+import { ReportViewsService } from './services/report-views.service';
 import { StockBalanceService } from './services/stock-balance.service';
 import { StockDocumentsService } from './services/stock-documents.service';
 import { StockReportService } from './services/stock-report.service';
@@ -34,13 +36,17 @@ const SERVICES = [
   StockBalanceService,
   ProductSalesService,
   StockDocumentsService,
+  ReportViewsService,
 ];
 
 @Module({ imports: [IdentityModule], providers: SERVICES, exports: SERVICES })
 export class ReportingModule {}
 
 /** The HTTP side of the reports. */
-@Module({ imports: [ReportingModule], controllers: [ReportsController, BookReportsController] })
+@Module({
+  imports: [ReportingModule],
+  controllers: [ReportsController, BookReportsController, ReportViewsController],
+})
 export class ReportingHttpModule {}
 
 /** Registers the refresh of the daily totals once the worker has started (worker only). */

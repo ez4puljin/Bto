@@ -1,4 +1,5 @@
 import { ChevronRight, Download, Info, Printer, SlidersHorizontal, X } from 'lucide-react';
+import type { ReportViewPage } from '@tugeel/shared/reports';
 import { businessDate, businessDateTime } from '@tugeel/shared/time';
 import { Popover } from 'radix-ui';
 import {
@@ -34,6 +35,7 @@ import { useAuthState } from '@/app/auth-context';
 import { useCompanyName } from '@/features/company/api';
 import { cn } from '@/lib/utils';
 import { DATE } from '../report-helpers';
+import { ReportViews } from '../report-views';
 import {
   BOOK_TABLE,
   type BookColumn,
@@ -335,6 +337,8 @@ export function BookActions(props: {
   /** The report is on screen (Excel and print have something to take). */
   ready: boolean;
   period: { from: string; to: string } | null;
+  /** The page whose saved views «Загвар» offers (ADR-0194). */
+  views?: ReportViewPage;
 }) {
   const { t } = useTranslation();
   const period = props.period ? periodText(props.period.from, props.period.to) : null;
@@ -363,6 +367,7 @@ export function BookActions(props: {
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
+      {props.views ? <ReportViews page={props.views} /> : null}
       {props.onExcel ? (
         <Button
           variant="outline"

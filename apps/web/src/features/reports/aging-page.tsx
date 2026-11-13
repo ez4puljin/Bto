@@ -56,6 +56,7 @@ import {
   RefreshControl,
   SummaryTile,
 } from './report-kit';
+import { ReportViews } from './report-views';
 
 const isGroup = (value: string | null): value is SettlementGroup =>
   SETTLEMENT_GROUPS.some((group) => group === value);
@@ -320,6 +321,7 @@ export function AgingPage() {
         }
         actions={
           <>
+            <ReportViews page="aging" />
             <RefreshControl />
             <ExcelButton
               disabled={downloads.aging.isPending}

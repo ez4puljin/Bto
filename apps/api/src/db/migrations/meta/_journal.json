@@ -694,6 +694,13 @@
       "when": 1794350230242,
       "tag": "0100_ebarimt_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1794551261664,
+      "tag": "0101_report_views",
+      "breakpoints": true
     }
   ]
 }

@@ -129,6 +129,7 @@ function LedgerPage({ kind }: { kind: LedgerKind }) {
           title={title}
           actions={
             <BookActions
+              views={kind === 'PARTY' ? 'party-ledger' : 'money-ledger'}
               ready={state.query !== null && report.data !== undefined}
               period={state.query}
               onPrompt={openPrompt}

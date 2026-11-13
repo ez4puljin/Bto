@@ -31,6 +31,8 @@ Status (built 2026-10-24, ADR-0108): the management reports — «Захирлы
 
 Grants: app USAGE on the schema, SELECT on every object, EXECUTE on `refresh_sales()`; nothing else (it cannot refresh or write). ai_reader nothing.
 
+An ordinary table too (migration `0101_report_views`, `schema.ts`, ADR-0194): `report_views` — a saved view of a report page: `page` (one of `REPORT_VIEW_PAGES`), `name` (unique per author and page without case), `query` (the page's address parameters, without the dates when `period` is set), `period` (a preset that moves with the calendar, or null), `shared`, `created_by`. Hard delete, audited. Not copied by `store:seed`.
+
 A migration that changes a column these objects use recreates them (the materialized view after its view) in the same migration.
 
 ## 3. Public API
@@ -57,6 +59,7 @@ Job: `reporting.refresh`, cron `*/15 * * * *` (Ulaanbaatar time), the scheduled 
 | `GET product-sales?from&to&source&kind=ALL|SALES|RETURNS&repUserId&customerCategoryId&customerId&productId&categoryId&warehouseId&brandIds&segmentIds&by=none|category|brand|segment|user&payments` (+ `.xlsx`), `GET product-sales/documents?…&productId&group` | reports.view | «Борлуулалт /Бараагаар/», live from `sales_lines`; cost and profit null without margins; rows carry their group (ADR-0134) and, with `payments`, the net sales by payment (wholesale «Авлага», a till's sale by its tenders) |
 | `GET product-sales/data?from&to` | reports.view | the period's every sales line for the browser to work the report out (ADR-0135): lines as parallel columns (cost only with margins), documents with tenders, products with brand and segments, customers' groups, group names; `truncated` and empty over 200,000 lines |
 | `GET stock-documents?from&to&docTypes&warehouseIds&productId&customerId&supplierId&userId` (+ `.xlsx`), `GET stock-documents/lines?docType&docId&warehouseIds` | reports.view | «Бараа материалын тайлан /баримтаар/»: one row per stock document; 3,000 rows |
+| `GET views?page=`, `POST views`, `PATCH views/:id`, `DELETE views/:id` | signed in; the page's own right is asked for | Saved views (ADR-0194): own and shared; only the author changes one; `identity.settings.manage` deletes another person's shared view; outside the reports' gate |
 
 Without `reports.margins.view` every cost, profit, margin and stock value comes back null.
 
@@ -77,7 +80,7 @@ Without `reports.margins.view` every cost, profit, margin and stock value comes 
 
 ## 6. Error codes introduced
 
-Validation is `VALIDATION_FAILED` 422. `REPORTS_BUSY` 429 (the gate is full or the wait ran out, with `Retry-After`) and `QUERY_TIMEOUT` 503 (a statement met its time limit) are raised by the platform (`common/reports`, `common/errors`), ADR-0193.
+Validation is `VALIDATION_FAILED` 422. `REPORT_VIEW_LIMIT` 409 (a person's views of one page are full, ADR-0194). `REPORTS_BUSY` 429 (the gate is full or the wait ran out, with `Retry-After`) and `QUERY_TIMEOUT` 503 (a statement met its time limit) are raised by the platform (`common/reports`, `common/errors`), ADR-0193.
 
 ## 7. Screens (`apps/web/src/features/reports/`)
 
@@ -87,6 +90,7 @@ Top-bar module «Тайлан» (ADR-0133). «Удирдлагын тайлан�
 
 - `apps/api/test/integration/reporting.int-spec.ts`: rights and hidden costs, sales ex-VAT net of returns with the ledger's cost, the documents behind a figure, the flag, the dashboard moved by its documents against the same days, aging by due date with the invoice link, stock cover and slow movers, the supplier report, the refresh lock and grants (fictitious data).
 - `apps/api/src/modules/reporting/services/report-periods.spec.ts`: same-days periods, short months, whole months, ranges.
+- `apps/api/test/integration/report-views.int-spec.ts`: own and shared views, the author alone changes one, the page's right, a moving period without dates, the name once per person and page, the limit; `packages/shared/src/reports/reports.test.ts`: presets and the kept address; `apps/web/src/features/reports/report-views.test.tsx`: the menu, opening, saving, replacing, deleting.
 - `nightly-jobs.int-spec.ts` lists the schedule; web tests in `apps/web/src/features/reports/`.
 
 ## 9. Open items

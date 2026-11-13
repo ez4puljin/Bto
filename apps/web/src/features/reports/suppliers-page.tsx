@@ -47,6 +47,7 @@ import {
 import { HorizontalBars } from './charts';
 import { idParam, reportHref, useRange } from './report-helpers';
 import { AmountCell, ExcelButton, PrintHeading, PrintLink, RefreshControl } from './report-kit';
+import { ReportViews } from './report-views';
 
 const AMOUNTS = ['purchases', 'purchasesExVat', 'otherBills', 'payments', 'balance'] as const;
 
@@ -247,6 +248,7 @@ export function SuppliersReportPage() {
         description={t('reports.suppliers.description')}
         actions={
           <>
+            <ReportViews page="suppliers" />
             <RefreshControl />
             <ExcelButton
               disabled={!range.valid || downloads.suppliers.isPending}

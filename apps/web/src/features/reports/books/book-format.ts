@@ -1,4 +1,3 @@
-import { addDays } from '@tugeel/shared/time';
 import type { BookOption } from './book-api';
 
 /** «Нарийвчлал»: amounts to the tögrög's hundredths or whole. */
@@ -185,22 +184,8 @@ export function paperRem(columns: readonly BookColumn[], compact = false): numbe
 }
 
 /** «Энэ сар», «Өмнөх сар», «Энэ улирал», «Энэ жил» of the prompt, from a business date. */
-export const PERIOD_PRESETS = ['thisMonth', 'lastMonth', 'thisQuarter', 'thisYear'] as const;
-export type PeriodPreset = (typeof PERIOD_PRESETS)[number];
-
-/** A preset's dates: from its first day to `today` (a past month to its last day). */
-export function presetRange(preset: PeriodPreset, today: string): { from: string; to: string } {
-  const [year = '1970', month = '01'] = today.split('-');
-  const monthIndex = Number.parseInt(month, 10) - 1;
-  if (preset === 'thisMonth') return { from: `${year}-${month}-01`, to: today };
-  if (preset === 'thisYear') return { from: `${year}-01-01`, to: today };
-  if (preset === 'thisQuarter') {
-    const first = String(monthIndex - (monthIndex % 3) + 1).padStart(2, '0');
-    return { from: `${year}-${first}-01`, to: today };
-  }
-  const lastDay = addDays(`${year}-${month}-01`, -1);
-  return { from: `${lastDay.slice(0, 8)}01`, to: lastDay };
-}
+// The period presets and their dates are shared with the saved views (ADR-0194).
+export { PERIOD_PRESETS, type PeriodPreset, presetRange } from '@tugeel/shared/reports';
 
 /** The sum of two amounts (two decimals) without floats; null when either is unknown. */
 export function addMoney(a: string | null, b: string | null): string | null {

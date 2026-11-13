@@ -116,6 +116,7 @@ export function StockBalancePage() {
           title={title}
           actions={
             <BookActions
+              views="stock-balance"
               ready={state.query !== null && report.data !== undefined}
               period={state.query}
               onPrompt={openPrompt}

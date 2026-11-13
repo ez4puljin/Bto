@@ -21,6 +21,8 @@ export const ErrorCode = {
   // a statement the database ended at its time limit; the reports' gate is full (ADR-0193)
   QUERY_TIMEOUT: 'QUERY_TIMEOUT',
   REPORTS_BUSY: 'REPORTS_BUSY',
+  // a user's saved views of one report page are full (ADR-0194)
+  REPORT_VIEW_LIMIT: 'REPORT_VIEW_LIMIT',
   // cross-module (docs/architecture.md §6)
   IDEMPOTENCY_KEY_REQUIRED: 'IDEMPOTENCY_KEY_REQUIRED',
   IDEMPOTENCY_KEY_REUSED: 'IDEMPOTENCY_KEY_REUSED',

@@ -315,6 +315,7 @@ export const STORE_SEED_TABLES: Record<string, SeedRule> = {
   'public.ai_questions': empty(HISTORY),
   'public.ai_usage': empty(HISTORY),
   'public.ai_reports': empty('saved reports are made again'),
+  'public.report_views': empty('saved report views are made again'),
   'reporting.refresh_state': empty(STATE),
 
   // --- the Finance Core: the organisation and the chart, never the books
