@@ -272,6 +272,24 @@ The staff app and, since ADR-0189, the office's web are reached from outside und
 
 **Switching it off:** delete the public hostname in the Cloudflare dashboard (at once), or empty `STORE_PUBLIC_HOST` and run `setup.sh`.
 
+## 11. Alerts to the owner's phone (ADR-0195)
+
+The watchman (`deploy/store/watch.sh`) looks at the system every minute from outside its processes and writes to the owner's Telegram when something is wrong, every 6 hours while it lasts, and when it is over. `setup.sh` installs its timer; it stays silent until the owner connects a bot, once:
+
+1. In Telegram open **@BotFather**, send `/newbot`, give the bot a name and a user name; it answers with a token.
+2. On the PC: `bash ~/bto/deploy/store/alerts-setup.sh`. Paste the token when asked (it is not shown), then write any word to the new bot from the phone that should get the alerts and press Enter; confirm the chat it found. A test message arrives.
+
+What it reports: the centre not answering, a stopped or missing part (the replicas are counted), the disk at 85 %, memory nearly gone, a failed or missing nightly backup, ten server errors in ten minutes, a report refused by the gate, and «PC дахин аслаа» with how long the PC was away.
+
+```bash
+bash ~/bto/deploy/store/watch.sh --check            # what it sees now; sends nothing
+bash ~/bto/deploy/store/watch.sh --test             # one test message
+systemctl --user list-timers bto-watch.timer        # when it runs next
+journalctl --user -u bto-watch -n 20                # the last rounds
+```
+
+The numbers are `STORE_ALERT_*` in `deploy/store/.env` (`.env.example` lists them). The PC being off cannot be reported by the PC: set `STORE_ALERT_HEARTBEAT_URL` to the ping address of a dead man's switch service and it speaks when the rounds stop. **To silence**: remove the two `STORE_ALERT_TELEGRAM_*` lines; **to remove**: `systemctl --user disable --now bto-watch.timer`.
+
 ## Troubleshooting
 
 - **«the target is not empty» at the seed.** The centre was started before the seed (the api writes the permissions at its first start). On a box that holds nothing real yet: `$S stop api worker web`, then the `dropdb` / `createdb` lines of §9 step 3, `$S run --rm provision`, `$S run --rm migrate`, and the seed again. Never on a system somebody has worked in.

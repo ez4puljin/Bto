@@ -104,3 +104,5 @@ jobs:
           docker run --rm -v "$PWD/deploy/store/Caddyfile.store:/etc/caddy/Caddyfile:ro" \
             caddy:2.11-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
           for script in deploy/store/*.sh; do bash -n "$script"; done
+          # The watchman's memory (ADR-0195): when a problem is said, repeated and closed.
+          bash deploy/store/watch.test.sh

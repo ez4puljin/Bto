@@ -122,6 +122,13 @@ elif command -v ufw >/dev/null 2>&1; then
   echo "Галт хана (ufw) идэвхтэй бол нэг удаа:  sudo ufw allow $PORT/tcp"
 fi
 
+# The watchman (ADR-0195): a round every minute as this user's timer; silent until
+# alerts-setup.sh has connected the owner's Telegram.
+if command -v systemctl >/dev/null 2>&1 && [ "$(id -u)" != "0" ]; then
+  bash "$(dirname "$0")/install-watch-timer.sh" >/dev/null 2>&1 ||
+    echo "Харуулын timer суусангүй. Гараар:  bash deploy/store/install-watch-timer.sh"
+fi
+
 # Old build cache is the one thing on this disk that only grows.
 "${DOCKER[@]}" builder prune -f --filter until=168h >/dev/null 2>&1 || true
 
@@ -133,5 +140,6 @@ cat <<EOF
 Бэлэн. Төв систем: http://${IP:-<энэ компьютерийн IP>}$SUFFIX   (хувилбар $APP_VERSION)
 Зөвхөн дэлгүүрийн дотоод сүлжээнээс нээгдэнэ. Посын хуудас хэвээр: http://${IP:-<IP>}:7400
 Нөөцлөлтийг нэг удаа тохируулна:  sudo bash deploy/store/install-backup-timer.sh
+Утас руу сэрэмжлүүлгийг нэг удаа тохируулна:  bash deploy/store/alerts-setup.sh
 Заавар: docs/runbooks/store-install.mn.md
 EOF
