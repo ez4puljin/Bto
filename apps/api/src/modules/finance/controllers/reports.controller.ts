@@ -12,6 +12,7 @@ import { ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { XLSX_CONTENT_TYPE } from '@tugeel/shared/files';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { xlsxFile } from '../../../common/excel/xlsx-file';
+import { GatedReport } from '../../../common/reports/report-gate.interceptor';
 import { invalid } from '../../../common/errors/app-error';
 import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
 import {
@@ -53,6 +54,7 @@ export class ReportsController {
   constructor(private readonly reports: ReportsService) {}
 
   @Get('reports/trial-balance')
+  @GatedReport()
   @RequirePermission('finance.read')
   @ApiOkResponse({ type: TrialBalanceDto })
   async trialBalance(
@@ -84,6 +86,7 @@ export class ReportsController {
   }
 
   @Get('reports/trial-balance.xlsx')
+  @GatedReport()
   @RequirePermission('finance.read')
   @ApiProduces(XLSX_CONTENT_TYPE)
   @ApiOkResponse({ schema: { type: 'string', format: 'binary' } })
@@ -100,6 +103,7 @@ export class ReportsController {
 
   /** Balances per account × party at the opening's date, for the sign-off (ADR-0106 #5). */
   @Get('reports/opening-check')
+  @GatedReport()
   @RequirePermission('finance.read')
   @ApiOkResponse({ type: OpeningCheckDto })
   async openingCheck(
@@ -117,6 +121,7 @@ export class ReportsController {
   }
 
   @Get('reports/opening-check.xlsx')
+  @GatedReport()
   @RequirePermission('finance.read')
   @ApiProduces(XLSX_CONTENT_TYPE)
   @ApiOkResponse({ schema: { type: 'string', format: 'binary' } })
@@ -133,6 +138,7 @@ export class ReportsController {
   }
 
   @Get('reports/vat')
+  @GatedReport()
   @RequirePermission('finance.read')
   @ApiOkResponse({ type: VatReportDto })
   async vat(
@@ -169,6 +175,7 @@ export class ReportsController {
   }
 
   @Get('reports/vat.xlsx')
+  @GatedReport()
   @RequirePermission('finance.read')
   @ApiProduces(XLSX_CONTENT_TYPE)
   @ApiOkResponse({ schema: { type: 'string', format: 'binary' } })

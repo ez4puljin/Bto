@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DbModule } from './common/db/db.module';
 import { HttpCoreModule } from './common/errors/http-core.module';
+import { ReportGateModule } from './common/reports/report-gate.module';
 import { JobsModule } from './common/jobs/jobs.module';
 import { CoreModule } from './core.module';
 import { FinanceCoreModule } from './finance-core';
@@ -34,6 +35,7 @@ import { SegmentsHttpModule } from './modules/segments';
     DbModule,
     JobsModule,
     HttpCoreModule,
+    ReportGateModule,
     HealthModule,
     LlmModule,
     FinanceCoreModule,

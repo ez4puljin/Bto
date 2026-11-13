@@ -1,9 +1,13 @@
-import { Controller, Get, Query, StreamableFile } from '@nestjs/common';
+import { Controller, Get, Query, StreamableFile, UseInterceptors } from '@nestjs/common';
 import { ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { XLSX_CONTENT_TYPE } from '@tugeel/shared/files';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { invalid } from '../../../common/errors/app-error';
 import { xlsxFile } from '../../../common/excel/xlsx-file';
+import {
+  ReportGateInterceptor,
+  UngatedReport,
+} from '../../../common/reports/report-gate.interceptor';
 import { type AuthContext, CurrentUser, RequirePermission } from '../../identity';
 import {
   BookReportOptionsDto,
@@ -41,6 +45,7 @@ const T = mn.reports.books.titles;
  */
 @ApiTags('reports')
 @Controller('reports')
+@UseInterceptors(ReportGateInterceptor)
 export class BookReportsController {
   constructor(
     private readonly options: BookOptionsService,
@@ -50,6 +55,7 @@ export class BookReportsController {
   ) {}
 
   @Get('book-options')
+  @UngatedReport()
   @RequirePermission('reports.view')
   @ApiOkResponse({ type: BookReportOptionsDto })
   async bookOptions(): Promise<BookReportOptionsDto> {

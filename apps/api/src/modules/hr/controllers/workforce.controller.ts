@@ -15,6 +15,7 @@ import { ApiCreatedResponse, ApiOkResponse, ApiProduces, ApiTags } from '@nestjs
 import { XLSX_CONTENT_TYPE } from '@tugeel/shared/files';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { xlsxFile } from '../../../common/excel/xlsx-file';
+import { GatedReport } from '../../../common/reports/report-gate.interceptor';
 import {
   type AuthContext,
   Authenticated,
@@ -358,6 +359,7 @@ export class WorkforceController {
 
   // reports
   @Get('reports/days')
+  @GatedReport()
   @RequirePermission(ATTENDANCE_VIEW)
   @ApiOkResponse({ type: HrReportDto })
   async reportDays(@Query() query: HrReportQueryDto): Promise<HrReportDto> {
@@ -373,6 +375,7 @@ export class WorkforceController {
   }
 
   @Get('reports/days.xlsx')
+  @GatedReport()
   @RequirePermission(ATTENDANCE_VIEW)
   @ApiProduces(XLSX_CONTENT_TYPE)
   @ApiOkResponse({ schema: { type: 'string', format: 'binary' } })

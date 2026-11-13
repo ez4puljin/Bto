@@ -42,6 +42,22 @@ export const EnvSchema = z.object({
   /** Pool budget per process (docs/architecture.md §10.2): required, never defaulted. */
   DB_POOL_MAX: z.coerce.number().int().min(1).max(50),
   PGBOSS_POOL_MAX: z.coerce.number().int().min(1).max(10),
+  /**
+   * The longest one statement of the app's pool may run, in milliseconds (ADR-0193); unset or 0:
+   * no limit. Set on the report replicas, where a report that outlives it is ended by PostgreSQL
+   * and answered QUERY_TIMEOUT.
+   */
+  DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(0).max(3_600_000).default(0),
+  /**
+   * The reports' gate, per process (ADR-0193): how many run at once, one caller's share of them,
+   * how many may wait and for how long. Keep REPORTS_MAX_RUNNING at about half of DB_POOL_MAX: a
+   * report asks several questions at once. The line is short on purpose: a report that could not
+   * start within REPORTS_WAIT_MS is better refused at once than after the wait.
+   */
+  REPORTS_MAX_RUNNING: z.coerce.number().int().min(1).max(50).default(3),
+  REPORTS_MAX_PER_USER: z.coerce.number().int().min(1).max(50).default(2),
+  REPORTS_MAX_WAITING: z.coerce.number().int().min(0).max(500).default(6),
+  REPORTS_WAIT_MS: z.coerce.number().int().min(0).max(120_000).default(40_000),
   /** Image tag or git sha, reported by /health. */
   APP_VERSION: z.string().trim().min(1).default('dev'),
   /** HS256 key of the 15-minute access tokens (ADR-0027); api only. */

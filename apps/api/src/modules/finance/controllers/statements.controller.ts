@@ -15,6 +15,7 @@ import { STATEMENT_KINDS, type StatementKind } from '@tugeel/shared/finance';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { invalid } from '../../../common/errors/app-error';
 import { xlsxFile } from '../../../common/excel/xlsx-file';
+import { GatedReport } from '../../../common/reports/report-gate.interceptor';
 import { type AuthContext, CurrentUser, RequirePermission } from '../../identity';
 import { StatementDto, StatementLinkDto, StatementQueryDto } from '../dto/statements.dto';
 import { type Statement, StatementsService } from '../services/statements.service';
@@ -72,6 +73,7 @@ export class StatementsController {
   constructor(private readonly statements: StatementsService) {}
 
   @Get('reports/statements/:kind')
+  @GatedReport()
   @RequirePermission('finance.read')
   @ApiOkResponse({ type: StatementDto })
   async get(
@@ -83,6 +85,7 @@ export class StatementsController {
   }
 
   @Get('reports/statements/:kind/xlsx')
+  @GatedReport()
   @RequirePermission('finance.read')
   @ApiProduces(XLSX_CONTENT_TYPE)
   @ApiOkResponse({ schema: { type: 'string', format: 'binary' } })

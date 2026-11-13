@@ -52,12 +52,16 @@ class DbLifecycle implements OnModuleInit, OnApplicationShutdown {
       inject: [AppConfig, PROCESS_ROLE],
       useFactory: (config: AppConfig, role: ProcessRole): Pool => {
         configurePgTypeParsers();
+        const statementTimeout = config.get('DB_STATEMENT_TIMEOUT_MS');
         const pool = new Pool({
           connectionString: config.get('DATABASE_URL'),
           max: config.get('DB_POOL_MAX'),
           application_name: `tugeel-${role}`,
           connectionTimeoutMillis: 5_000,
           idleTimeoutMillis: 30_000,
+          // ADR-0193: where a limit is set (the report replicas), PostgreSQL ends a statement
+          // that outlives it; the caller is answered QUERY_TIMEOUT.
+          ...(statementTimeout > 0 ? { statement_timeout: statementTimeout } : {}),
         });
         // An unhandled 'error' event on an idle client would crash the process.
         pool.on('error', (err) => new Logger('DbPool').error({ err }, 'idle client error'));

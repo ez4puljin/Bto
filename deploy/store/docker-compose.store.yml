@@ -142,6 +142,12 @@ services:
       <<: *api-env
       DB_POOL_MAX: '${STORE_REPORTS_DB_POOL_MAX:-6}'
       RUN_MIGRATIONS: 'false'
+      # ADR-0193: PostgreSQL ends a report's statement that runs longer than this (QUERY_TIMEOUT),
+      # and the reports' gate lets about half the pool run at once, the rest wait their turn.
+      DB_STATEMENT_TIMEOUT_MS: '${STORE_REPORTS_STATEMENT_TIMEOUT_MS:-60000}'
+      REPORTS_MAX_RUNNING: '${STORE_REPORTS_MAX_RUNNING:-3}'
+      REPORTS_MAX_PER_USER: '${STORE_REPORTS_MAX_PER_USER:-2}'
+      REPORTS_MAX_WAITING: '${STORE_REPORTS_MAX_WAITING:-6}'
     mem_limit: ${STORE_REPORTS_MEMORY:-1024m}
     deploy:
       replicas: ${STORE_REPORTS_REPLICAS:-0}

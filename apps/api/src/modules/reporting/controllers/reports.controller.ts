@@ -7,11 +7,16 @@ import {
   Post,
   Query,
   StreamableFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { XLSX_CONTENT_TYPE } from '@tugeel/shared/files';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { xlsxFile } from '../../../common/excel/xlsx-file';
+import {
+  ReportGateInterceptor,
+  UngatedReport,
+} from '../../../common/reports/report-gate.interceptor';
 import { type AuthContext, CurrentUser, RequirePermission } from '../../identity';
 import {
   AgingDto,
@@ -65,6 +70,7 @@ function dashboardDto(report: Dashboard): DashboardDto {
  */
 @ApiTags('reports')
 @Controller('reports')
+@UseInterceptors(ReportGateInterceptor)
 export class ReportsController {
   constructor(
     private readonly dashboards: DashboardService,
@@ -76,6 +82,7 @@ export class ReportsController {
   ) {}
 
   @Get('refresh-state')
+  @UngatedReport()
   @RequirePermission('reports.view')
   @ApiOkResponse({ type: RefreshStateDto })
   async refreshState(): Promise<RefreshStateDto> {

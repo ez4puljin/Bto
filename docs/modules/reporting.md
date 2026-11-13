@@ -73,9 +73,11 @@ Without `reports.margins.view` every cost, profit, margin and stock value comes 
 - Margin = profit ÷ sales × 100, one decimal, HALF_UP; flagged under the threshold, or a loss without sales.
 - Erkhet's stock reports (ADR-0133) count the warehouse movements only (receipt, delivery, till sale, issue and its reversal, transfer legs, return, adjustment, count); bin moves inside a warehouse are left out. Stock value = Σ qty × the ledger's unit cost + `stock_valuation_adjustments.value_delta` (the re-costing of stock on hand; its `variance` goes to the cost of sales, not to stock).
 
+- Reports take turns (ADR-0193): every route of the two controllers stands behind the process's `ReportGate` except `refresh-state` and `book-options` (`@UngatedReport()`); a new route is gated unless marked (the Finance Core's and HR's report routes carry `@GatedReport()` on the method). On the report replicas a statement is ended at `DB_STATEMENT_TIMEOUT_MS`.
+
 ## 6. Error codes introduced
 
-None (validation is `VALIDATION_FAILED` 422).
+Validation is `VALIDATION_FAILED` 422. `REPORTS_BUSY` 429 (the gate is full or the wait ran out, with `Retry-After`) and `QUERY_TIMEOUT` 503 (a statement met its time limit) are raised by the platform (`common/reports`, `common/errors`), ADR-0193.
 
 ## 7. Screens (`apps/web/src/features/reports/`)
 

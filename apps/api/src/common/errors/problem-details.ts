@@ -60,7 +60,32 @@ export function toProblem(error: unknown, context: ProblemContext): ProblemDetai
     const params = constraint.name ? { constraint: constraint.name } : undefined;
     return build(constraint.code, constraint.status, context, constraint.detail, params);
   }
+  const busy = databaseBusy(error);
+  if (busy) return build(busy.code, 503, context, busy.detail);
   return build('INTERNAL_ERROR', 500, context, 'Internal server error');
+}
+
+/** SQLSTATE query_canceled: PostgreSQL ended the statement at its time limit (ADR-0193). */
+const QUERY_CANCELED = '57014';
+/** node-postgres' words when no connection of the pool came free in time. */
+const POOL_WAIT_EXPIRED = 'timeout exceeded when trying to connect';
+
+/**
+ * The database answered «not now» rather than «wrong»: a statement stopped at its time limit, or
+ * every connection of the pool was busy for too long. Both are 503 with a text the screen can
+ * show, not «Internal error».
+ */
+function databaseBusy(
+  error: unknown,
+): { code: 'QUERY_TIMEOUT' | 'SERVICE_UNAVAILABLE'; detail: string } | undefined {
+  if (databaseErrorOf(error)?.code === QUERY_CANCELED) {
+    return { code: 'QUERY_TIMEOUT', detail: 'a statement was ended at its time limit' };
+  }
+  const cause: unknown = error instanceof DrizzleQueryError ? error.cause : error;
+  if (cause instanceof Error && cause.message === POOL_WAIT_EXPIRED) {
+    return { code: 'SERVICE_UNAVAILABLE', detail: 'no database connection came free in time' };
+  }
+  return undefined;
 }
 
 /** PostgreSQL SQLSTATEs that mean "the request conflicts with the data", not a server fault. */

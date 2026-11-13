@@ -18,6 +18,9 @@ export const ErrorCode = {
   TOO_MANY_REQUESTS: 'TOO_MANY_REQUESTS',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
   SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
+  // a statement the database ended at its time limit; the reports' gate is full (ADR-0193)
+  QUERY_TIMEOUT: 'QUERY_TIMEOUT',
+  REPORTS_BUSY: 'REPORTS_BUSY',
   // cross-module (docs/architecture.md §6)
   IDEMPOTENCY_KEY_REQUIRED: 'IDEMPOTENCY_KEY_REQUIRED',
   IDEMPOTENCY_KEY_REUSED: 'IDEMPOTENCY_KEY_REUSED',

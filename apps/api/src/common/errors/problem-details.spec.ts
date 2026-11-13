@@ -135,5 +135,18 @@ describe('validation', () => {
       expect(JSON.stringify(logged)).not.toContain('secret-hash');
       expect(logged.sql).toContain('insert into users');
     });
+
+    it('answers «not now» for a statement ended at its time limit and for a pool with no connection', () => {
+      const canceled = toProblem(wrapped(pgError('57014')), {});
+      expect(canceled).toMatchObject({ status: 503, code: 'QUERY_TIMEOUT' });
+      expect(JSON.stringify(canceled)).not.toContain('secret-hash');
+      const poolWait = new Error('timeout exceeded when trying to connect');
+      expect(toProblem(wrapped(poolWait), {})).toMatchObject({
+        status: 503,
+        code: 'SERVICE_UNAVAILABLE',
+      });
+      expect(toProblem(poolWait, {})).toMatchObject({ status: 503, code: 'SERVICE_UNAVAILABLE' });
+      expect(toProblem(new Error('timeout'), {})).toMatchObject({ status: 500 });
+    });
   });
 });

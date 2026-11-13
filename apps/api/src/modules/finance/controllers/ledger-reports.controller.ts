@@ -1,8 +1,12 @@
-import { Controller, Get, Query, StreamableFile } from '@nestjs/common';
+import { Controller, Get, Query, StreamableFile, UseInterceptors } from '@nestjs/common';
 import { ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { XLSX_CONTENT_TYPE } from '@tugeel/shared/files';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { xlsxFile } from '../../../common/excel/xlsx-file';
+import {
+  ReportGateInterceptor,
+  UngatedReport,
+} from '../../../common/reports/report-gate.interceptor';
 import { type AuthContext, CurrentUser, RequirePermission } from '../../identity';
 import {
   LedgerAccountOptionsDto,
@@ -20,10 +24,12 @@ import { money } from './mappers';
  */
 @ApiTags('finance')
 @Controller('finance/reports/ledger')
+@UseInterceptors(ReportGateInterceptor)
 export class LedgerReportsController {
   constructor(private readonly ledger: LedgerReportsService) {}
 
   @Get('accounts')
+  @UngatedReport()
   @RequirePermission('finance.read')
   @ApiOkResponse({ type: LedgerAccountOptionsDto })
   async accounts(@CurrentUser() ctx: AuthContext): Promise<LedgerAccountOptionsDto> {
