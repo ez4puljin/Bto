@@ -6,13 +6,15 @@ import { navTrail } from '@/app/nav-items';
 import { PAGE_WIDTHS, type PageWidth, widthOf } from '@/app/page-width';
 import { Sidebar } from '@/app/sidebar';
 import { TopBar } from '@/app/top-bar';
+import { useScreenUsage } from '@/features/system/use-screen-usage';
 import { rememberRecentPage } from '@/lib/recent-pages';
 import { cn } from '@/lib/utils';
 
 /**
  * The frame of every signed-in page (ADR-0042, ADR-0114): the top bar with the modules, the page
  * in its route's width (ADR-0066) on the grey canvas, the Ctrl/⌘+K search and the «Бүх цэс»
- * drawer the bar's ⋮⋮ slides in. The shell's only API call is the bar's bell.
+ * drawer the bar's ⋮⋮ slides in. The shell's only API calls are the bar's bell and the minute's
+ * screen counts (ADR-0197).
  */
 export function AppShell() {
   const location = useLocation();
@@ -27,6 +29,8 @@ export function AppShell() {
       .at(-1) ?? 'reading';
   const auth = useAuthState();
   const userId = auth.status === 'authenticated' ? auth.me.id : null;
+  // Which screens are used (ADR-0197): names and seconds only, sent once a minute.
+  useScreenUsage();
 
   useEffect(() => {
     setMenuOpen(false);

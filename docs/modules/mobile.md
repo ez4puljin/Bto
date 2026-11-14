@@ -146,6 +146,10 @@ The arithmetic is in `src/counts/rules.ts` (tested), the hooks in `src/api/count
 - **«Төлбөр»**: the rep's own reports of 60 days with the state — waiting, recorded with the voucher's number, refused with the reason.
 - Pure parts in `src/visits/stops.ts` (tested), hooks in `src/api/visits.ts`.
 
+## 1k. Which screens are used, in both apps (ADR-0197, staff 0.20.0, «Bto300» 0.6.0, 2026-11-14)
+
+`UsageGate` (`src/usage/usage-gate.tsx`) sits in both layouts, `(staff)/_layout.tsx` and `(customer)/_layout.tsx`, and renders nothing. It names the screen in front from expo-router's segments (`screenKeyFromSegments`: `['(staff)', 'order', '[id]']` is `/order/:id`; the group folders say nothing and go), feeds `UsageMeter` of `@tugeel/shared/usage`, and hands what gathered to the layout's `send` once a minute and when the app leaves the foreground (`AppState`): the staff app to `POST /api/v1/usage/screens` as `staff`, «Bto300» to `POST /api/v1/customer-app/usage/screens`. Time stops while the app is in the background; one open counts at most 10 minutes. A send that fails is dropped, never retried and never shown: nothing waits for it. Only names, opens and seconds leave the phone. An APK older than these versions sends nothing.
+
 ## 2. Pins (2026-10-15)
 
 | Package | Version |

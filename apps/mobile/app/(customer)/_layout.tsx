@@ -12,6 +12,7 @@ import { useCustomer } from '../../src/state/session';
 import { ShopProvider, useShop } from '../../src/state/shop';
 import { colors } from '../../src/theme/tokens';
 import { ToastProvider } from '../../src/ui/toast';
+import { UsageGate } from '../../src/usage/usage-gate';
 
 /** Screens the launch notice never covers: the camera, the checkout, a new password. */
 const BUSY_PATHS = new Set(['/scan', '/checkout', '/password', '/notice-popup']);
@@ -45,6 +46,14 @@ export default function CustomerLayout() {
         {/* White on «Bto300»'s blue header (ADR-0095); the sign-in screens keep the dark one. */}
         <StatusBar style="light" />
         <StorePopupGate />
+        {/* Which screens are used (ADR-0197): names and seconds, once a minute. */}
+        <UsageGate
+          send={(events) =>
+            session.client.POST('/api/v1/customer-app/usage/screens', {
+              body: { app: 'customer', events },
+            })
+          }
+        />
         <ThumbKeeperFor
           server={server}
           urlsOf={async () => unwrap(await session.client.GET('/api/v1/customer-app/thumbs')).urls}

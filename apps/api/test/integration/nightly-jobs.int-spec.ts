@@ -293,6 +293,15 @@ describe('nightly jobs', () => {
       kind: 'catalog.product_image',
     });
     const kept = await storedFile({ status: 'READY', uploaded: true, age: '3 days' });
+    // Screen usage (ADR-0197): the day-marks go after 120 days, the counts after 400.
+    await sql.query(
+      `INSERT INTO screen_usage (day, app, screen, opens, seconds)
+       VALUES (current_date - 401, 'web', '/old', 3, 30), (current_date - 130, 'web', '/kept', 2, 20)`,
+    );
+    await sql.query(
+      `INSERT INTO screen_usage_seen (day, app, screen, actor)
+       VALUES (current_date - 130, 'web', '/kept', 's1'), (current_date - 10, 'web', '/kept', 's1')`,
+    );
 
     const housekeeping = new HousekeepingService(app.get<Db>(DB), app.get(StorageService));
     expect(await housekeeping.run()).toEqual({
@@ -302,7 +311,11 @@ describe('nightly jobs', () => {
       filesRemoved: 1,
       filesAbandoned: 1,
       filesPurged: 2,
+      usageMarks: 1,
+      usageCounts: 1,
     });
+    const usage = await sql.query<{ screen: string }>(`SELECT screen FROM screen_usage`);
+    expect(usage.rows.map((row) => row.screen)).toEqual(['/kept']);
     const sessions = await sql.query<{ token_hash: string }>(
       `SELECT token_hash FROM auth_sessions WHERE token_hash IN
          ('expired-100d', 'revoked-95d', 'expired-80d', 'revoked-10d') ORDER BY 1`,
@@ -335,6 +348,8 @@ describe('nightly jobs', () => {
       filesRemoved: 0,
       filesAbandoned: 0,
       filesPurged: 0,
+      usageMarks: 0,
+      usageCounts: 0,
     });
   });
 

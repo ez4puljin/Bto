@@ -599,6 +599,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/usage/screens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Usage_summary"];
+        put?: never;
+        post: operations["Usage_record"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/usage/screens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CustomerUsage_record"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/uoms": {
         parameters: {
             query?: never;
@@ -11393,6 +11425,31 @@ export interface components {
             headers: components["schemas"]["FileUploadHeaders"];
             /** Format: date-time */
             expiresAt: string;
+        };
+        ScreenUsageEvent: {
+            /** @example /sales/orders/:id */
+            screen: string;
+            /** @description 0 for a screen that only stayed open since the last send */
+            opens: number;
+            /** @description Seconds the screen stood open, all its opens together */
+            seconds: number;
+        };
+        ScreenUsageRequest: {
+            /** @enum {string} */
+            app: "web" | "staff" | "customer";
+            events: components["schemas"]["ScreenUsageEvent"][];
+        };
+        ScreenUsageRow: {
+            /** @enum {string} */
+            app: "web" | "staff" | "customer";
+            screen: string;
+            opens: number;
+            seconds: number;
+            /** @description Different people who opened it */
+            people: number;
+        };
+        ScreenUsageList: {
+            data: components["schemas"]["ScreenUsageRow"][];
         };
         Uom: {
             id: number;
@@ -25030,6 +25087,97 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["FileUpload"];
                 };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Usage_summary: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenUsageList"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Usage_record: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreenUsageRequest"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerUsage_record: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreenUsageRequest"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description RFC 9457 problem details */
             default: {

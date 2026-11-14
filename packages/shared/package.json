@@ -162,6 +162,11 @@
       "types": "./dist/mn/index.d.ts",
       "default": "./dist/mn/index.js"
     },
+    "./usage": {
+      "@tugeel/source": "./src/usage/index.ts",
+      "types": "./dist/usage/index.d.ts",
+      "default": "./dist/usage/index.js"
+    },
     "./i18n/*.json": "./i18n/*.json",
     "./package.json": "./package.json"
   },

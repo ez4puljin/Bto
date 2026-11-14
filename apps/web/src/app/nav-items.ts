@@ -46,6 +46,7 @@ import {
   Megaphone,
   MessageSquareText,
   Monitor,
+  MousePointerClick,
   Move,
   Network,
   Newspaper,
@@ -718,6 +719,13 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'imports.manage',
       },
       { to: '/system/status', label: 'nav.systemStatus', icon: Activity },
+      // ADR-0197: which screens are opened, and which nobody opens.
+      {
+        to: '/system/usage',
+        label: 'nav.screenUsage',
+        icon: MousePointerClick,
+        permission: 'identity.audit.read',
+      },
     ],
   },
 ];

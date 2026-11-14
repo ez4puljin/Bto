@@ -15,6 +15,8 @@ export {
   rolePermissionOverrides,
   rolePermissions,
   roles,
+  screenUsage,
+  screenUsageSeen,
   settings,
   userCompanyRoles,
   userRoles,

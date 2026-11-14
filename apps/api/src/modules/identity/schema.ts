@@ -1,3 +1,4 @@
+import { USAGE, USAGE_APPS } from '@tugeel/shared/usage';
 import { sql } from 'drizzle-orm';
 import {
   bigint,
@@ -551,5 +552,52 @@ export const files = pgTable(
       'files_uploaded',
       sql`(${t.uploadedAt} IS NULL) = (${t.sha256} IS NULL) AND (${t.status} = 'PENDING' OR ${t.uploadedAt} IS NOT NULL)`,
     ),
+  ],
+);
+
+const USAGE_APP_LIST = sql.raw(USAGE_APPS.map((app) => `'${app}'`).join(', '));
+const USAGE_SCREEN_MAX = sql.raw(String(USAGE.screenMax));
+
+/**
+ * How much one screen was used on one day (ADR-0197). One row per day, client and screen — no
+ * person, no hour and nothing about what stood on the screen: enough to see which screens carry
+ * the work and which nobody opens, and no more.
+ */
+export const screenUsage = pgTable(
+  'screen_usage',
+  {
+    day: date('day').notNull(),
+    app: text('app').notNull(),
+    screen: text('screen').notNull(),
+    opens: bigint('opens', { mode: 'number' }).notNull().default(0),
+    seconds: bigint('seconds', { mode: 'number' }).notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ name: 'screen_usage_pkey', columns: [t.day, t.app, t.screen] }),
+    check('screen_usage_app', sql`${t.app} IN (${USAGE_APP_LIST})`),
+    check('screen_usage_screen', sql`length(${t.screen}) BETWEEN 1 AND ${USAGE_SCREEN_MAX}`),
+    check('screen_usage_counts', sql`${t.opens} >= 0 AND ${t.seconds} >= 0`),
+  ],
+);
+
+/**
+ * That someone opened this screen on this day — the one mark kept per person, and only so that «how
+ * many people» can be answered beside «how many times». `actor` is `s<user id>` for staff and
+ * `c<customer id>` for a store's account; the housekeeping drops the row after
+ * `USAGE.keepSeenDays` days while the counts above stay (ADR-0197).
+ */
+export const screenUsageSeen = pgTable(
+  'screen_usage_seen',
+  {
+    day: date('day').notNull(),
+    app: text('app').notNull(),
+    screen: text('screen').notNull(),
+    actor: text('actor').notNull(),
+  },
+  (t) => [
+    primaryKey({ name: 'screen_usage_seen_pkey', columns: [t.day, t.app, t.screen, t.actor] }),
+    check('screen_usage_seen_app', sql`${t.app} IN (${USAGE_APP_LIST})`),
+    check('screen_usage_seen_screen', sql`length(${t.screen}) BETWEEN 1 AND ${USAGE_SCREEN_MAX}`),
+    check('screen_usage_seen_actor', sql`${t.actor} ~ '^[sc][0-9]{1,18}$'`),
   ],
 );

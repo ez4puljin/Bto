@@ -9,6 +9,7 @@ import { useSignedIn } from '../../src/state/session';
 import { ShopProvider } from '../../src/state/shop';
 import { colors } from '../../src/theme/tokens';
 import { ToastProvider } from '../../src/ui/toast';
+import { UsageGate } from '../../src/usage/usage-gate';
 
 /**
  * The staff app (ADR-0061, ADR-0068, in «Bto300»'s look since ADR-0100): everyone lands on «Нүүр»
@@ -32,6 +33,12 @@ export default function StaffLayout() {
         {rep ? <NoticePopupGate /> : null}
         {rep ? <ThumbKeeper /> : null}
         <CommunityPopupGate />
+        {/* Which screens are used (ADR-0197): names and seconds, once a minute. */}
+        <UsageGate
+          send={(events) =>
+            session.client.POST('/api/v1/usage/screens', { body: { app: 'staff', events } })
+          }
+        />
         <Stack
           screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}
         >

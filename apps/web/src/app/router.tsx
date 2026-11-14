@@ -152,6 +152,7 @@ import { PosVoidsPage } from '@/features/pos/voids-page';
 import { PosVoucherPrintPage } from '@/features/pos/voucher-print-page';
 import { PosVouchersPage } from '@/features/pos/vouchers-page';
 import { SystemStatusPage } from '@/features/system/system-status-page';
+import { UsagePage } from '@/features/system/usage-page';
 
 /** React Router 7 data mode. Exported for createMemoryRouter in tests. */
 export const routes: RouteObject[] = [
@@ -362,6 +363,15 @@ export const routes: RouteObject[] = [
           ...appRoutes(),
           ...hrRoutes(),
           { path: 'system/status', handle: { width: 'wide' }, element: <SystemStatusPage /> },
+          {
+            path: 'system/usage',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="identity.audit.read">
+                <UsagePage />
+              </RequirePermission>
+            ),
+          },
           { path: 'account', handle: { width: 'reading' }, element: <AccountPage /> },
           { path: 'catalog/products', handle: { width: 'wide' }, element: <ProductsPage /> },
           {

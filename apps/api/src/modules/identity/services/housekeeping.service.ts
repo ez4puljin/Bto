@@ -1,8 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { USAGE } from '@tugeel/shared/usage';
 import { lt, or, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
-import { authSessions, customerPasswordCodes, idempotencyKeys, passwordResets } from '../schema';
+import {
+  authSessions,
+  customerPasswordCodes,
+  idempotencyKeys,
+  passwordResets,
+  screenUsage,
+  screenUsageSeen,
+} from '../schema';
 import { StorageService } from './storage.service';
 
 /** How long identity keeps its short-lived rows (ADR-0040). */
@@ -27,9 +35,14 @@ export interface HousekeepingResult {
   filesAbandoned: number;
   /** DELETED files whose bytes were removed. */
   filesPurged: number;
+  /** Screen-usage day-marks and counts past their keeping (ADR-0197). */
+  usageMarks: number;
+  usageCounts: number;
 }
 
 const daysAgo = (days: number): SQL => sql`now() - make_interval(days => ${days})`;
+/** For a `date` column: the calendar day that many days back. */
+const dayAgo = (days: number): SQL => sql`current_date - ${sql.raw(String(Math.trunc(days)))}`;
 
 /**
  * identity.housekeeping (ADR-0040): deletes the rows identity no longer needs and removes the
@@ -63,6 +76,13 @@ export class HousekeepingService {
       .where(lt(idempotencyKeys.createdAt, daysAgo(RETENTION.idempotencyKeyDays)));
     const pending = await this.storage.abandonPending(RETENTION.pendingFileHours);
     const filesPurged = await this.storage.purgeDeleted();
+    // The marks that say who opened a screen go first; the counts stay for a year's comparison.
+    const usageMarks = await this.db
+      .delete(screenUsageSeen)
+      .where(lt(screenUsageSeen.day, dayAgo(USAGE.keepSeenDays)));
+    const usageCounts = await this.db
+      .delete(screenUsage)
+      .where(lt(screenUsage.day, dayAgo(USAGE.keepDays)));
     return {
       sessions: sessions.rowCount ?? 0,
       passwordCodes: (passwordCodes.rowCount ?? 0) + (customerCodes.rowCount ?? 0),
@@ -70,6 +90,8 @@ export class HousekeepingService {
       filesRemoved: pending.removed,
       filesAbandoned: pending.abandoned,
       filesPurged,
+      usageMarks: usageMarks.rowCount ?? 0,
+      usageCounts: usageCounts.rowCount ?? 0,
     };
   }
 }

@@ -19,6 +19,7 @@ import { MobileAuthController } from './controllers/mobile-auth.controller';
 import { FilesController } from './controllers/files.controller';
 import { AuditController, OrgController, SettingsController } from './controllers/org.controller';
 import { RolesController } from './controllers/roles.controller';
+import { CustomerUsageController, UsageController } from './controllers/usage.controller';
 import { UsersController } from './controllers/users.controller';
 import { AuthGuard } from './guards/auth.guard';
 import { ensureTransitWarehouse, syncAccessCatalog } from './reference-data';
@@ -47,6 +48,7 @@ import { ScopeService } from './services/scope.service';
 import { SettingsService } from './services/settings.service';
 import { StaffAccountsService } from './services/staff-accounts.service';
 import { StorageService } from './services/storage.service';
+import { UsageService } from './services/usage.service';
 import { UserNamesService } from './services/user-names.service';
 import { UsersService } from './services/users.service';
 import { StorageUrlSigner } from './storage/url-signer';
@@ -129,6 +131,8 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
     SettingsController,
     AuditController,
     FilesController,
+    UsageController,
+    CustomerUsageController,
   ],
   providers: [
     IdentityBootstrap,
@@ -139,6 +143,7 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
     PasswordHasher,
     RolesService,
     StorageUrlSigner,
+    UsageService,
     UsersService,
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },

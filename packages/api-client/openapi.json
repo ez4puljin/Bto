@@ -2029,6 +2029,137 @@
         ]
       }
     },
+    "/api/v1/usage/screens": {
+      "post": {
+        "operationId": "Usage_record",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScreenUsageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "usage"
+        ]
+      },
+      "get": {
+        "operationId": "Usage_summary",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-30",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenUsageList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "usage"
+        ]
+      }
+    },
+    "/api/v1/customer-app/usage/screens": {
+      "post": {
+        "operationId": "CustomerUsage_record",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScreenUsageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "customer": []
+          }
+        ],
+        "tags": [
+          "usage"
+        ]
+      }
+    },
     "/api/v1/uoms": {
       "get": {
         "operationId": "Uoms_list",
@@ -46183,6 +46314,105 @@
           "method",
           "headers",
           "expiresAt"
+        ]
+      },
+      "ScreenUsageEvent": {
+        "type": "object",
+        "properties": {
+          "screen": {
+            "type": "string",
+            "maxLength": 120,
+            "example": "/sales/orders/:id"
+          },
+          "opens": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 500,
+            "description": "0 for a screen that only stayed open since the last send"
+          },
+          "seconds": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 300000,
+            "description": "Seconds the screen stood open, all its opens together"
+          }
+        },
+        "required": [
+          "screen",
+          "opens",
+          "seconds"
+        ]
+      },
+      "ScreenUsageRequest": {
+        "type": "object",
+        "properties": {
+          "app": {
+            "enum": [
+              "web",
+              "staff",
+              "customer"
+            ],
+            "type": "string"
+          },
+          "events": {
+            "minItems": 1,
+            "maxItems": 60,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScreenUsageEvent"
+            }
+          }
+        },
+        "required": [
+          "app",
+          "events"
+        ]
+      },
+      "ScreenUsageRow": {
+        "type": "object",
+        "properties": {
+          "app": {
+            "enum": [
+              "web",
+              "staff",
+              "customer"
+            ],
+            "type": "string"
+          },
+          "screen": {
+            "type": "string"
+          },
+          "opens": {
+            "type": "number"
+          },
+          "seconds": {
+            "type": "number"
+          },
+          "people": {
+            "type": "number",
+            "description": "Different people who opened it"
+          }
+        },
+        "required": [
+          "app",
+          "screen",
+          "opens",
+          "seconds",
+          "people"
+        ]
+      },
+      "ScreenUsageList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScreenUsageRow"
+            }
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "Uom": {
