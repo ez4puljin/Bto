@@ -2,7 +2,8 @@
 # The watchman of the store's Ubuntu PC (ADR-0195): once a minute it looks at the centre and the
 # till server from outside their processes and tells the owner's phone when something is wrong,
 # once when it starts, again every STORE_ALERT_REMIND_HOURS while it lasts, and once when it is
-# over. It also says that the PC has started again and for how long it was away.
+# over. It also says that the PC has started again and for how long it was away, and asks the
+# outside address (STORE_PUBLIC_HOST) the way a phone does.
 #
 #   bash deploy/store/watch.sh            one round (the bto-watch timer runs exactly this)
 #   bash deploy/store/watch.sh --check    what it sees now; sends nothing, remembers nothing
@@ -75,6 +76,41 @@ check_health() {
   case "$body" in
     *'"status":"ok"'*) ;;
     *) found health 2 "🔴 Систем хариу өгөхгүй байна (оффисын вэб, апп ажиллахгүй)." ;;
+  esac
+}
+
+# What an answer from the outside address means: `ok` (the centre itself answered), `silent`
+# (nothing came back: the internet, Cloudflare or the tunnel), `wrong` (something answered that is
+# not the centre).
+public_verdict() {
+  case "$2" in *'"status":"ok"'*) echo ok; return ;; esac
+  case "$1" in 000 | "") echo silent ;; *) echo wrong ;; esac
+}
+
+# The address the apps and the office use from outside (STORE_PUBLIC_HOST, ADR-0188), asked the
+# way a phone asks it: out to Cloudflare and back in through the tunnel. The centre being healthy
+# on this PC says nothing about that road. On 2026-11-14 a second PC on the LAN ran cloudflared
+# with this tunnel's token: every outside request went to that PC's own port 80, both apps were
+# cut off, and `/health` here stayed green throughout. Three rounds in a row, since an internet
+# line blinks; nothing is said while the centre itself is down, which is already said.
+check_public() {
+  local host out code body
+  host=$(store_setting STORE_PUBLIC_HOST "")
+  [ -n "$host" ] || return 0
+  [ -z "${FOUND_TEXT[health]+x}" ] || return 0
+  out=$(curl -s -m 12 -H 'Accept: application/json' -w '\n%{http_code}' "https://${host}/health" 2>/dev/null || true)
+  code=${out##*$'\n'}
+  body=${out%$'\n'*}
+  case "$(public_verdict "$code" "$body")" in
+    ok) ;;
+    silent)
+      found public 3 "🔴 Гаднын хаяг https://$host хариу өгөхгүй байна: гадуур яваа ажилчдын апп, «Bto300», гаднаас орох оффисын вэб ажиллахгүй. Систем өөрөө хэвийн, дотоод сүлжээнд ажиллаж байна.
+Интернэт эсвэл Cloudflare-ийн сувгийг шалгана уу (systemctl --user status cloudflared)."
+      ;;
+    *)
+      found public 3 "🔴 Гаднын хаяг https://$host дээр Bto биш өөр зүйл хариулж байна (HTTP $code): гадуур яваа ажилчдын апп, «Bto300», гаднаас орох оффисын вэб ажиллахгүй. Систем өөрөө хэвийн.
+Өөр компьютер дээр cloudflared ижил сувгаар ажиллаж байгаа эсэхийг шалгана уу (Cloudflare Zero Trust → Networks → Tunnels → Connectors)."
+      ;;
   esac
 }
 
@@ -267,6 +303,7 @@ greet_boot() {
 look() {
   CONTAINERS=""
   check_health
+  check_public
   check_containers
   check_disk
   check_memory

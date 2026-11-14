@@ -18,6 +18,7 @@ The owner maintains it alone and is reached by phone. The api cannot be the one 
 1. **A watchman outside the stack**: `deploy/store/watch.sh`, plain bash with curl and the Docker CLI, run every minute by a systemd timer of the checkout's owner (`install-watch-timer.sh`, no sudo; `setup.sh` installs it at every update). It needs nothing of the api, the database or Node to be alive.
 2. **What it looks at**, each a line of Mongolian for the phone:
    - the centre's `/health` through the web's Caddy (web, api, database, job queue in one answer);
+   - since 2026-11-14, the outside address: `https://<STORE_PUBLIC_HOST>/health`, asked the way a phone asks it, out to Cloudflare and back through the tunnel; reported after three rounds when nothing answers or when something that is not the centre answers, and not at all while the centre itself is down. Added the day a second PC on the LAN (192.168.1.152, running PRTG) ran cloudflared with this tunnel's token: Cloudflare sent every outside request to that PC, both apps and the outside web were cut off, and every check here stayed green;
    - the containers: `postgres`, `api`, `worker`, `web`, the configured number of `api-apps` and `api-reports` (ADR-0192), and the till server's three when it is installed; a missing, stopped or unhealthy one is named;
    - the disk of `/` and of the backup folder at `STORE_ALERT_DISK_PERCENT` (85 %);
    - memory under 5 % available;

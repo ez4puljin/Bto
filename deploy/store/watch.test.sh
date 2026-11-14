@@ -88,6 +88,32 @@ contains "with the time away" "$(last)" "1 цаг 54 минут орчим ун�
 greet_boot
 expect "once" "$(sent)" 1
 
+# The outside address (STORE_PUBLIC_HOST): only the centre's own answer counts.
+expect "the centre's answer is ok" "$(public_verdict 200 '{"status":"ok","db":"up"}')" ok
+expect "no answer at all is silence" "$(public_verdict 000 '')" silent
+expect "another program's page is wrong" "$(public_verdict 302 '')" wrong
+expect "an error page of the road is wrong" "$(public_verdict 502 '<html>Bad gateway</html>')" wrong
+
+PUBLIC_HOST=app.example.test
+PUBLIC_ANSWER=$'{"status":"ok"}\n200'
+store_setting() { if [ "$1" = STORE_PUBLIC_HOST ]; then printf '%s' "$PUBLIC_HOST"; else printf '%s' "$2"; fi; }
+curl() { printf '%s' "$PUBLIC_ANSWER"; }
+looked() {
+  FOUND_TEXT=() FOUND_NEED=()
+  [ -z "${1:-}" ] || found health 2 "$1"
+  check_public
+  printf '%s' "${FOUND_TEXT[public]:-none}"
+}
+expect "a healthy road says nothing" "$(looked)" none
+PUBLIC_ANSWER=$'\n302'
+contains "another program on the address is named" "$(looked)" "Bto биш өөр зүйл хариулж байна (HTTP 302)"
+expect "after three rounds in a row" "$(FOUND_TEXT=() FOUND_NEED=(); check_public; echo "${FOUND_NEED[public]}")" 3
+PUBLIC_ANSWER=$'\n000'
+contains "silence is named" "$(looked)" "хариу өгөхгүй байна"
+expect "nothing is added while the centre itself is down" "$(looked "🔴 Систем хариу өгөхгүй байна.")" none
+PUBLIC_HOST=""
+expect "without an outside address nothing is asked" "$(looked)" none
+
 echo
 if [ "$FAILS" -gt 0 ]; then echo "$FAILS failed"; exit 1; fi
 echo "all passed"

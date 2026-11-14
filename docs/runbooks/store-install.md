@@ -293,7 +293,7 @@ The watchman (`deploy/store/watch.sh`) looks at the system every minute from out
 1. In Telegram open **@BotFather**, send `/newbot`, give the bot a name and a user name; it answers with a token.
 2. On the PC: `bash ~/bto/deploy/store/alerts-setup.sh`. Paste the token when asked (it is not shown), then write any word to the new bot from the phone that should get the alerts and press Enter; confirm the chat it found. A test message arrives.
 
-What it reports: the centre not answering, a stopped or missing part (the replicas are counted), the disk at 85 %, memory nearly gone, a failed or missing nightly backup, ten server errors in ten minutes, a report refused by the gate, and «PC дахин аслаа» with how long the PC was away.
+What it reports: the centre not answering, the outside address (`STORE_PUBLIC_HOST`) not answering or answered by something that is not the centre (after three minutes; e.g. a second PC running cloudflared with the same tunnel, as on 2026-11-14), a stopped or missing part (the replicas are counted), the disk at 85 %, memory nearly gone, a failed or missing nightly backup, ten server errors in ten minutes, a report refused by the gate, and «PC дахин аслаа» with how long the PC was away.
 
 ```bash
 bash ~/bto/deploy/store/watch.sh --check            # what it sees now; sends nothing
