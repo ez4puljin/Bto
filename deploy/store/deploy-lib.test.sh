@@ -34,7 +34,8 @@ expect "no run for this commit is unknown" "$(ci_verdict)" "unknown"
 fake_gh 'echo "error: not signed in" >&2; exit 1'
 expect "a gh that cannot answer is unknown" "$(ci_verdict)" "unknown"
 rm -f "$BIN/gh"
-expect "no gh at all is unknown" "$(ci_verdict)" "unknown"
+# Only the emptied directory on the path: a PC that has the real gh, signed in, must not answer.
+expect "no gh at all is unknown" "$(PATH="$BIN" ci_verdict)" "unknown"
 
 # --- the versions the way back is made of ------------------------------------------------------
 expect "nothing deployed yet" "$(deployed_version)" ""
@@ -84,6 +85,28 @@ docker_one() {
 DOCKER=(docker_one)
 roll_service api-reports >/dev/null
 expect "a single container is not rolled" "$([ -f "$BTO_DEPLOY_STATE/rolled-one" ] && echo yes || echo no)" "no"
+
+# --- the door last and alone -------------------------------------------------------------------
+# A fake compose that answers `config --services` and writes down every `up`.
+compose_fake() {
+  case "$1" in
+    config) printf 'postgres\napi\napi-apps\napi-reports\nworker\nweb\n' ;;
+    up) shift; echo "up $*" >>"$BTO_DEPLOY_STATE/ups" ;;
+  esac
+}
+COMPOSE=(compose_fake)
+start_stack
+expect "two starts" "$(wc -l <"$BTO_DEPLOY_STATE/ups" | tr -d ' ')" "2"
+expect "everything but the door first" "$(sed -n 1p "$BTO_DEPLOY_STATE/ups")" "up -d --wait postgres api api-apps api-reports worker"
+expect "then the door alone, without touching what it waits for" "$(sed -n 2p "$BTO_DEPLOY_STATE/ups")" "up -d --no-deps --wait web"
+: >"$BTO_DEPLOY_STATE/ups"
+start_stack --force-recreate
+expect "the way back starts in the same order" "$(sed -n 2p "$BTO_DEPLOY_STATE/ups")" "up -d --no-deps --wait --force-recreate web"
+# A compose that cannot list its services: one plain start, as before.
+compose_mute() { case "$1" in up) shift; echo "up $*" >>"$BTO_DEPLOY_STATE/ups-mute" ;; esac; }
+COMPOSE=(compose_mute)
+start_stack
+expect "no list, one plain start" "$(cat "$BTO_DEPLOY_STATE/ups-mute")" "up -d --wait"
 
 rm -rf -- "${BTO_DEPLOY_STATE:?}" "${BIN:?}"
 echo

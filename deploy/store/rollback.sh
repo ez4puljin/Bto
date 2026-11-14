@@ -73,7 +73,7 @@ fi
 APP_VERSION=${BACK:-rollback}
 export APP_VERSION
 echo "== Төв системийг өмнөх хувилбар дээр асааж байна"
-"${COMPOSE[@]}" up -d --force-recreate --wait
+start_stack --force-recreate
 
 # What runs is the older one again; the newer stays as the way forward.
 if [ -n "$BACK" ]; then record_deployed "$BACK"; fi

@@ -74,6 +74,26 @@ roll_service() {
   [ "$rolled" = "0" ] || echo "   $service: $rolled процесс ээлжлэн солигдлоо"
 }
 
+# Starts the centre with its one door closed as briefly as it can be (ADR-0196 #2, 2026-11-14).
+#
+# Caddy in `web` is the only way in, to the apps' replicas too, and it waits for a healthy api.
+# Started together with the rest, compose takes the old Caddy down at the beginning and brings the
+# new one up only when the api answers: on 2026-11-14 that closed the door for 12 s and cut off
+# both apps, although their own processes had been rolled without one failed request. So
+# everything but the door first, while the old Caddy still hands the apps to their replicas; then
+# the door alone, which is the time of its own restart (a second: Caddyfile.store `grace_period`).
+# "$@": more flags for `up` (rollback.sh passes --force-recreate).
+start_stack() {
+  local others=()
+  mapfile -t others < <("${COMPOSE[@]}" config --services 2>/dev/null | grep -vx web)
+  if [ "${#others[@]}" -eq 0 ]; then
+    "${COMPOSE[@]}" up -d --wait "$@"
+    return
+  fi
+  "${COMPOSE[@]}" up -d --wait "$@" "${others[@]}"
+  "${COMPOSE[@]}" up -d --no-deps --wait "$@" web
+}
+
 # What CI says about the commit this checkout stands on: success, failure, pending, unknown.
 # Unknown covers everything the box cannot tell (no gh, not signed in, no run for this commit).
 ci_verdict() {

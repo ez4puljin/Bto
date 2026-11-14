@@ -7,6 +7,11 @@
 	admin off
 	persist_config off
 	auto_https off
+	# Stopping does not wait for the open event streams (the apps' live stock, the office's
+	# /events), which never end by themselves: without this Docker waits its 10 s and kills Caddy,
+	# and the one door of the centre is closed for all of them at every update (ADR-0196,
+	# measured 2026-11-14: 10.1 s with one open stream, 1.1 s with this).
+	grace_period 1s
 	servers {
 		# Only the hop from this PC itself (cloudflared and the edge, which arrive through Docker's
 		# bridge, 172.16.0.0/12) may say who the caller is in X-Forwarded-For; the api's sign-in limits

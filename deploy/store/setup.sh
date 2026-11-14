@@ -141,7 +141,7 @@ roll_service api-apps
 roll_service api-reports
 
 echo "== Төв системийг асааж байна"
-"${COMPOSE[@]}" up -d --wait
+start_stack
 record_deployed "$APP_VERSION"
 
 if command -v ufw >/dev/null 2>&1 && sudo -n true 2>/dev/null &&
