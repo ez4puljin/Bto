@@ -846,7 +846,8 @@ Keyboard-wedge first everywhere (web global keydown detector; mobile hidden Text
 
 - `apps/api/src/integrations/picture/`: `RemoveBgClient` over Node's `fetch` (no SDK) with a 60 s timeout. `POST https://api.remove.bg/v1.0/removebg`, header `X-Api-Key`, a multipart `image_file` with `size=auto` and `format=png`; the answer is the PNG itself. `GET /account` is the free check that also tells the credit left. An error answers `{ errors: [{ title, code }] }`, of which only the code is kept in a `PictureError` (`TIMEOUT`, `NETWORK`, `HTTP`, `INVALID_RESPONSE`); no retry.
 - `PictureModule` (global, imported by `app.module.ts` only) provides `PictureGateway`: the key saved on «Тохиргоо → AI → Барааны зураг» (`ai_picture_settings`, sealed under `AI_KEY_SECRET`), read at every call. No environment variable; without a key there is no service and the form keeps the photo as taken. Tests replace `PICTURE_FETCH` with a scripted fetch.
-- Data that leaves the company: one photo of a product per picture. The server draws nothing: the browser keeps the product, puts it on white and draws the company's logo.
+- Data that leaves the company: one photo of a product per picture. For the office's web the server draws nothing: the browser keeps the product, puts it on white and draws the company's logo.
+- Since ADR-0199 the api draws the same picture for the staff app, which has no canvas: `common/images/product-picture.ts` over `sharp` 0.35.5 (libvips, prebuilt, no install script) turns a phone's photo upright and scales it (`normalisedPhoto`), composes the cut-out (`composedPicture`) and makes the thumbnail. The rules both sides follow (`keepProduct`, `productPlace`, `stampPlace`) are `@tugeel/shared/pictures`.
 
 ---
 

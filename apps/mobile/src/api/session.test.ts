@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { StaffSession, type StoredSession, type TokenStore } from './session';
+import {
+  REQUEST_TIMEOUT_MS,
+  SLOW_REQUEST_TIMEOUT_MS,
+  StaffSession,
+  type StoredSession,
+  timeoutFor,
+  type TokenStore,
+} from './session';
 
 const SERVER = 'http://192.168.1.10:3300';
 let uuids = 0;
@@ -193,6 +200,17 @@ describe('the staff app session (ADR-0061 #4)', () => {
     expect(silent.getSnapshot()).toEqual({ status: 'offline' });
     expect(signals.map((signal) => signal.aborted)).toEqual([true]);
     expect(first.store.value).not.toBeNull();
+  });
+
+  it('gives the calls that wait for a model or the background service their own long limit (ADR-0199)', () => {
+    expect(timeoutFor('/api/v1/sales-rep/products')).toBe(REQUEST_TIMEOUT_MS);
+    expect(timeoutFor('/api/v1/product-registrations')).toBe(REQUEST_TIMEOUT_MS);
+    expect(timeoutFor('/api/v1/product-registrations/ai')).toBe(REQUEST_TIMEOUT_MS);
+    expect(timeoutFor('/api/v1/product-registrations/ai/read')).toBe(SLOW_REQUEST_TIMEOUT_MS);
+    expect(timeoutFor('/api/v1/product-registrations/ai/image')).toBe(SLOW_REQUEST_TIMEOUT_MS);
+    // A test's short limit does not shorten them: they are long by design.
+    expect(timeoutFor('/api/v1/product-registrations/ai/read', 20)).toBe(SLOW_REQUEST_TIMEOUT_MS);
+    expect(timeoutFor('/api/v1/auth/me', 20)).toBe(20);
   });
 
   it('ignores a session stored for another server', async () => {

@@ -1,5 +1,16 @@
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsInt, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  Max,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { MAX_AI_PHOTOS } from '../services/product-ai';
 
 @ApiSchema({ name: 'ProductAiReadRequest' })
@@ -48,10 +59,73 @@ export class ProductAiSupplierDto {
 
 @ApiSchema({ name: 'ProductAiBox' })
 export class ProductAiBoxDto {
-  @ApiProperty({ description: "Fraction of the photo's width" }) left: number;
-  @ApiProperty({ description: "Fraction of the photo's height" }) top: number;
-  @ApiProperty() width: number;
-  @ApiProperty() height: number;
+  @ApiProperty({ description: "Fraction of the photo's width" })
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  left: number;
+
+  @ApiProperty({ description: "Fraction of the photo's height" })
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  top: number;
+
+  @ApiProperty() @IsNumber() @Min(0) @Max(1) width: number;
+  @ApiProperty() @IsNumber() @Min(0) @Max(1) height: number;
+}
+
+@ApiSchema({ name: 'ProductAiImageRequest' })
+export class ProductAiImageDto {
+  @ApiProperty({ description: 'Uploaded file of kind catalog.ai_photo' })
+  @IsInt()
+  @Min(1)
+  photoFileId: number;
+
+  @ApiProperty({
+    type: ProductAiBoxDto,
+    nullable: true,
+    required: false,
+    description: "Where the product is on the photo: the reading's `productBox`",
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ProductAiBoxDto)
+  productBox?: ProductAiBoxDto | null;
+}
+
+@ApiSchema({ name: 'ProductAiImageFailure' })
+export class ProductAiImageFailureDto {
+  @ApiProperty({ description: 'TIMEOUT, NETWORK, HTTP, INVALID_RESPONSE or EMPTY' })
+  reason: string;
+
+  @ApiProperty({ type: Number, nullable: true }) status: number | null;
+  @ApiProperty({ type: String, nullable: true }) providerCode: string | null;
+}
+
+/** A finished product image, stored as pending product photos of the caller (ADR-0199). */
+@ApiSchema({ name: 'ProductAiImage' })
+export class ProductAiImageResultDto {
+  @ApiProperty({ description: 'A pending file of kind catalog.product_image' })
+  imageFileId: number;
+
+  @ApiProperty({ description: 'A pending file of kind catalog.product_thumb' })
+  thumbFileId: number;
+
+  @ApiProperty({
+    enum: ['made', 'original'],
+    description: 'made: cut out, on white, with the logo; original: the photo as taken',
+  })
+  picture: 'made' | 'original';
+
+  @ApiProperty({ description: 'The image: a JPEG in base64' }) image: string;
+
+  @ApiProperty({
+    type: ProductAiImageFailureDto,
+    nullable: true,
+    description: 'Why the image is the photo as taken although a background service is set',
+  })
+  failure: ProductAiImageFailureDto | null;
 }
 
 @ApiSchema({ name: 'ProductAiExisting' })

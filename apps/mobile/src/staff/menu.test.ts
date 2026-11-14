@@ -45,6 +45,15 @@ describe('the staff menu', () => {
     expect(keysOf(['inventory.transfers.manage'])).not.toContain('picking');
   });
 
+  it('shows «Бараа нэмэх» only to who may register products (ADR-0199)', () => {
+    const item = menuOf(person(['catalog.products.register']))
+      .flatMap((group) => group.items)
+      .find((one) => one.key === 'productNew');
+    expect(item).toEqual({ key: 'productNew', href: '/products/new' });
+    expect(keysOf([])).not.toContain('productNew');
+    expect(keysOf(['catalog.products.manage'])).not.toContain('productNew');
+  });
+
   it('gives a driver «Ачилт» (ADR-0179), first among their favourites', () => {
     expect(keysOf(['sales.orders.load'])).toContain('loading');
     expect(keysOf(['sales.orders.pick'])).not.toContain('loading');

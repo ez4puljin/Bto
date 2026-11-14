@@ -142,6 +142,11 @@
       "types": "./dist/ai/index.d.ts",
       "default": "./dist/ai/index.js"
     },
+    "./pictures": {
+      "@tugeel/source": "./src/pictures/index.ts",
+      "types": "./dist/pictures/index.d.ts",
+      "default": "./dist/pictures/index.js"
+    },
     "./pos": {
       "@tugeel/source": "./src/pos/index.ts",
       "types": "./dist/pos/index.d.ts",

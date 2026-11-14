@@ -1,5 +1,6 @@
 import { WEIGHT_PATTERN } from '@tugeel/shared/catalog';
 import { classifyBarcode } from '@tugeel/shared/gtin';
+import type { PhotoBox } from '@tugeel/shared/pictures';
 import { Decimal } from '@tugeel/shared/money';
 import { FACTOR_PATTERN, isExactFactor } from '@tugeel/shared/units';
 import { z } from 'zod';
@@ -130,13 +131,7 @@ export interface ProductReadLists {
   suppliers: readonly { id: number; code: string; name: string }[];
 }
 
-/** A place on a photo, as fractions of its width and height. */
-export interface PhotoBox {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-}
+export type { PhotoBox };
 
 export interface ProposedUnit {
   uomId: number;

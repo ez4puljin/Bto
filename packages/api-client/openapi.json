@@ -8090,6 +8090,53 @@
         ]
       }
     },
+    "/api/v1/product-registrations/ai/image": {
+      "post": {
+        "operationId": "ProductRegistrations_aiImage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductAiImageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductAiImage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The finished product image of a photo, for a client that cannot draw (the staff app,\nADR-0199): cut out and stamped when the background service answers, else the photo as taken.\nIt never fails for the service's sake, so a product can always be registered.",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
     "/api/v1/product-registrations": {
       "post": {
         "operationId": "ProductRegistrations_register",
@@ -51329,17 +51376,25 @@
         "properties": {
           "left": {
             "type": "number",
+            "minimum": 0,
+            "maximum": 1,
             "description": "Fraction of the photo's width"
           },
           "top": {
             "type": "number",
+            "minimum": 0,
+            "maximum": 1,
             "description": "Fraction of the photo's height"
           },
           "width": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
           },
           "height": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
           }
         },
         "required": [
@@ -51519,6 +51574,93 @@
         },
         "required": [
           "image"
+        ]
+      },
+      "ProductAiImageRequest": {
+        "type": "object",
+        "properties": {
+          "photoFileId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Uploaded file of kind catalog.ai_photo"
+          },
+          "productBox": {
+            "nullable": true,
+            "description": "Where the product is on the photo: the reading's `productBox`",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProductAiBox"
+              }
+            ]
+          }
+        },
+        "required": [
+          "photoFileId"
+        ]
+      },
+      "ProductAiImageFailure": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "TIMEOUT, NETWORK, HTTP, INVALID_RESPONSE or EMPTY"
+          },
+          "status": {
+            "type": "number",
+            "nullable": true
+          },
+          "providerCode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "reason",
+          "status",
+          "providerCode"
+        ]
+      },
+      "ProductAiImage": {
+        "type": "object",
+        "properties": {
+          "imageFileId": {
+            "type": "number",
+            "description": "A pending file of kind catalog.product_image"
+          },
+          "thumbFileId": {
+            "type": "number",
+            "description": "A pending file of kind catalog.product_thumb"
+          },
+          "picture": {
+            "enum": [
+              "made",
+              "original"
+            ],
+            "type": "string",
+            "description": "made: cut out, on white, with the logo; original: the photo as taken"
+          },
+          "image": {
+            "type": "string",
+            "description": "The image: a JPEG in base64"
+          },
+          "failure": {
+            "nullable": true,
+            "description": "Why the image is the photo as taken although a background service is set",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProductAiImageFailure"
+              }
+            ]
+          }
+        },
+        "required": [
+          "imageFileId",
+          "thumbFileId",
+          "picture",
+          "image",
+          "failure"
         ]
       },
       "RegistrationUnitRequest": {

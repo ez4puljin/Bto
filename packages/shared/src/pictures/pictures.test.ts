@@ -8,7 +8,7 @@ import {
   STAMP_MARGIN,
   STAMP_WIDTH,
   stampPlace,
-} from './product-picture';
+} from './index';
 
 /** An RGBA image of `width` × `height`, transparent but for the given rectangles. */
 function image(

@@ -3,6 +3,8 @@ import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Decimal } from '@tugeel/shared/money';
 import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
 import {
+  ProductAiImageDto,
+  ProductAiImageResultDto,
   ProductAiPictureDto,
   ProductAiPictureResultDto,
   ProductAiProposalDto,
@@ -57,6 +59,22 @@ export class ProductRegistrationsController {
     @Body() body: ProductAiPictureDto,
   ): Promise<ProductAiPictureResultDto> {
     return this.ai.picture(ctx, body.photoFileId);
+  }
+
+  /**
+   * The finished product image of a photo, for a client that cannot draw (the staff app,
+   * ADR-0199): cut out and stamped when the background service answers, else the photo as taken.
+   * It never fails for the service's sake, so a product can always be registered.
+   */
+  @Post('ai/image')
+  @HttpCode(200)
+  @RequirePermission(REGISTER)
+  @ApiOkResponse({ type: ProductAiImageResultDto })
+  aiImage(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: ProductAiImageDto,
+  ): Promise<ProductAiImageResultDto> {
+    return this.ai.productImage(ctx, body.photoFileId, body.productBox ?? null);
   }
 
   @Post()

@@ -1,4 +1,4 @@
-import { isRep, mayLoad, mayPick, mayRequestTransfers } from '../state/phase';
+import { isRep, mayLoad, mayPick, mayRegisterProducts, mayRequestTransfers } from '../state/phase';
 import type { Me } from '../api/session';
 
 // «Цэс» of the staff app (ADR-0174): every screen the app has, by the person's rights, and the
@@ -12,6 +12,7 @@ export type MenuKey =
   | 'transfers'
   | 'expiry'
   | 'counts'
+  | 'productNew'
   | 'attendance'
   | 'attendanceRequests'
   | 'attendanceHistory'
@@ -56,6 +57,7 @@ export function menuOf(me: Rights): MenuGroup[] {
         ...(mayRequestTransfers(me) ? [{ key: 'transfers' as const, href: '/transfers' }] : []),
         { key: 'expiry', href: '/expiry' },
         { key: 'counts', href: '/counts' },
+        ...(mayRegisterProducts(me) ? [{ key: 'productNew' as const, href: '/products/new' }] : []),
       ],
     },
     {

@@ -1,24 +1,63 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { gtinCheckDigit } from '@tugeel/shared/gtin';
 import type { Client } from 'pg';
+import sharp from 'sharp';
 import request from 'supertest';
 import { LLM_CLIENT, LlmError, type LlmContentPart } from '../../src/integrations/llm';
 import { PICTURE_FETCH, type PictureFetch } from '../../src/integrations/picture';
 import { FakeLlm } from '../harness/ai';
 import { connectAs, createHttpApp } from '../harness/apps';
-import { catalogApi } from '../harness/catalog';
+import { catalogApi, idempotency } from '../harness/catalog';
 import { bearer, customRoleUser, login, seedUser } from '../harness/identity';
+import { inventoryApi } from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 
 /** Not a real key: tests never reach the background service, every fetch below is scripted. */
 const TEST_KEY = 'test-picture-key-not-real-WXYZ';
-const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9, 9, 9, 9]);
 const ean = (body: string) => `${body}${gtinCheckDigit(body)}`;
 
+/** Real pictures, made once: the flow reads what it is given (ADR-0199). */
+const pictures = {
+  /** Small upright JPEGs, as the web uploads them; `mark` tells one from another. */
+  jpegs: new Map<number, Buffer>(),
+  /** What the background service answers: a red product and a blue matchbox apart from it. */
+  cutOut: Buffer.alloc(0),
+  logo: Buffer.alloc(0),
+  /** A phone's camera photo: large, and lying on its side until its EXIF turns it. */
+  camera: Buffer.alloc(0),
+};
+const solid = (width: number, height: number, background: string) =>
+  sharp({ create: { width, height, channels: 3, background } });
+
+async function makePictures(): Promise<void> {
+  for (const mark of [1, 2, 3, 5]) {
+    pictures.jpegs.set(
+      mark,
+      await solid(320, 240, `rgb(${mark * 40}, 90, 120)`)
+        .jpeg()
+        .toBuffer(),
+    );
+  }
+  pictures.cutOut = await sharp({
+    create: { width: 600, height: 800, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  })
+    .composite([
+      { input: await solid(200, 700, '#ff0000').png().toBuffer(), left: 100, top: 50 },
+      { input: await solid(100, 60, '#0000ff').png().toBuffer(), left: 420, top: 650 },
+    ])
+    .png()
+    .toBuffer();
+  pictures.logo = await solid(300, 100, '#008000').png().toBuffer();
+  pictures.camera = await solid(3200, 2400, '#336699')
+    .withMetadata({ orientation: 6 })
+    .jpeg()
+    .toBuffer();
+}
+
 function jpegBytes(mark: number): Buffer {
-  const body = Buffer.alloc(300, mark);
-  body.set([0xff, 0xd8, 0xff, 0xe0]);
-  return body;
+  const bytes = pictures.jpegs.get(mark);
+  if (!bytes) throw new Error(`no test picture ${mark}`);
+  return bytes;
 }
 
 interface Sent {
@@ -47,6 +86,7 @@ describe('product registration: AI reading and picture', () => {
   let water: number;
   let pcs: number;
   let block: number;
+  let home: number;
   let supplier: { id: number; code: string; name: string };
   const taken = ean('865000100009');
   const http = () => request(app.getHttpServer());
@@ -67,7 +107,10 @@ describe('product registration: AI reading and picture', () => {
       headers: { 'content-type': 'application/json' },
     });
   const cutOut = () =>
-    new Response(new Uint8Array(PNG), { status: 200, headers: { 'x-credits-charged': '1' } });
+    new Response(new Uint8Array(pictures.cutOut), {
+      status: 200,
+      headers: { 'x-credits-charged': '1' },
+    });
 
   async function upload(
     token: string,
@@ -89,6 +132,8 @@ describe('product registration: AI reading and picture', () => {
     upload(token, 'catalog.ai_photo', jpegBytes(mark), 'image/jpeg');
   const read = (photoFileIds: number[], token = registrar) =>
     http().post('/api/v1/product-registrations/ai/read').set(bearer(token)).send({ photoFileIds });
+  const image = (body: Record<string, unknown>, token = registrar) =>
+    http().post('/api/v1/product-registrations/ai/image').set(bearer(token)).send(body);
   const picture = (photoFileId: number, token = registrar) =>
     http()
       .post('/api/v1/product-registrations/ai/picture')
@@ -119,6 +164,7 @@ describe('product registration: AI reading and picture', () => {
     (await sql.query<{ n: string }>(`SELECT count(*)::text AS n FROM ${table}`)).rows[0]?.n;
 
   beforeAll(async () => {
+    await makePictures();
     app = await createHttpApp({
       override: (builder) =>
         builder
@@ -138,6 +184,7 @@ describe('product registration: AI reading and picture', () => {
     pcs = await catalog.uomId('PCS');
     block = await catalog.uomId('BLOCK');
     supplier = await partnersApi(app, admin).supplier({ name: 'МСМ ХХК' });
+    home = (await inventoryApi(app, admin).warehouse('W1')).id;
     await catalog.product({
       sku: '900',
       name: 'Хуучин ус 1л',
@@ -162,6 +209,7 @@ describe('product registration: AI reading and picture', () => {
     await status(worker).expect(403);
     await read([1], worker).expect(403);
     await picture(1, worker).expect(403);
+    await image({ photoFileId: 1 }, worker).expect(403);
     for (const token of [registrar, worker]) {
       await http().get('/api/v1/ai/picture-settings').set(bearer(token)).expect(403);
       await http()
@@ -381,7 +429,7 @@ describe('product registration: AI reading and picture', () => {
     const id = await photo(registrar, 5);
     answers.push(cutOut());
     const plain = await picture(id).expect(200);
-    expect(plain.body).toEqual({ image: PNG.toString('base64'), stamp: null });
+    expect(plain.body).toEqual({ image: pictures.cutOut.toString('base64'), stamp: null });
     expect(sent[0]).toMatchObject({
       url: 'https://api.remove.bg/v1.0/removebg',
       method: 'POST',
@@ -395,7 +443,7 @@ describe('product registration: AI reading and picture', () => {
     expect(sent).toHaveLength(1);
 
     // The company's logo: uploaded, saved, public, and sent along with a cut-out.
-    const logoBytes = Buffer.concat([PNG, Buffer.alloc(40, 3)]);
+    const logoBytes = pictures.logo;
     const logo = await upload(admin, 'ai.picture_stamp', logoBytes, 'image/png');
     const withLogo = await saveSettings({ stampFileId: logo }).expect(200);
     expect(withLogo.body.stampUrl).toMatch(/\.png$/);
@@ -436,10 +484,137 @@ describe('product registration: AI reading and picture', () => {
     expect(notPng.body.params).toMatchObject({ reason: 'INVALID_RESPONSE' });
   });
 
+  it('draws the finished image for a phone: upright, cut out, only the product, the logo, ready to attach', async () => {
+    const logo = await upload(admin, 'ai.picture_stamp', pictures.logo, 'image/png');
+    await saveSettings({ stampFileId: logo }).expect(200);
+    const taken = await upload(registrar, 'catalog.ai_photo', pictures.camera, 'image/jpeg');
+    answers.push(cutOut());
+    const { body } = await image({
+      photoFileId: taken,
+      productBox: { left: 0.1, top: 0.05, width: 0.4, height: 0.9 },
+    }).expect(200);
+    expect(body).toMatchObject({ picture: 'made', failure: null });
+
+    // The service got the photo upright and scaled, not the camera's 3200 × 2400 on its side.
+    const sentPhoto = sent[0]?.form?.get('image_file') as File;
+    const sentMeta = await sharp(Buffer.from(await sentPhoto.arrayBuffer())).metadata();
+    expect([sentMeta.width, sentMeta.height, sentMeta.orientation]).toEqual([960, 1280, undefined]);
+
+    // The picture: a white square, the red product in the middle, the logo top-left, no matchbox.
+    const jpeg = Buffer.from(body.image as string, 'base64');
+    const meta = await sharp(jpeg).metadata();
+    expect([meta.width, meta.height, meta.format]).toEqual([1000, 1000, 'jpeg']);
+    const { data } = await sharp(jpeg).raw().toBuffer({ resolveWithObject: true });
+    const at = (x: number, y: number) => [
+      ...data.subarray((y * 1000 + x) * 3, (y * 1000 + x) * 3 + 3),
+    ];
+    const [red, green, corner] = [at(500, 500), at(60, 60), at(950, 50)];
+    expect((red[0] ?? 0) > 200 && (red[2] ?? 255) < 60).toBe(true);
+    expect((green[1] ?? 0) > 100 && (green[0] ?? 255) < 60).toBe(true);
+    expect(corner.every((value) => value > 245)).toBe(true);
+    let blue = 0;
+    for (let i = 0; i < data.length; i += 3) {
+      if ((data[i + 2] ?? 0) > 200 && (data[i] ?? 255) < 60 && (data[i + 1] ?? 255) < 60) blue += 1;
+    }
+    expect(blue).toBe(0);
+
+    // Both files wait as the registrar's own product photos, and a registration attaches them.
+    const stored = await sql.query<{ kind: string; status: string }>(
+      'SELECT kind, status FROM files WHERE id = ANY($1::bigint[]) ORDER BY id',
+      [[body.imageFileId, body.thumbFileId]],
+    );
+    expect(stored.rows).toEqual([
+      { kind: 'catalog.product_image', status: 'PENDING' },
+      { kind: 'catalog.product_thumb', status: 'PENDING' },
+    ]);
+    const registered = await http()
+      .post('/api/v1/product-registrations')
+      .set(bearer(admin))
+      .set(idempotency())
+      .send({
+        sku: '777',
+        name: 'Утаснаас бүртгэсэн бараа',
+        categoryId: water,
+        baseUomId: pcs,
+        boxFactor: '12',
+        supplierId: supplier.id,
+        homeWarehouseId: home,
+        images: [{ imageFileId: body.imageFileId, thumbFileId: body.thumbFileId }],
+      })
+      .expect(201);
+    const product = (
+      await http()
+        .get(`/api/v1/products/${(registered.body as { productId: number }).productId}`)
+        .set(bearer(admin))
+        .expect(200)
+    ).body as { images: { isPrimary: boolean; url: string }[] };
+    expect(product.images).toHaveLength(1);
+    expect(product.images[0]?.isPrimary).toBe(true);
+    await http()
+      .get(product.images[0]?.url ?? '')
+      .expect(200);
+    await saveSettings({ stampFileId: null }).expect(200);
+  });
+
+  it('keeps the photo as taken when the service refuses, and says why', async () => {
+    answers.push(
+      json(402, { errors: [{ title: 'Insufficient credits', code: 'insufficient_credits' }] }),
+    );
+    const { body } = await image({ photoFileId: await photo(registrar, 5) }).expect(200);
+    expect(body).toMatchObject({
+      picture: 'original',
+      failure: { reason: 'HTTP', status: 402, providerCode: 'insufficient_credits' },
+    });
+    expect(Buffer.from(body.image as string, 'base64').equals(jpegBytes(5))).toBe(true);
+    // A cut-out with nothing in it is no picture either.
+    answers.push(
+      new Response(
+        new Uint8Array(
+          await sharp({
+            create: {
+              width: 50,
+              height: 50,
+              channels: 4,
+              background: { r: 0, g: 0, b: 0, alpha: 0 },
+            },
+          })
+            .png()
+            .toBuffer(),
+        ),
+        { status: 200 },
+      ),
+    );
+    const empty = await image({ photoFileId: await photo() }).expect(200);
+    expect(empty.body).toMatchObject({ picture: 'original', failure: { reason: 'EMPTY' } });
+  });
+
+  it('refuses an upload that is no readable photo, and another person’s', async () => {
+    const broken = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(200, 1)]);
+    const id = await upload(registrar, 'catalog.ai_photo', broken, 'image/jpeg');
+    const refused = await image({ photoFileId: id }).expect(415);
+    expect(refused.body.code).toBe('UNSUPPORTED_MEDIA_TYPE');
+    await read([id]).expect(415);
+    await image({ photoFileId: await photo(otherRegistrar) }).expect(404);
+    await image({
+      photoFileId: await photo(),
+      productBox: { left: 2, top: 0, width: 1, height: 1 },
+    }).expect(422);
+    expect(sent).toHaveLength(0);
+  });
+
   it('removing the key stops the pictures again', async () => {
     const removed = await saveSettings({ apiKey: null }).expect(200);
     expect(removed.body.keyHint).toBeNull();
     expect((await status().expect(200)).body).toEqual({ read: true, picture: false });
     await picture(await photo()).expect(503);
+  });
+
+  it('without a key the image is the photo as taken, upright and scaled, with nothing to explain', async () => {
+    const taken = await upload(registrar, 'catalog.ai_photo', pictures.camera, 'image/jpeg');
+    const { body } = await image({ photoFileId: taken }).expect(200);
+    expect(body).toMatchObject({ picture: 'original', failure: null });
+    const meta = await sharp(Buffer.from(body.image as string, 'base64')).metadata();
+    expect([meta.width, meta.height]).toEqual([960, 1280]);
+    expect(sent).toHaveLength(0);
   });
 });

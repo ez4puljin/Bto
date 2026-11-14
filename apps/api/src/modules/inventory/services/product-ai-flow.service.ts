@@ -1,6 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { categoryTree } from '@tugeel/shared/catalog';
 import { AppError } from '../../../common/errors/app-error';
+import {
+  composedPicture,
+  normalisedPhoto,
+  thumbnailOf,
+  UnreadablePictureError,
+} from '../../../common/images/product-picture';
 import { type LlmContentPart, LlmError, LlmGateway } from '../../../integrations/llm';
 import { PictureError, PictureGateway } from '../../../integrations/picture';
 import { BarcodeService, CatalogService, CategoriesService, UomsService } from '../../catalog';
@@ -8,6 +14,7 @@ import { actorUserId, type AuthContext, StorageService } from '../../identity';
 import { SuppliersService } from '../../partners';
 import {
   MAX_AI_PHOTOS,
+  type PhotoBox,
   PRODUCT_READ_INSTRUCTIONS,
   PRODUCT_READ_SCHEMA,
   type ProductProposalValues,
@@ -21,12 +28,12 @@ import {
 export const AI_PHOTO = 'catalog.ai_photo';
 /** The file kind of the company's logo, saved by the ai module's settings. */
 const PICTURE_STAMP = 'ai.picture_stamp';
+const PRODUCT_IMAGE = 'catalog.product_image';
+const PRODUCT_THUMB = 'catalog.product_thumb';
 
 const ANSWER_TOKENS = 2_000;
 /** Product names shown to the model as the catalogue's style. */
 const NAME_EXAMPLES = 40;
-
-type ImageType = 'image/jpeg' | 'image/png' | 'image/webp';
 
 /** What «AI ашиглах» can do now: read photos (a model is set), cut a picture out (a key is set). */
 export interface ProductAiStatus {
@@ -46,6 +53,26 @@ export interface ProductPicture {
   image: string;
   /** The company's logo to draw on it, or null while none is uploaded. */
   stamp: { data: string; mediaType: string } | null;
+}
+
+/** Why a product image is the photo as taken: the service's code and status, never its words. */
+export interface PictureFailureFacts {
+  /** A PictureError reason, or EMPTY when the service found nothing to keep. */
+  reason: string;
+  status: number | null;
+  providerCode: string | null;
+}
+
+/** A finished product image, uploaded and ready for a registration's `images` (ADR-0199). */
+export interface ProductImage {
+  imageFileId: number;
+  thumbFileId: number;
+  /** `made`: cut out, on white, with the logo; `original`: the photo as taken, scaled. */
+  picture: 'made' | 'original';
+  /** The image itself (a JPEG in base64), for the phone to show before the product exists. */
+  image: string;
+  /** Why it is `original` although a background service is set; null otherwise. */
+  failure: PictureFailureFacts | null;
 }
 
 /**
@@ -174,34 +201,106 @@ export class ProductAiFlowService {
     return { image: png.toString('base64'), stamp: await this.stamp() };
   }
 
+  /**
+   * The product image of a photo, finished on the server for a client without a canvas (the staff
+   * app, ADR-0199): cut out by the background service, only the product kept, on a white square
+   * with the logo, as the office's browser draws it. Without a service, or when it refuses, the
+   * photo as taken (upright, scaled) is the image, so a product can always be registered. The
+   * picture and its thumbnail are stored as pending product photos of the caller, to be attached
+   * by the registration.
+   */
+  async productImage(
+    ctx: AuthContext,
+    photoFileId: number,
+    box: PhotoBox | null,
+  ): Promise<ProductImage> {
+    const photo = await this.photo(ctx, photoFileId);
+    const remover = await this.pictures.remover();
+    let made: Buffer | null = null;
+    let failure: PictureFailureFacts | null = null;
+    if (remover !== null) {
+      try {
+        const cut = await remover.cutOut(photo);
+        const stamp = await this.stampBytes();
+        made = await composedPicture(cut.png, box, stamp?.data ?? null);
+        if (made === null) failure = { reason: 'EMPTY', status: null, providerCode: null };
+      } catch (error: unknown) {
+        if (error instanceof PictureError) {
+          failure = {
+            reason: error.reason,
+            status: error.status ?? null,
+            providerCode: error.providerCode ?? null,
+          };
+        } else if (error instanceof UnreadablePictureError) {
+          failure = { reason: 'INVALID_RESPONSE', status: null, providerCode: null };
+        } else {
+          throw error;
+        }
+        this.logger.warn(failure, 'the product image is kept as taken');
+      }
+    }
+    const image = made ?? photo.data;
+    const ownerId = actorUserId(ctx);
+    const [stored, thumb] = [
+      await this.storage.ingest({
+        kind: PRODUCT_IMAGE,
+        contentType: 'image/jpeg',
+        bytes: image,
+        ownerId,
+      }),
+      await this.storage.ingest({
+        kind: PRODUCT_THUMB,
+        contentType: 'image/jpeg',
+        bytes: await thumbnailOf(image),
+        ownerId,
+      }),
+    ];
+    return {
+      imageFileId: stored.id,
+      thumbFileId: thumb.id,
+      picture: made ? 'made' : 'original',
+      image: image.toString('base64'),
+      failure,
+    };
+  }
+
   /** The logo's bytes, or null: a picture is still made without it. */
   private async stamp(): Promise<ProductPicture['stamp']> {
+    const stamp = await this.stampBytes();
+    return stamp ? { data: stamp.data.toString('base64'), mediaType: stamp.mediaType } : null;
+  }
+
+  private async stampBytes(): Promise<{ data: Buffer; mediaType: string } | null> {
     const fileId = await this.pictures.stampFileId();
     if (fileId === null) return null;
     const file = await this.storage.get(fileId);
     if (!file || file.kind !== PICTURE_STAMP) return null;
     const opened = await this.storage.openPublic(file.key);
     if (!opened) return null;
-    return {
-      data: (await bytesOf(opened.body)).toString('base64'),
-      mediaType: opened.file.contentType,
-    };
+    return { data: await bytesOf(opened.body), mediaType: opened.file.contentType };
   }
 
-  /** A photo the caller uploaded for a reading; another person's is not found. */
+  /**
+   * A photo the caller uploaded for a reading; another person's is not found. It goes on upright,
+   * within 1280 px and as a JPEG: the web's uploads already are and pass untouched, a phone's
+   * camera photo is turned and scaled here (ADR-0199).
+   */
   private async photo(
     ctx: AuthContext,
     fileId: number,
-  ): Promise<{ data: Buffer; mediaType: ImageType }> {
+  ): Promise<{ data: Buffer; mediaType: 'image/jpeg' }> {
     const { file, body } = await this.storage.openUploaded(fileId, AI_PHOTO);
     if (file.ownerId !== actorUserId(ctx)) {
       throw new AppError('NOT_FOUND', `file ${fileId} not found`, { id: fileId });
     }
-    const mediaType = file.contentType;
-    if (mediaType !== 'image/jpeg' && mediaType !== 'image/png' && mediaType !== 'image/webp') {
-      throw new AppError('UNSUPPORTED_MEDIA_TYPE', `a product photo is not ${mediaType}`);
+    try {
+      return { data: await normalisedPhoto(await bytesOf(body)), mediaType: 'image/jpeg' };
+    } catch (error: unknown) {
+      if (!(error instanceof UnreadablePictureError)) throw error;
+      throw new AppError('UNSUPPORTED_MEDIA_TYPE', `file ${fileId} is not a readable photo`, {
+        id: fileId,
+      });
     }
-    return { data: await bytesOf(body), mediaType };
   }
 
   /** The catalogue's own lists the model chooses from. */

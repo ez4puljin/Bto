@@ -53,6 +53,7 @@ Confirmed 2026-10-10 from the npm registry (exact pins in every `package.json`; 
 | barcode-detector, zxing-wasm | 3.2.2, 3.1.3 | web camera fallback; `zxing-wasm` = the exact version `barcode-detector` declares, `.wasm` served from our build (ADR-0031) |
 | exceljs | 4.4.0 (api only) | imports (ADR-0036): the worker loads the whole workbook (`workbook.xlsx.load`, files ≤ 5 MiB); never the streaming reader, which loses shared strings and hyperlink targets |
 | libpg-query | 18.1.5 (api only) | the AI assistant's SQL guard (ADR-0045): the PostgreSQL 18 parser in WebAssembly; parse-tree types are imported from it (its `@pgsql/types` resolves to 18.0.0); LLM providers through plain `fetch`, no SDK |
+| sharp | 0.35.5 (api only) | product pictures for the staff app (ADR-0199): libvips prebuilt for linux-x64, no install script; used only in `apps/api/src/common/images/`; add packages with `pnpm install` from the repository root, never `pnpm add` inside a package (it emptied `node_modules`, 2026-11-14) |
 | pdfmake, `@nestjs/throttler`, receipt-printer-encoder | `npm view <pkg> version` when first installed; pick a version older than 24 h | |
 
 Majors change only in dedicated sessions between deliveries.

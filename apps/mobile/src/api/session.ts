@@ -73,6 +73,19 @@ const EARLY_MS = 30_000;
  */
 export const REQUEST_TIMEOUT_MS = 10_000;
 
+/**
+ * Calls that wait for an outside service by design (ADR-0199): a model reading product photos and
+ * the background service cutting a picture out take tens of seconds, and giving up at ten would
+ * throw away an answer already paid for. Everything else keeps the short limit.
+ */
+export const SLOW_ROUTES = /^\/api\/v1\/product-registrations\/ai\/(read|image)$/;
+export const SLOW_REQUEST_TIMEOUT_MS = 120_000;
+
+/** How long a call to `path` may take before it counts as no connection. */
+export function timeoutFor(path: string, base: number = REQUEST_TIMEOUT_MS): number {
+  return SLOW_ROUTES.test(path) ? Math.max(base, SLOW_REQUEST_TIMEOUT_MS) : base;
+}
+
 export interface SessionOptions {
   server: string;
   store: TokenStore;
@@ -296,10 +309,13 @@ export abstract class MobileSession<P> {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timedOut = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => {
-        controller.abort();
-        reject(new TypeError('Network request timed out'));
-      }, this.options.timeoutMs ?? REQUEST_TIMEOUT_MS);
+      timer = setTimeout(
+        () => {
+          controller.abort();
+          reject(new TypeError('Network request timed out'));
+        },
+        timeoutFor(pathOf(request.url), this.options.timeoutMs ?? REQUEST_TIMEOUT_MS),
+      );
     });
     try {
       return await Promise.race([

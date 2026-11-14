@@ -13,6 +13,8 @@ export const PICK_LEAD_RIGHT = 'sales.orders.pickLead';
 export const LOAD_RIGHT = 'sales.orders.load';
 /** Status and archive of an expiry record (ADR-0172 #4); recording and correcting are everyone's. */
 export const EXPIRY_MANAGE_RIGHT = 'expiry.items.manage';
+/** Registering a new product (ADR-0044 #5), on the phone since ADR-0199. */
+export const PRODUCT_REGISTER_RIGHT = 'catalog.products.register';
 
 /** A sales rep: the shop, the cart and the orders are theirs. */
 export function isRep(me: Pick<Me, 'permissions'>): boolean {
@@ -32,6 +34,11 @@ export function mayPick(me: Pick<Me, 'permissions'>): boolean {
 /** A driver (ADR-0179): «Ачилт» is theirs. */
 export function mayLoad(me: Pick<Me, 'permissions'>): boolean {
   return me.permissions.includes(LOAD_RIGHT);
+}
+
+/** Who may register products (ADR-0199): «Бараа нэмэх» is theirs. */
+export function mayRegisterProducts(me: Pick<Me, 'permissions'>): boolean {
+  return me.permissions.includes(PRODUCT_REGISTER_RIGHT);
 }
 
 /** The warehouse lead (ADR-0126 #2): sees and confirms every warehouse's part. */

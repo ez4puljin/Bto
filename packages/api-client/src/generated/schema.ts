@@ -2031,6 +2031,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/product-registrations/ai/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The finished product image of a photo, for a client that cannot draw (the staff app,
+         *     ADR-0199): cut out and stamped when the background service answers, else the photo as taken.
+         *     It never fails for the service's sake, so a product can always be registered.
+         */
+        post: operations["ProductRegistrations_aiImage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/product-registrations": {
         parameters: {
             query?: never;
@@ -12900,6 +12921,33 @@ export interface components {
                 data: string;
                 mediaType: string;
             } | null;
+        };
+        ProductAiImageRequest: {
+            /** @description Uploaded file of kind catalog.ai_photo */
+            photoFileId: number;
+            /** @description Where the product is on the photo: the reading's `productBox` */
+            productBox?: components["schemas"]["ProductAiBox"] | null;
+        };
+        ProductAiImageFailure: {
+            /** @description TIMEOUT, NETWORK, HTTP, INVALID_RESPONSE or EMPTY */
+            reason: string;
+            status: number | null;
+            providerCode: string | null;
+        };
+        ProductAiImage: {
+            /** @description A pending file of kind catalog.product_image */
+            imageFileId: number;
+            /** @description A pending file of kind catalog.product_thumb */
+            thumbFileId: number;
+            /**
+             * @description made: cut out, on white, with the logo; original: the photo as taken
+             * @enum {string}
+             */
+            picture: "made" | "original";
+            /** @description The image: a JPEG in base64 */
+            image: string;
+            /** @description Why the image is the photo as taken although a background service is set */
+            failure: components["schemas"]["ProductAiImageFailure"] | null;
         };
         RegistrationUnitRequest: {
             uomId: number;
@@ -28999,6 +29047,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProductAiPicture"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ProductRegistrations_aiImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductAiImageRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductAiImage"];
                 };
             };
             /** @description RFC 9457 problem details */
