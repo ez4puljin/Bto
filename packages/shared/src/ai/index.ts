@@ -82,7 +82,7 @@ export const AI_MODEL_CATALOG: Readonly<
 };
 
 /** Where a model call came from on the usage page. */
-export const AI_USAGE_PURPOSES = ['ASK', 'INVOICE_CHECK'] as const;
+export const AI_USAGE_PURPOSES = ['ASK', 'INVOICE_CHECK', 'PRODUCT_READ'] as const;
 export type AiUsagePurpose = (typeof AI_USAGE_PURPOSES)[number];
 
 /** Where the connection in force comes from: the settings screen, the server's .env, nowhere. */

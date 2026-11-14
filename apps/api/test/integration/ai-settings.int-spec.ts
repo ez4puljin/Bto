@@ -252,6 +252,7 @@ describe('AI settings', () => {
     expect(body.month).toMatchObject({
       questions: 1,
       invoiceChecks: 0,
+      productReads: 0,
       inputTokens: 2000,
       outputTokens: 200,
       costUsd: '0.006000',

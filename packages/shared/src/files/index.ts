@@ -33,6 +33,24 @@ export const FILE_KINDS = {
     visibility: 'public',
     permissions: ['catalog.products.manage', 'catalog.products.register'],
   },
+  /**
+   * A photo of a product for the registration form's «AI ашиглах» (ADR-0198): read by the vision
+   * model and cut out by the background service, never attached to the product, so private and
+   * removed by housekeeping like any upload nobody attached.
+   */
+  'catalog.ai_photo': {
+    contentTypes: IMAGE_TYPES,
+    maxBytes: 5 * 1024 * 1024,
+    visibility: 'private',
+    permissions: ['catalog.products.register'],
+  },
+  /** The company's logo drawn on a product picture made by «AI ашиглах» (ADR-0198). */
+  'ai.picture_stamp': {
+    contentTypes: IMAGE_TYPES,
+    maxBytes: 512 * 1024,
+    visibility: 'public',
+    permissions: ['ai.settings.manage'],
+  },
   /** The picture of an app notice (ADR-0062 #1), resized in the browser like product photos. */
   'notifications.notice_image': {
     contentTypes: IMAGE_TYPES,

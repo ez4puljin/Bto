@@ -31,7 +31,13 @@ Since ADR-0162 (migration `0079_ai_settings`):
 | Table | What | Guards |
 |---|---|---|
 | `ai_settings` | one row: the switch, provider, model, Ollama's address, the sealed key and its last characters, prices, the month and day limits | never deleted; only the api writes it; `ai_reader` has no access |
-| `ai_usage` | one model call the provider answered: purpose (`ASK`, `INVOICE_CHECK`), person, provider, model, tokens, cost at that day's price (NULL when no price is known) | append-only like `ai_questions`; never a prompt or an answer |
+| `ai_usage` | one model call the provider answered: purpose (`ASK`, `INVOICE_CHECK`, `PRODUCT_READ` since ADR-0198), person, provider, model, tokens, cost at that day's price (NULL when no price is known) | append-only like `ai_questions`; never a prompt or an answer |
+
+Since ADR-0198 (migration `0103_product_ai`):
+
+| Table | What | Guards |
+|---|---|---|
+| `ai_picture_settings` | one row: the background service's key, sealed, with its last characters, and the file of the company's logo | never deleted (`REVOKE DELETE, TRUNCATE … FROM app`); the key and its hint are both set or both null; `ai_reader` has no access |
 
 Schema `ai` holds views owned by `migrator`; `ai_reader` has `USAGE` on the schema and `SELECT` on the views, `app` has neither. Every view lists its columns explicitly, calls built-in functions only and has no `security_invoker`; "today" is `(now() AT TIME ZONE 'Asia/Ulaanbaatar')::date`.
 
@@ -88,6 +94,8 @@ None: nothing imports `modules/ai`. Inside the module:
 | `GET /ai/settings`, `PATCH /ai/settings` | `ai.settings.manage` | the connection and limits; `apiKey` is write-only; `provider: null` removes the saved connection (ADR-0162) |
 | `POST /ai/settings/test` | `ai.settings.manage` | a free request to the provider with typed values, or the connection in force; saves nothing |
 | `GET /ai/usage` | `ai.settings.manage` | the connection's state (`?check=true` asks again, otherwise kept 5 minutes), today's and the month's totals, the limit, the people |
+| `GET /ai/picture-settings`, `PATCH /ai/picture-settings` | `ai.settings.manage` | product pictures (ADR-0198): `{ keyHint, keyUnreadable, secretReady, stampUrl, updatedAt, updatedBy }`; `apiKey` is write-only and `null` removes it; `stampFileId` is an uploaded `ai.picture_stamp` and `null` takes the logo away (the old file is marked DELETED) |
+| `POST /ai/picture-settings/test` | `ai.settings.manage` | remove.bg's free account request with a typed key, or the saved one; `{ ok, reason, status, providerCode, credits, freeCalls }`; saves nothing |
 | `POST /ai/questions` | `ai.ask`, Idempotency-Key | `{ conversationId?, question }` → the answer: conversation, question id, status, kind, explanation, summary, SQL, columns, rows (≤ 500), truncated. A replay returns the stored answer without rows; the web then calls `run` |
 | `GET /ai/conversations` | `ai.ask` | own conversations, newest first, keyset |
 | `GET /ai/conversations/:id` | `ai.ask` | own conversation with its questions (no rows) |
@@ -181,3 +189,15 @@ A migration that changes a column an `ai.*` view uses recreates the view in the 
 - SPEC §11 #24 (legal advice on sending personal data abroad) and #25 (provider retention terms; the monthly budget now has a field, ADR-0162).
 - `temp_file_limit` on the managed database at go-live (architecture A6).
 - Later, if asked: charts, scheduled reports.
+
+## 13. Product readings and pictures (ADR-0198)
+
+The registration form's «AI ашиглах» uses this module's connection and settings but lives in inventory (`ProductAiFlowService`, `docs/modules/inventory.md` §4), because it needs catalog and partners and nobody imports `ai`.
+
+- **Reading.** A model call through `LlmGateway.forWork({ purpose: 'PRODUCT_READ' })`: the month's limit applies, the person's day limit (questions) does not; the call is on the meter and shows as «Барааны зураг уншуулсан» on «Системийн төлөв». The assistant being switched off switches the reading off too.
+- **Pictures.** `PictureSettingsFlowService` answers `PictureGateway` (`integrations/picture`) as `AiSettingsFlowService` answers `LlmGateway`: the remove.bg key, opened at every call, and the logo's file. The key is sealed with `sealSecret(key, AI_KEY_SECRET, 'ai_picture_settings.api_key')`: a value sealed for the model does not open as this one, or the other way round. A cut-out is not on the meter: remove.bg's own account counts credits, and the settings card's «Түлхүүр шалгах» shows what is left.
+- **Screen.** «Тохиргоо → AI → Барааны зураг» (`features/ai/picture-settings-card.tsx`): the key field (a password box; only «Хадгалсан (…WXYZ)» afterwards), «Хадгалах», «Түлхүүр шалгах» with the credit left or the reason in words, «Түлхүүр устгах»; the logo with «Лого сонгох / солих» (scaled to 512 px as a PNG, transparency kept) and «Логог авах».
+- **Audit.** `ai_picture_settings` CREATE and UPDATE: whether a key exists, whether it changed, the logo's file id; never the key, its sealed text or its last characters.
+- **Errors.** `PICTURE_NOT_CONFIGURED` (503), `PICTURE_PROVIDER_FAILED` (502: `params.reason`, `status`, `providerCode`); the key cannot be saved without `AI_KEY_SECRET` (`AI_KEY_SECRET_MISSING`).
+- **Tests.** `integrations/picture/remove-bg.client.spec.ts` (the request, a non-PNG answer, refusals by code without their words or the key, timeouts, the account), `services/secret-box.spec.ts` (the two bindings), `product-ai.int-spec.ts`, `features/ai/ai-settings.test.tsx` (a typed key checked and saved once, a wrong key explained). No test reaches remove.bg: `PICTURE_FETCH` is scripted.
+- **Owner's steps on a new installation.** Type the model's key and the remove.bg key on «Тохиргоо → AI», upload the logo. `ai_picture_settings` is not copied by `store:seed` (the key is sealed with that PC's `AI_KEY_SECRET`).

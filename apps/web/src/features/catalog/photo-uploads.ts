@@ -17,6 +17,8 @@ export interface PendingPhoto {
   preview: string;
   status: 'uploading' | 'ready' | 'failed';
   files: { imageFileId: number; thumbFileId: number } | null;
+  /** Made by «AI ашиглах» from a photo (ADR-0198), not chosen as it is. */
+  made?: boolean;
 }
 
 export type PhotoUploads = ReturnType<typeof usePhotoUploads>;
@@ -85,6 +87,30 @@ export function usePhotoUploads() {
     }
   };
 
+  /**
+   * A picture made in the browser (the cut-out of «AI ашиглах», ADR-0198), put first so it is the
+   * primary photo: uploaded like a chosen one. False when there is no room or the upload failed.
+   */
+  const addFirst = async (photo: Blob, thumb: Blob): Promise<boolean> => {
+    if (count.current >= MAX_PHOTOS) return false;
+    setProblem(null);
+    const key = randomUuid();
+    const preview = URL.createObjectURL(thumb);
+    previews.current.add(preview);
+    count.current += 1;
+    setPhotos((list) => [{ key, preview, status: 'uploading', files: null, made: true }, ...list]);
+    try {
+      const imageFileId = await uploadFile(api, 'catalog.product_image', photo);
+      const thumbFileId = await uploadFile(api, 'catalog.product_thumb', thumb);
+      update(key, { status: 'ready', files: { imageFileId, thumbFileId } });
+      return true;
+    } catch (error) {
+      setProblem(problemFromError(error));
+      update(key, { status: 'failed' });
+      return false;
+    }
+  };
+
   const remove = (key: string) => {
     const found = photos.find((photo) => photo.key === key);
     if (!found) return;
@@ -103,5 +129,5 @@ export function usePhotoUploads() {
     setUnsupported(false);
   }, []);
 
-  return { photos, add, remove, reset, problem, unsupported };
+  return { photos, add, addFirst, remove, reset, problem, unsupported };
 }

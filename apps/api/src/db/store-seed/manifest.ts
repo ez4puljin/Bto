@@ -311,6 +311,9 @@ export const STORE_SEED_TABLES: Record<string, SeedRule> = {
   'public.ai_settings': empty(
     'the key is sealed with AI_KEY_SECRET, which is new on the store PC: typed again on «Тохиргоо → AI»',
   ),
+  'public.ai_picture_settings': empty(
+    'the key is sealed with AI_KEY_SECRET and the logo is a file: both set again on «Тохиргоо → AI»',
+  ),
   'public.ai_conversations': empty(HISTORY),
   'public.ai_questions': empty(HISTORY),
   'public.ai_usage': empty(HISTORY),

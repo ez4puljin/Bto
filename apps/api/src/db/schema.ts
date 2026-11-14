@@ -96,7 +96,14 @@ export {
   priceProfileVersions,
   productPrices,
 } from '../modules/pricing/schema';
-export { aiConversations, aiQuestions, aiReports, aiSettings, aiUsage } from '../modules/ai/schema';
+export {
+  aiConversations,
+  aiPictureSettings,
+  aiQuestions,
+  aiReports,
+  aiSettings,
+  aiUsage,
+} from '../modules/ai/schema';
 export { reportViews } from '../modules/reporting/schema';
 export { segmentProducts, segments } from '../modules/segments/schema';
 export {

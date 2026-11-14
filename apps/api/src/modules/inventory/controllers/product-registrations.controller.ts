@@ -1,8 +1,16 @@
-import { Body, Controller, Post } from '@nestjs/common';
-import { ApiCreatedResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Decimal } from '@tugeel/shared/money';
 import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
+import {
+  ProductAiPictureDto,
+  ProductAiPictureResultDto,
+  ProductAiProposalDto,
+  ProductAiReadDto,
+  ProductAiStatusDto,
+} from '../dto/product-ai.dto';
 import { ProductRegistrationDto, RegisteredProductDto } from '../dto/product-registrations.dto';
+import { ProductAiFlowService } from '../services/product-ai-flow.service';
 import { ProductRegistrationService } from '../services/product-registration.service';
 
 const REGISTER = 'catalog.products.register';
@@ -11,7 +19,45 @@ const REGISTER = 'catalog.products.register';
 @ApiTags('catalog')
 @Controller('product-registrations')
 export class ProductRegistrationsController {
-  constructor(private readonly registrations: ProductRegistrationService) {}
+  constructor(
+    private readonly registrations: ProductRegistrationService,
+    private readonly ai: ProductAiFlowService,
+  ) {}
+
+  /** What «AI ашиглах» can do now (ADR-0198): the form explains what is not set. */
+  @Get('ai')
+  @RequirePermission(REGISTER)
+  @ApiOkResponse({ type: ProductAiStatusDto })
+  aiStatus(): Promise<ProductAiStatusDto> {
+    return this.ai.status();
+  }
+
+  /**
+   * Reads photos of one product and proposes the form's values (ADR-0198); saves nothing. 503
+   * while no model is set, 502 when the provider fails: the form is then filled by hand.
+   */
+  @Post('ai/read')
+  @HttpCode(200)
+  @RequirePermission(REGISTER)
+  @ApiOkResponse({ type: ProductAiProposalDto })
+  aiRead(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: ProductAiReadDto,
+  ): Promise<ProductAiProposalDto> {
+    return this.ai.read(ctx, body.photoFileIds);
+  }
+
+  /** Cuts the product of a photo out of its background, with the company's logo to draw on it. */
+  @Post('ai/picture')
+  @HttpCode(200)
+  @RequirePermission(REGISTER)
+  @ApiOkResponse({ type: ProductAiPictureResultDto })
+  aiPicture(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: ProductAiPictureDto,
+  ): Promise<ProductAiPictureResultDto> {
+    return this.ai.picture(ctx, body.photoFileId);
+  }
 
   @Post()
   @RequirePermission(REGISTER)

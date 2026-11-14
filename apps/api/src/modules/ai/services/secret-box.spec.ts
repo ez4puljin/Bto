@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { openSecret, sealSecret } from './secret-box';
+import { openSecret, PICTURE_KEY_CONTEXT, sealSecret } from './secret-box';
 
 const SECRET = randomBytes(32).toString('base64');
 const PLAIN = 'test-key-not-real-0123456789';
@@ -25,6 +25,13 @@ describe('secret box (ADR-0162)', () => {
     expect(openSecret(parts.join('.'), SECRET)).toBeNull();
     expect(openSecret('v2.a.b.c', SECRET)).toBeNull();
     expect(openSecret('nonsense', SECRET)).toBeNull();
+  });
+
+  it('a key sealed for one use does not open as another (ADR-0198)', () => {
+    const sealed = sealSecret(PLAIN, SECRET, PICTURE_KEY_CONTEXT);
+    expect(openSecret(sealed, SECRET, PICTURE_KEY_CONTEXT)).toBe(PLAIN);
+    expect(openSecret(sealed, SECRET)).toBeNull();
+    expect(openSecret(sealSecret(PLAIN, SECRET), SECRET, PICTURE_KEY_CONTEXT)).toBeNull();
   });
 
   it('refuses a secret of the wrong length', () => {

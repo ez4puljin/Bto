@@ -43,6 +43,7 @@ const USAGE: Schemas['AiUsage'] = {
   today: {
     questions: 2,
     invoiceChecks: 0,
+    productReads: 4,
     inputTokens: 1000,
     outputTokens: 200,
     costUsd: '0.004000',
@@ -51,6 +52,7 @@ const USAGE: Schemas['AiUsage'] = {
   month: {
     questions: 40,
     invoiceChecks: 3,
+    productReads: 25,
     inputTokens: 500000,
     outputTokens: 20000,
     costUsd: '17.250000',
@@ -84,7 +86,17 @@ const ROLES = [
   },
 ];
 
+const PICTURE: Schemas['PictureSettings'] = {
+  keyHint: null,
+  keyUnreadable: false,
+  secretReady: true,
+  stampUrl: null,
+  updatedAt: null,
+  updatedBy: null,
+};
+
 const ROUTES = {
+  'GET /api/v1/ai/picture-settings': () => json(PICTURE),
   'GET /api/v1/settings': () => json({ data: [], nextCursor: null }),
   'GET /api/v1/ai/settings': () => json(SETTINGS),
   'GET /api/v1/ai/usage': () => json(USAGE),
@@ -141,6 +153,77 @@ describe('«Тохиргоо → AI» (ADR-0162)', () => {
     await waitFor(() => expect(calls(fetchMock, 'PATCH', '/api/v1/roles/9')).toHaveLength(1));
     const [request] = calls(fetchMock, 'PATCH', '/api/v1/roles/9');
     expect(await bodyOf(request)).toEqual({ permissions: ['ai.ask', 'ai.data.stock'] });
+  });
+
+  it('checks a typed background service key for free, saves it once and forgets it (ADR-0198)', async () => {
+    const user = userEvent.setup();
+    const P = T.picture;
+    const key = 'test-picture-key-not-real-WXYZ';
+    let saved = PICTURE;
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...ROUTES,
+      'GET /api/v1/ai/picture-settings': () => json(saved),
+      'POST /api/v1/ai/picture-settings/test': () =>
+        json({
+          ok: true,
+          reason: null,
+          status: null,
+          providerCode: null,
+          credits: '42',
+          freeCalls: 50,
+        }),
+      'PATCH /api/v1/ai/picture-settings': () => {
+        saved = { ...PICTURE, keyHint: 'WXYZ' };
+        return json(saved);
+      },
+    });
+    renderApp('/settings?tab=ai', fetchMock);
+    const card = await screen.findByRole('region', { name: P.title });
+    expect(await within(card).findByText(P.logoNone)).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: P.test })).toBeDisabled();
+
+    await user.type(within(card).getByLabelText(P.key), key);
+    await user.click(within(card).getByRole('button', { name: P.test }));
+    expect(await within(card).findByText(P.testOk)).toBeInTheDocument();
+    expect(within(card).getByText('Үлдсэн кредит: 42')).toBeInTheDocument();
+    const [checked] = calls(fetchMock, 'POST', '/api/v1/ai/picture-settings/test');
+    expect(await bodyOf(checked)).toEqual({ apiKey: key });
+    expect(calls(fetchMock, 'PATCH', '/api/v1/ai/picture-settings')).toHaveLength(0);
+
+    await user.click(within(card).getByRole('button', { name: mn.common.save }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'PATCH', '/api/v1/ai/picture-settings')).toHaveLength(1),
+    );
+    const [patched] = calls(fetchMock, 'PATCH', '/api/v1/ai/picture-settings');
+    expect(await bodyOf(patched)).toEqual({ apiKey: key });
+    await waitFor(() => expect(within(card).getByLabelText(P.key)).toHaveValue(''));
+    expect(await within(card).findByText(/Хадгалсан \(…WXYZ\)/)).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: P.keyRemove })).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(key);
+  });
+
+  it('explains a wrong background service key in words', async () => {
+    const user = userEvent.setup();
+    const P = T.picture;
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...ROUTES,
+      'GET /api/v1/ai/picture-settings': () => json({ ...PICTURE, keyHint: 'WXYZ' }),
+      'POST /api/v1/ai/picture-settings/test': () =>
+        json({
+          ok: false,
+          reason: 'HTTP',
+          status: 403,
+          providerCode: 'auth_failed',
+          credits: null,
+          freeCalls: null,
+        }),
+    });
+    renderApp('/settings?tab=ai', fetchMock);
+    const card = await screen.findByRole('region', { name: P.title });
+    await user.click(await within(card).findByRole('button', { name: P.test }));
+    expect(await within(card).findByText(P.failed.badKey)).toBeInTheDocument();
+    const [checked] = calls(fetchMock, 'POST', '/api/v1/ai/picture-settings/test');
+    expect(await bodyOf(checked)).toEqual({});
   });
 
   it('is a tab only for who manages the AI', async () => {

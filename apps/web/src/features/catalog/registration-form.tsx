@@ -34,12 +34,15 @@ import { barcodeKey } from './barcodes';
 import { categoryTree } from './category-tree';
 import { PhotoPicker } from './photo-picker';
 import { photosMessage, usePhotoUploads } from './photo-uploads';
+import { applyProposal } from './product-ai';
+import { ProductAiPanel } from './product-ai-panel';
 import {
   emptyRegistration,
   registrationBody,
   registrationSchema,
   type RegistrationValues,
 } from './registration-schema';
+import { useProductAi, useProductAiStatus } from './use-product-ai';
 
 const WHOLESALE = ['WHOLESALE'] as const;
 
@@ -84,6 +87,13 @@ export function RegistrationForm(props: { uoms: readonly Uom[]; categories: read
     }),
   });
   const units = useFieldArray({ control: form.control, name: 'units' });
+  // «AI ашиглах» (ADR-0198) fills the form from photos; the registrar checks and saves.
+  const aiStatus = useProductAiStatus();
+  const ai = useProductAi({
+    status: aiStatus.data,
+    uploads,
+    apply: (proposal) => applyProposal(form, units.replace, proposal),
+  });
   const [key, setKey] = useState(randomUuid);
   const [problem, setProblem] = useState<ProblemDetails | null>(null);
   const [photoError, setPhotoError] = useState<ValidationMessage | null>(null);
@@ -142,6 +152,7 @@ export function RegistrationForm(props: { uoms: readonly Uom[]; categories: read
         setRegistered(product);
         setKey(randomUuid());
         uploads.reset();
+        ai.clear();
         form.reset(
           emptyRegistration({
             categoryId: values.categoryId,
@@ -236,6 +247,14 @@ export function RegistrationForm(props: { uoms: readonly Uom[]; categories: read
           </AlertDescription>
         </Alert>
       ) : null}
+
+      <ProductAiPanel
+        status={aiStatus.data}
+        phase={ai.phase}
+        outcome={ai.outcome}
+        problem={ai.problem}
+        onFiles={(files) => void ai.run(files)}
+      />
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start 2xl:grid-cols-[minmax(0,1fr)_26rem]">
         <div className="flex min-w-0 flex-col gap-4">

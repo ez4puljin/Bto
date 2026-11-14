@@ -26,6 +26,7 @@ import { InventoryAttentionService } from './services/attention.service';
 import { BinMovesService } from './services/bin-moves.service';
 import { BinsService } from './services/bins.service';
 import { ProductLocationsService } from './services/product-locations.service';
+import { ProductAiFlowService } from './services/product-ai-flow.service';
 import { ProductRegistrationService } from './services/product-registration.service';
 import { PurchaseBooksService } from './services/purchase-books.service';
 import { ReceiptsService } from './services/receipts.service';
@@ -93,9 +94,12 @@ export class InventoryBootstrap implements OnApplicationBootstrap {
   }
 }
 
-/** The HTTP side of inventory (api only). */
+/**
+ * The HTTP side of inventory (api only). ProductAiFlowService lives here and not in
+ * InventoryModule: it needs the model and picture gateways, which only the api's root provides.
+ */
 @Module({
-  imports: [InventoryModule],
+  imports: [InventoryModule, IdentityModule, CatalogModule, PartnersModule],
   controllers: [
     BinsController,
     IssuesController,
@@ -115,7 +119,7 @@ export class InventoryBootstrap implements OnApplicationBootstrap {
     TransferLinesController,
     InventoryAttentionController,
   ],
-  providers: [InventoryBootstrap],
+  providers: [InventoryBootstrap, ProductAiFlowService],
 })
 export class InventoryHttpModule {}
 

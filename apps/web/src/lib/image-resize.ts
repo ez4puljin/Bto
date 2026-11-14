@@ -58,6 +58,37 @@ export async function resizeToJpeg(file: Blob, maxSide: number, quality = 0.85):
   }
 }
 
+/**
+ * A logo scaled down within `maxSide` as a PNG, its transparent background kept (the stamp of
+ * product pictures, ADR-0198). Re-encoding drops any metadata.
+ */
+export async function resizeToPng(file: Blob, maxSide: number): Promise<Blob> {
+  if (!ACCEPTED_TYPES.includes(file.type)) throw new UnsupportedImageError(file.type || 'unknown');
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  } catch {
+    throw new UnsupportedImageError('cannot decode');
+  }
+  try {
+    const size = fitWithin(bitmap.width, bitmap.height, maxSide);
+    const canvas = document.createElement('canvas');
+    canvas.width = size.width;
+    canvas.height = size.height;
+    const context = canvas.getContext('2d');
+    if (!context) throw new UnsupportedImageError('no canvas');
+    context.imageSmoothingQuality = 'high';
+    context.drawImage(bitmap, 0, 0, size.width, size.height);
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/png');
+    });
+    if (!blob || blob.type !== 'image/png') throw new UnsupportedImageError('encoding failed');
+    return blob;
+  } finally {
+    bitmap.close();
+  }
+}
+
 /** «Bto300»'s banner (2:1, ADR-0092 #5) and a top category's picture (square, #6). */
 export const BANNER_SIZE = { width: 1200, height: 600 } as const;
 export const CATEGORY_PICTURE_SIZE = { width: 512, height: 512 } as const;

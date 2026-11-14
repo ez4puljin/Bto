@@ -3,6 +3,7 @@ import type { components } from '@tugeel/api-client';
 import { Decimal } from '@tugeel/shared/money';
 import { useApiClient } from '@/app/api-client-context';
 import { unwrap } from '@/lib/problem';
+import { PRODUCT_AI_STATUS_KEY } from '../catalog/use-product-ai';
 import { KEYS as AI_KEYS } from './api';
 
 type Schemas = components['schemas'];
@@ -12,10 +13,14 @@ export type AiSettingsTest = Schemas['AiSettingsTestRequest'];
 export type AiCheck = Schemas['AiSettingsTestResult'];
 export type AiUsage = Schemas['AiUsage'];
 export type AiUsageTotals = Schemas['AiUsageTotals'];
+export type PictureSettings = Schemas['PictureSettings'];
+export type PictureSettingsUpdate = Schemas['PictureSettingsUpdateRequest'];
+export type PictureCheck = Schemas['PictureSettingsTestResult'];
 
 const KEYS = {
   settings: ['ai', 'settings'] as const,
   usage: ['ai', 'usage'] as const,
+  picture: ['ai', 'picture-settings'] as const,
 };
 
 /** The connection, the limits (ADR-0162); the key itself never comes back. */
@@ -63,6 +68,53 @@ export function useAiSettingsMutations() {
       onSuccess: (usage) => queryClient.setQueryData(KEYS.usage, usage),
     }),
   };
+}
+
+/** Product pictures (ADR-0198): the background service's key (never returned) and the logo. */
+export function usePictureSettings() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: KEYS.picture,
+    queryFn: async ({ signal }) => unwrap(await api.GET('/api/v1/ai/picture-settings', { signal })),
+  });
+}
+
+export function usePictureSettingsMutations() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return {
+    update: useMutation({
+      mutationFn: async (body: PictureSettingsUpdate) =>
+        unwrap(await api.PATCH('/api/v1/ai/picture-settings', { body })),
+      onSuccess: (view) => {
+        queryClient.setQueryData(KEYS.picture, view);
+        return queryClient.invalidateQueries({ queryKey: PRODUCT_AI_STATUS_KEY });
+      },
+    }),
+    /** A free request to the service with a typed key, or the saved one; saves nothing. */
+    test: useMutation({
+      mutationFn: async (apiKey: string | undefined) =>
+        unwrap(
+          await api.POST('/api/v1/ai/picture-settings/test', {
+            body: apiKey ? { apiKey } : {},
+          }),
+        ),
+    }),
+  };
+}
+
+type PictureFailureKey =
+  'noKey' | 'keyUnreadable' | 'badKey' | 'credit' | 'rateLimit' | 'timeout' | 'other';
+
+/** Which text explains a failed check of the background service: its code and status only. */
+export function pictureCheckFailureOf(check: PictureCheck): PictureFailureKey {
+  if (check.reason === 'NO_KEY') return 'noKey';
+  if (check.reason === 'KEY_UNREADABLE') return 'keyUnreadable';
+  if (check.status === 402 || check.providerCode === 'insufficient_credits') return 'credit';
+  if (check.status === 401 || check.status === 403) return 'badKey';
+  if (check.status === 429) return 'rateLimit';
+  if (check.reason === 'TIMEOUT' || check.reason === 'NETWORK') return 'timeout';
+  return 'other';
 }
 
 const CREDIT_CODES = new Set(['billing_error', 'credit_balance_too_low', 'insufficient_quota']);

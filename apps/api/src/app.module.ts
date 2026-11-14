@@ -7,6 +7,7 @@ import { CoreModule } from './core.module';
 import { FinanceCoreModule } from './finance-core';
 import { HealthModule } from './health/health.module';
 import { LlmModule } from './integrations/llm';
+import { PictureModule } from './integrations/picture';
 import { AiHttpModule } from './modules/ai';
 import { CatalogHttpModule } from './modules/catalog';
 import { EbarimtHttpModule } from './modules/ebarimt';
@@ -38,6 +39,7 @@ import { SegmentsHttpModule } from './modules/segments';
     ReportGateModule,
     HealthModule,
     LlmModule,
+    PictureModule,
     FinanceCoreModule,
     FinBridgeHttpModule,
     IdentityHttpModule,

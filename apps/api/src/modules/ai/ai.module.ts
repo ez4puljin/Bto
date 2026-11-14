@@ -7,6 +7,7 @@ import { AiLimitsService } from './services/ai-limits.service';
 import { AiSettingsFlowService } from './services/ai-settings-flow.service';
 import { AskFlowService } from './services/ask-flow.service';
 import { ConversationsService } from './services/conversations.service';
+import { PictureSettingsFlowService } from './services/picture-settings-flow.service';
 import { ReportsService } from './services/reports.service';
 import { AiReaderService } from './sql/ai-reader.service';
 
@@ -19,6 +20,7 @@ const SERVICES = [
   AiReaderService,
   AiLimitsService,
   AiSettingsFlowService,
+  PictureSettingsFlowService,
   AskFlowService,
   ConversationsService,
   ReportsService,

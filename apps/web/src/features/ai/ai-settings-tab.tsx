@@ -42,6 +42,7 @@ import {
   useAiSettings,
   useAiSettingsMutations,
 } from './ai-settings-api';
+import { PictureSettingsCard } from './picture-settings-card';
 
 const OTHER_MODEL = '__other__';
 
@@ -66,6 +67,7 @@ export function AiSettingsTab() {
           <LimitsCard view={settings.data} />
         </>
       ) : null}
+      <PictureSettingsCard />
       {mayManageRoles ? <RightsCard /> : null}
     </div>
   );

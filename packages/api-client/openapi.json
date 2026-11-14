@@ -7959,6 +7959,137 @@
         ]
       }
     },
+    "/api/v1/product-registrations/ai": {
+      "get": {
+        "operationId": "ProductRegistrations_aiStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductAiStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "What «AI ашиглах» can do now (ADR-0198): the form explains what is not set.",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/product-registrations/ai/read": {
+      "post": {
+        "operationId": "ProductRegistrations_aiRead",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductAiReadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductAiProposal"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reads photos of one product and proposes the form's values (ADR-0198); saves nothing. 503\nwhile no model is set, 502 when the provider fails: the form is then filled by hand.",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/product-registrations/ai/picture": {
+      "post": {
+        "operationId": "ProductRegistrations_aiPicture",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductAiPictureRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductAiPicture"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cuts the product of a photo out of its background, with the company's logo to draw on it.",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
     "/api/v1/product-registrations": {
       "post": {
         "operationId": "ProductRegistrations_register",
@@ -16579,6 +16710,134 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/ai/picture-settings": {
+      "get": {
+        "operationId": "AiSettings_pictureSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PictureSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Product pictures (ADR-0198): the background service's key and the company's logo.",
+        "tags": [
+          "ai"
+        ]
+      },
+      "patch": {
+        "operationId": "AiSettings_updatePictureSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PictureSettingsUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PictureSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/ai/picture-settings/test": {
+      "post": {
+        "operationId": "AiSettings_testPictureSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PictureSettingsTestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PictureSettingsTestResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A free request to the background service: it spends no credit and saves nothing.",
         "tags": [
           "ai"
         ]
@@ -46242,6 +46501,8 @@
             "enum": [
               "catalog.product_image",
               "catalog.product_thumb",
+              "catalog.ai_photo",
+              "ai.picture_stamp",
               "notifications.notice_image",
               "catalog.category_image",
               "customer.banner_image",
@@ -50985,6 +51246,279 @@
         "required": [
           "productId",
           "warehouseId"
+        ]
+      },
+      "ProductAiStatus": {
+        "type": "object",
+        "properties": {
+          "read": {
+            "type": "boolean",
+            "description": "A model is configured: photos can be read"
+          },
+          "picture": {
+            "type": "boolean",
+            "description": "A background service key is saved: a picture can be cut out"
+          }
+        },
+        "required": [
+          "read",
+          "picture"
+        ]
+      },
+      "ProductAiReadRequest": {
+        "type": "object",
+        "properties": {
+          "photoFileIds": {
+            "minItems": 1,
+            "description": "Uploaded files of kind catalog.ai_photo: photos of one product",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "required": [
+          "photoFileIds"
+        ]
+      },
+      "ProductAiUnit": {
+        "type": "object",
+        "properties": {
+          "uomId": {
+            "type": "number"
+          },
+          "factorToBase": {
+            "type": "string",
+            "example": "10"
+          },
+          "barcodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "uomId",
+          "factorToBase",
+          "barcodes"
+        ]
+      },
+      "ProductAiSupplier": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
+      "ProductAiBox": {
+        "type": "object",
+        "properties": {
+          "left": {
+            "type": "number",
+            "description": "Fraction of the photo's width"
+          },
+          "top": {
+            "type": "number",
+            "description": "Fraction of the photo's height"
+          },
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "left",
+          "top",
+          "width",
+          "height"
+        ]
+      },
+      "ProductAiExisting": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "productId",
+          "sku",
+          "name"
+        ]
+      },
+      "ProductAiProposal": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryId": {
+            "type": "number",
+            "nullable": true
+          },
+          "categoryPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "baseUomId": {
+            "type": "number",
+            "nullable": true
+          },
+          "boxFactor": {
+            "type": "string",
+            "nullable": true
+          },
+          "weightKg": {
+            "type": "string",
+            "nullable": true
+          },
+          "baseBarcodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "boxBarcodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductAiUnit"
+            }
+          },
+          "supplier": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProductAiSupplier"
+              }
+            ]
+          },
+          "frontPhoto": {
+            "type": "number",
+            "description": "Index (0 is the first) of the photo for the catalogue picture"
+          },
+          "frontPhotoFileId": {
+            "type": "number",
+            "description": "The uploaded photo the catalogue picture is made of"
+          },
+          "productBox": {
+            "nullable": true,
+            "description": "Where the product is",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProductAiBox"
+              }
+            ]
+          },
+          "droppedBarcodes": {
+            "type": "number",
+            "description": "Barcodes read without a valid check digit, left out"
+          },
+          "existing": {
+            "description": "Read barcodes already registered",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductAiExisting"
+            }
+          },
+          "note": {
+            "type": "string",
+            "description": "The model's remark in Mongolian; may be empty"
+          }
+        },
+        "required": [
+          "name",
+          "categoryId",
+          "categoryPath",
+          "baseUomId",
+          "boxFactor",
+          "weightKg",
+          "baseBarcodes",
+          "boxBarcodes",
+          "units",
+          "supplier",
+          "frontPhoto",
+          "frontPhotoFileId",
+          "productBox",
+          "droppedBarcodes",
+          "existing",
+          "note"
+        ]
+      },
+      "ProductAiPictureRequest": {
+        "type": "object",
+        "properties": {
+          "photoFileId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Uploaded file of kind catalog.ai_photo"
+          }
+        },
+        "required": [
+          "photoFileId"
+        ]
+      },
+      "ProductAiPicture": {
+        "type": "object",
+        "properties": {
+          "image": {
+            "type": "string",
+            "description": "The product on a transparent background: a PNG in base64"
+          },
+          "stamp": {
+            "required": [
+              "data",
+              "mediaType"
+            ],
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "data": {
+                "type": "string"
+              },
+              "mediaType": {
+                "type": "string"
+              }
+            },
+            "description": "The company's logo in base64, drawn on the picture by the browser"
+          }
+        },
+        "required": [
+          "image"
         ]
       },
       "RegistrationUnitRequest": {
@@ -59494,6 +60028,10 @@
           "invoiceChecks": {
             "type": "number"
           },
+          "productReads": {
+            "type": "number",
+            "description": "Readings of product photos (ADR-0198)"
+          },
           "inputTokens": {
             "type": "number"
           },
@@ -59512,6 +60050,7 @@
         "required": [
           "questions",
           "invoiceChecks",
+          "productReads",
           "inputTokens",
           "outputTokens",
           "costUsd",
@@ -59612,6 +60151,125 @@
           "budget",
           "byUser",
           "userDailyQuestions"
+        ]
+      },
+      "PictureSettings": {
+        "type": "object",
+        "properties": {
+          "keyHint": {
+            "type": "string",
+            "nullable": true,
+            "description": "The saved key's last characters"
+          },
+          "keyUnreadable": {
+            "type": "boolean",
+            "description": "A saved key AI_KEY_SECRET no longer opens"
+          },
+          "secretReady": {
+            "type": "boolean",
+            "description": "AI_KEY_SECRET is set, so a key can be saved"
+          },
+          "stampUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "The logo's public URL"
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "updatedBy": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "keyHint",
+          "keyUnreadable",
+          "secretReady",
+          "stampUrl",
+          "updatedAt",
+          "updatedBy"
+        ]
+      },
+      "PictureSettingsUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 8,
+            "maxLength": 200,
+            "pattern": "^\\S+$",
+            "writeOnly": true,
+            "description": "The background service's key; null removes the saved one. Never returned"
+          },
+          "stampFileId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Uploaded file of kind ai.picture_stamp; null takes the logo away"
+          }
+        }
+      },
+      "PictureSettingsTestRequest": {
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 200,
+            "pattern": "^\\S+$",
+            "writeOnly": true,
+            "description": "A typed key; without it the saved one"
+          }
+        }
+      },
+      "PictureSettingsTestResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "reason": {
+            "nullable": true,
+            "enum": [
+              "TIMEOUT",
+              "NETWORK",
+              "HTTP",
+              "INVALID_RESPONSE",
+              "NO_KEY",
+              "KEY_UNREADABLE"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "type": "number",
+            "nullable": true
+          },
+          "providerCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "credits": {
+            "type": "string",
+            "nullable": true,
+            "description": "Credits left on the account"
+          },
+          "freeCalls": {
+            "type": "number",
+            "nullable": true,
+            "description": "Free calls left this month"
+          }
+        },
+        "required": [
+          "ok",
+          "reason",
+          "status",
+          "providerCode",
+          "credits",
+          "freeCalls"
         ]
       },
       "WorkSite": {
@@ -89892,6 +90550,8 @@
           "AI_USER_LIMIT_REACHED",
           "AI_KEY_SECRET_MISSING",
           "AI_PRICE_REQUIRED",
+          "PICTURE_NOT_CONFIGURED",
+          "PICTURE_PROVIDER_FAILED",
           "UNIT_SUPERSEDED",
           "PRICE_MISSING",
           "DISCOUNT_OVER_CAP",

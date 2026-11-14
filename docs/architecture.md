@@ -840,6 +840,13 @@ Keyboard-wedge first everywhere (web global keydown detector; mobile hidden Text
 - Errors are `LlmError` with a reason (`TIMEOUT`, `NETWORK`, `HTTP` with the status and the provider's short error code such as `invalid_api_key`, `REFUSED`, `INCOMPLETE`, `INVALID_RESPONSE`); no automatic retry — the person asks again. Only the reason and the HTTP status are logged, never a request or response body.
 - `LlmModule` (global) provides `LLM_CLIENT`, or `null` when `LLM_PROVIDER` is empty, and `LlmGateway` (ADR-0162), which flows inject: the connection saved on the settings screen, else `LLM_CLIENT`, read at every call and metered; `app.module.ts` imports it. Tests replace it with a scripted fake; the harness removes every `LLM_*` variable, so a real key is never used by a test.
 - Data that leaves the company: the question, the dataset descriptions, earlier steps of the conversation and up to 50 result rows (names, phones, TINs, addresses and amounts included, by the owner's decision; SPEC §6.14, §11 #24). Credentials, sessions, files and audit data never do.
+- Since ADR-0198 the registration form's «AI ашиглах» is a third caller (`ProductAiFlowService`, purpose `PRODUCT_READ`): it sends photos of one product with the names of every category, unit and active supplier and 40 product names, and nothing else.
+
+### 9.6 Background removal: remove.bg (ADR-0198)
+
+- `apps/api/src/integrations/picture/`: `RemoveBgClient` over Node's `fetch` (no SDK) with a 60 s timeout. `POST https://api.remove.bg/v1.0/removebg`, header `X-Api-Key`, a multipart `image_file` with `size=auto` and `format=png`; the answer is the PNG itself. `GET /account` is the free check that also tells the credit left. An error answers `{ errors: [{ title, code }] }`, of which only the code is kept in a `PictureError` (`TIMEOUT`, `NETWORK`, `HTTP`, `INVALID_RESPONSE`); no retry.
+- `PictureModule` (global, imported by `app.module.ts` only) provides `PictureGateway`: the key saved on «Тохиргоо → AI → Барааны зураг» (`ai_picture_settings`, sealed under `AI_KEY_SECRET`), read at every call. No environment variable; without a key there is no service and the form keeps the photo as taken. Tests replace `PICTURE_FETCH` with a scripted fetch.
+- Data that leaves the company: one photo of a product per picture. The server draws nothing: the browser keeps the product, puts it on white and draws the company's logo.
 
 ---
 

@@ -20,7 +20,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { LLM_PROVIDERS } from '../../common/config/env.schema';
 import { cost, money, usdFine } from '../../common/db/types';
-import { users } from '../identity/schema';
+import { files, users } from '../identity/schema';
 
 // Tables owned by the ai module (docs/modules/ai.md, ADR-0045). Migration 0017_ai adds by hand the
 // schema `ai` with the read-only views the assistant queries, and the guards that keep
@@ -194,6 +194,27 @@ export const aiSettings = pgTable(
       'ai_settings_limits',
       sql`coalesce(${t.monthlyBudgetUsd}, 1) > 0 AND coalesce(${t.userDailyQuestions}, 1) > 0`,
     ),
+  ],
+);
+
+/**
+ * Product pictures made by «AI ашиглах» (ADR-0198), one row: the background service's key, sealed
+ * like the model's, and the company's logo drawn on a picture. Without a key no picture is cut
+ * out; without a logo none is drawn.
+ */
+export const aiPictureSettings = pgTable(
+  'ai_picture_settings',
+  {
+    id: smallint('id').primaryKey(),
+    apiKeySealed: text('api_key_sealed'),
+    apiKeyHint: text('api_key_hint'),
+    stampFileId: ref('stamp_file_id').references(() => files.id),
+    updatedBy: ref('updated_by').references(() => users.id),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check('ai_picture_settings_single', sql`${t.id} = 1`),
+    check('ai_picture_settings_key', sql`(${t.apiKeySealed} IS NULL) = (${t.apiKeyHint} IS NULL)`),
   ],
 );
 
