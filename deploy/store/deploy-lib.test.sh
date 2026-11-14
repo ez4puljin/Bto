@@ -98,10 +98,10 @@ COMPOSE=(compose_fake)
 start_stack
 expect "two starts" "$(wc -l <"$BTO_DEPLOY_STATE/ups" | tr -d ' ')" "2"
 expect "everything but the door first" "$(sed -n 1p "$BTO_DEPLOY_STATE/ups")" "up -d --wait postgres api api-apps api-reports worker"
-expect "then the door alone, without touching what it waits for" "$(sed -n 2p "$BTO_DEPLOY_STATE/ups")" "up -d --no-deps --wait web"
+expect "then the door alone, without touching what it waits for" "$(sed -n 2p "$BTO_DEPLOY_STATE/ups")" "up -d --no-deps --wait --timeout 2 web"
 : >"$BTO_DEPLOY_STATE/ups"
 start_stack --force-recreate
-expect "the way back starts in the same order" "$(sed -n 2p "$BTO_DEPLOY_STATE/ups")" "up -d --no-deps --wait --force-recreate web"
+expect "the way back starts in the same order" "$(sed -n 2p "$BTO_DEPLOY_STATE/ups")" "up -d --no-deps --wait --timeout 2 --force-recreate web"
 # A compose that cannot list its services: one plain start, as before.
 compose_mute() { case "$1" in up) shift; echo "up $*" >>"$BTO_DEPLOY_STATE/ups-mute" ;; esac; }
 COMPOSE=(compose_mute)

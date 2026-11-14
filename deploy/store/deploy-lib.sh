@@ -91,7 +91,9 @@ start_stack() {
     return
   fi
   "${COMPOSE[@]}" up -d --wait "$@" "${others[@]}"
-  "${COMPOSE[@]}" up -d --no-deps --wait "$@" web
+  # --timeout: the Caddy that is running may be one started before `grace_period` was in its file
+  # (a mounted file changing does not restart a container), and would hold the door for 10 s.
+  "${COMPOSE[@]}" up -d --no-deps --wait --timeout 2 "$@" web
 }
 
 # What CI says about the commit this checkout stands on: success, failure, pending, unknown.
