@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { components } from '@tugeel/api-client';
 import { SYSTEM_ROLE_PERMISSIONS } from '@tugeel/shared/auth';
 import mn from '@tugeel/shared/i18n/mn.json';
+import { addDays, businessDate } from '@tugeel/shared/time';
 import { describe, expect, it, vi } from 'vitest';
 import { ADMIN_ME, findSidebar, json, type Me, renderApp, signedIn } from '@/test/render-app';
 
@@ -133,6 +134,61 @@ describe('import upload', () => {
     });
     expect(created?.headers.get('Idempotency-Key')).toMatch(UUID);
     expect(await screen.findByRole('heading', { name: 'Бараа.xlsx' })).toBeInTheDocument();
+    put.mockRestore();
+  });
+
+  it('sends the day of the opening balance, any day up to today, and says when a month is split (ADR-0200)', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      'GET /api/v1/imports': () => json({ data: [], nextCursor: null }),
+      'POST /api/v1/files/presign': () =>
+        json(
+          {
+            fileId: 42,
+            uploadUrl: '/api/v1/files/local/y.xlsx?exp=1&sig=s',
+            method: 'PUT',
+            headers: { 'Content-Type': XLSX },
+            expiresAt: STAMP,
+          },
+          201,
+        ),
+      'PUT /api/v1/files/local/y.xlsx': () => new Response(null, { status: 204 }),
+      'POST /api/v1/imports': () =>
+        json({ ...JOB, kind: 'FIN_OPENING', status: 'UPLOADED', totalRows: 0 }, 201),
+      'GET /api/v1/imports/5': () =>
+        json({ ...JOB, kind: 'FIN_OPENING', status: 'UPLOADED', totalRows: 0 }),
+    });
+    const put = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation((input, init) => fetchMock(new Request(input, init)));
+    renderApp('/imports', fetchMock);
+    const user = userEvent.setup();
+    const today = businessDate();
+    const monthStart = `${today.slice(0, 7)}-01`;
+    const date = await screen.findByLabelText(mn.imports.openingOptions.date);
+    // Offered: the usual start on a month's 1st, so the last day of the month before.
+    expect(date).toHaveValue(addDays(monthStart, -1));
+    expect(screen.queryByText(/хуваагдана/)).not.toBeInTheDocument();
+
+    // The 1st of this month is never a month's last day and never after today.
+    await user.clear(date);
+    await user.type(date, monthStart);
+    await user.tab();
+    expect(
+      await screen.findByText(new RegExp(`${addDays(monthStart, 1)}-нээс эхэлнэ`)),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/хуваагдана/)).toBeInTheDocument();
+
+    await user.upload(
+      screen.getByLabelText(`${mn.imports.upload}: ${mn.imports.kinds.FIN_OPENING}`),
+      new File([new Uint8Array([0x50, 0x4b, 3, 4])], 'Үлдэгдэл.xlsx', { type: '' }),
+    );
+    await waitFor(() => expect(calls(fetchMock, 'POST', '/api/v1/imports')).toHaveLength(1));
+    expect(await calls(fetchMock, 'POST', '/api/v1/imports')[0]?.clone().json()).toEqual({
+      kind: 'FIN_OPENING',
+      fileId: 42,
+      fileName: 'Үлдэгдэл.xlsx',
+      openingOptions: { date: monthStart },
+    });
     put.mockRestore();
   });
 

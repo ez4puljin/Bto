@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { FinOpeningImportOptions } from '@tugeel/shared/imports';
 import { Decimal } from '@tugeel/shared/money';
-import { addDays, businessDate, isIsoDate } from '@tugeel/shared/time';
+import { businessDate, isIsoDate } from '@tugeel/shared/time';
 import type { Db, Tx } from '../../../common/db/db.types';
 import {
   CUSTOMER_CONTROLS,
@@ -205,8 +205,8 @@ export class FinOpeningImporter implements Importer<OpeningLine> {
       if (facts.openingStockAccountCode === null) {
         first.error(null, 'NOT_FOUND', { value: 'OPENING_STOCK' });
       }
+      // Any day up to today (ADR-0200): Bto starts the day after, in the middle of a month too.
       if (date > businessDate()) first.error(null, 'OUT_OF_RANGE', { value: date });
-      if (!addDays(date, 1).endsWith('-01')) first.error(null, 'NOT_MONTH_END', { value: date });
       if (planned.every((entry) => entry.check.ok) && !debitTotal.eq(creditTotal)) {
         first.error(null, 'UNBALANCED', {
           debit: debitTotal.toFixed(2),

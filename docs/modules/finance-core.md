@@ -433,9 +433,9 @@ The owner adopted every suggestion of the accountant questionnaire as a decision
 **Bto's side.**
 - `FinPosting.submitInTx(tx, ctx, command, branchId)` tags a POST with a Bto branch, mapping a branch added after boot on the spot (a closed one tags nothing). Invoices, credit notes, vouchers (the money account's branch), supplier bills and returns, stock and revaluation journals (the one branch of their warehouses, else none) and the POS shift close pass it; allocations, manual entries, the opening and the year close stay company-level.
 - An admin-added goods-issue expense type books to `ISSUE_TYPE_<id>` once finance picks its account (`IssueExpenseAccountsService`, `/finance/issue-expense-accounts`), else to ISSUE_OTHER.
-- The opening import refuses a date that is not a month's last day (`NOT_MONTH_END`); `ReportsService.openingCheck` and `/finance/reports/opening-check[.xlsx]` give the sign-off sheet.
+- The opening import took only a month's last day until 2026-11-14 (`NOT_MONTH_END`); since ADR-0200 it takes any day up to today; `ReportsService.openingCheck` and `/finance/reports/opening-check[.xlsx]` give the sign-off sheet.
 
-**Tests.** `finance-stock.int-spec.ts` (the branch on a sale's stock entry, its invoice, a goods issue, a supplier return and a FIN voucher; the admin type's account), `finance-close-opening.int-spec.ts` (`NOT_MONTH_END`, the opening-check figures and its Excel file).
+**Tests.** `finance-stock.int-spec.ts` (the branch on a sale's stock entry, its invoice, a goods issue, a supplier return and a FIN voucher; the admin type's account), `finance-close-opening.int-spec.ts` (an opening in the middle of a month (ADR-0200), the opening-check figures and its Excel file).
 
 ## 4. Data model (schema `fin`, ADR-0070 / ADR-0072 / ADR-0076)
 

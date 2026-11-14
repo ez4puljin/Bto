@@ -205,7 +205,7 @@ Also: the home tile «Хугацаа хэтэрсэн авлагатай хар�
 
 - e-Barimt receipts on invoices (ADR-0017): after P0a; the invoice carries everything the receipt needs (lines with `vat_type`, rates and amounts, the customer's TIN through partners); `ebarimt_receipts` is keyed by the source document from its first migration, never by `invoice_id` (ADR-0074).
 - Done 2026-10-19 (ADR-0082): no QPay (ADR-0080); the customer app reads the store's balance, open invoices and payments through finance's public services and lists the `money_accounts` flagged «Харилцагчид харуулах» (`docs/modules/customer.md`).
-- Opening balances: built 2026-10-23 (ADR-0102) as the `FIN_OPENING` import; the date and the sign-off against Erkhet's closing trial balance per account and per party wait for the accountant (TODO-VERIFY D27), and Erkhet's real chart for D16.
+- Opening balances: built 2026-10-23 (ADR-0102) as the `FIN_OPENING` import; since 2026-11-14 (ADR-0200) dated any day up to today, not only a month's last day (the owner starts from the closing balances of 2026-11-14); the date and the sign-off against Erkhet's closing trial balance per account and per party wait for the accountant (TODO-VERIFY D27), and Erkhet's real chart for D16.
 - The Finance Core carve itself: phases P0b … P5, H1, H2, A1, A2 and the go-live additions (`docs/modules/finance-core.md` §16).
 - A shorter due date for cash sales if the owner wants it (today every invoice takes the customer's term).
 - CLOSED orders when their invoice is paid; reminders.

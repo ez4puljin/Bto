@@ -27,7 +27,7 @@ describe('finance close and opening', () => {
   let office: string;
   const today = businessDate();
   const lastMonth = addMonths(`${today.slice(0, 7)}-01`, -1).slice(0, 7);
-  /** Bto starts on a month's 1st; the opening is dated the day before (ADR-0106 #5). */
+  /** The usual opening: Bto starts on a month's 1st, the opening is dated the day before. */
   const openingDay = addDays(`${today.slice(0, 7)}-01`, -1);
   const http = () => request(app.getHttpServer());
   const close = (token: string, code: string) =>
@@ -197,11 +197,12 @@ describe('finance close and opening', () => {
       ],
       { openingOptions: { date: addDays(openingDay, -1) } },
     );
+    // Any day up to today may be the opening's (ADR-0200): the middle of a month is not refused.
     expect(
       (await imports0.rows(midMonth.id, 'ERRORS')).flatMap((row) =>
         row.errors.map((issue) => issue.code),
       ),
-    ).toEqual(['NOT_MONTH_END']);
+    ).toEqual([]);
     const options = { openingOptions: { date: openingDay } };
 
     const unbalanced = await imports.check(
@@ -329,6 +330,47 @@ describe('finance close and opening', () => {
     expect(after.balance).toBe('0.00');
     const again = await imports.check('FIN_OPENING', rows, options);
     expect(again.status).toBe('VALIDATED');
+  });
+
+  it('takes the closing balance of any day as the opening, in the middle of a month too', async () => {
+    // The 1st of this month is never a month's last day and never after today (ADR-0200).
+    const midMonth = `${today.slice(0, 7)}-01`;
+    const imports = importsApi(app, admin);
+    const job = await imports.check(
+      'FIN_OPENING',
+      [
+        { account: '730101', debit: '250' },
+        { account: '511020', credit: '250' },
+      ],
+      { openingOptions: { date: midMonth } },
+    );
+    expect(job).toMatchObject({ status: 'VALIDATED', errorRows: 0 });
+    expect((await imports.commit(job.id)).status).toBe('COMMITTED');
+
+    // The books carry the day itself, and the sign-off opens on it.
+    const check = (
+      await http().get('/api/v1/finance/reports/opening-check').set(bearer(accountant)).expect(200)
+    ).body as { date: string; opening: { date: string } | null; debit: string; credit: string };
+    expect(check.date).toBe(midMonth);
+    expect(check.opening?.date).toBe(midMonth);
+    expect(check.debit).toBe('250.00');
+    expect(check.credit).toBe('250.00');
+
+    // One opening at a time still holds, whatever its day.
+    const second = await imports.check(
+      'FIN_OPENING',
+      [
+        { account: '730101', debit: '1' },
+        { account: '511020', credit: '1' },
+      ],
+      { openingOptions: { date: openingDay } },
+    );
+    expect(
+      (await imports.rows(second.id, 'ERRORS')).flatMap((row) =>
+        row.errors.map((issue) => issue.code),
+      ),
+    ).toEqual(['OPENING_EXISTS']);
+    expect((await imports.revert(job.id)).status).toBe('REVERTED');
   });
 
   it('splits a long opening into documents of 499 rows that balance through the offset', async () => {

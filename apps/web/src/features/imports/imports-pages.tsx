@@ -47,7 +47,7 @@ import {
   useReceiptPaymentAccounts,
 } from './api';
 import { columnName, fieldNames, issueText } from './helpers';
-import { MonthInput } from '@/components/date-input';
+import { DateInput } from '@/components/date-input';
 
 const FILTERS: readonly RowFilter[] = ['ERRORS', 'WARNINGS', 'ALL'];
 /** Filled cells shown for each row before the ones with a problem. */
@@ -187,10 +187,12 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
   const [issueWarehouse, setIssueWarehouse] = useState<number | undefined>();
   const issueOptions =
     kind === 'ISSUES' && issueWarehouse !== undefined ? { warehouseId: issueWarehouse } : undefined;
-  // Bto starts on a month's 1st; the opening is dated the day before (ADR-0106 #5).
-  const thisMonth = businessDate().slice(0, 7);
-  const [startMonth, setStartMonth] = useState(thisMonth);
-  const openingDate = startMonth === '' ? '' : addDays(`${startMonth}-01`, -1);
+  // The opening is the closing balance of any day up to today, and Bto starts the day after
+  // (ADR-0200). The usual start is a month's 1st, so the month before's last day is offered.
+  const today = businessDate();
+  const [openingDate, setOpeningDate] = useState(() => addDays(`${today.slice(0, 7)}-01`, -1));
+  const startDate = openingDate === '' ? '' : addDays(openingDate, 1);
+  const midMonth = startDate !== '' && !startDate.endsWith('-01');
   const openingOptions =
     kind === 'FIN_OPENING' && openingDate !== '' ? { date: openingDate } : undefined;
   const ready =
@@ -243,16 +245,24 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
         ) : null}
         {kind === 'FIN_OPENING' ? (
           <FormField
-            label={t('imports.openingOptions.startMonth')}
-            htmlFor="opening-month"
-            hint={t('imports.openingOptions.startMonthHint', { date: openingDate })}
+            label={t('imports.openingOptions.date')}
+            htmlFor="opening-date"
+            hint={[
+              startDate === '' ? '' : t('imports.openingOptions.dateHint', { start: startDate }),
+              midMonth
+                ? t('imports.openingOptions.midMonthHint', { month: startDate.slice(0, 7) })
+                : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
           >
-            <MonthInput
-              id="opening-month"
-              max={thisMonth}
+            <DateInput
+              id="opening-date"
+              max={today}
+              required
               className="sm:w-44"
-              value={startMonth}
-              onChange={(value) => setStartMonth(value)}
+              value={openingDate}
+              onChange={(value) => setOpeningDate(value)}
             />
           </FormField>
         ) : null}
