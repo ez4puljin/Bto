@@ -228,9 +228,9 @@ export function StockPage() {
               emptyLabel={t('inventory.allWarehouses')}
               onChange={(id) => setParam('warehouseId', id === undefined ? '' : String(id))}
             />
-            {/* The left side holds the category from `lg`; a narrow window keeps it here. */}
+            {/* The left side holds the category from `xl`; a narrow window keeps it here. */}
             <NativeSelect
-              className="lg:hidden"
+              className="xl:hidden"
               variant="filter"
               aria-label={t('catalog.product.category')}
               value={categoryId === undefined ? '' : String(categoryId)}

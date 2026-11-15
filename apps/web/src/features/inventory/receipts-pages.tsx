@@ -148,7 +148,7 @@ export function ReceiptsPage() {
             {supplier.data?.name ?? t('common.loading')}
           </FilterChip>
         ) : (
-          <div className="w-full sm:w-56">
+          <div className="w-full sm:w-48">
             <label htmlFor="receipts-supplier" className="sr-only">
               {t('inventory.receipts.supplier')}
             </label>
@@ -177,7 +177,7 @@ export function ReceiptsPage() {
             <ProductSearch
               id="receipts-product"
               variant="filter"
-              className="sm:w-56"
+              className="sm:w-48"
               pickLabel={t('inventory.receipts.pickProduct')}
               onPick={(picked) => setParam('productId', String(picked.id))}
             />

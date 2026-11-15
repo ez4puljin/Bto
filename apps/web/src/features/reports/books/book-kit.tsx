@@ -83,7 +83,10 @@ export function PromptDialog(props: {
       >
         <DialogHeader>
           <DialogTitle>{props.title}</DialogTitle>
-          <DialogDescription>{t('reports.prompt.description')}</DialogDescription>
+          {/* For a screen reader only: its line on screen is given to the form (ADR-0201). */}
+          <DialogDescription className="sr-only">
+            {t('reports.prompt.description')}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="@container flex flex-col gap-5">
           {/*

@@ -268,29 +268,30 @@ export function HrReportPage() {
       <PageHeader
         title={t('hr.report.title')}
         description={t('hr.report.description')}
+        // The tabs on the title's line, not at the filter bar's end: there they took a row of their
+        // own on a till PC and pushed the list down by its height (ADR-0201).
         actions={
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!report.data}
-            pending={downloads.report.isPending}
-            onClick={() => void exportReport()}
-          >
-            <Download />
-            {t('hr.report.export')}
-          </Button>
+          <>
+            <SegmentedControl
+              options={TABS}
+              value={tab}
+              label={(value) => t(`hr.report.tabs.${value}`)}
+              onChange={(value) => setParam('tab', value === 'days' ? null : value)}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!report.data}
+              pending={downloads.report.isPending}
+              onClick={() => void exportReport()}
+            >
+              <Download />
+              {t('hr.report.export')}
+            </Button>
+          </>
         }
       />
-      <FilterBar
-        end={
-          <SegmentedControl
-            options={TABS}
-            value={tab}
-            label={(value) => t(`hr.report.tabs.${value}`)}
-            onChange={(value) => setParam('tab', value === 'days' ? null : value)}
-          />
-        }
-      >
+      <FilterBar>
         <DateFilter
           label={t('hr.report.from')}
           value={from}

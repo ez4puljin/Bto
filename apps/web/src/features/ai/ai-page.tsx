@@ -315,9 +315,8 @@ export function AiPage() {
             data-floating={floating ? 'true' : undefined}
             className={cn(
               'space-y-2 rounded-2xl p-3 ring-1 ring-black/[0.06] print:hidden',
-              configured
-                ? 'sticky bottom-3 z-20 bg-background/95 shadow-popover backdrop-blur-md'
-                : 'bg-card shadow-card',
+              configured && 'sticky bottom-3 z-20',
+              floating ? 'bg-background/95 shadow-popover backdrop-blur-md' : 'bg-card shadow-card',
             )}
             onSubmit={(event) => {
               event.preventDefault();

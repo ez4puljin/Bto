@@ -129,9 +129,9 @@ export function FieldList(props: {
             className={cn(
               'grid gap-1 border-b border-border/80 px-3.5 py-2.5 last:border-b-0 @md:grid-cols-[11rem_minmax(0,1fr)] @md:gap-4',
               props.columns === undefined &&
-                '@min-[80rem]:nth-last-[2]:border-b-0 @min-[80rem]:even:border-l @min-[80rem]:even:border-border/80',
+                '@min-[80rem]:nth-last-[2]:odd:border-b-0 @min-[80rem]:even:border-l @min-[80rem]:even:border-border/80',
               props.columns === 2 &&
-                '@min-[44rem]:nth-last-[2]:border-b-0 @min-[44rem]:even:border-l @min-[44rem]:even:border-border/80',
+                '@min-[44rem]:nth-last-[2]:odd:border-b-0 @min-[44rem]:even:border-l @min-[44rem]:even:border-border/80',
             )}
           >
             <dt className="text-[0.8125rem] leading-snug text-muted-foreground">{item.label}</dt>

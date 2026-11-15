@@ -8,6 +8,7 @@ import {
   ChevronHead,
   EmptyState,
   FilterBar,
+  FilterToggle,
   LinkRow,
   ListCard,
   ListTable,
@@ -22,7 +23,6 @@ import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -170,13 +170,11 @@ export function IssuesPage() {
           ))}
         </NativeSelect>
         {canConfirm ? (
-          <Label className="flex items-center gap-2 text-sm font-normal">
-            <Checkbox
-              checked={pending}
-              onCheckedChange={(checked) => setParam('pending', checked === true ? '1' : '0')}
-            />
-            {t('inventory.issues.pendingOnly')}
-          </Label>
+          <FilterToggle
+            label={t('inventory.issues.pendingOnly')}
+            checked={pending}
+            onCheckedChange={(checked) => setParam('pending', checked ? '1' : '0')}
+          />
         ) : null}
       </FilterBar>
       <ProblemAlert problem={problemFromError(issues.error)} onRetry={issues.refetch} />

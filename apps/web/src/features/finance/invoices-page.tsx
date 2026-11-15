@@ -76,6 +76,9 @@ export function InvoicesPage() {
       />
       <FilterBar>
         <SearchField
+          // It gives way down to 12rem before the dates take a row of their own (a till PC keeps
+          // one line) and takes the row's spare width up to the kit's own (ADR-0201).
+          className="sm:w-auto sm:max-w-72 sm:flex-[1_1_12rem]"
           aria-label={t('common.search')}
           placeholder={t('finance.invoices.searchPlaceholder')}
           value={search}

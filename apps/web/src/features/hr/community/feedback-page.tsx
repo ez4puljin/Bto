@@ -6,7 +6,6 @@ import { useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { DialogFormFooter, FormField } from '@/components/form';
 import {
-  DateFilter,
   EmptyState,
   FilterBar,
   ListCard,
@@ -30,6 +29,7 @@ import {
 } from '@/components/ui/dialog';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { DateRangeFilter } from '@/features/finance/date-range-filter';
 import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbMinute } from '@/lib/dayjs';
 import { problemFromError } from '@/lib/problem';
@@ -190,7 +190,8 @@ export function FeedbackPage() {
         description={t('hr.community.feedback.description')}
       />
       <FilterBar>
-        {/* The search gives way: one row on a till PC, the two dates together on a tablet. */}
+        {/* The search gives way and the dates are one pill: one row on a till PC, the two dates
+            together on a tablet. */}
         <SearchField
           className="sm:w-auto sm:max-w-72 sm:min-w-48 sm:flex-1"
           aria-label={t('common.search')}
@@ -198,15 +199,14 @@ export function FeedbackPage() {
           value={search}
           onChange={(event) => setParam('q', event.target.value)}
         />
-        <DateFilter
-          label={t('hr.community.from')}
-          value={from || undefined}
-          onChange={(value) => setParam('from', value ?? null)}
-        />
-        <DateFilter
-          label={t('hr.community.to')}
-          value={to || undefined}
-          onChange={(value) => setParam('to', value ?? null)}
+        <DateRangeFilter
+          label={t('hr.community.feedback.columns.createdAt')}
+          fromLabel={t('hr.community.from')}
+          toLabel={t('hr.community.to')}
+          from={from || undefined}
+          to={to || undefined}
+          onFrom={(value) => setParam('from', value ?? null)}
+          onTo={(value) => setParam('to', value ?? null)}
         />
         <NativeSelect
           variant="filter"

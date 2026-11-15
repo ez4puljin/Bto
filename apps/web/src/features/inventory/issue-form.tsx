@@ -36,7 +36,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Kbd } from '@/components/ui/kbd';
 import { TableCell, TableRow } from '@/components/ui/table';
-import { Hint } from '@/components/ui/tooltip';
 import { useBarcodeLookup } from '@/features/catalog/api';
 import { useIssueExpenseAccounts } from '@/features/finance/api';
 import { SupplierPicker } from '@/features/partners/supplier-picker';
@@ -919,26 +918,24 @@ function DraftEditor(props: {
             label={t('inventory.issues.defaultWarehouse')}
             htmlFor="issue-warehouse"
             error={required.warehouse ? 'validation.required' : undefined}
+            hint={t('inventory.issues.defaultWarehouseHint')}
+            hintBeside
           >
-            <Hint label={t('inventory.issues.defaultWarehouseHint')}>
-              <div>
-                <WarehouseSelect
-                  id="issue-warehouse"
-                  options={warehouses.options}
-                  value={warehouseId}
-                  emptyLabel={t('inventory.pickWarehouse')}
-                  onChange={(id) => {
-                    if (id === undefined) {
-                      if (detail === null) setPickedWarehouse(undefined);
-                      return;
-                    }
-                    setRequired((previous) => ({ ...previous, warehouse: false }));
-                    if (detail === null) setPickedWarehouse(id);
-                    else if (id !== detail.warehouseId) patchHeader({ warehouseId: id });
-                  }}
-                />
-              </div>
-            </Hint>
+            <WarehouseSelect
+              id="issue-warehouse"
+              options={warehouses.options}
+              value={warehouseId}
+              emptyLabel={t('inventory.pickWarehouse')}
+              onChange={(id) => {
+                if (id === undefined) {
+                  if (detail === null) setPickedWarehouse(undefined);
+                  return;
+                }
+                setRequired((previous) => ({ ...previous, warehouse: false }));
+                if (detail === null) setPickedWarehouse(id);
+                else if (id !== detail.warehouseId) patchHeader({ warehouseId: id });
+              }}
+            />
           </FormField>
           <FormField
             label={t('inventory.issues.expenseType')}
@@ -1174,7 +1171,7 @@ function DraftEditor(props: {
                       value={line.warehouseId}
                       label={t('inventory.issues.moveLineTo', { product: name })}
                       emptyLabel={line.warehouseName}
-                      className="min-w-36"
+                      className="w-full min-w-0"
                       onChange={(id) => {
                         if (id !== undefined && id !== line.warehouseId)
                           saveLine(line.id, { warehouseId: id });

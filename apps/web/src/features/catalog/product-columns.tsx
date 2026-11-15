@@ -55,9 +55,10 @@ export const WIDE_DEFAULT_HIDDEN_PRODUCT_COLUMNS: readonly ProductColumnKey[] = 
  * The columns that leave a default set too wide for its table (ADR-0201), the least needed first
  * and one at a time; the product's own page shows each. Only a search's rows let them go: in the
  * categories' order a category's row spans the table, which then scrolls as before. A search's
- * set needs 57.75rem: beside the filters a 1366px window has 57.35 and a till PC 56.2 without
- * them, so the supplier goes (50.75); a tablet upright has 41.2 and keeps the tick, the code, the
- * name, the price and the status (40.75). The wide set's three columns go first.
+ * set needs 57.75rem: beside the filters a 1366px window has 59.35 and keeps it whole; a till PC
+ * has 56.2 without them, so the supplier goes (50.75); a tablet upright has 41.2 and keeps the
+ * tick, the code, the name, the price and the status (40.75). The wide set's three columns go
+ * first.
  */
 export const PRODUCT_COLUMNS_LEAVING: readonly ProductColumnKey[] = [
   'homeWarehouse',

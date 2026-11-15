@@ -232,6 +232,8 @@ export function ListTable(props: {
   columns: readonly ColumnSpec[];
   children: ReactNode;
   className?: string;
+  /** The table's name, for a page with more than one list. */
+  'aria-label'?: string;
   ref?: Ref<HTMLTableElement>;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -264,6 +266,7 @@ export function ListTable(props: {
       <ColumnLayoutContext value={sized}>
         <Table
           ref={props.ref}
+          aria-label={props['aria-label']}
           data-layout={sized ? 'columns' : undefined}
           className={cn(
             sized

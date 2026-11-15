@@ -154,13 +154,9 @@ export function ReceiptNoteCard(props: {
         </span>
         {qtyInput}
         {amountInput}
-        {check ? (
-          <Hint label={countedText}>
-            <span>{check}</span>
-          </Hint>
-        ) : (
-          <span className="whitespace-nowrap text-muted-foreground">{countedText}</span>
-        )}
+        {/* The counted total stays in view beside the check: a finger has no hover (ADR-0201). */}
+        <span className="whitespace-nowrap text-muted-foreground">{countedText}</span>
+        {check}
         {detail.hasNotePhoto ? (
           <Hint label={t('inventory.receipt.note.photoView')}>
             <Button

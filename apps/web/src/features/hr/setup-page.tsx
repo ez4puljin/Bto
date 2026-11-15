@@ -830,12 +830,14 @@ export function AttendanceSetupPage() {
       {canManage ? null : (
         <p className="text-[0.8125rem] text-muted-foreground">{t('hr.readOnly')}</p>
       )}
-      {/* The sites' table takes the room it needs inside the reading column (ADR-0158). */}
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,3fr)]">
-        <SitesCard canManage={canManage} />
+      {/* The sites' table takes the whole reading column (ADR-0158): beside the company's hours
+          it had under its own 38rem at every laptop size. The hours stand beside the calendar's
+          types instead, the shorter table. */}
+      <SitesCard canManage={canManage} />
+      <div className="grid items-start gap-4 *:min-w-0 xl:grid-cols-2">
         <ScheduleCard canManage={canManage} />
+        <EventTypesCard canManage={canManage} />
       </div>
-      <EventTypesCard canManage={canManage} />
       <EmployeesCard canManage={canManage} />
     </div>
   );

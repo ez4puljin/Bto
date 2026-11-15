@@ -116,8 +116,9 @@ export function ProductFilterPanel(props: {
   );
 
   return (
-    // Beside the list from `xl`: on a till PC it took a third of the window (ADR-0201).
-    <aside aria-label={t('catalog.products.panel.label')} className="hidden w-72 shrink-0 xl:block">
+    // Beside the list from `xl`: on a till PC it took a third of the window (ADR-0201). 16rem, as
+    // the other rails: at 18rem a search's columns no longer fitted a 1366px window beside it.
+    <aside aria-label={t('catalog.products.panel.label')} className="hidden w-64 shrink-0 xl:block">
       <ListCard scroll beside>
         {shown.has('category') ? (
           <Section title={t('catalog.product.category')} defaultOpen>

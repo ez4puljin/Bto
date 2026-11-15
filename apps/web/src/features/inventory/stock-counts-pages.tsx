@@ -4,7 +4,6 @@ import { useDeferredValue, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
-import { CheckboxGroup } from '@/components/checkbox-group';
 import { DialogFormFooter, FormField } from '@/components/form';
 import {
   ChevronHead,
@@ -236,6 +235,12 @@ function CountCreateDialog({ onCancel }: { onCancel: () => void }) {
     { q: supplierQ, status: 'ACTIVE' },
     { enabled: scope === 'SUPPLIER' && supplierQ.trim() !== '', limit: 20 },
   );
+  const chosenCategories = (categories.data ?? []).filter((row) =>
+    categoryIds.includes(String(row.id)),
+  );
+  const categoryOptions = (categories.data ?? [])
+    .filter((row) => !categoryIds.includes(String(row.id)))
+    .map((row) => ({ value: String(row.id), label: row.name }));
   const supplierOptions = (found.data?.pages[0]?.data ?? [])
     .filter((row) => !suppliers.some((chosen) => chosen.id === row.id))
     .map((row) => ({ value: String(row.id), label: row.name }));
@@ -257,9 +262,11 @@ function CountCreateDialog({ onCancel }: { onCancel: () => void }) {
             }
           : null;
       case 'CATEGORY': {
-        const rows = (categories.data ?? []).filter((row) => categoryIds.includes(String(row.id)));
-        return rows.length > 0
-          ? { ids: rows.map((row) => row.id), label: rows.map((row) => row.name).join(', ') }
+        return chosenCategories.length > 0
+          ? {
+              ids: chosenCategories.map((row) => row.id),
+              label: chosenCategories.map((row) => row.name).join(', '),
+            }
           : null;
       }
     }
@@ -383,22 +390,44 @@ function CountCreateDialog({ onCancel }: { onCancel: () => void }) {
           {scope === 'CATEGORY' ? (
             <FormField
               label={t('inventory.counts.categories')}
+              htmlFor="count-category"
               error={
                 categoryIds.length > MAX_SCOPE_IDS
                   ? t('inventory.counts.tooMany', { max: MAX_SCOPE_IDS })
                   : undefined
               }
             >
-              <div className="max-h-56 overflow-y-auto rounded-lg border border-border p-3">
-                <CheckboxGroup
-                  name="count-categories"
-                  options={(categories.data ?? []).map((row) => ({
-                    value: String(row.id),
-                    label: row.name,
-                  }))}
-                  value={categoryIds}
-                  onChange={setCategoryIds}
+              {/*
+                Chosen like the suppliers, a search and chips: a list of ticks made the dialog about
+                740px high, over what a laptop and a till PC leave (ADR-0201).
+              */}
+              <div className="flex flex-col gap-2">
+                <SearchSelect
+                  id="count-category"
+                  value=""
+                  options={categoryOptions}
+                  placeholder={t('common.search')}
+                  onChange={(next) => {
+                    if (next && categoryIds.length < MAX_SCOPE_IDS) {
+                      setCategoryIds((list) => [...list, next]);
+                    }
+                  }}
                 />
+                {chosenCategories.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {chosenCategories.map((row) => (
+                      <FilterChip
+                        key={row.id}
+                        clearLabel={t('inventory.counts.remove', { name: row.name })}
+                        onClear={() =>
+                          setCategoryIds((list) => list.filter((id) => id !== String(row.id)))
+                        }
+                      >
+                        {row.name}
+                      </FilterChip>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </FormField>
           ) : null}
