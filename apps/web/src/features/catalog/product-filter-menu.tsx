@@ -50,8 +50,9 @@ export function ProductFilterMenu(props: {
   return (
     <>
       <DropdownMenu modal={false}>
+        {/* From `xl` the side panel lists the fields; the chips below stay at every width. */}
         <DropdownMenuTrigger asChild>
-          <Button ref={trigger} variant="outline" size="sm" className="lg:hidden">
+          <Button ref={trigger} variant="outline" size="sm" className="xl:hidden">
             <ListFilter />
             {t('catalog.products.filters.menu')}
           </Button>

@@ -46,7 +46,7 @@ import { segmentParam } from '@/features/segments/segment-definition';
 import { SegmentFilter } from '@/features/segments/segment-filter';
 import { ContactsCard } from './contacts-card';
 import { ListColumnCell, ListColumnHead } from './list-column-cell';
-import { columnSpecs } from './list-columns';
+import { columnSpecs, isDefaultSet } from './list-columns';
 import {
   emptySupplier,
   PARTNER_STATUSES,
@@ -60,6 +60,7 @@ import {
   LOCKED_SUPPLIER_COLUMNS,
   SUPPLIER_COLUMN_KEYS,
   SUPPLIER_COLUMNS,
+  SUPPLIER_COLUMNS_LEAVING,
   WIDE_DEFAULT_HIDDEN_SUPPLIER_COLUMNS,
 } from './supplier-columns';
 import { PRODUCT_CATEGORY_PARAM, productCategoryOf } from './supplier-filters';
@@ -114,8 +115,17 @@ export function SuppliersPage() {
     () => SUPPLIER_COLUMNS.filter((column) => !hidden.has(column.key)),
     [hidden],
   );
+  // A default set lets its least needed columns go in a narrow table (ADR-0201).
+  const untouched = isDefaultSet(
+    hidden,
+    DEFAULT_HIDDEN_SUPPLIER_COLUMNS,
+    WIDE_DEFAULT_HIDDEN_SUPPLIER_COLUMNS,
+  );
   // The layout of the shown columns and the chevron (ADR-0119).
-  const specs = useMemo(() => [...columnSpecs(columns), CHEVRON_COLUMN], [columns]);
+  const specs = useMemo(
+    () => [...columnSpecs(columns, untouched ? SUPPLIER_COLUMNS_LEAVING : []), CHEVRON_COLUMN],
+    [columns, untouched],
+  );
   const filtered = Boolean(q || status || segmentId || categoryId || productCategoryId);
   const clearFilters = () => {
     setSearch('');
@@ -171,9 +181,9 @@ export function SuppliersPage() {
                 setParam('q', event.target.value.trim());
               }}
             />
-            {/* The left side holds these from `lg`; a narrow window keeps them here. */}
+            {/* The left side holds these from `xl`; a narrower window keeps them here. */}
             <NativeSelect
-              className="lg:hidden"
+              className="xl:hidden"
               variant="filter"
               aria-label={t('partners.supplier.status')}
               value={status ?? ''}
@@ -187,7 +197,7 @@ export function SuppliersPage() {
               ))}
             </NativeSelect>
             <NativeSelect
-              className="lg:hidden"
+              className="xl:hidden"
               variant="filter"
               aria-label={t('partners.supplier.category')}
               value={categoryId ?? ''}
@@ -202,7 +212,7 @@ export function SuppliersPage() {
             </NativeSelect>
             <SearchSelect
               variant="filter"
-              className="sm:w-60 lg:hidden"
+              className="sm:w-60 xl:hidden"
               aria-label={t('partners.suppliers.productCategory')}
               placeholder={t('partners.suppliers.productCategory')}
               value={productCategoryId === undefined ? '' : String(productCategoryId)}
@@ -210,7 +220,7 @@ export function SuppliersPage() {
               onChange={(value) => setParam(PRODUCT_CATEGORY_PARAM, value)}
               onClear={() => setParam(PRODUCT_CATEGORY_PARAM, '')}
             />
-            <div className="contents lg:hidden">
+            <div className="contents xl:hidden">
               <SegmentFilter
                 entity="SUPPLIER"
                 value={segmentId}
@@ -313,8 +323,8 @@ export function SupplierCreatePage() {
 }
 
 /**
- * One supplier: its data, then from `xl` on a side column with the contacts and the products
- * ordered from it (ADR-0066).
+ * One supplier: its data, then from `lg` on a side column with the contacts and the products
+ * ordered from it (ADR-0066): 22rem on a till PC, 26rem from the laptops (ADR-0201).
  */
 export function SupplierPage() {
   const { t } = useTranslation();
@@ -352,7 +362,7 @@ export function SupplierPage() {
           </>
         }
       />
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_26rem] xl:items-start">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_26rem]">
         <div className="flex min-w-0 flex-col gap-4">
           <DetailCard
             title={t('partners.supplier.info')}

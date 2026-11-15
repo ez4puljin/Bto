@@ -74,16 +74,23 @@ const CANCEL_TONE: Record<WholesaleCancelStatus, Tone> = {
   INDETERMINATE: 'warning',
 };
 
+/**
+ * The list's columns (ADR-0119). The state says why under its pills, so the reason needs no
+ * column of its own, and the buttons keep 11.5rem («Сугалаатай хэвлэх»). A table too narrow for
+ * all eight (ADR-0201) lets the ДДТД go first (the print carries it), then the time, then the
+ * type; the invoice, the customer, the amount, the state and the buttons stay. In rem: 83.5
+ * whole (1536px and wider), 73.5 on a 1366 laptop (76 of room), 54.5 on a till PC (56); a tablet
+ * (41) has no room for these five and scrolls in its card.
+ */
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'createdAt', kind: 'datetime' },
-  { key: 'invoice', kind: 'number' },
-  { key: 'customer', kind: 'text', weight: 3, min: 14 },
-  { key: 'type', kind: 'status' },
+  { key: 'createdAt', kind: 'datetime', drop: 2 },
+  { key: 'invoice', kind: 'number', width: 11 },
+  { key: 'customer', kind: 'text', weight: 3, min: 10.5 },
+  { key: 'type', kind: 'code', width: 7.5, drop: 3 },
   { key: 'amount', kind: 'money' },
   { key: 'status', kind: 'status', width: 13 },
-  { key: 'ddtd', kind: 'text', weight: 2, min: 12 },
-  { key: 'message', kind: 'text', weight: 3, min: 12 },
-  { key: 'actions', kind: 'text', weight: 2, min: 16 },
+  { key: 'ddtd', kind: 'text', weight: 2, min: 10, drop: 1 },
+  { key: 'actions', kind: 'text', weight: 2, min: 11.5 },
   { key: 'spacer', kind: 'spacer' },
 ];
 
@@ -318,13 +325,12 @@ export function EbarimtReceiptsPage() {
               </TableHead>
               <TableHead>{t('finance.ebarimtReceipts.columns.status')}</TableHead>
               <TableHead>{t('finance.ebarimtReceipts.columns.ddtd')}</TableHead>
-              <TableHead>{t('finance.ebarimtReceipts.columns.message')}</TableHead>
               <TableHead>{t('finance.ebarimtReceipts.columns.actions')}</TableHead>
               <SpacerHead />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {receipts.isPending ? <SkeletonRows columns={10} /> : null}
+            {receipts.isPending ? <SkeletonRows columns={COLUMNS.length} /> : null}
             {rows.map((row) => {
               const reason = ebarimtReason(row, t);
               return (
@@ -349,11 +355,19 @@ export function EbarimtReceiptsPage() {
                   <TableCell className="text-right font-mono">{formatTugrik(row.total)}</TableCell>
                   <TableCell>
                     <EbarimtStatusBadges receipt={row} />
+                    {reason ? (
+                      // Why it waits, under the state it explains; a finger reads two lines.
+                      <span
+                        className="mt-0.5 block max-w-52 truncate text-xs text-muted-foreground touch:line-clamp-2 touch:whitespace-normal"
+                        title={reason}
+                      >
+                        {reason}
+                      </span>
+                    ) : null}
                   </TableCell>
                   <TruncateCell text={row.ddtd ?? ''}>
                     <span className="font-mono">{row.ddtd ?? ''}</span>
                   </TruncateCell>
-                  <TruncateCell text={reason}>{reason}</TruncateCell>
                   <TableCell className="py-1">
                     <EbarimtRowActions
                       receipt={row}

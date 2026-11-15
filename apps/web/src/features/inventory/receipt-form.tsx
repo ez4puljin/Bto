@@ -61,6 +61,7 @@ import { formatMnt, formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
+import { useMediaQuery } from '@/lib/use-media-query';
 import { cn } from '@/lib/utils';
 import { randomUuid } from '@/lib/uuid';
 import {
@@ -75,10 +76,10 @@ import {
   useReceiptCosting,
   useReceiptCounterAccounts,
 } from './api';
-import { type CostEntry, modalOpen, parseMoney } from './helpers';
+import { BELOW_LAPTOP, BELOW_TILL_PC, type CostEntry, modalOpen, parseMoney } from './helpers';
 import { PriceCells, ReceiptTotals } from './receipt-costing';
 import { ReceiptDiscountsCard } from './receipt-discounts';
-import { type PanelLine, ReceiptLinePanel } from './receipt-line-panel';
+import { type DraftShape, type PanelLine, ReceiptLinePanel } from './receipt-line-panel';
 import { ReceiptConfirmations, ReceiptNoteCard } from './receipt-note';
 import {
   arrivedLines,
@@ -155,10 +156,12 @@ function HeaderCard(props: { children: ReactNode; note?: ReactNode }) {
 const HEADER_GRID = 'grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4';
 /**
  * The document's fields in one strip over the lines (ADR-0156): the supplier first, where the cursor
- * starts, then the date, the number, the account and the note.
+ * starts, then the date, the number, the account and the note. One row from the laptops up; a till
+ * PC's 1024px left the supplier 10rem of it, so there the strip is two rows of three, the note
+ * taking the second row's end (ADR-0201).
  */
 const STRIP_GRID =
-  'grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_9.5rem_10rem_minmax(0,1.7fr)_minmax(0,1.1fr)]';
+  'grid gap-2 sm:grid-cols-2 lg:grid-cols-3 lg:max-xl:[&>:nth-child(5)]:col-span-2 xl:grid-cols-[minmax(0,1.4fr)_9.5rem_10rem_minmax(0,1.7fr)_minmax(0,1.1fr)]';
 
 /** «Үнэ НӨАТ-тэй (10%)…», for cost holders, when the supplier's prices carry VAT. */
 function VatNote({ detail }: { detail: ReceiptDetail | null }) {
@@ -226,8 +229,11 @@ function LinesTable(props: {
   actions: boolean;
   selectedId?: number | null;
   onSelect?: (line: ReceiptLine) => void;
-  /** The line editor under the column heads, with its name (ADR-0156): the head stays in view. */
-  entry?: { label: string; rows: ReactNode };
+  /**
+   * The line editor under the column heads, with its name (ADR-0156): the head stays in view. Its
+   * rows are built for the columns this window shows (`DraftShape`).
+   */
+  entry?: { label: string; rows: (shape: DraftShape) => ReactNode };
   /** The line just added: it flashes where it landed. */
   landedId?: number | null;
   /** The line being removed: dimmed until the server answers. */
@@ -246,59 +252,115 @@ function LinesTable(props: {
   const productIds = [...new Set(props.lines.map((line) => line.productId))].slice(0, 200);
   const current = useCurrentPricesOf(productIds, productIds.length > 0);
   const priceOf = new Map((current.data ?? []).map((row) => [row.productId, row.warehousePrice]));
-  const expected = props.lines.some((line) => line.expectedQty !== null);
+  const ordered = props.lines.some((line) => line.expectedQty !== null);
   const check = props.prices && props.previous !== undefined;
   const { entry } = props;
+  // A window narrower than a laptop's cannot hold every column with the editor's fields under
+  // them (ADR-0201). `max-width`, so a test, where no query answers, sees the whole table.
+  const compact = useMediaQuery(BELOW_LAPTOP);
+  const tablet = useMediaQuery(BELOW_TILL_PC);
+  /**
+   * What the table shows. A posted receipt: every column, the least needed leaving a narrow table
+   * by themselves (`drop`). A draft's entry has cells spanning columns, so nothing can leave by
+   * itself there: the window decides. A till PC gives the weight's column up, and a cost holder's
+   * prices take the markup's and the number's place (the code's too where the order's quantities
+   * stand); a tablet upright has the entry as a form above the lines, and the lines keep the
+   * product, the warehouse or the prices, the unit and the quantities.
+   */
+  const shape: DraftShape = entry
+    ? {
+        stacked: tablet,
+        narrow: compact,
+        lineNo: !tablet && !(compact && props.prices),
+        sku: !tablet && !(compact && props.prices && ordered),
+        warehouse: !(tablet && props.prices),
+        expected: ordered && !(tablet && props.prices),
+        weight: !compact,
+        markup: props.prices && !compact,
+      }
+    : {
+        stacked: false,
+        narrow: false,
+        lineNo: true,
+        sku: true,
+        warehouse: true,
+        expected: ordered,
+        weight: true,
+        markup: props.prices,
+      };
   // A draft's table: narrow enough for a 1366 window with the editor's fields in its columns; free
-  // goods are listed apart, so it has no «Бонус» (ADR-0156). The last two columns hold «Хадгалах».
+  // goods are listed apart, so it has no «Бонус» (ADR-0156). The last columns hold «Хадгалах».
+  // A laptop: 69rem with the prices (74.5 with the order's quantities), 56.5 without. A till PC
+  // (about 55.5 with a scrollbar): 54.5 and 55 with the prices, 47 and 52.5 without. A tablet
+  // upright (about 40.5): 38.25 with the prices, 34 and 39.5 without.
   const draftColumns: ColumnSpec[] = [
-    { key: 'lineNo', kind: 'count', width: 3.5 },
-    { key: 'sku', kind: 'code', width: 5 },
-    { key: 'product', kind: 'text', weight: 3, min: 13 },
-    { key: 'warehouse', kind: 'text', weight: 1, min: 10 },
+    ...(shape.lineNo ? [{ key: 'lineNo', kind: 'count', width: compact ? 3 : 3.5 } as const] : []),
+    ...(shape.sku ? [{ key: 'sku', kind: 'code', width: 5 } as const] : []),
+    { key: 'product', kind: 'text', weight: 3, min: compact ? 12 : 13 },
+    ...(shape.warehouse
+      ? [
+          {
+            key: 'warehouse',
+            kind: 'text',
+            weight: 1,
+            min: compact ? (props.prices ? 6.5 : 8) : 10,
+          } as const,
+        ]
+      : []),
     ...(BINS_SOON ? [] : [{ key: 'bin', kind: 'code', width: 8 } as const]),
-    { key: 'unit', kind: 'code', width: 5 },
-    ...(expected ? [{ key: 'expected', kind: 'qty', width: 5.5 } as const] : []),
-    { key: 'qty', kind: 'qty', width: 5 },
-    { key: 'weight', kind: 'qty', width: 5 },
+    { key: 'unit', kind: 'code', width: compact ? 4.5 : 5 },
+    ...(shape.expected ? [{ key: 'expected', kind: 'qty', width: 5.5 } as const] : []),
+    { key: 'qty', kind: 'qty', width: compact ? 4.5 : 5 },
+    ...(shape.weight ? [{ key: 'weight', kind: 'qty', width: 5 } as const] : []),
     ...(props.prices
       ? [
           { key: 'unitPrice', kind: 'money', width: 6 } as const,
           { key: 'amount', kind: 'money', width: 6.25 } as const,
-          { key: 'markup', kind: 'percent', width: 5.25 } as const,
         ]
       : []),
-    { key: 'actions', kind: 'actions', width: props.prices ? 5 : 10 },
+    ...(shape.markup ? [{ key: 'markup', kind: 'percent', width: 5.25 } as const] : []),
+    // The entry's «Болих» and «Хадгалах» stand over the rows' two icons: beside the markup's
+    // column on a laptop, alone on a till PC; a tablet's entry keeps its buttons in its form.
+    {
+      key: 'actions',
+      kind: 'actions',
+      width: tablet ? 5 : compact ? (props.prices ? 9.75 : 10) : props.prices ? 5 : 10,
+    },
   ];
-  // One entry per cell, under the same conditions as the header cells (ADR-0119).
+  // One entry per cell, under the same conditions as the header cells (ADR-0119). A posted
+  // receipt's price check is 80rem (85.5 with the order's quantities): a 1366 window's card (about
+  // 73.5) lets the number, the weight and the order's quantity go (71), a till PC's (about 53.5)
+  // the warehouse and the markup too, then the code (53); what is left is the check itself, and a
+  // tablet scrolls it in its card. Without the prices it is 40rem, 31 on a tablet (ADR-0201).
   const columns: ColumnSpec[] = entry
     ? draftColumns
     : [
-        { key: 'lineNo', kind: 'count', width: 3 },
-        { key: 'sku', kind: 'code' },
-        { key: 'product', kind: 'text', weight: 3, min: 14 },
-        { key: 'warehouse', kind: 'text', weight: 1 },
+        { key: 'lineNo', kind: 'count', width: 3, drop: 1 },
+        { key: 'sku', kind: 'code', width: 5.5, drop: 3 },
+        { key: 'product', kind: 'text', weight: 3, min: 10 },
+        { key: 'warehouse', kind: 'text', weight: 1, min: 6.5, drop: 2 },
         ...(BINS_SOON ? [] : [{ key: 'bin', kind: 'code', width: 8 } as const]),
         { key: 'unit', kind: 'text', weight: 1, min: 4 },
-        ...(expected ? [{ key: 'expected', kind: 'qty' } as const] : []),
-        { key: 'qty', kind: 'qty' },
-        { key: 'weight', kind: 'qty' },
+        ...(ordered ? [{ key: 'expected', kind: 'qty', width: 5.5, drop: 1 } as const] : []),
+        { key: 'qty', kind: 'qty', width: 5 },
+        { key: 'weight', kind: 'qty', drop: 1 },
         ...(check
           ? [
-              { key: 'previous', kind: 'qty', width: 8 } as const,
-              { key: 'diff', kind: 'qty' } as const,
+              { key: 'previous', kind: 'qty', width: 6.5 } as const,
+              { key: 'diff', kind: 'qty', width: 5.5 } as const,
             ]
           : []),
         ...(props.prices
           ? [
               { key: 'unitPrice', kind: 'money' } as const,
               { key: 'amount', kind: 'money' } as const,
-              { key: 'freeGoods', kind: 'status', width: 6 } as const,
+              { key: 'freeGoods', kind: 'status', width: 4.5 } as const,
             ]
           : []),
-        ...(props.prices ? [{ key: 'markup', kind: 'percent' } as const] : []),
+        ...(props.prices ? [{ key: 'markup', kind: 'percent', drop: 2 } as const] : []),
         ...(props.actions ? [{ key: 'actions', kind: 'actions', actions: 2 } as const] : []),
       ];
+  const entryRows = entry?.rows(shape);
   return (
     <ListTable ref={props.table} columns={columns}>
       <TableHeader
@@ -307,18 +369,24 @@ function LinesTable(props: {
           entry ? 'sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--color-border)]' : undefined
         }
       >
+        {/* A form of its own stands over the columns' names, which belong to the lines below. */}
+        {shape.stacked ? entryRows : null}
         <TableRow>
-          <TableHead className="text-right">{t('inventory.receipt.form.lineNo')}</TableHead>
-          <TableHead>{t('inventory.sku')}</TableHead>
+          {shape.lineNo ? (
+            <TableHead className="text-right">{t('inventory.receipt.form.lineNo')}</TableHead>
+          ) : null}
+          {shape.sku ? <TableHead>{t('inventory.sku')}</TableHead> : null}
           <TableHead>{t('inventory.product')}</TableHead>
-          <TableHead>{t('inventory.warehouse')}</TableHead>
+          {shape.warehouse ? <TableHead>{t('inventory.warehouse')}</TableHead> : null}
           {BINS_SOON ? null : <TableHead>{t('inventory.bin')}</TableHead>}
           <TableHead>{t('inventory.unit')}</TableHead>
-          {expected ? (
+          {shape.expected ? (
             <TableHead className="text-right">{t('inventory.receipt.receive.expected')}</TableHead>
           ) : null}
           <TableHead className="text-right">{t('inventory.qty')}</TableHead>
-          <TableHead className="text-right">{t('inventory.receipt.form.weightColumn')}</TableHead>
+          {shape.weight ? (
+            <TableHead className="text-right">{t('inventory.receipt.form.weightColumn')}</TableHead>
+          ) : null}
           {check ? (
             <>
               <TableHead className="text-right">{t('inventory.receipt.check.previous')}</TableHead>
@@ -332,7 +400,7 @@ function LinesTable(props: {
               {entry ? null : <TableHead>{t('inventory.costing.freeGoods')}</TableHead>}
             </>
           ) : null}
-          {props.prices ? (
+          {shape.markup ? (
             <TableHead className="text-right">{t('inventory.receipt.form.markup')}</TableHead>
           ) : null}
           {props.actions ? (
@@ -341,7 +409,7 @@ function LinesTable(props: {
             </TableHead>
           ) : null}
         </TableRow>
-        {entry?.rows}
+        {shape.stacked ? null : entryRows}
       </TableHeader>
       <TableBody>
         {props.lines.map((line, index) => {
@@ -371,40 +439,58 @@ function LinesTable(props: {
                 props.onSelect?.(line);
               }}
             >
-              <TableCell className="text-right font-mono text-muted-foreground">
-                {index + 1}
-              </TableCell>
-              <TableCell className="font-mono text-[0.8125rem]">{line.productSku}</TableCell>
-              {/* A draft's rows keep one height: the whole name on hover. */}
+              {shape.lineNo ? (
+                <TableCell className="text-right font-mono text-muted-foreground">
+                  {index + 1}
+                </TableCell>
+              ) : null}
+              {shape.sku ? (
+                <TableCell className="font-mono text-[0.8125rem]">{line.productSku}</TableCell>
+              ) : null}
+              {/* A draft's rows keep one height: the whole name on hover, with its code where the
+                  code has no column. */}
               <TableCell
                 className={entry ? undefined : 'whitespace-normal'}
-                title={entry ? line.productName : undefined}
+                title={
+                  entry
+                    ? shape.sku
+                      ? line.productName
+                      : `${line.productSku} ${line.productName}`
+                    : undefined
+                }
               >
                 {line.productName}
               </TableCell>
-              <TableCell title={entry ? line.warehouseName : undefined}>
-                {line.warehouseName}
-              </TableCell>
+              {shape.warehouse ? (
+                <TableCell title={entry ? line.warehouseName : undefined}>
+                  {line.warehouseName}
+                </TableCell>
+              ) : null}
               {BINS_SOON ? null : <TableCell className="font-mono">{line.binCode}</TableCell>}
               <TableCell>{line.unitName}</TableCell>
-              {expected ? (
+              {shape.expected ? (
                 <TableCell className="text-right font-mono text-muted-foreground">
                   {line.expectedQty === null ? t('common.none') : formatQty(line.expectedQty)}
                 </TableCell>
               ) : null}
               <TableCell className="text-right font-mono">{formatQty(line.enteredQty)}</TableCell>
-              <TableCell className="text-right font-mono">
-                {line.weightKg
-                  ? formatQty(
-                      new Decimal(line.weightKg).times(line.qtyBase).toDecimalPlaces(2).toString(),
-                    )
-                  : t('common.none')}
-              </TableCell>
+              {shape.weight ? (
+                <TableCell className="text-right font-mono">
+                  {line.weightKg
+                    ? formatQty(
+                        new Decimal(line.weightKg)
+                          .times(line.qtyBase)
+                          .toDecimalPlaces(2)
+                          .toString(),
+                      )
+                    : t('common.none')}
+                </TableCell>
+              ) : null}
               {props.prices && props.previous ? (
                 <PreviousCells line={line} previous={props.previous} />
               ) : null}
               {props.prices ? cells.prices : null}
-              {props.prices ? (
+              {shape.markup ? (
                 <TableCell className="text-right font-mono">
                   {markup === null ? t('common.none') : `${markup.toFixed(1)}%`}
                 </TableCell>
@@ -447,6 +533,10 @@ function PreviousCells(props: {
         }
       >
         {was === null ? t('common.none') : formatMnt(was.toString())}
+        {/* Which receipt it comes from, in sight: a finger never opens the title (ADR-0201). */}
+        {was !== null && before?.previousDate ? (
+          <span className="block text-xs text-muted-foreground">{before.previousDate}</span>
+        ) : null}
       </TableCell>
       <TableCell className="text-right font-mono">
         {diff === null ? (
@@ -1127,7 +1217,6 @@ function DraftEditor(props: {
 
   const discounts = detail ? discountsOf(detail) : [];
   const freeCount = lines.length - bought.length;
-  const expected = bought.some((line) => line.expectedQty !== null);
 
   return (
     <DocumentWindow>
@@ -1166,12 +1255,12 @@ function DraftEditor(props: {
                 label: editing
                   ? t('inventory.receipt.panel.editTitle')
                   : t('inventory.receipt.panel.title'),
-                rows: (
+                rows: (shape) => (
                   <ReceiptLinePanel
                     supplierId={supplier?.id}
                     editing={editing}
                     primary={lines.length === 0}
-                    expected={expected}
+                    shape={shape}
                     searchInput={productSearch}
                     pending={
                       mutations.createReceipt.isPending ||

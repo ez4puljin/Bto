@@ -15,6 +15,7 @@ import { useSearchParams } from 'react-router';
 import { useAuthState, useHasPermission } from '@/app/auth-context';
 import { Combobox } from '@/components/combobox';
 import { DateInput, TimeInput } from '@/components/date-input';
+import { FieldList } from '@/components/detail';
 import { DialogFormFooter, FormField } from '@/components/form';
 import {
   DateFilter,
@@ -37,6 +38,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -58,7 +60,9 @@ import { useSetParam } from '@/lib/search-params';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
+import { cn } from '@/lib/utils';
 import { randomUuid } from '@/lib/uuid';
+import { ROW_TITLE } from './hr-helpers';
 import { Avatar } from './hr-kit';
 import { useRequestLength, useRequestWhen } from './request-helpers';
 import {
@@ -78,20 +82,94 @@ const STATUS_VARIANT = {
   CANCELLED: 'outline',
 } as const satisfies Record<RequestStatus, string>;
 
+// 72.75rem with every column: sized on a 1366 laptop (75.5rem), a range of days («2026-11-18 –
+// 2026-11-22») whole in its 12.5rem. Narrower, what the row's dialog says leaves: the sent time
+// (63.75rem), the length (56.75rem), the note (48.75rem, a till PC's 55.5rem), then the type
+// (39.75rem, a tablet upright's 40.5rem). Who, when, the status and the actions always stay.
 const COLUMNS: readonly ColumnSpec[] = [
   { key: 'employee', kind: 'text', weight: 3, min: 12 },
-  { key: 'type', kind: 'text', weight: 2, min: 9 },
-  { key: 'when', kind: 'text', weight: 2, min: 10 },
-  { key: 'length', kind: 'code', width: 7 },
-  { key: 'note', kind: 'text', weight: 2, min: 8 },
-  { key: 'status', kind: 'status', width: 9 },
-  { key: 'createdAt', kind: 'datetime' },
+  { key: 'type', kind: 'text', weight: 2, min: 9, drop: 4 },
+  { key: 'when', kind: 'text', weight: 2, min: 12.5 },
+  { key: 'length', kind: 'code', width: 7, drop: 2 },
+  { key: 'note', kind: 'text', weight: 2, min: 8, drop: 3 },
+  { key: 'status', kind: 'status', width: 8.5 },
+  { key: 'createdAt', kind: 'datetime', width: 9, drop: 1 },
   { key: 'actions', kind: 'actions', actions: 3 },
 ];
 
 function RequestStatusBadge({ status }: { status: RequestStatus }) {
   const { t } = useTranslation();
   return <Badge variant={STATUS_VARIANT[status]}>{t(`hr.requestStatuses.${status}`)}</Badge>;
+}
+
+/* -------------------------------------------------------------------- read */
+
+/**
+ * A request read in full (ADR-0201): the list cuts the note to a line and said who decided, when
+ * and why only in the status pill's tooltip, which a finger cannot ask; a narrow list also lets
+ * the note, the length and the sent time go. HR decides a pending one from here too.
+ */
+function RequestDialog(props: {
+  request: HrTimeRequest;
+  canDecide: boolean;
+  onDecide: (approve: boolean) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const when = useRequestWhen();
+  const length = useRequestLength();
+  const { request } = props;
+  const decision =
+    request.decidedBy && request.decidedAt
+      ? `${t('hr.requests.decidedBy', {
+          name: request.decidedBy,
+          at: formatUbMinute(request.decidedAt),
+        })}${request.decisionNote ? ` — ${request.decisionNote}` : ''}`
+      : undefined;
+  return (
+    <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
+      <DialogContent closeLabel={t('common.close')} size="md" guard={false}>
+        <DialogHeader>
+          <DialogTitle>{request.fullName}</DialogTitle>
+          <DialogDescription>
+            {request.typeName} · {when(request)}
+          </DialogDescription>
+        </DialogHeader>
+        <FieldList
+          items={[
+            { label: t('hr.requests.columns.length'), value: length(request) },
+            {
+              label: t('hr.requests.columns.note'),
+              value: request.note ? (
+                <span className="whitespace-pre-wrap">{request.note}</span>
+              ) : null,
+            },
+            {
+              label: t('hr.requests.columns.status'),
+              value: <RequestStatusBadge status={request.status} />,
+              hint: decision,
+            },
+            {
+              label: t('hr.requests.columns.createdAt'),
+              value: <span className="font-mono">{formatUbMinute(request.createdAt)}</span>,
+            },
+          ]}
+        />
+        {props.canDecide ? (
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => props.onDecide(false)}>
+              <X />
+              {t('hr.requests.reject')}
+            </Button>
+            <Button type="button" onClick={() => props.onDecide(true)}>
+              <Check />
+              {t('hr.requests.approve')}
+            </Button>
+          </DialogFooter>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 /* ------------------------------------------------------------------ decide */
@@ -562,7 +640,7 @@ function TypesDialog(props: { onClose: () => void }) {
  * «Цагийн хүсэлт» (ADR-0144): the employees' time requests — leave, trips, overtime, missed punches
  * — narrowed by status, type, employee and dates (the filters in the URL). HR approves (an approved
  * punch becomes the punch) or rejects with a note, adds a request for an employee and keeps the
- * types; a pending request can be cancelled by its sender.
+ * types; a pending request can be cancelled by its sender. A row opens the request to read.
  */
 export function RequestsPage() {
   const { t } = useTranslation();
@@ -583,6 +661,7 @@ export function RequestsPage() {
   const [deciding, setDeciding] = useState<{ request: HrTimeRequest; approve: boolean } | null>(
     null,
   );
+  const [openId, setOpenId] = useState<number | null>(null);
   const statusParam = search.get('status');
   const status = REQUEST_STATUSES.find((value) => value === statusParam);
   const typeParam = search.get('type') ?? '';
@@ -601,6 +680,7 @@ export function RequestsPage() {
     [staff.data],
   );
   const rows = requests.data ?? [];
+  const open = rows.find((row) => row.id === openId) ?? null;
   const filtered =
     Boolean(status) || typeParam !== '' || userParam !== '' || from !== '' || to !== '';
 
@@ -718,7 +798,16 @@ export function RequestsPage() {
                 const pendingRow = request.status === 'PENDING';
                 const own = request.userId === myId;
                 return (
-                  <TableRow key={request.id}>
+                  // The whole row opens the request (a finger's target); the name stays the
+                  // keyboard's button, and the row's own actions do their own work.
+                  <TableRow
+                    key={request.id}
+                    className="cursor-pointer has-[button:focus-visible]:bg-accent"
+                    onClick={(event) => {
+                      if (event.target instanceof Element && event.target.closest('button')) return;
+                      setOpenId(request.id);
+                    }}
+                  >
                     <TableCell>
                       <div className="flex min-w-0 items-center gap-2">
                         <Avatar
@@ -726,7 +815,13 @@ export function RequestsPage() {
                           src={photos.get(request.userId) ?? null}
                           className="size-7 text-[0.6875rem]"
                         />
-                        <span className="truncate font-medium">{request.fullName}</span>
+                        <button
+                          type="button"
+                          className={cn('min-w-0', ROW_TITLE)}
+                          onClick={() => setOpenId(request.id)}
+                        >
+                          <span className="block truncate">{request.fullName}</span>
+                        </button>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -801,6 +896,18 @@ export function RequestsPage() {
           </ListTable>
         )}
       </ListCard>
+      {open ? (
+        <RequestDialog
+          request={open}
+          canDecide={canManage && open.status === 'PENDING'}
+          onDecide={(approve) => {
+            // The decision has its own dialog with a note: one dialog at a time.
+            setOpenId(null);
+            setDeciding({ request: open, approve });
+          }}
+          onClose={() => setOpenId(null)}
+        />
+      ) : null}
       <DecideDialog target={deciding} onClose={() => setDeciding(null)} />
       {creating.open ? (
         <RequestCreateDialog chooseEmployee={canManage} onClose={() => creating.setOpen(false)} />

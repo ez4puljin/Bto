@@ -21,8 +21,10 @@ const FRAME =
 /**
  * The rows of an answer or a report: the column names as the query labelled them, numbers to the
  * right with grouped thousands, a note when only the first rows are shown. Scrolls inside its own
- * frame, header kept in view; `tall` (a report's side panel) lets the frame take the window's
- * height.
+ * frame, header kept in view: 28rem at most, and never more than a low window leaves between the
+ * top bar and the floating question box (14.5rem with a little air), so its head and its sideways
+ * scrollbar can be in view together (ADR-0201); `tall` (a report's side panel) lets the frame take
+ * the window's height.
  */
 export function ResultTable({
   result,
@@ -39,7 +41,14 @@ export function ResultTable({
   }
   return (
     <div className="space-y-2">
-      <div className={cn(FRAME, tall ? 'max-h-[max(20rem,calc(100svh-15rem))]' : 'max-h-[28rem]')}>
+      <div
+        className={cn(
+          FRAME,
+          tall
+            ? 'max-h-[max(20rem,calc(100svh-15rem))]'
+            : 'max-h-[min(28rem,calc(100svh-14.5rem))]',
+        )}
+      >
         <Table aria-label={label}>
           <TableHeader>
             <TableRow>

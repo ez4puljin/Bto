@@ -100,7 +100,9 @@ const money = (value: string | null): string =>
 
 /**
  * The form's rows, a heading and a total in bold; with `accounts` each row's accounts are listed
- * under it, and whoever keeps the chart may move one to another row of its kind.
+ * under it, and whoever keeps the chart may move one to another row of its kind. A name breaks
+ * over two lines before the figures leave the card or the paper: the row numbers and two figure
+ * columns of 9rem leave a tablet's 700px about 300px for it (ADR-0201).
  */
 function StatementTable(props: {
   statement: Statement;
@@ -124,11 +126,11 @@ function StatementTable(props: {
           <TableHead className="w-20">{t('finance.statements.columns.no')}</TableHead>
           <TableHead>{t('finance.statements.columns.row')}</TableHead>
           {balance ? (
-            <TableHead className="w-44 text-right">
+            <TableHead className="w-36 text-right">
               {t('finance.statements.columns.opening')}
             </TableHead>
           ) : null}
-          <TableHead className="w-44 text-right">
+          <TableHead className="w-36 text-right">
             {t(
               balance ? 'finance.statements.columns.closing' : 'finance.statements.columns.amount',
             )}
@@ -140,7 +142,10 @@ function StatementTable(props: {
           <Fragment key={row.code}>
             <TableRow className={rowClass(row)}>
               <TableCell className="font-mono text-muted-foreground">{row.no}</TableCell>
-              <TableCell style={{ paddingLeft: `${0.75 + row.level * 1.25}rem` }}>
+              <TableCell
+                className="whitespace-normal"
+                style={{ paddingLeft: `${0.75 + row.level * 1.25}rem` }}
+              >
                 {name(row.code)}
               </TableCell>
               {balance ? (
@@ -152,7 +157,10 @@ function StatementTable(props: {
               ? row.accounts.map((account) => (
                   <TableRow key={account.accountId} className="text-[0.8125rem]">
                     <TableCell />
-                    <TableCell style={{ paddingLeft: `${2 + row.level * 1.25}rem` }}>
+                    <TableCell
+                      className="whitespace-normal"
+                      style={{ paddingLeft: `${2 + row.level * 1.25}rem` }}
+                    >
                       <span className="flex flex-wrap items-center gap-2">
                         <Link
                           className="font-mono text-link underline-offset-4 hover:underline"
@@ -191,7 +199,11 @@ function StatementTable(props: {
             {props.accounts && row.result && !new Decimal(row.result.amount).isZero() ? (
               <TableRow className="text-[0.8125rem] text-muted-foreground">
                 <TableCell />
-                <TableCell colSpan={balance ? 3 : 2} style={{ paddingLeft: '2rem' }}>
+                <TableCell
+                  colSpan={balance ? 3 : 2}
+                  className="whitespace-normal"
+                  style={{ paddingLeft: '2rem' }}
+                >
                   {t('finance.statements.resultNote', { amount: formatMnt(row.result.amount) })}
                 </TableCell>
               </TableRow>
@@ -214,7 +226,9 @@ function RowSelect(props: {
   return (
     <NativeSelect
       variant="filter"
-      className="ml-auto max-w-72 print:hidden"
+      // Its width is the cell's, up to 18rem: a width of its own would hold the table wider than
+      // a tablet (ADR-0201).
+      className="ml-auto w-full max-w-72 print:hidden"
       aria-label={props.label}
       value={props.value}
       onChange={(event) => props.onChange(event.target.value === '' ? null : event.target.value)}
@@ -307,7 +321,7 @@ export function StatementsPage() {
         <FormField label={t('finance.statements.from')} htmlFor="statement-from">
           <DateInput
             id="statement-from"
-            className="sm:w-44"
+            className="sm:w-40"
             value={from}
             max={to}
             onChange={(value) => set('from', value)}
@@ -316,7 +330,7 @@ export function StatementsPage() {
         <FormField label={t('finance.statements.to')} htmlFor="statement-to">
           <DateInput
             id="statement-to"
-            className="sm:w-44"
+            className="sm:w-40"
             value={to}
             min={from}
             onChange={(value) => set('to', value)}

@@ -256,7 +256,9 @@ export function RegistrationForm(props: { uoms: readonly Uom[]; categories: read
         onFiles={(files) => void ai.run(files)}
       />
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start 2xl:grid-cols-[minmax(0,1fr)_26rem]">
+      {/* The side keeps its 22rem on wider screens too: the page is a 60rem column (ADR-0158),
+          where a wider side only narrowed the form (ADR-0201). */}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
         <div className="flex min-w-0 flex-col gap-4">
           <Card>
             <CardContent className="flex flex-col gap-6">
@@ -309,7 +311,9 @@ export function RegistrationForm(props: { uoms: readonly Uom[]; categories: read
 
               <FormSection step={2} title={t('catalog.registration.sectionUnits')} plain>
                 <div className="flex flex-col gap-5">
-                  <div className="grid gap-4 sm:grid-cols-3">
+                  {/* The weight's label is the longest: its column is the widest, so no label
+                      breaks beside the side column. */}
+                  <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.35fr)]">
                     <FormField
                       label={t('catalog.product.baseUnit')}
                       htmlFor="registration-base-unit"
@@ -371,14 +375,17 @@ export function RegistrationForm(props: { uoms: readonly Uom[]; categories: read
                         {t('catalog.product.noExtraUnits')}
                       </p>
                     ) : (
-                      <div className="flex flex-col gap-3">
+                      // A unit's row lays itself out by its own width (ADR-0201): under 42rem
+                      // (beside the side column, on a tablet upright) the barcode box takes a
+                      // line of its own, where a scanned code can be read.
+                      <div className="@container flex flex-col gap-3">
                         {units.fields.map((field, index) => {
                           const prefix = `registration-unit-${field.id}`;
                           const unitErrors = errors.units?.[index];
                           return (
                             <div
                               key={field.id}
-                              className="relative grid gap-4 rounded-xl border border-border/90 bg-background p-4 pr-12 md:grid-cols-[10rem_8rem_minmax(0,1fr)]"
+                              className="relative grid grid-cols-[minmax(0,1fr)_8rem] gap-4 rounded-xl border border-border/90 bg-background p-4 pr-12 @2xl:grid-cols-[10rem_8rem_minmax(0,1fr)]"
                             >
                               <FormField
                                 label={t('catalog.product.unit')}
@@ -410,24 +417,26 @@ export function RegistrationForm(props: { uoms: readonly Uom[]; categories: read
                                   {...form.register(`units.${index}.factorToBase`)}
                                 />
                               </FormField>
-                              <FormField
-                                label={t('catalog.product.unitBarcodes')}
-                                htmlFor={`${prefix}-barcodes`}
-                              >
-                                <Controller
-                                  control={form.control}
-                                  name={`units.${index}.barcodes`}
-                                  render={({ field: barcodes }) => (
-                                    <BarcodeList
-                                      id={`${prefix}-barcodes`}
-                                      label={t('catalog.product.unitBarcodes')}
-                                      value={barcodes.value}
-                                      onChange={barcodes.onChange}
-                                      isRepeated={isRepeated}
-                                    />
-                                  )}
-                                />
-                              </FormField>
+                              <div className="col-span-2 @2xl:col-span-1">
+                                <FormField
+                                  label={t('catalog.product.unitBarcodes')}
+                                  htmlFor={`${prefix}-barcodes`}
+                                >
+                                  <Controller
+                                    control={form.control}
+                                    name={`units.${index}.barcodes`}
+                                    render={({ field: barcodes }) => (
+                                      <BarcodeList
+                                        id={`${prefix}-barcodes`}
+                                        label={t('catalog.product.unitBarcodes')}
+                                        value={barcodes.value}
+                                        onChange={barcodes.onChange}
+                                        isRepeated={isRepeated}
+                                      />
+                                    )}
+                                  />
+                                </FormField>
+                              </div>
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -604,12 +613,16 @@ export function RegistrationForm(props: { uoms: readonly Uom[]; categories: read
           </div>
         }
       >
-        <Button type="button" variant="ghost" onClick={() => void navigate('/catalog/products')}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="submit" disabled={isSubmitting}>
-          {t('common.save')}
-        </Button>
+        {/* Together: beside a summary too wide for the bar (a till PC) both go to the next line,
+            never one of them alone. */}
+        <div className="flex gap-2">
+          <Button type="button" variant="ghost" onClick={() => void navigate('/catalog/products')}>
+            {t('common.cancel')}
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {t('common.save')}
+          </Button>
+        </div>
       </StickyActions>
     </form>
   );

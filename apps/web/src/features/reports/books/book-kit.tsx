@@ -33,6 +33,7 @@ import { Label } from '@/components/ui/label';
 import { TableBody, TableCell } from '@/components/ui/table';
 import { useAuthState } from '@/app/auth-context';
 import { useCompanyName } from '@/features/company/api';
+import { useMediaQuery } from '@/lib/use-media-query';
 import { cn } from '@/lib/utils';
 import { DATE } from '../report-helpers';
 import { ReportViews } from '../report-views';
@@ -53,9 +54,11 @@ import type { usePromptDates } from './book-state';
 import { DateInput } from '@/components/date-input';
 
 /**
- * «Тайлангийн нөхцөл» (2026-11-02): the report's name as the title, then «Хугацаа» across the
- * whole width (the dates and the usual periods), «Шүүлтүүр» in two balanced columns and
- * «Харагдац» (precision, grouping, the switches); the content scrolls under a fixed footer.
+ * «Тайлангийн нөхцөл» (2026-11-02): the report's name as the title, then «Хугацаа» (the dates and
+ * the usual periods), «Шүүлтүүр» in two balanced columns and «Харагдац» (precision, grouping, the
+ * switches) over a fixed footer. From 48rem of its own width «Хугацаа» and «Харагдац» stand in a
+ * column beside «Шүүлтүүр», so the longest prompt (ten filters) fits a window 600px high; narrower
+ * (a tablet upright) the three follow one another (ADR-0201).
  */
 export function PromptDialog(props: {
   open: boolean;
@@ -82,16 +85,33 @@ export function PromptDialog(props: {
           <DialogTitle>{props.title}</DialogTitle>
           <DialogDescription>{t('reports.prompt.description')}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit} className="flex flex-col gap-5">
-          <PromptSection title={t('reports.prompt.period')}>
-            <PeriodFields {...props.dates} />
-          </PromptSection>
-          <PromptSection title={t('reports.prompt.filterSection')}>
-            <div className="grid items-start gap-x-6 gap-y-3 sm:grid-cols-2">{props.filters}</div>
-          </PromptSection>
-          <PromptSection title={t('reports.prompt.view')}>
-            <div className="grid items-end gap-x-6 gap-y-3 sm:grid-cols-3">{props.view}</div>
-          </PromptSection>
+        <form onSubmit={submit} className="@container flex flex-col gap-5">
+          {/*
+           * The narrow column is the two dates' width (2 × 10rem and their gap), and what stands
+           * in it keeps their two columns; its second row takes what «Шүүлтүүр» adds, so
+           * «Харагдац» stays under «Хугацаа».
+           */}
+          <div className="grid gap-x-8 gap-y-5 @3xl:grid-cols-[20.75rem_minmax(0,1fr)] @3xl:grid-rows-[auto_1fr]">
+            <PromptSection title={t('reports.prompt.period')}>
+              <PeriodFields {...props.dates} />
+            </PromptSection>
+            <PromptSection
+              title={t('reports.prompt.filterSection')}
+              className="@3xl:col-start-2 @3xl:row-span-2 @3xl:row-start-1"
+            >
+              <div className="grid items-start gap-x-6 gap-y-3 @xl:grid-cols-2">
+                {props.filters}
+              </div>
+            </PromptSection>
+            <PromptSection
+              title={t('reports.prompt.view')}
+              className="@3xl:col-start-1 @3xl:row-start-2"
+            >
+              <div className="grid items-end gap-x-6 gap-y-3 @xl:grid-cols-3 @3xl:grid-cols-[repeat(2,10rem)] @3xl:gap-x-3">
+                {props.view}
+              </div>
+            </PromptSection>
+          </div>
           <DialogFormFooter
             pending={false}
             disabled={!props.valid}
@@ -105,10 +125,18 @@ export function PromptDialog(props: {
 }
 
 /** A titled part of the prompt. */
-function PromptSection({ title, children }: { title: string; children: ReactNode }) {
+function PromptSection({
+  title,
+  className,
+  children,
+}: {
+  title: string;
+  className?: string;
+  children: ReactNode;
+}) {
   const id = useId();
   return (
-    <div role="group" aria-labelledby={id} className="flex flex-col gap-2.5">
+    <div role="group" aria-labelledby={id} className={cn('flex flex-col gap-2.5', className)}>
       <h3 id={id} className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
         {title}
       </h3>
@@ -151,7 +179,11 @@ function PeriodFields(props: ReturnType<typeof usePromptDates>) {
           />
         </FormField>
       </div>
-      <div className="flex flex-wrap items-center gap-1.5 sm:mt-[1.4rem]">
+      {/*
+       * Always a line of their own (wrapped under the dates they stood a label's height low); in
+       * the narrow column two by two under the two dates.
+       */}
+      <div className="flex w-full flex-wrap items-center gap-1.5 @3xl:grid @3xl:grid-cols-[repeat(2,10rem)] @3xl:gap-x-3">
         {PERIOD_PRESETS.map((preset) => {
           const range = presetRange(preset, today);
           const active = range.from === props.start && range.to === props.end;
@@ -229,7 +261,10 @@ export function SelectField(props: {
   );
 }
 
-/** A switch of the prompt's «Харагдац»: a box and its label on the controls' line. */
+/**
+ * A switch of the prompt's «Харагдац»: a box and its label on the controls' line, or on a line of
+ * its own where «Харагдац» is the narrow column (its label would not fit half of it).
+ */
 export function CheckField(props: {
   id: string;
   label: string;
@@ -237,7 +272,7 @@ export function CheckField(props: {
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <div className="flex h-9 items-center gap-2">
+    <div className="flex h-9 items-center gap-2 @3xl:col-span-full">
       <Checkbox
         id={props.id}
         checked={props.checked}
@@ -277,7 +312,7 @@ export function MultiPick(props: {
               {option.label}
               <button
                 type="button"
-                className="rounded p-0.5 text-muted-foreground hover:bg-background hover:text-foreground"
+                className="rounded p-0.5 text-muted-foreground hover:bg-background hover:text-foreground touch:relative touch:after:absolute touch:after:-inset-3"
                 aria-label={t('reports.prompt.remove', { name: option.label })}
                 onClick={() => props.onChange(props.values.filter((v) => v !== option.value))}
               >
@@ -400,7 +435,10 @@ export function BookActions(props: {
  * A report's column (2026-11-01): the page header and the paper share one width, sized to the
  * paper's table (narrower below 1600px) and centred, so the buttons line up with the paper's right
  * edge; `null` runs the whole width. Paper pages are the exception to "pages sit at the left"
- * (docs/ui.md §4).
+ * (docs/ui.md §4). They also share the window's height: the column is as tall as the shell leaves
+ * under its top bar (3.25rem and a hairline, the page's 1.25rem above and 2.5rem below) and the
+ * paper gives way, so it ends at the window's foot however many rows stand above it — a header
+ * broken over two lines on a tablet, the conditions bar, an alert (ADR-0201).
  */
 export function BookPage({
   columns,
@@ -419,7 +457,7 @@ export function BookPage({
   return (
     <div
       className={cn(
-        'mx-auto w-full print:max-w-none!',
+        'mx-auto flex max-h-[calc(100dvh-7rem-1px)] w-full flex-col print:block print:max-h-none print:max-w-none!',
         columns !== null && 'max-w-(--paper) max-[1600px]:max-w-(--paper-compact)',
       )}
       style={style}
@@ -428,6 +466,12 @@ export function BookPage({
     </div>
   );
 }
+
+/**
+ * What a finger gets instead of the hover that says a cut text whole (ADR-0201): the text takes
+ * the lines it needs, as it does on paper.
+ */
+const TOUCH_WRAP = 'touch:break-words touch:whitespace-normal';
 
 /** The time a paper is printed, set again just before each print (Ulaanbaatar). */
 function usePrintedAt(): string {
@@ -444,7 +488,8 @@ function usePrintedAt(): string {
  * The report's paper as Erkhet draws it: the title in the middle (the page's heading), the company
  * on the left with its note, the period on the right «(төгрөгөөр)» (and on paper the time it was
  * printed), the conditions, then ONE scroll box with the table — its head and first column in
- * view — and the lines to sign; the paper never runs past the window, so the box is the only thing
+ * view — and the lines to sign; the paper never runs past the window (`BookPage` holds its height;
+ * it keeps 16rem in a window too low for that, and the page scrolls), so the box is the only thing
  * that scrolls. Without a `period` it is the blank paper before the first run.
  * `orientation` is the printed A4 sheet's, numbered «1 / 3» at the foot.
  */
@@ -464,7 +509,7 @@ export function BookSheet(props: {
   const me = auth.status === 'authenticated' ? auth.me.fullName : '';
   const filters = props.filters.join(', ');
   return (
-    <section className="flex max-h-[calc(100dvh-10rem)] flex-col rounded-xl bg-card px-4 pt-6 pb-4 shadow-card ring-1 ring-black/[0.06] min-[1600px]:px-8 min-[1600px]:pb-6 print:block print:max-h-none print:rounded-none print:p-0 print:shadow-none print:ring-0">
+    <section className="flex min-h-64 flex-col rounded-xl bg-card px-4 pt-6 pb-4 shadow-card ring-1 ring-black/[0.06] min-[1600px]:px-8 min-[1600px]:pb-6 print:block print:rounded-none print:p-0 print:shadow-none print:ring-0">
       <style media="print">{`@page{size:A4 ${props.orientation};margin:10mm 8mm 12mm;@bottom-right{content:counter(page) " / " counter(pages);font-size:8pt}}`}</style>
       <h1 className="mb-3 text-center text-[1.25rem] leading-tight font-semibold tracking-tight text-balance">
         {props.title}
@@ -489,7 +534,10 @@ export function BookSheet(props: {
         </div>
       ) : null}
       {props.period && filters ? (
-        <p className="mb-3 truncate text-[0.8125rem] print:whitespace-normal" title={filters}>
+        <p
+          className={cn('mb-3 truncate text-[0.8125rem] print:whitespace-normal', TOUCH_WRAP)}
+          title={filters}
+        >
           <span className="text-muted-foreground">{t('reports.prompt.filters')}</span> {filters}
         </p>
       ) : null}
@@ -608,13 +656,20 @@ export function HeadLabel({ label, note }: { label: string; note: string }) {
   );
 }
 
-/** A text cell on one line, cut with «…» and whole on hover; it wraps on paper. */
+/**
+ * A text cell on one line, cut with «…» and whole on hover; it wraps on paper and on a screen
+ * worked by a finger.
+ */
 export function TextCell(props: { text: string; colSpan?: number; className?: string }) {
   return (
     <TableCell
       colSpan={props.colSpan}
       title={props.text || undefined}
-      className={cn('truncate print:overflow-visible print:whitespace-normal', props.className)}
+      className={cn(
+        'truncate print:overflow-visible print:whitespace-normal',
+        TOUCH_WRAP,
+        props.className,
+      )}
     >
       {props.text}
     </TableCell>
@@ -658,7 +713,8 @@ export function TotalRow({ labelSpan, children }: { labelSpan: number; children:
 
 /**
  * A row that opens its detail on a click of ▸, a double click or Enter; only an open row is
- * tinted. `drillable={false}` (nothing moved in the period) is a plain row.
+ * tinted. `drillable={false}` (nothing moved in the period) is a plain row. On a screen worked by a
+ * finger one tap anywhere on the row opens it: ▸ alone is too small to aim at (ADR-0201).
  */
 export function DrillRow(props: {
   expanded: boolean;
@@ -667,6 +723,7 @@ export function DrillRow(props: {
   className?: string;
   children: ReactNode;
 }) {
+  const finger = useMediaQuery('(pointer: coarse)');
   const onKeyDown = (event: KeyboardEvent<HTMLTableRowElement>) => {
     if (event.target !== event.currentTarget) return;
     if (event.key === 'Enter' || event.key === ' ') {
@@ -686,6 +743,7 @@ export function DrillRow(props: {
       data-slot="table-row"
       tabIndex={0}
       aria-expanded={props.expanded}
+      onClick={finger ? props.onToggle : undefined}
       onDoubleClick={props.onToggle}
       onKeyDown={onKeyDown}
       className={cn(
@@ -721,7 +779,9 @@ export function DrillCell(props: {
             name={props.name ?? props.text}
           />
         )}
-        <span className="min-w-0 truncate print:whitespace-normal">{props.text}</span>
+        <span className={cn('min-w-0 truncate print:whitespace-normal', TOUCH_WRAP)}>
+          {props.text}
+        </span>
       </span>
     </TableCell>
   );
@@ -744,7 +804,7 @@ function DrillMark(props: { expanded: boolean; onToggle: () => void; name: strin
         props.onToggle();
       }}
       onDoubleClick={(event) => event.stopPropagation()}
-      className="-my-0.5 mr-1 grid size-5 shrink-0 place-items-center rounded text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring print:hidden"
+      className="-my-0.5 mr-1 grid size-5 shrink-0 place-items-center rounded text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring touch:relative touch:after:absolute touch:after:-inset-x-3 touch:after:-inset-y-2 print:hidden"
     >
       <ChevronRight
         aria-hidden
@@ -805,7 +865,7 @@ export function DetailLabel(props: {
     <TableCell
       colSpan={props.colSpan}
       title={text || undefined}
-      className="truncate pl-8! print:overflow-visible print:whitespace-normal"
+      className={cn('truncate pl-8! print:overflow-visible print:whitespace-normal', TOUCH_WRAP)}
     >
       {props.number ? (
         <span className="text-primary tabular-nums group-hover/detail:underline print:text-foreground">

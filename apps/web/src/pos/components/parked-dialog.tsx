@@ -68,7 +68,9 @@ function ParkedList(props: {
     return <p className="py-6 text-center text-muted-foreground">{t('posKiosk.parked.empty')}</p>;
   }
   return (
-    <div className="space-y-3">
+    // `min-w-0`: a basket's product names are cut with «…», they never widen the dialog's one
+    // column (a long preview pushed «Дуудах» past the dialog's edge).
+    <div className="min-w-0 space-y-3">
       {props.cartEmpty ? null : (
         <KioskAlert tone="warning">{t('posKiosk.parked.cartNotEmpty')}</KioskAlert>
       )}

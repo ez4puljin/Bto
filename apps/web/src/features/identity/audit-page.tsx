@@ -3,7 +3,6 @@ import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router';
 import {
-  DateFilter,
   EmptyState,
   FilterBar,
   ListCard,
@@ -16,6 +15,7 @@ import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DateRangeFilter } from '@/features/finance/date-range-filter';
 import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { problemFromError } from '@/lib/problem';
@@ -115,12 +115,16 @@ export function AuditPage() {
             </option>
           ))}
         </NativeSelect>
-        <DateFilter
-          label={t('audit.from')}
-          value={filter.from}
-          onChange={(from) => setParam('from', from)}
+        {/* One pill for the two days: the bar keeps one row at a till PC's width (ADR-0201). */}
+        <DateRangeFilter
+          label={t('audit.time')}
+          fromLabel={t('audit.from')}
+          toLabel={t('audit.to')}
+          from={filter.from}
+          to={filter.to}
+          onFrom={(from) => setParam('from', from)}
+          onTo={(to) => setParam('to', to)}
         />
-        <DateFilter label={t('audit.to')} value={filter.to} onChange={(to) => setParam('to', to)} />
       </FilterBar>
       <ProblemAlert problem={problemFromError(audit.error)} onRetry={audit.refetch} />
       <ListCard scroll>

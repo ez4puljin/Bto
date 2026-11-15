@@ -56,7 +56,10 @@ export function PrintLink(props: { to: string }) {
   );
 }
 
-/** A count or amount over a report's table. */
+/**
+ * A count or amount over a report's table. Between 1024 and 1280px, where five or six of them
+ * share one row (a tile of 9rem), it is drawn tighter, so that «1,234,567,890₮» still fits.
+ */
 export function SummaryTile(props: {
   label: string;
   value: ReactNode;
@@ -64,11 +67,11 @@ export function SummaryTile(props: {
   tone?: 'default' | 'warning' | 'destructive';
 }) {
   return (
-    <div className="rounded-xl bg-card px-4 py-3 shadow-card ring-1 ring-black/[0.06]">
+    <div className="rounded-xl bg-card px-4 py-3 shadow-card ring-1 ring-black/[0.06] lg:max-xl:px-3">
       <p className="text-[0.8125rem] text-muted-foreground">{props.label}</p>
       <p
         className={cn(
-          'font-mono text-[1.125rem] font-semibold',
+          'font-mono text-[1.125rem] font-semibold lg:max-xl:text-[0.9375rem]',
           props.tone === 'warning' && 'text-warning',
           props.tone === 'destructive' && 'text-destructive',
         )}
@@ -79,6 +82,14 @@ export function SummaryTile(props: {
     </div>
   );
 }
+
+/**
+ * The name in a row that opens its panel: a real button, for the keyboard. It cuts its own text
+ * with «…» (a button inside a cut cell is clipped without one) and keeps the text at its start
+ * where a finger's screen gives the name a second line (a button centres its lines).
+ */
+export const ROW_NAME =
+  'block max-w-full overflow-hidden text-left font-medium text-ellipsis underline-offset-4 hover:underline';
 
 /** A right-aligned amount cell (journal style, no sign). */
 export function AmountCell(props: { value: string | null; className?: string }) {

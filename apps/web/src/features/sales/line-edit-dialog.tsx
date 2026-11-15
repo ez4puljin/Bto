@@ -484,7 +484,8 @@ function Editor({ order, onClose }: { order: SalesOrder; onClose: () => void }) 
           }
         />
       ) : null}
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-border">
+      {/* `relative`: a locked row's screen-reader-only text scrolls with its row, not with the dialog. */}
+      <div className="relative min-h-0 flex-1 overflow-y-auto rounded-md border border-border">
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-10 bg-card text-xs text-muted-foreground">
             <tr className="border-b border-border">

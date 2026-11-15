@@ -66,9 +66,12 @@ const isKind = (value: string | null): value is PaymentKind =>
 const isStatus = (value: string | null): value is PaymentStatus =>
   PAYMENT_STATUSES.some((status) => status === value);
 
-/** The list's columns (ADR-0119): number, date, kind, counterparty, money account, amount, status. */
+/**
+ * The list's columns (ADR-0119): number, date, kind, counterparty, money account, amount, status.
+ * The number is the row's link in medium weight and the first cell: «Т-20261016-0001» needs 11rem.
+ */
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'number', kind: 'number' },
+  { key: 'number', kind: 'number', width: 11 },
   { key: 'date', kind: 'date' },
   { key: 'kind', kind: 'status' },
   { key: 'counterparty', kind: 'text', weight: 3, min: 14 },
@@ -124,8 +127,9 @@ export function PaymentsPage() {
       />
       <FilterBar>
         <SearchField
-          // Narrower here, so the five filters keep one line at 1366px.
-          className="sm:w-52"
+          // Narrower here, so the five filters keep one line at 1366px; it takes the row's spare
+          // width up to the kit's own, where its placeholder reads whole.
+          className="sm:w-auto sm:max-w-72 sm:flex-[1_1_13rem]"
           aria-label={t('common.search')}
           placeholder={t('finance.payments.searchPlaceholder')}
           value={search}

@@ -171,6 +171,8 @@ describe('kiosk: the till tools (ADR-0104)', () => {
     expect(within(prices).getByText('40,000₮')).toBeInTheDocument();
     expect(within(prices).getByText(MILK_BARCODE)).toBeInTheDocument();
     await user.keyboard('{Escape}');
+    // A lookup has nothing to lose: Esc closes it at once, without asking to discard what was typed.
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(screen.getByText(k.sale.empty)).toBeInTheDocument();
     expect(edge.callsTo('POST /quote')).toHaveLength(0);
   });

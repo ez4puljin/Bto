@@ -34,9 +34,11 @@ import {
 } from './partner-schema';
 
 /**
- * One customer: data and delivery addresses, then from `xl` on a side column with the credit
+ * One customer: data and delivery addresses, then from `lg` on a side column with the credit
  * terms, the balance («Тооцоо», finance), the customer app («Апп», ADR-0079 #11) and the contacts
- * (SPEC §5.3, ADR-0066).
+ * (SPEC §5.3, ADR-0066). The side is 22rem on a till PC and 26rem from the laptops: in one column
+ * at 1024px three quarters of every row stood empty and the credit was far under the fold
+ * (ADR-0201).
  */
 export function CustomerPage() {
   const { t } = useTranslation();
@@ -82,7 +84,7 @@ export function CustomerPage() {
           </>
         }
       />
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_26rem] xl:items-start">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_26rem]">
         <div className="flex min-w-0 flex-col gap-4">
           <DetailCard
             title={t('partners.customer.info')}

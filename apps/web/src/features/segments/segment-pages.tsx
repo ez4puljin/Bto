@@ -24,8 +24,6 @@ import {
   LoadMore,
   SegmentedControl,
   SkeletonRows,
-  SpacerCell,
-  SpacerHead,
   TruncateCell,
 } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
@@ -78,12 +76,15 @@ function useCountText() {
         : t(`segments.countOf.${entity}`, { count: formatCount(count) });
 }
 
-/** The list's columns (ADR-0119): the name with its badges, the description, the count. */
+/**
+ * The list's columns (ADR-0119): the name with its badges, the description, the count. The
+ * description takes the larger share: a name with both badges needs about 20rem, a description
+ * reads on. 35.25rem in all, under a tablet's 41.2 (ADR-0201).
+ */
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'name', kind: 'text', weight: 3, min: 14 },
-  { key: 'description', kind: 'text', weight: 2 },
+  { key: 'name', kind: 'text', weight: 2, min: 16 },
+  { key: 'description', kind: 'text', weight: 3, min: 9 },
   { key: 'count', kind: 'count', width: 8 },
-  { key: 'spacer', kind: 'spacer' },
   { key: 'chevron', kind: 'chevron' },
 ];
 
@@ -140,31 +141,34 @@ export function SegmentsPage() {
               <TableHead>{t('segments.columns.name')}</TableHead>
               <TableHead>{t('segments.columns.description')}</TableHead>
               <TableHead className="text-right">{t('segments.columns.count')}</TableHead>
-              <SpacerHead />
               <ChevronHead />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {segments.isPending ? <SkeletonRows columns={5} /> : null}
+            {segments.isPending ? <SkeletonRows columns={4} /> : null}
             {rows.map((row) => (
               <LinkRow key={row.id} to={`/segments/${row.id}`}>
                 <TableCell>
-                  <Link
-                    to={`/segments/${row.id}`}
-                    className="font-medium underline-offset-4 hover:underline"
-                  >
-                    {row.name}
-                  </Link>
-                  {row.kind === 'LIST' ? (
-                    <Badge variant="secondary" className="ml-2">
-                      {t('segments.kinds.LIST')}
-                    </Badge>
-                  ) : null}
-                  {row.appRank !== null ? (
-                    <Badge variant="default" className="ml-2" title={t('segments.app.badgeHint')}>
-                      {t('segments.app.badge')}
-                    </Badge>
-                  ) : null}
+                  {/* A badge that finds no room beside the name takes a line of its own; only a
+                      name longer than the column is cut (a finger gets its second line, as in
+                      `TruncateCell`). */}
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <Link
+                      to={`/segments/${row.id}`}
+                      className="min-w-0 truncate font-medium underline-offset-4 hover:underline touch:line-clamp-2 touch:whitespace-normal"
+                      title={row.name}
+                    >
+                      {row.name}
+                    </Link>
+                    {row.kind === 'LIST' ? (
+                      <Badge variant="secondary">{t('segments.kinds.LIST')}</Badge>
+                    ) : null}
+                    {row.appRank !== null ? (
+                      <Badge variant="default" title={t('segments.app.badgeHint')}>
+                        {t('segments.app.badge')}
+                      </Badge>
+                    ) : null}
+                  </span>
                 </TableCell>
                 <TruncateCell
                   text={row.description ?? t('common.none')}
@@ -173,7 +177,6 @@ export function SegmentsPage() {
                 <TableCell className="text-right tabular-nums">
                   {countText(entity, counts.data ? (countOf.get(row.id) ?? null) : undefined)}
                 </TableCell>
-                <SpacerCell />
               </LinkRow>
             ))}
           </TableBody>

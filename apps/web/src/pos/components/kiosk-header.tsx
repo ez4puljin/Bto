@@ -69,7 +69,10 @@ export function KioskHeader(props: {
       <header className="flex h-16 shrink-0 items-center gap-4 border-b border-border bg-background px-4">
         <div className="flex min-w-0 items-center gap-3">
           <BrandMark />
-          <div className="min-w-0 leading-tight">
+          {/* Beside the search the sides give way, not the search (ADR-0201): on a 1024px till the
+              company and the till leave (the sign-in names them) and the cashier's name is cut
+              sooner, so the field keeps its width while the store is offline too. */}
+          <div className={cn('min-w-0 leading-tight', props.center ? 'hidden xl:block' : null)}>
             <p className="truncate text-[0.9375rem] font-semibold">
               {session.companyName ?? t('brand.company')}
             </p>
@@ -84,7 +87,12 @@ export function KioskHeader(props: {
           <div className="flex items-center gap-2">
             <UserRound aria-hidden className="size-5 text-muted-foreground" />
             <div className="leading-tight">
-              <p className="max-w-48 truncate text-[0.8125rem] font-semibold">
+              <p
+                className={cn(
+                  'truncate text-[0.8125rem] font-semibold',
+                  props.center ? 'max-w-32 xl:max-w-48' : 'max-w-48',
+                )}
+              >
                 {session.cashier.fullName}
               </p>
               <p className="font-mono text-xs text-muted-foreground">{session.businessDate}</p>

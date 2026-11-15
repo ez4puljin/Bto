@@ -313,7 +313,7 @@ export function ShiftSummaryScreen(props: {
       <main className="flex-1 overflow-y-auto p-4">
         <section
           aria-labelledby="z-title"
-          className="mx-auto max-w-xl space-y-4 rounded-2xl bg-card p-6 shadow-card ring-1 ring-black/[0.06]"
+          className="mx-auto max-w-xl space-y-4 rounded-2xl bg-card p-6 shadow-card ring-1 ring-black/[0.06] lg:max-w-3xl"
         >
           <div>
             <h1 id="z-title" className="text-2xl font-semibold tracking-tight">
@@ -323,7 +323,10 @@ export function ShiftSummaryScreen(props: {
               {t('posKiosk.z.description', { number: summary.number })}
             </p>
           </div>
-          <dl className="divide-y divide-border">
+          {/* Two columns on a till: 12 to 15 rows in one were taller than the 704px under the
+              header, so the page opened scrolled to «Гарах» with the title cut. Each row carries
+              its own rule, so both columns end with one. */}
+          <dl className="*:break-inside-avoid *:border-b lg:columns-2 lg:gap-x-10">
             <Figure
               label={t('pos.fields.openedAt')}
               value={formatUbDateTime(Date.parse(summary.openedAt))}

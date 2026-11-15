@@ -88,13 +88,17 @@ const STATUSES: readonly AdjustmentStatus[] = ['DRAFT', 'SUBMITTED', 'POSTED', '
 /** Cost per base unit, NUMERIC(14,4). */
 const UNIT_COST = /^\d{1,10}(\.\d{1,4})?$/;
 
-/** The adjustments list's columns (ADR-0119). */
+/**
+ * The adjustments list's columns (ADR-0119): 47rem, whole on a till PC. A tablet upright (about
+ * 40.5) lets the count of lines go (42.5), then the date (35.25): the adjustment's page has both
+ * (ADR-0201).
+ */
 const LIST_COLUMNS: readonly ColumnSpec[] = [
   { key: 'number', kind: 'number' },
-  { key: 'date', kind: 'date' },
+  { key: 'date', kind: 'date', drop: 2 },
   { key: 'warehouse', kind: 'text', weight: 1 },
   { key: 'reason', kind: 'text', weight: 2 },
-  { key: 'lines', kind: 'count' },
+  { key: 'lines', kind: 'count', drop: 1 },
   { key: 'status', kind: 'status' },
   { key: 'chevron', kind: 'chevron' },
 ];

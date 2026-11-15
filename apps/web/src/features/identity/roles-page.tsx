@@ -63,7 +63,8 @@ const COLUMNS: readonly ColumnSpec[] = [
   { key: 'name', kind: 'text', weight: 3, min: 12 },
   { key: 'kind', kind: 'status', width: 10 },
   { key: 'permissions', kind: 'count' },
-  { key: 'users', kind: 'count' },
+  // «Ажилтан» is 5rem with its padding: a count's 4.5 cut it.
+  { key: 'users', kind: 'count', width: 5.5 },
   { key: 'actions', kind: 'actions', actions: 2 },
 ];
 

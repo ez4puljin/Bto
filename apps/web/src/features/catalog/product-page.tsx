@@ -230,10 +230,13 @@ function KeyFigures({ detail }: { detail: ProductDetail }) {
     );
   };
   return (
-    <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    // Two rows from a till PC up (the stock beside six figures), three on a tablet upright (the
+    // stock across the first): two to a row took four, and the first card began under the fold of
+    // a till's 640px (ADR-0201).
+    <div className="mb-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
       <section
         aria-label={t('catalog.product.key.onHandNow')}
-        className="flex min-w-0 flex-col gap-1 rounded-xl bg-card px-4 py-3 shadow-card ring-1 ring-black/[0.06] xl:col-start-4 xl:row-span-2 xl:row-start-1"
+        className="flex min-w-0 flex-col gap-1 rounded-xl bg-card px-4 py-3 shadow-card ring-1 ring-black/[0.06] md:max-lg:col-span-3 lg:col-start-4 lg:row-span-2 lg:row-start-1"
       >
         <span className="text-[0.75rem] font-medium tracking-wide text-muted-foreground uppercase">
           {t('catalog.product.key.onHandNow')}

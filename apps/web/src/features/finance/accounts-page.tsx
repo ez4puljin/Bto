@@ -73,16 +73,22 @@ import { StockCountAccountsDialog } from './stock-count-accounts-dialog';
 const CODE = /^[0-9A-Za-z][0-9A-Za-z._-]{0,15}$/;
 const isRole = (value: string): value is GlRole => GL_ROLES.some((role) => role === value);
 
-/** The chart's columns (ADR-0119): the code, the name, the kind and role, three amounts, the menu. */
+/**
+ * The chart's columns (ADR-0119): the code, the name, the kind and role, three amounts, the menu.
+ * A table too narrow for all ten (ADR-0201) lets the currency and the role go first, then the
+ * turnover, then the kind; the code, the name and the balance stay. In rem: 78 whole (1536px
+ * and wider), 67.5 on a 1366 laptop (76 of room), 50.5 on a till PC (56), 39.5 on a tablet (41,
+ * less beside a page scrollbar).
+ */
 const ACCOUNT_COLUMNS: readonly ColumnSpec[] = [
-  { key: 'code', kind: 'code', width: 11 },
-  { key: 'name', kind: 'text', weight: 4, min: 18 },
-  { key: 'journal', kind: 'text', weight: 2, min: 13 },
-  { key: 'currency', kind: 'code', width: 4.5 },
-  { key: 'role', kind: 'text', weight: 1, min: 6 },
-  { key: 'debit', kind: 'money' },
-  { key: 'credit', kind: 'money' },
-  { key: 'balance', kind: 'money', width: 10 },
+  { key: 'code', kind: 'code', width: 10.5 },
+  { key: 'name', kind: 'text', weight: 4, min: 14.5 },
+  { key: 'journal', kind: 'text', weight: 2, min: 11, drop: 3 },
+  { key: 'currency', kind: 'code', width: 4.5, drop: 1 },
+  { key: 'role', kind: 'text', weight: 1, min: 6, drop: 1 },
+  { key: 'debit', kind: 'money', drop: 2 },
+  { key: 'credit', kind: 'money', drop: 2 },
+  { key: 'balance', kind: 'money', width: 9 },
   { key: 'actions', kind: 'actions', actions: 1 },
   { key: 'chevron', kind: 'chevron' },
 ];
@@ -310,15 +316,22 @@ export function AccountsPage() {
             {accounts.isPending ? <SkeletonRows columns={10} /> : null}
             {lines.map((line) =>
               line.group ? (
-                <TableRow key={`g${line.group.id}`} className="bg-muted/40 hover:bg-muted/40">
+                <TableRow
+                  key={`g${line.group.id}`}
+                  className="bg-muted/40 font-semibold hover:bg-muted/40"
+                >
+                  {/* A cell per column, never one across them: a spanning cell would keep every
+                      column in a narrow table (ADR-0201). */}
                   <TableCell
-                    colSpan={10}
-                    className="py-1.5 font-semibold"
+                    className="font-mono text-muted-foreground"
                     style={{ paddingLeft: `${0.75 + line.depth * 0.875}rem` }}
                   >
-                    <span className="mr-2 font-mono text-muted-foreground">{line.group.code}</span>
-                    {line.group.name}
+                    {line.group.code}
                   </TableCell>
+                  <TruncateCell text={line.group.name} />
+                  {ACCOUNT_COLUMNS.slice(2).map((column) => (
+                    <TableCell key={column.key} />
+                  ))}
                 </TableRow>
               ) : (
                 // A row opens the account's ledger; its code stays the keyboard's link.

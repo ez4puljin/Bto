@@ -145,24 +145,42 @@ export function FormRow(props: {
   );
 }
 
-/** A field stacked label over control, for dialogs and other narrow places. */
+/**
+ * A field stacked label over control, for dialogs and other narrow places. `hintBeside` puts the
+ * hint at the end of the label's line: a fact that comes and goes while the form is filled (an
+ * account's balance) then moves nothing under it (ADR-0201).
+ */
 export function FormField(props: {
   label: string;
   htmlFor?: string;
   hint?: ReactNode;
+  hintBeside?: boolean;
   error?: string | undefined;
   children: ReactNode;
 }) {
   useDescribedBy(props.htmlFor, Boolean(props.hint), isValidationMessage(props.error));
+  const hint = props.hint ? (
+    <p
+      id={describedId(props.htmlFor, 'hint')}
+      className={cn('text-xs text-muted-foreground', props.hintBeside && 'min-w-0 truncate')}
+    >
+      {props.hint}
+    </p>
+  ) : null;
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={props.htmlFor}>{props.label}</Label>
+      {props.hintBeside ? (
+        <div className="flex items-baseline justify-between gap-3">
+          <Label htmlFor={props.htmlFor} className="shrink-0">
+            {props.label}
+          </Label>
+          {hint}
+        </div>
+      ) : (
+        <Label htmlFor={props.htmlFor}>{props.label}</Label>
+      )}
       {props.children}
-      {props.hint ? (
-        <p id={describedId(props.htmlFor, 'hint')} className="text-xs text-muted-foreground">
-          {props.hint}
-        </p>
-      ) : null}
+      {props.hintBeside ? null : hint}
       <FieldError message={props.error} id={describedId(props.htmlFor, 'error')} />
     </div>
   );
@@ -185,10 +203,18 @@ export function DialogFormFooter(props: {
   disabled?: boolean;
   /** «Хадгалаад шинэ» (ADR-0151): saves and keeps the dialog for the next one. */
   onSaveAndNew?: () => void;
+  /**
+   * What the save will write, said beside the buttons that write it (a posting's two sides): it
+   * takes the footer's free start, so it adds nothing to the dialog's height (ADR-0201).
+   */
+  start?: ReactNode;
 }) {
   const { t } = useTranslation();
   return (
-    <DialogFooter>
+    <DialogFooter className={props.start ? 'sm:flex-wrap sm:items-center' : undefined}>
+      {props.start ? (
+        <div className="min-w-0 sm:mr-auto sm:flex-[1_1_14rem]">{props.start}</div>
+      ) : null}
       <Button type="button" variant="ghost" onClick={props.onCancel}>
         {t('common.cancel')}
       </Button>

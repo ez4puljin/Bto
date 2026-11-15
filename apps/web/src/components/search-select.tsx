@@ -135,8 +135,8 @@ export function SearchSelect(props: {
             aria-invalid={props.invalid ? true : undefined}
             autoComplete="off"
             className={cn(
-              'pr-9',
-              props.variant === 'filter' && 'h-8.5 rounded-full md:text-[0.8125rem]',
+              'pr-9 text-ellipsis',
+              props.variant === 'filter' && 'h-8.5 rounded-full md:text-[0.8125rem] touch:h-11',
             )}
             // A choice cut by a narrow field reads whole on hover.
             title={!open && chosenLabel ? chosenLabel : undefined}
@@ -159,7 +159,7 @@ export function SearchSelect(props: {
             <button
               type="button"
               aria-label={t('common.clear')}
-              className="absolute top-1/2 right-2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md opacity-60 hover:bg-muted hover:opacity-100"
+              className="absolute top-1/2 right-2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md opacity-60 hover:bg-muted hover:opacity-100 touch:after:absolute touch:after:-inset-2.5"
               onClick={() => {
                 props.onClear?.();
                 input.current?.focus();
@@ -196,7 +196,8 @@ export function SearchSelect(props: {
               ref={list}
               id={listId}
               role="listbox"
-              className="relative flex max-h-72 flex-col overflow-y-auto"
+              // Never taller than the room the window leaves under (or over) the field.
+              className="relative flex max-h-[min(18rem,calc(var(--radix-popover-content-available-height,100vh)-1.5rem))] flex-col overflow-y-auto"
             >
               {rows.map((option, position) => (
                 <li

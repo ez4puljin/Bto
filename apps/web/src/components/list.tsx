@@ -6,6 +6,7 @@ import {
   type Ref,
   type RefObject,
   useContext,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -17,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Table, TableCell, TableHead, TableRow } from '@/components/ui/table';
-import { columnLayout, type ColumnSpec } from '@/lib/column-layout';
+import { type ColumnSpec, fitColumns } from '@/lib/column-layout';
 import { cn } from '@/lib/utils';
 import { DateInput } from '@/components/date-input';
 
@@ -46,7 +47,11 @@ export function SearchField({ className, ...props }: ComponentProps<'input'>) {
         aria-hidden
         className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
       />
-      <Input type="search" {...props} className="h-8.5 rounded-full pl-9 md:text-[0.8125rem]" />
+      <Input
+        type="search"
+        {...props}
+        className="h-8.5 rounded-full pl-9 md:text-[0.8125rem] touch:h-11"
+      />
     </div>
   );
 }
@@ -60,7 +65,7 @@ export function FilterToggle(props: {
   return (
     <label
       className={cn(
-        'inline-flex h-8.5 cursor-pointer items-center gap-2 rounded-full border px-3 text-[0.8125rem] font-medium shadow-control transition-colors duration-200 select-none',
+        'inline-flex h-8.5 cursor-pointer items-center gap-2 rounded-full border px-3 text-[0.8125rem] font-medium shadow-control transition-colors duration-200 select-none touch:h-11',
         props.checked
           ? 'border-transparent bg-secondary text-secondary-foreground'
           : 'border-border bg-background hover:bg-accent',
@@ -98,7 +103,7 @@ export function FilterChip(props: {
   onClear: () => void;
 }) {
   return (
-    <span className="inline-flex h-8.5 max-w-full items-center gap-1 rounded-full bg-secondary pr-1 pl-3 text-[0.8125rem] font-medium text-secondary-foreground">
+    <span className="inline-flex h-8.5 max-w-full items-center gap-1 rounded-full bg-secondary pr-1 pl-3 text-[0.8125rem] font-medium text-secondary-foreground touch:h-11">
       <span className="min-w-0 truncate">{props.children}</span>
       <Button
         size="icon-xs"
@@ -117,7 +122,10 @@ export function FilterChip(props: {
 /**
  * An Apple segmented control: a few mutually exclusive views of a list (in force / planned / all).
  * The segments are tabs, so tests and screen readers find them by name; `name` names the group
- * when its segments alone do not say what they choose (a paper size).
+ * when its segments alone do not say what they choose (a paper size). A label never breaks over
+ * two lines: a control wider than its place scrolls sideways inside itself and keeps the chosen
+ * segment in sight (ADR-0201). `size="field"` stands in a form at the inputs' height, its
+ * segments sharing the width; a finger gets taller segments.
  */
 export function SegmentedControl<T extends string>(props: {
   options: readonly T[];
@@ -125,12 +133,29 @@ export function SegmentedControl<T extends string>(props: {
   label: (value: T) => string;
   onChange: (value: T) => void;
   name?: string;
+  size?: 'pill' | 'field';
 }) {
+  const field = props.size === 'field';
+  const list = useRef<HTMLDivElement>(null);
+  // Only the control scrolls, never the page: a control below the fold stays where it is.
+  useLayoutEffect(() => {
+    const box = list.current;
+    const tab = box?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!box || !tab || box.scrollWidth <= box.clientWidth) return;
+    const frame = box.getBoundingClientRect();
+    const chosen = tab.getBoundingClientRect();
+    if (chosen.left < frame.left) box.scrollLeft -= frame.left - chosen.left + 8;
+    else if (chosen.right > frame.right) box.scrollLeft += chosen.right - frame.right + 8;
+  }, [props.value]);
   return (
     <div
+      ref={list}
       role="tablist"
       aria-label={props.name}
-      className="inline-flex w-fit rounded-full bg-black/[0.05] p-0.5"
+      className={cn(
+        'max-w-full overflow-x-auto rounded-full bg-black/[0.05] p-0.5 [scrollbar-width:none]',
+        field ? 'grid h-10 w-full auto-cols-fr grid-flow-col' : 'inline-flex w-fit',
+      )}
     >
       {props.options.map((value) => {
         const selected = value === props.value;
@@ -141,7 +166,8 @@ export function SegmentedControl<T extends string>(props: {
             role="tab"
             aria-selected={selected}
             className={cn(
-              'h-7.5 rounded-full px-3.5 text-[0.8125rem] font-medium transition-[color,background-color,box-shadow] duration-200 ease-apple outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+              'shrink-0 rounded-full px-3.5 font-medium whitespace-nowrap transition-[color,background-color,box-shadow] duration-200 ease-apple outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+              field ? 'h-full text-sm' : 'h-7.5 text-[0.8125rem] touch:h-9.5',
               selected
                 ? 'bg-background text-foreground shadow-control'
                 : 'text-muted-foreground hover:text-foreground',
@@ -194,10 +220,13 @@ const ColumnLayoutContext = createContext(false);
  * A list's table with sized columns (ADR-0119): when its box is at least as wide as the spec's
  * minimum, `table-layout: fixed` with a `<colgroup>` from `lib/column-layout.ts` — codes, dates,
  * money, counts and status pills keep a fixed width, the text columns get their minimum and share
- * the rest by weight, a cell wider than its column is cut with «…». In a narrower box (a laptop
- * showing a wide register) the table keeps the browser's own layout and scrolls sideways in its
- * card, as before. The spec must have one entry per cell of a row — the checkbox, the spacer and
- * the chevron or the actions included. Widths are in rem; the box is measured in px.
+ * the rest by weight, a cell wider than its column is cut with «…». In a narrower box (a till PC,
+ * a tablet, a laptop showing a wide register) the columns marked `drop` leave first, the least
+ * needed before the rest (ADR-0201); if what is left still does not fit, the table keeps the
+ * browser's own layout and scrolls sideways in its card, as before. The spec must have one entry
+ * per cell of a row — the checkbox, the spacer and the chevron or the actions included: a column
+ * leaves by its place in the row, so nothing leaves a table that has a cell spanning columns.
+ * Widths are in rem; the box is measured in px.
  */
 export function ListTable(props: {
   columns: readonly ColumnSpec[];
@@ -206,28 +235,52 @@ export function ListTable(props: {
   ref?: Ref<HTMLTableElement>;
 }) {
   const box = useRef<HTMLDivElement>(null);
+  const id = useId();
   const available = useBoxWidth(box);
-  const layout = useMemo(
-    () => (available === null ? null : columnLayout(props.columns, available)),
-    [props.columns, available],
-  );
-  const sized = layout !== null && available !== null && available >= layout.minWidth;
+  // Looked for whenever the rows change: they are the page's, and they come and go.
+  const [spans, setSpans] = useState(false);
+  const { children } = props;
+  useLayoutEffect(() => {
+    setSpans(box.current?.querySelector(SPANNING_CELL) != null);
+  }, [children]);
+  const fit = useMemo(() => {
+    if (available === null) return null;
+    return fitColumns(spans ? props.columns.map(withoutDrop) : props.columns, available);
+  }, [props.columns, available, spans]);
+  const sized = fit !== null && fit.fits;
+  const dropped = fit?.dropped ?? [];
   return (
-    <div ref={box} data-slot="list-table" className="min-w-0">
+    <div ref={box} data-slot="list-table" data-list-table={id} className="min-w-0">
+      {dropped.length > 0 ? (
+        <style>
+          {`${dropped
+            .map(
+              (index) =>
+                `[data-list-table="${id}"] > [data-slot=table-container] > table > * > tr > :nth-child(${index + 1})`,
+            )
+            .join(',')}{display:none}`}
+        </style>
+      ) : null}
       <ColumnLayoutContext value={sized}>
         <Table
           ref={props.ref}
           data-layout={sized ? 'columns' : undefined}
           className={cn(
-            sized &&
-              'table-fixed [&_td]:overflow-hidden [&_td]:text-ellipsis [&_th]:overflow-hidden [&_th]:text-ellipsis',
+            sized
+              ? 'table-fixed [&_td]:overflow-hidden [&_td]:text-ellipsis [&_th]:overflow-hidden [&_th]:text-ellipsis'
+              : // In the browser's own layout a one-line text has no column to stop at: it would
+                // stretch the table as wide as its longest value (ADR-0201). `fill` opts out.
+                '[&_td_.truncate]:max-w-[24rem]',
             props.className,
           )}
         >
           {sized ? (
             <colgroup>
-              {props.columns.map((column, index) => (
-                <col key={column.key} style={{ width: `${layout.widths[index]}rem` }} />
+              {fit.kept.map((index, place) => (
+                <col
+                  key={props.columns[index]?.key}
+                  style={{ width: `${fit.layout.widths[place]}rem` }}
+                />
               ))}
             </colgroup>
           ) : null}
@@ -237,6 +290,12 @@ export function ListTable(props: {
     </div>
   );
 }
+
+/** A cell that spans columns: its row has fewer cells than the spec has columns. */
+const SPANNING_CELL = ':is(td, th)[colspan]:not([colspan="1"])';
+
+const withoutDrop = (column: ColumnSpec): ColumnSpec =>
+  column.drop === undefined ? column : { ...column, drop: undefined };
 
 /**
  * The width of a box in rem, kept current as the window or the page resizes; null until measured
@@ -250,6 +309,7 @@ function useBoxWidth(ref: RefObject<HTMLElement | null>): number | null {
     const measure = () => {
       const px = element.clientWidth;
       const next = px > 0 ? px / remPx() : null;
+      // (remPx reads the root font each time: it steps at 1600 and 1900px of window.)
       setWidth((previous) => (previous === next ? previous : next));
     };
     measure();
@@ -264,14 +324,14 @@ function useBoxWidth(ref: RefObject<HTMLElement | null>): number | null {
   return width;
 }
 
-/** The root font size in px (1rem), read once. */
-let rem: number | null = null;
+/**
+ * The root font size in px (1rem). Read at every measure, not once: the root steps at 1600 and
+ * 1900px of window (index.css), and a window moved to the monitor, or maximised, crosses a step
+ * while its lists stay mounted (ADR-0201).
+ */
 function remPx(): number {
-  if (rem === null) {
-    const size = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
-    rem = Number.isFinite(size) && size > 0 ? size : 16;
-  }
-  return rem;
+  const size = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+  return Number.isFinite(size) && size > 0 ? size : 16;
 }
 
 /** A scrolling card: its own table box stops scrolling and the header cells stick to its top. */
@@ -285,7 +345,9 @@ const BELOW_CARD_REM = 2.5;
  * Below this much room (a card low on the page, under a form or tiles) the card does not scroll
  * by itself: the page scrolls as usual, so there is never a scroll inside a scroll.
  */
-const MIN_FITTED = 288;
+// The head and five rows, in rem as the rows are: a till PC's 640px leave a list under a row of
+// tiles about 240px (ADR-0201); at 288px its card gave up and the head scrolled away.
+const MIN_FITTED_REM = 13;
 
 /**
  * The height a scrolling card may take: what the window leaves between its top and what follows it
@@ -310,7 +372,7 @@ function useFittedHeight(
       const room = Math.floor(
         window.innerHeight - (box.top + window.scrollY) - after - BELOW_CARD_REM * rem,
       );
-      const next = room >= MIN_FITTED ? room : null;
+      const next = room >= MIN_FITTED_REM * rem ? room : null;
       setHeight((previous) => (previous === next ? previous : next));
     };
     measure();
@@ -425,7 +487,14 @@ export function TruncateCell(props: {
   return (
     <TableCell className={cn(!sized && props.fill && 'w-full max-w-0', props.className)}>
       <span
-        className={cn('block truncate', !sized && !props.fill && 'max-w-[24rem]')}
+        // A finger has no hover to read the whole of a cut name: in a sized table it gets a second
+        // line (ADR-0201). Not in the browser's own layout, which would break every name in two
+        // to save width and still scroll.
+        className={cn(
+          'block truncate',
+          sized && 'touch:line-clamp-2 touch:whitespace-normal',
+          !sized && !props.fill && 'max-w-[24rem]',
+        )}
         title={props.text}
       >
         {props.children ?? props.text}
@@ -478,7 +547,8 @@ export function RowAction(props: {
       size="icon-sm"
       variant="ghost"
       className={cn(
-        'size-7 text-muted-foreground hover:text-foreground',
+        // A finger's reach goes up and down only: the next icon stands 2px away (ADR-0201).
+        'size-7 text-muted-foreground hover:text-foreground touch:after:w-full!',
         props.destructive && 'hover:bg-danger-soft hover:text-destructive',
       )}
       aria-label={props.label}

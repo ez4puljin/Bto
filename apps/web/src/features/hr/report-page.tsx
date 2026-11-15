@@ -62,31 +62,40 @@ const CELL_TONE: Record<ReportStatus, string> = {
   OPEN: 'bg-warning-soft text-warning',
 };
 
+// 71.5rem with every column: sized from a 1366 laptop (76rem), the name with room to spare. A till
+// PC (55.5rem) lets the 1s go — the lateness in words, the overtime, the request's name: 51rem;
+// narrower, the schedule's hours (44.5rem), then the two punches (35.5rem, a tablet upright's
+// 40.5rem): «Ирцийн бүртгэл» shows them, and Excel carries every column.
 const DAY_COLUMNS: readonly ColumnSpec[] = [
-  { key: 'date', kind: 'date', width: 8.25 },
+  { key: 'date', kind: 'date', width: 7.5 },
   { key: 'employee', kind: 'text', weight: 3, min: 12 },
-  { key: 'plan', kind: 'code', width: 7.5 },
-  { key: 'firstIn', kind: 'code', width: 5 },
-  { key: 'lastOut', kind: 'code', width: 5 },
-  { key: 'arrival', kind: 'text', weight: 1, min: 7 },
-  { key: 'worked', kind: 'code', width: 7.5 },
-  { key: 'overtime', kind: 'code', width: 6.5 },
+  { key: 'plan', kind: 'code', width: 6.5, drop: 2 },
+  { key: 'firstIn', kind: 'code', width: 4.5, drop: 3 },
+  { key: 'lastOut', kind: 'code', width: 4.5, drop: 3 },
+  { key: 'arrival', kind: 'text', weight: 1, min: 7, drop: 1 },
+  { key: 'worked', kind: 'code', width: 7 },
+  { key: 'overtime', kind: 'code', width: 6.5, drop: 1 },
   { key: 'status', kind: 'status', width: 9 },
-  { key: 'request', kind: 'text', weight: 1, min: 7 },
+  { key: 'request', kind: 'text', weight: 1, min: 7, drop: 1 },
 ];
 
+// 82rem with every column (the heads set the counts' widths: «Ажлын өдөр» needs 6.5rem). A 1366
+// laptop (75.5rem) lets the division go, which the bar filters by: 74rem; a till PC (55.5rem) the
+// planned hours, the late time and the overtime too: 52.5rem; narrower, the planned and the
+// attended days (41.5rem), then the leave days: 37rem, so a tablet upright (41rem at most) reads a
+// whole name.
 const EMPLOYEE_COLUMNS: readonly ColumnSpec[] = [
-  { key: 'employee', kind: 'text', weight: 3, min: 12 },
-  { key: 'division', kind: 'text', weight: 2, min: 8 },
-  { key: 'workdays', kind: 'count', width: 6 },
-  { key: 'present', kind: 'count', width: 5.5 },
-  { key: 'lateDays', kind: 'count', width: 6.5 },
-  { key: 'absent', kind: 'count', width: 6 },
-  { key: 'leave', kind: 'count', width: 5 },
-  { key: 'scheduled', kind: 'code', width: 8 },
-  { key: 'worked', kind: 'code', width: 8 },
-  { key: 'late', kind: 'code', width: 7 },
-  { key: 'overtime', kind: 'code', width: 7 },
+  { key: 'employee', kind: 'text', weight: 3, min: 12.5 },
+  { key: 'division', kind: 'text', weight: 2, min: 8, drop: 1 },
+  { key: 'workdays', kind: 'count', width: 6.5, drop: 3 },
+  { key: 'present', kind: 'count', width: 4.5, drop: 3 },
+  { key: 'lateDays', kind: 'count', width: 5.5 },
+  { key: 'absent', kind: 'count', width: 5.5 },
+  { key: 'leave', kind: 'count', width: 4.5, drop: 4 },
+  { key: 'scheduled', kind: 'code', width: 7.5, drop: 2 },
+  { key: 'worked', kind: 'code', width: 7.5 },
+  { key: 'late', kind: 'code', width: 7, drop: 2 },
+  { key: 'overtime', kind: 'code', width: 7, drop: 2 },
   { key: 'rate', kind: 'percent' },
 ];
 
@@ -159,12 +168,29 @@ function weekdayKey(date: string): (typeof WEEKDAYS)[number] {
   return WEEKDAYS[day === 0 ? 6 : day - 1] ?? 'd0';
 }
 
+/**
+ * A total of the period. The hint stands on the label's line, so every tile has one height; and the
+ * tile goes by its own width (ADR-0201): six in a row on a till PC are under 9rem each, where the
+ * figure takes the body's size and the padding tightens — «10164 ц 30 мин» still fits and the list
+ * under the tiles keeps its rows.
+ */
 function Tile(props: { label: string; value: string; hint?: string; tone?: string }) {
   return (
-    <div className="rounded-xl border bg-card px-4 py-3 shadow-control">
-      <p className="text-xs text-muted-foreground">{props.label}</p>
-      <p className={cn('mt-1 font-mono text-lg font-semibold', props.tone)}>{props.value}</p>
-      {props.hint ? <p className="text-xs text-muted-foreground">{props.hint}</p> : null}
+    <div className="@container rounded-xl border bg-card shadow-control">
+      <div className="px-2.5 py-2 @min-[11.5rem]:px-4 @min-[11.5rem]:py-3">
+        <p className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
+          <span className="truncate">{props.label}</span>
+          {props.hint ? <span className="shrink-0">{props.hint}</span> : null}
+        </p>
+        <p
+          className={cn(
+            'truncate font-mono text-sm font-semibold @min-[11.5rem]:mt-1 @min-[11.5rem]:text-lg',
+            props.tone,
+          )}
+        >
+          {props.value}
+        </p>
+      </div>
     </div>
   );
 }
@@ -309,7 +335,8 @@ export function HrReportPage() {
       ) : null}
       <ProblemAlert problem={problemFromError(report.error)} onRetry={report.refetch} />
       {totals ? (
-        <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        // One row from a till PC: two rows of tiles left its 640px three rows of the list.
+        <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6 xl:gap-3">
           <Tile label={t('hr.report.tiles.scheduled')} value={timeText(totals.scheduledMinutes)} />
           <Tile
             label={t('hr.report.tiles.worked')}
@@ -496,95 +523,98 @@ export function HrReportPage() {
           </ListTable>
         ) : null}
         {tab === 'grid' && employees.length > 0 ? (
-          <div>
-            <table className="w-full border-separate border-spacing-0 text-[0.75rem]">
-              <thead className="sticky top-0 z-10 bg-card">
-                <tr>
-                  <th className="sticky left-0 z-10 min-w-44 border-b bg-card px-3 py-2 text-left font-semibold">
-                    {t('hr.report.columns.employee')}
+          <table className="w-full border-separate border-spacing-0 text-[0.75rem]">
+            <thead className="sticky top-0 z-10 bg-card">
+              <tr>
+                <th className="sticky left-0 z-10 min-w-44 border-b bg-card px-3 py-2 text-left font-semibold">
+                  {t('hr.report.columns.employee')}
+                </th>
+                {dates.map((date) => {
+                  const weekday = weekdayKey(date);
+                  return (
+                    <th
+                      key={date}
+                      className={cn(
+                        // The letter's square and no more: a month of 31 days fits a 1366 laptop.
+                        'min-w-7 border-b px-0.5 py-1 text-center font-medium',
+                        (weekday === 'd5' || weekday === 'd6') && 'text-muted-foreground',
+                      )}
+                    >
+                      <span className="block text-[0.625rem]">{t(`hr.weekdays.${weekday}`)}</span>
+                      <span className="font-mono">{date.slice(8)}</span>
+                    </th>
+                  );
+                })}
+                <th className="border-b px-2 py-1 text-right font-semibold">
+                  {t('hr.report.columns.worked')}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {employees.map((entry) => (
+                <tr key={entry.userId}>
+                  <th
+                    scope="row"
+                    className="sticky left-0 z-[1] border-b bg-card px-3 py-1.5 text-left font-normal"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Avatar
+                        name={entry.fullName}
+                        src={entry.photoUrl}
+                        className="size-6 text-[0.625rem]"
+                      />
+                      <span className="truncate font-medium">{entry.fullName}</span>
+                    </span>
                   </th>
                   {dates.map((date) => {
-                    const weekday = weekdayKey(date);
+                    const cell = cells.get(`${entry.userId}:${date}`);
                     return (
-                      <th
-                        key={date}
-                        className={cn(
-                          'min-w-8 border-b px-0.5 py-1 text-center font-medium',
-                          (weekday === 'd5' || weekday === 'd6') && 'text-muted-foreground',
-                        )}
-                      >
-                        <span className="block text-[0.625rem]">{t(`hr.weekdays.${weekday}`)}</span>
-                        <span className="font-mono">{date.slice(8)}</span>
-                      </th>
+                      <td key={date} className="border-b px-0.5 py-1 text-center">
+                        {cell ? (
+                          <span
+                            className={cn(
+                              'mx-auto grid size-6 place-items-center rounded-md font-semibold',
+                              CELL_TONE[cell.status],
+                            )}
+                            title={`${date} · ${t(`hr.reportStatuses.${cell.status}`)}${
+                              cell.requestName ? ` · ${cell.requestName}` : ''
+                            }${cell.workedMinutes > 0 ? ` · ${worded(cell.workedMinutes)}` : ''}`}
+                          >
+                            {t(`hr.report.letters.${cell.status}`)}
+                          </span>
+                        ) : null}
+                      </td>
                     );
                   })}
-                  <th className="border-b px-2 py-1 text-right font-semibold">
-                    {t('hr.report.columns.worked')}
-                  </th>
+                  <td className="border-b px-2 py-1 text-right font-mono whitespace-nowrap">
+                    {timeText(entry.worked)}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {employees.map((entry) => (
-                  <tr key={entry.userId}>
-                    <th
-                      scope="row"
-                      className="sticky left-0 z-[1] border-b bg-card px-3 py-1.5 text-left font-normal"
-                    >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <Avatar
-                          name={entry.fullName}
-                          src={entry.photoUrl}
-                          className="size-6 text-[0.625rem]"
-                        />
-                        <span className="truncate font-medium">{entry.fullName}</span>
-                      </span>
-                    </th>
-                    {dates.map((date) => {
-                      const cell = cells.get(`${entry.userId}:${date}`);
-                      return (
-                        <td key={date} className="border-b px-0.5 py-1 text-center">
-                          {cell ? (
-                            <span
-                              className={cn(
-                                'mx-auto grid size-6 place-items-center rounded-md font-semibold',
-                                CELL_TONE[cell.status],
-                              )}
-                              title={`${date} · ${t(`hr.reportStatuses.${cell.status}`)}${
-                                cell.requestName ? ` · ${cell.requestName}` : ''
-                              }${cell.workedMinutes > 0 ? ` · ${worded(cell.workedMinutes)}` : ''}`}
-                            >
-                              {t(`hr.report.letters.${cell.status}`)}
-                            </span>
-                          ) : null}
-                        </td>
-                      );
-                    })}
-                    <td className="border-b px-2 py-1 text-right font-mono whitespace-nowrap">
-                      {timeText(entry.worked)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="flex flex-wrap items-center gap-3 border-t px-3 py-2 text-[0.75rem] text-muted-foreground">
-              <span>{t('hr.report.legend')}:</span>
-              {REPORT_STATUSES.map((status) => (
-                <span key={status} className="inline-flex items-center gap-1.5">
-                  <span
-                    className={cn(
-                      'grid size-5 place-items-center rounded font-semibold',
-                      CELL_TONE[status],
-                    )}
-                  >
-                    {t(`hr.report.letters.${status}`)}
-                  </span>
-                  {t(`hr.reportStatuses.${status}`)}
-                </span>
               ))}
-            </div>
-          </div>
+            </tbody>
+          </table>
         ) : null}
       </ListCard>
+      {tab === 'grid' && employees.length > 0 ? (
+        // Under the card, not after its last row: the letters' key stays in view while the rows
+        // scroll (a finger has no tooltip to ask), and the card fits the window above it.
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[0.75rem] text-muted-foreground">
+          <span>{t('hr.report.legend')}:</span>
+          {REPORT_STATUSES.map((status) => (
+            <span key={status} className="inline-flex items-center gap-1.5">
+              <span
+                className={cn(
+                  'grid size-5 place-items-center rounded font-semibold',
+                  CELL_TONE[status],
+                )}
+              >
+                {t(`hr.report.letters.${status}`)}
+              </span>
+              {t(`hr.reportStatuses.${status}`)}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

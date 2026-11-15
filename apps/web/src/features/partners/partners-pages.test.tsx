@@ -223,8 +223,12 @@ describe('customers list', () => {
     // The filters' labels read the same as the badges: look in the table only.
     expect(table.getByText(mn.partners.addresses.noGps)).toBeInTheDocument();
 
+    // The yes/no filters stand behind «Шүүлтүүр».
+    await user.click(screen.getByRole('button', { name: mn.catalog.products.filters.menu }));
     await user.click(
-      screen.getByRole('checkbox', { name: mn.partners.customers.filters.tinPending }),
+      await screen.findByRole('menuitemcheckbox', {
+        name: mn.partners.customers.filters.tinPending,
+      }),
     );
     await waitFor(() => expect(router.state.location.search).toBe('?tinPending=1'));
     expect(await screen.findByRole('link', { name: 'ТТД-гүй ХХК' })).toBeInTheDocument();

@@ -30,8 +30,8 @@ export type SupplierColumnKey = (typeof SUPPLIER_COLUMN_KEYS)[number];
 export const LOCKED_SUPPLIER_COLUMNS: readonly SupplierColumnKey[] = ['code', 'name'];
 
 /**
- * What a user who never chose sees hidden (ADR-0066): code, name, category, phone, the contact, the
- * product count and status fit a 1366px screen beside the filters; every column stays in «Баганууд».
+ * What a user who never chose sees hidden (ADR-0066): the code, the name, the category, the phone,
+ * the contact, the product count and the status show; every column stays in «Баганууд».
  */
 export const DEFAULT_HIDDEN_SUPPLIER_COLUMNS: readonly SupplierColumnKey[] = [
   'tin',
@@ -52,6 +52,26 @@ export const WIDE_DEFAULT_HIDDEN_SUPPLIER_COLUMNS: readonly SupplierColumnKey[] 
   'regNo',
   'bankAccount',
   'note',
+];
+
+/**
+ * The columns that leave a default set too wide for its table (ADR-0201), the least needed first
+ * and one at a time; the supplier's own page shows each. The default set needs 62.75rem: beside
+ * the filters a 1366px window has 59.35 and lets the contact go (52.75), which a till PC's 56.2
+ * holds too; a tablet upright has 41.2 and keeps the code, the name, the product count and the
+ * status (36.75). The wide set's five columns (98.75) go first: beside the filters a 1600px window
+ * (67.9) shows the default set and a 1920px one (80) the TIN and the email with it (77.75).
+ * `partners-logic.test.ts` checks the sums against the screens.
+ */
+export const SUPPLIER_COLUMNS_LEAVING: readonly SupplierColumnKey[] = [
+  'paymentTerm',
+  'bankName',
+  'address',
+  'email',
+  'tin',
+  'contact',
+  'phone',
+  'category',
 ];
 
 /** A column of the supplier list, sized by the layout (ADR-0119). */
@@ -124,7 +144,14 @@ export const SUPPLIER_COLUMNS: readonly SupplierColumn[] = [
         ? none(t)
         : t('partners.credit.termCustomer', { days: row.paymentTermDays }),
   },
-  { key: 'contact', kind: 'text', weight: 2, cell: (row, t) => contactCell(row.contact, t) },
+  {
+    key: 'contact',
+    kind: 'text',
+    weight: 2,
+    // The phone whole and some letters of the name.
+    min: 10,
+    cell: (row, t) => contactCell(row.contact, t),
+  },
   {
     key: 'productCount',
     kind: 'count',

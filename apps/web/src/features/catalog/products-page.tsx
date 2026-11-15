@@ -17,6 +17,7 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { SelectionBar } from '@/components/selection-bar';
 import { Button } from '@/components/ui/button';
 import { useWarehouseName } from '@/features/inventory/helpers';
+import { isDefaultSet } from '@/features/partners/list-columns';
 import { SegmentActions } from '@/features/segments/segment-actions';
 import { saveBlob } from '@/lib/download';
 import { formatCount } from '@/lib/money';
@@ -39,6 +40,7 @@ import {
   DEFAULT_HIDDEN_PRODUCT_COLUMNS,
   LOCKED_PRODUCT_COLUMNS,
   PRODUCT_COLUMNS,
+  PRODUCT_COLUMNS_LEAVING,
   WIDE_DEFAULT_HIDDEN_PRODUCT_COLUMNS,
 } from './product-columns';
 import { ProductFilterMenu } from './product-filter-menu';
@@ -137,6 +139,13 @@ export function ProductsPage() {
     WIDE_DEFAULT_HIDDEN_PRODUCT_COLUMNS,
   );
   const { hidden } = columnState;
+  // A default set lets its least needed columns go in a narrow table (ADR-0201); what the user
+  // chose in «Баганууд» stays as chosen.
+  const untouched = isDefaultSet(
+    hidden,
+    DEFAULT_HIDDEN_PRODUCT_COLUMNS,
+    WIDE_DEFAULT_HIDDEN_PRODUCT_COLUMNS,
+  );
   // In the categories' order each category heads its rows: a column would only repeat it.
   const grouped = !q;
   const columns = useMemo(
@@ -306,9 +315,9 @@ export function ProductsPage() {
                 setParam('q', event.target.value.trim());
               }}
             />
-            {/* The left side holds these from `lg`; a narrow window keeps them here. */}
+            {/* The left side holds these from `xl`; a narrower window keeps them here. */}
             <NativeSelect
-              className="lg:hidden"
+              className="xl:hidden"
               variant="filter"
               aria-label={t('catalog.product.category')}
               value={categoryId === undefined ? '' : String(categoryId)}
@@ -322,7 +331,7 @@ export function ProductsPage() {
               ))}
             </NativeSelect>
             <NativeSelect
-              className="lg:hidden"
+              className="xl:hidden"
               variant="filter"
               aria-label={t('catalog.product.status')}
               value={stage ?? ''}
@@ -361,6 +370,7 @@ export function ProductsPage() {
               context={context}
               {...(q ? {} : { categoryOf: (id: number) => categoryById.get(id) })}
               {...(canSelect ? { selection } : {})}
+              {...(untouched ? { leaving: PRODUCT_COLUMNS_LEAVING } : {})}
             />
             {empty ? (
               <EmptyState

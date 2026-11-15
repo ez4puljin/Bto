@@ -168,6 +168,35 @@ describe('modules (ADR-0114)', () => {
     );
   });
 
+  it('folds the modules the bar has no room for into «Бусад» (ADR-0201)', async () => {
+    // jsdom lays nothing out: every module is 100px wide and the bar has room for three and «Бусад».
+    const width = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(100);
+    const room = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(420);
+    try {
+      const user = userEvent.setup();
+      const { router } = renderApp('/', signedIn(ADMIN_ME));
+      const bar = within(await screen.findByRole('navigation', { name: mn.shell.modules }));
+      const more = await bar.findByRole('button', { name: mn.shell.moreModules });
+      // The ones that fit stay menus of their pages; the rest are out of the keyboard's way.
+      expect(bar.getByText(mn.nav.modules.catalog).closest('button')).not.toHaveAttribute('inert');
+      expect(bar.getByText(mn.nav.modules.partners).closest('button')).toHaveAttribute('inert');
+      await user.click(more);
+      const menu = within(await screen.findByRole('menu'));
+      expect(menu.queryByRole('menuitem', { name: mn.nav.modules.catalog })).toBeNull();
+      expect(menu.getByRole('menuitem', { name: mn.nav.modules.finance })).toHaveAttribute(
+        'href',
+        '/m/finance',
+      );
+      await user.click(menu.getByRole('menuitem', { name: mn.nav.modules.partners }));
+      await waitFor(() => expect(router.state.location.pathname).toBe('/m/partners'));
+      // The open page's module is folded away: «Бусад» is lit in its place.
+      expect(bar.getByRole('button', { name: mn.shell.moreModules })).toHaveClass('bg-secondary');
+    } finally {
+      width.mockRestore();
+      room.mockRestore();
+    }
+  });
+
   it('opens a module from the top bar and lists its pages on its own page', async () => {
     const user = userEvent.setup();
     const { router } = renderApp('/', signedIn(ADMIN_ME));

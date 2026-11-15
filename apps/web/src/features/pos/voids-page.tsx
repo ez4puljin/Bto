@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import {
   ChevronHead,
-  DateFilter,
   EmptyState,
   FilterBar,
   LinkRow,
@@ -28,6 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { DateRangeFilter } from '@/features/finance/date-range-filter';
 import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatCount, formatQty, formatTugrik } from '@/lib/money';
@@ -39,14 +39,19 @@ import { VoidReasonBadge } from './badges';
 const isReason = (value: string | null): value is VoidReason =>
   VOID_REASONS.some((entry) => entry === value);
 
-/** The voids list's columns (ADR-0119). */
+/**
+ * The voids list's columns (ADR-0119): 64.25rem in all. The panel names who approved, the cashier
+ * and the lines, so a till PC's 56rem lets the approver go (54.25) and a tablet's 41rem the
+ * cashier and the count of lines too (39.75): when, where, why and how much stay (ADR-0201).
+ */
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'voidedAt', kind: 'datetime' },
+  // The row's link: a first cell's wider padding and the heavier figures need 12.
+  { key: 'voidedAt', kind: 'datetime', width: 12 },
   { key: 'till', kind: 'code' },
-  { key: 'cashier', kind: 'text', weight: 2, min: 10 },
+  { key: 'cashier', kind: 'text', weight: 2, min: 10, drop: 2 },
   { key: 'reason', kind: 'status', width: 10 },
-  { key: 'approvedBy', kind: 'text', weight: 2, min: 10 },
-  { key: 'lineCount', kind: 'count' },
+  { key: 'approvedBy', kind: 'text', weight: 2, min: 10, drop: 1 },
+  { key: 'lineCount', kind: 'count', drop: 2 },
   { key: 'total', kind: 'money' },
   { key: 'spacer', kind: 'spacer' },
   { key: 'chevron', kind: 'chevron' },
@@ -129,19 +134,15 @@ export function PosVoidsPage() {
             </option>
           ))}
         </NativeSelect>
-        {/* The two days wrap as a pair: on a laptop they share the second row. */}
-        <div className="flex flex-wrap items-center gap-2">
-          <DateFilter
-            label={t('pos.fields.from')}
-            value={from}
-            onChange={(value) => setParam('from', value)}
-          />
-          <DateFilter
-            label={t('pos.fields.to')}
-            value={to}
-            onChange={(value) => setParam('to', value)}
-          />
-        </div>
+        <DateRangeFilter
+          label={t('pos.fields.paidOn')}
+          fromLabel={t('pos.fields.from')}
+          toLabel={t('pos.fields.to')}
+          from={from}
+          to={to}
+          onFrom={(value) => setParam('from', value)}
+          onTo={(value) => setParam('to', value)}
+        />
       </FilterBar>
       <ProblemAlert problem={problemFromError(voids.error)} onRetry={voids.refetch} />
       <ListCard scroll>

@@ -103,7 +103,7 @@ export function CameraScanner(props: {
     <Dialog open={props.open} onOpenChange={(open) => (open ? undefined : props.onClose())}>
       <DialogContent
         closeLabel={t('common.close')}
-        className="sm:max-w-lg"
+        size="md"
         onCloseAutoFocus={(event) => {
           // A quick answer to the read has already put the cursor where the work goes on: it stays.
           if (read.current && document.activeElement !== document.body) event.preventDefault();

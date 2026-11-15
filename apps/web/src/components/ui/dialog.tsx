@@ -49,13 +49,18 @@ function DialogOverlay({
   )
 }
 
-/** Dialog widths (ADR-0066): a question or ≤3 fields, a one-column form, two columns or a small table, a line editor. */
+/**
+ * Dialog widths (ADR-0066): a question or ≤3 fields, a one-column form, two columns or a small
+ * table, a line editor, a wide table to read. Each is its width or the window less a margin,
+ * whichever is smaller (ADR-0201): the root font grows the rem widths, so a width alone met the
+ * window's sides on a tablet (`xl` is 952px at a 17px root, a tablet 768px wide).
+ */
 const DIALOG_SIZES = {
-  sm: "sm:max-w-md",
-  md: "sm:max-w-lg",
-  lg: "sm:max-w-2xl",
-  xl: "sm:max-w-4xl",
-  "2xl": "sm:max-w-[min(80rem,calc(100%-2rem))]",
+  sm: "max-w-[min(28rem,calc(100%-2rem))]",
+  md: "max-w-[min(32rem,calc(100%-2rem))]",
+  lg: "max-w-[min(42rem,calc(100%-2rem))]",
+  xl: "max-w-[min(56rem,calc(100%-2rem))]",
+  "2xl": "max-w-[min(80rem,calc(100%-2rem))]",
 } as const
 
 /**
@@ -189,7 +194,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100svh-2rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] rounded-2xl bg-popover p-5 text-sm text-popover-foreground shadow-dialog ring-1 ring-black/[0.06] duration-200 ease-apple outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:duration-150 data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100svh-2rem)] w-full grid-cols-1 -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] rounded-2xl bg-popover p-5 text-sm text-popover-foreground shadow-dialog ring-1 ring-black/[0.06] duration-200 ease-apple outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:duration-150 data-closed:fade-out-0 data-closed:zoom-out-95",
           DIALOG_SIZES[size],
           className
         )}

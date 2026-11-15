@@ -17,6 +17,7 @@ import {
   SkeletonRows,
   SpacerCell,
   SpacerHead,
+  TruncateCell,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
@@ -33,7 +34,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { ColumnSpec } from '@/lib/column-layout';
-import { formatUbDateTime } from '@/lib/dayjs';
+import { formatUbMinute } from '@/lib/dayjs';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
@@ -44,12 +45,19 @@ import {
   useReceiptTemplates,
 } from './receipt-templates-api';
 
+/**
+ * The templates' columns (ADR-0119): 53.75rem in all, the publishing to the minute, so a till
+ * PC's 56rem shows every one with the actions and the chevron in the card. A tablet's 41rem
+ * lets the publishing time go (43.75), then the POS that print with it (36.75): the template's
+ * own page lists its versions and «Пос» says which POS chose it (ADR-0201).
+ */
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'name', kind: 'text', weight: 3, min: 14 },
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
   { key: 'kind', kind: 'status' },
-  { key: 'state', kind: 'text', weight: 1, min: 10 },
-  { key: 'tills', kind: 'text', weight: 2, min: 10 },
-  { key: 'publishedAt', kind: 'datetime' },
+  { key: 'state', kind: 'text', weight: 1, min: 9 },
+  { key: 'tills', kind: 'text', weight: 2, min: 7, drop: 2 },
+  // «2026-11-15 14:05» is 141px: 10rem with its padding.
+  { key: 'publishedAt', kind: 'datetime', width: 10, drop: 1 },
   { key: 'spacer', kind: 'spacer' },
   { key: 'actions', kind: 'actions', actions: 2 },
   { key: 'chevron', kind: 'chevron' },
@@ -108,6 +116,12 @@ export function ReceiptTemplatesPage() {
             {templates.isPending ? <SkeletonRows columns={8} /> : null}
             {(templates.data ?? []).map((template) => {
               const href = `/pos/receipt-templates/${template.id}`;
+              const usedBy =
+                template.tills.length > 0
+                  ? template.tills.map((till) => till.name).join(', ')
+                  : template.isDefault
+                    ? t('pos.receiptTemplates.allOther')
+                    : t('common.none');
               return (
                 <LinkRow key={template.id} to={href}>
                   <TableCell>
@@ -133,15 +147,9 @@ export function ReceiptTemplatesPage() {
                       ) : null}
                     </span>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {template.tills.length > 0
-                      ? template.tills.map((till) => till.name).join(', ')
-                      : template.isDefault
-                        ? t('pos.receiptTemplates.allOther')
-                        : t('common.none')}
-                  </TableCell>
+                  <TruncateCell text={usedBy} className="text-muted-foreground" />
                   <TableCell className="font-mono">
-                    {formatUbDateTime(Date.parse(template.publishedAt))}
+                    {formatUbMinute(template.publishedAt)}
                   </TableCell>
                   <SpacerCell />
                   <RowActions>

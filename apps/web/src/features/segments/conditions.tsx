@@ -340,7 +340,9 @@ function ConditionEditor(props: {
           ))}
         </NativeSelect>
       ) : null}
-      <div className="min-w-0 flex-1">
+      {/* The value asks 18rem of its own (two dates side by side): beside two selects on a tablet
+          upright less is left, and the row's wrap gives it a line to itself (ADR-0201). */}
+      <div className="min-w-0 sm:flex-[1_1_18rem]">
         <ValueEditor entity={entity} label={label} condition={condition} onChange={onChange} />
       </div>
       {props.onRemove ? (

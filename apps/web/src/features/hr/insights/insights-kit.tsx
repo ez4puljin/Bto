@@ -247,7 +247,11 @@ export function StatTile(props: {
             </span>
           </p>
         )}
-        <h2 className="truncate text-[0.8125rem] font-medium text-muted-foreground">
+        {/* Two lines before «…»: a narrow tile's «Эрт тарсан (дунджаар)» is read nowhere else. */}
+        <h2
+          className="line-clamp-2 text-[0.8125rem] leading-snug font-medium text-muted-foreground"
+          title={props.title}
+        >
           {props.title}
         </h2>
         {props.line ? <div className="flex min-w-0">{props.line}</div> : null}

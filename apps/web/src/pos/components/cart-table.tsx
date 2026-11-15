@@ -30,6 +30,11 @@ interface CartTableProps {
  * The basket, one line per product so that as many as possible show (owner 2026-11-05): number,
  * code, name, quantity, unit price and line total. The − / + / remove buttons work the selected line from
  * the bar under the list; a line on the bulk price shows it against the supermarket price.
+ *
+ * Below `xl` (a 1024px till, ADR-0201) the code gives its place to the name, which a line is read
+ * for: of the cart's 656px the fixed columns take 32 + 80 + 136 + 112 and leave the name 296px
+ * (216px beside the code: 19 letters, where a product's name has 25 at the median). The selected
+ * line's bar still reads «name · code».
  */
 export function CartTable(props: CartTableProps) {
   const { t } = useTranslation();
@@ -48,16 +53,20 @@ export function CartTable(props: CartTableProps) {
         <table className="w-full table-fixed text-sm" aria-label={t('posKiosk.sale.cart')}>
           <thead className="sticky top-0 z-10 bg-card">
             <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
-              <th scope="col" className="h-8 w-10 pl-3 font-medium">
+              <th scope="col" className="h-8 w-8 pl-3 font-medium xl:w-10">
                 {t('posKiosk.sale.columns.no')}
               </th>
-              <th scope="col" className="h-8 w-[4.5rem] px-2 font-medium">
+              <th scope="col" className="hidden h-8 w-[4.5rem] px-2 font-medium xl:table-cell">
                 {t('posKiosk.sale.columns.code')}
               </th>
               <th scope="col" className="h-8 px-2 font-medium">
                 {t('posKiosk.sale.columns.name')}
               </th>
-              <th scope="col" className="h-8 w-20 px-2 text-center font-medium xl:w-[14%]">
+              {/* One line in the 80px column: the head needs 68px, so it keeps 4px a side. */}
+              <th
+                scope="col"
+                className="h-8 w-20 px-1 text-center font-medium whitespace-nowrap xl:w-[14%]"
+              >
                 {t('posKiosk.sale.columns.qty')}
               </th>
               <th scope="col" className="h-8 w-34 px-2 text-right font-medium xl:w-[20%]">
@@ -208,7 +217,10 @@ function CartRow(
       )}
     >
       <td className="h-9 pl-3 font-mono text-xs text-muted-foreground">{props.index + 1}</td>
-      <td className="truncate px-2 font-mono text-xs text-muted-foreground" title={line.sku}>
+      <td
+        className="hidden truncate px-2 font-mono text-xs text-muted-foreground xl:table-cell"
+        title={line.sku}
+      >
         {line.sku}
       </td>
       <td className="px-2">
@@ -261,7 +273,7 @@ function CartRow(
           <span aria-hidden>{'…'}</span>
         ) : bulk ? (
           <>
-            <span className="block text-[0.6875rem] leading-3.5 text-muted-foreground">
+            <span className="block text-xs leading-3.5 text-muted-foreground">
               <span className="font-sans">{t('posKiosk.sale.priceRetail')}</span>{' '}
               <s>{formatTugrik(bulk.retailPrice)}</s>
             </span>
@@ -290,7 +302,11 @@ function CartRow(
           <>
             {formatTugrik(quoted.total)}
             {discount ? (
-              <span className="block text-[0.6875rem] leading-3.5 font-medium text-success">
+              // Kept to the cell's right edge with the amount always whole: a line wider than the
+              // column and 12px of the gap beside it loses the start of its word. It used to run
+              // past the cart's edge, cut, and made the list scroll sideways. 12px only from
+              // `xl`, where the column holds the word and the amount.
+              <span className="-ml-3 flex justify-end overflow-hidden text-[0.6875rem] leading-3.5 font-medium text-success xl:text-xs">
                 {t('posKiosk.sale.lineDiscount', { amount: formatMnt(discount) })}
               </span>
             ) : null}

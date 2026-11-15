@@ -4,6 +4,7 @@ import { useDeferredValue, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import {
+  ChevronHead,
   EmptyState,
   FilterBar,
   FilterToggle,
@@ -28,20 +29,28 @@ import { useCustomerBalances } from './api';
 /**
  * Who owes what (ADR-0060 #4): every customer with a ledger, largest balance first, with the open
  * invoices, the overdue amount and the aging; a row opens the customer's ledger. The aging buckets
- * are plain figures under one «Насжилт (₮)» header, so the table fits a laptop (ADR-0066).
+ * are plain figures under heads of two lines («1–30 хоног»), one row of heads with a cell per
+ * column: a head across the buckets would keep every column in a narrow table (ADR-0201).
  */
-/** A header of two lines beside the aging group (rows of numbers below it stay narrow). */
+/** A head of two lines over a narrow column of figures. */
 const WRAPPING_HEAD = 'text-right whitespace-normal';
 
-/** One entry per leaf column (ADR-0119): the customer, three figures, the aging, group, limit. */
+/**
+ * One entry per column (ADR-0119): the customer, three figures, the aging, group, limit. A table
+ * too narrow for all twelve (ADR-0201) lets the group and the limit go first, then the count of
+ * invoices, then the aging — the customer's ledger shows them all; the customer, the balance and
+ * the overdue amount stay. In rem: 94.25 whole (a monitor's 97), 78.25 on a 1536 laptop (86),
+ * 72.25 on a 1366 one (76), 32.25 on a till PC (56) and a tablet (41). The count's column is as
+ * wide as its head's longer word.
+ */
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'customer', kind: 'text', weight: 3, min: 14 },
-  { key: 'balance', kind: 'money', width: 10 },
-  { key: 'openInvoices', kind: 'count' },
-  { key: 'overdue', kind: 'money', width: 10 },
-  ...AGING_BUCKETS.map((bucket): ColumnSpec => ({ key: bucket, kind: 'money' })),
-  { key: 'settlementGroup', kind: 'text', weight: 1 },
-  { key: 'creditLimit', kind: 'money', width: 10 },
+  { key: 'customer', kind: 'text', weight: 3, min: 12 },
+  { key: 'balance', kind: 'money', width: 9 },
+  { key: 'openInvoices', kind: 'count', width: 6, drop: 2 },
+  { key: 'overdue', kind: 'money', width: 9 },
+  ...AGING_BUCKETS.map((bucket): ColumnSpec => ({ key: bucket, kind: 'money', width: 8, drop: 3 })),
+  { key: 'settlementGroup', kind: 'text', weight: 1, drop: 1 },
+  { key: 'creditLimit', kind: 'money', width: 9, drop: 1 },
   { key: 'chevron', kind: 'chevron' },
 ];
 
@@ -79,35 +88,18 @@ export function CustomerBalancesPage() {
         <ListTable columns={COLUMNS}>
           <TableHeader>
             <TableRow>
-              <TableHead rowSpan={2}>{t('finance.fields.customer')}</TableHead>
-              <TableHead rowSpan={2} className={WRAPPING_HEAD}>
-                {t('finance.fields.balance')}
-              </TableHead>
-              <TableHead rowSpan={2} className={WRAPPING_HEAD}>
-                {t('finance.balances.openInvoices')}
-              </TableHead>
-              <TableHead rowSpan={2} className={WRAPPING_HEAD}>
-                {t('finance.fields.overdue')}
-              </TableHead>
-              <TableHead colSpan={AGING_BUCKETS.length} className="h-7 text-center">
-                {t('finance.balances.agingGroup')}
-              </TableHead>
-              <TableHead rowSpan={2} className={WRAPPING_HEAD}>
-                {t('partners.settlement.group')}
-              </TableHead>
-              <TableHead rowSpan={2} className={WRAPPING_HEAD}>
-                {t('finance.balances.creditLimit')}
-              </TableHead>
-              {/* ChevronHead takes no rowSpan: the chevron's head spans both rows by hand. */}
-              <TableHead aria-hidden rowSpan={2} className="pl-0" />
-            </TableRow>
-            <TableRow>
+              <TableHead>{t('finance.fields.customer')}</TableHead>
+              <TableHead className={WRAPPING_HEAD}>{t('finance.fields.balance')}</TableHead>
+              <TableHead className={WRAPPING_HEAD}>{t('finance.balances.openInvoices')}</TableHead>
+              <TableHead className={WRAPPING_HEAD}>{t('finance.fields.overdue')}</TableHead>
               {AGING_BUCKETS.map((bucket) => (
-                // The second header row sticks under the first one in a scrolling card.
-                <TableHead key={bucket} className="h-7 text-right top-7!">
-                  {t(`finance.agingShort.${bucket}`)}
+                <TableHead key={bucket} className={WRAPPING_HEAD}>
+                  {t(`finance.aging.${bucket}`)}
                 </TableHead>
               ))}
+              <TableHead className={WRAPPING_HEAD}>{t('partners.settlement.group')}</TableHead>
+              <TableHead className={WRAPPING_HEAD}>{t('finance.balances.creditLimit')}</TableHead>
+              <ChevronHead />
             </TableRow>
           </TableHeader>
           <TableBody>

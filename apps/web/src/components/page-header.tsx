@@ -140,7 +140,10 @@ export function PageHeader({
     );
   }
 
-  // The actions sit on the title's line (ADR-0066), whatever lines follow the title.
+  // The actions sit on the title's line (ADR-0066), whatever lines follow the title. The
+  // description stands under that row at the page's width, so a long line of text never pushes
+  // the buttons onto a row of their own (ADR-0201); they move under the title only when it would
+  // be left less than 18rem.
   return (
     <div className="mb-4">
       {shown.length > 0 ? (
@@ -157,7 +160,7 @@ export function PageHeader({
         )
       ) : null}
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="flex min-w-0 items-center gap-4">
+        <div className="flex min-w-0 flex-[1_1_18rem] items-center gap-4">
           {media ? <div className="shrink-0">{media}</div> : null}
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
@@ -172,15 +175,15 @@ export function PageHeader({
                 {meta}
               </div>
             ) : null}
-            {description ? (
-              <p className="mt-1 max-w-3xl text-[0.8125rem] text-muted-foreground">{description}</p>
-            ) : null}
           </div>
         </div>
         {actions ? (
           <div className="flex flex-wrap items-center gap-2 print:hidden">{actions}</div>
         ) : null}
       </div>
+      {description ? (
+        <p className="mt-1 max-w-3xl text-[0.8125rem] text-muted-foreground">{description}</p>
+      ) : null}
     </div>
   );
 }

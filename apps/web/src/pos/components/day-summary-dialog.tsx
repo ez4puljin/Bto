@@ -60,7 +60,9 @@ function DaySummaryPanel() {
   const summary = useDaySummary(day);
   const data = summary.data;
   return (
-    <div className="max-h-[min(40rem,70svh)] space-y-4 overflow-y-auto">
+    // No scroller of its own: the dialog scrolls, so the count's footer sticks to the dialog's
+    // foot. Inside an inner scroller its bleed scrolled sideways and its buttons were cut.
+    <div className="space-y-4">
       <DayField value={day} onChange={setDay} />
       {summary.isPending ? (
         <p role="status" className="text-sm text-muted-foreground">

@@ -214,43 +214,51 @@ function PanelBody({
   const title = detail ? (detail.number ?? t('sales.order.draftNo', { id: detail.id })) : '';
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    // `@container/panel`: the sections' tabs (and the lines' unit field) stand by the panel's own
+    // width, not the window's.
+    <div className="@container/panel flex h-full min-h-0 flex-col">
       <SheetHeader className="gap-2 border-b border-border px-5 py-3 pr-14">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <SheetTitle className="text-lg">{title}</SheetTitle>
+            {/* The badges on the number's line: a row less above the lines (ADR-0201). */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <SheetTitle className="text-lg">{title}</SheetTitle>
+              {detail ? (
+                <>
+                  <OrderStatusBadge status={detail.status} />
+                  <PaymentLabel method={detail.paymentMethod} />
+                  {detail.archivedAt ? (
+                    <Badge variant="outline">{t('sales.work.archivedBadge')}</Badge>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
             <SheetDescription>{detail?.customerName ?? ''}</SheetDescription>
             {detail ? <OrderPlace order={detail} unsaved={unsaved} /> : null}
-            {detail ? (
-              <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                <OrderStatusBadge status={detail.status} />
-                <PaymentLabel method={detail.paymentMethod} />
-                {detail.archivedAt ? (
-                  <Badge variant="outline">{t('sales.work.archivedBadge')}</Badge>
-                ) : null}
-              </div>
-            ) : null}
           </div>
           {detail ? <PanelActions order={detail} /> : null}
         </div>
       </SheetHeader>
       <ProblemAlert problem={problemFromError(order.error)} onRetry={order.refetch} />
       {detail ? (
+        // The tabs are a left column where the panel is 72rem wide (a 1366px laptop's is 75);
+        // narrower (a till PC's 57rem, a tablet) they are a row on top and the lines get the width
+        // (ADR-0201).
         <Tabs
           value={current}
           onValueChange={(value) => onTab(tabs.find((entry) => entry === value) ?? 'overview')}
           orientation="vertical"
-          className="min-h-0 flex-1 gap-0 lg:flex-row"
+          className="min-h-0 flex-1 gap-0 @[72rem]/panel:flex-row"
         >
           <TabsList
             aria-label={t('sales.panel.sections')}
-            className="w-full shrink-0 overflow-x-auto px-3 lg:w-52 lg:flex-col lg:items-stretch lg:gap-1 lg:overflow-visible lg:border-r lg:border-b-0 lg:py-4"
+            className="w-full shrink-0 overflow-x-auto px-3 @[72rem]/panel:w-52 @[72rem]/panel:flex-col @[72rem]/panel:items-stretch @[72rem]/panel:gap-1 @[72rem]/panel:overflow-visible @[72rem]/panel:border-r @[72rem]/panel:border-b-0 @[72rem]/panel:py-4"
           >
             {tabs.map((entry) => (
               <TabsTrigger
                 key={entry}
                 value={entry}
-                className="lg:-mb-0 lg:justify-start lg:rounded-lg lg:border-b-0 lg:px-3 lg:data-[state=active]:bg-secondary lg:data-[state=active]:text-secondary-foreground"
+                className="@[72rem]/panel:-mb-0 @[72rem]/panel:justify-start @[72rem]/panel:rounded-lg @[72rem]/panel:border-b-0 @[72rem]/panel:px-3 @[72rem]/panel:data-[state=active]:bg-secondary @[72rem]/panel:data-[state=active]:text-secondary-foreground"
               >
                 {t(`sales.panel.tabs.${entry}`)}
               </TabsTrigger>

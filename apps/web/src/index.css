@@ -13,6 +13,20 @@
 /* Light only: `dark:` classes in the shadcn components apply under a .dark class we never set. */
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * A screen worked by a finger (ADR-0201): `touch:` is the coarse pointer; `touch-static:` leaves
+ * out what a class already places (absolute, fixed, sticky), so giving a button a finger's reach
+ * (button.tsx) never moves a dialog's ✕ or a field's clear button.
+ */
+@custom-variant touch (@media (pointer: coarse));
+@custom-variant touch-static {
+  @media (pointer: coarse) {
+    &:not(.absolute, .fixed, .sticky) {
+      @slot;
+    }
+  }
+}
+
 :root {
   --canvas: #f2f2f7;
   --background: #ffffff;
@@ -290,6 +304,25 @@
 }
 
 @layer components {
+  /*
+   * The till kiosk (pos.html, ADR-0113, ADR-0201): worked by a finger at arm's length. The shared
+   * pieces of a dialog keep the office's sizes (✕ 34px, a question's buttons 40px), so inside a
+   * kiosk dialog every shared button is at least 2.75rem, and the title leaves the ✕ its room.
+   * A pull down never reloads the page (the cart lives in memory) and a double tap never zooms.
+   */
+  html[data-app='pos'],
+  html[data-app='pos'] body {
+    overscroll-behavior: none;
+    touch-action: manipulation;
+  }
+  html[data-app='pos'] [data-slot='dialog-content'] [data-slot='button'],
+  html[data-app='pos'] [data-slot='dialog-content'] [data-slot='dialog-close'] {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+  html[data-app='pos'] [data-slot='dialog-title'] {
+    padding-right: 3.5rem;
+  }
   /* An error above a list sits a gap away from its card. */
   [data-slot='alert'] + [data-slot='list-card'] {
     margin-top: 1rem;

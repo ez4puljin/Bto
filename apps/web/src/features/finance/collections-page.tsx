@@ -58,14 +58,20 @@ const TONE: Record<CollectionStatus, 'warning' | 'success' | 'destructive'> = {
   REJECTED: 'destructive',
 };
 
+/**
+ * The list's columns (ADR-0119); the two buttons keep one line in 16rem. A report has no page of
+ * its own, so what it says is said only here: a table too narrow for all eight (ADR-0201) lets
+ * the time alone go («Орлого бичих» asks the day again). In rem: 83.5 whole (1536px and wider),
+ * 72 on a 1366 laptop (76 of room); a till PC (56) and a tablet (41) scroll in the card.
+ */
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'createdAt', kind: 'datetime' },
+  { key: 'createdAt', kind: 'datetime', drop: 1 },
   { key: 'rep', kind: 'text', weight: 2, min: 10 },
-  { key: 'customer', kind: 'text', weight: 3, min: 14 },
-  { key: 'method', kind: 'status' },
+  { key: 'customer', kind: 'text', weight: 3, min: 12 },
+  { key: 'method', kind: 'code', width: 7 },
   { key: 'amount', kind: 'money' },
   { key: 'status', kind: 'status' },
-  { key: 'note', kind: 'text', weight: 3, min: 12 },
+  { key: 'note', kind: 'text', weight: 3, min: 10 },
   { key: 'actions', kind: 'text', weight: 2, min: 16 },
   { key: 'spacer', kind: 'spacer' },
 ];
@@ -175,7 +181,7 @@ export function RepCollectionsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {collections.isPending ? <SkeletonRows columns={9} /> : null}
+            {collections.isPending ? <SkeletonRows columns={COLUMNS.length} /> : null}
             {rows.map((row) => (
               <TableRow key={row.id}>
                 <TableCell className="font-mono">

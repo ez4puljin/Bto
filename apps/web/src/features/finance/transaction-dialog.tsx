@@ -77,10 +77,11 @@ function PartyField(props: {
 }) {
   const { t } = useTranslation();
   return (
-    <div className="grid gap-3 sm:col-span-2 sm:grid-cols-[auto_minmax(0,1fr)]">
+    <div className="grid gap-x-3 gap-y-3.5 @xl:col-span-2 @xl:grid-cols-[auto_minmax(0,1fr)]">
       <div className="flex flex-col gap-1.5">
         <Label>{t('finance.transactions.partyKind')}</Label>
         <SegmentedControl
+          size="field"
           name={t('finance.transactions.partyKind')}
           options={['customer', 'supplier'] as const}
           value={props.kind}
@@ -109,13 +110,16 @@ function PartyField(props: {
   );
 }
 
-/** What will be written, before it is: both sides of the entry (ADR-0155). */
+/**
+ * What will be written, before it is: both sides of the entry (ADR-0155), two short lines beside
+ * the buttons that write it. In the footer it is always in view and adds no height (ADR-0201).
+ */
 function PostingPreview(props: { debit: GlAccount; credit: GlAccount; amount: string }) {
   const { t } = useTranslation();
   const row = (side: string, account: GlAccount) => (
     <div className="flex min-w-0 items-baseline gap-2">
-      <span className="w-6 shrink-0 font-medium text-muted-foreground">{side}</span>
-      <span className="min-w-0 flex-1 truncate" title={account.name}>
+      <span className="w-5 shrink-0 font-medium text-muted-foreground">{side}</span>
+      <span className="min-w-0 flex-1 truncate" title={`${account.code} · ${account.name}`}>
         {account.code} · {account.name}
       </span>
       <span className="shrink-0 font-mono font-medium">{formatMnt(props.amount)}</span>
@@ -125,7 +129,7 @@ function PostingPreview(props: { debit: GlAccount; credit: GlAccount; amount: st
     <div
       role="group"
       aria-label={t('finance.transactions.preview')}
-      className="grid gap-x-6 gap-y-1 rounded-lg bg-muted/50 px-3 py-2 text-[0.8125rem] sm:grid-cols-2"
+      className="grid gap-0.5 text-xs leading-snug"
     >
       {row(t('finance.transactions.debitShort'), props.debit)}
       {row(t('finance.transactions.creditShort'), props.credit)}
@@ -140,6 +144,11 @@ function PostingPreview(props: { debit: GlAccount; credit: GlAccount; amount: st
  * «Үүсгэх / Хаах»; the general journal «Дебет / Кредит». A party is asked when a line needs one.
  * «Хадгалаад шинэ» keeps the date, the accounts and the kind for the next one and clears the rest.
  * What was typed is not lost by accident: a click outside does nothing, and «Болих», ✕ or Esc ask.
+ *
+ * The form lays itself out by its own width (a container query: two columns from 36rem, one
+ * below) and keeps one height while it is filled (ADR-0201): the balance stands on the account's
+ * label line, the tax ticks under the amount, the entry's two sides in the footer. So it fits a
+ * tablet 768px wide with a margin and a laptop's 633px of height without scrolling.
  */
 export function TransactionDialog(props: {
   journal: AccountJournal;
@@ -276,7 +285,7 @@ export function TransactionDialog(props: {
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
       <DialogContent
         closeLabel={t('common.close')}
-        size="xl"
+        size="lg"
         dirty={dirty}
         // The date is rarely changed: the work starts at the account (ADR-0155).
         onOpenAutoFocus={(event) => {
@@ -300,29 +309,33 @@ export function TransactionDialog(props: {
               : t('finance.transactions.dialogHint')}
           </DialogDescription>
         </DialogHeader>
-        <form className="flex flex-col gap-4" noValidate onSubmit={onSubmit}>
+        <form className="@container flex flex-col gap-4" noValidate onSubmit={onSubmit}>
           <ProblemAlert problem={action.problem} />
           {journal === 'RECEIVABLE_PAYABLE' && !transfer ? (
             <p className="rounded-lg bg-info-soft px-3 py-2 text-[0.8125rem]">
               {t('finance.transactions.debtNote')}
             </p>
           ) : null}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FormField label={t('finance.fields.date')} htmlFor="trx-date">
-              <DateInput
-                id="trx-date"
-                required
-                max={businessDate()}
-                value={entryDate}
-                onChange={setEntryDate}
-              />
-            </FormField>
+          <div className="grid gap-x-4 gap-y-3.5 *:min-w-0 @xl:grid-cols-2">
+            {/* A transfer has no direction: the date keeps its half of the first row to itself. */}
+            <div className={transfer ? '@xl:col-span-2 @xl:w-[calc(50%-0.5rem)]' : undefined}>
+              <FormField label={t('finance.fields.date')} htmlFor="trx-date">
+                <DateInput
+                  id="trx-date"
+                  required
+                  max={businessDate()}
+                  value={entryDate}
+                  onChange={setEntryDate}
+                />
+              </FormField>
+            </div>
             {transfer ? null : (
               <FormField
                 label={t(`finance.transactions.direction.${words}`)}
                 htmlFor="trx-direction"
               >
                 <SegmentedControl
+                  size="field"
                   name={t(`finance.transactions.direction.${words}`)}
                   options={['IN', 'OUT'] as const}
                   value={direction}
@@ -343,6 +356,7 @@ export function TransactionDialog(props: {
                   ? t('finance.transactions.balance', { amount: formatMnt(account.balance) })
                   : undefined
               }
+              hintBeside
               error={checked && accountId === null ? 'validation.required' : undefined}
             >
               <SearchSelect
@@ -380,10 +394,28 @@ export function TransactionDialog(props: {
               <MoneyInput
                 ref={amountInput}
                 id="trx-amount"
-                className="h-12 text-lg font-semibold"
+                className="text-base font-semibold"
                 value={amount}
                 onValueChange={setAmount}
               />
+              {words === 'money' && !transfer ? (
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  <Label className="flex items-center gap-2 font-normal">
+                    <Checkbox
+                      checked={withVat}
+                      onCheckedChange={(value) => setWithVat(value === true)}
+                    />
+                    {t('finance.transactions.withVat')}
+                  </Label>
+                  <Label className="flex items-center gap-2 font-normal">
+                    <Checkbox
+                      checked={withCityTax}
+                      onCheckedChange={(value) => setWithCityTax(value === true)}
+                    />
+                    {t('finance.transactions.withCityTax')}
+                  </Label>
+                </div>
+              ) : null}
             </FormField>
             <FormField
               label={t('finance.fields.description')}
@@ -427,36 +459,20 @@ export function TransactionDialog(props: {
               />
             ) : null}
           </div>
-          {words === 'money' && !transfer ? (
-            <div className="flex flex-wrap gap-5">
-              <Label className="flex items-center gap-2">
-                <Checkbox
-                  checked={withVat}
-                  onCheckedChange={(value) => setWithVat(value === true)}
-                />
-                {t('finance.transactions.withVat')}
-              </Label>
-              <Label className="flex items-center gap-2">
-                <Checkbox
-                  checked={withCityTax}
-                  onCheckedChange={(value) => setWithCityTax(value === true)}
-                />
-                {t('finance.transactions.withCityTax')}
-              </Label>
-            </div>
-          ) : null}
-          {account && counter && amountOk && !withVat && !withCityTax ? (
-            <PostingPreview
-              debit={side === 'DEBIT' ? account : counter}
-              credit={side === 'DEBIT' ? counter : account}
-              amount={amount}
-            />
-          ) : null}
           <DialogFormFooter
             pending={mutations.postTransaction.isPending}
             onCancel={props.onClose}
             submitLabel={t('common.save')}
             onSaveAndNew={() => void save(true)}
+            start={
+              account && counter && amountOk && !withVat && !withCityTax ? (
+                <PostingPreview
+                  debit={side === 'DEBIT' ? account : counter}
+                  credit={side === 'DEBIT' ? counter : account}
+                  amount={amount}
+                />
+              ) : undefined
+            }
           />
         </form>
       </DialogContent>

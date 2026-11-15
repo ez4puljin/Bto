@@ -80,7 +80,7 @@ export function TillChooser({ onPaired }: { onPaired: () => void }) {
             ))}
           </ul>
         </nav>
-        <Button variant="ghost" className="w-full" onClick={() => setWithCode(true)}>
+        <Button variant="ghost" className="h-11 w-full" onClick={() => setWithCode(true)}>
           {t('posKiosk.choose.withCode')}
         </Button>
       </div>

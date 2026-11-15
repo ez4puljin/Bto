@@ -157,7 +157,7 @@ export function NoticeDialog(props: { onClose: () => void }) {
   const full = products.length >= NOTICE_LIMITS.productsMax;
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
-      <DialogContent closeLabel={t('common.close')} className="sm:max-w-4xl">
+      <DialogContent closeLabel={t('common.close')} size="xl">
         <form className="space-y-4" noValidate onSubmit={(event) => void submit(event)}>
           <DialogHeader>
             <DialogTitle>{t('notifications.new')}</DialogTitle>

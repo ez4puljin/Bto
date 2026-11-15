@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { SegmentedControl } from '@/components/list';
+import { ListTable, SegmentedControl, TruncateCell } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { StickyActions } from '@/components/sticky-actions';
@@ -18,15 +18,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { formatUbDateTime } from '@/lib/dayjs';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
+import { formatUbMinute } from '@/lib/dayjs';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
@@ -48,7 +42,6 @@ import { CountSheet } from './stock-count-sheet';
 // their reasons, and «Гүйлгээ хийх», where the differences' account and party are chosen.
 
 const UNCOUNTED: readonly StockCountUncounted[] = ['ZERO', 'LEAVE'];
-const time = (value: string) => formatUbDateTime(Date.parse(value));
 
 export function StockCountPage() {
   const { t } = useTranslation();
@@ -61,6 +54,7 @@ export function StockCountPage() {
   const mutations = useStockCountMutations();
   const action = useAction();
   const [confirm, setConfirm] = useState<'close' | 'reopen' | 'cancel' | 'approve' | null>(null);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
 
   const loadProblem = problemFromError(count.error);
   if (loadProblem) return <ProblemAlert problem={loadProblem} />;
@@ -111,9 +105,21 @@ export function StockCountPage() {
 
   return (
     <>
+      {/* One row of title and facts, so the sheet starts high in a short window (ADR-0201). */}
       <PageHeader
+        dense
         title={detail.number ?? t('inventory.stocktake.noNumber', { id: detail.id })}
         crumbs={[{ label: t('inventory.counts.title'), to: '/inventory/counts' }]}
+        actions={
+          counting ? null : (
+            <Button variant="outline" size="sm" onClick={() => setSessionsOpen(true)}>
+              {t('inventory.counts.sessions.title')}
+              <Badge variant="secondary" className="tabular-nums">
+                {detail.sessions.length}
+              </Badge>
+            </Button>
+          )
+        }
         meta={
           <>
             <DocStatusBadge status={detail.status} />
@@ -139,8 +145,27 @@ export function StockCountPage() {
         {detail.note ? <p className="text-sm text-muted-foreground">{detail.note}</p> : null}
         <ProblemAlert problem={confirm ? null : action.problem} />
 
-        <SessionsCard detail={detail} mayForce={counting && manages} />
+        {/*
+          While people count, who counts stands above the sheet. Once counting is closed they are
+          the count's history and open from the header: the sheet, where the approver works, then
+          has its first rows in a 640px window (ADR-0201).
+        */}
+        {counting ? <SessionsCard detail={detail} mayForce={manages} /> : null}
         <CountSheet detail={detail} mayEdit={(counting || review) && approves} />
+        <Dialog open={sessionsOpen} onOpenChange={setSessionsOpen}>
+          {sessionsOpen ? (
+            <DialogContent closeLabel={t('common.close')} size="lg">
+              <DialogHeader>
+                <DialogTitle>{t('inventory.counts.sessions.title')}</DialogTitle>
+                <DialogDescription>{t('inventory.counts.sessions.description')}</DialogDescription>
+              </DialogHeader>
+              <SessionsTable detail={detail} />
+              <DialogFooter>
+                <Button onClick={() => setSessionsOpen(false)}>{t('common.close')}</Button>
+              </DialogFooter>
+            </DialogContent>
+          ) : null}
+        </Dialog>
 
         {(counting && manages) || (review && (manages || approves)) ? (
           <StickyActions
@@ -242,70 +267,23 @@ function SessionsCard({ detail, mayForce }: { detail: StockCountDetail; mayForce
     });
 
   return (
-    <Card>
+    <Card size="sm">
       <CardHeader>
         <CardTitle>{t('inventory.counts.sessions.title')}</CardTitle>
         <CardDescription>{t('inventory.counts.sessions.description')}</CardDescription>
       </CardHeader>
       <CardContent>
-        {detail.sessions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t('inventory.counts.sessions.empty')}</p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('inventory.counts.sessions.counter')}</TableHead>
-                <TableHead>{t('inventory.counts.sessions.started')}</TableHead>
-                <TableHead>{t('inventory.counts.sessions.sent')}</TableHead>
-                <TableHead className="text-right">
-                  {t('inventory.counts.sessions.products')}
-                </TableHead>
-                <TableHead className="text-right">
-                  {t('inventory.counts.sessions.entries')}
-                </TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {detail.sessions.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell className="font-medium">{row.name}</TableCell>
-                  <TableCell className="font-mono">{time(row.startedAt)}</TableCell>
-                  <TableCell>
-                    {row.sentAt === null ? (
-                      <Badge variant="warning">{t('inventory.counts.sessions.notSent')}</Badge>
-                    ) : (
-                      <span className="font-mono">
-                        {time(row.sentAt)}
-                        {row.sentByName && row.sentByName !== row.name ? (
-                          <span className="ml-2 font-sans text-xs text-muted-foreground">
-                            {t('inventory.counts.sessions.sentBy', { name: row.sentByName })}
-                          </span>
-                        ) : null}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">{row.products}</TableCell>
-                  <TableCell className="text-right font-mono">{row.entries}</TableCell>
-                  <TableCell className="text-right">
-                    {mayForce && row.sentAt === null ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          action.clear();
-                          setForcing(row.id);
-                        }}
-                      >
-                        {t('inventory.counts.sessions.sendFor')}
-                      </Button>
-                    ) : null}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+        <SessionsTable
+          detail={detail}
+          {...(mayForce
+            ? {
+                onForce: (sessionId: number) => {
+                  action.clear();
+                  setForcing(sessionId);
+                },
+              }
+            : {})}
+        />
       </CardContent>
       <ConfirmDialog
         open={forcing !== null}
@@ -319,6 +297,78 @@ function SessionsCard({ detail, mayForce }: { detail: StockCountDetail; mayForce
         onClose={() => setForcing(null)}
       />
     </Card>
+  );
+}
+
+/**
+ * The counters' columns: 47.5rem with «Өмнөөс нь илгээх», 36.5 without. A tablet upright's card
+ * (about 39) lets the two counts of each counter go: 38.5rem (ADR-0201).
+ */
+const sessionColumns = (force: boolean): ColumnSpec[] => [
+  { key: 'counter', kind: 'text', weight: 2, min: 7.5 },
+  { key: 'started', kind: 'datetime', width: 10 },
+  { key: 'sent', kind: 'text', weight: 1, min: 10 },
+  { key: 'products', kind: 'count', drop: 1 },
+  { key: 'entries', kind: 'count', drop: 1 },
+  ...(force ? [{ key: 'force', kind: 'actions', width: 11 } as const] : []),
+];
+
+/**
+ * Each counter: when they started and sent (to the minute, so the table fits a tablet's card and
+ * the dialog), how much they counted. `onForce`: the manager sends for one who has not.
+ */
+function SessionsTable(props: { detail: StockCountDetail; onForce?: (sessionId: number) => void }) {
+  const { t } = useTranslation();
+  const { detail, onForce } = props;
+  if (detail.sessions.length === 0) {
+    return <p className="text-sm text-muted-foreground">{t('inventory.counts.sessions.empty')}</p>;
+  }
+  return (
+    <ListTable columns={sessionColumns(onForce !== undefined)}>
+      <TableHeader>
+        <TableRow>
+          <TableHead>{t('inventory.counts.sessions.counter')}</TableHead>
+          <TableHead>{t('inventory.counts.sessions.started')}</TableHead>
+          <TableHead>{t('inventory.counts.sessions.sent')}</TableHead>
+          <TableHead className="text-right">{t('inventory.counts.sessions.products')}</TableHead>
+          <TableHead className="text-right">{t('inventory.counts.sessions.entries')}</TableHead>
+          {onForce ? <TableHead /> : null}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {detail.sessions.map((row) => (
+          <TableRow key={row.id}>
+            <TruncateCell text={row.name} className="font-medium" />
+            <TableCell className="font-mono">{formatUbMinute(row.startedAt)}</TableCell>
+            <TableCell>
+              {row.sentAt === null ? (
+                <Badge variant="warning">{t('inventory.counts.sessions.notSent')}</Badge>
+              ) : (
+                <>
+                  <span className="font-mono">{formatUbMinute(row.sentAt)}</span>
+                  {row.sentByName && row.sentByName !== row.name ? (
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {t('inventory.counts.sessions.sentBy', { name: row.sentByName })}
+                    </span>
+                  ) : null}
+                </>
+              )}
+            </TableCell>
+            <TableCell className="text-right font-mono">{row.products}</TableCell>
+            <TableCell className="text-right font-mono">{row.entries}</TableCell>
+            {onForce ? (
+              <TableCell className="text-right">
+                {row.sentAt === null ? (
+                  <Button size="sm" variant="outline" onClick={() => onForce(row.id)}>
+                    {t('inventory.counts.sessions.sendFor')}
+                  </Button>
+                ) : null}
+              </TableCell>
+            ) : null}
+          </TableRow>
+        ))}
+      </TableBody>
+    </ListTable>
   );
 }
 

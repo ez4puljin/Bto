@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import {
   ChevronHead,
-  DateFilter,
   EmptyState,
   FilterBar,
   LinkRow,
@@ -22,9 +21,10 @@ import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DateRangeFilter } from '@/features/finance/date-range-filter';
 import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
-import { formatCount, formatTugrik } from '@/lib/money';
+import { formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { hrefWithParam, useSetParam } from '@/lib/search-params';
 import {
@@ -44,17 +44,24 @@ const isKind = (value: string | null): value is SaleKind =>
 const isEbarimt = (value: string | null): value is EbarimtStatus =>
   EBARIMT_STATUSES.some((entry) => entry === value);
 
-/** The sales list's columns (ADR-0119). */
+/**
+ * The sales list's columns (ADR-0119): 79.25rem in all, each as wide as its values («К1», a
+ * receipt's cash, «Баримт гараагүй»). What a narrower table lets go, least needed first (ADR-0201):
+ * the POS's code, which the number begins with (a laptop's 76rem: 74.25); the cashier (64.25);
+ * the time, whose day the number carries (a till PC's 56rem: 52.75); the tenders (a tablet's
+ * 41rem: 37.75). The number, the kind, the total and the receipt's state stay; the panel says
+ * the rest.
+ */
 const COLUMNS: readonly ColumnSpec[] = [
   { key: 'number', kind: 'number' },
-  { key: 'soldAt', kind: 'datetime' },
-  { key: 'till', kind: 'code' },
-  { key: 'cashier', kind: 'text', weight: 2, min: 10 },
-  { key: 'kind', kind: 'status' },
+  { key: 'soldAt', kind: 'datetime', drop: 3 },
+  { key: 'till', kind: 'code', width: 5, drop: 1 },
+  { key: 'cashier', kind: 'text', weight: 2, min: 10, drop: 2 },
+  { key: 'kind', kind: 'status', width: 7.5 },
   { key: 'total', kind: 'money' },
-  { key: 'cash', kind: 'money' },
-  { key: 'card', kind: 'money' },
-  { key: 'ebarimt', kind: 'status' },
+  { key: 'cash', kind: 'money', width: 7.5, drop: 4 },
+  { key: 'card', kind: 'money', width: 7.5, drop: 4 },
+  { key: 'ebarimt', kind: 'status', width: 9 },
   { key: 'spacer', kind: 'spacer' },
   { key: 'chevron', kind: 'chevron' },
 ];
@@ -87,7 +94,6 @@ export function PosSalesPage() {
   const sales = useSales(filter);
   const summary = useSalesSummary(filter);
   const rows = sales.data?.pages.flatMap((page) => page.data) ?? [];
-  const total = sales.data?.pages[0]?.total ?? null;
   const filtered = Boolean(
     q || kind || ebarimtStatus || tillId || cashierUserId || shiftId || from || to,
   );
@@ -98,16 +104,9 @@ export function PosSalesPage() {
 
   return (
     <div>
-      <PageHeader
-        title={t('pos.sales.title')}
-        meta={
-          total !== null ? (
-            <span className="tabular-nums">
-              {t('pos.sales.count', { count: formatCount(total) })}
-            </span>
-          ) : undefined
-        }
-      />
+      {/* No count under the title: the banner's first tile counts the sales and the returns, and
+          its line took the list's card out of a laptop's window (ADR-0201). */}
+      <PageHeader title={t('pos.sales.title')} />
       <FilterBar>
         <SearchField
           className="sm:w-60"
@@ -171,19 +170,15 @@ export function PosSalesPage() {
             </option>
           ))}
         </NativeSelect>
-        {/* The two days wrap as a pair: on a laptop they share the second row. */}
-        <div className="flex flex-wrap items-center gap-2">
-          <DateFilter
-            label={t('pos.fields.from')}
-            value={from}
-            onChange={(value) => setParam('from', value)}
-          />
-          <DateFilter
-            label={t('pos.fields.to')}
-            value={to}
-            onChange={(value) => setParam('to', value)}
-          />
-        </div>
+        <DateRangeFilter
+          label={t('pos.fields.paidOn')}
+          fromLabel={t('pos.fields.from')}
+          toLabel={t('pos.fields.to')}
+          from={from}
+          to={to}
+          onFrom={(value) => setParam('from', value)}
+          onTo={(value) => setParam('to', value)}
+        />
       </FilterBar>
       <SalesTotals summary={summary.data} />
       <ProblemAlert problem={problemFromError(sales.error)} onRetry={sales.refetch} />

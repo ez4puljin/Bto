@@ -1,13 +1,5 @@
 import { PRICE_ROUNDINGS } from '@tugeel/shared/pricing';
-import {
-  Archive,
-  ArchiveRestore,
-  Pencil,
-  Plus,
-  SlidersHorizontal,
-  Tags,
-  Trash2,
-} from 'lucide-react';
+import { Archive, ArchiveRestore, Pencil, Plus, Tags, Trash2 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -57,6 +49,7 @@ import {
   usePricingMutations,
 } from './api';
 import { lastDayOf } from './helpers';
+import { FilterHead, FilterRail, FilterSheet } from './list-filters';
 import { profileValuesOf, useProfileSummaryParts } from './price-views';
 import { ProfileExample, ProfileProductsLink } from './profile-form';
 
@@ -70,15 +63,21 @@ const STATUS_VARIANT: Record<PriceProfile['status'], 'success' | 'default' | 'se
   ARCHIVED: 'secondary',
 };
 
-/** The list's columns (ADR-0119): the markups and the rounding read as one, each whole. */
+/**
+ * The list's columns (ADR-0119): the markups and the rounding read as one, each whole (the longest,
+ * «Супермаркет бөөний (8+) +5%», takes 15rem with its cell). 61.75rem in all: a 1366px window
+ * leaves 62.6 beside the filters. Without them a till PC has 56.2 and lets who made the profile and
+ * when go (50); a tablet upright has 41.2 and lets the day it changed and the count of its products
+ * go too (38.5). The profile's own page shows all four (ADR-0201).
+ */
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'name', kind: 'text', weight: 2, min: 10 },
+  { key: 'name', kind: 'text', weight: 2, min: 8 },
   { key: 'status', kind: 'status', width: 6.5 },
-  { key: 'values', kind: 'text', weight: 4, min: 13 },
-  { key: 'products', kind: 'count', width: 5.75 },
-  { key: 'createdBy', kind: 'text', weight: 1, min: 5 },
-  { key: 'createdAt', kind: 'date', width: 7 },
-  { key: 'updatedAt', kind: 'date', width: 7 },
+  { key: 'values', kind: 'text', weight: 4, min: 15 },
+  { key: 'products', kind: 'count', width: 4.75, drop: 3 },
+  { key: 'createdBy', kind: 'text', weight: 1, min: 5, drop: 1 },
+  { key: 'createdAt', kind: 'date', width: 6.75, drop: 1 },
+  { key: 'updatedAt', kind: 'date', width: 6.75, drop: 2 },
   { key: 'actions', kind: 'actions', actions: 3 },
   { key: 'chevron', kind: 'chevron' },
 ];
@@ -125,6 +124,52 @@ export function PriceProfilesPage() {
     setSearch('');
     setParams({}, { replace: true });
   };
+  // The same filters stand beside the list on a laptop and in the sheet below it (ADR-0201).
+  const head = (className?: string) => (
+    <FilterHead
+      title={t('pricing.profiles.panel.title')}
+      clearLabel={t('pricing.profiles.panel.clear')}
+      filtered={filtered}
+      onClear={clear}
+      {...(className ? { className } : {})}
+    />
+  );
+  const sections = (
+    <>
+      <FilterSection title={t('pricing.profiles.columns.status')} defaultOpen active={!!status}>
+        <FilterChoices
+          options={STATUSES}
+          label={(value) => t(`pricing.profiles.statuses.${value}`)}
+          value={status ?? null}
+          onChange={(value) => setParam('status', value)}
+        />
+      </FilterSection>
+      <FilterSection title={t('pricing.profiles.fields.rounding')} defaultOpen active={!!rounding}>
+        <FilterChoices
+          options={PRICE_ROUNDINGS}
+          label={(value) => t(`pricing.roundings.${value}`)}
+          value={rounding ?? null}
+          onChange={(value) => setParam('rounding', value)}
+        />
+      </FilterSection>
+      <FilterSection title={t('pricing.profiles.panel.bulk')} active={!!bulk}>
+        <FilterChoices
+          options={BULKS}
+          label={(value) => t(`pricing.profiles.panel.bulks.${value}`)}
+          value={bulk ?? null}
+          onChange={(value) => setParam('bulk', value)}
+        />
+      </FilterSection>
+      <FilterSection title={t('pricing.profiles.panel.used')} active={!!used}>
+        <FilterChoices
+          options={USES}
+          label={(value) => t(`pricing.profiles.panel.uses.${value}`)}
+          value={used ?? null}
+          onChange={(value) => setParam('used', value)}
+        />
+      </FilterSection>
+    </>
+  );
 
   return (
     <div>
@@ -143,62 +188,10 @@ export function PriceProfilesPage() {
         }
       />
       <div className="flex items-start gap-3">
-        <aside
-          aria-label={t('pricing.profiles.panel.label')}
-          className="hidden w-52 shrink-0 lg:block"
-        >
-          <ListCard scroll beside>
-            <div className="flex items-center gap-2 px-3 py-2.5 text-sm font-semibold">
-              <SlidersHorizontal aria-hidden className="size-4 text-muted-foreground" />
-              <span className="flex-1">{t('pricing.profiles.panel.title')}</span>
-              {filtered ? (
-                <Button type="button" size="xs" variant="ghost" onClick={clear}>
-                  {t('pricing.profiles.panel.clear')}
-                </Button>
-              ) : null}
-            </div>
-            <FilterSection
-              title={t('pricing.profiles.columns.status')}
-              defaultOpen
-              active={!!status}
-            >
-              <FilterChoices
-                options={STATUSES}
-                label={(value) => t(`pricing.profiles.statuses.${value}`)}
-                value={status ?? null}
-                onChange={(value) => setParam('status', value)}
-              />
-            </FilterSection>
-            <FilterSection
-              title={t('pricing.profiles.fields.rounding')}
-              defaultOpen
-              active={!!rounding}
-            >
-              <FilterChoices
-                options={PRICE_ROUNDINGS}
-                label={(value) => t(`pricing.roundings.${value}`)}
-                value={rounding ?? null}
-                onChange={(value) => setParam('rounding', value)}
-              />
-            </FilterSection>
-            <FilterSection title={t('pricing.profiles.panel.bulk')} active={!!bulk}>
-              <FilterChoices
-                options={BULKS}
-                label={(value) => t(`pricing.profiles.panel.bulks.${value}`)}
-                value={bulk ?? null}
-                onChange={(value) => setParam('bulk', value)}
-              />
-            </FilterSection>
-            <FilterSection title={t('pricing.profiles.panel.used')} active={!!used}>
-              <FilterChoices
-                options={USES}
-                label={(value) => t(`pricing.profiles.panel.uses.${value}`)}
-                value={used ?? null}
-                onChange={(value) => setParam('used', value)}
-              />
-            </FilterSection>
-          </ListCard>
-        </aside>
+        <FilterRail label={t('pricing.profiles.panel.label')}>
+          {head()}
+          {sections}
+        </FilterRail>
         <div className="min-w-0 flex-1">
           <FilterBar>
             <SearchField
@@ -211,6 +204,15 @@ export function PriceProfilesPage() {
                 setParam('q', event.target.value.trim() || null);
               }}
             />
+            <FilterSheet
+              label={t('pricing.profiles.panel.label')}
+              title={t('pricing.profiles.panel.title')}
+              count={[status, rounding, bulk, used].filter(Boolean).length}
+            >
+              {/* The sheet's ✕ stands at the head's end. */}
+              {head('pr-12')}
+              {sections}
+            </FilterSheet>
           </FilterBar>
           <ProblemAlert problem={problemFromError(profiles.error)} onRetry={profiles.refetch} />
           <ProfileTable
@@ -337,6 +339,7 @@ function ProfileRow(props: {
   const upcoming = profile.current ? null : (profile.scheduled[0] ?? null);
   const values = profile.current ?? upcoming;
   const archived = profile.status === 'ARCHIVED';
+  const author = profile.createdByName ?? t('common.none');
   return (
     <LinkRow to={`/pricing/profiles/${profile.id}`}>
       <TruncateCell text={profile.name}>
@@ -353,7 +356,7 @@ function ProfileRow(props: {
         </Badge>
       </TableCell>
       <TableCell className="whitespace-normal">
-        {/* Each value whole; on a narrow window they wrap between themselves. */}
+        {/* Each value whole, wrapping between themselves; only one wider than the column breaks. */}
         <div className="flex flex-wrap gap-x-3 gap-y-0.5">
           {upcoming ? (
             <span className="text-muted-foreground">
@@ -361,11 +364,7 @@ function ProfileRow(props: {
             </span>
           ) : null}
           {values ? (
-            summary(values).map((part) => (
-              <span key={part} className="whitespace-nowrap">
-                {part}
-              </span>
-            ))
+            summary(values).map((part) => <span key={part}>{part}</span>)
           ) : (
             <span className="text-muted-foreground">{t('common.none')}</span>
           )}
@@ -385,7 +384,13 @@ function ProfileRow(props: {
           formatCount(profile.productsToday)
         )}
       </TableCell>
-      <TruncateCell text={profile.createdByName ?? t('common.none')} />
+      {/* Two lines for the name: beside the filters a laptop leaves this column 5rem, and the
+          values beside it take several lines anyway. */}
+      <TableCell className="whitespace-normal">
+        <span className="line-clamp-2 break-words" title={author}>
+          {author}
+        </span>
+      </TableCell>
       {/* The day in the row, the minute on hover. */}
       <TableCell
         className="font-mono text-xs"

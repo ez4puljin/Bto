@@ -1,5 +1,5 @@
 import { Camera, Trash2, X } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { type ReactNode, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useApiClient } from '@/app/api-client-context';
 import { Combobox } from '@/components/combobox';
@@ -102,38 +102,52 @@ export function PeoplePicker(props: {
   );
 }
 
+/**
+ * «Хэнд»: everybody or chosen people. `beside` is a second short choice of the form («Хэзээ
+ * илгээх») that shares the choice's row where the form (its `@container`) is at least 28rem wide,
+ * so the dialog is a row shorter (ADR-0201); the people picker takes the whole width under them.
+ */
 export function AudienceField(props: {
   audience: ReturnType<typeof useAudience>;
   showMissing: boolean;
+  beside?: ReactNode;
 }) {
   const { t } = useTranslation();
   const { audience } = props;
-  return (
-    <div className="flex flex-col gap-1.5">
+  const choice = (
+    <div className="flex min-w-0 flex-col items-start gap-1.5">
       <Label>{t('hr.community.audience.label')}</Label>
-      <div className="flex flex-col items-start gap-2">
-        <SegmentedControl
-          name={t('hr.community.audience.label')}
-          options={AUDIENCE_MODES}
-          value={audience.mode}
-          label={(mode) => t(`hr.community.audience.modes.${mode}`)}
-          onChange={audience.setMode}
+      <SegmentedControl
+        name={t('hr.community.audience.label')}
+        options={AUDIENCE_MODES}
+        value={audience.mode}
+        label={(mode) => t(`hr.community.audience.modes.${mode}`)}
+        onChange={audience.setMode}
+      />
+    </div>
+  );
+  return (
+    <div className="flex flex-col gap-2">
+      {props.beside ? (
+        <div className="grid gap-4 @md:grid-cols-[minmax(0,1fr)_auto]">
+          {choice}
+          {props.beside}
+        </div>
+      ) : (
+        choice
+      )}
+      {audience.mode === 'CHOSEN' ? (
+        <PeoplePicker
+          label={t('hr.community.audience.people')}
+          value={audience.ids}
+          onChange={audience.setIds}
         />
-        {audience.mode === 'CHOSEN' ? (
-          <div className="w-full">
-            <PeoplePicker
-              label={t('hr.community.audience.people')}
-              value={audience.ids}
-              onChange={audience.setIds}
-            />
-          </div>
-        ) : null}
-        {props.showMissing && audience.missing ? (
-          <p role="alert" className="text-sm text-destructive">
-            {t('hr.community.audience.missing')}
-          </p>
-        ) : null}
-      </div>
+      ) : null}
+      {props.showMissing && audience.missing ? (
+        <p role="alert" className="text-sm text-destructive">
+          {t('hr.community.audience.missing')}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -24,13 +24,38 @@ export interface ListColumn<Row> {
   cell: (row: Row, t: TFunction) => ReactNode;
 }
 
-/** The layout of a list's shown columns (`ListTable`): one spec per column, in their order. */
-export function columnSpecs<Row>(columns: readonly ListColumn<Row>[]): ColumnSpec[] {
-  return columns.map<ColumnSpec>((column) => ({
-    key: column.key,
-    kind: column.kind ?? (column.numeric ? 'money' : 'text'),
-    ...(column.weight === undefined ? {} : { weight: column.weight }),
-    ...(column.min === undefined ? {} : { min: column.min }),
-    ...(column.width === undefined ? {} : { width: column.width }),
-  }));
+/**
+ * The layout of a list's shown columns (`ListTable`): one spec per column, in their order.
+ * `leaving` names the columns that leave a table too narrow for all of them, the least needed
+ * first and one at a time (ADR-0201). Pass it for a default set only (`isDefaultSet`): what a user
+ * chose in «Баганууд» is shown as chosen and scrolls in its card when it is too wide, as it did.
+ */
+export function columnSpecs<Row>(
+  columns: readonly ListColumn<Row>[],
+  leaving: readonly string[] = [],
+): ColumnSpec[] {
+  return columns.map<ColumnSpec>((column) => {
+    const place = leaving.indexOf(column.key);
+    return {
+      key: column.key,
+      kind: column.kind ?? (column.numeric ? 'money' : 'text'),
+      ...(column.weight === undefined ? {} : { weight: column.weight }),
+      ...(column.min === undefined ? {} : { min: column.min }),
+      ...(column.width === undefined ? {} : { width: column.width }),
+      ...(place < 0 ? {} : { drop: place + 1 }),
+    };
+  });
+}
+
+/**
+ * Whether the hidden columns are exactly one of a list's default sets: the user never chose, or
+ * chose it back.
+ */
+export function isDefaultSet(
+  hidden: ReadonlySet<string>,
+  ...defaults: readonly (readonly string[])[]
+): boolean {
+  return defaults.some(
+    (keys) => hidden.size === keys.length && keys.every((key) => hidden.has(key)),
+  );
 }

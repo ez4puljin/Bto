@@ -7,9 +7,11 @@ import { Slot } from "radix-ui"
 // Apple-like buttons (ADR-0042; capsules since 2026-10-30, the owner's choice): blue fill for the
 // one main action, a pale blue tint for secondary actions, white outlined and ghost for the rest;
 // 2.5rem high (40px at a 16px root — the root grows with the window, index.css), fully round,
-// 200ms Apple easing and a slight press.
+// 200ms Apple easing and a slight press. A finger's reach (ADR-0201): on a screen worked by touch
+// (`pointer: coarse`) a button answers within at least 2.75rem around its centre whatever its
+// drawn size — an unseen ::after carries the area, so nothing moves and a mouse sees no change.
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-full border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow,transform] duration-200 ease-apple outline-none select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:not-aria-[haspopup]:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 touch-static:relative touch:after:absolute touch:after:top-1/2 touch:after:left-1/2 touch:after:size-[max(100%,2.75rem)] touch:after:-translate-x-1/2 touch:after:-translate-y-1/2 items-center justify-center rounded-full border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow,transform] duration-200 ease-apple outline-none select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:not-aria-[haspopup]:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -22,7 +24,7 @@ const buttonVariants = cva(
         ghost: "text-foreground hover:bg-accent aria-expanded:bg-accent",
         destructive:
           "bg-danger-soft text-destructive hover:bg-destructive/15 focus-visible:ring-destructive",
-        link: "text-link underline-offset-4 hover:underline",
+        link: "text-link underline-offset-4 hover:underline touch:after:hidden",
       },
       size: {
         default:

@@ -51,7 +51,14 @@ import {
   useSalesDocuments,
 } from './api';
 import { idParam, marginText, NONE, reportHref, useRange } from './report-helpers';
-import { AmountCell, ExcelButton, PrintHeading, PrintLink, RefreshControl } from './report-kit';
+import {
+  AmountCell,
+  ExcelButton,
+  PrintHeading,
+  PrintLink,
+  RefreshControl,
+  ROW_NAME,
+} from './report-kit';
 import { ReportViews } from './report-views';
 
 const isGrouping = (value: string | null): value is ProfitGrouping =>
@@ -138,16 +145,25 @@ function useRowName() {
   };
 }
 
-/** The report's columns on screen (ADR-0119): the code and quantity only when the grouping shows them. */
+/**
+ * The report's columns on screen (ADR-0119): the code and quantity only when the grouping shows
+ * them; 71.25rem by product, 65.25 by customer or category, 58.25 by rep, the sales and the cost
+ * of a year 10rem («12,345,678,901»). What a narrower table lets go, least needed first
+ * (ADR-0201): the returns, which the sales are already less (62.75 by product); the code and the
+ * quantity (a till PC's 55.5rem: 49.75); the cost, which the profit is less (a tablet's 40.5rem:
+ * 39.75) — the row's panel lists the documents behind all of them. The name, the sales, the profit
+ * and its margin stay. A row has one cell for each column: a cell spanning columns would stop the
+ * dropping.
+ */
 function profitColumns(coded: boolean, product: boolean): readonly ColumnSpec[] {
   return [
-    ...(coded ? [{ key: 'code', kind: 'code' } as const] : []),
-    { key: 'name', kind: 'text', weight: 3, min: 14 },
-    ...(product ? [{ key: 'qty', kind: 'qty' } as const] : []),
+    ...(coded ? [{ key: 'code', kind: 'code', drop: 2 } as const] : []),
+    { key: 'name', kind: 'text', weight: 3, min: 13 },
+    ...(product ? [{ key: 'qty', kind: 'qty', drop: 2 } as const] : []),
     { key: 'sales', kind: 'money', width: 10 },
-    { key: 'returns', kind: 'money' },
-    { key: 'cost', kind: 'money', width: 10 },
-    { key: 'profit', kind: 'money', width: 10 },
+    { key: 'returns', kind: 'money', drop: 1 },
+    { key: 'cost', kind: 'money', width: 10, drop: 3 },
+    { key: 'profit', kind: 'money' },
     { key: 'margin', kind: 'percent' },
     { key: 'chevron', kind: 'chevron' },
   ];
@@ -162,8 +178,15 @@ function ProfitTable(props: { report: ProfitReport; onOpen?: (row: ProfitRow) =>
   const product = report.by === 'product';
   const coded = report.by !== 'rep';
   const spec = useMemo(() => profitColumns(coded, product), [coded, product]);
-  // The cells before the amounts: the name, the code and the quantity when shown.
-  const span = 1 + (coded ? 1 : 0) + (product ? 1 : 0);
+  // A summary row's cells before the amounts: its label under the names, an empty cell under the
+  // codes and the quantities when they are shown.
+  const label = (text: string) => (
+    <>
+      {coded ? <TableCell /> : null}
+      <TruncateCell text={text} />
+      {product ? <TableCell /> : null}
+    </>
+  );
   const amounts = (row: {
     sales: string;
     returns: string;
@@ -198,7 +221,10 @@ function ProfitTable(props: { report: ProfitReport; onOpen?: (row: ProfitRow) =>
           <TableHead className="text-right">{t(`${columns}.returns`)}</TableHead>
           <TableHead className="text-right">{t(`${columns}.cost`)}</TableHead>
           <TableHead className="text-right">{t(`${columns}.profit`)}</TableHead>
-          <TableHead className="text-right">{t(`${columns}.margin`)}</TableHead>
+          {/* Two words over a percentage: two lines, or the sized column would cut them. */}
+          <TableHead className="text-right leading-tight whitespace-normal">
+            {t(`${columns}.margin`)}
+          </TableHead>
           {props.onOpen ? <ChevronHead /> : null}
         </TableRow>
       </TableHeader>
@@ -211,11 +237,7 @@ function ProfitTable(props: { report: ProfitReport; onOpen?: (row: ProfitRow) =>
               {coded ? <TableCell className="font-mono">{row.code ?? ''}</TableCell> : null}
               <TruncateCell text={name}>
                 {opens ? (
-                  <button
-                    type="button"
-                    className="font-medium underline-offset-4 hover:underline"
-                    onClick={() => props.onOpen?.(row)}
-                  >
+                  <button type="button" className={ROW_NAME} onClick={() => props.onOpen?.(row)}>
                     {name}
                   </button>
                 ) : (
@@ -243,13 +265,13 @@ function ProfitTable(props: { report: ProfitReport; onOpen?: (row: ProfitRow) =>
         })}
         {report.others ? (
           <TableRow className="text-muted-foreground">
-            <TableCell colSpan={span}>{t('reports.profit.others')}</TableCell>
+            {label(t('reports.profit.others'))}
             {amounts(report.others)}
             {props.onOpen ? <TableCell /> : null}
           </TableRow>
         ) : null}
         <TableRow className="font-semibold">
-          <TableCell colSpan={span}>{t('reports.common.total')}</TableCell>
+          {label(t('reports.common.total'))}
           {amounts(report.totals)}
           {props.onOpen ? <TableCell /> : null}
         </TableRow>

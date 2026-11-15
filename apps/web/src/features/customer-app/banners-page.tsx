@@ -74,12 +74,17 @@ const STATE_BADGES: Record<BannerState, 'success' | 'default' | 'secondary' | 'o
 const VIEWS = ['LIVE', 'ARCHIVED'] as const;
 type View = (typeof VIEWS)[number];
 
-/** The list's columns (ADR-0119): a 2:1 thumbnail, then the live rows' move and archive actions. */
+/**
+ * The list's columns (ADR-0119): a 2:1 thumbnail, the title with what a tap opens under it, the
+ * period, the state, then the live rows' move and archive actions. A banner has no page of its
+ * own, so nothing may leave a narrow table (ADR-0201): the link stands under the title and the
+ * period breaks after its dash. In rem: 6.75 + 9.5 + 8.5 + 8.5 + 6.75 = 40 (a tablet upright
+ * leaves 41); from a till PC's 56 the period has its one line (14).
+ */
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'picture', kind: 'image', width: 8 },
-  { key: 'title', kind: 'text', weight: 3, min: 12 },
-  { key: 'link', kind: 'text', weight: 2 },
-  { key: 'period', kind: 'date', width: 14 },
+  { key: 'picture', kind: 'image', width: 6.75 },
+  { key: 'title', kind: 'text', weight: 3, min: 9.5 },
+  { key: 'period', kind: 'text', weight: 2, min: 8.5 },
   { key: 'state', kind: 'status' },
 ];
 const LIVE_COLUMNS: readonly ColumnSpec[] = [
@@ -141,7 +146,6 @@ export function BannersPage() {
             <TableRow>
               <TableHead>{t('customerApp.banners.columns.picture')}</TableHead>
               <TableHead>{t('customerApp.banners.columns.title')}</TableHead>
-              <TableHead>{t('customerApp.banners.columns.link')}</TableHead>
               <TableHead>{t('customerApp.banners.columns.period')}</TableHead>
               <TableHead>{t('customerApp.banners.columns.state')}</TableHead>
               {view === 'LIVE' ? (
@@ -152,27 +156,28 @@ export function BannersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {banners.isPending ? <SkeletonRows columns={view === 'LIVE' ? 6 : 5} /> : null}
+            {banners.isPending ? <SkeletonRows columns={view === 'LIVE' ? 5 : 4} /> : null}
             {rows.map((banner, index) => (
               <TableRow key={banner.id}>
                 <TableCell>
+                  {/* `max-w-none`: an image otherwise shrinks with a table laid out by the browser. */}
                   {banner.imageUrl ? (
                     <img
                       src={banner.imageUrl}
                       alt={banner.title}
-                      className="aspect-[2/1] w-28 rounded-md border object-cover"
+                      className="aspect-[2/1] w-20 max-w-none rounded-md border object-cover"
                     />
                   ) : (
-                    <span className="flex aspect-[2/1] w-28 items-center justify-center rounded-md border bg-muted">
+                    <span className="flex aspect-[2/1] w-20 items-center justify-center rounded-md border bg-muted">
                       <ImageIcon aria-hidden className="size-4 text-muted-foreground" />
                     </span>
                   )}
                 </TableCell>
-                <TableCell className="font-medium">{banner.title}</TableCell>
-                <TableCell>
+                <TableCell className="whitespace-normal">
+                  <div className="font-medium">{banner.title}</div>
                   <BannerLink banner={banner} />
                 </TableCell>
-                <TableCell className="font-mono">
+                <TableCell className="font-mono whitespace-normal">
                   {banner.validTo
                     ? t('customerApp.banners.period', {
                         from: banner.validFrom,
@@ -238,6 +243,12 @@ export function BannersPage() {
           />
         ) : null}
       </ListCard>
+      {/* Why a link is broken, written out: a finger cannot open the pill's tooltip (ADR-0201). */}
+      {rows.some((banner) => banner.linkKind !== 'NONE' && banner.linkBroken) ? (
+        <p className="mt-2 px-1 text-xs text-muted-foreground">
+          {`${t('customerApp.banners.linkBroken')}: ${t('customerApp.banners.linkBrokenHint')}`}
+        </p>
+      ) : null}
       {creating ? <BannerDialog onClose={() => setCreating(false)} /> : null}
       <ConfirmDialog
         open={archiving !== null}
@@ -257,26 +268,30 @@ export function BannersPage() {
   );
 }
 
-/** What a tap opens, or that the target is gone (the app then shows the banner without it). */
+/**
+ * What a tap opens, on the line under the title, or that the target is gone (the app then shows
+ * the banner without it; the list's foot says why).
+ */
 function BannerLink({ banner }: { banner: Banner }) {
   const { t } = useTranslation();
-  if (banner.linkKind === 'NONE') {
-    return <span className="text-muted-foreground">{t('customerApp.banners.links.NONE')}</span>;
-  }
-  if (banner.linkBroken) {
+  if (banner.linkKind !== 'NONE' && banner.linkBroken) {
     return (
-      <Badge variant="warning" title={t('customerApp.banners.linkBrokenHint')}>
-        {t('customerApp.banners.linkBroken')}
-      </Badge>
+      <div className="mt-0.5">
+        <Badge variant="warning" title={t('customerApp.banners.linkBrokenHint')}>
+          {t('customerApp.banners.linkBroken')}
+        </Badge>
+      </div>
     );
   }
   return (
-    <span>
-      {t('customerApp.banners.linkLabel', {
-        kind: t(`customerApp.banners.links.${banner.linkKind}`),
-        name: banner.linkName ?? '',
-      })}
-    </span>
+    <div className="text-[0.8125rem] text-muted-foreground">
+      {banner.linkKind === 'NONE'
+        ? t('customerApp.banners.links.NONE')
+        : t('customerApp.banners.linkLabel', {
+            kind: t(`customerApp.banners.links.${banner.linkKind}`),
+            name: banner.linkName ?? '',
+          })}
+    </div>
   );
 }
 

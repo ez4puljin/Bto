@@ -4,8 +4,10 @@
  * in rem; text columns get their `min` and share what is left by weight (a name 3 : a category
  * 2 : a note 2 …). The table is `table-layout: fixed` with these widths, so a long text truncates
  * inside its column instead of stretching it, and at 1920px nothing that fits is cut. A table
- * narrower than its minimum (every text column at its `min`) keeps the browser's own layout, as
- * before this rule.
+ * narrower than its minimum (every text column at its `min`) first lets go of the columns marked
+ * `drop`, the least needed first (ADR-0201: a till PC and a tablet show the columns that matter
+ * instead of scrolling sideways past them); only when what is left still does not fit does it keep
+ * the browser's own layout and scroll in its card.
  */
 export type ColumnKind =
   | 'check'
@@ -37,6 +39,13 @@ export interface ColumnSpec {
   min?: number;
   /** An `actions` column: how many icon buttons it holds (default 2). */
   actions?: number;
+  /**
+   * The order in which the column leaves a table too narrow for all of them (ADR-0201): the 1s
+   * leave first and together, then the 2s … A column without it always stays. Mark what the
+   * record's own page shows anyway (who entered it, when, a note), never what a row is read for
+   * (its name, its amount, its status) nor a checkbox, the actions or the chevron.
+   */
+  drop?: number;
 }
 
 /** The default width in rem of every fixed kind, for 13px Inter (8.3px a mono glyph) and the cells' 12px padding. */
@@ -47,7 +56,9 @@ export const COLUMN_WIDTHS: Record<Exclude<ColumnKind, 'text' | 'spacer' | 'acti
   code: 7,
   number: 10.5,
   date: 7.25,
-  datetime: 10.75,
+  // «2026-11-15 14:05:09» measures 165px at the 17px root: 10.75 cut the seconds (ADR-0201). A
+  // list short of room prints the minute instead (`formatUbMinute`) in a column of 10.
+  datetime: 11.5,
   money: 8.5,
   qty: 6,
   count: 4.5,
@@ -111,4 +122,41 @@ export function columnLayout(columns: readonly ColumnSpec[], available?: number)
       : round(fixedWidth(column)),
   );
   return { widths, minWidth: round(minWidth) };
+}
+
+export interface FittedColumns {
+  /** The indices of the columns shown, in order. */
+  kept: number[];
+  /** The indices of the columns that left, in order. */
+  dropped: number[];
+  /** The widths of the kept columns for the room given. */
+  layout: ColumnLayout;
+  /** Whether the kept columns fit the room (else the browser lays the table out and it scrolls). */
+  fits: boolean;
+}
+
+/**
+ * The columns a table with `available` rem of room shows (ADR-0201): all of them when they fit;
+ * else the ones marked `drop` leave, the lowest number first and equal numbers together, until
+ * the rest fit or nothing more may leave.
+ */
+export function fitColumns(columns: readonly ColumnSpec[], available: number): FittedColumns {
+  const steps = [...new Set(columns.flatMap((column) => column.drop ?? []))].sort((a, b) => a - b);
+  let kept = columns.map((_, index) => index);
+  let layout = columnLayout(columns, available);
+  for (const step of steps) {
+    if (layout.minWidth <= available) break;
+    kept = kept.filter((index) => columns[index]?.drop !== step);
+    layout = columnLayout(
+      kept.flatMap((index) => columns[index] ?? []),
+      available,
+    );
+  }
+  const shown = new Set(kept);
+  return {
+    kept,
+    dropped: columns.map((_, index) => index).filter((index) => !shown.has(index)),
+    layout,
+    fits: layout.minWidth <= available,
+  };
 }

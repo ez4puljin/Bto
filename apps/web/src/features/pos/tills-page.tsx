@@ -34,7 +34,7 @@ import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/compon
 import { TillAccessDialog } from './till-access-dialog';
 import { useWarehouses } from '@/features/identity/api';
 import type { ColumnSpec } from '@/lib/column-layout';
-import { formatUbDateTime } from '@/lib/dayjs';
+import { formatUbDateTime, formatUbMinute } from '@/lib/dayjs';
 import { formatCount } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
@@ -48,29 +48,43 @@ import { useReceiptTemplates } from './receipt-templates-api';
 /** ADR-0138: the path that opens a POS on its edge's kiosk port without a code. */
 const tillPath = (code: string) => `/${tillCodeUrlSegment(code)}`;
 
-/** The tills' columns (ADR-0119). */
+/**
+ * The tills' columns (ADR-0119): 69.75rem in all, the last sale to the minute. The row's actions
+ * are the page's work (a pairing code, the access, the edit), so they never leave the card: a
+ * till PC's 56rem lets the address (the code after a «/», said in the edit dialog) and the
+ * server's code go (54.75), a tablet's 41rem the access summary and the last sale too (36.75)
+ * (ADR-0201).
+ */
 const TILL_COLUMNS: readonly ColumnSpec[] = [
-  { key: 'code', kind: 'code' },
-  { key: 'name', kind: 'text', weight: 3, min: 12 },
-  { key: 'address', kind: 'code', width: 8 },
-  { key: 'node', kind: 'code' },
+  { key: 'code', kind: 'code', width: 6 },
+  { key: 'name', kind: 'text', weight: 3, min: 10.5 },
+  { key: 'address', kind: 'code', width: 8, drop: 1 },
+  { key: 'node', kind: 'code', drop: 1 },
   { key: 'warehouse', kind: 'text', weight: 2 },
-  { key: 'access', kind: 'text', weight: 1 },
-  { key: 'lastSale', kind: 'datetime' },
-  { key: 'status', kind: 'status' },
+  // «Кассчид / бараа» is 7.5rem with its padding.
+  { key: 'access', kind: 'text', weight: 2, min: 8, drop: 2 },
+  // «2026-11-15 14:05» is 141px: 10rem with its padding.
+  { key: 'lastSale', kind: 'datetime', width: 10, drop: 2 },
+  { key: 'status', kind: 'status', width: 6.5 },
   { key: 'spacer', kind: 'spacer' },
   { key: 'actions', kind: 'actions', actions: 3 },
 ];
 
-/** The edge servers' columns; the PosAPI facts are two or three short lines. */
+/**
+ * The edge servers' columns: 61.75rem in all, the last contact to the minute; the PosAPI facts
+ * are short lines that break before their value («Татварт сүүлд илгээсэн:» is 10.75rem with its
+ * padding). A till PC's 56rem lets the token's first letters go (54.75), a tablet's 41rem the
+ * last contact and the queue too (39) (ADR-0201).
+ */
 const NODE_COLUMNS: readonly ColumnSpec[] = [
-  { key: 'code', kind: 'code' },
-  { key: 'name', kind: 'text', weight: 3, min: 12 },
-  { key: 'tokenPrefix', kind: 'code' },
-  { key: 'lastSeen', kind: 'datetime' },
-  { key: 'backlog', kind: 'count' },
-  { key: 'posapi', kind: 'text', weight: 2, min: 12 },
-  { key: 'status', kind: 'status' },
+  { key: 'code', kind: 'code', width: 6 },
+  { key: 'name', kind: 'text', weight: 3, min: 9 },
+  { key: 'tokenPrefix', kind: 'code', drop: 1 },
+  { key: 'lastSeen', kind: 'datetime', width: 10, drop: 2 },
+  // «Дараалалд» is 5.75rem with its padding.
+  { key: 'backlog', kind: 'count', width: 5.75, drop: 2 },
+  { key: 'posapi', kind: 'text', weight: 2, min: 10.75 },
+  { key: 'status', kind: 'status', width: 6.5 },
   { key: 'spacer', kind: 'spacer' },
   { key: 'actions', kind: 'actions', actions: 3 },
 ];
@@ -194,7 +208,7 @@ export function PosTillsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {tills.isPending ? <SkeletonRows columns={8} rows={2} /> : null}
+              {tills.isPending ? <SkeletonRows columns={10} rows={2} /> : null}
               {(tills.data ?? []).map((till) => (
                 <TableRow key={till.id}>
                   <TableCell className="font-mono font-medium">{till.code}</TableCell>
@@ -206,12 +220,15 @@ export function PosTillsPage() {
                     {tillPath(till.code)}
                   </TableCell>
                   <TableCell className="font-mono">{nodeName(till.edgeNodeId)}</TableCell>
-                  <TableCell>{till.warehouseName ?? none}</TableCell>
-                  <TableCell className="text-[0.8125rem] text-muted-foreground">
-                    {accessSummary(till)}
-                  </TableCell>
+                  <TruncateCell text={till.warehouseName ?? t('pos.fields.none')}>
+                    {till.warehouseName ?? none}
+                  </TruncateCell>
+                  <TruncateCell
+                    text={accessSummary(till)}
+                    className="text-[0.8125rem] text-muted-foreground"
+                  />
                   <TableCell className="font-mono">
-                    {till.lastSaleAt ? formatUbDateTime(Date.parse(till.lastSaleAt)) : none}
+                    {till.lastSaleAt ? formatUbMinute(till.lastSaleAt) : none}
                   </TableCell>
                   <TableCell>
                     <ActiveBadge status={till.status} />
@@ -277,7 +294,7 @@ export function PosTillsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {nodes.isPending ? <SkeletonRows columns={10} rows={2} /> : null}
+              {nodes.isPending ? <SkeletonRows columns={9} rows={2} /> : null}
               {(nodes.data ?? []).map((node) => (
                 <TableRow key={node.id}>
                   <TableCell className="font-mono font-medium">{node.code}</TableCell>
@@ -287,7 +304,7 @@ export function PosTillsPage() {
                   </TableCell>
                   <TableCell className="font-mono">
                     {node.lastSeenAt ? (
-                      formatUbDateTime(Date.parse(node.lastSeenAt))
+                      formatUbMinute(node.lastSeenAt)
                     ) : (
                       <span className="font-sans text-muted-foreground">
                         {t('pos.nodes.neverSeen')}
@@ -816,16 +833,17 @@ function PosapiFacts({ node }: { node: EdgeNode }) {
     : NaN;
   const late = Number.isNaN(sent) || Date.now() - sent > SEND_LATE_MS;
   const few = node.posapiLeftLotteries !== null && node.posapiLeftLotteries < FEW_LOTTERIES;
+  // A line longer than its column breaks before its value instead of being cut (ADR-0201).
   return (
-    <div className="text-xs leading-snug">
+    <div className="text-xs leading-snug whitespace-normal">
       {node.posapiError ? <p className="text-warning">{node.posapiError}</p> : null}
       <p className={late ? 'font-medium text-warning' : undefined}>
         {t('pos.fields.posapiLastSent')}:{' '}
-        <span className="font-mono">{node.posapiLastSent ?? '—'}</span>
+        <span className="font-mono whitespace-nowrap">{node.posapiLastSent ?? '—'}</span>
       </p>
       <p className={few ? 'font-medium text-warning' : 'text-muted-foreground'}>
         {t('pos.fields.posapiLotteries')}:{' '}
-        <span className="font-mono">{node.posapiLeftLotteries ?? '—'}</span>
+        <span className="font-mono whitespace-nowrap">{node.posapiLeftLotteries ?? '—'}</span>
       </p>
     </div>
   );

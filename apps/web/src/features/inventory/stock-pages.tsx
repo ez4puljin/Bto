@@ -52,22 +52,46 @@ import { formatUbDateTime } from '@/lib/dayjs';
 import { formatCount, formatQty, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
+import { cn } from '@/lib/utils';
 import { useProductStock, useReconciliation, useStock } from './api';
 import { useWarehouseName, useWarehouseOptions } from './helpers';
 import { WarehouseSelect } from './shared';
 
 const STOCK_KINDS = ['WHOLESALE', 'STORE', 'VEHICLE', 'TRANSIT'] as const;
 
-/** The stock list's columns (ADR-0119); the value only for cost holders. */
+/**
+ * The stock list's columns (ADR-0119); the value only for cost holders. «Боломжит үлдэгдэл» needs
+ * 9rem for its head. 47.25rem with the value, 38.75 without: a tablet upright (about 40.5) lets
+ * the value go, which the product's own stock page shows (ADR-0201).
+ */
 const STOCK_COLUMNS: readonly ColumnSpec[] = [
   { key: 'sku', kind: 'code' },
-  { key: 'product', kind: 'text', weight: 3, min: 14 },
+  { key: 'product', kind: 'text', weight: 3, min: 12 },
   { key: 'onHand', kind: 'qty', width: 8.5 },
-  { key: 'available', kind: 'qty' },
-  { key: 'value', kind: 'money' },
+  { key: 'available', kind: 'qty', width: 9 },
+  { key: 'value', kind: 'money', drop: 1 },
   { key: 'chevron', kind: 'chevron' },
 ];
 const STOCK_COLUMNS_NO_COSTS = STOCK_COLUMNS.filter((column) => column.key !== 'value');
+
+/**
+ * One product's stock by warehouse: 53rem with the costs, which a till PC's card holds (about 54).
+ * A tablet upright's card (about 39) lets go of what stands on the selling shelves and what is
+ * reserved, the two parts of «Боломжит үлдэгдэл»: 38.5rem; in half a row, beside the shelves, the
+ * average cost goes too (31.5; ADR-0201).
+ */
+const WAREHOUSE_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'warehouse', kind: 'text', weight: 1, min: 6 },
+  { key: 'onHand', kind: 'qty', width: 8 },
+  { key: 'sellable', kind: 'qty', width: 8.5, drop: 1 },
+  { key: 'reserved', kind: 'qty', drop: 1 },
+  { key: 'available', kind: 'qty', width: 9 },
+  { key: 'avgCost', kind: 'money', width: 7, drop: 2 },
+  { key: 'value', kind: 'money' },
+];
+const WAREHOUSE_COLUMNS_NO_COSTS = WAREHOUSE_COLUMNS.filter(
+  (column) => column.key !== 'avgCost' && column.key !== 'value',
+);
 
 /** The left panel's sections on the stock list (owner 2026-11-10): what says which products. */
 const STOCK_PANEL_SECTIONS: readonly ProductPanelSection[] = [
@@ -353,8 +377,11 @@ export function StockProductPage() {
           </>
         }
       />
-      {/* By warehouse beside by shelf from xl (owner 2026-10-30). */}
-      <div className="grid items-start gap-4 xl:grid-cols-2">
+      {/*
+        By warehouse beside by shelf from xl (owner 2026-10-30), once the shelves are back: beside
+        their «Тун удахгүй» note the seven columns had half a row and scrolled sideways.
+      */}
+      <div className={cn('grid items-start gap-4', !BINS_SOON && 'xl:grid-cols-2')}>
         <Card>
           <CardHeader>
             <CardTitle>{t('inventory.stock.byWarehouse')}</CardTitle>
@@ -363,7 +390,7 @@ export function StockProductPage() {
             {detail.warehouses.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t('inventory.stock.noStock')}</p>
             ) : (
-              <Table>
+              <ListTable columns={canSeeCosts ? WAREHOUSE_COLUMNS : WAREHOUSE_COLUMNS_NO_COSTS}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t('inventory.warehouse')}</TableHead>
@@ -382,7 +409,7 @@ export function StockProductPage() {
                 <TableBody>
                   {detail.warehouses.map((row) => (
                     <TableRow key={row.warehouseId}>
-                      <TableCell>{warehouseName(row.warehouseId)}</TableCell>
+                      <TruncateCell text={warehouseName(row.warehouseId)} />
                       <TableCell className="text-right font-mono">
                         {t('inventory.qtyWithUnit', { qty: formatQty(row.onHand), unit })}
                       </TableCell>
@@ -410,7 +437,7 @@ export function StockProductPage() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+              </ListTable>
             )}
           </CardContent>
         </Card>

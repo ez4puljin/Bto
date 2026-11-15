@@ -54,6 +54,7 @@ import {
   PrintHeading,
   PrintLink,
   RefreshControl,
+  ROW_NAME,
   SummaryTile,
 } from './report-kit';
 import { ReportViews } from './report-views';
@@ -80,17 +81,31 @@ function filterParams(filter: AgingFilter) {
   };
 }
 
-/** The aging's columns on screen (ADR-0119): code, name, group, the buckets, credit, total, oldest. */
+/**
+ * The aging's columns on screen (ADR-0119): code, name, group, the buckets, credit, total, oldest;
+ * 95.5rem in all, a bucket 8rem («1,234,567,890»), so a monitor's 96.5rem shows every one. What a
+ * narrower table lets go, least needed first (ADR-0201): the group, which the bar filters by
+ * (88.5); the oldest due day (a 1536 laptop's 86rem: 81.25); the code (a 1366 laptop's 76rem:
+ * 74.25); the advance (66.25) — the customer's panel says all four. The name, the five buckets and
+ * the total are what the report is read for: on a till PC and a tablet they scroll in the card.
+ */
 const AGING_COLUMNS: readonly ColumnSpec[] = [
-  { key: 'code', kind: 'code' },
+  { key: 'code', kind: 'code', drop: 3 },
   { key: 'name', kind: 'text', weight: 3, min: 14 },
-  { key: 'group', kind: 'text', weight: 1 },
-  ...AGING_BUCKETS.map((bucket): ColumnSpec => ({ key: bucket, kind: 'money' })),
-  { key: 'credit', kind: 'money' },
+  { key: 'group', kind: 'text', weight: 1, drop: 1 },
+  ...AGING_BUCKETS.map((bucket): ColumnSpec => ({ key: bucket, kind: 'money', width: 8 })),
+  { key: 'credit', kind: 'money', width: 8, drop: 4 },
   { key: 'total', kind: 'money', width: 10 },
-  { key: 'oldest', kind: 'date' },
+  { key: 'oldest', kind: 'date', drop: 2 },
   { key: 'chevron', kind: 'chevron' },
 ];
+
+/**
+ * Where the kit cannot size the table (a till PC, a tablet) the browser lays it out, and a name
+ * took up to 24rem of it: there the name keeps the 14rem the sized table gives it at least, so the
+ * amounts stand in sight, or a short scroll away.
+ */
+const NAME_AT_ITS_LEAST = '[&:not([data-layout=columns])_td_.truncate]:max-w-[14rem]';
 
 /** With `onOpen` (the screen) the columns are sized by the layout; on paper the table lays itself out. */
 function AgingTable(props: { report: Aging; onOpen?: (row: AgingRow) => void }) {
@@ -111,7 +126,10 @@ function AgingTable(props: { report: Aging; onOpen?: (row: AgingRow) => void }) 
           ))}
           <TableHead className="text-right">{t(`${columns}.credit`)}</TableHead>
           <TableHead className="text-right">{t(`${columns}.total`)}</TableHead>
-          <TableHead>{t(`${columns}.oldest`)}</TableHead>
+          {/* Three words over a date: two lines, or the sized column would cut them. */}
+          <TableHead className="leading-tight whitespace-normal">
+            {t(`${columns}.oldest`)}
+          </TableHead>
           {props.onOpen ? <ChevronHead /> : null}
         </TableRow>
       </TableHeader>
@@ -122,11 +140,7 @@ function AgingTable(props: { report: Aging; onOpen?: (row: AgingRow) => void }) 
               <TableCell className="font-mono">{row.code ?? ''}</TableCell>
               <TruncateCell text={row.name}>
                 {props.onOpen ? (
-                  <button
-                    type="button"
-                    className="font-medium underline-offset-4 hover:underline"
-                    onClick={() => props.onOpen?.(row)}
-                  >
+                  <button type="button" className={ROW_NAME} onClick={() => props.onOpen?.(row)}>
                     {row.name}
                   </button>
                 ) : (
@@ -176,7 +190,9 @@ function AgingTable(props: { report: Aging; onOpen?: (row: AgingRow) => void }) 
     </>
   );
   return props.onOpen ? (
-    <ListTable columns={AGING_COLUMNS}>{body}</ListTable>
+    <ListTable columns={AGING_COLUMNS} className={NAME_AT_ITS_LEAST}>
+      {body}
+    </ListTable>
   ) : (
     <Table>{body}</Table>
   );
@@ -185,7 +201,9 @@ function AgingTable(props: { report: Aging; onOpen?: (row: AgingRow) => void }) 
 function BucketTiles({ report }: { report: Aging }) {
   const { t } = useTranslation();
   return (
-    <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+    // One row from a till PC up (ADR-0201): in two rows they pushed the list so low in a 640px
+    // window that its card could no longer scroll by itself.
+    <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6 lg:max-xl:gap-2">
       {AGING_BUCKETS.map((bucket) => (
         <SummaryTile
           key={bucket}

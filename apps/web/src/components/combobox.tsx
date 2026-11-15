@@ -83,7 +83,7 @@ export function Combobox(props: {
           aria-controls={open ? listId : undefined}
           data-active={props.value !== '' ? 'true' : undefined}
           className={cn(
-            'inline-flex h-8.5 max-w-64 items-center gap-1.5 rounded-full border border-border bg-background pr-2 pl-3 text-[0.8125rem] font-medium shadow-control outline-none hover:bg-accent focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring data-[active=true]:border-transparent data-[active=true]:bg-secondary data-[active=true]:text-secondary-foreground',
+            'inline-flex h-8.5 max-w-64 items-center gap-1.5 rounded-full border border-border bg-background pr-2 pl-3 text-[0.8125rem] font-medium shadow-control outline-none touch:h-11 hover:bg-accent focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring data-[active=true]:border-transparent data-[active=true]:bg-secondary data-[active=true]:text-secondary-foreground',
             props.className,
           )}
         >
@@ -95,6 +95,7 @@ export function Combobox(props: {
         <Popover.Content
           align="start"
           sideOffset={4}
+          collisionPadding={8}
           className="z-50 w-(--radix-popover-trigger-width) max-w-[min(28rem,var(--radix-popover-content-available-width))] min-w-72 overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-popover"
         >
           <div className="relative p-1">
@@ -121,7 +122,12 @@ export function Combobox(props: {
           {matches.length === 0 ? (
             <p className="px-3 py-2 text-sm text-muted-foreground">{t('common.noMatches')}</p>
           ) : (
-            <ul id={listId} role="listbox" className="flex max-h-80 flex-col overflow-y-auto">
+            <ul
+              id={listId}
+              role="listbox"
+              // Never taller than the room the window leaves: the search box stays above it.
+              className="flex max-h-[min(20rem,calc(var(--radix-popover-content-available-height,100vh)-4.5rem))] flex-col overflow-y-auto"
+            >
               {matches.map((option, position) => (
                 <li
                   key={option.value}

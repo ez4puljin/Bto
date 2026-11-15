@@ -10,6 +10,14 @@ import { useWarehouses } from '@/features/identity/api';
 type WarehouseKind = components['schemas']['WarehouseKind'];
 
 /**
+ * Windows narrower than a laptop's (`xl`) and than a till PC's (`lg`), for a document window whose
+ * lines table cannot let columns go by itself (ADR-0201). `max-width`: where no media query
+ * answers (a test), the window is a laptop's.
+ */
+export const BELOW_LAPTOP = '(max-width: 1279px)';
+export const BELOW_TILL_PC = '(max-width: 1023px)';
+
+/**
  * Active warehouses of the given kinds; with `writable`, only those the user may write documents
  * for (ADR-0027 #7), so a form never offers a warehouse the server would refuse.
  */

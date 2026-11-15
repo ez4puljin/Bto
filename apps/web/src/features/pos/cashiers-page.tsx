@@ -30,7 +30,7 @@ import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/compon
 import { useUsers } from '@/features/identity/api';
 import { localPhone } from '@/features/partners/phone';
 import type { ColumnSpec } from '@/lib/column-layout';
-import { formatUbDateTime } from '@/lib/dayjs';
+import { formatUbDateTime, formatUbMinute } from '@/lib/dayjs';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
@@ -38,13 +38,20 @@ import { useCreateParam } from '@/lib/use-create-param';
 import { type Cashier, useCashiers, usePosMutations } from './api';
 import { ActiveBadge } from './badges';
 
-/** The list's columns (ADR-0119); the status cell may hold a second badge with a time. */
+/**
+ * The list's columns (ADR-0119): 54.75rem in all, the PIN's time to the minute, so a till PC's
+ * 56rem shows every one; the status cell may hold a second badge with a time. A row's actions are
+ * the page's work (the PIN, the state, the lock), so they never leave the card: an upright
+ * tablet's 41rem lets who set the PIN go (46.75), then when (36.75) (ADR-0201).
+ */
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'cashier', kind: 'text', weight: 3, min: 12 },
+  { key: 'cashier', kind: 'text', weight: 3, min: 11 },
   { key: 'user', kind: 'code', width: 9 },
   { key: 'status', kind: 'text', weight: 2, min: 10 },
-  { key: 'pinSetAt', kind: 'datetime' },
-  { key: 'pinSetBy', kind: 'text', weight: 1 },
+  // «2026-11-15 14:05» is 141px: 10rem with its padding.
+  { key: 'pinSetAt', kind: 'datetime', width: 10, drop: 2 },
+  // «Тохируулсан хүн» is 8rem with its padding.
+  { key: 'pinSetBy', kind: 'text', weight: 1, min: 8, drop: 1 },
   { key: 'spacer', kind: 'spacer' },
   { key: 'actions', kind: 'actions', actions: 3 },
 ];
@@ -129,9 +136,7 @@ export function PosCashiersPage() {
                       ) : null}
                     </span>
                   </TableCell>
-                  <TableCell className="font-mono">
-                    {formatUbDateTime(Date.parse(cashier.pinSetAt))}
-                  </TableCell>
+                  <TableCell className="font-mono">{formatUbMinute(cashier.pinSetAt)}</TableCell>
                   <TableCell>
                     {cashier.pinSetByName ?? (
                       <span className="text-muted-foreground">{t('pos.fields.none')}</span>

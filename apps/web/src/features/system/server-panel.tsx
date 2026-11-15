@@ -95,7 +95,7 @@ function Tiles({ data }: { data: ServerMetrics }) {
   const ofTotal = (used: number, total: number) =>
     t('systemStatus.server.usedOf', { used: formatBytes(used), total: formatBytes(total) });
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
       <Tile
         title={t('systemStatus.server.cpu')}
         value={formatPercent(data.cpu.percent)}

@@ -165,7 +165,7 @@ export function InlineText(props: {
           value={draft}
           maxLength={props.maxLength}
           placeholder={props.placeholder}
-          className={cn('h-7 px-1.5 text-xs md:text-xs', props.mono && 'font-mono')}
+          className={cn('h-7 px-1.5 text-xs md:text-xs touch:h-11', props.mono && 'font-mono')}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={() => finish(true)}
           onKeyDown={(event) => {
@@ -179,7 +179,7 @@ export function InlineText(props: {
           aria-label={`${props.label}: ${props.value || props.placeholder}`}
           title={props.value || props.label}
           className={cn(
-            'block w-full cursor-text rounded-md text-left hover:bg-accent',
+            'block w-full cursor-text rounded-md text-left hover:bg-accent touch:min-h-11',
             FOCUS_RING,
           )}
           onClick={open}
@@ -204,7 +204,7 @@ export function InlineText(props: {
           title={t('ebarimtCheck.cells.revert')}
           aria-label={`${props.label}: ${t('ebarimtCheck.cells.revert')}`}
           className={cn(
-            'flex w-full items-center gap-1 truncate px-1 text-left text-xs text-muted-foreground hover:text-destructive',
+            'flex w-full items-center gap-1 truncate px-1 text-left text-xs text-muted-foreground hover:text-destructive touch:min-h-11',
             FOCUS_RING,
           )}
           onClick={props.onRevert}
@@ -290,7 +290,7 @@ export function InlineAmount(props: {
           aria-invalid={invalid || undefined}
           inputMode="decimal"
           value={draft}
-          className="h-7 px-1.5 text-right font-mono text-xs md:text-xs"
+          className="h-7 px-1.5 text-right font-mono text-xs md:text-xs touch:h-11"
           onValueChange={(raw) => {
             if (raw === '') {
               signed.current = false;
@@ -335,7 +335,7 @@ export function InlineAmount(props: {
       aria-label={`${props.label}: ${amountText(props.value)}`}
       title={`${props.label}: ${amountText(props.value)}`}
       className={cn(
-        'block w-full cursor-text rounded-md px-1 py-0.5 text-right font-mono hover:bg-accent',
+        'block w-full cursor-text rounded-md px-1 py-0.5 text-right font-mono hover:bg-accent touch:min-h-11',
         FOCUS_RING,
         amount.isZero() ? 'text-muted-foreground' : 'font-semibold text-warning',
       )}

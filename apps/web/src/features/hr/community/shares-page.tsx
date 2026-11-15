@@ -29,10 +29,12 @@ import { PersonLine } from './community-kit';
 const VIEWS = ['LIST', 'MAP'] as const;
 type View = (typeof VIEWS)[number];
 
+// 24rem: sized in its half of a till PC (27rem beside the map), the minute-long date at its own
+// width; the map names the pressed point in full.
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'who', kind: 'text', weight: 2, min: 11 },
-  { key: 'when', kind: 'datetime' },
-  { key: 'note', kind: 'text', weight: 2, min: 8 },
+  { key: 'who', kind: 'text', weight: 3, min: 9 },
+  { key: 'when', kind: 'datetime', width: 9 },
+  { key: 'note', kind: 'text', weight: 2, min: 6 },
 ];
 
 /**
@@ -91,14 +93,17 @@ export function SharesPage() {
         />
       </FilterBar>
       <ProblemAlert problem={problemFromError(shares.error)} onRetry={shares.refetch} />
+      {/* A pressed row moves the map, so both stay in the window (ADR-0201): side by side from a
+          till PC, each as tall as the window leaves; on a tablet upright the map first and the
+          list in what is left under it, scrolling inside itself. */}
       <div
         className={cn(
           'grid items-start gap-4',
-          view === 'LIST' && 'xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]',
+          view === 'LIST' && 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]',
         )}
       >
         {view === 'LIST' ? (
-          <ListCard scroll>
+          <ListCard scroll beside className="max-lg:order-last">
             {shares.data && rows.length === 0 ? (
               <EmptyState
                 title={filtered ? t('hr.community.noMatch') : t('hr.community.shares.empty')}
@@ -128,7 +133,7 @@ export function SharesPage() {
                         <TableCell>
                           <button
                             type="button"
-                            className="block w-full text-left outline-none"
+                            className="block w-full text-left outline-none touch:relative touch:after:absolute touch:after:inset-x-0 touch:after:-inset-y-2"
                             aria-label={t('hr.community.shares.focus', { name: share.fullName })}
                             aria-pressed={focusId === id}
                           >
@@ -155,9 +160,11 @@ export function SharesPage() {
           points={points}
           label={t('hr.community.shares.mapLabel')}
           focusId={focusId}
+          // The content starts 13.5rem down (17.5rem on a tablet, whose filters take two rows) and
+          // the page keeps 2.5rem below it.
           className={cn(
-            'bg-card',
-            view === 'LIST' ? 'h-[calc(100dvh-14rem)] min-h-80' : 'h-[calc(100dvh-13rem)] min-h-96',
+            'min-h-72 bg-card lg:h-[calc(100dvh-16rem)]',
+            view === 'LIST' ? 'max-lg:h-[36dvh]' : 'max-lg:h-[calc(100dvh-20rem)]',
           )}
         />
       </div>

@@ -131,14 +131,19 @@ export function EmployeePage() {
         }
       />
       <ProblemAlert problem={action.problem} />
+      {/* Two stacks from a laptop (docs/ui.md §4): the short access card with the details under
+          it beside the tall card, so no card's height opens a hole beside another. The cards are
+          containers: where one is at least 44rem wide (a till PC's single column) its facts run
+          two to a row. */}
       <div className="grid items-start gap-4 xl:grid-cols-2">
         <DetailCard
+          className="@container"
           title={t('hr.staff.dialog.editTitle')}
           canEdit={canManage}
           view={<CardFacts staff={staff} canManage={canManage} />}
           edit={(close) => <StaffForm staff={staff} onCancel={close} onSaved={close} />}
         />
-        <div className="min-w-0">
+        <div className="grid min-w-0 gap-4">
           {canReadUsers && user.data ? (
             <UserAccessCard
               user={user.data}
@@ -149,8 +154,8 @@ export function EmployeePage() {
           ) : (
             <RolesCard roles={staff.roles} />
           )}
+          <StaffDetailsCard staff={staff} canManage={canManage} />
         </div>
-        <StaffDetailsCard staff={staff} canManage={canManage} />
         {canManageUsers ? (
           <div className="min-w-0 xl:col-span-2">
             <UserSessionsCard userId={id} />
@@ -182,6 +187,7 @@ function CardFacts({ staff, canManage }: { staff: HrStaff; canManage: boolean })
     <div className="flex flex-col gap-4">
       <PhotoPicker staff={staff} canManage={canManage} />
       <FieldList
+        columns={2}
         items={[
           { label: t('hr.staff.dialog.lastName'), value: staff.lastName },
           { label: t('hr.staff.dialog.firstName'), value: staff.firstName ?? staff.fullName },

@@ -38,6 +38,79 @@ function Demo() {
   );
 }
 
+const NARROW = [
+  { key: 'code', kind: 'code' },
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
+  { key: 'author', kind: 'text', drop: 1 },
+  { key: 'amount', kind: 'money' },
+] as const;
+
+function Droppable(props: { total?: boolean }) {
+  return (
+    <ListTable columns={NARROW}>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Код</TableHead>
+          <TableHead>Нэр</TableHead>
+          <TableHead>Оруулсан</TableHead>
+          <TableHead className="text-right">Дүн</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        <TableRow>
+          <TableCell>A1</TableCell>
+          <TableCell>Ус</TableCell>
+          <TableCell>Бат</TableCell>
+          <TableCell className="text-right font-mono">1,000</TableCell>
+        </TableRow>
+        {props.total ? (
+          <TableRow>
+            <TableCell colSpan={3}>Нийт</TableCell>
+            <TableCell className="text-right font-mono">1,000</TableCell>
+          </TableRow>
+        ) : null}
+      </TableBody>
+    </ListTable>
+  );
+}
+
+describe('ListTable in a narrow box (ADR-0201)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('lets a column marked drop leave and sizes the rest', () => {
+    // 7 + 12 + 7 + 8.5 = 34.5rem at least; a 480px box is 30rem: «Оруулсан» leaves, 27.5rem fit.
+    boxOf(480);
+    const { container } = render(<Droppable />);
+    const table = screen.getByRole('table');
+    expect(table).toHaveClass('table-fixed');
+    expect(
+      [...table.querySelectorAll('colgroup > col')].map(
+        (col) => (col as HTMLTableColElement).style.width,
+      ),
+    ).toEqual(['7rem', '14.5rem', '8.5rem']);
+    // The third cell of every row is taken out by its place.
+    const rule = container.querySelector('style')?.textContent ?? '';
+    expect(rule).toContain(':nth-child(3)');
+    expect(rule).toContain('display:none');
+    expect(rule).not.toContain(':nth-child(2)');
+  });
+
+  it('shows every column again in a box wide enough', () => {
+    boxOf(1000);
+    const { container } = render(<Droppable />);
+    expect(container.querySelector('style')).toBeNull();
+    expect(screen.getByRole('table').querySelectorAll('colgroup > col')).toHaveLength(4);
+  });
+
+  it('lets nothing leave a table that has a cell spanning columns', () => {
+    boxOf(480);
+    const { container } = render(<Droppable total />);
+    expect(container.querySelector('style')).toBeNull();
+    // Too narrow for all four: the browser's own layout, scrolling in its card.
+    expect(screen.getByRole('table')).not.toHaveClass('table-fixed');
+  });
+});
+
 describe('ListTable (ADR-0119)', () => {
   afterEach(() => vi.restoreAllMocks());
 

@@ -299,7 +299,7 @@ function IssuedForm(props: {
           inputMode="numeric"
           autoComplete="off"
           maxLength={40}
-          className="h-11 font-mono"
+          className="h-11 font-mono text-base md:text-base"
           value={ddtd}
           onChange={(event) => setDdtd(event.target.value.replace(/\D/g, ''))}
         />
@@ -310,7 +310,7 @@ function IssuedForm(props: {
           autoComplete="off"
           maxLength={19}
           placeholder="2026-10-26 14:05:00"
-          className="h-11 font-mono"
+          className="h-11 font-mono text-base md:text-base"
           value={date}
           onChange={(event) => setDate(event.target.value)}
         />

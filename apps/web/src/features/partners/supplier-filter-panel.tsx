@@ -13,7 +13,9 @@ import { PARTNER_STATUSES } from './partner-schema';
 
 /**
  * The supplier list's left side, like the product list's (owner 2026-11-06): what they sell on top,
- * each tree with a box that finds a category, then their own category, status and segments.
+ * each tree with a box that finds a category, then their own category, status and segments. It
+ * stands beside the list from `xl`; a till PC and a tablet keep the list whole and filter with the
+ * pills of its filter bar (ADR-0201).
  */
 export function SupplierFilterPanel(props: {
   productCategoryId: number | undefined;
@@ -50,7 +52,7 @@ export function SupplierFilterPanel(props: {
   return (
     <aside
       aria-label={t('partners.suppliers.panel.label')}
-      className="hidden w-64 shrink-0 lg:block"
+      className="hidden w-64 shrink-0 xl:block"
     >
       <ListCard scroll beside>
         <div className="flex items-center gap-2 px-3 py-2.5 text-sm font-semibold">
@@ -91,7 +93,7 @@ export function SupplierFilterPanel(props: {
           )}
           <Link
             to="/partners/supplier-categories"
-            className="mt-1 inline-flex items-center gap-1.5 px-2 py-1 text-xs text-link underline-offset-4 hover:underline"
+            className="mt-1 inline-flex items-center gap-1.5 px-2 py-1 text-xs text-link underline-offset-4 hover:underline touch:min-h-11"
           >
             <Settings2 aria-hidden className="size-3.5" />
             {t('partners.suppliers.panel.settings')}

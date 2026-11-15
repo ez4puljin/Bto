@@ -96,7 +96,7 @@ function lineColumns(flags: {
   return [
     { key: 'product', kind: 'text', weight: 3, min: 14 },
     ...(flags.warehouse ? [{ key: 'warehouse', kind: 'text', weight: 1 } as const] : []),
-    // An editable unit is a select of 11rem (`UnitSelect`).
+    // An editable unit is a select of 11rem (`UnitSelect`; narrower in a narrow panel, `UNIT_FIELD`).
     { key: 'unit', kind: 'text', weight: 1, min: flags.editable ? 12 : 7 },
     { key: 'ordered', kind: 'qty', width: flags.editable ? 7 : 6.5 },
     ...(flags.confirmed ? [{ key: 'reserved', kind: 'qty', width: 7.5 } as const] : []),
@@ -113,6 +113,14 @@ function lineColumns(flags: {
 
 /** The first column of a group (the quantities, the money) draws a line before it. */
 const GROUP_START = 'border-l border-border/70';
+
+/**
+ * In a panel under 72rem wide (a till PC's, a tablet's: `@container/panel` in order-panel.tsx) the
+ * unit's select takes its column instead of its own 11rem and gives way down to 7rem: a till PC's
+ * panel then holds the table's eight columns without scrolling sideways (ADR-0201).
+ */
+const UNIT_FIELD =
+  '@max-[72rem]/panel:[&_.native-select]:w-full @max-[72rem]/panel:[&_.native-select]:min-w-28';
 
 /**
  * «Бараа» (ADR-0059, erxes's Products): the order's lines with a search by name or code, a filter by
@@ -451,7 +459,7 @@ export function OrderProducts({
                         {warehouseId === null ? '' : warehouseName(warehouseId)}
                       </TableCell>
                     )}
-                    <TableCell>
+                    <TableCell className={editable ? UNIT_FIELD : undefined}>
                       {editable ? (
                         <UnitSelect
                           productId={line.productId}
@@ -600,10 +608,17 @@ export function OrderProducts({
           </p>
         </ListCard>
       ) : null}
+      {/* How the parts go, said once after them: in the sticky footer it hid a line of the list. */}
+      {grouped ? (
+        <p className="text-[0.8125rem] text-muted-foreground">{t('sales.pick.partsHint')}</p>
+      ) : null}
       <ProblemAlert problem={action.problem} />
-      {/* The footer sticks to the panel's foot, so «Хадгалах» stays in reach under long lists. */}
+      {/*
+        The footer sticks to the panel's foot, so «Хадгалах» stays in reach under long lists. Its
+        text gives way to the buttons (`basis-72`): one row, not the buttons under a line of hint.
+      */}
       <div className="sticky -bottom-5 z-10 -mx-5 -mb-5 flex flex-wrap items-center justify-between gap-3 border-t border-border/80 bg-popover/95 px-5 py-3 backdrop-blur-md">
-        <div className="min-w-0 text-sm">
+        <div className="min-w-0 flex-1 basis-72 text-sm">
           <p className="font-medium">
             {t('sales.panel.products.summary', {
               count: lines.length,
@@ -625,9 +640,6 @@ export function OrderProducts({
             <p className="text-[0.8125rem] text-destructive">
               {t('sales.pick.shortSummary', { count: shortLines.length })}
             </p>
-          ) : null}
-          {grouped && !dirty ? (
-            <p className="text-[0.8125rem] text-muted-foreground">{t('sales.pick.partsHint')}</p>
           ) : null}
           {!frozen && lines.length > 0 ? (
             <p className="text-[0.8125rem] text-muted-foreground">

@@ -23,6 +23,7 @@ import { formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import {
   ARCHIVED_SCOPES,
+  DEFAULT_HIDDEN,
   LIST_COLUMNS,
   LIST_SCOPES,
   type ListColumn,
@@ -38,20 +39,30 @@ import {
   useOrderList,
 } from './pipelines-api';
 
-/** How each column shares the list's width (ADR-0119); the chevron column ends every row. */
+/**
+ * How each column shares the list's width (ADR-0119); the chevron column ends every row. A table
+ * too narrow for the default set lets go of what the order's panel shows anyway (ADR-0201): first
+ * how it is paid, then the stage and the delivery date. Counted in rem with the chevron's 2.25:
+ * the whole set 9.5 + 11 + 7 + 8.5 + 7.25 + 8.5 + 8.5 = 62.5 (a laptop); without the payment 54 (a
+ * till PC leaves 56); without the stage and the date too 39.75 (a tablet upright leaves 41).
+ */
 const COLUMN_SPECS: Record<ListColumn, ColumnSpec> = {
-  number: { key: 'number', kind: 'number' },
-  customer: { key: 'customer', kind: 'text', weight: 3, min: 12 },
-  stage: { key: 'stage', kind: 'text', weight: 1 },
+  // «20261031_0003» with the cell's padding is 9rem.
+  number: { key: 'number', kind: 'number', width: 9.5 },
+  customer: { key: 'customer', kind: 'text', weight: 3, min: 11 },
+  stage: { key: 'stage', kind: 'text', weight: 1, drop: 2 },
   status: { key: 'status', kind: 'status' },
-  deliveryDate: { key: 'deliveryDate', kind: 'date' },
+  deliveryDate: { key: 'deliveryDate', kind: 'date', drop: 2 },
   total: { key: 'total', kind: 'money' },
-  payment: { key: 'payment', kind: 'status' },
+  payment: { key: 'payment', kind: 'status', drop: 1 },
   createdBy: { key: 'createdBy', kind: 'text', weight: 1 },
   channel: { key: 'channel', kind: 'text', weight: 1 },
   createdAt: { key: 'createdAt', kind: 'datetime' },
 };
 const CHEVRON_COLUMN: ColumnSpec = { key: 'chevron', kind: 'chevron' };
+
+/** A column as the user's own, wider set keeps it: it never leaves. */
+const staying = ({ drop: _drop, ...spec }: ColumnSpec): ColumnSpec => spec;
 
 /** «Баганууд» of the list view, at the end of the work page's bar. */
 export function ListColumnChooser({ columns }: { columns: ListColumns }) {
@@ -198,12 +209,17 @@ export function ListView({
   const visible = LIST_COLUMNS.filter(shown);
   // The spec follows the shown columns, so the colgroup always matches the cells of a row.
   const hidden = columns.hidden;
+  // Only the default set gives way on a narrow screen. A set the user widened in «Баганууд»
+  // scrolls sideways as before: a column ticked there shows, and takes no other with it.
+  const widened = DEFAULT_HIDDEN.some((column) => !hidden.has(column));
   const specs = useMemo(
     () => [
-      ...LIST_COLUMNS.filter((column) => !hidden.has(column)).map((column) => COLUMN_SPECS[column]),
+      ...LIST_COLUMNS.filter((column) => !hidden.has(column)).map((column) =>
+        widened ? staying(COLUMN_SPECS[column]) : COLUMN_SPECS[column],
+      ),
       CHEVRON_COLUMN,
     ],
-    [hidden],
+    [hidden, widened],
   );
   const problem = problemFromError(orders.error);
   return (

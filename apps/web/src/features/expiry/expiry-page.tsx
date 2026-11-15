@@ -44,7 +44,7 @@ import { hrefWithParam, useSetParam } from '@/lib/search-params';
 import { useCreateParam } from '@/lib/use-create-param';
 import { useDebounced } from '@/lib/use-debounced';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
-import { useMediaQuery } from '@/lib/use-media-query';
+import { useMediaQuery, WIDE_SCREEN } from '@/lib/use-media-query';
 import { cn } from '@/lib/utils';
 import {
   type ExpiryItem,
@@ -55,15 +55,16 @@ import {
   useExpirySummary,
 } from './api';
 import {
-  CHEVRON_COLUMN,
   DEFAULT_HIDDEN_EXPIRY_COLUMNS,
   EXPIRY_COLUMN_KEYS,
-  EXPIRY_COLUMN_SPECS,
   type ExpiryColumnKey,
+  expiryColumnSpecs,
   FULL_DEFAULT_HIDDEN_EXPIRY_COLUMNS,
   FULL_SCREEN,
+  isDefaultSet,
   isNumericColumn,
   LOCKED_EXPIRY_COLUMNS,
+  NO_FILTER_PANEL,
   WIDE_DEFAULT_HIDDEN_EXPIRY_COLUMNS,
 } from './expiry-columns';
 import { ExpiryCreateDialog } from './expiry-create-dialog';
@@ -128,18 +129,26 @@ export function ExpiryPage() {
   const today = summary.data?.today;
 
   const fullScreen = useMediaQuery(FULL_SCREEN);
+  const wideScreen = useMediaQuery(WIDE_SCREEN);
+  const compact = useMediaQuery(NO_FILTER_PANEL);
+  const wideDefault = fullScreen
+    ? FULL_DEFAULT_HIDDEN_EXPIRY_COLUMNS
+    : WIDE_DEFAULT_HIDDEN_EXPIRY_COLUMNS;
   const columnState = useHiddenColumns(
     COLUMNS_LIST,
     EXPIRY_COLUMN_KEYS,
     LOCKED_EXPIRY_COLUMNS,
     DEFAULT_HIDDEN_EXPIRY_COLUMNS,
-    fullScreen ? FULL_DEFAULT_HIDDEN_EXPIRY_COLUMNS : WIDE_DEFAULT_HIDDEN_EXPIRY_COLUMNS,
+    wideDefault,
   );
   const { hidden } = columnState;
   const columns = useMemo(() => EXPIRY_COLUMN_KEYS.filter((key) => !hidden.has(key)), [hidden]);
+  // A till PC and a tablet let the default set's least needed columns go (ADR-0201); what a user
+  // chose in «Баганууд» stays as chosen.
+  const untouched = isDefaultSet(hidden, wideScreen ? wideDefault : DEFAULT_HIDDEN_EXPIRY_COLUMNS);
   const specs = useMemo(
-    () => [...columns.map((key) => EXPIRY_COLUMN_SPECS[key]), CHEVRON_COLUMN],
-    [columns],
+    () => expiryColumnSpecs(columns, { compact, untouched }),
+    [columns, compact, untouched],
   );
 
   const narrowed = isNarrowed(filter);
@@ -385,7 +394,8 @@ function ExpiryTiles(props: {
   return (
     <section
       aria-label={t('expiry.tiles.label')}
-      className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4"
+      // Two by two on a tablet upright: four across cut the tiles' own names there (ADR-0201).
+      className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4"
     >
       {tiles.map((tile) => {
         const count = tile.count === undefined ? '' : formatCount(tile.count);
@@ -396,7 +406,7 @@ function ExpiryTiles(props: {
             aria-pressed={props.view === tile.view}
             aria-label={`${tile.label}: ${count}`}
             className={cn(
-              'flex items-center gap-3 rounded-xl bg-card px-3.5 py-2.5 text-left shadow-card ring-1 ring-black/[0.06] transition-[box-shadow,transform] duration-200 ease-apple outline-none hover:shadow-popover focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]',
+              '@container flex items-center gap-3 rounded-xl bg-card px-3.5 py-2.5 text-left shadow-card ring-1 ring-black/[0.06] transition-[box-shadow,transform] duration-200 ease-apple outline-none hover:shadow-popover focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]',
               props.view === tile.view && 'ring-2 ring-primary',
             )}
             onClick={() => props.onView(tile.view)}
@@ -415,7 +425,8 @@ function ExpiryTiles(props: {
               </span>
               <span className="mt-1 block truncate text-[0.8125rem] leading-snug text-muted-foreground">
                 {tile.label}
-                <span className="text-xs"> · {tile.hint}</span>
+                {/* The hint only where the tile holds it whole: four across a till PC do not. */}
+                <span className="hidden text-xs @[15rem]:inline"> · {tile.hint}</span>
               </span>
             </span>
           </button>
@@ -473,7 +484,7 @@ function ExpiryCell(props: { column: ExpiryColumnKey; item: ExpiryItem; href: st
     case 'status':
       return (
         <TableCell>
-          <ExpiryStatusBadge status={item.status} />
+          <ExpiryStatusBadge status={item.status} cut />
         </TableCell>
       );
     case 'liability':

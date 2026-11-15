@@ -65,14 +65,21 @@ const idOf = (value: string | null | undefined) => {
  * Purchase orders by supplier (ADR-0115): every order with its lowest status and its suppliers,
  * filtered by number, status and «Миний нийлүүлэгч»; managers start a new one from a dialog.
  */
-/** The columns of the order list (ADR-0119): number, date, suppliers, their count, note, status, chevron. */
+/**
+ * The columns of the order list (ADR-0119): number, date, suppliers, their count, note, status,
+ * chevron. The count and the status are as wide as their heads («Нийлүүлэгч», «Нийлүүлэгчдийн
+ * төлөв»). A narrow table lets the count and the note go, which the order's own page shows
+ * (ADR-0201). In rem: all of it 10 + 7.25 + 10 + 6 + 6 + 10.5 + 2.25 = 52 (a till PC leaves 56,
+ * most of the rest to the names); without the two 40 (a tablet upright leaves 41).
+ */
 const ORDER_LIST_COLUMNS: readonly ColumnSpec[] = [
-  { key: 'number', kind: 'number' },
+  // «PO-2026-000005» with the cell's padding is 9.75rem.
+  { key: 'number', kind: 'number', width: 10 },
   { key: 'date', kind: 'date' },
-  { key: 'suppliers', kind: 'text', weight: 3, min: 12 },
-  { key: 'supplierCount', kind: 'count' },
-  { key: 'note', kind: 'text', weight: 2 },
-  { key: 'status', kind: 'status' },
+  { key: 'suppliers', kind: 'text', weight: 4, min: 10 },
+  { key: 'supplierCount', kind: 'count', width: 6, drop: 1 },
+  { key: 'note', kind: 'text', weight: 1, min: 6, drop: 1 },
+  { key: 'status', kind: 'status', width: 10.5 },
   { key: 'chevron', kind: 'chevron' },
 ];
 

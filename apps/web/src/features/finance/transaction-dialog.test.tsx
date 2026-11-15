@@ -127,6 +127,26 @@ describe('«Шинэ гүйлгээ» (ADR-0150)', () => {
     expect(shown.getByText(/511020/).parentElement).toHaveTextContent(/^Кт.*5,000/);
   });
 
+  it('keeps its height while it is filled: nothing appears between the fields (ADR-0201)', async () => {
+    const user = userEvent.setup();
+    const dialog = await open(signedIn(ACCOUNTANT_ME, routes()));
+    await pick(user, dialog, words.account, /^110102/);
+    await pick(user, dialog, words.counterAccount, /^511020/);
+    await user.type(dialog.getByLabelText(mn.finance.fields.amount), '5000');
+    // The balance stands on the account's label line and still describes the field.
+    const account = dialog.getByLabelText(words.account);
+    const balance = dialog.getByText(/^Үлдэгдэл:/);
+    expect(balance.parentElement).toContainElement(dialog.getByText(words.account));
+    expect(account).toHaveAccessibleDescription(balance.textContent ?? '');
+    // The entry's two sides stand beside the buttons that write it.
+    const footer = dialog.getByRole('button', { name: mn.common.save }).parentElement;
+    expect(footer).toContainElement(dialog.getByRole('group', { name: words.preview }));
+    // The tax ticks belong to the amount's own cell.
+    expect(dialog.getByText(mn.finance.fields.amount).parentElement).toContainElement(
+      dialog.getByText(words.withVat),
+    );
+  });
+
   it('groups the amount as it is typed and sends it plain', async () => {
     const user = userEvent.setup();
     const fetchMock = signedIn(ACCOUNTANT_ME, routes());

@@ -174,5 +174,7 @@ export function SettlementText({ value }: { value: StockCountSettlement | null }
       : null,
     value.charged ? t('inventory.counts.settlement.chargedShort') : null,
   ].filter((part): part is string => part !== null && part !== '');
-  return <span>{parts.join(' · ')}</span>;
+  const text = parts.join(' · ');
+  // A list's cell cuts it with «…»: the whole on hover.
+  return <span title={text}>{text}</span>;
 }

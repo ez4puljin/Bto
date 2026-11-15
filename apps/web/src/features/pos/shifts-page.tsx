@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import {
   ChevronHead,
-  DateFilter,
   EmptyState,
   FilterBar,
   LinkRow,
@@ -21,6 +20,7 @@ import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DateRangeFilter } from '@/features/finance/date-range-filter';
 import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatTugrik } from '@/lib/money';
@@ -34,15 +34,20 @@ import { ShiftPanel } from './shift-panel';
 const isStatus = (value: string | null): value is ShiftStatus =>
   SHIFT_STATUSES.some((entry) => entry === value);
 
-/** The shifts list's columns (ADR-0119). */
+/**
+ * The shifts list's columns (ADR-0119): 66.25rem in all. The number carries the POS's code and the
+ * day («К1-261016-Э1») and the panel says the rest, so a till PC's 56rem lets the opening time go
+ * (54.75) and a tablet's 41rem the POS's name and the cashier too (35.25): the number, the
+ * status and the two amounts stay (ADR-0201).
+ */
 const COLUMNS: readonly ColumnSpec[] = [
   { key: 'number', kind: 'number' },
-  { key: 'till', kind: 'text', weight: 2 },
-  { key: 'cashier', kind: 'text', weight: 2, min: 10 },
-  { key: 'openedAt', kind: 'datetime' },
-  { key: 'status', kind: 'status' },
+  { key: 'till', kind: 'text', weight: 2, min: 10, drop: 2 },
+  { key: 'cashier', kind: 'text', weight: 2, min: 9.5, drop: 2 },
+  { key: 'openedAt', kind: 'datetime', drop: 1 },
+  { key: 'status', kind: 'status', width: 7 },
   { key: 'salesTotal', kind: 'money' },
-  { key: 'variance', kind: 'money' },
+  { key: 'variance', kind: 'money', width: 7 },
   { key: 'spacer', kind: 'spacer' },
   { key: 'chevron', kind: 'chevron' },
 ];
@@ -99,15 +104,14 @@ export function PosShiftsPage() {
             </option>
           ))}
         </NativeSelect>
-        <DateFilter
-          label={t('pos.fields.from')}
-          value={from}
-          onChange={(value) => setParam('from', value)}
-        />
-        <DateFilter
-          label={t('pos.fields.to')}
-          value={to}
-          onChange={(value) => setParam('to', value)}
+        <DateRangeFilter
+          label={t('pos.fields.paidOn')}
+          fromLabel={t('pos.fields.from')}
+          toLabel={t('pos.fields.to')}
+          from={from}
+          to={to}
+          onFrom={(value) => setParam('from', value)}
+          onTo={(value) => setParam('to', value)}
         />
       </FilterBar>
       <ProblemAlert problem={problemFromError(shifts.error)} onRetry={shifts.refetch} />
@@ -138,7 +142,7 @@ export function PosShiftsPage() {
                       {shift.number}
                     </Link>
                   </TableCell>
-                  <TableCell>{shift.tillName}</TableCell>
+                  <TruncateCell text={shift.tillName} />
                   <TruncateCell text={shift.cashierName ?? t('pos.fields.none')}>
                     {shift.cashierName ?? none}
                   </TruncateCell>

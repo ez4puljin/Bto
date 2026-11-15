@@ -15,7 +15,9 @@ interface Tile {
  * «Посын борлуулалт»'s banner (owner 2026-11-10): the totals of every sale and return the
  * filters match — the count and amount of the sales, then the money by tender kind, each net of
  * its refunds. «Бусад» (vouchers, points) shows only when there is some. The tile look is the
- * count sheet's.
+ * count sheet's. One row from a till PC's width, so the list under it starts a row of tiles
+ * higher (ADR-0201): six tiles there are 9rem each, so a label takes a second line and the
+ * figure one size less, which keeps a total in the billions inside its tile.
  */
 export function SalesTotals({ summary }: { summary: SalesSummary | undefined }) {
   const { t } = useTranslation();
@@ -57,7 +59,7 @@ export function SalesTotals({ summary }: { summary: SalesSummary | undefined }) 
       aria-label={t('pos.sales.totals.label')}
       className={cn(
         'mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3',
-        other ? 'xl:grid-cols-7' : 'xl:grid-cols-6',
+        other ? 'lg:grid-cols-4 xl:grid-cols-7' : 'lg:grid-cols-6',
       )}
     >
       {tiles.map((tile) => (
@@ -67,8 +69,15 @@ export function SalesTotals({ summary }: { summary: SalesSummary | undefined }) 
           aria-label={tile.label}
           className="rounded-xl bg-card px-3 py-2 shadow-card ring-1 ring-black/[0.06]"
         >
-          <div className="text-[0.75rem] text-muted-foreground">{tile.label}</div>
-          <div className="font-mono text-lg font-semibold tabular-nums">{tile.value}</div>
+          <div className="text-[0.75rem] leading-tight text-muted-foreground">{tile.label}</div>
+          <div
+            className={cn(
+              'font-mono text-lg font-semibold tabular-nums',
+              !other && 'lg:max-xl:text-base',
+            )}
+          >
+            {tile.value}
+          </div>
           {tile.sub ? <div className="text-[0.75rem] text-muted-foreground">{tile.sub}</div> : null}
         </div>
       ))}

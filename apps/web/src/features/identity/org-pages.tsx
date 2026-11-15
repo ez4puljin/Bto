@@ -80,12 +80,17 @@ function ActiveSwitch(props: {
 /** A manager's row ends with its edit action (ADR-0119). */
 const EDIT_ACTION: ColumnSpec = { key: 'actions', kind: 'actions', actions: 1 };
 
+/**
+ * The branches' columns: 47.25rem with the edit action; «e-Barimt салбарын дугаар» is 11.5rem
+ * with its padding and was cut in a code's 7. An upright tablet's 41rem lets the district code go
+ * (40.25): the edit dialog shows it (ADR-0201).
+ */
 const BRANCH_COLUMNS: readonly ColumnSpec[] = [
   { key: 'code', kind: 'code' },
   { key: 'name', kind: 'text', weight: 3, min: 12 },
-  { key: 'branchNo', kind: 'code' },
-  { key: 'districtCode', kind: 'code' },
-  { key: 'status', kind: 'status' },
+  { key: 'branchNo', kind: 'code', width: 11.5 },
+  { key: 'districtCode', kind: 'code', drop: 1 },
+  { key: 'status', kind: 'status', width: 6.5 },
 ];
 const MANAGED_BRANCH_COLUMNS: readonly ColumnSpec[] = [...BRANCH_COLUMNS, EDIT_ACTION];
 
@@ -285,12 +290,17 @@ const warehouseSchema = z.object({
 });
 type WarehouseValues = z.infer<typeof warehouseSchema>;
 
+/**
+ * The warehouses' columns: 44.25rem with the edit action; «Бөөний агуулах» is 8.5rem with its
+ * padding. An upright tablet's 41rem lets the branch go (37.25), which an installation has one
+ * of and the edit dialog names, so the state and the edit action stay in the card (ADR-0201).
+ */
 const WAREHOUSE_COLUMNS: readonly ColumnSpec[] = [
   { key: 'code', kind: 'code' },
   { key: 'name', kind: 'text', weight: 3, min: 12 },
-  { key: 'kind', kind: 'text', weight: 1 },
-  { key: 'branch', kind: 'text', weight: 2 },
-  { key: 'status', kind: 'status' },
+  { key: 'kind', kind: 'text', weight: 1, min: 8.5 },
+  { key: 'branch', kind: 'text', weight: 2, drop: 1 },
+  { key: 'status', kind: 'status', width: 6.5 },
 ];
 const MANAGED_WAREHOUSE_COLUMNS: readonly ColumnSpec[] = [...WAREHOUSE_COLUMNS, EDIT_ACTION];
 
@@ -343,10 +353,11 @@ export function WarehousesPage() {
               return (
                 <TableRow key={warehouse.id}>
                   <TableCell className="font-mono">{warehouse.code}</TableCell>
-                  <TableCell className="font-medium">
+                  {/* A long name and the system note take a line more, never the card's width. */}
+                  <TableCell className="font-medium whitespace-normal">
                     {name}
                     {editable ? null : (
-                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                      <span className="block text-xs font-normal text-muted-foreground">
                         {t('org.warehouses.systemNote')}
                       </span>
                     )}

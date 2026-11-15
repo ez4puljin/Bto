@@ -1,4 +1,4 @@
-import { Factory } from 'lucide-react';
+import { ChevronRight, Factory } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
@@ -19,7 +19,7 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { RecordSheet, TotalsGrid } from '@/components/record-sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -37,6 +37,7 @@ import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
 import { useAction } from '@/lib/use-action';
 import { useDebounced } from '@/lib/use-debounced';
+import { useMediaQuery } from '@/lib/use-media-query';
 import {
   type SupplierReport,
   type SupplierReportRow,
@@ -44,18 +45,40 @@ import {
   useSupplierEntries,
   useSupplierReport,
 } from './api';
-import { HorizontalBars } from './charts';
+import { type BarItem, HorizontalBars } from './charts';
 import { idParam, reportHref, useRange } from './report-helpers';
-import { AmountCell, ExcelButton, PrintHeading, PrintLink, RefreshControl } from './report-kit';
+import {
+  AmountCell,
+  ExcelButton,
+  PrintHeading,
+  PrintLink,
+  RefreshControl,
+  ROW_NAME,
+} from './report-kit';
 import { ReportViews } from './report-views';
 
 const AMOUNTS = ['purchases', 'purchasesExVat', 'otherBills', 'payments', 'balance'] as const;
 
-/** The report's columns on screen (ADR-0119): code, name, the five amounts, the chevron. */
+/** An amount's width when it is not a money column's 8.5rem, and when it leaves a narrow table. */
+const AMOUNT_COLUMNS: Record<(typeof AMOUNTS)[number], Pick<ColumnSpec, 'width' | 'drop'>> = {
+  purchases: { width: 10 },
+  purchasesExVat: { width: 10, drop: 1 },
+  otherBills: { drop: 2 },
+  payments: { width: 10, drop: 4 },
+  balance: {},
+};
+
+/**
+ * The report's columns on screen (ADR-0119): code, name, the five amounts, the chevron; 70.25rem
+ * in all, the turnover of a year 10rem («12,345,678,901») and the smaller amounts 8.5. What a
+ * narrower table lets go, least needed first (ADR-0201): the purchases without VAT (60.25); the
+ * other bills (a till PC's 55.5rem: 51.75); the code (44.75); the payments (a tablet's 40.5rem:
+ * 34.75) — the supplier's panel says them all. The name, the purchases and what is owed stay.
+ */
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'code', kind: 'code' },
+  { key: 'code', kind: 'code', drop: 3 },
   { key: 'name', kind: 'text', weight: 3, min: 14 },
-  ...AMOUNTS.map((key): ColumnSpec => ({ key, kind: 'money', width: 10 })),
+  ...AMOUNTS.map((key): ColumnSpec => ({ key, kind: 'money', ...AMOUNT_COLUMNS[key] })),
   { key: 'chevron', kind: 'chevron' },
 ];
 
@@ -72,8 +95,9 @@ function SuppliersTable(props: {
         <TableRow>
           <TableHead>{t(`${columns}.code`)}</TableHead>
           <TableHead>{t(`${columns}.name`)}</TableHead>
+          {/* «Худалдан авалт (НӨАТ-тэй)» is wider than its amounts: a head may take two lines. */}
           {AMOUNTS.map((key) => (
-            <TableHead key={key} className="text-right">
+            <TableHead key={key} className="text-right leading-tight whitespace-normal">
               {t(`${columns}.${key}`)}
             </TableHead>
           ))}
@@ -87,11 +111,7 @@ function SuppliersTable(props: {
               <TableCell className="font-mono">{row.code ?? ''}</TableCell>
               <TruncateCell text={row.name}>
                 {props.onOpen ? (
-                  <button
-                    type="button"
-                    className="font-medium underline-offset-4 hover:underline"
-                    onClick={() => props.onOpen?.(row)}
-                  >
+                  <button type="button" className={ROW_NAME} onClick={() => props.onOpen?.(row)}>
                     {row.name}
                   </button>
                 ) : (
@@ -223,6 +243,50 @@ function EntriesSheet(props: {
   );
 }
 
+/**
+ * The ten largest suppliers as bars, behind their title. On a tall window the chart is open; where
+ * it alone would push the list under the window's foot (a till PC, a laptop: under 850px of
+ * height) it waits folded until it is asked for (ADR-0201). What the user pressed wins.
+ */
+function TopSuppliers(props: { items: readonly BarItem[]; onSelect: (item: BarItem) => void }) {
+  const { t } = useTranslation();
+  const low = useMediaQuery('(max-height: 849px)');
+  const [chosen, setChosen] = useState<boolean | null>(null);
+  const open = chosen ?? !low;
+  return (
+    <Card className="mb-3 py-0">
+      <details open={open} className="group">
+        <summary
+          className="flex cursor-pointer list-none items-center gap-2 rounded-xl px-4 py-3 outline-none select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset touch:min-h-11 [&::-webkit-details-marker]:hidden"
+          onClick={(event) => {
+            // React holds the state: the browser's own toggle would run ahead of it.
+            event.preventDefault();
+            setChosen(!open);
+          }}
+        >
+          <ChevronRight
+            aria-hidden
+            className="size-4 text-muted-foreground transition-transform group-open:rotate-90"
+          />
+          <span className="font-heading text-[0.9375rem] leading-snug font-semibold tracking-tight">
+            {t('reports.suppliers.chart')}
+          </span>
+        </summary>
+        {open ? (
+          <CardContent className="pb-4">
+            <HorizontalBars
+              items={props.items}
+              label={t('reports.suppliers.chart')}
+              valueLabel={t('reports.suppliers.columns.purchases')}
+              onSelect={props.onSelect}
+            />
+          </CardContent>
+        ) : null}
+      </details>
+    </Card>
+  );
+}
+
 /** «Тайлан → Нийлүүлэгчийн тайлан» (ADR-0108): purchases, payments and what is owed per supplier. */
 export function SuppliersReportPage() {
   const { t } = useTranslation();
@@ -287,19 +351,7 @@ export function SuppliersReportPage() {
       </FilterBar>
       <ProblemAlert problem={action.problem ?? problemFromError(report.error)} />
       {top.length > 0 ? (
-        <Card className="mb-3 gap-2">
-          <CardHeader>
-            <CardTitle>{t('reports.suppliers.chart')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <HorizontalBars
-              items={top}
-              label={t('reports.suppliers.chart')}
-              valueLabel={t('reports.suppliers.columns.purchases')}
-              onSelect={(item) => setParam('party', item.key)}
-            />
-          </CardContent>
-        </Card>
+        <TopSuppliers items={top} onSelect={(item) => setParam('party', item.key)} />
       ) : null}
       <ListCard scroll>
         {report.isPending && range.valid ? (

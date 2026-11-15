@@ -28,7 +28,8 @@ export function SupplierProductCount(props: { supplierId: number; name: string; 
       <Popover.Trigger asChild>
         <button
           type="button"
-          className="text-link underline-offset-4 hover:underline"
+          // A finger's reach around the one or two digits (ADR-0201): a miss opens the row.
+          className="text-link underline-offset-4 hover:underline touch:relative touch:after:absolute touch:after:-inset-x-4 touch:after:-inset-y-3"
           aria-label={t('partners.suppliers.brief.open', {
             name: props.name,
             count: formatCount(props.count),

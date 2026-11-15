@@ -16,6 +16,7 @@ import {
   SkeletonRows,
   SpacerCell,
   SpacerHead,
+  TruncateCell,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
@@ -43,12 +44,20 @@ import {
   useDocumentTemplates,
 } from './document-templates-api';
 
+/**
+ * The list's columns (ADR-0119). A narrow table keeps the name its 12rem and lets go (ADR-0201)
+ * first of the day of publishing, which the template's own page lists version by version, then of
+ * the pipelines, which choose their template in their own settings. In rem: all of it 12 + 8.5 +
+ * 10 + 9.5 + 11 + 5 + 2.25 = 58.25 (a laptop); without the day 47.25 (a till PC leaves 56);
+ * without the pipelines too 37.75 (a tablet upright leaves 41).
+ */
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'name', kind: 'text', weight: 3, min: 14 },
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
   { key: 'kind', kind: 'status' },
   { key: 'state', kind: 'text', weight: 1, min: 10 },
-  { key: 'pipelines', kind: 'text', weight: 2, min: 10 },
-  { key: 'publishedAt', kind: 'datetime' },
+  // Its head, «Ашигладаг дамжлага», is 9.25rem.
+  { key: 'pipelines', kind: 'text', weight: 3, min: 9.5, drop: 2 },
+  { key: 'publishedAt', kind: 'datetime', drop: 1 },
   { key: 'spacer', kind: 'spacer' },
   { key: 'actions', kind: 'actions', actions: 2 },
   { key: 'chevron', kind: 'chevron' },
@@ -120,13 +129,16 @@ export function DocumentTemplatesPage() {
                       ) : null}
                     </span>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {template.pipelines.length > 0
-                      ? template.pipelines.map((pipeline) => pipeline.name).join(', ')
-                      : template.isDefault
-                        ? t('sales.documentTemplates.allOther')
-                        : t('common.none')}
-                  </TableCell>
+                  <TruncateCell
+                    className="text-muted-foreground"
+                    text={
+                      template.pipelines.length > 0
+                        ? template.pipelines.map((pipeline) => pipeline.name).join(', ')
+                        : template.isDefault
+                          ? t('sales.documentTemplates.allOther')
+                          : t('common.none')
+                    }
+                  />
                   <TableCell className="font-mono">
                     {formatUbDateTime(Date.parse(template.publishedAt))}
                   </TableCell>

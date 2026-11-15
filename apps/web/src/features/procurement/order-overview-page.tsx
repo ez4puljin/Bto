@@ -220,7 +220,8 @@ function Overview({ detail, onRefresh }: { detail: PurchaseOrderDetail; onRefres
         }
       />
 
-      <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+      {/* One row where the tiles fit at 10rem each (five on a till PC), so the groups start high. */}
+      <div className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(10rem,1fr))] gap-3">
         <Tile label={t('procurement.overview.suppliers')} value={formatCount(totals.suppliers)} />
         <Tile label={t('procurement.overview.boxes')} value={formatQty(totals.boxes.toFixed())} />
         <Tile label={t('procurement.overview.pieces')} value={formatQty(totals.pieces.toFixed())} />
@@ -318,10 +319,20 @@ function Tile({ label, value }: { label: string; value: string }) {
       className="flex flex-col gap-1 rounded-xl bg-card px-4 py-3 shadow-card ring-1 ring-black/[0.06]"
     >
       <h2 className="text-[0.8125rem] font-medium text-muted-foreground">{label}</h2>
-      <p className="font-mono text-[1.5rem] leading-tight font-semibold">{value}</p>
+      {/* 1.25rem below 1536px: «123,456,789₮» stands in a tile of 10rem. */}
+      <p className="font-mono text-[1.25rem] leading-tight font-semibold 2xl:text-[1.5rem]">
+        {value}
+      </p>
     </section>
   );
 }
+
+/**
+ * A finger's reach for this board's own buttons, drawn smaller than 2.75rem (ADR-0201): an unseen
+ * ::after around the centre, as the shared Button has, so nothing moves and a mouse sees no change.
+ */
+const FINGER_REACH =
+  'touch-static:relative touch:after:absolute touch:after:top-1/2 touch:after:left-1/2 touch:after:size-11 touch:after:-translate-x-1/2 touch:after:-translate-y-1/2';
 
 /** A status's colours, here only: this board has its own look (owner 2026-11-06). */
 const STATUS_TONE: Record<PoStatus, { pill: string; dot: string }> = {
@@ -520,6 +531,7 @@ function OrdererGroup(props: {
                       aria-selected={current === value}
                       className={cn(
                         'rounded-md px-3 py-1 text-[0.8125rem] font-medium',
+                        FINGER_REACH,
                         current === value
                           ? 'bg-white text-slate-900 shadow-sm'
                           : 'text-slate-600 hover:text-slate-900',
@@ -671,7 +683,10 @@ function SupplierRow(props: {
               aria-label={t('procurement.overview.showLinesNamed', {
                 name: supplier.supplierName,
               })}
-              className="flex size-5 shrink-0 items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+              className={cn(
+                'flex size-5 shrink-0 items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700',
+                FINGER_REACH,
+              )}
               onClick={() => setOpen((value) => !value)}
             >
               <ChevronDown
@@ -774,7 +789,10 @@ function SupplierRow(props: {
               type="button"
               aria-label={t('procurement.supplier.nextNamed', { name: supplier.supplierName })}
               title={nextLabel}
-              className="inline-flex h-8 items-center gap-1 rounded-lg bg-indigo-600 px-2.5 text-[0.8125rem] font-medium whitespace-nowrap text-white hover:bg-indigo-700"
+              className={cn(
+                'inline-flex h-8 items-center gap-1 rounded-lg bg-indigo-600 px-2.5 text-[0.8125rem] font-medium whitespace-nowrap text-white hover:bg-indigo-700',
+                FINGER_REACH,
+              )}
               onClick={() => props.onStep(supplier, 1)}
             >
               <ArrowRight aria-hidden className="size-3.5" />
@@ -786,7 +804,10 @@ function SupplierRow(props: {
               aria-label={t('procurement.overview.addProductNamed', {
                 name: supplier.supplierName,
               })}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[0.8125rem] font-medium whitespace-nowrap text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
+              className={cn(
+                'inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[0.8125rem] font-medium whitespace-nowrap text-slate-600 hover:bg-indigo-50 hover:text-indigo-700',
+                FINGER_REACH,
+              )}
               onClick={() => setAdding(true)}
             >
               <PackagePlus aria-hidden className="size-4" />
@@ -796,7 +817,10 @@ function SupplierRow(props: {
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label={t('procurement.overview.moreNamed', { name: supplier.supplierName })}
-              className="flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200 hover:text-slate-800"
+              className={cn(
+                'flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200 hover:text-slate-800',
+                FINGER_REACH,
+              )}
             >
               <Ellipsis aria-hidden className="size-4" />
             </DropdownMenuTrigger>

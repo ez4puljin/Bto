@@ -9,7 +9,7 @@ import {
   Plus,
   Settings2,
 } from 'lucide-react';
-import { type FormEvent, type ReactNode, useState } from 'react';
+import { type FormEvent, type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
@@ -273,14 +273,18 @@ export function CalendarItemLine(props: {
   );
 }
 
-/** One type above the month: the legend's dot and name, and a pill that shows only its kind. */
+/**
+ * One type above the month: the legend's dot and name, and a pill that shows only its kind. At the
+ * filter pills' size, a finger's 2.75rem under `touch:`; it never shrinks or breaks: its row
+ * scrolls.
+ */
 function TypePill(props: { pressed: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
       type="button"
       aria-pressed={props.pressed}
       className={cn(
-        'inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors duration-200 outline-none select-none focus-visible:ring-2 focus-visible:ring-ring',
+        'inline-flex h-8.5 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[0.8125rem] font-medium whitespace-nowrap transition-colors duration-200 outline-none select-none focus-visible:ring-2 focus-visible:ring-ring touch:h-11',
         props.pressed
           ? 'border-transparent bg-secondary text-secondary-foreground'
           : 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground',
@@ -375,6 +379,22 @@ export function CalendarPage() {
     if (key !== null && !next.delete(key)) next.add(key);
     setParam('types', [...next].join(','));
   };
+  // The type row scrolls inside itself: a type chosen by the address may stand outside it. Only
+  // the row moves, never the page, and never while a chosen pill is already in sight.
+  const pills = useRef<HTMLDivElement>(null);
+  const chosenKey = [...chosen].join(',');
+  const typeCount = typeRows.size;
+  useLayoutEffect(() => {
+    const row = pills.current;
+    if (!row || row.scrollWidth <= row.clientWidth) return;
+    const frame = row.getBoundingClientRect();
+    const pressed = Array.from(row.querySelectorAll<HTMLElement>('[aria-pressed="true"]')).map(
+      (pill) => pill.getBoundingClientRect(),
+    );
+    const first = pressed[0];
+    if (!first || pressed.some((box) => box.left >= frame.left && box.right <= frame.right)) return;
+    row.scrollLeft += first.left - frame.left - 8;
+  }, [chosenKey, typeCount]);
   const archive = async () => {
     if (archiving?.eventId == null) return;
     const id = archiving.eventId;
@@ -407,7 +427,7 @@ export function CalendarPage() {
         }
       />
       <ProblemAlert problem={problemFromError(calendar.error)} onRetry={calendar.refetch} />
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
         <Card>
           <CardHeader className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle aria-live="polite">
@@ -439,10 +459,14 @@ export function CalendarPage() {
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
+            {/* One row that scrolls inside itself (ADR-0201): fifteen types wrapped into three
+                rows, four on a tablet, and left a 640px window two of the month's weeks. The
+                padding keeps the pills' focus rings whole inside the scroller. */}
             <div
+              ref={pills}
               role="group"
               aria-label={t('hr.community.calendar.filter')}
-              className="flex flex-wrap gap-1.5"
+              className="-m-1 flex gap-1.5 overflow-x-auto p-1 [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin]"
             >
               <TypePill pressed={chosen.size === 0} onClick={() => choose(null)}>
                 {t('common.all')}
@@ -488,7 +512,10 @@ export function CalendarPage() {
             />
           </CardContent>
         </Card>
-        <Card>
+        {/* A pressed day shows its list in the window (ADR-0201): beside the month and under the
+            top bar from a till PC; on a tablet upright at the window's foot, over the month, so a
+            press moves nothing. A long day scrolls inside the card. */}
+        <Card className="sticky z-10 overflow-y-auto max-lg:bottom-4 max-lg:max-h-[40dvh] max-lg:shadow-popover lg:top-[4.5rem] lg:max-h-[calc(100dvh-5.5rem)]">
           <CardHeader>
             <CardTitle>{t('hr.community.calendar.dayTitle', { day })}</CardTitle>
           </CardHeader>

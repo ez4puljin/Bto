@@ -2,7 +2,7 @@ import { matchesQuery, queryTerms, searchKeys } from '@tugeel/shared/text';
 import { SCHEDULE_KINDS, type ScheduleKind, WORKFORCE_LIMITS } from '@tugeel/shared/hr';
 import { addMonths, businessDate, businessMonthStart } from '@tugeel/shared/time';
 import { CalendarClock, ChevronLeft, ChevronRight, Copy, Pencil, Plus, Trash2 } from 'lucide-react';
-import { type FormEvent, useMemo, useState } from 'react';
+import { type FormEvent, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
@@ -13,7 +13,6 @@ import { EmptyState, ListCard, SearchField, SegmentedControl } from '@/component
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -258,7 +257,8 @@ function ScheduleDialog(props: {
                     aria-label={value}
                     aria-pressed={color === value}
                     className={cn(
-                      'size-6 rounded-full ring-offset-2 ring-offset-background outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      // A finger's reach around the dot (ADR-0201); nothing moves on screen.
+                      'size-6 rounded-full ring-offset-2 ring-offset-background outline-none focus-visible:ring-2 focus-visible:ring-ring touch:relative touch:after:absolute touch:after:-inset-2.5',
                       color === value && 'ring-2 ring-foreground',
                     )}
                     style={{ backgroundColor: value }}
@@ -462,6 +462,20 @@ export function SchedulesPage() {
   const active = (staff.data ?? []).filter((row) => row.leftOn === null && row.status === 'ACTIVE');
   const unassigned = active.filter((row) => row.scheduleId === null).length;
 
+  // The month is wider than a tablet or a till PC shows at once: the card opens with today in the
+  // middle of the days it shows (the first column sticks over them). Only the card scrolls.
+  const todayHead = useRef<HTMLTableCellElement>(null);
+  const rowCount = rows.length;
+  useLayoutEffect(() => {
+    const cell = todayHead.current;
+    const card = cell?.closest<HTMLElement>('[data-slot=list-card]');
+    if (!cell || !card || card.scrollWidth <= card.clientWidth) return;
+    const frame = card.getBoundingClientRect();
+    const box = cell.getBoundingClientRect();
+    const first = cell.parentElement?.firstElementChild?.getBoundingClientRect().width ?? 0;
+    card.scrollLeft += box.left + box.width / 2 - (frame.left + first + (frame.width - first) / 2);
+  }, [month, view, rowCount]);
+
   const remove = async () => {
     if (!removing) return;
     const ok = await action.run(() => mutations.archiveSchedule.mutateAsync(removing.id));
@@ -520,7 +534,8 @@ export function SchedulesPage() {
           <Link
             to="/hr/staff"
             title={t('hr.schedules.unassignedHint')}
-            className="ml-auto rounded-full bg-warning-soft px-3 py-1 text-[0.8125rem] font-medium text-warning hover:underline"
+            // At the bar's pill height, a finger's 2.75rem under `touch:` (ADR-0201).
+            className="ml-auto inline-flex h-8.5 items-center rounded-full bg-warning-soft px-3 text-[0.8125rem] font-medium text-warning hover:underline touch:h-11"
           >
             {t('hr.schedules.unassigned', { count: unassigned })}
           </Link>
@@ -548,6 +563,7 @@ export function SchedulesPage() {
                   return (
                     <th
                       key={date}
+                      ref={date === today ? todayHead : undefined}
                       className={cn(
                         'min-w-11 border-b px-0.5 py-1.5 text-center font-medium',
                         weekday >= 6 && 'text-muted-foreground',
@@ -702,11 +718,6 @@ export function SchedulesPage() {
             </article>
           ))}
         </div>
-      ) : null}
-      {view === 'calendar' && rows.length > 0 && unassigned > 0 ? (
-        <Alert className="mt-3">
-          <AlertDescription>{t('hr.schedules.unassignedHint')}</AlertDescription>
-        </Alert>
       ) : null}
       {creating.open ? (
         <ScheduleDialog

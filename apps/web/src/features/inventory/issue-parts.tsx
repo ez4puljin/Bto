@@ -10,8 +10,10 @@ import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/compon
 import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatTugrik } from '@/lib/money';
+import { useMediaQuery } from '@/lib/use-media-query';
 import { cn } from '@/lib/utils';
 import type { IssueDetail, IssueLine } from './api';
+import { BELOW_LAPTOP, BELOW_TILL_PC } from './helpers';
 import { hasCosts, isDamageCharge, postedWarehouses } from './issue-helpers';
 
 /**
@@ -36,36 +38,60 @@ export function LinesTable(props: {
 }) {
   const { t } = useTranslation();
   const none = t('common.none');
-  const costs = hasCosts(props.detail);
-  const sale = isDamageCharge(props.detail);
   const frozen = postedWarehouses(props.detail);
   const { entry } = props;
+  // The work window's table has the entry's cells spanning its columns, so no column can leave by
+  // itself (`drop`): the window decides (ADR-0201). Below a laptop's width it shows no per-line
+  // prices or costs, which a line has only once its warehouse's part is posted and the foot sums;
+  // a tablet upright also gives the code's column up. `max-width`: a test sees a laptop's table.
+  const compact = useMediaQuery(BELOW_LAPTOP) && entry !== undefined;
+  const tablet = useMediaQuery(BELOW_TILL_PC) && entry !== undefined;
+  const costs = hasCosts(props.detail) && !compact;
+  const sale = isDamageCharge(props.detail) && !compact;
+  const code = entry !== undefined && !tablet;
   // One entry per cell, under the same conditions as the header cells (ADR-0119). While the lines
-  // are edited the warehouse is a select and the quantity a box.
+  // are edited the warehouse is a select and the quantity a box. The work window: 48.25rem (17
+  // more for each pair of money columns on a laptop), what a till PC leaves (about 55.5); 39.75 on
+  // a tablet upright (about 40.5). A posted issue read on a narrow window lets its number go
+  // first, then the warehouse, then the unit cost and the unit price: their amounts stay.
   const columns: ColumnSpec[] = [
-    { key: 'lineNo', kind: 'count', width: entry ? 3.5 : 3 },
-    ...(entry ? [{ key: 'sku', kind: 'code', width: 5 } as const] : []),
-    { key: 'product', kind: 'text', weight: 3, min: entry ? 13 : 14 },
-    { key: 'warehouse', kind: 'text', weight: 1, min: props.actions ? 10.5 : 8 },
+    {
+      key: 'lineNo',
+      kind: 'count',
+      width: entry && !tablet ? 3.5 : 3,
+      drop: entry ? undefined : 1,
+    },
+    ...(code ? [{ key: 'sku', kind: 'code', width: 5 } as const] : []),
+    { key: 'product', kind: 'text', weight: 3, min: entry ? (tablet ? 12 : 13) : 14 },
+    {
+      key: 'warehouse',
+      kind: 'text',
+      weight: 1,
+      min: props.actions ? (tablet ? 9.5 : 10.5) : 8,
+      drop: entry ? undefined : 2,
+    },
     entry
-      ? ({ key: 'unit', kind: 'code', width: 5 } as const)
+      ? ({ key: 'unit', kind: 'code', width: tablet ? 4.5 : 5 } as const)
       : ({ key: 'unit', kind: 'text', weight: 1, min: 4 } as const),
     // The shelf, or «Нярав батлахад тогтоно» until the keeper confirms.
     ...(BINS_SOON ? [] : [{ key: 'bin', kind: 'code', width: 11 } as const]),
-    { key: 'qty', kind: 'qty', width: props.actions ? 8 : 6.5 },
+    { key: 'qty', kind: 'qty', width: props.actions ? (tablet ? 7.5 : 8) : 6.5 },
     ...(sale
       ? [
-          { key: 'salePrice', kind: 'money' } as const,
+          { key: 'salePrice', kind: 'money', drop: entry ? undefined : 4 } as const,
           { key: 'saleAmount', kind: 'money' } as const,
         ]
       : []),
     ...(costs
-      ? [{ key: 'unitCost', kind: 'money' } as const, { key: 'amount', kind: 'money' } as const]
+      ? [
+          { key: 'unitCost', kind: 'money', drop: entry ? undefined : 3 } as const,
+          { key: 'amount', kind: 'money' } as const,
+        ]
       : []),
     ...(props.actions ? [{ key: 'actions', kind: 'actions', actions: 1 } as const] : []),
   ];
   // The columns on either side of «Тоо», for the entry's cells.
-  const before = (entry ? 5 : 4) + (BINS_SOON ? 0 : 1);
+  const before = (code ? 5 : 4) + (BINS_SOON ? 0 : 1);
   const after = (sale ? 2 : 0) + (costs ? 2 : 0) + (props.actions ? 1 : 0);
   return (
     <ListTable columns={columns}>
@@ -77,7 +103,7 @@ export function LinesTable(props: {
       >
         <TableRow>
           <TableHead className="text-right">{t('inventory.receipt.form.lineNo')}</TableHead>
-          {entry ? <TableHead>{t('inventory.sku')}</TableHead> : null}
+          {code ? <TableHead>{t('inventory.sku')}</TableHead> : null}
           <TableHead>{t('inventory.product')}</TableHead>
           <TableHead>{t('inventory.issues.lineWarehouse')}</TableHead>
           <TableHead>{t('inventory.unit')}</TableHead>
@@ -124,9 +150,16 @@ export function LinesTable(props: {
               </TableCell>
               {entry ? (
                 <>
-                  <TableCell className="font-mono text-[0.8125rem]">{line.productSku}</TableCell>
-                  {/* The rows keep one height: the whole name on hover. */}
-                  <TableCell title={line.productName}>{line.productName}</TableCell>
+                  {code ? (
+                    <TableCell className="font-mono text-[0.8125rem]">{line.productSku}</TableCell>
+                  ) : null}
+                  {/* The rows keep one height: the whole name on hover, with its code where the
+                      code has no column. */}
+                  <TableCell
+                    title={code ? line.productName : `${line.productSku} ${line.productName}`}
+                  >
+                    {line.productName}
+                  </TableCell>
                 </>
               ) : (
                 <TableCell className="whitespace-normal">

@@ -9,6 +9,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -35,7 +36,12 @@ export function HistoryDialog(props: {
   const { t } = useTranslation();
   return (
     <Dialog open={props.open} onOpenChange={(open) => (open ? undefined : props.onClose())}>
-      <DialogContent size="lg" onCloseAutoFocus={props.onCloseAutoFocus}>
+      <DialogContent
+        size="lg"
+        // A viewer: a typed receipt number is nothing to lose, so closing never asks.
+        guard={false}
+        onCloseAutoFocus={props.onCloseAutoFocus}
+      >
         <DialogHeader>
           <DialogTitle>{t('posKiosk.history.title')}</DialogTitle>
           <DialogDescription>{t('posKiosk.history.description')}</DialogDescription>
@@ -62,36 +68,41 @@ function HistoryPanel() {
   if (opened) {
     return (
       <div className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <Button
-            variant="ghost"
-            className="h-10 px-2"
-            onClick={() => {
-              opening.reset();
-              reprint.reset();
-            }}
-          >
-            <ChevronLeft />
-            {t('posKiosk.history.backToList')}
-          </Button>
-          <Button
-            variant="outline"
-            className="h-10"
-            disabled={reprint.isPending}
-            onClick={() => reprint.mutate(opened.receipt.clientId)}
-          >
-            <Printer />
-            {t('posKiosk.history.printCopy')}
-          </Button>
-        </div>
-        {reprint.isError ? <KioskAlert>{problemText(reprint.error)}</KioskAlert> : null}
         <KioskReceiptView receipt={opened.receipt} copy={opened.copy} />
+        {/* Under the receipt, where a footer sticks: a receipt is taller than the dialog, and
+            above it the two buttons scrolled out of reach. A refused print shows beside them. */}
+        <DialogFooter className="sm:flex-col">
+          {reprint.isError ? <KioskAlert>{problemText(reprint.error)}</KioskAlert> : null}
+          <div className="flex items-center justify-between gap-2">
+            <Button
+              variant="ghost"
+              className="h-11 px-2"
+              onClick={() => {
+                opening.reset();
+                reprint.reset();
+              }}
+            >
+              <ChevronLeft />
+              {t('posKiosk.history.backToList')}
+            </Button>
+            <Button
+              variant="outline"
+              className="h-11"
+              disabled={reprint.isPending}
+              onClick={() => reprint.mutate(opened.receipt.clientId)}
+            >
+              <Printer />
+              {t('posKiosk.history.printCopy')}
+            </Button>
+          </div>
+        </DialogFooter>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
+    // `min-w-0`: a long customer name is cut in its row, it never widens the dialog's one column.
+    <div className="min-w-0 space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <DayField value={day} onChange={setDay} />
         <div className="relative min-w-48 flex-1">

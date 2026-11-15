@@ -12,9 +12,22 @@ const STATUS_VARIANT = {
   ARCHIVED: 'secondary',
 } as const satisfies Record<ExpiryStatus, 'default' | 'warning' | 'secondary'>;
 
-export function ExpiryStatusBadge({ status }: { status: ExpiryStatus }) {
+export function ExpiryStatusBadge(props: {
+  status: ExpiryStatus;
+  /** In a list's cell: the pill never outgrows its column, its whole name on hover. */
+  cut?: boolean;
+}) {
   const { t } = useTranslation();
-  return <Badge variant={STATUS_VARIANT[status]}>{t(`expiry.status.${status}`)}</Badge>;
+  const name = t(`expiry.status.${props.status}`);
+  return (
+    <Badge
+      variant={STATUS_VARIANT[props.status]}
+      className={props.cut ? 'block max-w-full truncate' : undefined}
+      title={props.cut ? name : undefined}
+    >
+      {name}
+    </Badge>
+  );
 }
 
 /** «12 хоног үлдсэн», coloured by how close the date is; the text comes from the server's days. */

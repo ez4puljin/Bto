@@ -36,6 +36,7 @@ import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
 import { useAction } from '@/lib/use-action';
 import { useDebounced } from '@/lib/use-debounced';
+import { cn } from '@/lib/utils';
 import {
   SLOW_DAYS,
   type SlowDays,
@@ -86,23 +87,33 @@ function filterParams(filter: StockFilter) {
   };
 }
 
-/** The report's columns on screen (ADR-0119), the value only when costs are shown. */
+/**
+ * The report's columns on screen (ADR-0119), the value only when costs are shown: 78.25rem in all,
+ * the day counts as wide as their heads' longer word («Хүрэлцэх», «Зарагдаагүй»: the heads take
+ * two lines) and the status as its two badges side by side («Удаан», «Бага»). What a narrower
+ * table lets go, least needed first (ADR-0201): the category, which the product's page says (a
+ * laptop's 76rem: 71.25); the day of the last sale, which «Зарагдаагүй хоног» counts from (64);
+ * the days of cover (58.75); the code (a till PC's 55.5rem: 51.75); the value and the days without
+ * a sale (a tablet's 40.5rem: 36.75). The name, the stock, what was sold and the marks stay.
+ */
 function stockColumns(costs: boolean): readonly ColumnSpec[] {
   return [
-    { key: 'sku', kind: 'code' },
+    { key: 'sku', kind: 'code', drop: 4 },
     { key: 'name', kind: 'text', weight: 3, min: 14 },
-    { key: 'category', kind: 'text', weight: 2 },
+    { key: 'category', kind: 'text', weight: 2, drop: 1 },
     { key: 'onHand', kind: 'qty' },
-    ...(costs ? [{ key: 'value', kind: 'money' } as const] : []),
+    ...(costs ? [{ key: 'value', kind: 'money', drop: 5 } as const] : []),
     { key: 'sold', kind: 'qty' },
-    { key: 'cover', kind: 'count' },
-    { key: 'lastSale', kind: 'date' },
-    { key: 'sinceSale', kind: 'count' },
-    // Two badges («Удаан», «Бага») side by side.
-    { key: 'status', kind: 'status', width: 11 },
+    { key: 'cover', kind: 'count', width: 5.25, drop: 3 },
+    { key: 'lastSale', kind: 'date', drop: 2 },
+    { key: 'sinceSale', kind: 'count', width: 6.5, drop: 5 },
+    { key: 'status', kind: 'status' },
     { key: 'chevron', kind: 'chevron' },
   ];
 }
+
+/** A head of two words in a column as wide as its figures: it takes two lines. */
+const TWO_LINES = 'leading-tight whitespace-normal';
 
 /** With `links` (the screen) the columns are sized by the layout; on paper the table lays itself out. */
 function StockTable(props: {
@@ -125,12 +136,12 @@ function StockTable(props: {
           {props.costs ? (
             <TableHead className="text-right">{t(`${columns}.value`)}</TableHead>
           ) : null}
-          <TableHead className="text-right">
+          <TableHead className={cn('text-right', TWO_LINES)}>
             {t(`${columns}.sold`, { days: props.slowDays })}
           </TableHead>
-          <TableHead className="text-right">{t(`${columns}.cover`)}</TableHead>
-          <TableHead>{t(`${columns}.lastSale`)}</TableHead>
-          <TableHead className="text-right">{t(`${columns}.sinceSale`)}</TableHead>
+          <TableHead className={cn('text-right', TWO_LINES)}>{t(`${columns}.cover`)}</TableHead>
+          <TableHead className={TWO_LINES}>{t(`${columns}.lastSale`)}</TableHead>
+          <TableHead className={cn('text-right', TWO_LINES)}>{t(`${columns}.sinceSale`)}</TableHead>
           <TableHead>{t(`${columns}.status`)}</TableHead>
           {props.links ? <ChevronHead /> : null}
         </TableRow>
@@ -191,7 +202,9 @@ function StockTiles({ report }: { report: StockReport }) {
   const { t } = useTranslation();
   const { totals } = report;
   return (
-    <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+    // One row from a till PC up (ADR-0201): in two rows they pushed the list so low in a 640px
+    // window that its card could no longer scroll by itself.
+    <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5 lg:max-xl:gap-2">
       <SummaryTile label={t('reports.stock.tiles.products')} value={formatCount(totals.products)} />
       {totals.value !== null ? (
         <SummaryTile label={t('reports.stock.tiles.value')} value={formatTugrik(totals.value)} />

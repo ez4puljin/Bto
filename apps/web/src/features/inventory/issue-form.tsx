@@ -90,10 +90,11 @@ const HEADER_CODES = new Set([
 const HEADER_GRID = 'grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3';
 /**
  * The document's fields in one strip over the lines (ADR-0157): the date, the warehouse, the type,
- * the recipient with its kind, which needs the most room, and the note.
+ * the recipient with its kind, which needs the most room, and the note. One row from the laptops
+ * up; on a till PC's 1024px two rows of three, the recipient taking two of the second (ADR-0201).
  */
 const STRIP_GRID =
-  'grid gap-2 sm:grid-cols-2 lg:grid-cols-[9.5rem_minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1.9fr)_minmax(0,1fr)]';
+  'grid gap-2 sm:grid-cols-2 lg:grid-cols-3 lg:max-xl:[&>:nth-child(4)]:col-span-2 xl:grid-cols-[9.5rem_minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1.9fr)_minmax(0,1fr)]';
 /** The rows' fields a little lower than the entry's, so the lines keep one height and more fit. */
 const DENSE_ROWS =
   '[&_tbody_.native-select]:h-7.5 [&_tbody_[data-slot=input]]:h-7.5 [&_tbody_td]:py-0.5';

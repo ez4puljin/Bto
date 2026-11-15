@@ -8,6 +8,14 @@ import { useTranslation } from 'react-i18next';
 
 export const WEEKDAYS = ['d0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6'] as const;
 
+/**
+ * A row's title as the button that opens it (the keyboard's way in; the row itself is the finger's
+ * and the mouse's): the text cuts inside it on one line (`<span className="block truncate">`), and
+ * a finger still gets its reach above and below (ADR-0201).
+ */
+export const ROW_TITLE =
+  'text-left font-medium text-link hover:underline touch:relative touch:after:absolute touch:after:inset-x-0 touch:after:-inset-y-3';
+
 /** «7 ц 35 мин» for a minute count; under an hour only «35 мин». */
 export function useWorded() {
   const { t } = useTranslation();

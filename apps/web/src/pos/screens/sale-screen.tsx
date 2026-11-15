@@ -980,7 +980,7 @@ function ToolTile(props: {
     >
       {props.icon}
       <span className="w-full truncate">{props.label}</span>
-      <span className="text-[0.6875rem] font-normal text-muted-foreground">{props.hotkey}</span>
+      <span className="text-xs font-normal text-muted-foreground">{props.hotkey}</span>
     </Button>
   );
 }

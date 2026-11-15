@@ -89,13 +89,17 @@ const UNIT_COST = /^\d{1,10}(\.\d{1,4})?$/;
 const CODES_SHOWN = 60;
 const REVIEW_VIEWS = ['differences', 'all'] as const;
 
-/** The stocktakes list's columns (ADR-0119); the date cell may hold a date and time. */
+/**
+ * The stocktakes list's columns (ADR-0119); the date cell may hold a date and time, and «Дууссан
+ * тавиур» needs 8rem for its head. 47.25rem, whole on a till PC; a tablet upright (about 40.5)
+ * lets the date go (36.25), which the stocktake's page shows (ADR-0201).
+ */
 const LIST_COLUMNS: readonly ColumnSpec[] = [
   { key: 'number', kind: 'number' },
   { key: 'warehouse', kind: 'text', weight: 1 },
-  { key: 'shelves', kind: 'count', width: 6 },
+  { key: 'shelves', kind: 'count', width: 8 },
   { key: 'status', kind: 'status' },
-  { key: 'date', kind: 'datetime' },
+  { key: 'date', kind: 'datetime', drop: 1 },
   { key: 'chevron', kind: 'chevron' },
 ];
 

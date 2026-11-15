@@ -86,8 +86,10 @@ import { PLAIN_COLUMN, STAGE_TONES } from './stage-tones';
 import { useMover } from './use-mover';
 
 const DRAG_TYPE = 'application/x-tugeel-order';
-/** Space kept under the board: the page's bottom padding (`pb-10`). */
-const BELOW_BOARD = 40;
+/** Space kept under the board, in rem as the page's bottom padding is (`pb-10`). */
+const BELOW_BOARD_REM = 2.5;
+/** The least a fitted board takes: a stage's head and about two cards (the floor is 600px high). */
+const MIN_BOARD = 280;
 const INTERACTIVE = 'a, button, input, select, textarea, label, [role="menuitem"]';
 /** The orders whose parts are still worked on; afterwards the card drops them. */
 const PICKING_STATUSES: readonly OrderCard['status'][] = ['CONFIRMED', 'PICKING', 'PACKED'];
@@ -95,9 +97,9 @@ const PICKING_STATUSES: readonly OrderCard['status'][] = ['CONFIRMED', 'PICKING'
 /**
  * «Самбараар» (ADR-0056 #8, ADR-0057 #7): the pipeline's visible stages as columns in their own
  * sort, the cards dragged (or moved through a menu) from stage to stage; a stage header holds its
- * count and total, «+» (a new order in a stage without an action) and the stage's «⋯» menu. On a
- * desktop the board fits the window (ADR-0066): each column scrolls its own cards under its header
- * and the sideways scrollbar stays in view.
+ * count and total, «+» (a new order in a stage without an action) and the stage's «⋯» menu. The
+ * board fits the window (ADR-0066; a tablet too, ADR-0201): each column scrolls its own cards under
+ * its header and the sideways scrollbar stays in view.
  */
 export function BoardView({
   pipeline,
@@ -353,28 +355,34 @@ export function BoardView({
 }
 
 /**
- * The board's height on a desktop: what the window leaves below its top, so the columns scroll
- * their own cards and the board's sideways scrollbar stays above the window's edge. Phones and
- * tablets keep the board's natural height.
+ * The board's height: what the window leaves below its top, so the columns scroll their own cards
+ * and the board's sideways scrollbar stays above the window's edge — on an upright tablet too
+ * (ADR-0201), whose stage heads scrolled away with the page. A phone keeps the board's natural
+ * height.
  */
 function useBoardHeight(ref: RefObject<HTMLElement | null>): number | null {
   const [height, setHeight] = useState<number | null>(null);
   useLayoutEffect(() => {
     const element = ref.current;
     if (!element || typeof window.matchMedia !== 'function') return undefined;
-    const desktop = window.matchMedia('(min-width: 1024px)');
+    const supported = window.matchMedia('(min-width: 768px)');
     const measure = () => {
-      if (!desktop.matches) {
+      if (!supported.matches) {
         setHeight(null);
         return;
       }
       const top = element.getBoundingClientRect().top + window.scrollY;
-      const next = Math.max(360, Math.floor(window.innerHeight - top - BELOW_BOARD));
+      // Read each time: the root font steps at 1600 and 1900px of window (index.css).
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      const next = Math.max(
+        MIN_BOARD,
+        Math.floor(window.innerHeight - top - BELOW_BOARD_REM * rem),
+      );
       setHeight((previous) => (previous === next ? previous : next));
     };
     measure();
     window.addEventListener('resize', measure);
-    desktop.addEventListener('change', measure);
+    supported.addEventListener('change', measure);
     // Content above the board (an alert, the filter chips wrapping) moves it: the main resizes.
     const main = element.closest('main');
     const observer =
@@ -382,7 +390,7 @@ function useBoardHeight(ref: RefObject<HTMLElement | null>): number | null {
     if (observer && main) observer.observe(main);
     return () => {
       window.removeEventListener('resize', measure);
-      desktop.removeEventListener('change', measure);
+      supported.removeEventListener('change', measure);
       observer?.disconnect();
     };
   }, [ref]);
@@ -498,7 +506,9 @@ function Card({
     <article
       draggable={targets.length > 0}
       aria-label={title}
-      className="shrink-0 cursor-pointer rounded-lg border border-border bg-card p-3 text-sm shadow-card transition-shadow hover:shadow-popover has-[button:focus-visible]:ring-2 has-[button:focus-visible]:ring-ring"
+      // `relative`: the card's screen-reader-only texts are placed inside it, so the column's and
+      // the board's scrollers hold them; unplaced, they widened the page itself (ADR-0201).
+      className="relative shrink-0 cursor-pointer rounded-lg border border-border bg-card p-3 text-sm shadow-card transition-shadow hover:shadow-popover has-[button:focus-visible]:ring-2 has-[button:focus-visible]:ring-ring"
       onClick={(event) => {
         if (opensCard(event)) onOpen();
       }}

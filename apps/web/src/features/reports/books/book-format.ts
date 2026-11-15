@@ -102,7 +102,8 @@ export function sidesOf(balance: string): { debit: string; credit: string } {
  * foot carries a darker rule. Below 1600px (a 17px root) the text, the padding and the columns
  * shrink (`compact` widths). The first column stays in view while the table scrolls sideways
  * (a cell spanning several columns never sticks); a row's cells take its opaque background.
- * The descendant selectors outweigh the shadcn cells' own height, padding and colours.
+ * On a screen worked by a finger the rows are about 2.25rem, a list's row: a tap opens them
+ * (ADR-0201). The descendant selectors outweigh the shadcn cells' own height, padding and colours.
  */
 export const BOOK_TABLE = [
   'w-full table-fixed border-separate border-spacing-0 border-l border-border text-[0.8125rem] leading-tight max-[1600px]:text-xs',
@@ -113,6 +114,7 @@ export const BOOK_TABLE = [
   '[&_td]:h-auto [&_td]:border-r [&_td]:border-b [&_td]:border-r-border/60 [&_td]:border-b-border/70 [&_td]:px-2 [&_td]:py-1 [&_td]:align-middle [&_td]:first:pl-2 [&_td]:last:pr-2',
   '[&_tr>*:last-child]:border-r-border',
   'max-[1600px]:[&_td]:px-1.5 max-[1600px]:[&_th]:px-1.5',
+  'touch:[&_td]:py-2.5',
   '[&_tbody_tr>td:first-child:not([colspan])]:sticky [&_tbody_tr>td:first-child:not([colspan])]:left-0 [&_tbody_tr>td:first-child:not([colspan])]:z-10 [&_tbody_tr>td:first-child:not([colspan])]:bg-inherit',
   '[&_thead_tr:first-child>th:first-child]:sticky [&_thead_tr:first-child>th:first-child]:left-0 [&_thead_tr:first-child>th:first-child]:z-10',
   'print:table-auto print:text-[0.6875rem] print:[&_col]:w-auto! print:[&_thead]:static print:[&_tr]:break-inside-avoid',
@@ -138,7 +140,8 @@ function fixed(rem: number, compact = rem): FixedColumn {
 /** The fixed columns of the papers in rem (ADR-0119's idea); text columns take the rest. */
 export const COL = {
   code: fixed(6, 5.75),
-  docNumber: fixed(10.5, 9.75),
+  // «ADJ-2026-000001» whole after its ▸: the small text below 1600px runs wider for its size.
+  docNumber: fixed(10.5, 10.75),
   date: fixed(6.5, 5.5),
   unit: fixed(4.5, 3.5),
   qty: fixed(5, 4.5),

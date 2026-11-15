@@ -91,6 +91,24 @@ export interface PanelLine {
   warehouseId?: number;
 }
 
+/**
+ * What a draft's lines table shows in this window, so the entry can stand under it (ADR-0201): a
+ * laptop has every column; a narrower window gives some up, and a tablet upright (`stacked`) has
+ * the entry as a form of its own above the lines.
+ */
+export interface DraftShape {
+  stacked: boolean;
+  /** Below a laptop's width: the product's cell may be narrower than the search likes. */
+  narrow: boolean;
+  lineNo: boolean;
+  sku: boolean;
+  warehouse: boolean;
+  /** The order's quantities: their cell stays empty in the entry. */
+  expected: boolean;
+  weight: boolean;
+  markup: boolean;
+}
+
 /** A line's own unit, for editing it: a line keeps its product and unit. */
 function productOfLine(line: ReceiptLine): PanelProduct {
   return {
@@ -136,8 +154,8 @@ export function ReceiptLinePanel(props: {
   primary?: boolean;
   /** A problem to show under the fields (a refused add). */
   problem?: ReactNode;
-  /** The table has a column of ordered quantities: its cell stays empty here. */
-  expected?: boolean;
+  /** The columns of the table the entry stands in; every one without it. */
+  shape?: DraftShape;
   /** The search box, for the window to put the cursor in. */
   searchInput?: RefObject<HTMLInputElement | null>;
   onSubmit: (line: PanelLine) => Promise<boolean>;
@@ -147,6 +165,17 @@ export function ReceiptLinePanel(props: {
   const { editing } = props;
   const free = props.free === true;
   const canCost = useHasPermission('inventory.costs.manage') && !free;
+  // Without a table's say, a laptop's: every column.
+  const shape: DraftShape = props.shape ?? {
+    stacked: false,
+    narrow: false,
+    lineNo: true,
+    sku: true,
+    warehouse: true,
+    expected: false,
+    weight: true,
+    markup: canCost,
+  };
   const api = useApiClient();
   const lookupBarcode = useBarcodeLookup();
   const warehouses = useWarehouseOptions(WHOLESALE);
@@ -480,7 +509,8 @@ export function ReceiptLinePanel(props: {
             role="radio"
             aria-checked={scope === value}
             tabIndex={scope === value ? 0 : -1}
-            className="h-6 rounded-full px-2.5 font-medium text-muted-foreground transition-[color,background-color,box-shadow] duration-200 ease-apple outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-checked:bg-background aria-checked:text-foreground aria-checked:shadow-control"
+            // Taller for a finger (ADR-0201): the list's head has the room.
+            className="h-6 rounded-full px-2.5 font-medium text-muted-foreground transition-[color,background-color,box-shadow] duration-200 ease-apple outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-checked:bg-background aria-checked:text-foreground aria-checked:shadow-control touch:h-9"
             onClick={() => {
               chooseScope(value);
               searchRef.current?.focus();
@@ -503,9 +533,12 @@ export function ReceiptLinePanel(props: {
 
   const productControl = product ? (
     <div className="flex h-8.5 min-w-0 items-center gap-2 rounded-lg border border-input bg-muted/40 px-2 text-sm">
-      <span className="shrink-0 font-mono text-[0.8125rem] text-muted-foreground">
-        {product.sku}
-      </span>
+      {/* In a till PC's narrowest cell the code would leave the name four letters. */}
+      {shape.narrow && !shape.stacked && !shape.sku ? null : (
+        <span className="shrink-0 font-mono text-[0.8125rem] text-muted-foreground">
+          {product.sku}
+        </span>
+      )}
       <span className="min-w-0 flex-1 truncate" title={product.name}>
         {product.name}
       </span>
@@ -828,7 +861,8 @@ export function ReceiptLinePanel(props: {
             {t('inventory.receipt.panel.weightTotal', { total: totalWeight })}
           </Info>
         ) : null
-      ) : product.weightKg ? (
+      ) : product.weightKg && !(shape.stacked && canCost) ? (
+        // A tablet's line has no room for it beside a cost holder's last price and markup.
         <Info label={t('inventory.receipt.panel.weightField')}>{formatQty(product.weightKg)}</Info>
       ) : null}
     </dl>
@@ -921,58 +955,126 @@ export function ReceiptLinePanel(props: {
       {text}
     </span>
   );
+  // The table's columns, as the entry's cells span them.
+  const leading = (shape.lineNo ? 1 : 0) + (shape.sku ? 1 : 0) + 1;
+  const location = (shape.warehouse ? 1 : 0) + (BINS_SOON ? 0 : 1);
+  const closing = shape.markup ? 2 : 1;
   const columnCount =
-    3 + (BINS_SOON ? 1 : 2) + 1 + (props.expected ? 1 : 0) + 2 + (canCost ? 4 : 1);
+    leading +
+    location +
+    1 +
+    (shape.expected ? 1 : 0) +
+    1 +
+    (shape.weight ? 1 : 0) +
+    (canCost ? 2 : 0) +
+    closing;
+  const cancelButton = editing ? (
+    <Button variant="ghost" size="sm" className="px-2.5" onClick={props.onCancelEdit}>
+      {t('common.cancel')}
+    </Button>
+  ) : null;
+  const saveButton = (className: string) => (
+    <Button
+      className={className}
+      size="sm"
+      variant={props.primary ? 'default' : 'secondary'}
+      pending={props.pending}
+      onClick={() => void submit()}
+    >
+      {t('common.save')}
+      {editing ? null : <Kbd>{t('inventory.receipt.panel.keys.enter')}</Kbd>}
+    </Button>
+  );
+  /** A field of the tablet's form under its column's name; the field names itself to a reader. */
+  const captioned = (label: string, control: ReactNode, className: string) => (
+    <div className={cn('flex flex-col gap-0.5', className)}>
+      <span aria-hidden className="text-xs leading-snug text-muted-foreground">
+        {label}
+      </span>
+      {control}
+    </div>
+  );
 
   return (
     <>
-      <TableRow ref={rowRoot} data-editing={editing ? 'true' : undefined} className={ENTRY_ROW}>
-        <TableCell colSpan={3} className={ENTRY_CELL}>
-          <div className="min-w-56">{productControl}</div>
-        </TableCell>
-        <TableCell colSpan={BINS_SOON ? 1 : 2} className={ENTRY_CELL}>
-          {locationControl}
-        </TableCell>
-        <TableCell className={ENTRY_CELL}>{unitControl}</TableCell>
-        {props.expected ? <TableCell className={ENTRY_CELL} /> : null}
-        <TableCell className={ENTRY_CELL}>{qtyControl}</TableCell>
-        <TableCell className={ENTRY_CELL}>
-          <Input
-            id={`${ids}-weight`}
-            aria-label={t('inventory.receipt.panel.weightTotalLabel')}
-            readOnly
-            tabIndex={-1}
-            className={cn(PLAIN_FIELD, 'text-right font-mono')}
-            value={totalWeight ?? ''}
-            placeholder={product ? none : undefined}
-          />
-        </TableCell>
-        {canCost ? (
-          <>
-            <TableCell className={ENTRY_CELL}>{priceControl}</TableCell>
-            <TableCell className={ENTRY_CELL}>{amountControl}</TableCell>
-          </>
-        ) : null}
-        <TableCell colSpan={canCost ? 2 : 1} className={ENTRY_CELL}>
-          <div className="flex items-center justify-end gap-1">
-            {editing ? (
-              <Button variant="ghost" size="sm" className="px-2.5" onClick={props.onCancelEdit}>
-                {t('common.cancel')}
-              </Button>
-            ) : null}
-            <Button
-              className="min-w-0 flex-1 rounded-lg px-2"
-              size="sm"
-              variant={props.primary ? 'default' : 'secondary'}
-              pending={props.pending}
-              onClick={() => void submit()}
-            >
-              {t('common.save')}
-              {editing ? null : <Kbd>{t('inventory.receipt.panel.keys.enter')}</Kbd>}
-            </Button>
-          </div>
-        </TableCell>
-      </TableRow>
+      {shape.stacked ? (
+        // A tablet upright (ADR-0201): the fields no longer fit under the lines' columns, so they
+        // stand as a form of three rows of one height: the product and where it goes; the unit,
+        // the quantity, the prices and the buttons; what the product says.
+        <TableRow ref={rowRoot} data-editing={editing ? 'true' : undefined} className={ENTRY_ROW}>
+          <TableCell colSpan={columnCount} className={ENTRY_CELL}>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex min-w-0 gap-1.5">
+                {captioned(t('inventory.product'), productControl, 'min-w-0 flex-1')}
+                {captioned(
+                  t('inventory.receipt.panel.location'),
+                  <div className="flex min-w-0">{locationControl}</div>,
+                  'w-44 shrink-0',
+                )}
+              </div>
+              <div className="flex min-w-0 items-end gap-1.5">
+                {captioned(t('inventory.unit'), unitControl, 'w-28 shrink-0')}
+                {captioned(t('inventory.qty'), qtyControl, 'w-20 shrink-0')}
+                {canCost ? (
+                  <>
+                    {captioned(
+                      t('inventory.receipt.form.unitPrice'),
+                      priceControl,
+                      'w-28 shrink-0',
+                    )}
+                    {captioned(t('inventory.receipt.form.amount'), amountControl, 'w-32 shrink-0')}
+                  </>
+                ) : null}
+                <div className="ml-auto flex items-center gap-1">
+                  {cancelButton}
+                  {saveButton('rounded-lg px-3')}
+                </div>
+              </div>
+              <div className="flex min-h-5 min-w-0 items-center text-[0.8125rem]">{facts}</div>
+            </div>
+          </TableCell>
+        </TableRow>
+      ) : (
+        <TableRow ref={rowRoot} data-editing={editing ? 'true' : undefined} className={ENTRY_ROW}>
+          <TableCell colSpan={leading} className={ENTRY_CELL}>
+            {/* A till PC's product cell is narrower than a laptop's: the search follows it. */}
+            <div className={shape.narrow ? 'min-w-44' : 'min-w-56'}>{productControl}</div>
+          </TableCell>
+          {location > 0 ? (
+            <TableCell colSpan={location} className={ENTRY_CELL}>
+              {locationControl}
+            </TableCell>
+          ) : null}
+          <TableCell className={ENTRY_CELL}>{unitControl}</TableCell>
+          {shape.expected ? <TableCell className={ENTRY_CELL} /> : null}
+          <TableCell className={ENTRY_CELL}>{qtyControl}</TableCell>
+          {shape.weight ? (
+            <TableCell className={ENTRY_CELL}>
+              <Input
+                id={`${ids}-weight`}
+                aria-label={t('inventory.receipt.panel.weightTotalLabel')}
+                readOnly
+                tabIndex={-1}
+                className={cn(PLAIN_FIELD, 'text-right font-mono')}
+                value={totalWeight ?? ''}
+                placeholder={product ? none : undefined}
+              />
+            </TableCell>
+          ) : null}
+          {canCost ? (
+            <>
+              <TableCell className={ENTRY_CELL}>{priceControl}</TableCell>
+              <TableCell className={ENTRY_CELL}>{amountControl}</TableCell>
+            </>
+          ) : null}
+          <TableCell colSpan={closing} className={ENTRY_CELL}>
+            <div className="flex items-center justify-end gap-1">
+              {cancelButton}
+              {saveButton('min-w-0 flex-1 rounded-lg px-2')}
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
       <TableRow>
         <TableCell colSpan={columnCount} className={ENTRY_SLOT_CELL}>
           <div className={ENTRY_SLOT}>
@@ -988,20 +1090,27 @@ export function ReceiptLinePanel(props: {
                 </span>
               </span>
             ) : null}
-            {facts}
+            {shape.stacked ? null : facts}
             <div className="ml-auto flex shrink-0 items-center gap-3 text-xs">
               {product && !editing ? (
-                <Link
-                  to={`/catalog/products/${product.id}`}
-                  target="_blank"
-                  className="inline-flex items-center gap-1 text-[0.8125rem] whitespace-nowrap text-link hover:underline"
-                  onClick={() => {
-                    editedProduct.current = true;
-                  }}
+                // A shared button, for a finger's reach (ADR-0201); the row keeps its height.
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="xs"
+                  className="h-6 text-[0.8125rem] text-link"
                 >
-                  <Pencil aria-hidden className="size-3.5" />
-                  {t('inventory.receipt.panel.editProduct')}
-                </Link>
+                  <Link
+                    to={`/catalog/products/${product.id}`}
+                    target="_blank"
+                    onClick={() => {
+                      editedProduct.current = true;
+                    }}
+                  >
+                    <Pencil aria-hidden className="size-3.5" />
+                    {t('inventory.receipt.panel.editProduct')}
+                  </Link>
+                </Button>
               ) : null}
               {editing
                 ? hint(

@@ -45,6 +45,27 @@ export const PUBLIC_ROUTES = [
  * `dialog: true` waits for a dialog or a sheet to open before measuring; `then` is a script run in
  * the page once it has loaded (a double click that opens a report row's detail).
  */
+/** Types into the «Шинэ гүйлгээ» form: the first account found by a digit on each side, an amount, a note. */
+const FILL_TRANSACTION = `
+  const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  const type = (id, text) => {
+    const field = document.getElementById(id);
+    field.focus();
+    set.call(field, text);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    return field;
+  };
+  const pause = (ms) => new Promise((done) => setTimeout(done, ms));
+  for (const [id, digit] of [['trx-account', '1'], ['trx-counter', '5']]) {
+    const field = type(id, digit);
+    await pause(300);
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await pause(200);
+  }
+  type('trx-amount', '1250000');
+  type('trx-description', 'Түрээсийн төлбөр');
+`;
+
 export const ROUTES = [
   { area: 'home', name: 'home', path: '/' },
 
@@ -195,6 +216,14 @@ export const ROUTES = [
     name: 'transactions-transfer',
     path: '/finance/transactions?journal=BANK&transfer=1',
     dialog: true,
+  },
+  {
+    // The form as it stands filled: the balance on the label's line, the entry's sides in the foot.
+    area: 'finance',
+    name: 'transactions-filled',
+    path: '/finance/transactions?journal=BANK&new=1',
+    dialog: true,
+    then: FILL_TRANSACTION,
   },
   { area: 'finance', name: 'accounts-new', path: '/finance/accounts?new=1', dialog: true },
   { area: 'finance', name: 'account-ledger', path: '/finance/accounts/{glAccount}' },

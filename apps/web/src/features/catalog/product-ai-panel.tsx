@@ -68,7 +68,8 @@ export function ProductAiPanel(props: {
     <Card>
       <CardContent className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <div className="min-w-0">
+          {/* The hint breaks beside the button instead of pushing it onto a row of its own. */}
+          <div className="min-w-0 grow basis-80">
             <h3 className="text-sm font-medium">{t('catalog.registration.ai.title')}</h3>
             <p className="text-sm text-muted-foreground">{t('catalog.registration.ai.hint')}</p>
           </div>

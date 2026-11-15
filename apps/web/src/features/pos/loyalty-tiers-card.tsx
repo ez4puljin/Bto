@@ -146,8 +146,11 @@ function TiersForm({ tiers, onClose }: { tiers: LoyaltyTier[]; onClose: () => vo
       });
   };
 
+  // The card stands in a half column from a laptop's width (27.5rem inside) and in the whole page
+  // below it, so the rows ask the form's width, not the window's (ADR-0201): four tracks from
+  // 26rem, the name on its own row in anything narrower.
   return (
-    <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
+    <form className="@container flex flex-col gap-4" onSubmit={submit} noValidate>
       <p className="text-sm text-muted-foreground">{t('posLoyalty.tiers.hint')}</p>
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('posLoyalty.tiers.empty')}</p>
@@ -155,7 +158,7 @@ function TiersForm({ tiers, onClose }: { tiers: LoyaltyTier[]; onClose: () => vo
         <div className="flex flex-col gap-2">
           <div
             aria-hidden
-            className="hidden gap-2 text-[0.8125rem] text-muted-foreground sm:grid sm:grid-cols-[minmax(0,1fr)_12rem_7rem_2.25rem]"
+            className="hidden gap-2 text-[0.8125rem] text-muted-foreground @[26rem]:grid @[26rem]:grid-cols-[minmax(0,1fr)_9rem_5rem_2.25rem]"
           >
             <span>{t('posLoyalty.tiers.columns.name')}</span>
             <span>{t('posLoyalty.tiers.columns.from')}</span>
@@ -169,9 +172,9 @@ function TiersForm({ tiers, onClose }: { tiers: LoyaltyTier[]; onClose: () => vo
               return (
                 <li
                   key={row.key}
-                  className="grid grid-cols-[minmax(0,1fr)_6rem_2.25rem] items-start gap-2 sm:grid-cols-[minmax(0,1fr)_12rem_7rem_2.25rem]"
+                  className="grid grid-cols-[minmax(0,1fr)_6rem_2.25rem] items-start gap-2 @[26rem]:grid-cols-[minmax(0,1fr)_9rem_5rem_2.25rem]"
                 >
-                  <div className="col-span-3 flex flex-col gap-1 sm:col-span-1">
+                  <div className="col-span-3 flex flex-col gap-1 @[26rem]:col-span-1">
                     <Input
                       aria-label={t('posLoyalty.tiers.name', { place })}
                       maxLength={LOYALTY_LIMITS.maxTierName}

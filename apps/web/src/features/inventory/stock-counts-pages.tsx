@@ -17,6 +17,7 @@ import {
   LoadMore,
   SearchField,
   SkeletonRows,
+  TruncateCell,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
@@ -67,13 +68,18 @@ const SCOPES: readonly StockCountScope[] = ['ALL', 'SCANNED', 'SEGMENT', 'SUPPLI
 /** The server takes up to 50 suppliers or categories. */
 const MAX_SCOPE_IDS = 50;
 
+/**
+ * 53.25rem: a till PC (about 55.5) holds it whole. A tablet upright (about 40.5) lets what the
+ * count's own page says go: which products it calls up (46.25), then when it started (35.25;
+ * ADR-0201).
+ */
 const LIST_COLUMNS: readonly ColumnSpec[] = [
   { key: 'number', kind: 'number' },
   { key: 'warehouse', kind: 'text', weight: 1 },
-  { key: 'scope', kind: 'text', weight: 1 },
+  { key: 'scope', kind: 'text', weight: 1, drop: 1 },
   { key: 'progress', kind: 'count', width: 7 },
   { key: 'status', kind: 'status' },
-  { key: 'date', kind: 'datetime' },
+  { key: 'date', kind: 'datetime', drop: 2 },
   { key: 'chevron', kind: 'chevron' },
 ];
 
@@ -444,17 +450,21 @@ export function StockCountVariancePage() {
   const q = useDeferredValue(text.trim());
   const variance = useStockCountVariance({ from, to, warehouseId, q });
   const rows = variance.data?.pages.flatMap((page) => page.data) ?? [];
+  // 75rem with the cost, what a 1366 window leaves (about 75.5), the product at 12rem of it. In a
+  // narrower table what explains a difference leaves before the difference (ADR-0201): the
+  // warehouse and the cost (62.5), the stock and the count (51.5: a till PC has about 55.5), then
+  // the account (42.5) and the date (35.25: a tablet upright has about 40.5).
   const columns: readonly ColumnSpec[] = [
-    { key: 'date', kind: 'date' },
+    { key: 'date', kind: 'date', drop: 4 },
     { key: 'number', kind: 'number' },
-    { key: 'warehouse', kind: 'text', weight: 1 },
-    { key: 'product', kind: 'text', weight: 2 },
-    { key: 'expected', kind: 'qty' },
-    { key: 'counted', kind: 'qty' },
-    { key: 'difference', kind: 'qty' },
-    ...(seesCost ? [{ key: 'cost', kind: 'money' } as const] : []),
-    { key: 'settlement', kind: 'text', weight: 1 },
-    { key: 'charge', kind: 'money' },
+    { key: 'warehouse', kind: 'text', weight: 1, min: 5.5, drop: 1 },
+    { key: 'product', kind: 'text', weight: 3, min: 12 },
+    { key: 'expected', kind: 'qty', width: 5.5, drop: 2 },
+    { key: 'counted', kind: 'qty', width: 5.5, drop: 2 },
+    { key: 'difference', kind: 'qty', width: 5.5 },
+    ...(seesCost ? [{ key: 'cost', kind: 'money', width: 7, drop: 1 } as const] : []),
+    { key: 'settlement', kind: 'text', weight: 2, min: 9, drop: 3 },
+    { key: 'charge', kind: 'money', width: 7.25 },
   ];
 
   return (
@@ -518,10 +528,16 @@ export function StockCountVariancePage() {
               >
                 <TableCell className="font-mono">{row.effectiveDate ?? ''}</TableCell>
                 <TableCell className="font-mono">
-                  {row.number ?? t('inventory.stocktake.noNumber', { id: row.stocktakeId })}
+                  {/* The way in for a finger and the keyboard: a double click is neither's. */}
+                  <Link
+                    to={`/inventory/counts/${row.stocktakeId}`}
+                    className="font-medium underline-offset-4 hover:underline"
+                  >
+                    {row.number ?? t('inventory.stocktake.noNumber', { id: row.stocktakeId })}
+                  </Link>
                 </TableCell>
-                <TableCell className="truncate">{row.warehouseName}</TableCell>
-                <TableCell className="truncate">
+                <TruncateCell text={row.warehouseName} />
+                <TruncateCell text={`${row.name} ${row.sku}`}>
                   <Link
                     to={`/inventory/movements?product=${row.productId}&warehouse=${row.warehouseId}&from=${from}&to=${to}`}
                     className="font-medium underline-offset-4 hover:underline"
@@ -529,7 +545,7 @@ export function StockCountVariancePage() {
                     {row.name}
                   </Link>
                   <span className="ml-2 font-mono text-xs text-muted-foreground">{row.sku}</span>
-                </TableCell>
+                </TruncateCell>
                 <TableCell className="text-right font-mono">
                   {row.expectedQty === null ? '' : formatQty(row.expectedQty)}
                 </TableCell>

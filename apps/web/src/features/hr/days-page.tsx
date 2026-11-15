@@ -61,15 +61,18 @@ const STATUSES = ['PRESENT', 'LATE', 'ABSENT', 'OFF'] as const satisfies readonl
 const MAX_DAYS = 62;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+// 64rem with every column: sized on a laptop. A till PC (55.5rem) lets the site and the lateness
+// go (the status says «Хоцорсон»): 50rem; a tablet upright (40.5rem) the two punches too: 40rem.
+// The row's panel lists the day's punches with their sites.
 const COLUMNS: readonly ColumnSpec[] = [
   { key: 'date', kind: 'date' },
   { key: 'employee', kind: 'text', weight: 3, min: 12 },
-  { key: 'firstIn', kind: 'code', width: 5 },
-  { key: 'lastOut', kind: 'code', width: 5 },
+  { key: 'firstIn', kind: 'code', width: 5, drop: 2 },
+  { key: 'lastOut', kind: 'code', width: 5, drop: 2 },
   { key: 'worked', kind: 'code', width: 7.5 },
-  { key: 'late', kind: 'code', width: 6 },
+  { key: 'late', kind: 'code', width: 6, drop: 1 },
   { key: 'status', kind: 'status', width: 11 },
-  { key: 'site', kind: 'text', weight: 2, min: 8 },
+  { key: 'site', kind: 'text', weight: 2, min: 8, drop: 1 },
   { key: 'chevron', kind: 'chevron' },
 ];
 

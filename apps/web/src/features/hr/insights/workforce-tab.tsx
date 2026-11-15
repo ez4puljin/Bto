@@ -263,60 +263,64 @@ function ChildrenRadar({ rows, total }: { rows: readonly HrGenderCount[]; total:
   });
   const boys = t('hr.insights.children.boys');
   const girls = t('hr.insights.children.girls');
+  // By the card's own width (ADR-0201): beside its list the radar needs 32rem of card, else its
+  // side labels fall outside the canvas (a card of two or three to a row is narrower).
   return (
-    <div className="grid items-center gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,13rem)]">
-      <EChart
-        label={t('hr.insights.children.title')}
-        height={232}
-        option={(colors) => ({
-          tooltip: { trigger: 'item' },
-          radar: {
-            radius: '68%',
-            indicator: names.map((name) => ({ name, max: peak })),
-            axisName: { color: colors.muted, fontSize: 12 },
-            axisLine: { lineStyle: { color: colors.grid } },
-            splitLine: { lineStyle: { color: colors.grid } },
-            splitArea: { show: false },
-          },
-          series: [
-            {
-              type: 'radar',
-              data: [
-                shape(
-                  boys,
-                  colors.male,
-                  rows.map((row) => row.male),
-                ),
-                shape(
-                  girls,
-                  colors.female,
-                  rows.map((row) => row.female),
-                ),
-              ],
+    <div className="@container">
+      <div className="grid items-center gap-4 @lg:grid-cols-[minmax(0,1fr)_minmax(0,13rem)]">
+        <EChart
+          label={t('hr.insights.children.title')}
+          height={232}
+          option={(colors) => ({
+            tooltip: { trigger: 'item' },
+            radar: {
+              radius: '68%',
+              indicator: names.map((name) => ({ name, max: peak })),
+              axisName: { color: colors.muted, fontSize: 12 },
+              axisLine: { lineStyle: { color: colors.grid } },
+              splitLine: { lineStyle: { color: colors.grid } },
+              splitArea: { show: false },
             },
-          ],
-        })}
-      >
-        <FigureTable
-          head={[t('hr.insights.fields.band'), boys, girls]}
-          rows={rows.map((row, index) => [names[index] ?? '', row.male, row.female])}
-        />
-      </EChart>
-      <div className="min-w-0 space-y-2">
-        <ul className="flex flex-wrap gap-x-4 gap-y-1">
-          <SwatchLine color={palette.male} label={boys} />
-          <SwatchLine color={palette.female} label={girls} />
-        </ul>
-        <ul className="divide-y divide-border text-[0.8125rem]">
-          {rows.map((row, index) => (
-            <li key={row.key} className="flex items-center justify-between gap-2 py-1">
-              <span className="min-w-0 truncate">{names[index]}</span>
-              <span className="shrink-0 text-muted-foreground tabular-nums">
-                {t('hr.insights.children.split', { boys: row.male, girls: row.female })}
-              </span>
-            </li>
-          ))}
-        </ul>
+            series: [
+              {
+                type: 'radar',
+                data: [
+                  shape(
+                    boys,
+                    colors.male,
+                    rows.map((row) => row.male),
+                  ),
+                  shape(
+                    girls,
+                    colors.female,
+                    rows.map((row) => row.female),
+                  ),
+                ],
+              },
+            ],
+          })}
+        >
+          <FigureTable
+            head={[t('hr.insights.fields.band'), boys, girls]}
+            rows={rows.map((row, index) => [names[index] ?? '', row.male, row.female])}
+          />
+        </EChart>
+        <div className="min-w-0 space-y-2">
+          <ul className="flex flex-wrap gap-x-4 gap-y-1">
+            <SwatchLine color={palette.male} label={boys} />
+            <SwatchLine color={palette.female} label={girls} />
+          </ul>
+          <ul className="divide-y divide-border text-[0.8125rem]">
+            {rows.map((row, index) => (
+              <li key={row.key} className="flex items-center justify-between gap-2 py-1">
+                <span className="min-w-0 truncate">{names[index]}</span>
+                <span className="shrink-0 text-muted-foreground tabular-nums">
+                  {t('hr.insights.children.split', { boys: row.male, girls: row.female })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   );

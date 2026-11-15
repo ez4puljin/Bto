@@ -271,32 +271,36 @@ function RecordBody(props: {
   }, [dirty, onDirty]);
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
-      <div className="flex min-w-0 flex-col gap-5">
-        <FactChips facts={factsOf(t, item)} />
-        <PanelSection title={t('expiry.panel.formTitle')}>
-          {archived ? (
-            <div className="flex flex-col gap-3">
-              {dirty ? (
-                <HeldCorrection typed={changedFields(form.draft, form.read.values)} />
-              ) : null}
-              <ArchivedValues item={item} />
-            </div>
-          ) : (
-            <RecordForm
-              item={item}
-              today={props.today}
-              form={form}
-              dirty={dirty}
-              onReload={props.onReload}
-            />
-          )}
+    // The facts run across the panel (two rows on a till PC, not four beside the history), and the
+    // history stands beside the form where the panel itself is wide enough (ADR-0201).
+    <div className="@container flex flex-col gap-5">
+      <FactChips facts={factsOf(t, item)} />
+      <div className="grid gap-5 @[52rem]:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="flex min-w-0 flex-col gap-5">
+          <PanelSection title={t('expiry.panel.formTitle')}>
+            {archived ? (
+              <div className="flex flex-col gap-3">
+                {dirty ? (
+                  <HeldCorrection typed={changedFields(form.draft, form.read.values)} />
+                ) : null}
+                <ArchivedValues item={item} />
+              </div>
+            ) : (
+              <RecordForm
+                item={item}
+                today={props.today}
+                form={form}
+                dirty={dirty}
+                onReload={props.onReload}
+              />
+            )}
+          </PanelSection>
+          <LiabilitySection item={item} />
+        </div>
+        <PanelSection title={t('expiry.history.title')}>
+          <HistoryTimeline itemId={item.id} />
         </PanelSection>
-        <LiabilitySection item={item} />
       </div>
-      <PanelSection title={t('expiry.history.title')}>
-        <HistoryTimeline itemId={item.id} />
-      </PanelSection>
     </div>
   );
 }

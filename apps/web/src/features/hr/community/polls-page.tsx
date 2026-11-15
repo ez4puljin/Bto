@@ -21,7 +21,7 @@ import {
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import { RecordSheet } from '@/components/record-sheet';
+import { FactChips, RecordSheet } from '@/components/record-sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -37,6 +37,7 @@ import { useSetParam } from '@/lib/search-params';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
+import { cn } from '@/lib/utils';
 import { randomUuid } from '@/lib/uuid';
 import {
   type HrPoll,
@@ -46,6 +47,7 @@ import {
   useEngagementMutations,
   useHrPolls,
 } from '../engagement-api';
+import { ROW_TITLE } from '../hr-helpers';
 import {
   emptyMoment,
   momentInstant,
@@ -64,11 +66,14 @@ const STATE_VARIANT = {
   CLOSED: 'outline',
 } as const satisfies Record<PollState, string>;
 
+// 46rem with every column: sized on a till PC (55.5rem). The two minute-long dates and the pill
+// («Хугацаа дууссан») keep their own widths, the bar with «120 / 120» its 9rem. A tablet upright
+// (40.5rem) lets the dates go, which the results panel says: 37rem.
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'title', kind: 'text', weight: 3, min: 16 },
-  { key: 'progress', kind: 'text', weight: 1, min: 12 },
-  { key: 'dates', kind: 'text', weight: 1, min: 14 },
-  { key: 'state', kind: 'status' },
+  { key: 'title', kind: 'text', weight: 3, min: 14 },
+  { key: 'progress', kind: 'text', weight: 1, min: 9 },
+  { key: 'dates', kind: 'datetime', width: 9, drop: 1 },
+  { key: 'state', kind: 'status', width: 9 },
   { key: 'actions', kind: 'actions', actions: 2 },
 ];
 
@@ -304,125 +309,174 @@ function PollDialog(props: { kind: HrPollKind; onClose: () => void }) {
   const update = (at: number, question: QuestionDraft) =>
     setQuestions((prev) => prev.map((value, index) => (index === at ? question : value)));
   const voteQuestion = questions[0];
+  const titleField = (
+    <FormField
+      label={
+        isVote ? t('hr.community.polls.fields.voteQuestion') : t('hr.community.polls.fields.title')
+      }
+      htmlFor="poll-title"
+      error={tried && title.trim() === '' ? 'validation.required' : undefined}
+    >
+      <Input
+        id="poll-title"
+        maxLength={ENGAGEMENT_LIMITS.maxTitle}
+        value={title}
+        onChange={(event) => setTitle(event.target.value)}
+      />
+    </FormField>
+  );
+  const noteField = (
+    <FormField label={t('hr.community.polls.fields.note')} htmlFor="poll-note">
+      <Textarea
+        id="poll-note"
+        rows={2}
+        maxLength={ENGAGEMENT_LIMITS.maxNote}
+        value={note}
+        onChange={(event) => setNote(event.target.value)}
+      />
+    </FormField>
+  );
+  const pictureField = (
+    <PictureField
+      label={t('hr.community.polls.fields.picture')}
+      onChange={setImageFileId}
+      onBusy={setUploading}
+    />
+  );
+  const audienceField = <AudienceField audience={audience} showMissing={tried} />;
+  const dateFields = (
+    <>
+      <MomentField
+        id="poll-starts"
+        label={t('hr.community.polls.fields.starts')}
+        value={starts}
+        onChange={setStarts}
+      />
+      <MomentField
+        id="poll-ends"
+        label={t('hr.community.polls.fields.ends')}
+        min={starts.date || businessDate()}
+        value={ends}
+        onChange={setEnds}
+        error={tried && endTooEarly ? t('hr.community.polls.fields.endTooEarly') : null}
+      />
+    </>
+  );
+  const switches = (
+    <>
+      <SettingSwitch
+        id="poll-show-results"
+        label={t('hr.community.polls.fields.showResults')}
+        hint={t('hr.community.polls.fields.showResultsHint')}
+        checked={showResults}
+        onChange={setShowResults}
+      />
+      <SettingSwitch
+        id="poll-allow-change"
+        label={t('hr.community.polls.fields.allowChange')}
+        hint={t('hr.community.polls.fields.allowChangeHint')}
+        checked={allowChange}
+        onChange={setAllowChange}
+      />
+      <SettingSwitch
+        id="poll-anonymous"
+        label={t('hr.community.polls.fields.anonymous')}
+        hint={t('hr.community.polls.fields.anonymousHint')}
+        checked={anonymous}
+        onChange={setAnonymous}
+      />
+    </>
+  );
+  // The form lays itself out by its own width (ADR-0201). A vote: the question and its options
+  // beside the note, the picture and the audience, the dates and the three switches in rows under
+  // them, so two options fit a laptop's 600px without scrolling (one column was 888px). A survey
+  // is a builder that grows with its questions: in the wider dialog they keep the left and what is
+  // set once stands beside them from 48rem, in view from the start instead of after the last one.
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : close())}>
-      <DialogContent closeLabel={t('common.close')} size="lg">
+      <DialogContent closeLabel={t('common.close')} size={isVote ? 'lg' : 'xl'}>
         <DialogHeader>
           <DialogTitle>{t(`hr.community.polls.${props.kind}.create`)}</DialogTitle>
         </DialogHeader>
-        <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
+        <form
+          className="@container flex flex-col gap-4"
+          noValidate
+          onSubmit={(event) => void submit(event)}
+        >
           <ProblemAlert problem={action.problem} />
-          <FormField
-            label={
-              isVote
-                ? t('hr.community.polls.fields.voteQuestion')
-                : t('hr.community.polls.fields.title')
-            }
-            htmlFor="poll-title"
-            error={tried && title.trim() === '' ? 'validation.required' : undefined}
-          >
-            <Input
-              id="poll-title"
-              maxLength={ENGAGEMENT_LIMITS.maxTitle}
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-            />
-          </FormField>
-          {isVote && voteQuestion ? (
-            <OptionsEditor
-              idPrefix="vote"
-              options={voteQuestion.options}
-              onChange={(options) => update(0, { ...voteQuestion, options })}
-              showError={tried}
-            />
-          ) : null}
-          <FormField label={t('hr.community.polls.fields.note')} htmlFor="poll-note">
-            <Textarea
-              id="poll-note"
-              rows={2}
-              maxLength={ENGAGEMENT_LIMITS.maxNote}
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-            />
-          </FormField>
-          {isVote ? null : (
-            <div className="flex flex-col gap-3">
-              {questions.map((question, index) => (
-                <QuestionEditor
-                  key={question.key}
-                  index={index}
-                  question={question}
-                  canRemove={questions.length > 1}
-                  onChange={(next) => update(index, next)}
-                  onRemove={() =>
-                    setQuestions((prev) => prev.filter((value) => value.key !== question.key))
-                  }
-                  showError={tried}
-                />
-              ))}
-              <div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={questions.length >= ENGAGEMENT_LIMITS.maxQuestions}
-                  onClick={() => {
-                    const added = newQuestion(nextKey.current, 'SINGLE');
-                    nextKey.current += 1;
-                    setQuestions((prev) => [...prev, added]);
-                  }}
-                >
-                  <Plus />
-                  {t('hr.community.polls.fields.addQuestion')}
-                </Button>
+          {isVote ? (
+            <>
+              <div className="grid gap-4 *:min-w-0 @xl:grid-cols-2">
+                <div className="flex flex-col gap-4">
+                  {titleField}
+                  {voteQuestion ? (
+                    <OptionsEditor
+                      idPrefix="vote"
+                      options={voteQuestion.options}
+                      onChange={(options) => update(0, { ...voteQuestion, options })}
+                      showError={tried}
+                    />
+                  ) : null}
+                </div>
+                <div className="flex flex-col gap-4">
+                  {noteField}
+                  {pictureField}
+                  {audienceField}
+                </div>
+              </div>
+              <div className="grid gap-4 *:min-w-0 @xl:grid-cols-2">{dateFields}</div>
+              <div className="grid gap-3 rounded-lg bg-fill/50 p-3 *:min-w-0 @xl:grid-cols-3">
+                {switches}
+              </div>
+            </>
+          ) : (
+            <div className="grid items-start gap-4 *:min-w-0 @3xl:grid-cols-[minmax(0,1fr)_20rem]">
+              <div className="flex flex-col gap-4">
+                {titleField}
+                {noteField}
+                <div className="flex flex-col gap-3">
+                  {questions.map((question, index) => (
+                    <QuestionEditor
+                      key={question.key}
+                      index={index}
+                      question={question}
+                      canRemove={questions.length > 1}
+                      onChange={(next) => update(index, next)}
+                      onRemove={() =>
+                        setQuestions((prev) => prev.filter((value) => value.key !== question.key))
+                      }
+                      showError={tried}
+                    />
+                  ))}
+                  <div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={questions.length >= ENGAGEMENT_LIMITS.maxQuestions}
+                      onClick={() => {
+                        const added = newQuestion(nextKey.current, 'SINGLE');
+                        nextKey.current += 1;
+                        setQuestions((prev) => [...prev, added]);
+                      }}
+                    >
+                      <Plus />
+                      {t('hr.community.polls.fields.addQuestion')}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col gap-4">
+                {pictureField}
+                {audienceField}
+                {/* Side by side under the questions (a tablet upright), stacked beside them. */}
+                <div className="grid gap-4 *:min-w-0 @xl:grid-cols-2 @3xl:grid-cols-1">
+                  {dateFields}
+                </div>
+                <div className="flex flex-col gap-3 rounded-lg bg-fill/50 p-3">{switches}</div>
               </div>
             </div>
           )}
-          <PictureField
-            label={t('hr.community.polls.fields.picture')}
-            onChange={setImageFileId}
-            onBusy={setUploading}
-          />
-          <AudienceField audience={audience} showMissing={tried} />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <MomentField
-              id="poll-starts"
-              label={t('hr.community.polls.fields.starts')}
-              value={starts}
-              onChange={setStarts}
-            />
-            <MomentField
-              id="poll-ends"
-              label={t('hr.community.polls.fields.ends')}
-              min={starts.date || businessDate()}
-              value={ends}
-              onChange={setEnds}
-              error={tried && endTooEarly ? t('hr.community.polls.fields.endTooEarly') : null}
-            />
-          </div>
-          <div className="flex flex-col gap-3 rounded-lg bg-fill/50 p-3">
-            <SettingSwitch
-              id="poll-show-results"
-              label={t('hr.community.polls.fields.showResults')}
-              hint={t('hr.community.polls.fields.showResultsHint')}
-              checked={showResults}
-              onChange={setShowResults}
-            />
-            <SettingSwitch
-              id="poll-allow-change"
-              label={t('hr.community.polls.fields.allowChange')}
-              hint={t('hr.community.polls.fields.allowChangeHint')}
-              checked={allowChange}
-              onChange={setAllowChange}
-            />
-            <SettingSwitch
-              id="poll-anonymous"
-              label={t('hr.community.polls.fields.anonymous')}
-              hint={t('hr.community.polls.fields.anonymousHint')}
-              checked={anonymous}
-              onChange={setAnonymous}
-            />
-          </div>
           <DialogFormFooter
             pending={mutations.createPoll.isPending}
             onCancel={close}
@@ -541,6 +595,23 @@ function PollResultsSheet({ poll, onClose }: { poll: HrPoll; onClose: () => void
       }
     >
       <div className="flex flex-col gap-4">
+        {/* The list lets its dates go on a narrow screen: the panel says them. */}
+        <FactChips
+          facts={[
+            {
+              label: t('hr.community.polls.fields.starts'),
+              value: <span className="font-mono">{formatUbMinute(poll.startsAt)}</span>,
+            },
+            {
+              label: t('hr.community.polls.fields.ends'),
+              value: poll.endsAt ? (
+                <span className="font-mono">{formatUbMinute(poll.endsAt)}</span>
+              ) : (
+                t('hr.community.polls.noEnd')
+              ),
+            },
+          ]}
+        />
         {poll.imageUrl ? (
           <img
             src={poll.imageUrl}
@@ -660,11 +731,11 @@ export function PollsPage({ kind }: { kind: HrPollKind }) {
                     <TableCell>
                       <button
                         type="button"
-                        className="block max-w-full truncate text-left font-medium text-link hover:underline"
+                        className={cn('block max-w-full', ROW_TITLE)}
                         title={poll.title}
                         onClick={() => setParam('poll', String(poll.id))}
                       >
-                        {poll.title}
+                        <span className="block truncate">{poll.title}</span>
                       </button>
                       {poll.note ? (
                         <p

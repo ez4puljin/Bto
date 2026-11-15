@@ -17,12 +17,12 @@ export function CheckboxGroup<T extends string | number>(props: {
   disabled?: boolean;
 }) {
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
+    <div className="grid gap-2 sm:grid-cols-2 touch:gap-y-0">
       {props.options.map((option) => {
         const id = `${props.name}-${String(option.value)}`;
         const checked = props.value.includes(option.value);
         return (
-          <div key={id} className="flex items-center gap-2">
+          <div key={id} className="flex items-center gap-2 touch:min-h-10">
             <Checkbox
               id={id}
               checked={checked}
@@ -35,7 +35,10 @@ export function CheckboxGroup<T extends string | number>(props: {
                 )
               }
             />
-            <Label htmlFor={id} className="font-normal">
+            <Label
+              htmlFor={id}
+              className="leading-snug font-normal touch:flex touch:flex-1 touch:items-center touch:self-stretch"
+            >
               {option.label}
             </Label>
           </div>

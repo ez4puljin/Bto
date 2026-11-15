@@ -3,7 +3,7 @@ import { addDays, businessDate } from '@tugeel/shared/time';
 import { Download, FileSpreadsheet, ListChecks, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FormField } from '@/components/form';
 import {
@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useHasPermission } from '@/app/auth-context';
 import { useWarehouses } from '@/features/identity/api';
 import { WarehouseSelect } from '@/features/inventory/shared';
@@ -89,13 +90,14 @@ function StatusBadge({ status }: { status: ImportStatus }) {
 }
 
 /**
- * Imports (ADR-0036): a compact card per kind for the template and the upload, three in a row on
- * wide screens so the history stays near the first screen (ADR-0066), then the history.
+ * Imports (ADR-0036): a compact card per kind for the template and the upload, and the history
+ * of what was brought in. Two tabs, the open one in the URL (`?tab=history`): under the ten
+ * cards the history began two screens down at every size (ADR-0201).
  */
 export function ImportsPage() {
   const { t } = useTranslation();
-  const imports = useImports();
-  const rows = imports.data?.pages.flatMap((page) => page.data) ?? [];
+  const [search, setSearch] = useSearchParams();
+  const tab = search.get('tab') === 'history' ? 'history' : 'upload';
   // The chart and the opening are the accountant's books (ADR-0102 #4, #5).
   const journal = useHasPermission('finance.journal.manage');
   const kinds = IMPORT_KINDS.filter(
@@ -105,14 +107,40 @@ export function ImportsPage() {
   return (
     <div>
       <PageHeader title={t('imports.title')} description={t('imports.intro')} />
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {kinds.map((kind) => (
-          <ImportKindCard key={kind} kind={kind} />
-        ))}
-      </div>
-      <h2 className="mt-6 mb-2.5 text-[0.9375rem] leading-tight font-semibold tracking-tight">
-        {t('imports.history')}
-      </h2>
+      <Tabs
+        value={tab}
+        className="gap-3"
+        onValueChange={(next) =>
+          setSearch(next === 'history' ? { tab: 'history' } : {}, { replace: true })
+        }
+      >
+        <TabsList aria-label={t('imports.title')}>
+          <TabsTrigger value="upload">{t('imports.upload')}</TabsTrigger>
+          <TabsTrigger value="history">{t('imports.history')}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="upload">
+          {/* Two across until a laptop: three leave a card too narrow for its two buttons. */}
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {kinds.map((kind) => (
+              <ImportKindCard key={kind} kind={kind} />
+            ))}
+          </div>
+        </TabsContent>
+        <TabsContent value="history">
+          <ImportHistory />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+/** What was brought in, newest first; a row opens the import's check. */
+function ImportHistory() {
+  const { t } = useTranslation();
+  const imports = useImports();
+  const rows = imports.data?.pages.flatMap((page) => page.data) ?? [];
+  return (
+    <>
       <ProblemAlert problem={problemFromError(imports.error)} onRetry={imports.refetch} />
       <ListCard scroll>
         <ListTable columns={HISTORY_COLUMNS}>
@@ -155,7 +183,7 @@ export function ImportsPage() {
         ) : null}
         <LoadMore query={imports} />
       </ListCard>
-    </div>
+    </>
   );
 }
 

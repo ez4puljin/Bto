@@ -51,12 +51,17 @@ const RESULT_TONE: Record<VisitResult, 'success' | 'secondary' | 'warning' | 'de
   PAYMENT: 'default',
 };
 
+/**
+ * The log's columns (ADR-0119). In rem: all of it 11 + 8 + 10 + 8.5 + 10 = 47.5 (a till PC leaves
+ * 56); an upright tablet's 41 holds when, who, where and what came of it (37.5) and lets the note
+ * go (ADR-0201).
+ */
 const LOG_COLUMNS: readonly ColumnSpec[] = [
   { key: 'visitedAt', kind: 'datetime' },
-  { key: 'rep', kind: 'text', weight: 2, min: 10 },
-  { key: 'customer', kind: 'text', weight: 3, min: 14 },
+  { key: 'rep', kind: 'text', weight: 2, min: 8 },
+  { key: 'customer', kind: 'text', weight: 3, min: 10 },
   { key: 'result', kind: 'status' },
-  { key: 'note', kind: 'text', weight: 3, min: 12 },
+  { key: 'note', kind: 'text', weight: 3, min: 10, drop: 1 },
   { key: 'spacer', kind: 'spacer' },
 ];
 

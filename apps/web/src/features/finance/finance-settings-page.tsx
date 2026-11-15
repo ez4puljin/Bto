@@ -12,6 +12,7 @@ import { type FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DetailCard, FieldList } from '@/components/detail';
 import { DialogFormFooter, FormField, FormFooter, FormRow, FormSection } from '@/components/form';
+import { ListTable, TruncateCell } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { SearchSelect } from '@/components/search-select';
 import { PageHeader } from '@/components/page-header';
@@ -35,15 +36,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useBranches } from '@/features/identity/api';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
@@ -70,6 +65,23 @@ const PATTERN_KEYS: Record<
 };
 const isMoneyKind = (value: string): value is MoneyAccountKind =>
   MONEY_ACCOUNT_KINDS.some((kind) => kind === value);
+
+/**
+ * The money accounts' columns (ADR-0119). The name alone takes the spare width: all seven are
+ * 45.5rem and leave it 19rem in a till PC's card (53), its longest names whole. A tablet's card
+ * (38) lets the branch and the journal account go, which the account's dialog shows, so the
+ * balance and the menu stay in view: 34rem (ADR-0201).
+ */
+const MONEY_ACCOUNT_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'code', kind: 'code', width: 6 },
+  { key: 'name', kind: 'text', min: 12 },
+  { key: 'kind', kind: 'text', weight: 0, min: 4 },
+  { key: 'branch', kind: 'text', weight: 0, min: 5.5, drop: 1 },
+  { key: 'account', kind: 'code', width: 6, drop: 1 },
+  { key: 'balance', kind: 'money' },
+  // One icon button and the last cell's wider padding.
+  { key: 'actions', kind: 'actions', width: 3.5 },
+];
 
 /** The finance settings (ADR-0060 #8, #5): the four number formats and the money accounts. */
 export function FinanceSettingsPage() {
@@ -102,7 +114,7 @@ export function FinanceSettingsPage() {
               problem={problemFromError(moneyAccounts.error)}
               onRetry={moneyAccounts.refetch}
             />
-            <Table>
+            <ListTable columns={MONEY_ACCOUNT_COLUMNS}>
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('finance.fields.code')}</TableHead>
@@ -121,7 +133,7 @@ export function FinanceSettingsPage() {
                     className={account.status === 'INACTIVE' ? 'text-muted-foreground' : undefined}
                   >
                     <TableCell className="font-mono">{account.code}</TableCell>
-                    <TableCell>
+                    <TruncateCell text={account.name}>
                       {account.name}
                       {account.bankAccountNo ? (
                         <span className="ml-2 font-mono text-xs text-muted-foreground">
@@ -138,7 +150,7 @@ export function FinanceSettingsPage() {
                           {t('finance.accountStatuses.INACTIVE')}
                         </Badge>
                       ) : null}
-                    </TableCell>
+                    </TruncateCell>
                     <TableCell>{t(`finance.moneyKinds.${account.kind}`)}</TableCell>
                     <TableCell>{account.branchName ?? ''}</TableCell>
                     <TableCell className="font-mono">{account.glAccountCode}</TableCell>
@@ -166,7 +178,7 @@ export function FinanceSettingsPage() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </ListTable>
           </CardContent>
         </Card>
         {numbering.data ? (
@@ -398,8 +410,10 @@ function MoneyAccountDialog({
           </DialogTitle>
           <DialogDescription>{account ? account.code : ''}</DialogDescription>
         </DialogHeader>
-        <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
-          <div className="grid gap-4 sm:grid-cols-2">
+        <form className="@container flex flex-col gap-4" onSubmit={submit} noValidate>
+          {/* Two columns by the dialog's own width: a bank account's ten fields take five rows
+              and its dialog fits a laptop's height (ADR-0201). */}
+          <div className="grid gap-x-4 gap-y-3.5 *:min-w-0 @xl:grid-cols-2">
             <FormField
               label={t('finance.settings.moneyAccountDialog.code')}
               htmlFor="money-code"
@@ -429,130 +443,139 @@ function MoneyAccountDialog({
                 ))}
               </NativeSelect>
             </FormField>
-          </div>
-          <FormField
-            label={t('finance.settings.moneyAccountDialog.name')}
-            htmlFor="money-name"
-            error={checked && !name.trim() ? 'validation.required' : undefined}
-          >
-            <Input
-              id="money-name"
-              value={name}
-              maxLength={120}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </FormField>
-          <FormField label={t('finance.settings.moneyAccountDialog.branch')} htmlFor="money-branch">
-            <NativeSelect
-              id="money-branch"
-              value={branchId ?? ''}
-              onChange={(event) => setBranchId(Number.parseInt(event.target.value, 10) || null)}
+            <FormField
+              label={t('finance.settings.moneyAccountDialog.name')}
+              htmlFor="money-name"
+              error={checked && !name.trim() ? 'validation.required' : undefined}
             >
-              <option value="">{t('finance.settings.moneyAccountDialog.noBranch')}</option>
-              {(branches.data ?? []).map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name}
-                </option>
-              ))}
-            </NativeSelect>
-          </FormField>
-          {kind === 'BANK' ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField
-                label={t('finance.settings.moneyAccountDialog.bankName')}
-                htmlFor="money-bank"
-              >
-                <Input
-                  id="money-bank"
-                  value={bankName}
-                  maxLength={120}
-                  onChange={(event) => setBankName(event.target.value)}
-                />
-              </FormField>
-              <FormField
-                label={t('finance.settings.moneyAccountDialog.bankAccountNo')}
-                htmlFor="money-bank-no"
-              >
-                <Input
-                  id="money-bank-no"
-                  className="font-mono"
-                  value={bankAccountNo}
-                  maxLength={40}
-                  onChange={(event) => setBankAccountNo(event.target.value)}
-                />
-              </FormField>
-              <FormField
-                label={t('finance.settings.moneyAccountDialog.accountHolder')}
-                htmlFor="money-bank-holder"
-              >
-                <Input
-                  id="money-bank-holder"
-                  value={accountHolder}
-                  maxLength={120}
-                  onChange={(event) => setAccountHolder(event.target.value)}
-                />
-              </FormField>
-              <FormField
-                label={t('finance.settings.moneyAccountDialog.iban')}
-                htmlFor="money-bank-iban"
-              >
-                <Input
-                  id="money-bank-iban"
-                  className="font-mono"
-                  value={iban}
-                  maxLength={40}
-                  onChange={(event) => setIban(event.target.value)}
-                />
-              </FormField>
-            </div>
-          ) : null}
-          {kind === 'BANK' ? (
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="money-show-customers">
-                  {t('finance.settings.moneyAccountDialog.showToCustomers')}
-                </Label>
-                <Switch
-                  id="money-show-customers"
-                  checked={showToCustomers}
-                  aria-describedby="money-show-customers-hint"
-                  onCheckedChange={setShowToCustomers}
-                />
-              </div>
-              <p id="money-show-customers-hint" className="text-xs text-muted-foreground">
-                {t('finance.settings.moneyAccountDialog.showToCustomersHint')}
-              </p>
-            </div>
-          ) : null}
-          <FormField
-            label={t('finance.settings.moneyAccountDialog.glAccount')}
-            htmlFor="money-gl"
-            error={checked && glAccountId === null ? 'validation.required' : undefined}
-          >
-            <SearchSelect
-              id="money-gl"
-              value={glAccountId === null ? '' : String(glAccountId)}
-              options={assets.map(accountOption)}
-              placeholder={t('finance.journal.dialog.chooseAccount')}
-              onChange={(value) => setGlAccountId(Number.parseInt(value, 10) || null)}
-            />
-          </FormField>
-          {account ? (
-            <div className="flex items-center justify-between gap-3">
-              <Label htmlFor="money-active">{t('finance.accountStatuses.ACTIVE')}</Label>
-              <Switch
-                id="money-active"
-                checked={status === 'ACTIVE'}
-                onCheckedChange={(on) => setStatus(on ? 'ACTIVE' : 'INACTIVE')}
+              <Input
+                id="money-name"
+                value={name}
+                maxLength={120}
+                onChange={(event) => setName(event.target.value)}
               />
+            </FormField>
+            <FormField
+              label={t('finance.settings.moneyAccountDialog.branch')}
+              htmlFor="money-branch"
+            >
+              <NativeSelect
+                id="money-branch"
+                value={branchId ?? ''}
+                onChange={(event) => setBranchId(Number.parseInt(event.target.value, 10) || null)}
+              >
+                <option value="">{t('finance.settings.moneyAccountDialog.noBranch')}</option>
+                {(branches.data ?? []).map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </FormField>
+            {kind === 'BANK' ? (
+              <>
+                <FormField
+                  label={t('finance.settings.moneyAccountDialog.bankName')}
+                  htmlFor="money-bank"
+                >
+                  <Input
+                    id="money-bank"
+                    value={bankName}
+                    maxLength={120}
+                    onChange={(event) => setBankName(event.target.value)}
+                  />
+                </FormField>
+                <FormField
+                  label={t('finance.settings.moneyAccountDialog.bankAccountNo')}
+                  htmlFor="money-bank-no"
+                >
+                  <Input
+                    id="money-bank-no"
+                    className="font-mono"
+                    value={bankAccountNo}
+                    maxLength={40}
+                    onChange={(event) => setBankAccountNo(event.target.value)}
+                  />
+                </FormField>
+                <FormField
+                  label={t('finance.settings.moneyAccountDialog.accountHolder')}
+                  htmlFor="money-bank-holder"
+                >
+                  <Input
+                    id="money-bank-holder"
+                    value={accountHolder}
+                    maxLength={120}
+                    onChange={(event) => setAccountHolder(event.target.value)}
+                  />
+                </FormField>
+                <FormField
+                  label={t('finance.settings.moneyAccountDialog.iban')}
+                  htmlFor="money-bank-iban"
+                >
+                  <Input
+                    id="money-bank-iban"
+                    className="font-mono"
+                    value={iban}
+                    maxLength={40}
+                    onChange={(event) => setIban(event.target.value)}
+                  />
+                </FormField>
+              </>
+            ) : null}
+            {/* A cash box's account has the last row to itself; a bank's shares it. */}
+            <div className={kind === 'BANK' ? undefined : '@xl:col-span-2'}>
+              <FormField
+                label={t('finance.settings.moneyAccountDialog.glAccount')}
+                htmlFor="money-gl"
+                error={checked && glAccountId === null ? 'validation.required' : undefined}
+              >
+                <SearchSelect
+                  id="money-gl"
+                  value={glAccountId === null ? '' : String(glAccountId)}
+                  options={assets.map(accountOption)}
+                  placeholder={t('finance.journal.dialog.chooseAccount')}
+                  onChange={(value) => setGlAccountId(Number.parseInt(value, 10) || null)}
+                />
+              </FormField>
             </div>
-          ) : null}
+            {kind === 'BANK' ? (
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="money-show-customers">
+                    {t('finance.settings.moneyAccountDialog.showToCustomers')}
+                  </Label>
+                  <Switch
+                    id="money-show-customers"
+                    checked={showToCustomers}
+                    aria-describedby="money-show-customers-hint"
+                    onCheckedChange={setShowToCustomers}
+                  />
+                </div>
+                <p id="money-show-customers-hint" className="text-xs text-muted-foreground">
+                  {t('finance.settings.moneyAccountDialog.showToCustomersHint')}
+                </p>
+              </div>
+            ) : null}
+          </div>
           <ProblemAlert problem={action.problem} />
           <DialogFormFooter
             pending={
               mutations.createMoneyAccount.isPending || mutations.updateMoneyAccount.isPending
             }
             onCancel={onClose}
+            // Beside the buttons it adds no row to the form.
+            start={
+              account ? (
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="money-active"
+                    checked={status === 'ACTIVE'}
+                    onCheckedChange={(on) => setStatus(on ? 'ACTIVE' : 'INACTIVE')}
+                  />
+                  <Label htmlFor="money-active">{t('finance.accountStatuses.ACTIVE')}</Label>
+                </div>
+              ) : undefined
+            }
           />
         </form>
       </DialogContent>

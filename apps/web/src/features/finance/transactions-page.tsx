@@ -33,13 +33,17 @@ import { TransactionDialog } from './transaction-dialog';
 /** Erkhet's menu order; «Мөнгөн хөрөнгө» alone holds no account, so it has no tab. */
 const TABS = ACCOUNT_JOURNALS.filter((journal) => journal !== 'MONEY');
 
+/**
+ * The journal's own columns (journal-page.tsx): the whole number in 11rem, 52.5rem for all seven
+ * (a till PC's 56); a tablet (41) lets the line count, then the source go: 39.5rem (ADR-0201).
+ */
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'number', kind: 'number' },
+  { key: 'number', kind: 'number', width: 11 },
   { key: 'date', kind: 'date' },
-  { key: 'description', kind: 'text', weight: 3, min: 14 },
-  { key: 'source', kind: 'status' },
+  { key: 'description', kind: 'text', weight: 3, min: 10.5 },
+  { key: 'source', kind: 'status', drop: 2 },
   { key: 'amount', kind: 'money' },
-  { key: 'lines', kind: 'count' },
+  { key: 'lines', kind: 'count', drop: 1 },
   { key: 'chevron', kind: 'chevron' },
 ];
 
@@ -83,7 +87,9 @@ export function TransactionsPage() {
           ) : null
         }
       />
-      <div className="mb-3 overflow-x-auto">
+      {/* One bar: the tabs and the dates share a row where both fit (a laptop), so the list
+          starts a row higher; narrower, the dates take the next row as before. */}
+      <FilterBar>
         <SegmentedControl
           name={t('finance.fields.kind')}
           options={TABS}
@@ -100,8 +106,6 @@ export function TransactionsPage() {
             )
           }
         />
-      </div>
-      <FilterBar>
         <DateRangeFilter
           label={t('finance.fields.date')}
           fromLabel={t('finance.fields.from')}

@@ -12,7 +12,7 @@ import { problemFromError } from '@/lib/problem';
 import { cn } from '@/lib/utils';
 import type { Category, ProductListItem } from './api';
 import { categoryCode } from './category-code';
-import type { ProductCellContext, ProductColumn } from './product-columns';
+import type { ProductCellContext, ProductColumn, ProductColumnKey } from './product-columns';
 
 /** What every page of rows shares; suppliers, locations and prices are read per page. */
 export type ProductTableContext = Omit<ProductCellContext, 'suppliers' | 'locations' | 'prices'>;
@@ -27,16 +27,29 @@ export interface ProductSelection {
 
 const CHECK_COLUMN: ColumnSpec = { key: 'check', kind: 'check' };
 const CHEVRON_COLUMN: ColumnSpec = { key: 'chevron', kind: 'chevron' };
+const NONE_LEAVING: readonly ProductColumnKey[] = [];
 
-/** The layout of the shown columns (ADR-0119): the checkbox first, the chevron last. */
-function columnSpecs(columns: readonly ProductColumn[], selectable: boolean): ColumnSpec[] {
-  const specs = columns.map<ColumnSpec>((column) => ({
-    key: column.key,
-    kind: column.kind,
-    ...(column.weight === undefined ? {} : { weight: column.weight }),
-    ...(column.min === undefined ? {} : { min: column.min }),
-    ...(column.width === undefined ? {} : { width: column.width }),
-  }));
+/**
+ * The layout of the shown columns (ADR-0119): the checkbox first, the chevron last. `leaving`
+ * names the columns that leave a table too narrow for all of them, the least needed first
+ * (ADR-0201).
+ */
+function columnSpecs(
+  columns: readonly ProductColumn[],
+  selectable: boolean,
+  leaving: readonly ProductColumnKey[],
+): ColumnSpec[] {
+  const specs = columns.map<ColumnSpec>((column) => {
+    const place = leaving.indexOf(column.key);
+    return {
+      key: column.key,
+      kind: column.kind,
+      ...(column.weight === undefined ? {} : { weight: column.weight }),
+      ...(column.min === undefined ? {} : { min: column.min }),
+      ...(column.width === undefined ? {} : { width: column.width }),
+      ...(place < 0 ? {} : { drop: place + 1 }),
+    };
+  });
   return [...(selectable ? [CHECK_COLUMN] : []), ...specs, CHEVRON_COLUMN];
 }
 
@@ -54,17 +67,20 @@ export const ProductTable = memo(function ProductTable(props: {
   selection?: ProductSelection;
   /** The list stands in the categories' order: each category heads its rows with its code. */
   categoryOf?: (id: number) => Category | undefined;
+  /** A default set: the columns that leave a narrow table (`PRODUCT_COLUMNS_LEAVING`). */
+  leaving?: readonly ProductColumnKey[];
 }) {
   const { t } = useTranslation();
   const { selection } = props;
+  const leaving = props.leaving ?? NONE_LEAVING;
   const loaded = useMemo(
     () => props.pages.flatMap((page) => page.data.map((row) => row.id)),
     [props.pages],
   );
   const ticked = selection ? loaded.filter((id) => selection.selected.has(id)).length : 0;
   const specs = useMemo(
-    () => columnSpecs(props.columns, selection !== undefined),
-    [props.columns, selection],
+    () => columnSpecs(props.columns, selection !== undefined, leaving),
+    [props.columns, selection, leaving],
   );
   return (
     <ListTable columns={specs}>
@@ -88,7 +104,12 @@ export const ProductTable = memo(function ProductTable(props: {
           ) : null}
           {props.columns.map((column) => (
             <TableHead key={column.key} className={column.numeric ? 'text-right' : undefined}>
-              {t(`catalog.products.columns.${column.key}`)}
+              {column.key === 'image' ? (
+                // A thumbnail needs no word above it, and «Зураг» does not fit its 3rem.
+                <span className="sr-only">{t('catalog.products.columns.image')}</span>
+              ) : (
+                t(`catalog.products.columns.${column.key}`)
+              )}
             </TableHead>
           ))}
           <ChevronHead />

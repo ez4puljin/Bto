@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { type ProductSummary, useCategories, useProducts } from '@/features/catalog/api';
+import { CategoryPath } from '@/features/catalog/category-path';
 import { categoryPaths, categoryTree } from '@/features/catalog/category-tree';
 import type { ColumnSpec } from '@/lib/column-layout';
 import { formatMnt } from '@/lib/money';
@@ -41,12 +42,16 @@ const positiveId = (value: string | null) => {
   return Number.isSafeInteger(id) && id > 0 ? id : undefined;
 };
 
-/** The list's columns (ADR-0119): the tick, the product, its price and profile, one action. */
+/**
+ * The list's columns (ADR-0119): the tick, the product, its price and profile, one action. 47.25rem
+ * in all; a tablet upright has 41.2 and lets the category go (40.25): the product's page and the
+ * category filter above say it (ADR-0201).
+ */
 const COLUMNS: readonly ColumnSpec[] = [
   { key: 'check', kind: 'check' },
   { key: 'sku', kind: 'code' },
   { key: 'name', kind: 'text', weight: 3, min: 12 },
-  { key: 'category', kind: 'text', weight: 2 },
+  { key: 'category', kind: 'text', weight: 3, drop: 1 },
   { key: 'warehousePrice', kind: 'money' },
   { key: 'priceProfile', kind: 'text', weight: 1 },
   { key: 'spacer', kind: 'spacer' },
@@ -240,7 +245,10 @@ export function PendingProductsPage() {
                     <TruncateCell
                       text={paths.get(row.categoryId) ?? ''}
                       className="text-muted-foreground"
-                    />
+                    >
+                      {/* The parents give way, so the category itself is never the part cut. */}
+                      <CategoryPath path={paths.get(row.categoryId) ?? ''} />
+                    </TruncateCell>
                     <TableCell className="text-right font-mono">
                       {terms ? (
                         t('pricing.money', { amount: formatMnt(terms.warehousePrice) })

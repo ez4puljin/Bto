@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DetailCard, FieldList } from '@/components/detail';
-import { RowAction, RowActions, TruncateCell } from '@/components/list';
+import { ListTable, RowAction, RowActions, TruncateCell } from '@/components/list';
 import { RoleName } from '@/components/role-name';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { problemFromError, settle } from '@/lib/problem';
 import { toast } from '@/lib/toast';
@@ -32,6 +33,19 @@ import {
 import { UserAccessForm } from './user-form';
 
 const when = (iso: string) => formatUbDateTime(Date.parse(iso));
+
+/**
+ * The live devices' columns (ADR-0119): 49.75rem in all, the device taking what is left and cut
+ * with «…». An upright tablet's 41rem lets the expiry go (38.25), so the sign-out button stays in
+ * the card instead of behind a sideways scroll (ADR-0201).
+ */
+const SESSION_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'device', kind: 'text', min: 12 },
+  { key: 'started', kind: 'datetime' },
+  { key: 'lastUsed', kind: 'datetime' },
+  { key: 'ends', kind: 'datetime', drop: 1 },
+  { key: 'actions', kind: 'actions', actions: 1 },
+];
 
 /**
  * The account's roles and write scopes on the employee's page (ADR-0145), read first; «Засах» for
@@ -201,7 +215,8 @@ function SessionHistory({ userId }: { userId: number }) {
       <TableBody>
         {history.data.map((session) => (
           <TableRow key={session.id}>
-            <TruncateCell text={deviceText(session.userAgent)} />
+            {/* The device takes what the other columns leave, down to 12rem (ADR-0201). */}
+            <TruncateCell fill className="min-w-48" text={deviceText(session.userAgent)} />
             <TableCell className="font-mono">{session.ip ?? t('common.none')}</TableCell>
             <TableCell className="font-mono">{when(session.createdAt)}</TableCell>
             <TableCell>
@@ -257,7 +272,7 @@ export function UserSessionsCard({ userId }: { userId: number }) {
       {/* The table runs to the card's edges: its first column lines up with the title. */}
       <CardContent className={sessions.data?.length ? 'px-0' : undefined}>
         {sessions.data?.length ? (
-          <Table>
+          <ListTable columns={SESSION_COLUMNS}>
             <TableHeader>
               <TableRow>
                 <TableHead>{t('users.detail.device')}</TableHead>
@@ -289,7 +304,7 @@ export function UserSessionsCard({ userId }: { userId: number }) {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </ListTable>
         ) : (
           <p className="text-sm text-muted-foreground">{t('users.detail.noSessions')}</p>
         )}

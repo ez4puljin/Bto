@@ -48,17 +48,20 @@ import { useRoleLabel, useWorkdaysText } from './hr-helpers';
 import { Avatar, WeekdayChecks } from './hr-kit';
 import { TimeInput } from '@/components/date-input';
 
+// 38rem: sized in the card on a tablet upright (38.5rem). The radius' head «Радиус (м)» sets its
+// width; the coordinates are 21 small digits.
 const SITE_COLUMNS: readonly ColumnSpec[] = [
-  { key: 'name', kind: 'text', weight: 3, min: 10 },
-  { key: 'coordinates', kind: 'code', width: 12 },
-  { key: 'radius', kind: 'count', width: 5 },
-  { key: 'branch', kind: 'text', weight: 2, min: 7 },
+  { key: 'name', kind: 'text', weight: 3, min: 9 },
+  { key: 'coordinates', kind: 'code', width: 11.5 },
+  { key: 'radius', kind: 'count', width: 6.5 },
+  { key: 'branch', kind: 'text', weight: 2, min: 6 },
   { key: 'actions', kind: 'actions', actions: 2 },
 ];
 
+// 38.25rem; the switch's head «Тооцдог» sets its column's width.
 const EMPLOYEE_COLUMNS: readonly ColumnSpec[] = [
   { key: 'name', kind: 'text', weight: 3, min: 14 },
-  { key: 'tracked', kind: 'icon', width: 4 },
+  { key: 'tracked', kind: 'icon', width: 5 },
   { key: 'sites', kind: 'text', weight: 2, min: 8 },
   { key: 'hours', kind: 'text', weight: 2, min: 8 },
   { key: 'actions', kind: 'actions', actions: 1 },

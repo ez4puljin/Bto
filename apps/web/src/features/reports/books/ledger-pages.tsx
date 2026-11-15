@@ -195,16 +195,26 @@ function LedgerPage({ kind }: { kind: LedgerKind }) {
   );
 }
 
-/** Code, name, then opening, turnover and closing as debit / credit (portrait A4). */
+/**
+ * Code, name, then opening, turnover and closing as debit / credit (portrait A4). The name gives
+ * way down to 8.75rem, so a till PC shows the closing balance without scrolling sideways: 5.75 +
+ * 8.75 + 6 × 6.5 = 53.5rem of the 54.2rem (922px) a 1024px window leaves the table, less a
+ * scrollbar (ADR-0201).
+ */
 const PARTY_COLUMNS: readonly BookColumn[] = [
   COL.code,
-  textColumn(16),
+  textColumn(16, 8.75),
   ...Array<BookColumn>(6).fill(COL.money),
 ];
-/** Code, name, opening, in, out, closing (portrait A4). */
+/**
+ * Code, name, opening, in, out, closing (portrait A4). The name gives way down to 6.5rem, so a
+ * tablet upright shows all four amounts: 5.75 + 6.5 + 4 × 6.5 = 38.25rem of the 39.2rem (666px) a
+ * 768px window leaves the table, less a scrollbar; a finger gets the name on as many lines as it
+ * needs.
+ */
 const MONEY_COLUMNS: readonly BookColumn[] = [
   COL.code,
-  textColumn(19),
+  textColumn(19, 6.5),
   ...Array<BookColumn>(4).fill(COL.money),
 ];
 

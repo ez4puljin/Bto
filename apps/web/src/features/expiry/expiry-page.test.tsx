@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { components } from '@tugeel/api-client';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { type ColumnSpec, columnLayout } from '@/lib/column-layout';
+import { type ColumnSpec, columnLayout, fitColumns } from '@/lib/column-layout';
 import { bodyOf, calls, COLA_BOX, list, UUID } from '@/test/inventory-fixtures';
 import { ADMIN_ME, json, problem, renderApp, signedIn, WORKER_ME } from '@/test/render-app';
 import { wedgeScan } from '@/test/scan';
@@ -14,6 +14,7 @@ import {
   EXPIRY_COLUMN_KEYS,
   EXPIRY_COLUMN_SPECS,
   type ExpiryColumnKey,
+  expiryColumnSpecs,
   FULL_DEFAULT_HIDDEN_EXPIRY_COLUMNS,
   FULL_SCREEN,
   WIDE_DEFAULT_HIDDEN_EXPIRY_COLUMNS,
@@ -341,6 +342,30 @@ describe('ExpiryPage', () => {
       expect(needs(FULL_DEFAULT_HIDDEN_EXPIRY_COLUMNS)).toBeLessThanOrEqual(room(1900, 19));
       // The reason the fullest set waits for 1900px.
       expect(needs(FULL_DEFAULT_HIDDEN_EXPIRY_COLUMNS)).toBeGreaterThan(room(1600, 18));
+    });
+
+    it('fit a till PC whole without the filter panel, and a tablet without the split and the status', () => {
+      // No panel beside the list below 1280px: the gutters and the scrollbars alone go out.
+      const alone = (windowPx: number) => (windowPx - 26) / 17 - 4;
+      const shown = EXPIRY_COLUMN_KEYS.filter(
+        (key) => !DEFAULT_HIDDEN_EXPIRY_COLUMNS.includes(key),
+      );
+      const compact = expiryColumnSpecs(shown, { compact: true, untouched: true });
+      const tillPc = fitColumns(compact, alone(1024));
+      expect(tillPc.fits).toBe(true);
+      expect(tillPc.dropped).toEqual([]);
+      const tablet = fitColumns(compact, alone(768));
+      expect(tablet.fits).toBe(true);
+      expect(tablet.kept.map((index) => compact[index]?.key)).toEqual([
+        'product',
+        'expiryDate',
+        'daysLeft',
+        'qtyTotal',
+        'chevron',
+      ]);
+      // A set the user chose is shown as chosen: nothing leaves it.
+      const chosen = expiryColumnSpecs(shown, { compact: true, untouched: false });
+      expect(fitColumns(chosen, alone(768)).dropped).toEqual([]);
     });
 
     it('keep a seven-character count whole, as its cell has no other way to read it', () => {

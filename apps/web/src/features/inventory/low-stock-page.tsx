@@ -99,17 +99,20 @@ export function LowStockPage() {
 
   const wholesale = warehouse?.kind === 'WHOLESALE';
   // The columns this list shows (ADR-0119): the ticks for a requester, the home warehouse at a
-  // store, the main supplier at a wholesale warehouse.
+  // store, the main supplier at a wholesale warehouse. A store's list with its ticks is 54.25rem
+  // (a wholesale one 51.5), whole on a till PC (about 55.5). A tablet upright (about 40.5) lets the
+  // two limits go, which «Нөхөх тоо» already answers (44.25, 41.5), then where the goods come
+  // from (37, 34.5): the product's page says it (ADR-0201).
   const columnSpec: ColumnSpec[] = [
     ...(requestable ? [{ key: 'select', kind: 'check' } as const] : []),
-    { key: 'product', kind: 'text', weight: 3, min: 14 },
+    { key: 'product', kind: 'text', weight: 3, min: 12 },
     { key: 'status', kind: 'status' },
     { key: 'onHand', kind: 'qty', width: 8.5 },
-    { key: 'min', kind: 'qty' },
-    { key: 'max', kind: 'qty' },
-    { key: 'suggested', kind: 'qty' },
-    ...(isStore ? [{ key: 'home', kind: 'text', weight: 1 } as const] : []),
-    ...(wholesale ? [{ key: 'supplier', kind: 'text', weight: 2 } as const] : []),
+    { key: 'min', kind: 'qty', width: 5, drop: 1 },
+    { key: 'max', kind: 'qty', width: 5, drop: 1 },
+    { key: 'suggested', kind: 'qty', width: 5.5 },
+    ...(isStore ? [{ key: 'home', kind: 'text', weight: 1, min: 7.25, drop: 2 } as const] : []),
+    ...(wholesale ? [{ key: 'supplier', kind: 'text', weight: 2, drop: 2 } as const] : []),
   ];
   const columns = columnSpec.length;
 

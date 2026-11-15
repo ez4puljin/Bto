@@ -33,7 +33,13 @@ export function MemberDialog(props: {
   const { t } = useTranslation();
   return (
     <Dialog open={props.open} onOpenChange={(open) => (open ? undefined : props.onClose())}>
-      <DialogContent size="md" className="gap-3" onCloseAutoFocus={props.onCloseAutoFocus}>
+      <DialogContent
+        size="md"
+        className="gap-3"
+        // A lookup: a typed phone number is nothing to lose, so closing never asks.
+        guard={false}
+        onCloseAutoFocus={props.onCloseAutoFocus}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Gift aria-hidden className="size-5 text-primary" />

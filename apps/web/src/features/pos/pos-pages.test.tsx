@@ -249,6 +249,46 @@ describe('supermarket pages (ADR-0063 #8)', () => {
     );
   });
 
+  it('keeps the documents the centre refused folded above the shifts until asked for', async () => {
+    const user = userEvent.setup();
+    renderApp(
+      '/pos/shifts',
+      signedIn(undefined, {
+        ...routes(),
+        'GET /api/v1/pos/sync-rejections': () =>
+          list([
+            {
+              id: 5,
+              edgeNodeId: 1,
+              edgeNodeCode: 'SM1',
+              clientId: '00000000-0000-4000-8000-000000000005',
+              kind: 'SALE',
+              code: 'POS_TOTALS_MISMATCH',
+              params: null,
+              payload: {},
+              createdAt: '2026-11-04T06:05:29.000Z',
+              replayedAt: null,
+              replayedByName: null,
+            },
+          ]),
+      }),
+    );
+    const card = within(
+      await screen.findByRole('region', {
+        name: mn.pos.rejections.title.replace('{{count}}', '1'),
+      }),
+    );
+    // One strip with the count: the shifts its hint points to stay in view (ADR-0201).
+    const show = card.getByRole('button', { name: mn.pos.receiptTemplates.show });
+    expect(show).toHaveAttribute('aria-expanded', 'false');
+    expect(card.queryByRole('button', { name: mn.pos.rejections.replay })).toBeNull();
+    await user.click(show);
+    expect(card.getByText(mn.pos.rejections.hint)).toBeInTheDocument();
+    expect(card.getByRole('button', { name: mn.pos.rejections.replay })).toBeInTheDocument();
+    await user.click(card.getByRole('button', { name: mn.pos.receiptTemplates.hide }));
+    expect(card.queryByRole('button', { name: mn.pos.rejections.replay })).toBeNull();
+  });
+
   it('lists sales and opens one with its lines, tender and shortfall', async () => {
     const user = userEvent.setup();
     renderApp('/pos/sales', signedIn(undefined, routes()));

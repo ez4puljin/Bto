@@ -44,8 +44,9 @@ export type CustomerColumnKey = (typeof CUSTOMER_COLUMN_KEYS)[number];
 export const LOCKED_CUSTOMER_COLUMNS: readonly CustomerColumnKey[] = ['code', 'name'];
 
 /**
- * What a user who never chose sees hidden (ADR-0066): code, name, kind, phone, TIN, the overdue debt
- * (ADR-0101), credit status and status fit a 1366px screen; every column stays in «Баганууд».
+ * What a user who never chose sees hidden (ADR-0066): the code, the name, the category, the kind,
+ * the TIN, the phone, the overdue debt (ADR-0101), the credit status and the status show; every
+ * column stays in «Баганууд».
  */
 export const DEFAULT_HIDDEN_CUSTOMER_COLUMNS: readonly CustomerColumnKey[] = [
   'regNo',
@@ -75,6 +76,26 @@ export const WIDE_DEFAULT_HIDDEN_CUSTOMER_COLUMNS: readonly CustomerColumnKey[] 
   'contact',
   'note',
   'app',
+];
+
+/**
+ * The columns that leave a default set too wide for its table (ADR-0201), the least needed first
+ * and one at a time; the customer's own page shows each. The default set needs 79.25rem: a 1366px
+ * window has 76.35 and lets the TIN go (69.25: its 10rem go to the names, and «ТТД хүлээгдэж буй»
+ * has its filter); a till PC has 56.2 and keeps the code, the name, the overdue debt, the credit
+ * status and the status (48.75); a tablet upright has 41.2 and lets the credit status go too
+ * (40.25: the debt in red and the «Зээл хаасан» filter still say it). The wide set's two columns
+ * (94.75) go first, so a 1600px window (84.9) shows the default set whole and a 1920px one (97)
+ * the wide set. `partners-logic.test.ts` checks the sums against the screens.
+ */
+export const CUSTOMER_COLUMNS_LEAVING: readonly CustomerColumnKey[] = [
+  'settlementGroup',
+  'creditLimit',
+  'tin',
+  'kind',
+  'category',
+  'phone',
+  'creditHold',
 ];
 
 /** A column of the customer list, sized by the layout (ADR-0119). */
@@ -172,7 +193,14 @@ export const CUSTOMER_COLUMNS: readonly CustomerColumn[] = [
         <Badge variant="warning">{t('partners.addresses.noGps')}</Badge>
       ),
   },
-  { key: 'contact', kind: 'text', weight: 2, cell: (row, t) => contactCell(row.contact, t) },
+  {
+    key: 'contact',
+    kind: 'text',
+    weight: 2,
+    // The phone whole and some letters of the name.
+    min: 10,
+    cell: (row, t) => contactCell(row.contact, t),
+  },
   {
     key: 'creditLimit',
     kind: 'money',
@@ -246,6 +274,8 @@ export const CUSTOMER_COLUMNS: readonly CustomerColumn[] = [
   {
     key: 'status',
     kind: 'status',
+    // «Идэвхтэй» and «Идэвхгүй» take 6.2rem with their cell.
+    width: 8,
     cell: (row, t) => (
       <Badge variant={row.status === 'ACTIVE' ? 'success' : 'secondary'}>
         {t(`partners.status.${row.status}`)}

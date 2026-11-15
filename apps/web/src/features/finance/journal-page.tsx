@@ -61,14 +61,20 @@ import { accountOption } from './account-option';
 const isSource = (value: string | null): value is JournalSource =>
   JOURNAL_SOURCES.some((source) => source === value);
 
-/** The journal's columns (ADR-0119): number, date, description, source, amount, line count. */
+/**
+ * The journal's columns (ADR-0119): number, date, description, source, amount, line count. The
+ * number is the row's link in medium weight and the first cell: «Ж-20261029-0001» needs 11rem,
+ * 10.5 cut it. All seven take 52.5rem, a till PC's width (56); a tablet (41, less beside a page
+ * scrollbar) lets the line count and then the source go, which the entry's panel shows: 39.5rem
+ * (ADR-0201).
+ */
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'number', kind: 'number' },
+  { key: 'number', kind: 'number', width: 11 },
   { key: 'date', kind: 'date' },
-  { key: 'description', kind: 'text', weight: 3, min: 14 },
-  { key: 'source', kind: 'status' },
+  { key: 'description', kind: 'text', weight: 3, min: 10.5 },
+  { key: 'source', kind: 'status', drop: 2 },
   { key: 'amount', kind: 'money' },
-  { key: 'lines', kind: 'count' },
+  { key: 'lines', kind: 'count', drop: 1 },
   { key: 'chevron', kind: 'chevron' },
 ];
 

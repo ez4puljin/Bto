@@ -96,7 +96,7 @@ function TreeRow(props: {
               open ? 'catalog.products.panel.collapse' : 'catalog.products.panel.expand',
               { name: row.name },
             )}
-            className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+            className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-foreground touch:size-11"
             onClick={() => props.onToggle(row.id)}
           >
             <ChevronRight
@@ -105,13 +105,13 @@ function TreeRow(props: {
             />
           </button>
         ) : (
-          <span aria-hidden className="size-6 shrink-0" />
+          <span aria-hidden className="size-6 shrink-0 touch:size-11" />
         )}
         <button
           type="button"
           aria-pressed={active}
           title={row.name}
-          className="flex min-w-0 flex-1 items-baseline gap-1.5 py-1 pr-2 text-left text-[0.8125rem]"
+          className="flex min-w-0 flex-1 items-baseline gap-1.5 py-1 pr-2 text-left text-[0.8125rem] touch:min-h-11 touch:items-center"
           onClick={() => props.onPick(active ? undefined : row.id)}
         >
           {row.code ? (

@@ -74,8 +74,10 @@ export function AiPage() {
   const steps = conversationId === undefined ? [] : (conversation.data?.questions ?? []);
   const loadingConversation = conversationId !== undefined && conversation.isPending;
   const stillWorking = asking.problem?.code === 'IDEMPOTENCY_KEY_IN_PROGRESS';
-  // The question box floats at the foot of the window only over answers it adds to; on an empty
-  // page (examples, datasets) or while the assistant is off it stays in the flow (ADR-0066).
+  // The question box floats at the foot of the window over the answers it adds to (ADR-0066). On
+  // an empty page it keeps its place under the examples and stays in sight all the same: a till PC
+  // and a laptop are lower than the examples and the datasets, and the page's one control began
+  // under the window's foot there (ADR-0201). While the assistant is off it only stays in the flow.
   const floating = configured && (steps.length > 0 || pending !== null);
 
   // Follows the conversation as it grows; an empty page stays at its top (the notice, examples).
@@ -305,14 +307,15 @@ export function AiPage() {
             </ol>
           )}
           <ProblemAlert problem={rows.problem} />
-          {/* Over a conversation the question box floats at the foot of the window while the
-              answers scroll under it; its own refusals show inside it, next to the question. */}
+          {/* The question box sticks to the foot of the window while what stands above it scrolls
+              under it (the answers; on a low window the examples of an empty page); its own
+              refusals show inside it, next to the question. */}
           <form
             ref={composer}
             data-floating={floating ? 'true' : undefined}
             className={cn(
               'space-y-2 rounded-2xl p-3 ring-1 ring-black/[0.06] print:hidden',
-              floating
+              configured
                 ? 'sticky bottom-3 z-20 bg-background/95 shadow-popover backdrop-blur-md'
                 : 'bg-card shadow-card',
             )}

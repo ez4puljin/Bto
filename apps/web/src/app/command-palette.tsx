@@ -206,7 +206,7 @@ function Palette({ close }: { close: () => void }) {
     <DialogContent
       showCloseButton={false}
       aria-describedby={undefined}
-      className="top-[12vh] max-h-[76vh] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-xl data-open:slide-in-from-top-2"
+      className="top-[12vh] max-h-[76vh] translate-y-0 gap-0 overflow-hidden p-0 max-w-[min(36rem,calc(100%-2rem))] data-open:slide-in-from-top-2"
     >
       <DialogTitle className="sr-only">{t('palette.title')}</DialogTitle>
       <div className="flex items-center gap-2.5 border-b px-4">

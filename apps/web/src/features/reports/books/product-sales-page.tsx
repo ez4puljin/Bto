@@ -385,18 +385,10 @@ function SalesConditionBar(props: {
   const filtered = FILTER_KEYS.some((key) => search.has(key));
   return (
     <FilterBar
-      className="mb-2"
-      end={
-        filtered ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => update(Object.fromEntries(FILTER_KEYS.map((key) => [key, null])))}
-          >
-            {t('reports.books.bar.clear')}
-          </Button>
-        ) : null
-      }
+      // Under 1024px (a tablet upright) the ten pills took three rows: there they are one row that
+      // a finger swipes, as a SegmentedControl is (ADR-0201), the padding keeping their rings
+      // uncut.
+      className="mb-2 max-lg:-mx-1 max-lg:-mt-1 max-lg:mb-1 max-lg:flex-nowrap max-lg:overflow-x-auto max-lg:p-1 max-lg:[scrollbar-width:none] max-lg:*:shrink-0"
     >
       <Combobox
         aria-label={t('reports.books.prompt.grouping')}
@@ -465,6 +457,18 @@ function SalesConditionBar(props: {
       {many('sg', t('reports.books.prompt.segments'), segments)}
       {chip('c', 'cn')}
       {chip('pr', 'prn')}
+      {/* The bar's end; in the swiped row it stays in sight, over the pills that pass under it. */}
+      {filtered ? (
+        <div className="ml-auto flex items-center max-lg:sticky max-lg:-right-1 max-lg:-my-1 max-lg:self-stretch max-lg:bg-canvas max-lg:pl-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => update(Object.fromEntries(FILTER_KEYS.map((key) => [key, null])))}
+          >
+            {t('reports.books.bar.clear')}
+          </Button>
+        </div>
+      ) : null}
     </FilterBar>
   );
 }

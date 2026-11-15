@@ -14,7 +14,7 @@ export function FilterOption(props: {
       type="button"
       aria-pressed={props.active}
       className={cn(
-        'flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-[0.8125rem] hover:bg-accent',
+        'flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-[0.8125rem] hover:bg-accent touch:min-h-11',
         props.active && 'bg-secondary font-medium text-secondary-foreground hover:bg-secondary',
       )}
       onClick={props.onClick}
@@ -60,7 +60,7 @@ export function FilterSection(props: {
       <button
         type="button"
         aria-expanded={open}
-        className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground hover:text-foreground"
+        className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground hover:text-foreground touch:min-h-11"
         onClick={() => setOpen((value) => !value)}
       >
         <span className="min-w-0 flex-1 truncate">{props.title}</span>

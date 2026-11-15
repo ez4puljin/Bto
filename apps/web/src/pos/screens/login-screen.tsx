@@ -58,7 +58,9 @@ export function LoginScreen({ onNewCashier }: { onNewCashier: () => void }) {
           </p>
         </div>
       </div>
-      {notice === 'POS_SESSION_EXPIRED' ? (
+      {/* Beside the PIN pad the notice stands in the hint's line (PinEntry): the card keeps the one
+          height that fits a 768px screen. */}
+      {notice === 'POS_SESSION_EXPIRED' && !cashier ? (
         <KioskAlert tone="warning" className="mb-4">
           {t('errors.POS_SESSION_EXPIRED')}
         </KioskAlert>
@@ -125,7 +127,7 @@ function PinEntry(props: {
 }) {
   const { t } = useTranslation();
   const { client, credentials } = useKiosk();
-  const { lastCashierId } = useCredentials();
+  const { lastCashierId, notice } = useCredentials();
   const problemText = useProblemText();
   const [pin, setPin] = useState('');
   const current = useRef('');
@@ -196,7 +198,31 @@ function PinEntry(props: {
         <h1 id="pin-title" className="text-xl font-semibold tracking-tight">
           {cashier.fullName}
         </h1>
-        <p className="text-[0.8125rem] text-muted-foreground">{t('posKiosk.login.pinHint')}</p>
+        {/* A refusal, or the word that the session expired, takes the hint's place, two lines kept
+            for any of them: the pad never moves under the finger between the digits of the next
+            try (a box above the pad pushed it 35px), and the card fits a 768px screen. The keys
+            make each a new element, so a screen reader announces the alert as it did the box. */}
+        {login.isError ? (
+          <p
+            key="refusal"
+            role="alert"
+            className="min-h-10 text-[0.8125rem] font-medium text-destructive"
+          >
+            {problemText(login.error)}
+          </p>
+        ) : notice === 'POS_SESSION_EXPIRED' ? (
+          <p
+            key="expired"
+            role="alert"
+            className="min-h-10 text-[0.8125rem] font-medium text-warning"
+          >
+            {t('errors.POS_SESSION_EXPIRED')}
+          </p>
+        ) : (
+          <p key="hint" className="min-h-10 text-[0.8125rem] text-muted-foreground">
+            {t('posKiosk.login.pinHint')}
+          </p>
+        )}
       </div>
       <div
         role="img"
@@ -213,7 +239,6 @@ function PinEntry(props: {
           />
         ))}
       </div>
-      {login.isError ? <KioskAlert>{problemText(login.error)}</KioskAlert> : null}
       <div
         role="group"
         aria-label={t('posKiosk.login.pinPad')}

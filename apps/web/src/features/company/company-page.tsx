@@ -54,32 +54,37 @@ export function CompanyPage() {
 
 function IdentityView({ company }: { company: Company }) {
   const { t } = useTranslation();
+  // Short values: two pairs to a row where the card is 44rem wide (a till PC and wider), so the
+  // tax registrations and the branches follow in the same window (ADR-0158, ADR-0201).
   return (
-    <FieldList
-      items={[
-        { label: t('company.fields.legalName'), value: company.legalName },
-        {
-          label: t('company.fields.registerNo'),
-          value: company.registerNo ? (
-            <span className="font-mono">{company.registerNo}</span>
-          ) : null,
-        },
-        {
-          label: t('company.fields.tin'),
-          value: company.tin ? <span className="font-mono">{company.tin}</span> : null,
-        },
-        {
-          label: t('company.fields.code'),
-          value: <span className="font-mono">{company.code}</span>,
-        },
-        { label: t('company.fields.functionalCurrency'), value: company.functionalCurrency },
-        { label: t('company.fields.timezone'), value: company.timezone },
-        {
-          label: t('company.fields.fiscalYearStart'),
-          value: t('company.fiscalMonth', { month: company.fiscalYearStartMonth }),
-        },
-      ]}
-    />
+    <div className="@container">
+      <FieldList
+        columns={2}
+        items={[
+          { label: t('company.fields.legalName'), value: company.legalName },
+          {
+            label: t('company.fields.registerNo'),
+            value: company.registerNo ? (
+              <span className="font-mono">{company.registerNo}</span>
+            ) : null,
+          },
+          {
+            label: t('company.fields.tin'),
+            value: company.tin ? <span className="font-mono">{company.tin}</span> : null,
+          },
+          {
+            label: t('company.fields.code'),
+            value: <span className="font-mono">{company.code}</span>,
+          },
+          { label: t('company.fields.functionalCurrency'), value: company.functionalCurrency },
+          { label: t('company.fields.timezone'), value: company.timezone },
+          {
+            label: t('company.fields.fiscalYearStart'),
+            value: t('company.fiscalMonth', { month: company.fiscalYearStartMonth }),
+          },
+        ]}
+      />
+    </div>
   );
 }
 

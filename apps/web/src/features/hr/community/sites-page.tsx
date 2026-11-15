@@ -291,7 +291,10 @@ export function SitesPage() {
         problem={action.problem ?? problemFromError(sites.error)}
         onRetry={sites.refetch}
       />
-      <div className="grid items-stretch gap-4 lg:h-[calc(100dvh-11rem)] lg:min-h-[28rem] lg:grid-cols-[22rem_minmax(0,1fr)] 2xl:grid-cols-[26rem_minmax(0,1fr)]">
+      {/* The two panes fill what the window leaves (ADR-0201): the content starts 10.75rem down
+          and the page keeps 2.5rem below it, so neither pane's foot is cut at 600px of height.
+          Side by side from a tablet upright too, where the list keeps 18rem. */}
+      <div className="grid items-stretch gap-4 md:h-[calc(100dvh-13.25rem)] md:min-h-[22rem] md:grid-cols-[18rem_minmax(0,1fr)] lg:grid-cols-[22rem_minmax(0,1fr)] 2xl:grid-cols-[26rem_minmax(0,1fr)]">
         <Card className="min-h-0 gap-3 pb-0">
           <div className="flex flex-col gap-2 px-4">
             <SearchField

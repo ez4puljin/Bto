@@ -15,8 +15,6 @@ import {
   ListTable,
   LoadMore,
   SkeletonRows,
-  SpacerCell,
-  SpacerHead,
   TruncateCell,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
@@ -52,6 +50,7 @@ import {
   useReadiness,
   useReadinessProducts,
 } from './api';
+import { CategoryPath } from './category-path';
 import { categoryPaths, categoryTree } from './category-tree';
 import { CLASSIFICATION_CODE, TAX_PRODUCT_CODE } from './product-schema';
 
@@ -67,13 +66,17 @@ const positiveId = (value: string | null) => {
   return Number.isSafeInteger(id) && id > 0 ? id : undefined;
 };
 
-/** The list's columns (ADR-0119). */
+/**
+ * The list's columns (ADR-0119). The pills say what a product misses, each whole: they wrap
+ * inside their column, which holds the longest («Татварын кодгүй (НӨАТ-гүй бараа)», 16rem with its
+ * cell). 44.25rem in all, under a till PC's 56.2; a tablet upright has 41.2 and lets the category
+ * go (37.25): the filter above and the product's page say it (ADR-0201).
+ */
 const COLUMNS: readonly ColumnSpec[] = [
   { key: 'sku', kind: 'code' },
   { key: 'name', kind: 'text', weight: 3, min: 12 },
-  { key: 'category', kind: 'text', weight: 2 },
-  { key: 'missing', kind: 'text', weight: 2, min: 12 },
-  { key: 'spacer', kind: 'spacer' },
+  { key: 'category', kind: 'text', weight: 2, drop: 1 },
+  { key: 'missing', kind: 'text', weight: 3, min: 16 },
   { key: 'chevron', kind: 'chevron' },
 ];
 
@@ -164,12 +167,11 @@ export function ReadinessPage() {
               <TableHead>{t('catalog.products.columns.name')}</TableHead>
               <TableHead>{t('catalog.products.columns.category')}</TableHead>
               <TableHead>{t('catalog.readiness.missing')}</TableHead>
-              <SpacerHead />
               <ChevronHead />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {products.isPending ? <SkeletonRows columns={6} /> : null}
+            {products.isPending ? <SkeletonRows columns={5} /> : null}
             {rows.map((row) => (
               <LinkRow key={row.product.id} to={`/catalog/products/${row.product.id}`}>
                 <TableCell className="font-mono">{row.product.sku}</TableCell>
@@ -184,9 +186,13 @@ export function ReadinessPage() {
                 <TruncateCell
                   text={paths.get(row.product.categoryId) ?? t('common.none')}
                   className="text-muted-foreground"
-                />
-                <TableCell>
-                  <div className="flex gap-1">
+                >
+                  {/* The parents give way, so the category itself is never the part cut. */}
+                  <CategoryPath path={paths.get(row.product.categoryId) ?? t('common.none')} />
+                </TruncateCell>
+                <TableCell className="py-1 whitespace-normal">
+                  {/* Every pill whole: what does not fit the line goes on the next. */}
+                  <div className="flex flex-wrap gap-1">
                     {row.missing.map((item) => (
                       <Badge key={item} variant="warning">
                         {t(`catalog.readiness.gaps.${item}`)}
@@ -194,7 +200,6 @@ export function ReadinessPage() {
                     ))}
                   </div>
                 </TableCell>
-                <SpacerCell />
               </LinkRow>
             ))}
           </TableBody>

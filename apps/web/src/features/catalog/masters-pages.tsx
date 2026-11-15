@@ -58,6 +58,7 @@ import { uploadFile } from '@/lib/upload';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
 import { useDeleteConfirm } from '@/lib/use-delete-confirm';
+import { cn } from '@/lib/utils';
 import { CategoryIcon, CategoryIconField } from './category-icon';
 import { type Category, type Uom, useCatalogMutations, useCategories, useUoms } from './api';
 import { categoryTree, subtreeIds } from './category-tree';
@@ -71,13 +72,18 @@ const optionalCode = z
     'validation.classificationCode',
   );
 
-/** The category list's columns (ADR-0119), the actions column added per the user's rights. */
+/**
+ * The category list's columns (ADR-0119), the actions column added per the user's rights: 55.5rem
+ * with all four actions, which a till PC's 56.2 holds. A tablet upright has 41.2 and lets the app
+ * picture, then the default БҮНА code go (39.5): the picture's and the edit dialog show them, and
+ * the actions stay in view (ADR-0201). «Апп-ын зураг» needs 7rem for its head.
+ */
 const CATEGORY_COLUMNS: readonly ColumnSpec[] = [
   { key: 'name', kind: 'text', weight: 3, min: 14 },
-  { key: 'defaultCode', kind: 'code', width: 9 },
+  { key: 'defaultCode', kind: 'code', width: 9, drop: 2 },
   { key: 'skuRange', kind: 'text', weight: 2, min: 10 },
   { key: 'products', kind: 'count', width: 7 },
-  { key: 'appPicture', kind: 'image', width: 6 },
+  { key: 'appPicture', kind: 'image', width: 7, drop: 1 },
   { key: 'spacer', kind: 'spacer' },
 ];
 
@@ -85,7 +91,8 @@ const CATEGORY_COLUMNS: readonly ColumnSpec[] = [
 const UOM_COLUMNS: readonly ColumnSpec[] = [
   { key: 'name', kind: 'text', weight: 3, min: 12 },
   { key: 'kind', kind: 'status' },
-  { key: 'fractional', kind: 'icon', width: 7 },
+  // «Бутархай тоо (кг, л)» whole.
+  { key: 'fractional', kind: 'icon', width: 9 },
   { key: 'measureUnit', kind: 'text', weight: 2, min: 10 },
   { key: 'spacer', kind: 'spacer' },
   { key: 'actions', kind: 'actions', actions: 2 },
@@ -168,11 +175,19 @@ export function CategoriesPage() {
                 <TableRow key={category.id}>
                   <TableCell>
                     <span
-                      className="flex items-center gap-2"
+                      className="flex min-w-0 items-center gap-2"
                       style={{ paddingLeft: `${depth * 1.5}rem` }}
                     >
                       <CategoryIcon category={category} />
-                      <span className={depth === 0 ? 'font-medium' : undefined}>
+                      {/* A name longer than its column is cut with «…», whole on hover; a
+                          finger, having no hover, gets a second line (as `TruncateCell`). */}
+                      <span
+                        className={cn(
+                          'min-w-0 truncate touch:line-clamp-2 touch:whitespace-normal',
+                          depth === 0 && 'font-medium',
+                        )}
+                        title={category.name}
+                      >
                         {category.name}
                       </span>
                     </span>

@@ -29,6 +29,7 @@ import { formatMnt, formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useWedgeScanner } from '@/lib/scan/use-wedge-scanner';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
+import { useMediaQuery, WIDE_SCREEN } from '@/lib/use-media-query';
 import {
   type MovementDocType,
   type StockMovement,
@@ -86,14 +87,20 @@ const RIGHT: readonly Column[] = ['qty', 'warehouseBalance', 'binBalance', 'unit
 const COSTS: readonly Column[] = ['unitCost', 'value'];
 const NONE: readonly Column[] = [];
 
-/** How each column is sized (ADR-0119); the date and time, the document type and its number stack. */
+/**
+ * How each column is sized (ADR-0119); the date and time, the document type and its number stack.
+ * The default set is 55.25rem, what a till PC leaves (about 55.5). A tablet upright (about 40.5)
+ * lets the movement's kind go first, which the document's type and the quantity's sign mostly say,
+ * then the warehouse: 39.25rem. One product's history is 48.25rem, 39.25 without the kind
+ * (ADR-0201).
+ */
 const COLUMN_SPECS: Record<Column, ColumnSpec> = {
   postedAt: { key: 'postedAt', kind: 'date' },
   document: { key: 'document', kind: 'text', weight: 1, min: 10 },
-  movement: { key: 'movement', kind: 'text', weight: 1, min: 9 },
-  warehouse: { key: 'warehouse', kind: 'text', weight: 1 },
+  movement: { key: 'movement', kind: 'text', weight: 1, min: 9, drop: 1 },
+  warehouse: { key: 'warehouse', kind: 'text', weight: 1, drop: 2 },
   bin: { key: 'bin', kind: 'code' },
-  product: { key: 'product', kind: 'text', weight: 3, min: 14 },
+  product: { key: 'product', kind: 'text', weight: 3, min: 13 },
   qty: { key: 'qty', kind: 'qty', width: 9 },
   warehouseBalance: { key: 'warehouseBalance', kind: 'qty' },
   binBalance: { key: 'binBalance', kind: 'qty' },
@@ -127,15 +134,24 @@ export function MovementsPage() {
   const rows = movements.data?.pages.flatMap((page) => page.data) ?? [];
   const withBalances = productId !== undefined;
   const columnChoice = useHiddenColumns('stockMovements', COLUMNS, LOCKED, COSTS, NONE);
+  const wideScreen = useMediaQuery(WIDE_SCREEN);
   // The columns this page can show: balances with a product, costs for cost holders; one product's
-  // history needs no product column.
+  // history needs no product column, and nothing names a shelf while the shelves are on hold.
   const available = COLUMNS.filter((column) => {
     if (column === 'product') return !withBalances;
-    if (column === 'warehouseBalance' || column === 'binBalance') return withBalances;
+    if (column === 'bin') return !BINS_SOON;
+    if (column === 'warehouseBalance') return withBalances;
+    if (column === 'binBalance') return withBalances && !BINS_SOON;
     if (column === 'unitCost' || column === 'value') return canSeeCosts;
     return true;
   });
   const shown = (column: Column) => available.includes(column) && !columnChoice.hidden.has(column);
+  // Only the default set lets columns go on a narrow window (ADR-0201): what a user chose in
+  // «Баганууд» is shown as chosen and scrolls in its card when it is too wide.
+  const defaults = wideScreen ? NONE : COSTS;
+  const untouched =
+    columnChoice.hidden.size === defaults.length &&
+    defaults.every((column) => columnChoice.hidden.has(column));
 
   const update = (changes: Record<string, string | undefined>) =>
     setParams(
@@ -165,7 +181,9 @@ export function MovementsPage() {
   };
 
   const visible = available.filter(shown);
-  const columnSpec = visible.map((column) => COLUMN_SPECS[column]);
+  const columnSpec = visible.map((column) =>
+    untouched ? COLUMN_SPECS[column] : { ...COLUMN_SPECS[column], drop: undefined },
+  );
   const columns = visible.length;
 
   return (
@@ -309,9 +327,7 @@ export function MovementsPage() {
                   {shown('warehouse') ? (
                     <TableCell>{warehouseName(row.warehouseId)}</TableCell>
                   ) : null}
-                  {shown('bin') && !BINS_SOON ? (
-                    <TableCell className="font-mono">{row.binCode}</TableCell>
-                  ) : null}
+                  {shown('bin') ? <TableCell className="font-mono">{row.binCode}</TableCell> : null}
                   {shown('product') ? (
                     <TruncateCell text={`${row.product.sku} ${row.product.name}`}>
                       <Link

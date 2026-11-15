@@ -229,7 +229,11 @@ function StageProgress({
             </option>
           ))}
         </NativeSelect>
-        <ol className="flex min-w-0 flex-1 items-center overflow-x-auto py-1">
+        {/*
+          A finger moves through the select: the steps are named only on hover and stand too close
+          to press one, and a tap moved the order at once (ADR-0201); there they are a picture.
+        */}
+        <ol className="flex min-w-0 flex-1 items-center overflow-x-auto py-1 touch:pointer-events-none">
           {stages.map((stage, index) => {
             const done = current >= 0 && index < current;
             const here = index === current;

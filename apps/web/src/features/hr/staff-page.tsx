@@ -1,7 +1,7 @@
 import { isEmployeeLeft } from '@tugeel/shared/hr';
 import { matchesQuery, queryTerms, searchKeys } from '@tugeel/shared/text';
 import { Check, Download, Plus, Users, X } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
@@ -21,6 +21,13 @@ import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { localPhone } from '@/features/partners/phone';
 import type { ColumnSpec } from '@/lib/column-layout';
@@ -45,13 +52,18 @@ import {
   useWorkforceMutations,
 } from './workforce-api';
 
+// 74.75rem with every column, each wide enough to read whole (a long name, «Татан авалтын
+// ажилтан», «Компанийн хуваарь»): sized on a 1366 laptop (75.5rem). Narrower, what the employee's
+// page says leaves: the last sign-in (63.25rem), then the schedule (52.25rem, a till PC's 55.5rem),
+// then the roles (40.25rem, a tablet upright's 40.5rem), last the division. The name with the
+// position, the phone and the status always stay.
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'employee', kind: 'text', weight: 3, min: 14 },
-  { key: 'division', kind: 'text', weight: 2, min: 9 },
+  { key: 'employee', kind: 'text', weight: 3, min: 15 },
+  { key: 'division', kind: 'text', weight: 2, min: 7, drop: 4 },
   { key: 'phone', kind: 'code', width: 7.5 },
-  { key: 'roles', kind: 'text', weight: 2, min: 9 },
-  { key: 'schedule', kind: 'text', weight: 2, min: 8 },
-  { key: 'when', kind: 'datetime' },
+  { key: 'roles', kind: 'text', weight: 2, min: 12, drop: 3 },
+  { key: 'schedule', kind: 'text', weight: 2, min: 11, drop: 2 },
+  { key: 'when', kind: 'datetime', drop: 1 },
   { key: 'status', kind: 'status', width: 8.5 },
   { key: 'chevron', kind: 'chevron' },
 ];
@@ -73,10 +85,16 @@ function StaffStatus({ staff }: { staff: HrStaff }) {
   );
 }
 
-/** The pending requests above the list, each with «Зөвшөөрөх» and «Татгалзах» (timely's cards). */
-function PendingCards(props: {
+/**
+ * The pending requests, each with «Зөвшөөрөх» and «Татгалзах» (timely's cards), opened from the
+ * filter bar's pill. They stood above the list, where two rows of cards left a till PC's 640px no
+ * row of it (ADR-0201); here a card also says its whole note, which a finger could not ask a
+ * tooltip for. Two cards a row where the dialog is wide enough.
+ */
+function PendingDialog(props: {
   requests: readonly HrTimeRequest[];
   photos: Map<number, string | null>;
+  onClose: () => void;
 }) {
   const { t } = useTranslation();
   const mutations = useWorkforceMutations();
@@ -90,79 +108,86 @@ function PendingCards(props: {
     if (ok) toast.success(approve ? t('hr.requests.approved') : t('hr.requests.rejected'));
   };
   return (
-    <section aria-label={t('hr.staff.pending.title')} className="mb-4">
-      <div className="mb-2 flex items-center gap-2">
-        <h2 className="text-[0.9375rem] font-semibold">{t('hr.staff.pending.title')}</h2>
-        <Badge variant="warning">{props.requests.length}</Badge>
-        <Link
-          to="/hr/requests?status=PENDING"
-          className="ml-auto text-[0.8125rem] text-link hover:underline"
-        >
-          {t('hr.staff.pending.more', { count: props.requests.length })}
-        </Link>
-      </div>
-      <ProblemAlert problem={action.problem} />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {shown.map((request) => (
-          <article
-            key={request.id}
-            className="flex flex-col gap-2 rounded-xl border bg-card p-3 shadow-control"
-          >
-            <div className="flex items-center gap-2.5">
-              <Avatar name={request.fullName} src={props.photos.get(request.userId) ?? null} />
-              <div className="min-w-0">
-                <p className="truncate text-[0.8125rem] font-semibold">{request.fullName}</p>
-                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span
-                    aria-hidden
-                    className="size-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: request.color }}
-                  />
-                  <span className="truncate">{request.typeName}</span>
-                </p>
-              </div>
-            </div>
-            <p className="text-xs text-foreground">{when(request)}</p>
-            {request.note ? (
-              <p className="line-clamp-2 text-xs text-muted-foreground" title={request.note}>
-                {request.note}
-              </p>
-            ) : null}
-            <div className="mt-auto flex gap-2">
-              <Button
-                size="xs"
-                className="flex-1"
-                aria-label={t('hr.requests.approveFor', { name: request.fullName })}
-                onClick={() => void decide(request, true)}
+    <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
+      <DialogContent closeLabel={t('common.close')} size="lg" guard={false}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {t('hr.staff.pending.title')}
+            <Badge variant="warning">{props.requests.length}</Badge>
+          </DialogTitle>
+        </DialogHeader>
+        <ProblemAlert problem={action.problem} />
+        <div className="@container">
+          <div className="grid gap-3 @xl:grid-cols-2">
+            {shown.map((request) => (
+              <article
+                key={request.id}
+                className="flex min-w-0 flex-col gap-2 rounded-xl border bg-card p-3 shadow-control"
               >
-                <Check />
-                {t('hr.requests.approve')}
-              </Button>
-              <Button
-                size="xs"
-                variant="outline"
-                className="flex-1"
-                aria-label={t('hr.requests.rejectFor', { name: request.fullName })}
-                onClick={() => void decide(request, false)}
-              >
-                <X />
-                {t('hr.requests.reject')}
-              </Button>
-            </div>
-          </article>
-        ))}
-      </div>
-    </section>
+                <div className="flex items-center gap-2.5">
+                  <Avatar name={request.fullName} src={props.photos.get(request.userId) ?? null} />
+                  <div className="min-w-0">
+                    <p className="truncate text-[0.8125rem] font-semibold">{request.fullName}</p>
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <span
+                        aria-hidden
+                        className="size-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: request.color }}
+                      />
+                      <span className="truncate">{request.typeName}</span>
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-foreground">{when(request)}</p>
+                {request.note ? (
+                  <p className="text-xs break-words whitespace-pre-wrap text-muted-foreground">
+                    {request.note}
+                  </p>
+                ) : null}
+                <div className="mt-auto flex gap-2">
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    aria-label={t('hr.requests.approveFor', { name: request.fullName })}
+                    onClick={() => void decide(request, true)}
+                  >
+                    <Check />
+                    {t('hr.requests.approve')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    aria-label={t('hr.requests.rejectFor', { name: request.fullName })}
+                    onClick={() => void decide(request, false)}
+                  >
+                    <X />
+                    {t('hr.requests.reject')}
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button asChild variant="ghost" className="text-link">
+            <Link to="/hr/requests?status=PENDING">
+              {t('hr.staff.pending.more', { count: props.requests.length })}
+            </Link>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 /**
  * «Ажилтны бүртгэл» (ADR-0144, ADR-0145, hr.attendance.view): the one list of the staff — a system
  * user and an employee are one record — with the photo, division, phone, roles and schedule, the
- * pending requests on top for HR; narrowed by a search, the division, the role and «Ажлаас гарсан
- * ажилтнууд», which holds everybody whose account is closed. A row opens the employee's page;
- * «Ажилтан нэмэх» (?new=1) registers one who then signs in by phone and password. «Excel экспорт»
- * downloads the list.
+ * pending requests behind a pill for HR; narrowed by a search, the division, the role and «Ажлаас
+ * гарсан ажилтнууд», which holds everybody whose account is closed. A row opens the employee's
+ * page; «Ажилтан нэмэх» (?new=1) registers one who then signs in by phone and password. «Excel
+ * экспорт» downloads the list.
  */
 export function StaffPage() {
   const { t } = useTranslation();
@@ -177,6 +202,8 @@ export function StaffPage() {
   const downloads = useHrDownloads();
   const [creatingOpen, setCreatingOpen] = useCreateParam();
   const creating = { open: creatingOpen, setOpen: setCreatingOpen };
+  const [pendingOpen, setPendingOpen] = useState(false);
+  const pendingRows = canManage ? (pending.data ?? []) : [];
   const query = search.get('q') ?? '';
   const divisionParam = search.get('division') ?? '';
   const roleParam = search.get('role') ?? '';
@@ -258,19 +285,26 @@ export function StaffPage() {
           </>
         }
       />
-      {canManage && pending.data && pending.data.length > 0 ? (
-        <PendingCards requests={pending.data} photos={photos} />
-      ) : null}
       <FilterBar
         end={
-          staff.data ? (
-            <span className="text-[0.8125rem] text-muted-foreground">
-              {t('hr.staff.count', { count: rows.length })}
-            </span>
-          ) : null
+          <>
+            {pendingRows.length > 0 ? (
+              <Button size="sm" variant="outline" onClick={() => setPendingOpen(true)}>
+                {t('hr.staff.pending.title')}
+                <Badge variant="warning">{pendingRows.length}</Badge>
+              </Button>
+            ) : null}
+            {staff.data ? (
+              <span className="text-[0.8125rem] text-muted-foreground">
+                {t('hr.staff.count', { count: rows.length })}
+              </span>
+            ) : null}
+          </>
         }
       >
+        {/* The search gives way, so the count ends the same row on a till PC. */}
         <SearchField
+          className="sm:w-auto sm:max-w-72 sm:min-w-48 sm:flex-1"
           aria-label={t('hr.staff.search')}
           placeholder={t('hr.staff.search')}
           value={query}
@@ -398,6 +432,13 @@ export function StaffPage() {
           </ListTable>
         )}
       </ListCard>
+      {pendingOpen && pendingRows.length > 0 ? (
+        <PendingDialog
+          requests={pendingRows}
+          photos={photos}
+          onClose={() => setPendingOpen(false)}
+        />
+      ) : null}
       {creating.open && canManage ? (
         <StaffCreateDialog
           onClose={() => creating.setOpen(false)}

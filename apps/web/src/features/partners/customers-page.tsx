@@ -1,6 +1,6 @@
 import { SETTLEMENT_GROUPS, type SettlementGroup } from '@tugeel/shared/finance';
 import { CUSTOMER_KINDS } from '@tugeel/shared/taxpayer';
-import { Plus, Store } from 'lucide-react';
+import { ListFilter, Plus, Store } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
@@ -10,7 +10,7 @@ import {
   ChevronHead,
   EmptyState,
   FilterBar,
-  FilterToggle,
+  FilterChip,
   LinkRow,
   ListCard,
   ListTable,
@@ -22,6 +22,12 @@ import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { TableBody, TableHeader, TableRow } from '@/components/ui/table';
 import type { ColumnSpec } from '@/lib/column-layout';
 import { problemFromError } from '@/lib/problem';
@@ -39,12 +45,13 @@ import {
 import {
   CUSTOMER_COLUMN_KEYS,
   CUSTOMER_COLUMNS,
+  CUSTOMER_COLUMNS_LEAVING,
   DEFAULT_HIDDEN_CUSTOMER_COLUMNS,
   LOCKED_CUSTOMER_COLUMNS,
   WIDE_DEFAULT_HIDDEN_CUSTOMER_COLUMNS,
 } from './customer-columns';
 import { ListColumnCell, ListColumnHead } from './list-column-cell';
-import { columnSpecs } from './list-columns';
+import { columnSpecs, isDefaultSet } from './list-columns';
 import { PARTNER_STATUSES } from './partner-schema';
 
 const FLAGS = ['tinPending', 'gpsMissing', 'creditHold'] as const;
@@ -54,6 +61,53 @@ const APP_FILTERS: readonly AppAccountFilter[] = ['ACTIVE', 'DISABLED', 'NONE'];
 const COLUMNS_LIST = 'partners.customers';
 const CHEVRON_COLUMN: ColumnSpec = { key: 'chevron', kind: 'chevron' };
 type Flag = (typeof FLAGS)[number];
+
+/**
+ * The yes/no filters behind one «Шүүлтүүр» pill (docs/ui.md «Lists with many filters»): as three
+ * pills of their own they broke the bar into two rows on a laptop and three on a tablet
+ * (ADR-0201). One that is on shows after the pill as a chip whose button lifts it.
+ */
+function FlagFilters(props: {
+  isOn: (name: Flag) => boolean;
+  onChange: (name: Flag, on: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm">
+            <ListFilter />
+            {t('catalog.products.filters.menu')}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-60">
+          {FLAGS.map((name) => (
+            <DropdownMenuCheckboxItem
+              key={name}
+              checked={props.isOn(name)}
+              onCheckedChange={(checked) => props.onChange(name, checked)}
+            >
+              {t(`partners.customers.filters.${name}`)}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {FLAGS.filter(props.isOn).map((name) => {
+        const label = t(`partners.customers.filters.${name}`);
+        return (
+          <FilterChip
+            key={name}
+            clearLabel={t('catalog.products.filters.clear', { name: label })}
+            onClear={() => props.onChange(name, false)}
+          >
+            {label}
+          </FilterChip>
+        );
+      })}
+    </>
+  );
+}
 
 const isKind = (value: string | null): value is CustomerKind =>
   CUSTOMER_KINDS.some((kind) => kind === value);
@@ -115,8 +169,17 @@ export function CustomersPage() {
     () => CUSTOMER_COLUMNS.filter((column) => !hidden.has(column.key)),
     [hidden],
   );
+  // A default set lets its least needed columns go in a narrow table (ADR-0201).
+  const untouched = isDefaultSet(
+    hidden,
+    DEFAULT_HIDDEN_CUSTOMER_COLUMNS,
+    WIDE_DEFAULT_HIDDEN_CUSTOMER_COLUMNS,
+  );
   // The layout of the shown columns and the chevron (ADR-0119).
-  const specs = useMemo(() => [...columnSpecs(columns), CHEVRON_COLUMN], [columns]);
+  const specs = useMemo(
+    () => [...columnSpecs(columns, untouched ? CUSTOMER_COLUMNS_LEAVING : []), CHEVRON_COLUMN],
+    [columns, untouched],
+  );
   const filtered = Boolean(
     q ||
     kind ||
@@ -239,14 +302,10 @@ export function CustomersPage() {
           value={segmentId}
           onChange={(id) => setParam('segment', id ? String(id) : '')}
         />
-        {FLAGS.map((name) => (
-          <FilterToggle
-            key={name}
-            label={t(`partners.customers.filters.${name}`)}
-            checked={flag(name) === true}
-            onCheckedChange={(checked) => setParam(name, checked ? '1' : '')}
-          />
-        ))}
+        <FlagFilters
+          isOn={(name) => flag(name) === true}
+          onChange={(name, on) => setParam(name, on ? '1' : '')}
+        />
       </FilterBar>
       <ProblemAlert problem={problemFromError(customers.error)} onRetry={customers.refetch} />
       <ListCard scroll>

@@ -75,9 +75,9 @@ function SheetContent({
         className={cn(
           "fixed z-50 flex flex-col gap-4 overflow-y-auto [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] bg-popover p-5 text-sm text-popover-foreground shadow-dialog ring-1 ring-black/[0.06] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] outline-none *:shrink-0 data-open:animate-in data-closed:animate-out data-closed:duration-200",
           side === "right" &&
-            "inset-y-0 right-0 h-full w-full border-l sm:max-w-xl data-open:slide-in-from-right data-closed:slide-out-to-right",
+            "inset-y-0 right-0 h-full w-[calc(100vw-3rem)] border-l sm:max-w-xl data-open:slide-in-from-right data-closed:slide-out-to-right",
           side === "left" &&
-            "inset-y-0 left-0 h-full w-full border-r sm:max-w-xl data-open:slide-in-from-left data-closed:slide-out-to-left",
+            "inset-y-0 left-0 h-full w-[calc(100vw-3rem)] border-r sm:max-w-xl data-open:slide-in-from-left data-closed:slide-out-to-left",
           side === "top" &&
             "inset-x-0 top-0 h-auto border-b data-open:slide-in-from-top data-closed:slide-out-to-top",
           side === "bottom" &&

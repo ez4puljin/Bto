@@ -36,7 +36,13 @@ export function VoucherDialog(props: {
   const { t } = useTranslation();
   return (
     <Dialog open={props.open} onOpenChange={(open) => (open ? undefined : props.onClose())}>
-      <DialogContent size="md" className="gap-3" onCloseAutoFocus={props.onCloseAutoFocus}>
+      <DialogContent
+        size="md"
+        className="gap-3"
+        // The codes taken live in the sale, not here: closing loses nothing, so it never asks.
+        guard={false}
+        onCloseAutoFocus={props.onCloseAutoFocus}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Ticket aria-hidden className="size-5 text-primary" />
@@ -96,7 +102,8 @@ function VoucherPanel(props: {
     .reduce((sum, one) => sum.plus(one.amount), new Decimal(0));
 
   return (
-    <div className="space-y-3">
+    // `min-w-0`: a long voucher name is cut in its row, it never widens the dialog's one column.
+    <div className="min-w-0 space-y-3">
       <form onSubmit={submit} className="relative">
         <ScanBarcode
           aria-hidden
@@ -110,7 +117,7 @@ function VoucherPanel(props: {
           autoComplete="off"
           inputMode="numeric"
           spellCheck={false}
-          className="h-12 pl-10 font-mono text-lg"
+          className="h-12 pl-10 font-mono text-lg md:text-lg"
           value={text}
           disabled={checking}
           onChange={(event) => setText(event.target.value)}

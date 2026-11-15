@@ -1,7 +1,7 @@
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
 import { Trash2 } from 'lucide-react';
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useLayoutEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DialogFormFooter, FormField } from '@/components/form';
 import { MoneyInput } from '@/components/money-input';
@@ -70,12 +70,39 @@ const emptyLine = (): LineDraft => ({
   description: '',
 });
 
+/** The lines' box in rem under which a line's note stands under its account, not beside it. */
+const NOTE_COLUMN_FROM = 52;
+
+/**
+ * Whether a box is narrower than `rem` wide, kept current as it resizes (its own width, not the
+ * window's: ADR-0201). False until measured, and in jsdom, whose boxes have no size.
+ */
+function useNarrowerThan(box: HTMLElement | null, rem: number): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useLayoutEffect(() => {
+    if (!box) return;
+    const measure = () => {
+      const root = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      setNarrow(box.clientWidth > 0 && box.clientWidth < rem * root);
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(box);
+    return () => observer?.disconnect();
+  }, [box, rem]);
+  return narrow;
+}
+
 /**
  * «Гараар бичилт» (ADR-0060 #7): a dated, described entry of at least two lines that balance. A
  * line on a cash or bank account names its cash box or bank account (the money accounts that point
  * at it), a line on the receivables account names its customer (ADR-0090: the core refuses either
  * without it), a line on the payables account its supplier (F3, ADR-0091: a supplier's payment or
  * a service bill is such an entry).
+ *
+ * The amounts keep 10rem («9,999,999,999») and the account takes the rest. Where the dialog is
+ * narrower than a till PC's (a tablet upright), a line's note stands under its account, like the
+ * line's cash box or customer, and the account keeps about 260px (ADR-0201).
  */
 export function JournalEntryDialog({
   open,
@@ -96,6 +123,9 @@ export function JournalEntryDialog({
   const [description, setDescription] = useState('');
   const [lines, setLines] = useState<LineDraft[]>(() => [emptyLine(), emptyLine()]);
   const [checked, setChecked] = useState(false);
+  // The dialog's content mounts after this component: the box is known once it is there.
+  const [linesBox, setLinesBox] = useState<HTMLDivElement | null>(null);
+  const stacked = useNarrowerThan(linesBox, NOTE_COLUMN_FROM);
 
   const accountOf = (id: number | null): GlAccount | undefined =>
     id === null ? undefined : accounts.data?.find((account) => account.id === id);
@@ -186,6 +216,15 @@ export function JournalEntryDialog({
     });
   };
 
+  const balanceLine = balanced ? (
+    <span className="text-success">{t('finance.journal.dialog.balanced')}</span>
+  ) : (
+    <span className="text-destructive">
+      {t('finance.journal.dialog.difference')}:{' '}
+      <span className="font-mono">{formatMnt(debit.minus(credit).toFixed(2))}</span>
+    </span>
+  );
+
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
       <DialogContent closeLabel={t('common.close')} size="xl">
@@ -217,128 +256,148 @@ export function JournalEntryDialog({
               />
             </FormField>
           </div>
-          <div className="overflow-x-auto rounded-lg border border-border">
+          <div ref={setLinesBox} className="overflow-x-auto rounded-lg border border-border">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('finance.journal.dialog.account')}</TableHead>
-                  <TableHead className="w-32 text-right">
+                  <TableHead className="w-40 text-right">
                     {t('finance.journal.dialog.debit')}
                   </TableHead>
-                  <TableHead className="w-32 text-right">
+                  <TableHead className="w-40 text-right">
                     {t('finance.journal.dialog.credit')}
                   </TableHead>
-                  <TableHead>{t('finance.journal.dialog.lineDescription')}</TableHead>
+                  {stacked ? null : (
+                    <TableHead className="w-48">
+                      {t('finance.journal.dialog.lineDescription')}
+                    </TableHead>
+                  )}
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {lines.map((line, index) => (
-                  <TableRow key={line.id}>
-                    <TableCell className="align-top">
-                      <div className="flex flex-col gap-2">
-                        <SearchSelect
-                          aria-label={`${t('finance.journal.dialog.account')} ${index + 1}`}
-                          value={line.accountId === null ? '' : String(line.accountId)}
-                          options={(accounts.data ?? [])
-                            .filter((account) => account.status === 'ACTIVE')
-                            .map(accountOption)}
-                          placeholder={t('finance.journal.dialog.chooseAccount')}
-                          invalid={checked && line.accountId === null}
-                          onChange={(value) =>
-                            chooseAccount(line.id, Number.parseInt(value, 10) || null)
-                          }
-                        />
-                        {needsBox(line) ? (
+                {lines.map((line, index) => {
+                  const note = (
+                    <Input
+                      aria-label={`${t('finance.journal.dialog.lineDescription')} ${index + 1}`}
+                      // Without its column's head the field says what it is.
+                      placeholder={
+                        stacked ? t('finance.journal.dialog.lineDescription') : undefined
+                      }
+                      value={line.description}
+                      maxLength={300}
+                      onChange={(event) => patch(line.id, { description: event.target.value })}
+                    />
+                  );
+                  return (
+                    <TableRow key={line.id}>
+                      <TableCell className="align-top">
+                        <div className="flex flex-col gap-2">
                           <SearchSelect
-                            aria-label={`${t('finance.journal.dialog.moneyAccount')} ${index + 1}`}
-                            value={line.moneyAccountId === null ? '' : String(line.moneyAccountId)}
-                            options={boxesOf(line.accountId)
-                              .filter((box) => box.status === 'ACTIVE')
-                              .map((box) => ({ value: String(box.id), label: box.name }))}
-                            placeholder={t('finance.journal.dialog.chooseMoneyAccount')}
-                            invalid={checked && line.moneyAccountId === null}
+                            aria-label={`${t('finance.journal.dialog.account')} ${index + 1}`}
+                            value={line.accountId === null ? '' : String(line.accountId)}
+                            options={(accounts.data ?? [])
+                              .filter((account) => account.status === 'ACTIVE')
+                              .map(accountOption)}
+                            placeholder={t('finance.journal.dialog.chooseAccount')}
+                            invalid={checked && line.accountId === null}
                             onChange={(value) =>
-                              patch(line.id, { moneyAccountId: Number.parseInt(value, 10) || null })
+                              chooseAccount(line.id, Number.parseInt(value, 10) || null)
                             }
                           />
-                        ) : null}
-                        {needsCustomer(line) ? (
-                          <div className="flex flex-col gap-1">
-                            <Label htmlFor={`entry-customer-${line.id}`} className="sr-only">
-                              {`${t('finance.journal.dialog.customer')} ${index + 1}`}
-                            </Label>
-                            <CustomerSelect
-                              id={`entry-customer-${line.id}`}
-                              value={line.customer}
-                              onChange={(customer) => patch(line.id, { customer })}
-                              invalid={checked && line.customer === null}
+                          {needsBox(line) ? (
+                            <SearchSelect
+                              aria-label={`${t('finance.journal.dialog.moneyAccount')} ${index + 1}`}
+                              value={
+                                line.moneyAccountId === null ? '' : String(line.moneyAccountId)
+                              }
+                              options={boxesOf(line.accountId)
+                                .filter((box) => box.status === 'ACTIVE')
+                                .map((box) => ({ value: String(box.id), label: box.name }))}
+                              placeholder={t('finance.journal.dialog.chooseMoneyAccount')}
+                              invalid={checked && line.moneyAccountId === null}
+                              onChange={(value) =>
+                                patch(line.id, {
+                                  moneyAccountId: Number.parseInt(value, 10) || null,
+                                })
+                              }
                             />
-                          </div>
-                        ) : null}
-                        {needsSupplier(line) ? (
-                          <div className="flex flex-col gap-1">
-                            <Label htmlFor={`entry-supplier-${line.id}`} className="sr-only">
-                              {`${t('finance.journal.dialog.supplier')} ${index + 1}`}
-                            </Label>
-                            <SupplierSelect
-                              id={`entry-supplier-${line.id}`}
-                              value={line.supplier}
-                              onChange={(supplier) => patch(line.id, { supplier })}
-                              invalid={checked && line.supplier === null}
-                            />
-                          </div>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <MoneyInput
-                        aria-label={`${t('finance.journal.dialog.debit')} ${index + 1}`}
-                        value={line.debit}
-                        onValueChange={(raw) => patch(line.id, { debit: raw, credit: '' })}
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <MoneyInput
-                        aria-label={`${t('finance.journal.dialog.credit')} ${index + 1}`}
-                        value={line.credit}
-                        onValueChange={(raw) => patch(line.id, { credit: raw, debit: '' })}
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <Input
-                        aria-label={`${t('finance.journal.dialog.lineDescription')} ${index + 1}`}
-                        value={line.description}
-                        maxLength={300}
-                        onChange={(event) => patch(line.id, { description: event.target.value })}
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label={`${t('finance.journal.dialog.removeLine')} ${index + 1}`}
-                        disabled={lines.length <= 2}
-                        onClick={() =>
-                          setLines((previous) => previous.filter((entry) => entry.id !== line.id))
-                        }
-                      >
-                        <Trash2 />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          ) : null}
+                          {needsCustomer(line) ? (
+                            <div className="flex flex-col gap-1">
+                              <Label htmlFor={`entry-customer-${line.id}`} className="sr-only">
+                                {`${t('finance.journal.dialog.customer')} ${index + 1}`}
+                              </Label>
+                              <CustomerSelect
+                                id={`entry-customer-${line.id}`}
+                                value={line.customer}
+                                onChange={(customer) => patch(line.id, { customer })}
+                                invalid={checked && line.customer === null}
+                              />
+                            </div>
+                          ) : null}
+                          {needsSupplier(line) ? (
+                            <div className="flex flex-col gap-1">
+                              <Label htmlFor={`entry-supplier-${line.id}`} className="sr-only">
+                                {`${t('finance.journal.dialog.supplier')} ${index + 1}`}
+                              </Label>
+                              <SupplierSelect
+                                id={`entry-supplier-${line.id}`}
+                                value={line.supplier}
+                                onChange={(supplier) => patch(line.id, { supplier })}
+                                invalid={checked && line.supplier === null}
+                              />
+                            </div>
+                          ) : null}
+                          {stacked ? note : null}
+                        </div>
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <MoneyInput
+                          aria-label={`${t('finance.journal.dialog.debit')} ${index + 1}`}
+                          value={line.debit}
+                          onValueChange={(raw) => patch(line.id, { debit: raw, credit: '' })}
+                        />
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <MoneyInput
+                          aria-label={`${t('finance.journal.dialog.credit')} ${index + 1}`}
+                          value={line.credit}
+                          onValueChange={(raw) => patch(line.id, { credit: raw, debit: '' })}
+                        />
+                      </TableCell>
+                      {stacked ? null : <TableCell className="align-top">{note}</TableCell>}
+                      <TableCell className="align-top">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          aria-label={`${t('finance.journal.dialog.removeLine')} ${index + 1}`}
+                          disabled={lines.length <= 2}
+                          onClick={() =>
+                            setLines((previous) => previous.filter((entry) => entry.id !== line.id))
+                          }
+                        >
+                          <Trash2 />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 <TableRow className="font-semibold">
                   <TableCell>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setLines((previous) => [...previous, emptyLine()])}
-                    >
-                      {t('finance.journal.dialog.addLine')}
-                    </Button>
+                    {/* Without the note's column the difference stands before the sums. */}
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setLines((previous) => [...previous, emptyLine()])}
+                      >
+                        {t('finance.journal.dialog.addLine')}
+                      </Button>
+                      {stacked ? balanceLine : null}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {formatMnt(debit.toFixed(2))}
@@ -346,18 +405,7 @@ export function JournalEntryDialog({
                   <TableCell className="text-right font-mono">
                     {formatMnt(credit.toFixed(2))}
                   </TableCell>
-                  <TableCell colSpan={2}>
-                    {balanced ? (
-                      <span className="text-success">{t('finance.journal.dialog.balanced')}</span>
-                    ) : (
-                      <span className="text-destructive">
-                        {t('finance.journal.dialog.difference')}:{' '}
-                        <span className="font-mono">
-                          {formatMnt(debit.minus(credit).toFixed(2))}
-                        </span>
-                      </span>
-                    )}
-                  </TableCell>
+                  {stacked ? <TableCell /> : <TableCell colSpan={2}>{balanceLine}</TableCell>}
                 </TableRow>
               </TableBody>
             </Table>

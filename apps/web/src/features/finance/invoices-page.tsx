@@ -32,9 +32,12 @@ import { InvoicePanel } from './invoice-panel';
 const isSettlement = (value: string | null): value is Settlement =>
   SETTLEMENTS.some((entry) => entry === value);
 
-/** The list's columns (ADR-0119): number, two dates, the customer, two amounts, the status. */
+/**
+ * The list's columns (ADR-0119): number, two dates, the customer, two amounts, the status. The
+ * number is the row's link in medium weight and the first cell: «Н-20261016-0001» needs 11rem.
+ */
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'number', kind: 'number' },
+  { key: 'number', kind: 'number', width: 11 },
   { key: 'date', kind: 'date' },
   { key: 'dueDate', kind: 'date' },
   { key: 'customer', kind: 'text', weight: 3, min: 14 },

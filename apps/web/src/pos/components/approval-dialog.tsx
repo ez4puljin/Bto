@@ -99,7 +99,8 @@ export function ApprovalForm({
 
   return (
     <form
-      className="space-y-4"
+      // `min-w-0`: a long item is cut with «…», it never widens the dialog's one column.
+      className="min-w-0 space-y-4"
       onSubmit={(event) => {
         event.preventDefault();
         void submit();

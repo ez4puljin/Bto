@@ -199,12 +199,14 @@ describe('finance pages (ADR-0060 #11)', () => {
     const user = userEvent.setup();
     renderApp('/finance/customers', signedIn(ACCOUNTANT_ME, routes()));
     const row = await screen.findByRole('row', { name: /Номин дэлгүүр/ });
-    // The balance (₮) and its not-due aging bucket (plain, under «Насжилт (₮)») read the same.
+    // The balance (₮) and its not-due aging bucket (plain, under its own head) read the same.
     expect(within(row).getByText('100,000₮')).toBeInTheDocument();
     expect(within(row).getByText('100,000')).toBeInTheDocument();
+    // One row of heads with a cell per column, so a narrow table's columns can leave (ADR-0201).
     expect(
-      screen.getByRole('columnheader', { name: mn.finance.balances.agingGroup }),
+      screen.getByRole('columnheader', { name: mn.finance.aging.NOT_DUE }),
     ).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: mn.finance.balances.agingGroup })).toBeNull();
     await user.click(within(row).getByText('Номин дэлгүүр'));
     expect(await screen.findByRole('heading', { name: 'Номин дэлгүүр' })).toBeInTheDocument();
     const card = within(await screen.findByRole('region', { name: mn.finance.balances.card }));

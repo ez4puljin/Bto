@@ -49,8 +49,9 @@ export function AuthLayout(props: { title: string; description?: string; childre
           className="absolute inset-0 [background-image:linear-gradient(rgb(255_255_255/0.035)_1px,transparent_1px),linear-gradient(90deg,rgb(255_255_255/0.035)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(75%_65%_at_50%_45%,black,transparent)]"
         />
         {/* A laptop's short screen (1366×633) keeps the whole panel without a scroll: tighter
-            spacing below 760px of height, and the map never taller than the height leaves it. */}
-        <header className="relative flex items-center gap-3 px-12 pt-11 [@media(max-height:760px)]:pt-7">
+            spacing below 760px of height, and the map never taller than the height leaves it.
+            A till PC's half (512px) keeps each line of the legend whole: less padding below xl. */}
+        <header className="relative flex items-center gap-3 px-8 pt-11 xl:px-12 [@media(max-height:760px)]:pt-7">
           <BrandMark size="lg" />
           <div>
             <p className="text-[1.625rem] leading-none font-semibold tracking-tight">
@@ -60,15 +61,16 @@ export function AuthLayout(props: { title: string; description?: string; childre
           </div>
         </header>
         <div className="relative flex flex-1 flex-col justify-center px-10 py-8 xl:px-14 [@media(max-height:760px)]:py-3">
-          {/* Its full margin stays: the main branch's label reaches above the map. */}
-          <p className="mb-6 text-[0.8125rem] font-medium tracking-wide text-[#64d2ff] uppercase">
+          {/* Its full margin stays: the main branch's label reaches above the map, further
+              above a small one (a till PC's). */}
+          <p className="mb-6 text-[0.8125rem] font-medium tracking-wide text-[#64d2ff] uppercase lg:max-xl:mb-10">
             {t('brand.mapTitle')}
           </p>
           <div style={{ maxWidth: MAP_MAX_WIDTH }}>
             <MongoliaMap className="xl:scale-[1.04]" />
           </div>
         </div>
-        <footer className="relative flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-12 pb-11 [@media(max-height:760px)]:pb-7">
+        <footer className="relative flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-8 pb-11 xl:px-12 [@media(max-height:760px)]:pb-7">
           <ul className="flex flex-col gap-2.5 text-sm">
             <li className="flex items-center gap-2.5">
               <span

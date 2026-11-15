@@ -1,14 +1,4 @@
-import {
-  Archive,
-  ArchiveRestore,
-  BadgePercent,
-  Pencil,
-  Plus,
-  SlidersHorizontal,
-  Star,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { Archive, ArchiveRestore, BadgePercent, Pencil, Plus, Star, Trash2, X } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -52,6 +42,7 @@ import {
   usePricingMutations,
 } from './api';
 import { nineFactorKey } from './helpers';
+import { FilterHead, FilterRail, FilterSheet } from './list-filters';
 import { usePipelineChoices, useProgramNames, useTillChoices } from './program-choices';
 import { useProgramText } from './program-text';
 
@@ -73,16 +64,21 @@ export function ProgramStatusBadge({ status }: { status: ProgramStatus }) {
   return <Badge variant={STATUS_VARIANT[status]}>{t(`pricing.programs.status.${status}`)}</Badge>;
 }
 
-/** The list's columns (ADR-0119): the steps say the effect too (→ 1%, → 22,800₮, → −500₮). */
+/**
+ * The list's columns (ADR-0119): the steps say the effect too (→ 1%, → 22,800₮, → −500₮). 61.5rem
+ * in all: a 1366px window leaves 62.6 beside the filters. Without them a till PC has 56.2 and lets
+ * who made the plan and when go (49.75); a tablet upright has 41.2 and lets the day it changed and
+ * the star go too (40.5). The plan's own page shows all four (ADR-0201).
+ */
 const COLUMNS: readonly ColumnSpec[] = [
   { key: 'name', kind: 'text', weight: 3, min: 10.5 },
   { key: 'status', kind: 'status', width: 6.5 },
-  { key: 'priority', kind: 'icon', width: 2.5 },
+  { key: 'priority', kind: 'icon', width: 2.5, drop: 3 },
   { key: 'apply', kind: 'text', weight: 3, min: 7.5 },
   { key: 'steps', kind: 'text', weight: 1, min: 7 },
-  { key: 'createdBy', kind: 'text', weight: 1, min: 5 },
-  { key: 'createdAt', kind: 'date', width: 7 },
-  { key: 'updatedAt', kind: 'date', width: 7 },
+  { key: 'createdBy', kind: 'text', weight: 1, min: 5, drop: 1 },
+  { key: 'createdAt', kind: 'date', width: 6.75, drop: 1 },
+  { key: 'updatedAt', kind: 'date', width: 6.75, drop: 2 },
   { key: 'actions', kind: 'actions', actions: 3 },
   { key: 'chevron', kind: 'chevron' },
 ];
@@ -143,6 +139,121 @@ export function DiscountProgramsPage() {
     setSearch('');
     setParams({}, { replace: true });
   };
+  // The same filters stand beside the list on a laptop and in the sheet below it (ADR-0201).
+  const head = (className?: string) => (
+    <FilterHead
+      title={t('pricing.programs.panel.title')}
+      clearLabel={t('pricing.programs.panel.clear')}
+      filtered={filtered}
+      onClear={clear}
+      {...(className ? { className } : {})}
+    />
+  );
+  const sections = (
+    <>
+      <FilterSection title={t('pricing.programs.columns.status')} defaultOpen active={!!status}>
+        <FilterChoices
+          options={STATUSES}
+          label={(value) => t(`pricing.programs.status.${value}`)}
+          value={status ?? null}
+          onChange={(value) => setParam('status', value)}
+        />
+      </FilterSection>
+      <FilterSection title={t('pricing.programs.columns.apply')} defaultOpen active={!!applyType}>
+        <FilterChoices
+          options={APPLY_TYPES}
+          label={(value) => t(`pricing.programs.applyTypes.${value}`)}
+          value={applyType ?? null}
+          onChange={(value) => setParam('apply', value)}
+        />
+      </FilterSection>
+      <FilterSection title={t('pricing.programs.fields.product')} active={!!productId}>
+        {productId ? (
+          <FilterOption
+            label={params.get('prn') ?? String(productId)}
+            active
+            hint={<X aria-hidden className="size-3.5 shrink-0" />}
+            onClick={() =>
+              setParams(
+                (current) => {
+                  const next = new URLSearchParams(current);
+                  next.delete('pr');
+                  next.delete('prn');
+                  return next;
+                },
+                { replace: true },
+              )
+            }
+          />
+        ) : (
+          <ProductSearch
+            className="w-full"
+            pickLabel={t('pricing.programs.pickProduct')}
+            onPick={(picked) =>
+              setParams(
+                (current) => {
+                  const next = new URLSearchParams(current);
+                  next.set('pr', String(picked.id));
+                  next.set('prn', picked.name);
+                  return next;
+                },
+                { replace: true },
+              )
+            }
+          />
+        )}
+      </FilterSection>
+      <FilterSection title={t('pricing.programs.fields.priority')} active={!!priority}>
+        <FilterChoices
+          options={PRIORITIES}
+          label={(value) => t(`pricing.programs.priorities.${value}`)}
+          value={priority ?? null}
+          onChange={(value) => setParam('priority', value)}
+        />
+      </FilterSection>
+      <FilterSection title={t('pricing.programs.panel.condition')} active={!!condition}>
+        <FilterChoices
+          options={CONDITIONS}
+          label={(value) => t(`pricing.programs.panel.conditions.${value}`)}
+          value={condition ?? null}
+          onChange={(value) => setParam('condition', value)}
+        />
+      </FilterSection>
+      <FilterSection title={t('pricing.programs.fields.pipelines')} active={!!pipelineId}>
+        <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
+          {pipelines.map((pipeline) => (
+            <FilterOption
+              key={pipeline.id}
+              label={pipeline.label}
+              active={pipelineId === pipeline.id}
+              onClick={() =>
+                setParam('pipeline', pipelineId === pipeline.id ? null : String(pipeline.id))
+              }
+            />
+          ))}
+        </div>
+      </FilterSection>
+      <FilterSection title={t('pricing.programs.fields.tills')} active={!!tillId}>
+        <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
+          {tills.map((till) => (
+            <FilterOption
+              key={till.id}
+              label={till.label}
+              active={tillId === till.id}
+              onClick={() => setParam('till', tillId === till.id ? null : String(till.id))}
+            />
+          ))}
+        </div>
+      </FilterSection>
+      <FilterSection title={t('pricing.programs.panel.date')} active={!!date}>
+        <DateInput
+          aria-label={t('pricing.programs.panel.date')}
+          value={date ?? ''}
+          onChange={(value) => setParam('date', value || null)}
+        />
+      </FilterSection>
+    </>
+  );
 
   return (
     <div>
@@ -161,131 +272,10 @@ export function DiscountProgramsPage() {
         }
       />
       <div className="flex items-start gap-3">
-        <aside
-          aria-label={t('pricing.programs.panel.label')}
-          className="hidden w-52 shrink-0 lg:block"
-        >
-          <ListCard scroll beside>
-            <div className="flex items-center gap-2 px-3 py-2.5 text-sm font-semibold">
-              <SlidersHorizontal aria-hidden className="size-4 text-muted-foreground" />
-              <span className="flex-1">{t('pricing.programs.panel.title')}</span>
-              {filtered ? (
-                <Button type="button" size="xs" variant="ghost" onClick={clear}>
-                  {t('pricing.programs.panel.clear')}
-                </Button>
-              ) : null}
-            </div>
-            <FilterSection
-              title={t('pricing.programs.columns.status')}
-              defaultOpen
-              active={!!status}
-            >
-              <FilterChoices
-                options={STATUSES}
-                label={(value) => t(`pricing.programs.status.${value}`)}
-                value={status ?? null}
-                onChange={(value) => setParam('status', value)}
-              />
-            </FilterSection>
-            <FilterSection
-              title={t('pricing.programs.columns.apply')}
-              defaultOpen
-              active={!!applyType}
-            >
-              <FilterChoices
-                options={APPLY_TYPES}
-                label={(value) => t(`pricing.programs.applyTypes.${value}`)}
-                value={applyType ?? null}
-                onChange={(value) => setParam('apply', value)}
-              />
-            </FilterSection>
-            <FilterSection title={t('pricing.programs.fields.product')} active={!!productId}>
-              {productId ? (
-                <FilterOption
-                  label={params.get('prn') ?? String(productId)}
-                  active
-                  hint={<X aria-hidden className="size-3.5 shrink-0" />}
-                  onClick={() =>
-                    setParams(
-                      (current) => {
-                        const next = new URLSearchParams(current);
-                        next.delete('pr');
-                        next.delete('prn');
-                        return next;
-                      },
-                      { replace: true },
-                    )
-                  }
-                />
-              ) : (
-                <ProductSearch
-                  className="w-full"
-                  pickLabel={t('pricing.programs.pickProduct')}
-                  onPick={(picked) =>
-                    setParams(
-                      (current) => {
-                        const next = new URLSearchParams(current);
-                        next.set('pr', String(picked.id));
-                        next.set('prn', picked.name);
-                        return next;
-                      },
-                      { replace: true },
-                    )
-                  }
-                />
-              )}
-            </FilterSection>
-            <FilterSection title={t('pricing.programs.fields.priority')} active={!!priority}>
-              <FilterChoices
-                options={PRIORITIES}
-                label={(value) => t(`pricing.programs.priorities.${value}`)}
-                value={priority ?? null}
-                onChange={(value) => setParam('priority', value)}
-              />
-            </FilterSection>
-            <FilterSection title={t('pricing.programs.panel.condition')} active={!!condition}>
-              <FilterChoices
-                options={CONDITIONS}
-                label={(value) => t(`pricing.programs.panel.conditions.${value}`)}
-                value={condition ?? null}
-                onChange={(value) => setParam('condition', value)}
-              />
-            </FilterSection>
-            <FilterSection title={t('pricing.programs.fields.pipelines')} active={!!pipelineId}>
-              <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
-                {pipelines.map((pipeline) => (
-                  <FilterOption
-                    key={pipeline.id}
-                    label={pipeline.label}
-                    active={pipelineId === pipeline.id}
-                    onClick={() =>
-                      setParam('pipeline', pipelineId === pipeline.id ? null : String(pipeline.id))
-                    }
-                  />
-                ))}
-              </div>
-            </FilterSection>
-            <FilterSection title={t('pricing.programs.fields.tills')} active={!!tillId}>
-              <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
-                {tills.map((till) => (
-                  <FilterOption
-                    key={till.id}
-                    label={till.label}
-                    active={tillId === till.id}
-                    onClick={() => setParam('till', tillId === till.id ? null : String(till.id))}
-                  />
-                ))}
-              </div>
-            </FilterSection>
-            <FilterSection title={t('pricing.programs.panel.date')} active={!!date}>
-              <DateInput
-                aria-label={t('pricing.programs.panel.date')}
-                value={date ?? ''}
-                onChange={(value) => setParam('date', value || null)}
-              />
-            </FilterSection>
-          </ListCard>
-        </aside>
+        <FilterRail label={t('pricing.programs.panel.label')}>
+          {head()}
+          {sections}
+        </FilterRail>
         <div className="min-w-0 flex-1">
           <FilterBar>
             <SearchField
@@ -298,6 +288,26 @@ export function DiscountProgramsPage() {
                 setParam('q', event.target.value.trim() || null);
               }}
             />
+            <FilterSheet
+              label={t('pricing.programs.panel.label')}
+              title={t('pricing.programs.panel.title')}
+              count={
+                [
+                  status,
+                  applyType,
+                  priority,
+                  condition,
+                  productId,
+                  pipelineId,
+                  tillId,
+                  date,
+                ].filter(Boolean).length
+              }
+            >
+              {/* The sheet's ✕ stands at the head's end. */}
+              {head('pr-12')}
+              {sections}
+            </FilterSheet>
           </FilterBar>
           <ProblemAlert problem={problemFromError(programs.error)} onRetry={programs.refetch} />
           <ProgramTable

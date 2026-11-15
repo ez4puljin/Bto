@@ -376,7 +376,9 @@ function PaymentForm(props: {
     <form
       data-pay-form
       tabIndex={-1}
-      className="grid gap-4 outline-none"
+      // One column no wider than the dialog: a long customer or voucher name is cut with «…»
+      // in its own row and never widens the whole payment past the dialog's edge.
+      className="grid min-w-0 grid-cols-1 gap-4 outline-none"
       onSubmit={submit}
       onKeyDown={onKeyDown}
       noValidate
@@ -501,7 +503,7 @@ function PaymentForm(props: {
                         inputMode="numeric"
                         autoComplete="off"
                         maxLength={4}
-                        className="h-11 w-40 text-center font-mono text-lg tracking-[0.5em]"
+                        className="h-11 w-40 text-center font-mono text-lg tracking-[0.5em] placeholder:font-sans placeholder:tracking-normal md:text-lg"
                         value={pin}
                         onChange={(event) =>
                           setPin(event.target.value.replace(/[^0-9]/g, '').slice(0, 4))
@@ -528,7 +530,9 @@ function PaymentForm(props: {
               <p className="text-[0.8125rem] font-medium text-muted-foreground">
                 {t('posKiosk.pay.rows.add')}
               </p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {/* Three to a row in the dialog's 632px: a name has 128px and may take two lines
+                  («Khaanbank terminal»); four to a row left it 74px, eight letters. */}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {types.map((type, index) => (
                   <Button
                     key={type.id ?? type.kind}
@@ -555,7 +559,9 @@ function PaymentForm(props: {
                       {String(index + 1)}
                     </span>
                     {KIND_ICONS[type.kind]}
-                    <span className="truncate">{type.name}</span>
+                    <span className="line-clamp-2 text-left leading-tight break-words whitespace-normal">
+                      {type.name}
+                    </span>
                   </Button>
                 ))}
               </div>
@@ -760,7 +766,7 @@ function CustomerSection(props: {
               autoFocus
               autoComplete="off"
               maxLength={80}
-              className="h-11 flex-1"
+              className="h-11 flex-1 text-base md:text-base"
               value={q}
               onChange={(event) => setQ(event.target.value)}
               onKeyDown={(event) => {
@@ -869,7 +875,7 @@ function BuyerSection(props: {
               autoComplete="off"
               autoFocus
               maxLength={20}
-              className="h-11 flex-1 font-mono"
+              className="h-11 flex-1 font-mono text-base md:text-base"
               value={no}
               onChange={(event) => setNo(event.target.value)}
               onKeyDown={(event) => {

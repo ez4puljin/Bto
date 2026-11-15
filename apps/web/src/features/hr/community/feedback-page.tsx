@@ -36,6 +36,7 @@ import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
+import { cn } from '@/lib/utils';
 import {
   type HrFeedback,
   type HrFeedbackCategory,
@@ -43,15 +44,19 @@ import {
   useEngagementMutations,
   useHrFeedback,
 } from '../engagement-api';
+import { ROW_TITLE } from '../hr-helpers';
 import { Avatar } from '../hr-kit';
 import { FEEDBACK_STATUS_VARIANT } from './community-helpers';
 
+// 48.75rem with every column: sized on a till PC (55.5rem), the pills and the minute-long date at
+// their own widths. A tablet upright (40.5rem) lets the date go, which the row's dialog says:
+// 39.75rem; narrower still, the category too.
 const COLUMNS: readonly ColumnSpec[] = [
-  { key: 'who', kind: 'text', weight: 1, min: 11 },
-  { key: 'category', kind: 'status' },
-  { key: 'title', kind: 'text', weight: 3, min: 16 },
-  { key: 'status', kind: 'status' },
-  { key: 'createdAt', kind: 'datetime' },
+  { key: 'who', kind: 'text', weight: 1, min: 10 },
+  { key: 'category', kind: 'status', width: 6, drop: 2 },
+  { key: 'title', kind: 'text', weight: 3, min: 14 },
+  { key: 'status', kind: 'status', width: 6.5 },
+  { key: 'createdAt', kind: 'datetime', width: 9, drop: 1 },
   { key: 'actions', kind: 'actions', actions: 1 },
 ];
 
@@ -185,7 +190,9 @@ export function FeedbackPage() {
         description={t('hr.community.feedback.description')}
       />
       <FilterBar>
+        {/* The search gives way: one row on a till PC, the two dates together on a tablet. */}
         <SearchField
+          className="sm:w-auto sm:max-w-72 sm:min-w-48 sm:flex-1"
           aria-label={t('common.search')}
           placeholder={t('common.search')}
           value={search}
@@ -255,7 +262,16 @@ export function FeedbackPage() {
               {rows.map((row) => {
                 const who = row.fullName ?? t('hr.community.feedback.anonymous');
                 return (
-                  <TableRow key={row.id}>
+                  // The whole row opens the dialog (a finger's target); the title stays the
+                  // keyboard's button, and the row's own buttons do their own work.
+                  <TableRow
+                    key={row.id}
+                    className="cursor-pointer has-[button:focus-visible]:bg-accent"
+                    onClick={(event) => {
+                      if (event.target instanceof Element && event.target.closest('button')) return;
+                      setOpenId(row.id);
+                    }}
+                  >
                     <TableCell>
                       <div className="flex min-w-0 items-center gap-2">
                         <Avatar name={who} className="size-7 text-[0.6875rem]" />
@@ -278,11 +294,11 @@ export function FeedbackPage() {
                     <TableCell>
                       <button
                         type="button"
-                        className="block max-w-full truncate text-left font-medium text-link hover:underline"
+                        className={cn('block max-w-full', ROW_TITLE)}
                         title={row.title}
                         onClick={() => setOpenId(row.id)}
                       >
-                        {row.title}
+                        <span className="block truncate">{row.title}</span>
                       </button>
                       <p
                         className="truncate text-[0.8125rem] text-muted-foreground"

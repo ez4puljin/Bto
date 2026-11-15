@@ -183,7 +183,8 @@ function ReturnsPanel(props: {
   }
 
   return (
-    <div className="space-y-4">
+    // `min-w-0`: a long product name is cut in its row, it never widens the dialog's one column.
+    <div className="min-w-0 space-y-4">
       <form
         className="flex gap-2"
         onSubmit={(event) => {
@@ -244,7 +245,8 @@ function ReturnsPanel(props: {
                         : t('posKiosk.returns.nothingLeft')}
                     </span>
                   </span>
-                  <label className="flex items-center gap-2 text-sm">
+                  {/* The tick and the quantity are 44px for a finger (ADR-0113): the whole label ticks. */}
+                  <label className="flex h-11 items-center gap-2 px-1 text-sm">
                     <Checkbox
                       checked={pick.damaged}
                       disabled={!left.gt(0) || !sale.withinWindow}
@@ -257,7 +259,7 @@ function ReturnsPanel(props: {
                     inputMode="decimal"
                     autoComplete="off"
                     disabled={!left.gt(0) || !sale.withinWindow}
-                    className="h-10 w-20 text-right font-mono"
+                    className="h-11 w-20 text-right font-mono text-base md:text-base"
                     placeholder="0"
                     value={pick.qty}
                     onChange={(event) => set({ qty: event.target.value })}

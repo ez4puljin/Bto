@@ -10,6 +10,7 @@ import type { CurrentTerms } from '@/features/pricing/api';
 import type { ColumnKind } from '@/lib/column-layout';
 import { formatMnt } from '@/lib/money';
 import type { ProductListItem } from './api';
+import { CategoryPath } from './category-path';
 import { ProductStageBadge } from './product-stage-badge';
 
 /**
@@ -48,6 +49,23 @@ export const WIDE_DEFAULT_HIDDEN_PRODUCT_COLUMNS: readonly ProductColumnKey[] = 
   'baseBarcodes',
   'unitBarcodes',
   'fixedBins',
+];
+
+/**
+ * The columns that leave a default set too wide for its table (ADR-0201), the least needed first
+ * and one at a time; the product's own page shows each. Only a search's rows let them go: in the
+ * categories' order a category's row spans the table, which then scrolls as before. A search's
+ * set needs 57.75rem: beside the filters a 1366px window has 57.35 and a till PC 56.2 without
+ * them, so the supplier goes (50.75); a tablet upright has 41.2 and keeps the tick, the code, the
+ * name, the price and the status (40.75). The wide set's three columns go first.
+ */
+export const PRODUCT_COLUMNS_LEAVING: readonly ProductColumnKey[] = [
+  'homeWarehouse',
+  'weight',
+  'baseUnit',
+  'supplier',
+  'category',
+  'image',
 ];
 
 /** What the cells read besides the row; `suppliers`, `locations`, `prices` are undefined until loaded. */
@@ -110,26 +128,9 @@ const otherUnits = (row: ProductListItem) => row.units.filter((unit) => !unit.is
 /** Today's price terms of a product (ADR-0048), or undefined while they load. */
 const termsOf = (row: ProductListItem, ctx: ProductCellContext) => ctx.prices?.get(row.id)?.[0];
 
-/** How `categoryPaths` joins a path («Хүнс / Гурил», `@tugeel/shared/catalog`). */
-const PATH_SEPARATOR = ' / ';
-
-/**
- * A category's path in a narrow column: the parents give way («Туршилтын ба… / Ахуйн бараа») so
- * the category itself stays whole; the whole path shows on hover.
- */
-function categoryCell(path: string | undefined, ctx: ProductCellContext): ReactNode {
-  if (!path) return none(ctx);
-  const parts = path.split(PATH_SEPARATOR);
-  const leaf = parts.pop();
-  if (parts.length === 0 || leaf === undefined) return path;
-  return (
-    <span className="flex min-w-0">
-      <span className="min-w-0 truncate">{parts.join(PATH_SEPARATOR)}</span>
-      {/* The separator stays with the category, after the parents' «…». */}
-      <span className="shrink-0">{`\u00a0/ ${leaf}`}</span>
-    </span>
-  );
-}
+/** A category's path with the category itself whole (`CategoryPath`), or «—». */
+const categoryCell = (path: string | undefined, ctx: ProductCellContext): ReactNode =>
+  path ? <CategoryPath path={path} /> : none(ctx);
 
 /** The main supplier, with «+N» for the others; undefined while the links load. */
 function supplierText(row: ProductListItem, ctx: ProductCellContext): string | undefined {

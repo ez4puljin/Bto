@@ -67,7 +67,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type { ColumnSpec } from '@/lib/column-layout';
+import { type ColumnSpec, columnLayout } from '@/lib/column-layout';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useDebounced } from '@/lib/use-debounced';
@@ -105,13 +105,15 @@ const MODES: readonly Mode[] = ['month', 'range'];
 
 /**
  * Eleven columns: the cells sit closer than the kit's, billions fit the money columns, and the whole
- * stays under 1273px at the 17px root, 1366 wide with a page scrollbar. Past that the kit drops to the
- * browser's own layout.
+ * stays under 1273px at the 17px root, 1366 wide with a page scrollbar. A narrower table (a till
+ * PC, a tablet) lets the supplier's code go, the one column nothing is done in (ADR-0201); the
+ * ten it is worked in keep their narrowest widths, 70.5rem, and the table scrolls in its card
+ * (`AT_ITS_NARROWEST`).
  */
 const COLUMNS: readonly ColumnSpec[] = [
   { key: 'check', kind: 'check', width: 3.75 },
   { key: 'employee', kind: 'text', weight: 1.2, min: 8 },
-  { key: 'code', kind: 'code', width: 4 },
+  { key: 'code', kind: 'code', width: 4, drop: 1 },
   { key: 'supplier', kind: 'text', weight: 2.4, min: 10.5 },
   { key: 'registers', kind: 'text', weight: 1, min: 5 },
   { key: 'phone', kind: 'text', weight: 0.8, min: 6.25 },
@@ -122,6 +124,21 @@ const COLUMNS: readonly ColumnSpec[] = [
   { key: 'note', kind: 'text', weight: 1.4, min: 6 },
 ];
 const COMPACT_CELLS = '[&_td]:px-2 [&_th]:px-2';
+
+/**
+ * Where the kit cannot size the table, the browser's own layout made it half as wide again as it
+ * needs (a column as wide as its longest name) and crushed the filter boxes of a short list. The
+ * table keeps its columns instead, each at its narrowest: the head cells carry those widths, which
+ * count only here — the kit's own win where it sizes the table.
+ */
+const AT_ITS_NARROWEST =
+  '[&:not([data-layout=columns])]:table-fixed [&:not([data-layout=columns])_td]:overflow-hidden [&:not([data-layout=columns])_td]:text-ellipsis';
+
+/**
+ * A small mark to press (the history, the call, the pencil): a finger gets 2.75rem around it
+ * while nothing moves in the row (ADR-0201). The element is `relative`.
+ */
+const FINGER_REACH = 'touch:after:absolute touch:after:-inset-4';
 
 /** A consolidated row ticks nothing and lists who held it: the room goes to the names. */
 const RANGE_COLUMNS: readonly ColumnSpec[] = COLUMNS.map((column) => {
@@ -636,6 +653,10 @@ export function EbarimtPage() {
     (!monthMode && overview.isPending) ||
     (!nothingAsked && report.isPending);
   const columns = monthMode ? COLUMNS : RANGE_COLUMNS;
+  const narrowest = useMemo(
+    () => columnLayout(columns).widths.map((width) => ({ width: `${width}rem` })),
+    [columns],
+  );
   // Rows of the last choice while the next months settle: they read as such.
   const lagging = !monthMode && (report.isPlaceholderData || rangeKey !== settledKey);
   // A dialog whose row has left the list closes for good, rather than opening again later.
@@ -815,7 +836,7 @@ export function EbarimtPage() {
                 aria-pressed={on}
                 title={labels.name(month.period)}
                 className={cn(
-                  'relative h-7.5 min-w-9 rounded-full px-2 text-[0.8125rem] font-medium transition-colors',
+                  'relative h-7.5 min-w-9 rounded-full px-2 text-[0.8125rem] font-medium transition-colors touch:h-11 touch:min-w-11',
                   FOCUS_RING,
                   on
                     ? 'bg-primary text-primary-foreground'
@@ -880,10 +901,13 @@ export function EbarimtPage() {
       <ProblemAlert problem={problemFromError(report.error)} onRetry={report.refetch} />
 
       <ListCard scroll className={cn(lagging && 'opacity-60')}>
-        <ListTable columns={columns} className={cn('text-[0.8125rem]', COMPACT_CELLS)}>
+        <ListTable
+          columns={columns}
+          className={cn('text-[0.8125rem]', COMPACT_CELLS, AT_ITS_NARROWEST)}
+        >
           <TableHeader>
             <TableRow>
-              <TableHead className="text-center">
+              <TableHead className="text-center" style={narrowest[0]}>
                 {canTick ? (
                   <Checkbox
                     aria-label={t('ebarimtCheck.selectAll')}
@@ -894,22 +918,32 @@ export function EbarimtPage() {
                   t('ebarimtCheck.columns.number')
                 )}
               </TableHead>
-              <TableHead>
+              <TableHead style={narrowest[1]}>
                 {monthMode
                   ? t('ebarimtCheck.columns.employee')
                   : t('ebarimtCheck.columns.employeeMonths')}
               </TableHead>
-              <TableHead>{t('ebarimtCheck.columns.code')}</TableHead>
-              <TableHead>{t('ebarimtCheck.columns.supplier')}</TableHead>
-              <TableHead>{t('ebarimtCheck.columns.registers')}</TableHead>
-              <TableHead>{t('ebarimtCheck.columns.phone')}</TableHead>
-              <TableHead className="text-right">{t('ebarimtCheck.columns.purchase')}</TableHead>
-              <TableHead className="text-right">{t('ebarimtCheck.columns.ebarimt')}</TableHead>
-              <TableHead className="text-right" title={t('ebarimtCheck.columns.exemptFull')}>
+              <TableHead style={narrowest[2]}>{t('ebarimtCheck.columns.code')}</TableHead>
+              <TableHead style={narrowest[3]}>{t('ebarimtCheck.columns.supplier')}</TableHead>
+              <TableHead style={narrowest[4]}>{t('ebarimtCheck.columns.registers')}</TableHead>
+              <TableHead style={narrowest[5]}>{t('ebarimtCheck.columns.phone')}</TableHead>
+              <TableHead className="text-right" style={narrowest[6]}>
+                {t('ebarimtCheck.columns.purchase')}
+              </TableHead>
+              <TableHead className="text-right" style={narrowest[7]}>
+                {t('ebarimtCheck.columns.ebarimt')}
+              </TableHead>
+              <TableHead
+                className="text-right"
+                style={narrowest[8]}
+                title={t('ebarimtCheck.columns.exemptFull')}
+              >
                 {t('ebarimtCheck.columns.exempt')}
               </TableHead>
-              <TableHead className="text-right">{t('ebarimtCheck.columns.diff')}</TableHead>
-              <TableHead>{t('ebarimtCheck.columns.note')}</TableHead>
+              <TableHead className="text-right" style={narrowest[9]}>
+                {t('ebarimtCheck.columns.diff')}
+              </TableHead>
+              <TableHead style={narrowest[10]}>{t('ebarimtCheck.columns.note')}</TableHead>
             </TableRow>
             <TableRow className="hover:bg-transparent">
               <FilterHead>
@@ -919,7 +953,8 @@ export function EbarimtPage() {
                     aria-label={t('ebarimtCheck.filters.clearColumns')}
                     title={t('ebarimtCheck.filters.clearColumns')}
                     className={cn(
-                      'mx-auto grid size-5 place-items-center rounded-full bg-danger-soft text-destructive',
+                      'relative mx-auto grid size-5 place-items-center rounded-full bg-danger-soft text-destructive',
+                      FINGER_REACH,
                       FOCUS_RING,
                     )}
                     onClick={() => {
@@ -1072,6 +1107,14 @@ export function EbarimtPage() {
                         )
                       }
                     />
+                    {row.sharedRegisters.length > 0 ? (
+                      // The mark's title needs a hover: a finger reads it under the cell.
+                      <p className="hidden px-1 text-xs whitespace-normal text-warning touch:block">
+                        {t('ebarimtCheck.cells.sharedRegister', {
+                          registers: row.sharedRegisters.join(', '),
+                        })}
+                      </p>
+                    ) : null}
                   </TableCell>
                   <TableCell>
                     <div className="flex min-w-0 items-start gap-0.5">
@@ -1080,7 +1123,11 @@ export function EbarimtPage() {
                           href={`tel:${row.phone.split(/[\s,;/\uFF0F\\]+/)[0] ?? ''}`}
                           aria-label={t('ebarimtCheck.cells.call', { name: row.name })}
                           title={t('ebarimtCheck.cells.call', { name: row.name })}
-                          className="mt-1 shrink-0 text-muted-foreground hover:text-link"
+                          className={cn(
+                            'relative mt-1 shrink-0 text-muted-foreground hover:text-link',
+                            FINGER_REACH,
+                            canEdit && 'touch:mt-4',
+                          )}
                         >
                           <Phone aria-hidden className="size-3" />
                         </a>
@@ -1201,9 +1248,16 @@ export function EbarimtPage() {
           {!waiting && filtered.length > 0 ? (
             <TableFooter className="sticky bottom-0 z-10 bg-card font-medium">
               <TableRow>
-                <TableCell colSpan={6} className="text-right text-muted-foreground">
+                {/* A cell per column, never one across them: a spanning cell would keep the
+                    code in a narrow table. The count stands under the names. */}
+                <TableCell />
+                <TableCell />
+                <TableCell />
+                <TableCell className="truncate text-muted-foreground">
                   {t('ebarimtCheck.totals', { count: filtered.length })}
                 </TableCell>
+                <TableCell />
+                <TableCell />
                 <TableCell
                   title={amountText(totals.purchase.toFixed(2))}
                   className="text-right font-mono font-semibold"
@@ -1395,7 +1449,7 @@ function EmployeeChip(props: { active: boolean; onClick: () => void; children: R
       type="button"
       aria-pressed={props.active}
       className={cn(
-        'inline-flex h-7.5 items-center gap-1 rounded-full px-3 text-[0.8125rem] font-medium transition-colors',
+        'inline-flex h-7.5 items-center gap-1 rounded-full px-3 text-[0.8125rem] font-medium transition-colors touch:h-11',
         FOCUS_RING,
         props.active
           ? 'bg-secondary text-secondary-foreground'
@@ -1408,7 +1462,7 @@ function EmployeeChip(props: { active: boolean; onClick: () => void; children: R
   );
 }
 
-/** The supplier's name and its remark; a pencil on the row's hover starts one where there is none. */
+/** The supplier's name and its remark; a pencil beside the name starts one where there is none. */
 function SupplierCell(props: {
   row: EbarimtRow;
   editable: boolean;
@@ -1440,7 +1494,9 @@ function SupplierCell(props: {
             aria-label={label}
             title={label}
             className={cn(
-              'shrink-0 rounded text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:text-foreground focus-visible:opacity-100',
+              // A mouse sees it on the row's hover; a finger, which has none, always.
+              'relative shrink-0 rounded text-muted-foreground hover:text-foreground focus-visible:opacity-100 pointer-fine:opacity-0 pointer-fine:group-hover/row:opacity-100',
+              FINGER_REACH,
               FOCUS_RING,
             )}
             onClick={() => setAdding(true)}
@@ -1466,7 +1522,7 @@ function SupplierCell(props: {
   );
 }
 
-function HistoryButton(props: { row: EbarimtRow; onClick: () => void }) {
+function HistoryButton(props: { row: EbarimtRow; onClick: () => void; className?: string }) {
   const { t } = useTranslation();
   if (props.row.history.length === 0) return null;
   const label = t('ebarimtCheck.history.open', { name: props.row.name });
@@ -1475,7 +1531,12 @@ function HistoryButton(props: { row: EbarimtRow; onClick: () => void }) {
       type="button"
       aria-label={label}
       title={label}
-      className={cn('mt-0.5 shrink-0 rounded text-warning hover:text-foreground', FOCUS_RING)}
+      className={cn(
+        'relative mt-0.5 shrink-0 rounded text-warning hover:text-foreground',
+        FINGER_REACH,
+        FOCUS_RING,
+        props.className,
+      )}
       onClick={props.onClick}
     >
       <History className="size-3.5" />
@@ -1505,7 +1566,7 @@ function EmployeeCell(props: {
             })}
             title={name}
             className={cn(
-              'block w-full truncate rounded-md px-1 py-0.5 text-left hover:bg-accent',
+              'block w-full truncate rounded-md px-1 py-0.5 text-left hover:bg-accent touch:min-h-11',
               FOCUS_RING,
               row.employeeName ? '' : 'text-muted-foreground/70 italic',
               row.employeeAssigned && row.ordererName && 'font-medium text-link',
@@ -1534,7 +1595,12 @@ function EmployeeCell(props: {
           </span>
         ) : null}
       </div>
-      <HistoryButton row={row} onClick={props.onHistory} />
+      {/* Beside a name a finger's height tall, the mark stays on the name's line. */}
+      <HistoryButton
+        row={row}
+        className={props.canAssign ? 'touch:mt-4' : undefined}
+        onClick={props.onHistory}
+      />
     </div>
   );
 }
@@ -1582,7 +1648,7 @@ function AmountButton(props: {
       aria-label={props.label}
       title={props.hint ? `${props.label}\n${props.hint}` : props.label}
       className={cn(
-        'block w-full rounded-md px-1 py-0.5 text-right font-mono underline-offset-2 hover:bg-accent hover:text-link hover:underline',
+        'block w-full rounded-md px-1 py-0.5 text-right font-mono underline-offset-2 hover:bg-accent hover:text-link hover:underline touch:min-h-11',
         FOCUS_RING,
       )}
       onClick={props.onClick}
@@ -1615,7 +1681,7 @@ function TextFilter(props: {
         placeholder={t('ebarimtCheck.filters.columnPlaceholder')}
         value={props.value}
         className={cn(
-          'h-7 px-1.5 text-xs md:text-xs',
+          'h-7 px-1.5 text-xs md:text-xs touch:h-11',
           props.value && 'border-transparent bg-secondary',
         )}
         onChange={(event) => props.onChange(event.target.value)}

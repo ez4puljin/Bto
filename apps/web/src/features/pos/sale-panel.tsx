@@ -2,17 +2,12 @@ import { CircleCheck, Printer } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
+import { ListTable } from '@/components/list';
 import { ProblemAlert } from '@/components/problem-alert';
 import { FactChips, PanelSection, RecordSheet, TotalsGrid } from '@/components/record-sheet';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnSpec } from '@/lib/column-layout';
 import { printFormatParam, usePrintFormat } from '@/lib/print-format';
 import { PrintFormatToggle } from '@/components/print-format-toggle';
 import { formatUbDateTime } from '@/lib/dayjs';
@@ -21,6 +16,22 @@ import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { type SaleDetail, usePosMutations, useSale } from './api';
 import { EbarimtBadge, SaleKindBadge } from './badges';
+
+/**
+ * A sale's lines (ADR-0119): 49.75rem in all, so the sheet shows every column from a till PC's
+ * width (54rem inside it). An upright tablet's sheet (40rem) lets the line's VAT and then its
+ * discount go (36.75), which the tiles above total, instead of scrolling past the line's amount
+ * (ADR-0201). The unit stands after its quantity.
+ */
+const LINE_COLUMNS: readonly ColumnSpec[] = [
+  { key: 'product', kind: 'text', min: 10 },
+  { key: 'qty', kind: 'qty', width: 6.75 },
+  { key: 'unitPrice', kind: 'money', width: 6.75 },
+  { key: 'discount', kind: 'money', width: 6, drop: 2 },
+  { key: 'vat', kind: 'money', width: 7, drop: 1 },
+  { key: 'lineTotal', kind: 'money', width: 7.25 },
+  { key: 'returned', kind: 'qty', width: 6 },
+];
 
 /** One sale or return in the panel (`?sale=`): facts, totals, lines, tenders, shortfalls, returns. */
 export function SalePanel({ saleId, onClose }: { saleId: number | null; onClose: () => void }) {
@@ -211,12 +222,11 @@ function SaleBody({ sale }: { sale: SaleDetail }) {
       {sale.creditExcess !== null ? <CreditExcess sale={sale} /> : null}
       <PanelSection title={t('pos.sales.sections.lines')}>
         <div className="overflow-x-auto rounded-lg border border-border">
-          <Table>
+          <ListTable columns={LINE_COLUMNS}>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-full">{t('pos.fields.product')}</TableHead>
+                <TableHead>{t('pos.fields.product')}</TableHead>
                 <TableHead className="text-right">{t('pos.fields.qty')}</TableHead>
-                <TableHead>{t('pos.fields.unit')}</TableHead>
                 <TableHead className="text-right">{t('pos.fields.unitPrice')}</TableHead>
                 <TableHead className="text-right">{t('pos.fields.discount')}</TableHead>
                 <TableHead className="text-right">{t('pos.fields.vat')}</TableHead>
@@ -231,12 +241,13 @@ function SaleBody({ sale }: { sale: SaleDetail }) {
             <TableBody>
               {sale.lines.map((line) => (
                 <TableRow key={line.id}>
-                  <TableCell className="min-w-48 whitespace-normal">
+                  <TableCell className="whitespace-normal">
                     <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
                     {line.productName}
                   </TableCell>
-                  <TableCell className="text-right font-mono">{formatQty(line.qty)}</TableCell>
-                  <TableCell>{line.uomName}</TableCell>
+                  <TableCell className="text-right">
+                    <span className="font-mono">{formatQty(line.qty)}</span> {line.uomName}
+                  </TableCell>
                   <TableCell className="text-right font-mono">
                     {formatTugrik(line.unitPrice)}
                   </TableCell>
@@ -257,7 +268,7 @@ function SaleBody({ sale }: { sale: SaleDetail }) {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </ListTable>
         </div>
       </PanelSection>
       {/* Sections with nothing to show are left out rather than saying so (ADR-0066). */}

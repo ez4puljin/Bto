@@ -26,7 +26,7 @@ export const LIST_COLUMNS = [
 export type ListColumn = (typeof LIST_COLUMNS)[number];
 export const LOCKED_COLUMNS: readonly ListColumn[] = ['number'];
 /** What a user who never chose sees hidden, so the list fits a laptop beside the panel (ADR-0066). */
-const DEFAULT_HIDDEN: readonly ListColumn[] = ['createdBy', 'channel', 'createdAt'];
+export const DEFAULT_HIDDEN: readonly ListColumn[] = ['createdBy', 'channel', 'createdAt'];
 /** On a screen of 1600px or more every column fits (ADR-0119). */
 const WIDE_DEFAULT_HIDDEN: readonly ListColumn[] = [];
 

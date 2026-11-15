@@ -20,7 +20,10 @@ export type SetExpiryFilter = (
 /** A filter's long list of choices keeps its own scroll, so the panel stays short. */
 const LONG_LIST = 'flex max-h-56 flex-col gap-0.5 overflow-y-auto';
 
-/** The list's left side from `lg`, like the supplier list's (owner 2026-11-06). */
+/**
+ * The list's left side, like the supplier list's (owner 2026-11-06). From the laptops up (`xl`,
+ * ADR-0201): beside it a till PC's 1024px left the table 39rem of the 56 its columns need.
+ */
 export function ExpiryFilterPanel(props: {
   filter: ExpiryFilter;
   options: ExpiryFilterOptions;
@@ -36,7 +39,7 @@ export function ExpiryFilterPanel(props: {
     </p>
   ) : null;
   return (
-    <aside aria-label={t('expiry.filters.label')} className="hidden w-64 shrink-0 lg:block">
+    <aside aria-label={t('expiry.filters.label')} className="hidden w-64 shrink-0 xl:block">
       <ListCard scroll beside>
         <div className="flex items-center gap-2 px-3 py-2.5 text-sm font-semibold">
           <SlidersHorizontal aria-hidden className="size-4 text-muted-foreground" />
@@ -127,7 +130,7 @@ export function ExpiryFilterPanel(props: {
   );
 }
 
-/** The same filters in the filter bar below `lg`, where the left side gives way. */
+/** The same filters in the filter bar below `xl`, where the left side gives way. */
 export function ExpiryFilterSelects(props: {
   filter: ExpiryFilter;
   options: ExpiryFilterOptions;
@@ -138,7 +141,7 @@ export function ExpiryFilterSelects(props: {
   return (
     <>
       <NativeSelect
-        className="lg:hidden"
+        className="xl:hidden"
         variant="filter"
         active={filter.view !== 'ACTIVE'}
         aria-label={t('expiry.filters.view')}
@@ -154,7 +157,7 @@ export function ExpiryFilterSelects(props: {
         ))}
       </NativeSelect>
       <NativeSelect
-        className="lg:hidden"
+        className="xl:hidden"
         variant="filter"
         aria-label={t('expiry.filters.supplier')}
         value={filter.supplierId ?? ''}
@@ -168,7 +171,7 @@ export function ExpiryFilterSelects(props: {
         ))}
       </NativeSelect>
       <NativeSelect
-        className="lg:hidden"
+        className="xl:hidden"
         variant="filter"
         aria-label={t('expiry.filters.warehouse')}
         value={filter.warehouseId ?? ''}
@@ -182,7 +185,7 @@ export function ExpiryFilterSelects(props: {
         ))}
       </NativeSelect>
       <NativeSelect
-        className="lg:hidden"
+        className="xl:hidden"
         variant="filter"
         aria-label={t('expiry.filters.author')}
         value={filter.createdByName ?? ''}
@@ -196,7 +199,7 @@ export function ExpiryFilterSelects(props: {
         ))}
       </NativeSelect>
       <NativeSelect
-        className="lg:hidden"
+        className="xl:hidden"
         variant="filter"
         aria-label={t('expiry.filters.liability')}
         value={filter.liability ?? ''}

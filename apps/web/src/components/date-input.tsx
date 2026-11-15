@@ -178,8 +178,9 @@ function Field(props: {
           aria-label={t('common.calendar.open')}
           title={t('common.calendar.open')}
           className={cn(
-            'grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
-            !filter && 'absolute top-1/2 right-1.5 -translate-y-1/2',
+            // A finger's reach around the 28px drawing (ADR-0201).
+            'grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 touch:after:absolute touch:after:-inset-2',
+            filter ? 'touch:relative' : 'absolute top-1/2 right-1.5 -translate-y-1/2',
           )}
         >
           {props.kind === 'time' ? (
@@ -195,7 +196,7 @@ function Field(props: {
           sideOffset={6}
           collisionPadding={8}
           onOpenAutoFocus={(event) => event.preventDefault()}
-          className="z-50 w-72 rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-popover"
+          className="z-50 w-72 rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-popover touch:w-[22rem]"
         >
           {props.calendar(() => setOpen(false))}
         </Popover.Content>
@@ -215,7 +216,7 @@ function Field(props: {
       <span
         data-active={draft.value ? 'true' : undefined}
         className={cn(
-          'group inline-flex h-8.5 items-center gap-2 rounded-full border border-border bg-background pr-1 pl-3 text-[0.8125rem] font-medium shadow-control focus-within:border-ring focus-within:ring-1 focus-within:ring-ring hover:bg-accent data-[active=true]:border-transparent data-[active=true]:bg-secondary data-[active=true]:text-secondary-foreground',
+          'group inline-flex h-8.5 items-center gap-2 rounded-full border border-border bg-background pr-1 pl-3 text-[0.8125rem] font-medium shadow-control touch:h-11 focus-within:border-ring focus-within:ring-1 focus-within:ring-ring hover:bg-accent data-[active=true]:border-transparent data-[active=true]:bg-secondary data-[active=true]:text-secondary-foreground',
           field.className,
         )}
       >
@@ -317,7 +318,7 @@ function CalendarHeader(props: {
   next: { label: string; onClick: () => void; disabled?: boolean };
 }) {
   const arrow =
-    'grid size-8 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40';
+    'grid size-8 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40 touch:size-11';
   return (
     <div className="mb-2 flex items-center justify-between gap-1">
       <button
@@ -496,7 +497,7 @@ function DayCalendar(props: {
                 })}
                 onClick={() => props.onPick(date)}
                 className={cn(
-                  'grid h-7.5 place-items-center rounded-md text-[0.8125rem] tabular-nums hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-35',
+                  'grid h-7.5 place-items-center rounded-md text-[0.8125rem] tabular-nums hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-35 touch:h-11',
                   weekdayIndex(index) >= 5 && !selected && 'text-muted-foreground',
                   date === today && !selected && 'font-semibold text-link ring-1 ring-link/40',
                   selected && 'bg-primary font-semibold text-primary-foreground hover:bg-primary',
@@ -557,7 +558,7 @@ function MonthGrid(props: {
               aria-pressed={selected}
               onClick={() => props.onPick(month)}
               className={cn(
-                'h-9 rounded-md text-[0.8125rem] hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-35',
+                'h-9 rounded-md text-[0.8125rem] hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-35 touch:h-11',
                 selected && 'bg-primary font-semibold text-primary-foreground hover:bg-primary',
               )}
             >

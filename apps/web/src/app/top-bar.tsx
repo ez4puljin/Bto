@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, ChevronDown, LayoutGrid, LogOut, Search, Star, UserRound } from 'lucide-react';
 import type { Permission } from '@tugeel/shared/auth';
-import { type Ref, useMemo } from 'react';
+import { type Ref, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { useAuthSession, useAuthState } from '@/app/auth-context';
@@ -24,9 +24,10 @@ const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigat
 
 /**
  * The bar above every signed-in page (ADR-0114, after the owner's erxes example): the brand, «Бүх
- * цэс» (the drawer with every page), the permitted modules as menus of their pages (from `lg`), and
- * at the right the search (Ctrl/⌘+K), the starred pages, the bell, the assistant, «Систем» and
- * the account. The module of the open page is lit.
+ * цэс» (the drawer with every page), the permitted modules as menus of their pages, and at the
+ * right the search (Ctrl/⌘+K), the starred pages, the bell, the assistant, «Систем» and the
+ * account. The module of the open page is lit. The modules the window has no room for fold into
+ * «Бусад» (ADR-0201): nine of them need about 1220px, a till PC and a tablet have 1024 or 768.
  */
 export function TopBar(props: {
   menuOpen: boolean;
@@ -46,6 +47,9 @@ export function TopBar(props: {
   const business = modules.filter((module) => !module.tool);
   const system = modules.find((module) => module.key === 'system');
   const ai = modules.find((module) => module.key === 'ai');
+  const fitting = useFitting(business.length);
+  const { fits } = fitting;
+  const folded = business.slice(fits);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-md print:hidden">
@@ -75,18 +79,38 @@ export function TopBar(props: {
           {t('app.name')}
         </Link>
         <nav
+          ref={fitting.nav}
           aria-label={t('shell.modules')}
-          className="hidden min-w-0 items-center gap-0.5 lg:flex"
+          className="hidden min-w-0 flex-1 items-center gap-0.5 md:flex"
         >
-          {business.map((module) => (
-            <ModuleMenu key={module.key} module={module} active={module.key === current} />
-          ))}
+          {/* Cut to the modules that fit; the rest lie beyond its edge, out of sight. */}
+          <div
+            ref={fitting.row}
+            style={fitting.width === null ? undefined : { width: fitting.width }}
+            className="flex shrink-0 gap-0.5 overflow-hidden"
+          >
+            {business.map((module, index) => (
+              <ModuleMenu
+                key={module.key}
+                module={module}
+                active={module.key === current}
+                folded={index >= fits}
+              />
+            ))}
+          </div>
+          {folded.length > 0 ? (
+            <MoreModules
+              buttonRef={fitting.more}
+              modules={folded}
+              active={folded.some((module) => module.key === current)}
+            />
+          ) : null}
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-0.5">
           {/* A pill with its shortcut from 2200 px (nine modules need the room at 1366 and 1536 since ADR-0144; the modules show their icons and arrows from there too), an icon button below. */}
           <button
             type="button"
-            className="grid size-9 place-items-center rounded-full text-foreground transition-colors duration-200 hover:bg-black/[0.05] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none min-[2200px]:mr-1 min-[2200px]:flex min-[2200px]:h-8.5 min-[2200px]:w-44 min-[2200px]:items-center min-[2200px]:gap-2 min-[2200px]:bg-black/[0.05] min-[2200px]:px-3 min-[2200px]:text-[0.8125rem] min-[2200px]:text-muted-foreground min-[2200px]:hover:bg-black/[0.08]"
+            className="grid size-9 place-items-center rounded-full text-foreground touch:size-11 transition-colors duration-200 hover:bg-black/[0.05] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none min-[2200px]:mr-1 min-[2200px]:flex min-[2200px]:h-8.5 min-[2200px]:w-44 min-[2200px]:items-center min-[2200px]:gap-2 min-[2200px]:bg-black/[0.05] min-[2200px]:px-3 min-[2200px]:text-[0.8125rem] min-[2200px]:text-muted-foreground min-[2200px]:hover:bg-black/[0.08]"
             aria-keyshortcuts="Control+K Meta+K"
             title={t('shell.search')}
             onClick={props.onSearch}
@@ -125,17 +149,113 @@ export function TopBar(props: {
 }
 
 /**
+ * Which of the bar's modules fit it (ADR-0201). Every module is laid out in one row that never
+ * wraps; their widths are added up against the room the bar leaves, less «Бусад» when something
+ * must fold; the row is then cut to the ones that fit, so «Бусад» stands right after them and
+ * the rest lie out of sight. Measured again whenever the room changes. Without layout (a test)
+ * every width is 0 and everything fits.
+ */
+function useFitting(count: number) {
+  const nav = useRef<HTMLElement>(null);
+  const row = useRef<HTMLDivElement>(null);
+  const more = useRef<HTMLButtonElement>(null);
+  const [fit, setFit] = useState<{ count: number; width: number | null }>({ count, width: null });
+  useLayoutEffect(() => {
+    const outer = nav.current;
+    const box = row.current;
+    if (!outer || !box) return;
+    const measure = () => {
+      const widths = (Array.from(box.children) as HTMLElement[]).map((item) => item.offsetWidth);
+      const gap = Number.parseFloat(getComputedStyle(box).columnGap) || 0;
+      const room = outer.clientWidth;
+      const all = widths.reduce((sum, width) => sum + width, 0) + gap * (widths.length - 1);
+      let next = { count: widths.length, width: null as number | null };
+      if (all > room) {
+        // «Бусад» itself: its own width once it is drawn, about 6rem before that.
+        const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+        const reserved = (more.current?.offsetWidth ?? 6 * rem) + gap;
+        let used = 0;
+        let fitting = 0;
+        for (const width of widths) {
+          const wanted = used + (fitting > 0 ? gap : 0) + width;
+          if (wanted > room - reserved) break;
+          used = wanted;
+          fitting += 1;
+        }
+        next = { count: fitting, width: used };
+      }
+      setFit((last) => (last.count === next.count && last.width === next.width ? last : next));
+    };
+    measure();
+    // A test may have taken the observer away (list.tsx guards the same way).
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(outer);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+    // Measured again once «Бусад» is drawn: its real width replaces the guess.
+  }, [count, fit.count]);
+  return { nav, row, more, fits: Math.min(fit.count, count), width: fit.width };
+}
+
+const MODULE_TRIGGER =
+  'flex h-8.5 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm font-medium touch:h-11 whitespace-nowrap text-foreground/80 transition-colors duration-200 hover:bg-black/[0.04] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset aria-expanded:bg-black/[0.05] aria-expanded:text-foreground min-[2200px]:gap-1.5 min-[2200px]:px-3';
+const MODULE_TRIGGER_ACTIVE = 'bg-secondary text-secondary-foreground hover:bg-secondary';
+
+/** «Бусад»: the modules the bar has no room for, each opening its own page of tiles. */
+function MoreModules({
+  modules,
+  active,
+  buttonRef,
+}: {
+  modules: VisibleModule[];
+  active: boolean;
+  buttonRef: Ref<HTMLButtonElement>;
+}) {
+  const { t } = useTranslation();
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button
+          ref={buttonRef}
+          type="button"
+          className={cn(MODULE_TRIGGER, active && MODULE_TRIGGER_ACTIVE)}
+        >
+          {t('shell.moreModules')}
+          <ChevronDown aria-hidden className="size-3.5 shrink-0 opacity-60" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-52 p-1.5">
+        {modules.map((module) => (
+          <DropdownMenuItem key={module.key} asChild>
+            <Link to={modulePath(module.key)}>
+              <module.icon className="text-primary" />
+              <span className="truncate">{t(module.label)}</span>
+            </Link>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/**
  * A module's menu: one column per group (a group of one module has no heading), its pages with
- * their icons, and the module's own page at the foot.
+ * their icons, and the module's own page at the foot. `folded`: the bar has no room for it, so it
+ * lies out of sight and out of the keyboard's way until the window widens.
  */
 function ModuleMenu({
   module,
   active,
   iconOnly = false,
+  folded = false,
 }: {
   module: VisibleModule;
   active: boolean;
   iconOnly?: boolean;
+  folded?: boolean;
 }) {
   const { t } = useTranslation();
   const label = t(module.label);
@@ -156,10 +276,8 @@ function ModuleMenu({
         ) : (
           <button
             type="button"
-            className={cn(
-              'flex h-8.5 items-center gap-1 rounded-full px-2.5 text-sm min-[2200px]:gap-1.5 min-[2200px]:px-3 font-medium whitespace-nowrap text-foreground/80 transition-colors duration-200 hover:bg-black/[0.04] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none aria-expanded:bg-black/[0.05] aria-expanded:text-foreground',
-              active && 'bg-secondary text-secondary-foreground hover:bg-secondary',
-            )}
+            inert={folded ? true : undefined}
+            className={cn(MODULE_TRIGGER, active && MODULE_TRIGGER_ACTIVE)}
           >
             <module.icon aria-hidden className="hidden size-4 shrink-0 min-[2200px]:block" />
             {label}
@@ -294,7 +412,7 @@ function AccountMenu() {
         <button
           type="button"
           title={me.fullName}
-          className="ml-1 grid size-8 shrink-0 place-items-center rounded-full bg-secondary text-xs font-semibold text-secondary-foreground transition-shadow hover:ring-2 hover:ring-secondary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+          className="ml-1 grid size-8 shrink-0 place-items-center rounded-full bg-secondary touch:relative touch:after:absolute touch:after:-inset-1.5 text-xs font-semibold text-secondary-foreground transition-shadow hover:ring-2 hover:ring-secondary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
         >
           <span aria-hidden>{initials}</span>
           <span className="sr-only">{me.fullName}</span>

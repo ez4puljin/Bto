@@ -132,7 +132,12 @@ export function SupplierTicks(props: {
         ))}
       </div>
       <ProblemAlert problem={problemFromError(candidates.error)} onRetry={candidates.refetch} />
-      <div className="max-h-72 overflow-y-auto rounded-lg border border-border">
+      {/*
+        `relative`: each tick's hidden form input is placed inside the list, so the list scrolls
+        it; unplaced, they stretched the dialog's own scroll by the whole list. The height gives
+        way in a short window (ADR-0201): the dialog around it is up to 22rem, 2rem its margins.
+      */}
+      <div className="relative max-h-[min(18rem,calc(100svh-24rem))] overflow-y-auto rounded-lg border border-border">
         <ul className="flex flex-col divide-y divide-border/80">
           {listed.map((row) => {
             const inOrder = props.exclude?.has(row.id) ?? false;

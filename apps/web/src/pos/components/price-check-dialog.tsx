@@ -36,7 +36,13 @@ export function PriceCheckDialog(props: {
   const { t } = useTranslation();
   return (
     <Dialog open={props.open} onOpenChange={(open) => (open ? undefined : props.onClose())}>
-      <DialogContent size="lg" className="gap-3" onCloseAutoFocus={props.onCloseAutoFocus}>
+      <DialogContent
+        size="lg"
+        className="gap-3"
+        // A lookup: what was typed or scanned is nothing to lose, so closing never asks.
+        guard={false}
+        onCloseAutoFocus={props.onCloseAutoFocus}
+      >
         <DialogHeader>
           <DialogTitle>{t('posKiosk.priceCheck.title')}</DialogTitle>
           <DialogDescription>{t('posKiosk.priceCheck.description')}</DialogDescription>
@@ -76,7 +82,8 @@ function PriceCheckPanel() {
   };
 
   return (
-    <div className="space-y-3">
+    // `min-w-0`: a long product name is cut in its row, it never widens the dialog's one column.
+    <div className="min-w-0 space-y-3">
       <div className="relative">
         <ScanBarcode
           aria-hidden

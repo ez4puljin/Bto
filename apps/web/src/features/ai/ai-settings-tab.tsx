@@ -567,12 +567,19 @@ function RightsCard() {
       <CardContent className="flex flex-col gap-3 px-0">
         <ProblemAlert problem={problemFromError(roles.error ?? mutations.updateRole.error)} />
         <div className="overflow-x-auto">
+          {/*
+           * Nine columns in a tablet's 41rem (ADR-0201): the rights stand closer, a head of two
+           * words and a long role name take two lines, so «Санхүү» is not cut at the card's edge.
+           */}
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>{t('aiSettings.rights.role')}</TableHead>
                 {rights.map((right) => (
-                  <TableHead key={right.code} className="text-center">
+                  <TableHead
+                    key={right.code}
+                    className="px-2 text-center leading-tight whitespace-normal"
+                  >
                     {right.label}
                   </TableHead>
                 ))}
@@ -584,11 +591,11 @@ function RightsCard() {
                   role.code === 'ADMIN' ? t('roles.system.ADMIN') : (role.name ?? '');
                 return (
                   <TableRow key={role.id}>
-                    <TableCell className="font-medium">
+                    <TableCell className="font-medium whitespace-normal">
                       <RoleName role={role} />
                     </TableCell>
                     {rights.map((right) => (
-                      <TableCell key={right.code}>
+                      <TableCell key={right.code} className="px-2">
                         <div className="flex justify-center">
                           <Checkbox
                             aria-label={t('aiSettings.rights.toggle', {

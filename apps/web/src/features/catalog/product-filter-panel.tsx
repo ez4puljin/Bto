@@ -52,7 +52,9 @@ const ALL_SECTIONS: readonly ProductPanelSection[] = [
  * counts, then every filter with its choices in sight. A filter whose choices cannot be listed
  * (suppliers, a price range, chosen dates) opens its dialog. It writes what the list already reads
  * from the address, so a link and «back» keep working. Another list of products (the stock list,
- * owner 2026-11-10) shows the sections that make sense for it, in this order.
+ * owner 2026-11-10) shows the sections that make sense for it, in this order. It stands beside
+ * the list from `xl`, the laptops; a narrower window (a till PC, a tablet) keeps the list whole
+ * and filters with the pills and «Шүүлтүүр» of its filter bar (`ProductFilterMenu`, ADR-0201).
  */
 export function ProductFilterPanel(props: {
   categories: readonly Category[];
@@ -84,7 +86,7 @@ export function ProductFilterPanel(props: {
   const more = (field: ProductFilterField, label: string) => (
     <button
       type="button"
-      className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-[0.8125rem] font-medium text-link hover:bg-accent"
+      className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-[0.8125rem] font-medium text-link hover:bg-accent touch:min-h-11"
       onClick={() => setDialog(field)}
     >
       <SlidersHorizontal aria-hidden className="size-3.5" />
@@ -114,7 +116,8 @@ export function ProductFilterPanel(props: {
   );
 
   return (
-    <aside aria-label={t('catalog.products.panel.label')} className="hidden w-72 shrink-0 lg:block">
+    // Beside the list from `xl`: on a till PC it took a third of the window (ADR-0201).
+    <aside aria-label={t('catalog.products.panel.label')} className="hidden w-72 shrink-0 xl:block">
       <ListCard scroll beside>
         {shown.has('category') ? (
           <Section title={t('catalog.product.category')} defaultOpen>
@@ -141,7 +144,7 @@ export function ProductFilterPanel(props: {
             </div>
             <Link
               to="/segments"
-              className="rounded-md px-2 py-1 text-[0.8125rem] font-medium text-link hover:bg-accent"
+              className="flex items-center rounded-md px-2 py-1 text-[0.8125rem] font-medium text-link hover:bg-accent touch:min-h-11"
             >
               {t('catalog.products.panel.manageSegments')}
             </Link>

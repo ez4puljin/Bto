@@ -253,10 +253,13 @@ export function StaffDetailsCard({ staff, canManage }: { staff: HrStaff; canMana
   const { t } = useTranslation();
   return (
     <DetailCard
+      // A container: its facts run two to a row where the card is at least 44rem wide.
+      className="@container"
       title={t('hr.community.details.title')}
       canEdit={canManage}
       view={
         <FieldList
+          columns={2}
           items={[
             { label: t('hr.community.details.birthDate'), value: staff.birthDate },
             {

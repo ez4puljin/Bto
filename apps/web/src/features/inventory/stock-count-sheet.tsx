@@ -1,6 +1,6 @@
 import { addDays, businessDate, businessMonthStart } from '@tugeel/shared/time';
 import { ClipboardCheck, FileDown, Printer } from 'lucide-react';
-import { Fragment, useDeferredValue, useMemo, useState } from 'react';
+import { Fragment, type ReactNode, useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { EmptyState, FilterBar, ListCard, SearchField, SegmentedControl } from '@/components/list';
@@ -142,48 +142,10 @@ export function CountSheet({
         </p>
       ) : null}
 
-      <FilterBar
-        className="mb-0"
-        end={
-          <>
-            <span className="text-[0.8125rem] text-muted-foreground">
-              {t('inventory.counts.sheet.reportFor')}
-            </span>
-            <WarehouseSelect
-              variant="filter"
-              label={t('inventory.counts.sheet.reportWarehouse')}
-              options={warehouses.options}
-              value={reportWarehouse}
-              onChange={setReportWarehouse}
-              emptyLabel={t('inventory.allWarehouses')}
-            />
-            <DateRangeFilter
-              label={t('inventory.counts.sheet.period')}
-              fromLabel={t('inventory.counts.variance.from')}
-              toLabel={t('inventory.counts.variance.to')}
-              from={from}
-              to={to}
-              onFrom={setFrom}
-              onTo={setTo}
-            />
-          </>
-        }
-      >
-        <SegmentedControl
-          name={t('inventory.counts.lines.filter')}
-          options={SHEET_FILTERS}
-          value={filter}
-          label={(value) =>
-            data
-              ? t('inventory.counts.sheet.viewCount', {
-                  view: t(`inventory.counts.sheet.views.${value}`),
-                  count: viewCount(data.totals, value),
-                })
-              : t(`inventory.counts.sheet.views.${value}`)
-          }
-          onChange={setFilter}
-        />
-      </FilterBar>
+      {/*
+        Two rows of filters down to a till PC (ADR-0201): the views with the paper, then what
+        narrows the sheet. The product report's place and period stand in the report they steer.
+      */}
       <FilterBar
         className="mb-0"
         end={
@@ -203,7 +165,24 @@ export function CountSheet({
           </>
         }
       >
+        <SegmentedControl
+          name={t('inventory.counts.lines.filter')}
+          options={SHEET_FILTERS}
+          value={filter}
+          label={(value) =>
+            data
+              ? t('inventory.counts.sheet.viewCount', {
+                  view: t(`inventory.counts.sheet.views.${value}`),
+                  count: viewCount(data.totals, value),
+                })
+              : t(`inventory.counts.sheet.views.${value}`)
+          }
+          onChange={setFilter}
+        />
+      </FilterBar>
+      <FilterBar className="mb-0">
         <SearchField
+          className="sm:w-56 xl:w-72"
           aria-label={t('common.search')}
           placeholder={t('inventory.counts.searchProduct')}
           value={text}
@@ -211,7 +190,7 @@ export function CountSheet({
         />
         <NativeSelect
           variant="filter"
-          className="max-w-60"
+          className="max-w-52 xl:max-w-60"
           aria-label={t('inventory.counts.sheet.supplier')}
           value={supplierId}
           onChange={(event) => setSupplierId(event.target.value)}
@@ -225,7 +204,7 @@ export function CountSheet({
         </NativeSelect>
         <NativeSelect
           variant="filter"
-          className="max-w-60"
+          className="max-w-52 xl:max-w-60"
           aria-label={t('inventory.counts.categories')}
           value={categoryId}
           onChange={(event) => setCategoryId(event.target.value)}
@@ -255,20 +234,30 @@ export function CountSheet({
 
       <ProblemAlert problem={problemFromError(sheet.error)} onRetry={sheet.refetch} />
       <ListCard scroll>
-        <Table>
+        {/*
+          Below the laptops the nine columns stand closer (0.5rem a side), the code, the stock, the
+          price and the amount keep what their values need and the reason loses its 22rem: the
+          sheet then fits a till PC's card with the reason's field on it (ADR-0201). The name takes
+          what is left and breaks.
+        */}
+        <Table className="max-xl:[&_td]:px-2 max-xl:[&_th]:px-2">
           <TableHeader className="sticky top-0 z-10 bg-card">
             <TableRow>
               <TableHead className="w-12 text-right">{t('inventory.counts.sheet.no')}</TableHead>
-              <TableHead className="w-28">{t('inventory.counts.sheet.code')}</TableHead>
+              <TableHead className="w-28 max-xl:w-20">{t('inventory.counts.sheet.code')}</TableHead>
               <TableHead>{t('inventory.counts.sheet.name')}</TableHead>
-              <TableHead className="w-24 text-right">{t('inventory.counts.expected')}</TableHead>
+              <TableHead className="w-24 text-right max-xl:w-20">
+                {t('inventory.counts.expected')}
+              </TableHead>
               <TableHead className="w-24 text-right">{t('inventory.counts.counted')}</TableHead>
               <TableHead className="w-20 text-right">{t('inventory.counts.difference')}</TableHead>
-              <TableHead className="w-24 text-right">{t('inventory.counts.sheet.price')}</TableHead>
-              <TableHead className="w-28 text-right">
+              <TableHead className="w-24 text-right max-xl:w-[5.25rem]">
+                {t('inventory.counts.sheet.price')}
+              </TableHead>
+              <TableHead className="w-28 text-right max-xl:w-[6.5rem]">
                 {t('inventory.counts.sheet.amount')}
               </TableHead>
-              <TableHead className="w-[22rem]">{t('inventory.counts.sheet.reason')}</TableHead>
+              <TableHead className="xl:w-[22rem]">{t('inventory.counts.sheet.reason')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -317,7 +306,8 @@ export function CountSheet({
             ))}
             {rows.length > 0 ? (
               <TableRow className="bg-muted/60 font-medium hover:bg-muted/60">
-                <TableCell colSpan={5} className="text-right">
+                {/* Below the laptops it breaks too: unbroken, it set the width of its five columns. */}
+                <TableCell colSpan={5} className="text-right max-xl:whitespace-normal">
                   {t('inventory.counts.sheet.shownTotal', {
                     surplusQty: signedQty(shown.surplusQty),
                     surplusAmount: signedMnt(shown.surplusAmount),
@@ -363,6 +353,27 @@ export function CountSheet({
             from={from ?? addDays(businessDate(), -30)}
             to={to ?? businessDate()}
             onClose={() => setOpened(null)}
+            steer={
+              <>
+                <WarehouseSelect
+                  variant="filter"
+                  label={t('inventory.counts.sheet.reportWarehouse')}
+                  options={warehouses.options}
+                  value={reportWarehouse}
+                  onChange={setReportWarehouse}
+                  emptyLabel={t('inventory.allWarehouses')}
+                />
+                <DateRangeFilter
+                  label={t('inventory.counts.sheet.period')}
+                  fromLabel={t('inventory.counts.variance.from')}
+                  toLabel={t('inventory.counts.variance.to')}
+                  from={from}
+                  to={to}
+                  onFrom={setFrom}
+                  onTo={setTo}
+                />
+              </>
+            }
           />
         ) : null}
       </Dialog>
@@ -430,7 +441,8 @@ export function SheetTiles({ totals }: { totals: StockCountSheetTotals }) {
     },
   ];
   return (
-    <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+    // One row from a till PC up (ADR-0201): two of them stood between the page's top and the sheet.
+    <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
       {tiles.map((tile) => (
         <div
           key={tile.label}
@@ -473,7 +485,8 @@ function SheetRow(props: {
       <TableCell {...open} className={cn(open.className, 'font-mono text-primary')}>
         {row.sku}
       </TableCell>
-      <TableCell {...open}>
+      {/* Below the laptops a name breaks instead of pushing the reason's field off the card. */}
+      <TableCell {...open} className={cn(open.className, 'max-xl:whitespace-normal')}>
         <span className="font-medium">{row.name}</span>
         <span className="ml-2 inline-flex flex-wrap gap-1 align-middle">
           {row.listed ? null : <Badge variant="outline">{t('inventory.counts.sheet.added')}</Badge>}
@@ -574,7 +587,7 @@ function CountedInput({ countId, row }: { countId: number; row: StockCountSheetR
       aria-label={t('inventory.counts.sheet.countedFor', { name: row.name })}
       aria-invalid={failed || undefined}
       title={failed ? t('inventory.counts.sheet.countedFailed') : undefined}
-      className="ml-auto h-8 w-24 text-right tabular-nums"
+      className="ml-auto h-8 w-24 text-right tabular-nums max-xl:w-20"
       inputMode="decimal"
       value={value}
       onChange={(event) => setValue(event.target.value)}
@@ -628,13 +641,17 @@ function ReasonInput({ countId, row }: { countId: number; row: StockCountSheetRo
 
 const time = (value: string) => formatUbDateTime(Date.parse(value));
 
-/** One product: its stock report for the chosen place and period, and who counted it. */
+/**
+ * One product: its stock report for the chosen place and period, and who counted it. `steer`: the
+ * place and the period, chosen where they show; the sheet keeps them from product to product.
+ */
 function ProductReportDialog(props: {
   countId: number;
   row: StockCountSheetRow;
   warehouseId: number | undefined;
   from: string;
   to: string;
+  steer: ReactNode;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -651,7 +668,8 @@ function ProductReportDialog(props: {
   const lines = report.data?.rows ?? [];
   const closing = lines.at(-1)?.balanceQty ?? report.data?.openingQty ?? null;
   return (
-    <DialogContent closeLabel={t('common.close')} size="xl">
+    // Nothing here is work to lose: the place and the period are the sheet's, kept as chosen.
+    <DialogContent closeLabel={t('common.close')} size="xl" guard={false}>
       <DialogHeader>
         <DialogTitle>{row.name}</DialogTitle>
         <DialogDescription>
@@ -665,7 +683,10 @@ function ProductReportDialog(props: {
       <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto">
         <ProblemAlert problem={problemFromError(report.error) ?? problemFromError(entries.error)} />
         <section className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium">{t('inventory.counts.line.report')}</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="mr-auto text-sm font-medium">{t('inventory.counts.line.report')}</h3>
+            {props.steer}
+          </div>
           <Table>
             <TableHeader>
               <TableRow>

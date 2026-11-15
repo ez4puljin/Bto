@@ -22,9 +22,16 @@ import {
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
+import { FactChips } from '@/components/record-sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -36,6 +43,7 @@ import { useSetParam } from '@/lib/search-params';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
+import { cn } from '@/lib/utils';
 import { randomUuid } from '@/lib/uuid';
 import {
   type HrMessage,
@@ -43,6 +51,7 @@ import {
   useEngagementMutations,
   useHrMessages,
 } from '../engagement-api';
+import { ROW_TITLE } from '../hr-helpers';
 import {
   emptyMoment,
   MESSAGE_STATES,
@@ -62,21 +71,25 @@ const STATE_VARIANT = {
 const WHEN_MODES = ['NOW', 'LATER'] as const;
 type WhenMode = (typeof WHEN_MODES)[number];
 
+// A notice needs 48.25rem and news, with its category, 55.25rem: sized on a till PC (55.5rem), the
+// count («120 / 120»), the minute-long date and the pill at their own widths. Narrower, the author
+// goes first (47.25rem for news), then the category: both lists are 40.25rem on a tablet upright
+// (40.5rem), and the row's dialog says what left.
 const NOTICE_COLUMNS: readonly ColumnSpec[] = [
-  { key: 'title', kind: 'text', weight: 4, min: 16 },
-  { key: 'reads', kind: 'count', width: 7 },
-  { key: 'author', kind: 'text', weight: 1, min: 8 },
-  { key: 'when', kind: 'datetime' },
-  { key: 'state', kind: 'status' },
+  { key: 'title', kind: 'text', weight: 4, min: 15 },
+  { key: 'reads', kind: 'count', width: 6 },
+  { key: 'author', kind: 'text', weight: 1, min: 8, drop: 1 },
+  { key: 'when', kind: 'datetime', width: 9 },
+  { key: 'state', kind: 'status', width: 7 },
   { key: 'actions', kind: 'actions', actions: 1 },
 ];
 const NEWS_COLUMNS: readonly ColumnSpec[] = [
-  { key: 'title', kind: 'text', weight: 4, min: 16 },
-  { key: 'category', kind: 'text', weight: 1, min: 7 },
-  { key: 'reads', kind: 'count', width: 7 },
-  { key: 'author', kind: 'text', weight: 1, min: 8 },
-  { key: 'when', kind: 'datetime' },
-  { key: 'state', kind: 'status' },
+  { key: 'title', kind: 'text', weight: 4, min: 15 },
+  { key: 'category', kind: 'text', weight: 1, min: 7, drop: 2 },
+  { key: 'reads', kind: 'count', width: 6 },
+  { key: 'author', kind: 'text', weight: 1, min: 8, drop: 1 },
+  { key: 'when', kind: 'datetime', width: 9 },
+  { key: 'state', kind: 'status', width: 7 },
   { key: 'actions', kind: 'actions', actions: 1 },
 ];
 
@@ -141,20 +154,47 @@ function MessageDialog(props: { kind: HrMessageKind; onClose: () => void }) {
         <DialogHeader>
           <DialogTitle>{t(`hr.community.messages.${props.kind}.create`)}</DialogTitle>
         </DialogHeader>
-        <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
+        {/* The form goes by its own width (ADR-0201): news' category beside its title and the two
+            short choices, to whom and when, on one row, so the form opens with room under a
+            laptop's 600px for the people, the time or a picture (news scrolled from the start). */}
+        <form
+          className="@container flex flex-col gap-4"
+          noValidate
+          onSubmit={(event) => void submit(event)}
+        >
           <ProblemAlert problem={action.problem} />
-          <FormField
-            label={t('hr.community.messages.fields.title')}
-            htmlFor="message-title"
-            error={tried && title.trim() === '' ? 'validation.required' : undefined}
+          <div
+            className={cn(
+              'grid gap-4 *:min-w-0',
+              isNotice ? null : '@md:grid-cols-[minmax(0,1fr)_12rem]',
+            )}
           >
-            <Input
-              id="message-title"
-              maxLength={ENGAGEMENT_LIMITS.maxTitle}
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-            />
-          </FormField>
+            <FormField
+              label={t('hr.community.messages.fields.title')}
+              htmlFor="message-title"
+              error={tried && title.trim() === '' ? 'validation.required' : undefined}
+            >
+              <Input
+                id="message-title"
+                maxLength={ENGAGEMENT_LIMITS.maxTitle}
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+              />
+            </FormField>
+            {isNotice ? null : (
+              <FormField
+                label={t('hr.community.messages.fields.category')}
+                htmlFor="message-category"
+              >
+                <Input
+                  id="message-category"
+                  maxLength={ENGAGEMENT_LIMITS.maxCategory}
+                  value={category}
+                  onChange={(event) => setCategory(event.target.value)}
+                />
+              </FormField>
+            )}
+          </div>
           <FormField
             label={t('hr.community.messages.fields.body')}
             htmlFor="message-body"
@@ -168,25 +208,42 @@ function MessageDialog(props: { kind: HrMessageKind; onClose: () => void }) {
               onChange={(event) => setBody(event.target.value)}
             />
           </FormField>
-          {isNotice ? null : (
-            <FormField
-              label={t('hr.community.messages.fields.category')}
-              htmlFor="message-category"
-            >
-              <Input
-                id="message-category"
-                maxLength={ENGAGEMENT_LIMITS.maxCategory}
-                value={category}
-                onChange={(event) => setCategory(event.target.value)}
-              />
-            </FormField>
-          )}
           <PictureField
             label={t('hr.community.messages.fields.picture')}
             onChange={setImageFileId}
             onBusy={setUploading}
           />
-          <AudienceField audience={audience} showMissing={tried} />
+          <AudienceField
+            audience={audience}
+            showMissing={tried}
+            beside={
+              <div className="flex min-w-0 flex-col items-start gap-1.5">
+                <Label>{t('hr.community.messages.fields.when')}</Label>
+                <SegmentedControl
+                  name={t('hr.community.messages.fields.when')}
+                  options={WHEN_MODES}
+                  value={whenMode}
+                  label={(mode) => t(`hr.community.messages.whenModes.${mode}`)}
+                  onChange={setWhenMode}
+                />
+              </div>
+            }
+          />
+          {whenMode === 'LATER' ? (
+            <MomentField
+              id="message-moment"
+              label={t('hr.community.messages.fields.moment')}
+              required
+              min={businessDate()}
+              value={moment}
+              onChange={setMoment}
+              error={
+                tried && momentInstant(moment) === null
+                  ? t('hr.community.messages.momentMissing')
+                  : null
+              }
+            />
+          ) : null}
           {isNotice ? (
             <SettingSwitch
               id="message-popup"
@@ -196,35 +253,6 @@ function MessageDialog(props: { kind: HrMessageKind; onClose: () => void }) {
               onChange={setPopup}
             />
           ) : null}
-          <div className="flex flex-col gap-1.5">
-            <Label>{t('hr.community.messages.fields.when')}</Label>
-            <div className="flex flex-col items-start gap-2">
-              <SegmentedControl
-                name={t('hr.community.messages.fields.when')}
-                options={WHEN_MODES}
-                value={whenMode}
-                label={(mode) => t(`hr.community.messages.whenModes.${mode}`)}
-                onChange={setWhenMode}
-              />
-              {whenMode === 'LATER' ? (
-                <div className="w-full">
-                  <MomentField
-                    id="message-moment"
-                    label={t('hr.community.messages.fields.moment')}
-                    required
-                    min={businessDate()}
-                    value={moment}
-                    onChange={setMoment}
-                    error={
-                      tried && momentInstant(moment) === null
-                        ? t('hr.community.messages.momentMissing')
-                        : null
-                    }
-                  />
-                </div>
-              ) : null}
-            </div>
-          </div>
           <DialogFormFooter
             pending={mutations.createMessage.isPending}
             onCancel={close}
@@ -242,8 +270,72 @@ function MessageDialog(props: { kind: HrMessageKind; onClose: () => void }) {
 }
 
 /**
+ * A message read in full: the list shows one cut line of it, and a finger has no tooltip to ask
+ * for the rest (ADR-0201). Nothing to lose here, so it closes without a question.
+ */
+function MessageReadDialog(props: { message: HrMessage; onClose: () => void }) {
+  const { t } = useTranslation();
+  const { message } = props;
+  const state = messageState(message);
+  return (
+    <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
+      <DialogContent closeLabel={t('common.close')} size="md" guard={false}>
+        <DialogHeader>
+          <DialogTitle>{message.title}</DialogTitle>
+          <DialogDescription>
+            {message.createdByName} · {formatUbMinute(message.publishAt)}
+          </DialogDescription>
+        </DialogHeader>
+        {message.imageUrl ? (
+          <img
+            src={message.imageUrl}
+            alt=""
+            aria-hidden
+            className="max-h-40 w-full rounded-xl bg-secondary object-cover"
+          />
+        ) : null}
+        <p className="text-sm break-words whitespace-pre-wrap">{message.body}</p>
+        <FactChips
+          facts={[
+            {
+              label: t('hr.community.messages.columns.state'),
+              value: (
+                <Badge variant={STATE_VARIANT[state]}>
+                  {t(`hr.community.messages.states.${state}`)}
+                </Badge>
+              ),
+            },
+            {
+              label: t('hr.community.messages.columns.reads'),
+              value: (
+                <span className="font-mono">
+                  {t('hr.community.ofTotal', { value: message.reads, total: message.recipients })}
+                </span>
+              ),
+            },
+            {
+              label: t('hr.community.audience.label'),
+              value:
+                message.userIds.length > 0
+                  ? t('hr.community.audience.chosenCount', { count: message.userIds.length })
+                  : t('hr.community.audience.modes.ALL'),
+            },
+            ...(message.category
+              ? [{ label: t('hr.community.messages.fields.category'), value: message.category }]
+              : []),
+            ...(message.popup
+              ? [{ label: t('hr.community.messages.fields.popup'), value: t('common.yes') }]
+              : []),
+          ]}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
  * «Мэдэгдэл» and «Мэдээ» (ADR-0146 #2): what HR has sent, who has read it, when it goes out; a
- * message is never edited, it is withdrawn and written again.
+ * message is never edited, it is withdrawn and written again. A row opens the message to read.
  */
 export function MessagesPage({ kind }: { kind: HrMessageKind }) {
   const { t } = useTranslation();
@@ -257,6 +349,8 @@ export function MessagesPage({ kind }: { kind: HrMessageKind }) {
   const search = params.get('q') ?? '';
   const state = params.get('state') ?? '';
   const [withdrawing, setWithdrawing] = useState<HrMessage | null>(null);
+  const [readingId, setReadingId] = useState<number | null>(null);
+  const reading = messages.data?.find((message) => message.id === readingId) ?? null;
   const isNotice = kind === 'NOTICE';
   const rows = useMemo(() => {
     const words = search.trim().toLowerCase();
@@ -345,7 +439,16 @@ export function MessagesPage({ kind }: { kind: HrMessageKind }) {
               {rows.map((message) => {
                 const rowState = messageState(message);
                 return (
-                  <TableRow key={message.id}>
+                  // The whole row opens the message (a finger's target); the title stays the
+                  // keyboard's button, and «Буцаах» does its own work.
+                  <TableRow
+                    key={message.id}
+                    className="cursor-pointer has-[button:focus-visible]:bg-accent"
+                    onClick={(event) => {
+                      if (event.target instanceof Element && event.target.closest('button')) return;
+                      setReadingId(message.id);
+                    }}
+                  >
                     <TableCell>
                       <div className="flex min-w-0 items-center gap-2.5">
                         {message.imageUrl ? (
@@ -359,9 +462,14 @@ export function MessagesPage({ kind }: { kind: HrMessageKind }) {
                         ) : null}
                         <div className="min-w-0">
                           <p className="flex min-w-0 items-center gap-1.5">
-                            <span className="truncate font-medium" title={message.title}>
-                              {message.title}
-                            </span>
+                            <button
+                              type="button"
+                              className={cn('min-w-0', ROW_TITLE)}
+                              title={message.title}
+                              onClick={() => setReadingId(message.id)}
+                            >
+                              <span className="block truncate">{message.title}</span>
+                            </button>
                             {isNotice && message.popup ? (
                               <BellRing
                                 role="img"
@@ -434,6 +542,7 @@ export function MessagesPage({ kind }: { kind: HrMessageKind }) {
       {creating && canManage ? (
         <MessageDialog kind={kind} onClose={() => setCreating(false)} />
       ) : null}
+      {reading ? <MessageReadDialog message={reading} onClose={() => setReadingId(null)} /> : null}
       <ConfirmDialog
         open={withdrawing !== null}
         title={t('hr.community.messages.withdrawTitle')}
