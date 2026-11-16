@@ -34,7 +34,8 @@ import {
   useCustomerLedger,
 } from './api';
 import { PaymentDialog } from './payment-dialog';
-import { PeekLink, type RecordPeek, usePeek } from '@/features/reports/books/record-peek';
+import { PeekLink, type RecordPeek } from '@/features/reports/books/record-peek';
+import { usePeek } from '@/features/reports/books/use-peek';
 
 /** The ledger's columns (ADR-0119): date, kind, document number, two sides, balance after. */
 const LEDGER_COLUMNS: readonly ColumnSpec[] = [

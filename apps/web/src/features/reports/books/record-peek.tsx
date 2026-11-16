@@ -109,15 +109,6 @@ function PageSheet(props: { href: string | null; onClose: () => void; children: 
   );
 }
 
-/** A record to open over a page that is not a book report: the opener and its panel. */
-export function usePeek() {
-  const [peek, setPeek] = useState<RecordPeek | null>(null);
-  return {
-    open: setPeek,
-    panel: <RecordPeekPanel peek={peek} onClose={() => setPeek(null)} />,
-  };
-}
-
 /** A document's number that opens its record over the page, styled as the link it replaces. */
 export function PeekLink(props: {
   peek: RecordPeek;

@@ -258,6 +258,16 @@ describe('bulk product edits', () => {
       })
       .expect(201);
     await postReceipt(app, admin, (created.body as { id: number }).id);
+    // «Барааны үлдэгдэл»'s lines name the receipt by its supplier (2026-11-16).
+    const day = businessDate();
+    const lines = (
+      await http()
+        .get('/api/v1/reports/stock-balance/lines')
+        .query({ from: day, to: day, productId: cola.id })
+        .set(bearer(admin))
+        .expect(200)
+    ).body as { rows: { docType: string; partyName: string | null }[] };
+    expect(lines.rows.find((row) => row.docType === 'GR')?.partyName).toBe('АПУ ХК');
 
     const body = { productIds: [cola.id, still.id, rice.id], warehouseId: wh2.id };
     const dry = (await bulk('product-locations/bulk/home', { ...body, dryRun: true })).body;

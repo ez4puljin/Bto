@@ -69,7 +69,8 @@ import {
 import { SourceBadge } from './badges';
 import { IssueAccountsDialog } from './issue-accounts-dialog';
 import { StockCountAccountsDialog } from './stock-count-accounts-dialog';
-import { PeekLink, usePeek } from '@/features/reports/books/record-peek';
+import { PeekLink } from '@/features/reports/books/record-peek';
+import { usePeek } from '@/features/reports/books/use-peek';
 
 const CODE = /^[0-9A-Za-z][0-9A-Za-z._-]{0,15}$/;
 const isRole = (value: string): value is GlRole => GL_ROLES.some((role) => role === value);

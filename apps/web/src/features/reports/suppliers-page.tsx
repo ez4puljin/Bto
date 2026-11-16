@@ -56,7 +56,8 @@ import {
   ROW_NAME,
 } from './report-kit';
 import { ReportViews } from './report-views';
-import { PeekLink, usePeek } from './books/record-peek';
+import { PeekLink } from './books/record-peek';
+import { usePeek } from './books/use-peek';
 
 const AMOUNTS = ['purchases', 'purchasesExVat', 'otherBills', 'payments', 'balance'] as const;
 
