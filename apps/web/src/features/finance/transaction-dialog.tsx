@@ -1,4 +1,5 @@
 import type { AccountJournal } from '@tugeel/shared/finance';
+import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
 import { type FormEvent, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +22,7 @@ import { Label } from '@/components/ui/label';
 import type { PickedCustomer } from '@/features/partners/customer-picker';
 import { CustomerSelect, SupplierSelect } from '@/features/partners/party-select';
 import type { PickedSupplier } from '@/features/partners/supplier-picker';
+import { cn } from '@/lib/utils';
 import { formatMnt } from '@/lib/money';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
@@ -77,7 +79,7 @@ function PartyField(props: {
 }) {
   const { t } = useTranslation();
   return (
-    <div className="grid gap-x-3 gap-y-3.5 @xl:col-span-2 @xl:grid-cols-[auto_minmax(0,1fr)]">
+    <div className="grid gap-x-3 gap-y-3.5 @3xl:col-span-2 @3xl:grid-cols-[auto_minmax(0,1fr)]">
       <div className="flex flex-col gap-1.5">
         <Label>{t('finance.transactions.partyKind')}</Label>
         <SegmentedControl
@@ -111,15 +113,15 @@ function PartyField(props: {
 }
 
 /**
- * What will be written, before it is: both sides of the entry (ADR-0155), two short lines beside
- * the buttons that write it. In the footer it is always in view and adds no height (ADR-0201).
+ * What will be written, before it is: both sides of the entry (ADR-0155), at the foot of the
+ * summary beside the fields, where it moves none of them (ADR-0202).
  */
 function PostingPreview(props: { debit: GlAccount; credit: GlAccount; amount: string }) {
   const { t } = useTranslation();
   const row = (side: string, account: GlAccount) => (
     <div className="flex min-w-0 items-baseline gap-2">
       <span className="w-5 shrink-0 font-medium text-muted-foreground">{side}</span>
-      <span className="min-w-0 flex-1 truncate" title={`${account.code} · ${account.name}`}>
+      <span className="line-clamp-2 min-w-0 flex-1" title={`${account.code} · ${account.name}`}>
         {account.code} · {account.name}
       </span>
       <span className="shrink-0 font-mono font-medium">{formatMnt(props.amount)}</span>
@@ -129,7 +131,7 @@ function PostingPreview(props: { debit: GlAccount; credit: GlAccount; amount: st
     <div
       role="group"
       aria-label={t('finance.transactions.preview')}
-      className="grid gap-0.5 text-xs leading-snug"
+      className="grid gap-1.5 text-xs leading-snug"
     >
       {row(t('finance.transactions.debitShort'), props.debit)}
       {row(t('finance.transactions.creditShort'), props.credit)}
@@ -145,10 +147,12 @@ function PostingPreview(props: { debit: GlAccount; credit: GlAccount; amount: st
  * «Хадгалаад шинэ» keeps the date, the accounts and the kind for the next one and clears the rest.
  * What was typed is not lost by accident: a click outside does nothing, and «Болих», ✕ or Esc ask.
  *
- * The form lays itself out by its own width (a container query: two columns from 36rem, one
- * below) and keeps one height while it is filled (ADR-0201): the balance stands on the account's
- * label line, the tax ticks under the amount, the entry's two sides in the footer. So it fits a
- * tablet 768px wide with a margin and a laptop's 633px of height without scrolling.
+ * The owner's layout (ADR-0202): the fields on the left in the order they are asked — in or out,
+ * how much, which accounts, what for, when, who — and a summary on the right that says what they
+ * add up to: the account with its balance now and after, the tax ticks, the entry's two sides.
+ * Money in reads green and money out red. The form lays itself out by its own width (the summary
+ * stands beside the fields from 36rem, the fields pair up from 48rem) and the fields never move
+ * while it is filled (ADR-0201): what comes and goes does so in the summary.
  */
 export function TransactionDialog(props: {
   journal: AccountJournal;
@@ -281,16 +285,28 @@ export function TransactionDialog(props: {
     amountInput.current?.focus();
   };
 
+  // What the account holds once this is saved: a debit adds to Σ debit − Σ credit, a credit takes.
+  const balanceAfter =
+    account && amountOk
+      ? new Decimal(account.balance)
+          .plus(side === 'DEBIT' ? amount.trim() : `-${amount.trim()}`)
+          .toFixed(2)
+      : null;
+  // Money in reads green and money out red, wherever the direction shows (ADR-0202).
+  const tone = words === 'money' && !transfer ? (direction === 'IN' ? 'success' : 'danger') : null;
+  const toneText =
+    tone === 'success' ? 'text-success' : tone === 'danger' ? 'text-destructive' : undefined;
+
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
       <DialogContent
         closeLabel={t('common.close')}
-        size="lg"
+        size="xl"
         dirty={dirty}
-        // The date is rarely changed: the work starts at the account (ADR-0155).
+        // The amount is the first thing asked (ADR-0202); the date is rarely changed (ADR-0155).
         onOpenAutoFocus={(event) => {
           event.preventDefault();
-          document.getElementById('trx-account')?.focus();
+          amountInput.current?.focus();
         }}
       >
         <DialogHeader>
@@ -299,11 +315,14 @@ export function TransactionDialog(props: {
               ? t('finance.transactions.transfer.title', {
                   journal: t(`finance.transactions.tabs.${journal}`),
                 })
-              : t(`finance.transactions.tabs.${journal}`)}
+              : words === 'money'
+                ? t('finance.transactions.moneyTitle', {
+                    direction: t(`finance.transactions.money.${direction}`),
+                    journal: t(`finance.transactions.tabs.${journal}`),
+                  })
+                : t(`finance.transactions.tabs.${journal}`)}
           </DialogTitle>
-          <DialogDescription
-            className={journal === 'RECEIVABLE_PAYABLE' && !transfer ? 'sr-only' : undefined}
-          >
+          <DialogDescription className={transfer ? undefined : 'sr-only'}>
             {transfer
               ? t('finance.transactions.transfer.hint')
               : t('finance.transactions.dialogHint')}
@@ -316,9 +335,92 @@ export function TransactionDialog(props: {
               {t('finance.transactions.debtNote')}
             </p>
           ) : null}
-          <div className="grid gap-x-4 gap-y-3.5 *:min-w-0 @xl:grid-cols-2">
-            {/* A transfer has no direction: the date keeps its half of the first row to itself. */}
-            <div className={transfer ? '@xl:col-span-2 @xl:w-[calc(50%-0.5rem)]' : undefined}>
+          {/* The fields on the left, what they add up to on the right (ADR-0202). */}
+          <div className="grid gap-4 *:min-w-0 @xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+            <div className="grid content-start gap-x-4 gap-y-3.5 *:min-w-0 @3xl:grid-cols-2">
+              {transfer ? null : (
+                <div className="@3xl:col-span-2">
+                  <SegmentedControl
+                    size="field"
+                    name={t(`finance.transactions.direction.${words}`)}
+                    options={['IN', 'OUT'] as const}
+                    value={direction}
+                    label={(value) => t(`finance.transactions.${words}.${value}`)}
+                    tone={
+                      words === 'money'
+                        ? (value) => (value === 'IN' ? 'success' : 'danger')
+                        : undefined
+                    }
+                    onChange={setDirection}
+                  />
+                </div>
+              )}
+              <div className="@3xl:col-span-2">
+                <FormField
+                  label={t('finance.fields.amount')}
+                  htmlFor="trx-amount"
+                  error={checked && !amountOk ? 'validation.required' : undefined}
+                >
+                  <MoneyInput
+                    ref={amountInput}
+                    id="trx-amount"
+                    className={cn('h-12 text-xl font-semibold', toneText)}
+                    value={amount}
+                    onValueChange={setAmount}
+                  />
+                </FormField>
+              </div>
+              <FormField
+                label={
+                  transfer
+                    ? t('finance.transactions.transfer.from')
+                    : words === 'money'
+                      ? t('finance.transactions.moneyAccount')
+                      : t('finance.transactions.account')
+                }
+                htmlFor="trx-account"
+                error={checked && accountId === null ? 'validation.required' : undefined}
+              >
+                <SearchSelect
+                  id="trx-account"
+                  value={accountId === null ? '' : String(accountId)}
+                  options={own.map(accountOption)}
+                  placeholder={t('finance.journal.dialog.chooseAccount')}
+                  invalid={checked && accountId === null}
+                  onChange={(value) => pickAccount(Number.parseInt(value, 10) || null)}
+                />
+              </FormField>
+              <FormField
+                label={
+                  transfer
+                    ? t('finance.transactions.transfer.to')
+                    : words === 'money'
+                      ? t(`finance.transactions.reason.${direction}`)
+                      : t('finance.transactions.counterAccount')
+                }
+                htmlFor="trx-counter"
+                error={checked && counterId === null ? 'validation.required' : undefined}
+              >
+                <SearchSelect
+                  id="trx-counter"
+                  value={counterId === null ? '' : String(counterId)}
+                  options={others.map(accountOption)}
+                  placeholder={t('finance.journal.dialog.chooseAccount')}
+                  invalid={checked && counterId === null}
+                  onChange={(value) => pickCounter(Number.parseInt(value, 10) || null)}
+                />
+              </FormField>
+              <FormField
+                label={t('finance.fields.description')}
+                htmlFor="trx-description"
+                error={checked && !description.trim() ? 'validation.required' : undefined}
+              >
+                <Input
+                  id="trx-description"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                />
+              </FormField>
               <FormField label={t('finance.fields.date')} htmlFor="trx-date">
                 <DateInput
                   id="trx-date"
@@ -328,78 +430,63 @@ export function TransactionDialog(props: {
                   onChange={setEntryDate}
                 />
               </FormField>
-            </div>
-            {transfer ? null : (
-              <FormField
-                label={t(`finance.transactions.direction.${words}`)}
-                htmlFor="trx-direction"
-              >
-                <SegmentedControl
-                  size="field"
-                  name={t(`finance.transactions.direction.${words}`)}
-                  options={['IN', 'OUT'] as const}
-                  value={direction}
-                  label={(value) => t(`finance.transactions.${words}.${value}`)}
-                  onChange={setDirection}
+              {!transfer || needsParty ? (
+                <PartyField
+                  id="trx-party"
+                  label={
+                    needsParty
+                      ? t('finance.transactions.party')
+                      : t('finance.transactions.partyOptional')
+                  }
+                  kind={partyKind}
+                  onKind={setPartyKind}
+                  customer={customer}
+                  supplier={supplier}
+                  onCustomer={setCustomer}
+                  onSupplier={setSupplier}
+                  error={checked && !partyOk ? 'validation.required' : undefined}
                 />
-              </FormField>
-            )}
-            <FormField
-              label={
-                transfer
-                  ? t('finance.transactions.transfer.from')
-                  : t('finance.transactions.account')
-              }
-              htmlFor="trx-account"
-              hint={
-                account
-                  ? t('finance.transactions.balance', { amount: formatMnt(account.balance) })
-                  : undefined
-              }
-              hintBeside
-              error={checked && accountId === null ? 'validation.required' : undefined}
+              ) : null}
+              {bothNeedParty ? (
+                <PartyField
+                  id="trx-other-party"
+                  label={t('finance.transactions.otherParty')}
+                  kind={otherKind}
+                  onKind={setOtherKind}
+                  customer={otherCustomer}
+                  supplier={otherSupplier}
+                  onCustomer={setOtherCustomer}
+                  onSupplier={setOtherSupplier}
+                  error={checked && !otherOk ? 'validation.required' : undefined}
+                />
+              ) : null}
+            </div>
+            <section
+              aria-label={t('finance.transactions.summary')}
+              className="flex flex-col gap-3 rounded-xl bg-black/[0.035] p-3.5 text-sm"
             >
-              <SearchSelect
-                id="trx-account"
-                value={accountId === null ? '' : String(accountId)}
-                options={own.map(accountOption)}
-                placeholder={t('finance.journal.dialog.chooseAccount')}
-                invalid={checked && accountId === null}
-                onChange={(value) => pickAccount(Number.parseInt(value, 10) || null)}
-              />
-            </FormField>
-            <FormField
-              label={
-                transfer
-                  ? t('finance.transactions.transfer.to')
-                  : t('finance.transactions.counterAccount')
-              }
-              htmlFor="trx-counter"
-              error={checked && counterId === null ? 'validation.required' : undefined}
-            >
-              <SearchSelect
-                id="trx-counter"
-                value={counterId === null ? '' : String(counterId)}
-                options={others.map(accountOption)}
-                placeholder={t('finance.journal.dialog.chooseAccount')}
-                invalid={checked && counterId === null}
-                onChange={(value) => pickCounter(Number.parseInt(value, 10) || null)}
-              />
-            </FormField>
-            <FormField
-              label={t('finance.fields.amount')}
-              htmlFor="trx-amount"
-              error={checked && !amountOk ? 'validation.required' : undefined}
-            >
-              <MoneyInput
-                ref={amountInput}
-                id="trx-amount"
-                className="text-base font-semibold"
-                value={amount}
-                onValueChange={setAmount}
-              />
+              <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                {t('finance.transactions.summary')}
+              </h3>
+              {account ? (
+                <div className="grid gap-0.5">
+                  <p className="font-medium break-words">{account.name}</p>
+                  <p className="text-[0.8125rem] text-muted-foreground">
+                    {t('finance.transactions.balance', { amount: formatMnt(account.balance) })}
+                  </p>
+                  {balanceAfter === null ? null : (
+                    <p className={cn('text-[0.8125rem] font-medium', toneText)}>
+                      {t('finance.transactions.balanceAfter', { amount: formatMnt(balanceAfter) })}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-[0.8125rem] text-muted-foreground">
+                  {t('finance.transactions.summaryEmpty')}
+                </p>
+              )}
               {words === 'money' && !transfer ? (
-                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                <div className="grid gap-2 touch:gap-3">
                   <Label className="flex items-center gap-2 font-normal">
                     <Checkbox
                       checked={withVat}
@@ -416,63 +503,22 @@ export function TransactionDialog(props: {
                   </Label>
                 </div>
               ) : null}
-            </FormField>
-            <FormField
-              label={t('finance.fields.description')}
-              htmlFor="trx-description"
-              error={checked && !description.trim() ? 'validation.required' : undefined}
-            >
-              <Input
-                id="trx-description"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-              />
-            </FormField>
-            {!transfer || needsParty ? (
-              <PartyField
-                id="trx-party"
-                label={
-                  needsParty
-                    ? t('finance.transactions.party')
-                    : t('finance.transactions.partyOptional')
-                }
-                kind={partyKind}
-                onKind={setPartyKind}
-                customer={customer}
-                supplier={supplier}
-                onCustomer={setCustomer}
-                onSupplier={setSupplier}
-                error={checked && !partyOk ? 'validation.required' : undefined}
-              />
-            ) : null}
-            {bothNeedParty ? (
-              <PartyField
-                id="trx-other-party"
-                label={t('finance.transactions.otherParty')}
-                kind={otherKind}
-                onKind={setOtherKind}
-                customer={otherCustomer}
-                supplier={otherSupplier}
-                onCustomer={setOtherCustomer}
-                onSupplier={setOtherSupplier}
-                error={checked && !otherOk ? 'validation.required' : undefined}
-              />
-            ) : null}
+              {account && counter && amountOk && !withVat && !withCityTax ? (
+                <div className="border-t border-border/80 pt-3">
+                  <PostingPreview
+                    debit={side === 'DEBIT' ? account : counter}
+                    credit={side === 'DEBIT' ? counter : account}
+                    amount={amount}
+                  />
+                </div>
+              ) : null}
+            </section>
           </div>
           <DialogFormFooter
             pending={mutations.postTransaction.isPending}
             onCancel={props.onClose}
             submitLabel={t('common.save')}
             onSaveAndNew={() => void save(true)}
-            start={
-              account && counter && amountOk && !withVat && !withCityTax ? (
-                <PostingPreview
-                  debit={side === 'DEBIT' ? account : counter}
-                  credit={side === 'DEBIT' ? counter : account}
-                  amount={amount}
-                />
-              ) : undefined
-            }
           />
         </form>
       </DialogContent>

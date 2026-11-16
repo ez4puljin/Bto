@@ -27,7 +27,7 @@ The floor is **768px wide and 600px high**. On every screen from the floor up: t
 **Height.**
 
 - A dialog fits 600px of height in the fullest state its work usually reaches. One that cannot scrolls its body and keeps its footer in view (`DialogFooter` sticks), footer last.
-- **A form keeps one height while it is filled.** A fact that comes and goes while typing (an account's balance, the entry about to be written) stands where nothing moves: on the label's line (`FormField hintBeside`), under its own field, or in the footer's free start (`DialogFormFooter start`). «Шинэ гүйлгээ» (`features/finance/transaction-dialog.tsx`) is the worked example.
+- **A form keeps one height while it is filled.** A fact that comes and goes while typing (an account's balance, the entry about to be written) stands where nothing moves: on the label's line (`FormField hintBeside`), under its own field, in the footer's free start (`DialogFormFooter start`), or in a summary beside the fields. «Шинэ гүйлгээ» (`features/finance/transaction-dialog.tsx`, ADR-0202) is the worked example: the fields on the left in the order of the work (in or out, how much, the accounts, what for and when, who), «Хураангуй» on the right with the account's balance now and after, the tax ticks and the entry's two sides. A choice that is good or bad news (money in, money out) may colour its chosen segment (`SegmentedControl tone`: green, red); nothing else uses it.
 - Fields that share a row share a height: a choice of two or three in a form is `SegmentedControl size="field"`.
 
 **A finger** (`pointer: coarse`; the Tailwind variant `touch:`, and `touch-static:` which leaves out what a class already places as absolute, fixed or sticky; `pointer-fine:` for the mouse only).

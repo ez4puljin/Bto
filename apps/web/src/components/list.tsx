@@ -134,6 +134,8 @@ export function SegmentedControl<T extends string>(props: {
   onChange: (value: T) => void;
   name?: string;
   size?: 'pill' | 'field';
+  /** A colour for the chosen segment when the choice itself is good or bad news (money in, out). */
+  tone?: ((value: T) => 'success' | 'danger') | undefined;
 }) {
   const field = props.size === 'field';
   const list = useRef<HTMLDivElement>(null);
@@ -169,7 +171,14 @@ export function SegmentedControl<T extends string>(props: {
               'shrink-0 rounded-full px-3.5 font-medium whitespace-nowrap transition-[color,background-color,box-shadow] duration-200 ease-apple outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
               field ? 'h-full text-sm' : 'h-7.5 text-[0.8125rem] touch:h-9.5',
               selected
-                ? 'bg-background text-foreground shadow-control'
+                ? cn(
+                    'shadow-control',
+                    props.tone === undefined
+                      ? 'bg-background text-foreground'
+                      : props.tone(value) === 'success'
+                        ? 'bg-success-soft text-success'
+                        : 'bg-danger-soft text-destructive',
+                  )
                 : 'text-muted-foreground hover:text-foreground',
             )}
             onClick={() => props.onChange(value)}

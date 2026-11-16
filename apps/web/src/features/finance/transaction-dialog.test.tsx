@@ -35,8 +35,8 @@ describe('«Шинэ гүйлгээ» (ADR-0150)', () => {
     const user = userEvent.setup();
     const fetchMock = signedIn(ACCOUNTANT_ME, routes());
     const dialog = await open(fetchMock);
-    await pick(user, dialog, words.account, /^110102/);
-    await pick(user, dialog, words.counterAccount, /^511020/);
+    await pick(user, dialog, words.moneyAccount, /^110102/);
+    await pick(user, dialog, words.reason.IN, /^511020/);
     await user.type(dialog.getByLabelText(mn.finance.fields.amount), '5000');
     await user.type(dialog.getByLabelText(mn.finance.fields.description), 'Эхний');
     await user.click(dialog.getByRole('button', { name: mn.common.saveAndNew }));
@@ -44,8 +44,8 @@ describe('«Шинэ гүйлгээ» (ADR-0150)', () => {
     await waitFor(() => expect(calls(fetchMock, 'POST', POST)).toHaveLength(1));
     await waitFor(() => expect(dialog.getByLabelText(mn.finance.fields.amount)).toHaveValue(''));
     expect(dialog.getByLabelText(mn.finance.fields.description)).toHaveValue('');
-    expect(dialog.getByLabelText(words.account)).toHaveValue('110102 · Харилцах');
-    expect(dialog.getByLabelText(words.counterAccount)).toHaveValue(
+    expect(dialog.getByLabelText(words.moneyAccount)).toHaveValue('110102 · Харилцах');
+    expect(dialog.getByLabelText(words.reason.IN)).toHaveValue(
       `${counterLabel?.code} · ${counterLabel?.name}`,
     );
     expect(dialog.getByLabelText(mn.finance.fields.amount)).toHaveFocus();
@@ -109,8 +109,8 @@ describe('«Шинэ гүйлгээ» (ADR-0150)', () => {
   it('offers a party on every new transaction', async () => {
     const dialog = await open(signedIn(ACCOUNTANT_ME, routes()));
     expect(dialog.getByText(words.partyOptional)).toBeInTheDocument();
-    // The work starts at the account, not the date (ADR-0155).
-    await waitFor(() => expect(dialog.getByLabelText(words.account)).toHaveFocus());
+    // The work starts at the amount, the first thing asked (ADR-0202).
+    await waitFor(() => expect(dialog.getByLabelText(mn.finance.fields.amount)).toHaveFocus());
   });
 
   it('shows both sides of the entry before it is saved (ADR-0155)', async () => {
@@ -118,8 +118,8 @@ describe('«Шинэ гүйлгээ» (ADR-0150)', () => {
     const dialog = await open(signedIn(ACCOUNTANT_ME, routes()));
     const preview = mn.finance.transactions.preview;
     expect(dialog.queryByRole('group', { name: preview })).toBeNull();
-    await pick(user, dialog, words.account, /^110102/);
-    await pick(user, dialog, words.counterAccount, /^511020/);
+    await pick(user, dialog, words.moneyAccount, /^110102/);
+    await pick(user, dialog, words.reason.IN, /^511020/);
     await user.type(dialog.getByLabelText(mn.finance.fields.amount), '5000');
     const shown = within(dialog.getByRole('group', { name: preview }));
     // Money in: the bank is debited.
@@ -127,32 +127,33 @@ describe('«Шинэ гүйлгээ» (ADR-0150)', () => {
     expect(shown.getByText(/511020/).parentElement).toHaveTextContent(/^Кт.*5,000/);
   });
 
-  it('keeps its height while it is filled: nothing appears between the fields (ADR-0201)', async () => {
+  it('says what the fields add up to in the summary beside them (ADR-0202)', async () => {
     const user = userEvent.setup();
     const dialog = await open(signedIn(ACCOUNTANT_ME, routes()));
-    await pick(user, dialog, words.account, /^110102/);
-    await pick(user, dialog, words.counterAccount, /^511020/);
+    const summary = within(dialog.getByRole('region', { name: words.summary }));
+    expect(summary.getByText(words.summaryEmpty)).toBeInTheDocument();
+    // Money in or out is in the title, so the window says what it is doing.
+    expect(dialog.getByRole('heading', { name: /^Орлого · Харилцах$/ })).toBeInTheDocument();
+    await pick(user, dialog, words.moneyAccount, /^110102/);
+    await pick(user, dialog, words.reason.IN, /^511020/);
     await user.type(dialog.getByLabelText(mn.finance.fields.amount), '5000');
-    // The balance stands on the account's label line and still describes the field.
-    const account = dialog.getByLabelText(words.account);
-    const balance = dialog.getByText(/^Үлдэгдэл:/);
-    expect(balance.parentElement).toContainElement(dialog.getByText(words.account));
-    expect(account).toHaveAccessibleDescription(balance.textContent ?? '');
-    // The entry's two sides stand beside the buttons that write it.
-    const footer = dialog.getByRole('button', { name: mn.common.save }).parentElement;
-    expect(footer).toContainElement(dialog.getByRole('group', { name: words.preview }));
-    // The tax ticks belong to the amount's own cell.
-    expect(dialog.getByText(mn.finance.fields.amount).parentElement).toContainElement(
-      dialog.getByText(words.withVat),
-    );
+    // The account, its balance now and after, the tax ticks and the entry: all in the summary,
+    // so no field moves while the form is filled (ADR-0201).
+    expect(summary.getByText(/^Үлдэгдэл:/)).toBeInTheDocument();
+    expect(summary.getByText(/^Гүйлгээний дараа:/)).toBeInTheDocument();
+    expect(summary.getByText(words.withVat)).toBeInTheDocument();
+    expect(summary.getByRole('group', { name: words.preview })).toBeInTheDocument();
+    await user.click(dialog.getByRole('tab', { name: words.money.OUT }));
+    expect(dialog.getByRole('heading', { name: /^Зарлага · Харилцах$/ })).toBeInTheDocument();
+    expect(dialog.getByLabelText(words.reason.OUT)).toBeInTheDocument();
   });
 
   it('groups the amount as it is typed and sends it plain', async () => {
     const user = userEvent.setup();
     const fetchMock = signedIn(ACCOUNTANT_ME, routes());
     const dialog = await open(fetchMock);
-    await pick(user, dialog, words.account, /^110102/);
-    await pick(user, dialog, words.counterAccount, /^511020/);
+    await pick(user, dialog, words.moneyAccount, /^110102/);
+    await pick(user, dialog, words.reason.IN, /^511020/);
     const amount = dialog.getByLabelText(mn.finance.fields.amount);
     await user.type(amount, '1000000');
     expect(amount).toHaveValue('1,000,000');
@@ -173,7 +174,7 @@ describe('«Шинэ гүйлгээ» (ADR-0150)', () => {
   it('finds an account by typing its code or name, and Enter takes the row', async () => {
     const user = userEvent.setup();
     const dialog = await open(signedIn(ACCOUNTANT_ME, routes()));
-    const counter = dialog.getByLabelText(words.counterAccount);
+    const counter = dialog.getByLabelText(words.reason.IN);
     await waitFor(() => expect(counter).toBeEnabled());
     await user.click(counter);
     await screen.findByRole('option', { name: /^110102/ });
@@ -193,8 +194,8 @@ describe('«Шинэ гүйлгээ» (ADR-0150)', () => {
     const user = userEvent.setup();
     const fetchMock = signedIn(ACCOUNTANT_ME, routes());
     const dialog = await open(fetchMock);
-    await pick(user, dialog, words.account, /^110102/);
-    await pick(user, dialog, words.counterAccount, /^511020/);
+    await pick(user, dialog, words.moneyAccount, /^110102/);
+    await pick(user, dialog, words.reason.IN, /^511020/);
     await user.type(dialog.getByLabelText(mn.finance.fields.amount), '100');
     await user.type(dialog.getByLabelText(mn.finance.fields.description), 'Хүнтэй');
     const party = dialog.getByLabelText(words.partyOptional);
