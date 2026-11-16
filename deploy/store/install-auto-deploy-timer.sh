@@ -43,11 +43,11 @@ UNIT
 
 cat >"$UNITS/bto-auto-deploy.timer" <<UNIT
 [Unit]
-Description=Bto: look for a new push of main every minute
+Description=Bto: look for a new push of main every 20 seconds
 
 [Timer]
 OnBootSec=3min
-OnUnitInactiveSec=60s
+OnUnitInactiveSec=20s
 AccuracySec=5s
 
 [Install]

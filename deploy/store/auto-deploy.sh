@@ -4,10 +4,13 @@
 #
 #   - nothing new on origin/main                      → nothing
 #   - only docs (docs/, *.md, .claude/, .github/)     → the checkout moves, nothing is rebuilt
+#   - only the office's pages (apps/web)              → only the web image and its door (about a minute)
 #   - a new migration                                 → waits for CI green first (a migration is
 #                                                        not undone by rollback.sh), refuses a red one
 #   - anything else                                   → setup.sh at once (it still refuses a commit
 #                                                        CI has already found red), then the edge
+#   - the till server is rebuilt only when what it is built from changed (the api, packages, the
+#     kiosk's pos.html and src/pos, deploy/edge): otherwise the tills do not pause
 #
 # After an update made while CI was still running, the next rounds look at CI's answer: red →
 # rollback.sh to the version before (which itself refuses when a migration stands between them).
@@ -22,24 +25,44 @@ set -euo pipefail
 
 # --- what a round decides, from the changed files and CI's word (auto-deploy.test.sh) ----------
 
-# Prints one of: none, docs, deploy, wait, refuse.
+# Prints one of: none, docs, web, deploy, wait, refuse.
 #   $1: CI's verdict on the target (success, failure, pending, unknown); then the changed files.
+# `web`: only the office's pages changed, so only the web image is built and only its door
+# restarts (setup.sh --only-web: about a minute instead of four or five); the api is left running.
 plan_update() {
   local verdict=$1
   shift
   [ "$#" -gt 0 ] || { echo none; return 0; }
-  local file code=no migration=no
+  local file code=no migration=no other=no
   for file in "$@"; do
     case "$file" in
-      apps/api/src/db/migrations/*.sql) migration=yes; code=yes ;;
+      apps/api/src/db/migrations/*.sql) migration=yes; code=yes; other=yes ;;
       docs/* | .claude/* | .github/* | *.md) ;;
-      *) code=yes ;;
+      apps/web/Dockerfile | apps/web/package.json) code=yes; other=yes ;;
+      apps/web/*) code=yes ;;
+      *) code=yes; other=yes ;;
     esac
   done
   if [ "$code" = no ]; then echo docs; return 0; fi
   if [ "$verdict" = failure ]; then echo refuse; return 0; fi
   if [ "$migration" = yes ] && [ "$verdict" != success ]; then echo wait; return 0; fi
+  if [ "$other" = no ]; then echo web; return 0; fi
   echo deploy
+}
+
+# Prints yes when the till server (deploy/edge) is built from something that changed: its api is
+# the api image and its kiosk the web's pos.html. Only then does an update pause the tills.
+needs_edge() {
+  local file
+  for file in "$@"; do
+    case "$file" in
+      docs/* | .claude/* | .github/* | *.md) ;;
+      apps/web/src/pos/* | apps/web/pos.html | apps/web/Dockerfile | apps/web/package.json) echo yes; return 0 ;;
+      apps/web/*) ;;
+      *) echo yes; return 0 ;;
+    esac
+  done
+  echo no
 }
 
 if [ "${1:-}" = "--source-only" ]; then return 0 2>/dev/null || exit 0; fi
@@ -165,25 +188,31 @@ case "$PLAN" in
     ;;
 esac
 
-# deploy
+# web or deploy
 RUN="$DEPLOY_STATE/runs/$SHORT.log"
 stamp() { while IFS= read -r line; do printf '%s %s\n' "$(date +%T)" "$line"; done; }
+EDGE=$(needs_edge "${CHANGED[@]}")
 started=$(date +%s)
-say "$SHORT: тавьж эхэллээ (${#CHANGED[@]} файл, CI $VERDICT)"
+say "$SHORT: тавьж эхэллээ ($PLAN, ${#CHANGED[@]} файл, касс: $EDGE, CI $VERDICT)"
 git merge --ff-only -q "$TARGET"
-if ! bash deploy/store/setup.sh 2>&1 | stamp >"$RUN"; then
+SETUP=(bash deploy/store/setup.sh)
+if [ "$PLAN" = web ]; then SETUP+=(--only-web); fi
+if ! "${SETUP[@]}" 2>&1 | stamp >"$RUN"; then
   say "$SHORT: төв систем ТАВИГДСАНГҮЙ ($(($(date +%s) - started)) сек): runs/$SHORT.log"
   exit 0
 fi
 store_done=$(date +%s)
 edge_ok=yes
-bash deploy/edge/setup.sh 2>&1 | stamp >>"$RUN" || edge_ok=no
+if [ "$EDGE" = yes ]; then bash deploy/edge/setup.sh 2>&1 | stamp >>"$RUN" || edge_ok=no; fi
 finished=$(date +%s)
 port=$(grep -E '^STORE_HTTP_PORT=' "$ENV_FILE" | head -n 1 | cut -d= -f2-)
-running=$(curl -s --max-time 10 "http://127.0.0.1:${port:-80}/health" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
-note="төв $((store_done - started)) сек, касс $((finished - store_done)) сек"
+health=$(curl -s --max-time 10 "http://127.0.0.1:${port:-80}/health" || true)
+running=$(printf '%s' "$health" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
+note="төв $((store_done - started)) сек"
+if [ "$EDGE" = yes ]; then note="$note, касс $((finished - store_done)) сек"; fi
 if [ "$edge_ok" = no ]; then note="$note, КАССЫН СЕРВЕР АЛДААТАЙ"; fi
-if [ "$running" = "$SHORT" ]; then
+# After --only-web the api keeps the version it was built at: then the answer only has to be ok.
+if [ "$running" = "$SHORT" ] || { [ "$PLAN" = web ] && printf '%s' "$health" | grep -q '"status":"ok"'; }; then
   say "$SHORT: ажиллаж байна ($note)"
 else
   say "$SHORT: тавьсан боловч /health «${running:-хариугүй}» гэж хариулж байна ($note): runs/$SHORT.log"

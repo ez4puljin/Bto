@@ -14,13 +14,17 @@ COMPOSE_FILE=deploy/store/docker-compose.store.yml
 ENV_FILE=deploy/store/.env
 START_EMPTY=no
 CI_CHECK=yes
+ONLY_WEB=no
 for arg in "$@"; do
   case "$arg" in
     --start) START_EMPTY=yes ;;
+    # Only the office's pages changed (ADR-0204): build the web image alone and restart its door;
+    # the api, the database and the migrations are left as they are.
+    --only-web) ONLY_WEB=yes ;;
     # CI has not seen this commit, or its answer is not to be waited for: deploy anyway.
     --no-ci-check) CI_CHECK=no ;;
     *)
-      echo "Танигдаагүй сонголт: $arg (--start, --no-ci-check)" >&2
+      echo "Танигдаагүй сонголт: $arg (--start, --no-ci-check, --only-web)" >&2
       exit 64
       ;;
   esac
@@ -108,6 +112,16 @@ fi
 
 # What runs now is kept as :store-previous, so rollback.sh is a retag instead of a rebuild.
 keep_previous_images
+
+if [ "$ONLY_WEB" = "yes" ]; then
+  echo "== Зөвхөн вэб хуудсыг бүтээж байна — хувилбар $APP_VERSION"
+  "${COMPOSE[@]}" build web
+  echo "== Вэбийн хаалгыг солиж байна (1 секунд орчим)"
+  "${COMPOSE[@]}" up -d --no-deps --wait --timeout 2 web
+  record_deployed "$APP_VERSION"
+  echo "Бэлэн: вэб хуудас $APP_VERSION. Api өмнөх хувилбараараа ажиллаж байна."
+  exit 0
+fi
 
 echo "== Image-үүдийг бүтээж байна (эхний удаа 10-20 минут) — хувилбар $APP_VERSION"
 "${COMPOSE[@]}" build api web
