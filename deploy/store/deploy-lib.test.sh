@@ -26,7 +26,7 @@ expect "a green run is green" "$(ci_verdict)" "success"
 fake_gh 'echo failure'
 expect "a red run is red" "$(ci_verdict)" "failure"
 fake_gh 'echo cancelled'
-expect "a cancelled run is not a pass" "$(ci_verdict)" "failure"
+expect "a cancelled run is neither a pass nor a failure" "$(ci_verdict)" "cancelled"
 fake_gh 'echo pending'
 expect "a run still going is pending" "$(ci_verdict)" "pending"
 fake_gh 'echo none'

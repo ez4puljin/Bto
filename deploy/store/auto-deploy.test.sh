@@ -29,6 +29,9 @@ expect "a red migration is not put" "$(plan_update failure apps/api/src/db/migra
 expect "the migrations' journal alone is code, not a migration" \
   "$(plan_update pending apps/api/src/db/migrations/meta/_journal.json)" "deploy"
 expect "red docs still move the checkout" "$(plan_update failure docs/STATUS.md)" "docs"
+expect "a run stopped by a newer push does not hold code back" "$(plan_update cancelled apps/api/src/a.ts)" "deploy"
+expect "a migration whose run was stopped still waits" \
+  "$(plan_update cancelled apps/api/src/db/migrations/0105_x.sql)" "wait"
 expect "the office's pages alone build the web only" \
   "$(plan_update pending apps/web/src/features/finance/a.tsx docs/ui.md)" "web"
 expect "the web with the shared package is a whole update" \

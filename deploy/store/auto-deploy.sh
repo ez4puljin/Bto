@@ -129,6 +129,11 @@ follow_ci() {
       say "CI ногоон: ${watched:0:8}"
       [ "$CHECK" = yes ] || rm -f "$DEPLOY_STATE/auto-ci-watch"
       ;;
+    cancelled)
+      # A newer push stopped this run; that push's own run is the one to follow.
+      say "CI ${watched:0:8}-ийг шинэ push-ийн улмаас зогсоосон: буцаахгүй"
+      [ "$CHECK" = yes ] || rm -f "$DEPLOY_STATE/auto-ci-watch"
+      ;;
     failure)
       now=$(deployed_version)
       if [ "$CHECK" = yes ]; then

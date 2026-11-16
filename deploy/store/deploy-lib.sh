@@ -97,7 +97,7 @@ start_stack() {
 }
 
 # What CI says about a commit (this checkout's HEAD when none is named): success, failure,
-# pending, unknown. Unknown covers everything the box cannot tell (no gh, not signed in, no run
+# pending, cancelled, unknown. Unknown covers everything the box cannot tell (no gh, not signed in, no run
 # for this commit).
 ci_verdict() {
   local sha out
@@ -110,6 +110,8 @@ ci_verdict() {
   case "$out" in
     success) echo success ;;
     pending) echo pending ;;
+    # Stopped because a newer push started its own run: not a verdict on this commit (ADR-0205).
+    cancelled) echo cancelled ;;
     none | "" | null) echo unknown ;;
     *) echo failure ;;
   esac
