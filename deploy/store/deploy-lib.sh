@@ -96,12 +96,13 @@ start_stack() {
   "${COMPOSE[@]}" up -d --no-deps --wait --timeout 2 "$@" web
 }
 
-# What CI says about the commit this checkout stands on: success, failure, pending, unknown.
-# Unknown covers everything the box cannot tell (no gh, not signed in, no run for this commit).
+# What CI says about a commit (this checkout's HEAD when none is named): success, failure,
+# pending, unknown. Unknown covers everything the box cannot tell (no gh, not signed in, no run
+# for this commit).
 ci_verdict() {
   local sha out
   command -v gh >/dev/null 2>&1 || { echo unknown; return 0; }
-  sha=$(git rev-parse HEAD 2>/dev/null) || { echo unknown; return 0; }
+  sha=$(git rev-parse "${1:-HEAD}" 2>/dev/null) || { echo unknown; return 0; }
   out=$(gh run list --limit 30 --json headSha,status,conclusion \
     --jq "[.[] | select(.headSha == \"$sha\")] | first |
           if . == null then \"none\" elif .status != \"completed\" then \"pending\" else .conclusion end" \

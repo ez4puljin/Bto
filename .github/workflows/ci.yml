@@ -108,3 +108,5 @@ jobs:
           bash deploy/store/watch.test.sh
           # The deploy library's decisions (ADR-0196): CI verdicts, the kept versions, the roll.
           bash deploy/store/deploy-lib.test.sh
+          # What a round of the automatic update decides (ADR-0204): docs, deploy, wait, refuse.
+          bash deploy/store/auto-deploy.test.sh

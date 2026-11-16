@@ -212,6 +212,8 @@ docker compose -f deploy/edge/docker-compose.edge.yml -f deploy/store/docker-com
 
 ## 7. Шинэчлэх (main руу push хийсний дараа)
 
+**ADR-0204-өөс (2026-11-16) хойш энэ нь өөрөө хийгдэнэ:** `bto-auto-deploy` timer (`~/bto`-оос нэг удаа `bash deploy/store/install-auto-deploy-timer.sh`) минут тутам main-ийг шалгаж доорх хоёр `setup.sh`-ийг ажиллуулна. Код шууд тавигдана, migration-тэй бол CI ногоон болохыг хүлээнэ, дараа нь CI улаан болвол өмнөх хувилбар руу буцаана. Дараагийн удаа юу хийхийг: `bash deploy/store/auto-deploy.sh --check`; юу хийснийг: `~/.local/state/bto-deploy/auto-deploy.log`, шинэчлэл бүрийн дэлгэрэнгүйг (мөр бүрийн цагтай): `runs/<sha>.log`. Доорх алхмууд гараар хийх арга хэвээр (timer-ийг зогсоох: `systemctl --user disable --now bto-auto-deploy.timer`).
+
 Эзэмшигчийн дүрэм (2026-11-11, «Push бүрийн дараа»): push хийсэн кодын өөрчлөлт бүрийг тэр дор нь дэлгүүрийн компьютерт оруулна, эхлээд төвийг. Зөвхөн баримт бичиг өөрчилсөн push-д шинэчлэл хэрэггүй. Сешн үүнийг SSH-ээр, `sudo`-гүйгээр хийнэ (`git pull --ff-only && bash deploy/store/setup.sh && bash deploy/edge/setup.sh`). Оффисын дэлгэц 1–2 минут, кассууд 1 минут зогсдог тул том өөрчлөлтийг ачаалал багатай үед push хийвэл зүгээр. Шөнийн нөөцлөлтийн цаг тохируулаагүй үед доорх нөөцийн мөрийн оронд `BACKUP_DIR=$HOME/bto-backups bash deploy/store/backup.sh` (`sudo`-гүй, зургийн хуулбаргүй) ажиллуулна.
 
 ```bash

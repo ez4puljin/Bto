@@ -196,6 +196,8 @@ docker compose -f deploy/edge/docker-compose.edge.yml -f deploy/store/docker-com
 
 ## 7. Update after a push to main
 
+**Since ADR-0204 (2026-11-16) this is done by itself:** the timer `bto-auto-deploy` (`bash deploy/store/install-auto-deploy-timer.sh` once, from `~/bto`) fetches main every minute and runs the two `setup.sh` below; code goes at once, a migration waits for CI green, a later red CI rolls back. `bash deploy/store/auto-deploy.sh --check` says what the next round would do; `~/.local/state/bto-deploy/auto-deploy.log` what the rounds did, `runs/<sha>.log` each update with the time of every line. The steps below remain the way by hand (the timer off: `systemctl --user disable --now bto-auto-deploy.timer`).
+
 The owner's rule (2026-11-11, «Push бүрийн дараа»): every pushed code change goes onto the box at once, the centre first; a docs-only push needs no update. A session does it over SSH without sudo (`git pull --ff-only && bash deploy/store/setup.sh && bash deploy/edge/setup.sh`). The office's screens pause for a minute or two and the tills for a minute, so a large change is still best pushed at a quiet moment. Before the nightly timer exists, the backup line below is `BACKUP_DIR=$HOME/bto-backups bash deploy/store/backup.sh` (no sudo; without the file mirror).
 
 ```bash
