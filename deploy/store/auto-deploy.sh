@@ -67,6 +67,10 @@ needs_edge() {
 
 if [ "${1:-}" = "--source-only" ]; then return 0 2>/dev/null || exit 0; fi
 
+# The round moves this checkout, this file included, while it runs: bash reads a script as it goes,
+# so the whole round is one block, read to its end before the first line of it runs.
+{
+
 # --- one round -----------------------------------------------------------------------------------
 
 CHECK=no
@@ -218,3 +222,5 @@ else
   say "$SHORT: тавьсан боловч /health «${running:-хариугүй}» гэж хариулж байна ($note): runs/$SHORT.log"
 fi
 if [ "$VERDICT" != success ]; then printf '%s\n' "$TARGET" >"$DEPLOY_STATE/auto-ci-watch"; fi
+exit 0
+}
