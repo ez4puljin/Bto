@@ -178,6 +178,12 @@ export class ErkhetClient {
         } catch {
           throw new ErkhetError('UNEXPECTED_ANSWER', 'Erkhet redirected to a broken address');
         }
+        // Erkhet sits behind a TLS proxy and writes its own redirects as http:// (seen 2026-11-16);
+        // its HSTS header makes a browser go to https:// instead, and so does this client. Only
+        // for the same host: another host is still refused below.
+        if (url.protocol === 'http:' && url.host === new URL(this.origin).host) {
+          url.protocol = 'https:';
+        }
         verb = 'GET';
         body = undefined;
         continue;

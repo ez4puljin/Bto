@@ -25,6 +25,13 @@ const redirect = (location: string, cookies: string[] = []) => {
 };
 
 /** A small Erkhet: the sign-in form, the session cookie, the company's home and the lists. */
+/** The scripted Erkhet's own fetch, for a test that wraps its answers. */
+const plainFetch = (
+  server: ReturnType<typeof erkhet>,
+  url: string,
+  init: RequestInit,
+): Promise<Response> => server.fetchFn(url, init);
+
 function erkhet(options: { password?: string; company?: string; list?: () => Response } = {}) {
   const sent: Sent[] = [];
   const fetchFn: ErkhetFetch = (url, init) => {
@@ -73,7 +80,11 @@ function erkhet(options: { password?: string; company?: string; list?: () => Res
     }
     return Promise.resolve(redirect('/999/'));
   };
-  return { sent, client: new ErkhetClient(ACCOUNT, fetchFn, { page: 1_000, list: 1_000 }) };
+  return {
+    sent,
+    fetchFn,
+    client: new ErkhetClient(ACCOUNT, fetchFn, { page: 1_000, list: 1_000 }),
+  };
 }
 
 const failure = async (promise: Promise<unknown>): Promise<ErkhetError> => {
@@ -137,6 +148,23 @@ describe('Erkhet client (ADR-0203)', () => {
     expect(() => new ErkhetClient({ ...ACCOUNT, baseUrl: 'http://erkhet.test' }, away)).toThrow(
       ErkhetError,
     );
+  });
+
+  it("follows Erkhet's own http:// redirects over https, as its HSTS header asks", async () => {
+    // Erkhet behind its proxy writes `Location: http://<its host>/…` (seen 2026-11-16).
+    const plain = erkhet();
+    const sent: string[] = [];
+    const insecure: ErkhetFetch = async (url, init) => {
+      sent.push(url);
+      const answer = await plainFetch(plain, url, init);
+      const location = answer.headers.get('location');
+      if (!location) return answer;
+      const headers = new Headers(answer.headers);
+      headers.set('location', new URL(location, url).toString().replace('https://', 'http://'));
+      return new Response(null, { status: answer.status, headers });
+    };
+    await new ErkhetClient(ACCOUNT, insecure, { page: 1_000, list: 1_000 }).signIn();
+    expect(sent.every((url) => url.startsWith('https://erkhet.test/'))).toBe(true);
   });
 
   it('tells a timeout from an unreachable address', async () => {
