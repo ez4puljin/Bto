@@ -41,6 +41,10 @@ declare module './job-catalog' {
     'notifications.invoiceReminders': ScheduledPayload;
     /** Every 15 minutes: the daily sales totals of the management reports (ADR-0108 #6). */
     'reporting.refresh': ScheduledPayload;
+    /** One check of Erkhet's customers and items against Bto's (ADR-0203 #5). */
+    'erkhet.sync': { runId: number };
+    /** Nights: starts the day's Erkhet check when its sign-in is saved (ADR-0203 #5). */
+    'erkhet.nightly': ScheduledPayload;
   }
 }
 
@@ -69,6 +73,17 @@ const BTO_JOB_QUEUES = {
   'finance.reconcile': scheduledQueue(),
   'notifications.invoiceReminders': scheduledQueue(),
   'reporting.refresh': scheduledQueue(),
+  // One job per check (singletonKey = the run id). No retry: a failed check says why on its row
+  // and the person, or the next night, starts another.
+  'erkhet.sync': {
+    policy: 'exclusive',
+    retryLimit: 0,
+    expireInSeconds: 1_200,
+    heartbeatSeconds: 60,
+    retentionSeconds: 7 * 86_400,
+    deleteAfterSeconds: 7 * 86_400,
+  },
+  'erkhet.nightly': scheduledQueue(),
 } as const satisfies Readonly<Partial<Record<JobName, QueueOptions>>>;
 
 /** Every owner's queues: a job name without a queue fails typecheck. */

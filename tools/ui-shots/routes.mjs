@@ -176,6 +176,9 @@ export const ROUTES = [
   { area: 'partners', name: 'supplier-new', path: '/partners/suppliers/new' },
 
   { area: 'finance', name: 'ebarimt-check', path: '/finance/ebarimt' },
+  { area: 'finance', name: 'erkhet-sync', path: '/finance/erkhet' },
+  { area: 'finance', name: 'erkhet-sync-prices', path: '/finance/erkhet?kind=PRODUCT' },
+  { area: 'finance', name: 'erkhet-sync-settings', path: '/finance/erkhet?settings=1' },
   { area: 'finance', name: 'invoices', path: '/finance/invoices' },
   {
     area: 'finance',

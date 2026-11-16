@@ -38,6 +38,16 @@ export interface ImportProduct {
   }[];
 }
 
+/** A product as `directory()` lists it. */
+export interface ProductDirectoryEntry {
+  id: number;
+  sku: string;
+  name: string;
+  status: Product['status'];
+  /** Barcodes on its units, current or not. */
+  barcodes: number;
+}
+
 export interface BulkProductInput {
   sku: string;
   name: string;
@@ -103,6 +113,29 @@ export class CatalogImportService {
       .from(products)
       .where(eq(products.status, 'ACTIVE'))
       .orderBy(asc(products.sku));
+  }
+
+  /**
+   * Every product by what a check against another system's list compares (ADR-0203): the code, the
+   * name, the status and how many barcodes its units hold.
+   */
+  async directory(executor: Db | Tx = this.db): Promise<ProductDirectoryEntry[]> {
+    return executor
+      .select({
+        id: products.id,
+        sku: products.sku,
+        name: products.name,
+        status: products.status,
+        // Written out: Drizzle leaves columns unqualified in a single-table select, and `id` inside
+        // the subquery would then be the barcode's.
+        barcodes: sql<number>`(
+          SELECT count(*)::int FROM product_barcodes b
+          JOIN product_units u ON u.id = b.product_unit_id
+          WHERE u.product_id = "products"."id"
+        )`,
+      })
+      .from(products)
+      .orderBy(asc(products.id));
   }
 
   /** Products by SKU with their current units and barcodes. */

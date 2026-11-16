@@ -39,6 +39,7 @@ export {
   type CreditInput,
   type CreditTerms,
   type CustomerDetail,
+  type CustomerDirectoryEntry,
   type CustomerInput,
   type CustomerPatch,
   type CustomerSummary,

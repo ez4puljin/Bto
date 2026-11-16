@@ -318,6 +318,11 @@ export const STORE_SEED_TABLES: Record<string, SeedRule> = {
   'public.ai_questions': empty(HISTORY),
   'public.ai_usage': empty(HISTORY),
   'public.ai_reports': empty('saved reports are made again'),
+  'public.erkhet_settings': empty(
+    "Erkhet's password is sealed with ERKHET_KEY_SECRET, which is new on the store PC: typed again on «Эрхэт тулгалт»",
+  ),
+  'public.erkhet_sync_runs': empty(HISTORY),
+  'public.erkhet_sync_items': empty(HISTORY),
   'public.report_views': empty('saved report views are made again'),
   'public.screen_usage': empty(HISTORY),
   'public.screen_usage_seen': empty(HISTORY),

@@ -255,6 +255,7 @@ export {
   ebarimtCheckSupplierProfiles,
 } from '../modules/ebarimt-check/schema';
 export { ebarimtReceipts } from '../modules/ebarimt/schema';
+export { erkhetSettings, erkhetSyncItems, erkhetSyncRuns } from '../modules/erkhet/schema';
 export {
   expiryItemChanges,
   expiryItemRoles,

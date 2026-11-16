@@ -44525,6 +44525,360 @@
           "ebarimt"
         ]
       }
+    },
+    "/api/v1/erkhet/settings": {
+      "get": {
+        "operationId": "Erkhet_viewSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErkhetSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erkhet"
+        ]
+      },
+      "patch": {
+        "operationId": "Erkhet_updateSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErkhetSettingsUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErkhetSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erkhet"
+        ]
+      }
+    },
+    "/api/v1/erkhet/settings/test": {
+      "post": {
+        "operationId": "Erkhet_testSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErkhetSettingsTestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErkhetSettingsTestResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Signs in to Erkhet with what is typed or saved; saves nothing and reads no list.",
+        "tags": [
+          "erkhet"
+        ]
+      }
+    },
+    "/api/v1/erkhet/sync": {
+      "get": {
+        "operationId": "Erkhet_overview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErkhetOverview"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erkhet"
+        ]
+      }
+    },
+    "/api/v1/erkhet/sync/runs": {
+      "post": {
+        "operationId": "Erkhet_start",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErkhetRun"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Starts a check; the worker runs it and `GET erkhet/sync` says when it ended.",
+        "tags": [
+          "erkhet"
+        ]
+      }
+    },
+    "/api/v1/erkhet/sync/items": {
+      "get": {
+        "operationId": "Erkhet_items",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CUSTOMER",
+                "PRODUCT"
+              ]
+            }
+          },
+          {
+            "name": "issue",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MISSING_IN_BTO",
+                "GROUP_NOT_TAKEN",
+                "NAME_DIFFERS",
+                "PRICE_DIFFERS",
+                "NO_BTO_PRICE",
+                "INACTIVE_IN_BTO",
+                "AMBIGUOUS",
+                "NO_BARCODE",
+                "MISSING_IN_ERKHET"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "A code, a name or a barcode of either side",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "open",
+            "required": false,
+            "in": "query",
+            "description": "true: only rows not settled yet",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErkhetItemPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erkhet"
+        ]
+      }
+    },
+    "/api/v1/erkhet/sync/apply": {
+      "post": {
+        "operationId": "Erkhet_apply",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErkhetApplyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErkhetApplyResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Brings Bto to Erkhet for the chosen rows, or for every open row of one issue.",
+        "tags": [
+          "erkhet"
+        ]
+      }
     }
   },
   "info": {
@@ -45088,6 +45442,9 @@
           "ebarimt.check.edit",
           "ebarimt.check.assign",
           "ebarimt.check.settings",
+          "erkhet.sync.read",
+          "erkhet.sync.manage",
+          "erkhet.settings.manage",
           "imports.manage",
           "pricing.manage",
           "pricing.prices.manage",
@@ -90561,6 +90918,545 @@
           "outcome"
         ]
       },
+      "ErkhetSettings": {
+        "type": "object",
+        "properties": {
+          "baseUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "companyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasPassword": {
+            "type": "boolean",
+            "description": "A password is saved"
+          },
+          "passwordUnreadable": {
+            "type": "boolean",
+            "description": "A saved password ERKHET_KEY_SECRET no longer opens"
+          },
+          "secretReady": {
+            "type": "boolean",
+            "description": "ERKHET_KEY_SECRET is set, so a password can be saved"
+          },
+          "nightly": {
+            "type": "boolean"
+          },
+          "complete": {
+            "type": "boolean",
+            "description": "Everything a check needs is saved"
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "updatedBy": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "baseUrl",
+          "companyId",
+          "username",
+          "hasPassword",
+          "passwordUnreadable",
+          "secretReady",
+          "nightly",
+          "complete",
+          "updatedAt",
+          "updatedBy"
+        ]
+      },
+      "ErkhetSettingsUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "baseUrl": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200,
+            "description": "Erkhet's address, https only"
+          },
+          "companyId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The company inside Erkhet"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "password": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "maxLength": 200,
+            "writeOnly": true,
+            "description": "null removes the saved password. Never returned"
+          },
+          "nightly": {
+            "type": "boolean",
+            "description": "A check every night"
+          }
+        }
+      },
+      "ErkhetSettingsTestRequest": {
+        "type": "object",
+        "properties": {
+          "baseUrl": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Typed values; the saved ones fill what is not typed"
+          },
+          "companyId": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "writeOnly": true
+          }
+        }
+      },
+      "ErkhetSettingsTestResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "reason": {
+            "nullable": true,
+            "enum": [
+              "LOGIN_FAILED",
+              "COMPANY_UNREACHABLE",
+              "UNREACHABLE",
+              "TIMEOUT",
+              "UNEXPECTED_ANSWER",
+              "NOT_CONFIGURED",
+              "KEY_UNREADABLE"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "type": "number",
+            "nullable": true,
+            "description": "Erkhet's HTTP status, when it gave one"
+          }
+        },
+        "required": [
+          "ok",
+          "reason",
+          "status"
+        ]
+      },
+      "ErkhetListSummary": {
+        "type": "object",
+        "properties": {
+          "erkhet": {
+            "type": "number",
+            "description": "Rows in Erkhet's list"
+          },
+          "bto": {
+            "type": "number",
+            "description": "Active rows on Bto's side"
+          },
+          "agreed": {
+            "type": "number",
+            "description": "Erkhet rows that agree with Bto"
+          },
+          "issues": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Rows per issue"
+          }
+        },
+        "required": [
+          "erkhet",
+          "bto",
+          "agreed",
+          "issues"
+        ]
+      },
+      "ErkhetRunSummary": {
+        "type": "object",
+        "properties": {
+          "customers": {
+            "$ref": "#/components/schemas/ErkhetListSummary"
+          },
+          "products": {
+            "$ref": "#/components/schemas/ErkhetListSummary"
+          }
+        },
+        "required": [
+          "customers",
+          "products"
+        ]
+      },
+      "ErkhetRun": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "DONE",
+              "FAILED"
+            ],
+            "type": "string"
+          },
+          "trigger": {
+            "enum": [
+              "MANUAL",
+              "NIGHTLY"
+            ],
+            "type": "string"
+          },
+          "startedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "failure": {
+            "nullable": true,
+            "enum": [
+              "NOT_CONFIGURED",
+              "KEY_UNREADABLE",
+              "LOGIN_FAILED",
+              "COMPANY_UNREACHABLE",
+              "UNREACHABLE",
+              "TIMEOUT",
+              "UNEXPECTED_ANSWER",
+              "UNEXPECTED_FILE",
+              "INTERRUPTED",
+              "INTERNAL"
+            ],
+            "type": "string"
+          },
+          "summary": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErkhetRunSummary"
+              }
+            ]
+          },
+          "itemCount": {
+            "type": "number",
+            "description": "Rows of this check still kept"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "trigger",
+          "startedBy",
+          "createdAt",
+          "finishedAt",
+          "failure",
+          "summary",
+          "itemCount"
+        ]
+      },
+      "ErkhetOverview": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "description": "A complete sign-in is saved"
+          },
+          "nightly": {
+            "type": "boolean"
+          },
+          "active": {
+            "nullable": true,
+            "description": "Waiting or running now",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErkhetRun"
+              }
+            ]
+          },
+          "latest": {
+            "nullable": true,
+            "description": "The latest finished check",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErkhetRun"
+              }
+            ]
+          },
+          "failed": {
+            "nullable": true,
+            "description": "A later check that failed",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErkhetRun"
+              }
+            ]
+          }
+        },
+        "required": [
+          "configured",
+          "nightly",
+          "active",
+          "latest",
+          "failed"
+        ]
+      },
+      "ErkhetCustomerPlan": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "number"
+          },
+          "settlementGroup": {
+            "enum": [
+              "DAY_20",
+              "MONTH_END"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "COMPANY",
+              "INDIVIDUAL"
+            ],
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "categoryId",
+          "settlementGroup",
+          "kind",
+          "phone"
+        ]
+      },
+      "ErkhetItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "enum": [
+              "CUSTOMER",
+              "PRODUCT"
+            ],
+            "type": "string"
+          },
+          "issue": {
+            "enum": [
+              "MISSING_IN_BTO",
+              "GROUP_NOT_TAKEN",
+              "NAME_DIFFERS",
+              "PRICE_DIFFERS",
+              "NO_BTO_PRICE",
+              "INACTIVE_IN_BTO",
+              "AMBIGUOUS",
+              "NO_BARCODE",
+              "MISSING_IN_ERKHET"
+            ],
+            "type": "string"
+          },
+          "erkhetCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "erkhetName": {
+            "type": "string",
+            "nullable": true
+          },
+          "erkhetGroup": {
+            "type": "string",
+            "nullable": true
+          },
+          "erkhetBarcodes": {
+            "type": "string",
+            "nullable": true
+          },
+          "erkhetPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "MNT"
+          },
+          "btoId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The customer or product in Bto"
+          },
+          "btoCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "btoName": {
+            "type": "string",
+            "nullable": true
+          },
+          "btoPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "MNT"
+          },
+          "plan": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErkhetCustomerPlan"
+              }
+            ]
+          },
+          "resolution": {
+            "nullable": true,
+            "enum": [
+              "APPLIED",
+              "STALE",
+              "REFUSED"
+            ],
+            "type": "string"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "issue",
+          "erkhetCode",
+          "erkhetName",
+          "erkhetGroup",
+          "erkhetBarcodes",
+          "erkhetPrice",
+          "btoId",
+          "btoCode",
+          "btoName",
+          "btoPrice",
+          "plan",
+          "resolution",
+          "resolvedAt"
+        ]
+      },
+      "ErkhetItemPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErkhetItem"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "ErkhetApplyRequest": {
+        "type": "object",
+        "properties": {
+          "itemIds": {
+            "minItems": 1,
+            "description": "Chosen rows (1–500); without them, a kind and an issue",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "kind": {
+            "enum": [
+              "CUSTOMER",
+              "PRODUCT"
+            ],
+            "type": "string"
+          },
+          "issue": {
+            "enum": [
+              "MISSING_IN_BTO",
+              "GROUP_NOT_TAKEN",
+              "NAME_DIFFERS",
+              "PRICE_DIFFERS",
+              "NO_BTO_PRICE",
+              "INACTIVE_IN_BTO",
+              "AMBIGUOUS",
+              "NO_BARCODE",
+              "MISSING_IN_ERKHET"
+            ],
+            "type": "string",
+            "description": "Every open row of this issue, 500 at a time"
+          }
+        }
+      },
+      "ErkhetApplyResult": {
+        "type": "object",
+        "properties": {
+          "applied": {
+            "type": "number",
+            "description": "Bto now says what Erkhet says"
+          },
+          "stale": {
+            "type": "number",
+            "description": "Bto changed since the check: left alone"
+          },
+          "refused": {
+            "type": "number",
+            "description": "A rule of Bto refused the change"
+          },
+          "skipped": {
+            "type": "number",
+            "description": "Already settled, or nothing to do"
+          }
+        },
+        "required": [
+          "applied",
+          "stale",
+          "refused",
+          "skipped"
+        ]
+      },
       "ErrorCode": {
         "type": "string",
         "enum": [
@@ -90694,6 +91590,10 @@
           "AI_PRICE_REQUIRED",
           "PICTURE_NOT_CONFIGURED",
           "PICTURE_PROVIDER_FAILED",
+          "ERKHET_NOT_CONFIGURED",
+          "ERKHET_KEY_SECRET_MISSING",
+          "ERKHET_SYNC_RUNNING",
+          "ERKHET_RUN_SUPERSEDED",
           "UNIT_SUPERSEDED",
           "PRICE_MISSING",
           "DISCOUNT_OVER_CAP",

@@ -5,6 +5,8 @@ import { JobsWorkerModule } from './common/jobs/worker/jobs-worker.module';
 import { CoreModule } from './core.module';
 import { HealthCoreModule } from './health/health.module';
 import { WorkerHealthServer } from './health/worker-health.server';
+import { ErkhetIntegrationModule } from './integrations/erkhet';
+import { ErkhetWorkerModule } from './modules/erkhet';
 import { FinBridgeModule } from './modules/fin-bridge';
 import { FinanceWorkerModule } from './modules/finance';
 import { IdentityWorkerModule } from './modules/identity';
@@ -29,6 +31,9 @@ import { ReportingWorkerModule } from './modules/reporting';
     FinBridgeModule,
     NotificationsWorkerModule,
     ReportingWorkerModule,
+    // The checks of Erkhet's lists (ADR-0203): the worker signs in to Erkhet and compares.
+    ErkhetIntegrationModule,
+    ErkhetWorkerModule,
   ],
   providers: [WorkerHealthServer],
 })

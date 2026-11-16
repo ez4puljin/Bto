@@ -106,6 +106,19 @@ export const EnvSchema = z.object({
         error: 'AI_KEY_SECRET must be 32 bytes in base64',
       }),
   ),
+  /**
+   * Seals Erkhet's password saved on the settings screen (ADR-0203): 32 random bytes in base64, a
+   * secret like JWT_SECRET. The api seals with it and the worker opens what it sealed, so both
+   * read it. Without it no sign-in can be saved and no check runs.
+   */
+  ERKHET_KEY_SECRET: unsetWhenEmpty(
+    z
+      .string()
+      .trim()
+      .refine((value) => Buffer.from(value, 'base64').length === 32, {
+        error: 'ERKHET_KEY_SECRET must be 32 bytes in base64',
+      }),
+  ),
   /** The assistant's own pool (§10.2); at most the role's CONNECTION LIMIT 4. */
   AI_POOL_MAX: unsetWhenEmpty(z.coerce.number().int().min(1).max(4)),
 });

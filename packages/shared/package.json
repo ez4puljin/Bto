@@ -62,6 +62,11 @@
       "types": "./dist/ebarimt-check/index.d.ts",
       "default": "./dist/ebarimt-check/index.js"
     },
+    "./erkhet": {
+      "@tugeel/source": "./src/erkhet/index.ts",
+      "types": "./dist/erkhet/index.d.ts",
+      "default": "./dist/erkhet/index.js"
+    },
     "./expiry": {
       "@tugeel/source": "./src/expiry/index.ts",
       "types": "./dist/expiry/index.d.ts",

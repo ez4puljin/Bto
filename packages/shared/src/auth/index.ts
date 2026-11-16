@@ -54,6 +54,11 @@ export const PERMISSIONS = [
   'ebarimt.check.edit',
   'ebarimt.check.assign',
   'ebarimt.check.settings',
+  // «Эрхэт тулгалт» (ADR-0203): read a check of Erkhet's customers and items against Bto's; start a
+  // check and bring Bto to Erkhet (new customers, names, warehouse prices); Erkhet's sign-in.
+  'erkhet.sync.read',
+  'erkhet.sync.manage',
+  'erkhet.settings.manage',
   'imports.manage',
   'pricing.manage',
   'pricing.prices.manage',
@@ -266,6 +271,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'ebarimt.check.read',
     'ebarimt.check.edit',
     'ebarimt.check.settings',
+    // Erkhet's lists against Bto's (ADR-0203): reading only; bringing Bto to Erkhet is the admin's.
+    'erkhet.sync.read',
     // A record's status and who is liable for it (ADR-0172 #4).
     'expiry.items.manage',
     'expiry.liability.manage',

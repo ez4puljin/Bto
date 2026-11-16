@@ -34,6 +34,9 @@ x-app-env: &app-env
   PGBOSS_POOL_MAX: '2'
   STORAGE_DRIVER: local
   STORAGE_LOCAL_DIR: /data/storage
+  # Erkhet's password (ADR-0203) is typed on «Эрхэт тулгалт» and sealed with this: the api seals,
+  # the worker opens it to run a check.
+  ERKHET_KEY_SECRET: ${ERKHET_KEY_SECRET:?set ERKHET_KEY_SECRET in deploy/store/.env}
 
 # What every api process reads besides: the primary and, when the PC runs them, the replicas for
 # the apps and for the reports (ADR-0192). The pool size is each service's own.

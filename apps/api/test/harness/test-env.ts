@@ -84,6 +84,7 @@ export function applyWorkerEnv(project: DbProject): void {
     APP_VERSION: 'test',
     JWT_SECRET: 'test-jwt-secret-0123456789abcdefghijklmnop',
     AI_KEY_SECRET: Buffer.alloc(32, 7).toString('base64'),
+    ERKHET_KEY_SECRET: Buffer.alloc(32, 9).toString('base64'),
     AUTH_PEPPER: 'test-auth-pepper-0123456789abcdefghijklmnop',
     COOKIE_SECURE: 'false',
     STORAGE_DRIVER: 'local',

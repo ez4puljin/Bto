@@ -1,0 +1,526 @@
+import type { INestApplicationContext } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import { Test } from '@nestjs/testing';
+import ExcelJS from 'exceljs';
+import type { Client } from 'pg';
+import request from 'supertest';
+import { ERKHET_FETCH, type ErkhetFetch } from '../../src/integrations/erkhet';
+import { systemActor } from '../../src/modules/identity';
+import { ErkhetRunFlowService } from '../../src/modules/erkhet/services/erkhet-run-flow.service';
+import { ErkhetSyncService } from '../../src/modules/erkhet/services/erkhet-sync.service';
+import { WorkerModule } from '../../src/worker.module';
+import { connectAs, createHttpApp } from '../harness/apps';
+import { catalogApi, idempotency } from '../harness/catalog';
+import { bearer, customRoleUser, login, seedUser } from '../harness/identity';
+import { partnersApi } from '../harness/partners';
+import { pricingApi } from '../harness/pricing';
+
+/** Not a real sign-in: no test reaches Erkhet, the «Erkhet» below is scripted. */
+const PASSWORD = 'test-erkhet-password-not-real';
+const COMPANY = '1234567890';
+const EAN_A = '4006381333931';
+const EAN_B = '5901234123457';
+
+async function workbook(rows: (string | number | null)[][]): Promise<Uint8Array<ArrayBuffer>> {
+  const book = new ExcelJS.Workbook();
+  const sheet = book.addWorksheet('Sheet_0');
+  for (const row of rows) sheet.addRow(row);
+  // Copied: a Response body wants bytes over a plain ArrayBuffer.
+  return Uint8Array.from(Buffer.from(await book.xlsx.writeBuffer()));
+}
+
+const itemSheet = (rows: [string, string, string, number][]) =>
+  workbook([
+    ['Код', 'Нэр', 'Ангилал код', 'Ангилал нэр', 'Гадаад нэр', 'Баркод', 'Нэгж үнэ'],
+    ...rows.map(([code, name, barcodes, price]) => [
+      code,
+      name,
+      '101',
+      'Ундаа',
+      '',
+      barcodes,
+      price,
+    ]),
+  ]);
+
+const customerSheet = (rows: [string, string, string, string, string][]) =>
+  workbook([
+    ['Код', 'Нэр', 'Бүлэг код', 'Бүлэг нэр', 'мэйл', 'Хаяг', 'Утас'],
+    ...rows.map(([code, name, groupCode, groupName, phone]) => [
+      code,
+      name,
+      groupCode,
+      groupName,
+      '',
+      '',
+      phone,
+    ]),
+  ]);
+
+/**
+ * «Эрхэт тулгалт» (ADR-0203) over HTTP, with the check itself run as the worker runs it. Erkhet is
+ * scripted, so what is checked is ours: rights, the sign-in's secrecy, what a check finds, and
+ * that «Bto-д тааруулах» changes customers and prices only through their own rules.
+ */
+describe('Erkhet sync check', () => {
+  let app: NestExpressApplication;
+  let worker: INestApplicationContext;
+  let flow: ErkhetRunFlowService;
+  let sql: Client;
+  let admin: string;
+  let reader: string;
+  let outsider: string;
+  let ward: number;
+  let agreed: { id: number };
+  let renamed: { id: number };
+  let cola: { id: number };
+  let juice: { id: number };
+  let profile: number;
+  /** What the scripted Erkhet holds; a test changes it before a check. */
+  const erkhet = {
+    password: PASSWORD,
+    items: new Uint8Array(),
+    customers: new Uint8Array(),
+    posts: 0,
+  };
+  const http = () => request(app.getHttpServer());
+
+  const scriptedErkhet: ErkhetFetch = (url, init) => {
+    const headers = init.headers as Record<string, string>;
+    const { pathname, searchParams } = new URL(url);
+    const redirect = (location: string, cookie?: string) =>
+      new Response(null, {
+        status: 302,
+        headers: { location, ...(cookie ? { 'set-cookie': cookie } : {}) },
+      });
+    if (init.method === 'POST') erkhet.posts += 1;
+    if (pathname === '/login/' && init.method !== 'POST') {
+      return Promise.resolve(
+        new Response('<form>', { headers: { 'set-cookie': 'csrftoken=t1; Path=/' } }),
+      );
+    }
+    if (pathname === '/login/') {
+      const form = new URLSearchParams(typeof init.body === 'string' ? init.body : '');
+      return Promise.resolve(
+        form.get('password') === erkhet.password && form.get('login_with') === 'tester'
+          ? redirect(`/${COMPANY}/`, 'sessionid=s1; Path=/')
+          : new Response('<form>wrong</form>'),
+      );
+    }
+    if (!headers.Cookie?.includes('sessionid=s1')) return Promise.resolve(redirect('/login/'));
+    if (pathname === `/${COMPANY}/`) return Promise.resolve(new Response('home'));
+    if (pathname === `/${COMPANY}/transactions/trs/to-excel/`) {
+      const source = searchParams.get('source');
+      const data =
+        source === `/${COMPANY}/inventory/item/list/`
+          ? erkhet.items
+          : source === `/${COMPANY}/customers/list/`
+            ? erkhet.customers
+            : null;
+      return Promise.resolve(data ? new Response(data) : new Response('<html>', { status: 404 }));
+    }
+    return Promise.resolve(new Response('<html>', { status: 404 }));
+  };
+
+  const overview = async (token = admin) =>
+    (await http().get('/api/v1/erkhet/sync').set(bearer(token)).expect(200)).body as {
+      configured: boolean;
+      active: { id: number; status: string } | null;
+      latest: {
+        id: number;
+        status: string;
+        trigger: string;
+        itemCount: number;
+        summary: Record<
+          'customers' | 'products',
+          { erkhet: number; bto: number; agreed: number; issues: Record<string, number> }
+        >;
+      } | null;
+      failed: { id: number; failure: string } | null;
+    };
+  const start = (token = admin) => http().post('/api/v1/erkhet/sync/runs').set(bearer(token));
+  const items = async (query: Record<string, string>, token = admin) =>
+    (await http().get('/api/v1/erkhet/sync/items').query(query).set(bearer(token)).expect(200))
+      .body as {
+      data: {
+        id: number;
+        issue: string;
+        erkhetCode: string | null;
+        erkhetPrice: string | null;
+        btoId: number | null;
+        btoPrice: string | null;
+        resolution: string | null;
+        plan: Record<string, unknown> | null;
+      }[];
+      nextCursor: string | null;
+    };
+  const apply = (body: Record<string, unknown>, token = admin) =>
+    http().post('/api/v1/erkhet/sync/apply').set(bearer(token)).send(body);
+  /** A check from the button to its end, as the worker would run it. */
+  const check = async () => {
+    const run = (await start().expect(202)).body as { id: number; status: string };
+    expect(run.status).toBe('QUEUED');
+    return { id: run.id, ...(await flow.execute(run.id)) };
+  };
+  const priceOf = async (productId: number) =>
+    (
+      await sql.query<{ price: string }>(
+        `SELECT warehouse_price::text AS price FROM product_prices
+         WHERE product_id = $1 AND valid_to IS NULL`,
+        [productId],
+      )
+    ).rows[0]?.price;
+
+  beforeAll(async () => {
+    app = await createHttpApp({
+      override: (builder) => builder.overrideProvider(ERKHET_FETCH).useValue(scriptedErkhet),
+    });
+    // The worker's side without its job polling: the test runs a check itself.
+    worker = await Test.createTestingModule({ imports: [WorkerModule] })
+      .overrideProvider(ERKHET_FETCH)
+      .useValue(scriptedErkhet)
+      .compile();
+    flow = worker.get(ErkhetRunFlowService, { strict: false });
+    sql = await connectAs('migrator');
+    admin = (await login(app, await seedUser(app, { roles: ['ADMIN'] }))).accessToken;
+    reader = await customRoleUser(app, admin, ['erkhet.sync.read']);
+    outsider = (await login(app, await seedUser(app, { roles: ['WAREHOUSE'] }))).accessToken;
+
+    ward = (
+      (
+        await http()
+          .post('/api/v1/customer-categories')
+          .set(bearer(admin))
+          .set(idempotency())
+          .send({ name: '1-р хороо' })
+          .expect(201)
+      ).body as { id: number }
+    ).id;
+    const partners = partnersApi(app, admin);
+    agreed = await partners.customer({
+      code: '50001',
+      name: 'Нэг дэлгүүр',
+      categoryId: ward,
+      settlementGroup: 'MONTH_END',
+    });
+    renamed = await partners.customer({
+      code: '50002',
+      name: 'Хуучин нэр',
+      categoryId: ward,
+      settlementGroup: 'MONTH_END',
+    });
+
+    const catalog = catalogApi(app, admin);
+    const drinks = await catalog.category('Ундаа');
+    const pcs = await catalog.uomId('PCS');
+    cola = await catalog.product({
+      sku: '100001',
+      name: 'Кола 0.5л',
+      categoryId: drinks,
+      baseUomId: pcs,
+      baseBarcodes: [EAN_A],
+    });
+    juice = await catalog.product({
+      sku: '100002',
+      name: 'Жүүс 1л',
+      categoryId: drinks,
+      baseUomId: pcs,
+      baseBarcodes: [EAN_B],
+    });
+    const pricing = pricingApi(app, admin);
+    profile = await pricing.profile('Үндсэн');
+    await pricing.terms(cola.id, '1500', profile, null);
+    await pricing.terms(juice.id, '2000', profile, null);
+
+    erkhet.items = await itemSheet([
+      // Erkhet's codes are not Bto's: the barcode is what joins them.
+      ['900001', 'Кола 0.5л', EAN_A, 1500],
+      ['900002', 'Жүүс 1л', `${EAN_B}, 12345`, 2100],
+      ['900003', 'Шинэ бараа', '8690000000005', 990],
+    ]);
+    erkhet.customers = await customerSheet([
+      ['50001', 'Нэг дэлгүүр', '501', '1-р хороо', ''],
+      ['50002', 'Шинэ нэр', '501', '1-р хороо', ''],
+      ['50009', 'Гурав дэлгүүр', '501', '1-р хороо', '99112233'],
+      ['80001', 'Хархорин дэлгүүр', '82', 'Хархорин', ''],
+    ]);
+  });
+
+  afterAll(async () => {
+    await sql.end();
+    await worker.close();
+    await app.close();
+  });
+
+  it('keeps the routes to their rights', async () => {
+    for (const token of [reader, outsider]) {
+      await http().get('/api/v1/erkhet/settings').set(bearer(token)).expect(403);
+      await http().patch('/api/v1/erkhet/settings').set(bearer(token)).send({}).expect(403);
+      await http().post('/api/v1/erkhet/settings/test').set(bearer(token)).send({}).expect(403);
+      await start(token).expect(403);
+      await apply({ kind: 'PRODUCT', issue: 'PRICE_DIFFERS' }, token).expect(403);
+    }
+    await http().get('/api/v1/erkhet/sync').set(bearer(outsider)).expect(403);
+    await http()
+      .get('/api/v1/erkhet/sync/items')
+      .query({ kind: 'PRODUCT' })
+      .set(bearer(outsider))
+      .expect(403);
+    await overview(reader);
+  });
+
+  it('starts no check before a sign-in is saved', async () => {
+    expect((await overview()).configured).toBe(false);
+    const refused = await start().expect(409);
+    expect(refused.body).toMatchObject({ code: 'ERKHET_NOT_CONFIGURED' });
+  });
+
+  it('saves the sign-in sealed and never gives the password back', async () => {
+    const saved = await http()
+      .patch('/api/v1/erkhet/settings')
+      .set(bearer(admin))
+      .send({
+        baseUrl: 'https://erkhet.test/login/?next=/',
+        companyId: COMPANY,
+        username: ' tester ',
+        password: PASSWORD,
+      })
+      .expect(200);
+    expect(saved.body).toMatchObject({
+      baseUrl: 'https://erkhet.test',
+      companyId: COMPANY,
+      username: 'tester',
+      hasPassword: true,
+      passwordUnreadable: false,
+      secretReady: true,
+      nightly: true,
+      complete: true,
+    });
+    expect(JSON.stringify(saved.body)).not.toContain(PASSWORD);
+    const stored = await sql.query<{ sealed: string }>(
+      'SELECT password_sealed AS sealed FROM erkhet_settings WHERE id = 1',
+    );
+    expect(stored.rows[0]?.sealed).toMatch(/^v1\./);
+    expect(stored.rows[0]?.sealed).not.toContain(PASSWORD);
+    const audit = await sql.query<{ row: string }>(
+      `SELECT row_to_json(a)::text AS row FROM audit_log a WHERE entity = 'erkhet_settings'`,
+    );
+    expect(audit.rows).toHaveLength(1);
+    expect(audit.rows[0]?.row).not.toContain(PASSWORD);
+    expect(audit.rows[0]?.row).not.toContain(stored.rows[0]?.sealed);
+
+    await http()
+      .patch('/api/v1/erkhet/settings')
+      .set(bearer(admin))
+      .send({ baseUrl: 'http://erkhet.test' })
+      .expect(422);
+    const ok = await http()
+      .post('/api/v1/erkhet/settings/test')
+      .set(bearer(admin))
+      .send({})
+      .expect(200);
+    expect(ok.body).toEqual({ ok: true, reason: null, status: null });
+    const wrong = await http()
+      .post('/api/v1/erkhet/settings/test')
+      .set(bearer(admin))
+      .send({ password: 'another-password' })
+      .expect(200);
+    expect(wrong.body).toMatchObject({ ok: false, reason: 'LOGIN_FAILED' });
+    // The saved password is never tried against an address that is only typed.
+    const elsewhere = await http()
+      .post('/api/v1/erkhet/settings/test')
+      .set(bearer(admin))
+      .send({ baseUrl: 'https://elsewhere.test' })
+      .expect(200);
+    expect(elsewhere.body).toMatchObject({ ok: false, reason: 'NOT_CONFIGURED' });
+  });
+
+  it('runs one check at a time and stores what differs', async () => {
+    const run = (await start().expect(202)).body as { id: number };
+    expect((await start().expect(409)).body).toMatchObject({ code: 'ERKHET_SYNC_RUNNING' });
+    expect((await overview()).active).toMatchObject({ id: run.id, status: 'QUEUED' });
+    expect(await flow.execute(run.id)).toEqual({ status: 'DONE' });
+    // A second delivery of the job leaves a finished check alone.
+    expect(await flow.execute(run.id)).toEqual({ status: 'SKIPPED' });
+
+    const seen = await overview(reader);
+    expect(seen.active).toBeNull();
+    expect(seen.latest).toMatchObject({ id: run.id, status: 'DONE', trigger: 'MANUAL' });
+    expect(seen.latest?.summary.customers).toEqual({
+      erkhet: 4,
+      bto: 2,
+      agreed: 1,
+      issues: { NAME_DIFFERS: 1, MISSING_IN_BTO: 1, GROUP_NOT_TAKEN: 1 },
+    });
+    expect(seen.latest?.summary.products).toEqual({
+      erkhet: 3,
+      bto: 2,
+      agreed: 1,
+      issues: { PRICE_DIFFERS: 1, MISSING_IN_BTO: 1 },
+    });
+    expect(seen.latest?.itemCount).toBe(5);
+
+    const prices = await items({ kind: 'PRODUCT', issue: 'PRICE_DIFFERS' }, reader);
+    expect(prices.data).toHaveLength(1);
+    expect(prices.data[0]).toMatchObject({
+      erkhetCode: '900002',
+      erkhetPrice: '2100.00',
+      btoId: juice.id,
+      btoPrice: '2000.00',
+      resolution: null,
+    });
+    expect((await items({ kind: 'PRODUCT', q: 'шинэ бар' })).data.map((row) => row.issue)).toEqual([
+      'MISSING_IN_BTO',
+    ]);
+    const paged = await items({ kind: 'CUSTOMER', limit: '2' });
+    expect(paged.data).toHaveLength(2);
+    const rest = await items({ kind: 'CUSTOMER', limit: '2', cursor: paged.nextCursor ?? '' });
+    expect(rest.data).toHaveLength(1);
+    expect(rest.nextCursor).toBeNull();
+    // Reading Erkhet never posts anything but the sign-in form.
+    expect(erkhet.posts).toBeGreaterThan(0);
+  });
+
+  it('brings Bto to Erkhet through the customers and prices own rules', async () => {
+    const before = (await overview()).latest;
+    const priced = await apply({ kind: 'PRODUCT', issue: 'PRICE_DIFFERS' }).expect(200);
+    expect(priced.body).toEqual({ applied: 1, stale: 0, refused: 0, skipped: 0 });
+    expect(await priceOf(juice.id)).toBe('2100.00');
+    expect(await priceOf(cola.id)).toBe('1500.00');
+    // Again: the row is settled, nothing is written twice.
+    expect((await apply({ kind: 'PRODUCT', issue: 'PRICE_DIFFERS' }).expect(200)).body).toEqual({
+      applied: 0,
+      stale: 0,
+      refused: 0,
+      skipped: 0,
+    });
+
+    const customers = await items({ kind: 'CUSTOMER' });
+    const missing = customers.data.find((row) => row.issue === 'MISSING_IN_BTO');
+    const outside = customers.data.find((row) => row.issue === 'GROUP_NOT_TAKEN');
+    const differs = customers.data.find((row) => row.issue === 'NAME_DIFFERS');
+    expect(missing?.plan).toEqual({
+      categoryId: ward,
+      settlementGroup: 'MONTH_END',
+      kind: 'COMPANY',
+      phone: '+97699112233',
+    });
+    const done = await apply({
+      itemIds: [missing?.id, outside?.id, differs?.id],
+    }).expect(200);
+    // A group Bto never took is shown, never created.
+    expect(done.body).toEqual({ applied: 2, stale: 0, refused: 0, skipped: 1 });
+    const created = await sql.query<{
+      name: string;
+      phone: string;
+      category_id: string;
+      settlement_group: string;
+    }>(`SELECT name, phone, category_id, settlement_group FROM customers WHERE code = '50009'`);
+    expect(created.rows[0]).toEqual({
+      name: 'Гурав дэлгүүр',
+      phone: '+97699112233',
+      category_id: String(ward),
+      settlement_group: 'MONTH_END',
+    });
+    expect(await partnersApi(app, admin).getCustomer(renamed.id)).toMatchObject({
+      name: 'Шинэ нэр',
+    });
+    expect(await partnersApi(app, admin).getCustomer(agreed.id)).toMatchObject({
+      name: 'Нэг дэлгүүр',
+    });
+    expect((await sql.query(`SELECT 1 FROM customers WHERE code = '80001'`)).rowCount).toBe(0);
+    // Every change is the acting person's, in the audit of the table it changed.
+    const audited = await sql.query<{ entity: string; action: string }>(
+      `SELECT entity, action FROM audit_log
+       WHERE (entity = 'customers'
+              AND entity_id::text IN (SELECT id::text FROM customers WHERE code IN ('50002', '50009')))
+          OR entity = 'product_prices'
+       ORDER BY id`,
+    );
+    expect(
+      audited.rows
+        .filter((row) => row.entity === 'customers')
+        .map((row) => row.action)
+        .sort(),
+    ).toEqual(['CREATE', 'CREATE', 'UPDATE']);
+    expect(audited.rows.some((row) => row.entity === 'product_prices')).toBe(true);
+    expect(before?.id).toBe((await overview()).latest?.id);
+    expect((await items({ kind: 'CUSTOMER', open: 'true' })).data.map((row) => row.issue)).toEqual([
+      'GROUP_NOT_TAKEN',
+    ]);
+  });
+
+  it('leaves alone what changed in Bto since the check, and rows of an older check', async () => {
+    const first = (await overview()).latest;
+    const old = (await items({ kind: 'CUSTOMER', issue: 'GROUP_NOT_TAKEN' })).data[0];
+    erkhet.items = await itemSheet([
+      ['900001', 'Кола 0.5л', EAN_A, 1600],
+      ['900002', 'Жүүс 1л', EAN_B, 2100],
+    ]);
+    expect(await check()).toMatchObject({ status: 'DONE' });
+    const second = (await overview()).latest;
+    expect(second?.id).toBeGreaterThan(first?.id ?? 0);
+    expect(second?.summary.customers.issues).toEqual({ GROUP_NOT_TAKEN: 1 });
+    expect(second?.summary.products.issues).toEqual({ PRICE_DIFFERS: 1 });
+
+    // Someone sets another price by hand after the check.
+    await pricingApi(app, admin).terms(cola.id, '1700', profile, null);
+    const stale = await apply({ kind: 'PRODUCT', issue: 'PRICE_DIFFERS' }).expect(200);
+    expect(stale.body).toEqual({ applied: 0, stale: 1, refused: 0, skipped: 0 });
+    expect(await priceOf(cola.id)).toBe('1700.00');
+    expect((await items({ kind: 'PRODUCT' })).data[0]).toMatchObject({ resolution: 'STALE' });
+
+    const superseded = await apply({ itemIds: [old?.id] }).expect(409);
+    expect(superseded.body).toMatchObject({ code: 'ERKHET_RUN_SUPERSEDED' });
+    await apply({ itemIds: [999_999_999] }).expect(422);
+    await apply({}).expect(422);
+  });
+
+  it('says why a check failed and keeps the last good one on the page', async () => {
+    const good = (await overview()).latest;
+    erkhet.password = 'changed-in-erkhet';
+    expect(await check()).toMatchObject({ status: 'FAILED', failure: 'LOGIN_FAILED' });
+    erkhet.password = PASSWORD;
+    const seen = await overview();
+    expect(seen.failed).toMatchObject({ failure: 'LOGIN_FAILED' });
+    expect(seen.latest?.id).toBe(good?.id);
+    expect(seen.active).toBeNull();
+
+    // A file that is not the list is refused whole.
+    const customers = erkhet.customers;
+    erkhet.customers = erkhet.items;
+    expect(await check()).toMatchObject({ status: 'FAILED', failure: 'UNEXPECTED_FILE' });
+    erkhet.customers = customers;
+    expect((await overview()).latest?.id).toBe(good?.id);
+  });
+
+  it("starts the night's check once a day, and not when it is switched off", async () => {
+    // The same service the worker's schedule calls; the api's copy has pg-boss started.
+    const sync = app.get(ErkhetSyncService, { strict: false });
+    const actor = systemActor('job:erkhet.nightly');
+    const night = await sync.startNightly(actor);
+    expect(night.started).toBe(true);
+    expect(await sync.startNightly(actor)).toEqual({
+      started: false,
+      reason: 'ERKHET_SYNC_RUNNING',
+    });
+    expect(await flow.execute(night.runId ?? 0)).toEqual({ status: 'DONE' });
+    expect((await overview()).latest).toMatchObject({ id: night.runId, trigger: 'NIGHTLY' });
+    expect(await sync.startNightly(actor)).toEqual({ started: false, reason: 'ALREADY_TODAY' });
+
+    await http()
+      .patch('/api/v1/erkhet/settings')
+      .set(bearer(admin))
+      .send({ nightly: false })
+      .expect(200);
+    expect(await sync.startNightly(actor)).toEqual({ started: false, reason: 'SWITCHED_OFF' });
+    // A new address takes the saved password away: it was typed for the old one.
+    const moved = await http()
+      .patch('/api/v1/erkhet/settings')
+      .set(bearer(admin))
+      .send({ baseUrl: 'https://erkhet2.test' })
+      .expect(200);
+    expect(moved.body).toMatchObject({ hasPassword: false, complete: false });
+    expect(await sync.startNightly(actor)).toEqual({ started: false, reason: 'NOT_CONFIGURED' });
+  });
+});

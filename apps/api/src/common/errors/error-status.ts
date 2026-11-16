@@ -145,6 +145,12 @@ export const ERROR_HTTP_STATUS = {
   // product pictures: no background service key; the service failed (ADR-0198)
   PICTURE_NOT_CONFIGURED: 503,
   PICTURE_PROVIDER_FAILED: 502,
+  // erkhet: no sign-in saved; it cannot be sealed; a check is already running; rows of an older
+  // check than the latest (ADR-0203)
+  ERKHET_NOT_CONFIGURED: 409,
+  ERKHET_KEY_SECRET_MISSING: 503,
+  ERKHET_SYNC_RUNNING: 409,
+  ERKHET_RUN_SUPERSEDED: 409,
   UNIT_SUPERSEDED: 409,
   PRICE_MISSING: 422,
   DISCOUNT_OVER_CAP: 422,

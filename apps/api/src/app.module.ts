@@ -6,6 +6,7 @@ import { JobsModule } from './common/jobs/jobs.module';
 import { CoreModule } from './core.module';
 import { FinanceCoreModule } from './finance-core';
 import { HealthModule } from './health/health.module';
+import { ErkhetIntegrationModule } from './integrations/erkhet';
 import { LlmModule } from './integrations/llm';
 import { PictureModule } from './integrations/picture';
 import { AiHttpModule } from './modules/ai';
@@ -13,6 +14,7 @@ import { CatalogHttpModule } from './modules/catalog';
 import { EbarimtHttpModule } from './modules/ebarimt';
 import { EbarimtCheckHttpModule } from './modules/ebarimt-check';
 import { CustomerHttpModule } from './modules/customer';
+import { ErkhetHttpModule } from './modules/erkhet';
 import { ExpiryHttpModule } from './modules/expiry';
 import { FinBridgeHttpModule } from './modules/fin-bridge';
 import { FinanceHttpModule } from './modules/finance';
@@ -40,6 +42,7 @@ import { SegmentsHttpModule } from './modules/segments';
     HealthModule,
     LlmModule,
     PictureModule,
+    ErkhetIntegrationModule,
     FinanceCoreModule,
     FinBridgeHttpModule,
     IdentityHttpModule,
@@ -61,6 +64,7 @@ import { SegmentsHttpModule } from './modules/segments';
     EbarimtCheckHttpModule,
     ExpiryHttpModule,
     EbarimtHttpModule,
+    ErkhetHttpModule,
   ],
 })
 export class AppModule {}

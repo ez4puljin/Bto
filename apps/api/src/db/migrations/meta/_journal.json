@@ -715,6 +715,13 @@
       "when": 1794641299808,
       "tag": "0103_product_ai",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1794796723950,
+      "tag": "0104_erkhet_sync",
+      "breakpoints": true
     }
   ]
 }

@@ -25,6 +25,7 @@ import {
   Factory,
   FileChartColumn,
   FileSpreadsheet,
+  GitCompareArrows,
   FileStack,
   FileText,
   FolderTree,
@@ -460,6 +461,13 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         label: 'nav.ebarimtCheck',
         icon: ReceiptText,
         permission: 'ebarimt.check.read',
+      },
+      {
+        // Erkhet's customers and items against Bto's (ADR-0203): for whoever holds its own right.
+        to: '/finance/erkhet',
+        label: 'nav.erkhetSync',
+        icon: GitCompareArrows,
+        permission: 'erkhet.sync.read',
       },
       {
         to: '/finance/trial-balance',

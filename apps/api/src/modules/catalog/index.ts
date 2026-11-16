@@ -18,6 +18,7 @@ export {
   CatalogImportService,
   type CreatedProduct,
   type ImportProduct,
+  type ProductDirectoryEntry,
 } from './services/catalog-import.service';
 export {
   type CatalogRegistration,

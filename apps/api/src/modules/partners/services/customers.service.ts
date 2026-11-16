@@ -65,6 +65,17 @@ export interface CustomerInput {
   address?: AddressInput | null;
 }
 
+/** A customer as `directory()` lists it. */
+export interface CustomerDirectoryEntry {
+  id: number;
+  code: string;
+  name: string;
+  status: PartnerStatus;
+  kind: CustomerKind;
+  categoryId: number | null;
+  settlementGroup: SettlementGroup;
+}
+
 export type CustomerPatch = Partial<Omit<CustomerInput, 'address' | 'settlementGroup'>> & {
   status?: PartnerStatus;
 };
@@ -825,6 +836,25 @@ export class CustomersService implements OnModuleInit {
           inArray(sql<string>`lower(${customers.name})`, lowered),
         ),
       );
+  }
+
+  /**
+   * Every customer by what a check against another system's list compares (ADR-0203): the code,
+   * the name, the status, and what a new customer of the same category would take.
+   */
+  directory(executor: Db | Tx = this.db): Promise<CustomerDirectoryEntry[]> {
+    return executor
+      .select({
+        id: customers.id,
+        code: customers.code,
+        name: customers.name,
+        status: customers.status,
+        kind: customers.kind,
+        categoryId: customers.categoryId,
+        settlementGroup: customers.settlementGroup,
+      })
+      .from(customers)
+      .orderBy(asc(customers.id));
   }
 
   async findByCodes(codes: readonly string[], executor: Db | Tx = this.db) {
