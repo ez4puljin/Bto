@@ -5,7 +5,8 @@ import { type FormEvent, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DateInput } from '@/components/date-input';
-import { DialogFormFooter, FormField } from '@/components/form';
+import { FormField } from '@/components/form';
+import { Button } from '@/components/ui/button';
 import { MoneyInput } from '@/components/money-input';
 import { SegmentedControl } from '@/components/list';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -150,7 +151,8 @@ function PostingPreview(props: { debit: GlAccount; credit: GlAccount; amount: st
  * The owner's layout (ADR-0202): the fields on the left in the order they are asked — in or out,
  * how much, which accounts, what for, when, who — and a summary on the right that says what they
  * add up to: the account with its balance now and after, the tax ticks, the entry's two sides.
- * Money in reads green and money out red. The form lays itself out by its own width (the summary
+ * Money in reads green and money out red, the amount carries «₮», and the buttons that write the
+ * entry stand at the foot of the summary. The form lays itself out by its own width (the summary
  * stands beside the fields from 36rem, the fields pair up from 48rem) and the fields never move
  * while it is filled (ADR-0201): what comes and goes does so in the summary.
  */
@@ -365,6 +367,7 @@ export function TransactionDialog(props: {
                     ref={amountInput}
                     id="trx-amount"
                     className={cn('h-12 text-xl font-semibold', toneText)}
+                    suffix="₮"
                     value={amount}
                     onValueChange={setAmount}
                   />
@@ -512,14 +515,25 @@ export function TransactionDialog(props: {
                   />
                 </div>
               ) : null}
+              {/* The buttons under what they write (the owner's drawing, ADR-0202). */}
+              <div className="mt-auto grid gap-2 pt-2">
+                <Button type="submit" pending={mutations.postTransaction.isPending}>
+                  {t('common.save')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={mutations.postTransaction.isPending}
+                  onClick={() => void save(true)}
+                >
+                  {t('common.saveAndNew')}
+                </Button>
+                <Button type="button" variant="ghost" onClick={props.onClose}>
+                  {t('common.cancel')}
+                </Button>
+              </div>
             </section>
           </div>
-          <DialogFormFooter
-            pending={mutations.postTransaction.isPending}
-            onCancel={props.onClose}
-            submitLabel={t('common.save')}
-            onSaveAndNew={() => void save(true)}
-          />
         </form>
       </DialogContent>
     </Dialog>

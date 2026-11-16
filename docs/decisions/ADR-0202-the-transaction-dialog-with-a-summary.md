@@ -18,7 +18,8 @@ ADR-0201 made «Шинэ гүйлгээ» fit its screens. The owner then asked 
 3. **Words for cash and bank.** The title is «Орлого · Харилцах» or «Зарлага · Харилцах» and follows the choice. The accounts are «Мөнгөний данс» and «Юуны орлого» / «Юуны зарлага». The other journals keep «Данс» and «Харилцсан данс» and their own choice («Үүсгэх / Хаах», «Дебет / Кредит»). The form's one-line description is for a screen reader only.
 4. **Money in is green, money out red**: the chosen segment (`SegmentedControl tone`), the amount's figures and the balance after. Only for cash and bank; a debt made or a debit is neither good nor bad news.
 5. **The summary** holds what comes and goes while the form is filled, so no field moves (ADR-0201 #3): the account's whole name, its balance now and after this entry (Σ debit − Σ credit, plus a debit, less a credit), the two tax ticks, and the entry's two sides with names on up to two lines. Empty, it says what will show there.
-6. **The buttons stay in the dialog's footer** («Болих», «Хадгалаад шинэ», «Хадгалах»), as in every other dialog; the drawing had them in the summary.
+6. **The buttons stand at the foot of the summary**, under what they write, full width: «Хадгалах», «Хадгалаад шинэ», «Болих» (the owner, 2026-11-16: «товчнуудыг хураангуй руу зөө»; the first build had kept them in the footer, as in every other dialog). The dialog has no footer.
+7. **The amount carries «₮»** after its figures, inside the field and not part of its value (`MoneyInput suffix`).
 
 ## Alternatives considered
 
@@ -26,7 +27,7 @@ ADR-0201 made «Шинэ гүйлгээ» fit its screens. The owner then asked 
 |---|---|
 | One column in the order of the questions | Clearest to read, but the tallest: it only just fits a laptop's 633px, and the owner chose otherwise. |
 | The money's way drawn as two boxes and an arrow | Unusual, and cramped on a tablet 768px wide. |
-| The buttons inside the summary, as drawn | One dialog with its buttons elsewhere than all the others; the owner was told and may still ask for it. |
+| The buttons in the footer, as in every other dialog | Built first; the owner asked for the drawing's place. This dialog alone has its buttons elsewhere. |
 
 ## Consequences
 

@@ -90,6 +90,7 @@ import {
   SupplierLedgerPage,
 } from '@/features/finance/supplier-payables-pages';
 import { EbarimtPage } from '@/features/ebarimt-check/ebarimt-page';
+import { ErkhetSyncPage } from '@/features/erkhet/erkhet-sync-page';
 import { FinanceSettingsPage } from '@/features/finance/finance-settings-page';
 import { InvoicesPage } from '@/features/finance/invoices-page';
 import { BankStatementsPage } from '@/features/finance/bank-statements-page';
@@ -1121,6 +1122,15 @@ function financeRoutes(): RouteObject[] {
       element: (
         <RequirePermission permission="ebarimt.check.read">
           <EbarimtPage />
+        </RequirePermission>
+      ),
+    },
+    {
+      path: 'finance/erkhet',
+      handle: { width: 'wide' },
+      element: (
+        <RequirePermission permission="erkhet.sync.read">
+          <ErkhetSyncPage />
         </RequirePermission>
       ),
     },

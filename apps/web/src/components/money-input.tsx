@@ -37,10 +37,13 @@ export function MoneyInput({
   value,
   onValueChange,
   className,
+  suffix,
   ...props
 }: Omit<ComponentProps<typeof Input>, 'value' | 'onChange' | 'type'> & {
   value: string;
   onValueChange: (raw: string) => void;
+  /** A unit after the figures («₮»), drawn inside the field and not part of its value. */
+  suffix?: string;
 }) {
   const box = useRef<HTMLInputElement | null>(null);
   /** How many digits and points stood before the caret at the last keystroke. */
@@ -54,14 +57,14 @@ export function MoneyInput({
     before.current = null;
   }, [shown]);
 
-  return (
+  const field = (
     <Input
       {...props}
       ref={box}
       type="text"
       inputMode="decimal"
       autoComplete="off"
-      className={cn('text-right font-mono', className)}
+      className={cn('text-right font-mono', suffix && 'pr-8', className)}
       value={shown}
       onChange={(event) => {
         const typed = event.target.value;
@@ -78,5 +81,17 @@ export function MoneyInput({
         onValueChange(raw);
       }}
     />
+  );
+  if (!suffix) return field;
+  return (
+    <div className="relative">
+      {field}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-base font-medium text-muted-foreground"
+      >
+        {suffix}
+      </span>
+    </div>
   );
 }

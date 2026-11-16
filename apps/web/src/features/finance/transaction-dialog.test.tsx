@@ -143,6 +143,10 @@ describe('«Шинэ гүйлгээ» (ADR-0150)', () => {
     expect(summary.getByText(/^Гүйлгээний дараа:/)).toBeInTheDocument();
     expect(summary.getByText(words.withVat)).toBeInTheDocument();
     expect(summary.getByRole('group', { name: words.preview })).toBeInTheDocument();
+    // The buttons that write it stand under it, and the amount says its unit.
+    expect(summary.getByRole('button', { name: mn.common.save })).toBeInTheDocument();
+    expect(summary.getByRole('button', { name: mn.common.saveAndNew })).toBeInTheDocument();
+    expect(dialog.getByText('₮')).toBeInTheDocument();
     await user.click(dialog.getByRole('tab', { name: words.money.OUT }));
     expect(dialog.getByRole('heading', { name: /^Зарлага · Харилцах$/ })).toBeInTheDocument();
     expect(dialog.getByLabelText(words.reason.OUT)).toBeInTheDocument();
