@@ -13,12 +13,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { SaleEbarimt } from '@/features/finance/sale-ebarimt';
 import { openPrint, orderPrintPath } from './pipelines-api';
 import { usePrintFormat } from '@/lib/print-format';
 import { PrintFormatToggle } from '@/components/print-format-toggle';
 import type { Mover } from './use-mover';
 
-/** A move's question (the reason of a CANCEL stage) and, after it, the stage's documents. */
+/**
+ * A move's question (the reason of a CANCEL stage) and, after it, the stage's documents and the
+ * sale's e-Barimt receipt (ADR-0185).
+ */
 export function MoveDialogs({
   mover,
   showProblem = true,
@@ -62,7 +66,11 @@ export function MoveDialogs({
             <DialogTitle>{t('sales.boards.printTitle')}</DialogTitle>
             <DialogDescription>{t('sales.boards.printDescription')}</DialogDescription>
           </DialogHeader>
-          <div className="flex flex-wrap items-center gap-2">
+          <div
+            className={
+              mover.print?.kinds.length === 0 ? 'hidden' : 'flex flex-wrap items-center gap-2'
+            }
+          >
             <PrintFormatToggle value={format} onChange={setFormat} />
             {(mover.print?.kinds ?? []).map((kind) => (
               <Button
@@ -77,6 +85,9 @@ export function MoveDialogs({
               </Button>
             ))}
           </div>
+          {mover.print?.ebarimtOrder ? (
+            <SaleEbarimt orderNumber={mover.print.ebarimtOrder} />
+          ) : null}
           <DialogFooter closeLabel={t('common.close')} />
         </DialogContent>
       </Dialog>

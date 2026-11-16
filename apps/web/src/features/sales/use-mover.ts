@@ -11,11 +11,14 @@ import { useSalesMutations } from './pipelines-api';
 export interface MoveTarget {
   id: number;
   action: StageAction;
+  /** ADR-0185: a sale on this stage prepares the invoice's e-Barimt receipt. */
+  ebarimt?: boolean;
 }
 
 /**
  * Moving a card (ADR-0056 #3), on the board or from the order panel (ADR-0059): the request with
- * its key, a reason first for a CANCEL stage, then the documents the stage prints. A confirmation
+ * its key, a reason first for a CANCEL stage, then the documents the stage prints and, after a
+ * sale on a stage with «e-Barimt гаргах», the order's e-Barimt receipt (ADR-0185). A confirmation
  * of a customer with an overdue debt goes through and reminds in red (ADR-0101).
  */
 export function useMover() {
@@ -24,7 +27,12 @@ export function useMover() {
   const action = useAction();
   const [pending, setPending] = useState<{ orderId: number; stage: MoveTarget } | null>(null);
   const [reason, setReason] = useState('');
-  const [print, setPrint] = useState<{ orderId: number; kinds: PrintKind[] } | null>(null);
+  const [print, setPrint] = useState<{
+    orderId: number;
+    kinds: PrintKind[];
+    /** The order's number when its sale prepared an e-Barimt receipt to print. */
+    ebarimtOrder: string | null;
+  } | null>(null);
   const [key, setKey] = useState(randomUuid);
 
   const run = (orderId: number, stage: MoveTarget, why?: string) =>
@@ -42,7 +50,11 @@ export function useMover() {
       if (stage.action === 'CONFIRM' && overdue) {
         toast.warning(t('sales.overdue.confirmed', { amount: formatTugrik(overdue.amount) }));
       }
-      if (result.print.length > 0) setPrint({ orderId, kinds: result.print });
+      const ebarimtOrder =
+        stage.action === 'SALE' && stage.ebarimt === true ? result.order.number : null;
+      if (result.print.length > 0 || ebarimtOrder) {
+        setPrint({ orderId, kinds: result.print, ebarimtOrder });
+      }
     });
   return {
     pending,

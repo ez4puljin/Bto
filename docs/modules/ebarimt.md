@@ -74,7 +74,7 @@ The request never holds the merchant's TIN, `posNo`, district or branch number: 
 
 ## 7. Screens
 
-`/finance/ebarimt-receipts` «e-Barimt баримт» (menu «Санхүү», `finance.read`; refreshes every 15 s) and `/finance/ebarimt-receipts/:id/print`; the invoice's panel shows «e-Barimt» with the state and a link to the list; «e-Barimt гаргах» in the stage dialog (`sales.boards.ebarimt`).
+`/finance/ebarimt-receipts` «e-Barimt баримт» (menu «Санхүү», `finance.read`; refreshes every 15 s) and `/finance/ebarimt-receipts/:id/print`; the invoice's panel shows «e-Barimt» with the state and a link to the list; «e-Barimt гаргах» in the stage dialog (`sales.boards.ebarimt`). Since 2026-11-16 the dialog a move opens (`MoveDialogs`) shows the receipt where the sale was made: after a move onto a SALE stage with the switch on, `SaleEbarimt` (`features/finance/sale-ebarimt.tsx`) finds the order's receipt (`GET /ebarimt/receipts?q=<order number>`, every 2 s while PENDING or SENDING) and offers «НӨАТ-ын баримт хэвлэх» once it is CONFIRMED (the same print page: lottery and QR on the first print); a credit order says it has none, a person without `finance.read` is pointed to «Санхүү → e-Barimt баримт».
 
 ## 8. Tests
 
