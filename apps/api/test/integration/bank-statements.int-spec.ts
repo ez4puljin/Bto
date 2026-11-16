@@ -668,4 +668,64 @@ describe('bank statements, «Банкны хуулга хаах»', () => {
     expect(fees.getRow(2).getCell(14).value).toBe(2);
     expect(fees.getRow(2).getCell(19).value).toBe(180);
   });
+
+  it('writes a settlement on a receivable with the rules’ party, as Erkhet’s file does', async () => {
+    const finance = financeApi(app, admin);
+    const clearing = (
+      await finance
+        .createAccount({
+          code: '120905',
+          name: 'Туршилтын посын авлага',
+          journal: 'RECEIVABLE_PAYABLE',
+        })
+        .expect(201)
+    ).body as { id: number };
+    const rules = (
+      await http().get('/api/v1/finance/bank-statements/rules').set(bearer(accountant)).expect(200)
+    ).body as Record<string, unknown>;
+    const setRules = (partyCode: string) =>
+      http()
+        .put('/api/v1/finance/bank-statements/rules')
+        .set(bearer(accountant))
+        .send({ ...rules, settlementAccountId: clearing.id, partyCode })
+        .expect(200);
+    await setRules('99999');
+    const uploaded = (
+      await upload(
+        await statementFile([
+          [
+            `${yesterday.replaceAll('-', '/')} 04:03`,
+            '5',
+            0,
+            0,
+            4500,
+            0,
+            '02/11/2026 SETTLEMENT - TURSHILT',
+            '',
+          ],
+        ]),
+      )
+    ).body as UploadJson;
+    const id = uploaded.statement?.id ?? 0;
+    // No customer has the rules' code: the line waits for one instead of failing in the books.
+    expect((await detail(id)).lines[0]).toMatchObject({
+      kind: 'SETTLEMENT',
+      counterAccountId: clearing.id,
+      missing: ['party'],
+    });
+    expect(((await post(id).expect(200)).body as PostJson).skipped).toBe(1);
+
+    await setRules(shop.code);
+    expect((await detail(id)).lines[0]?.missing).toEqual([]);
+    const result = (await post(id).expect(200)).body as PostJson;
+    expect(result).toMatchObject({ posted: 1, failures: [] });
+    const entry = await financeApi(app, accountant).journalGet(
+      result.statement.lines[0]?.journalEntryId ?? 0,
+    );
+    expect(entry.lines?.find((row) => row.accountId === clearing.id)).toMatchObject({
+      credit: '4500.00',
+      customerId: shop.id,
+    });
+    expect(entry.lines?.find((row) => row.accountId === bank.glAccountId)?.debit).toBe('4500.00');
+  });
 });

@@ -140,6 +140,8 @@ interface Books {
   arId: number | null;
   apId: number | null;
   rules: BankRules;
+  /** The rules' «Харилцагчийн код» as Bto's customer and supplier, for a fee or settlement on a party account. */
+  ruleParty: { customerId: number | null; supplierId: number | null };
 }
 
 const DIGITS_AROUND = (number: string) => new RegExp(`(^|\\D)${number}(\\D|$)`);
@@ -708,8 +710,7 @@ export class BankStatementsService {
                 accountId: counter.id,
                 debit: moneyIn ? zero : amount,
                 credit: moneyIn ? amount : zero,
-                customerId: first.customerId,
-                supplierId: first.supplierId,
+                ...partyOf(first, counter, books),
               },
             ],
           },
@@ -1027,12 +1028,16 @@ export class BankStatementsService {
       this.moneyAccounts.list(),
       this.rules(),
     ]);
+    const code = rules.partyCode.trim();
+    const [customer] = code ? await this.customers.findByCodes([code]) : [];
+    const [supplier] = code ? await this.suppliers.findByCodes([code]) : [];
     return {
       accounts: new Map(list.map((account) => [account.id, account])),
       money,
       arId: list.find((account) => account.role === 'AR')?.id ?? null,
       apId: list.find((account) => account.role === 'AP')?.id ?? null,
       rules,
+      ruleParty: { customerId: customer?.id ?? null, supplierId: supplier?.id ?? null },
     };
   }
 
@@ -1301,24 +1306,39 @@ function assertEditable(line: LineRow): void {
   }
 }
 
-/** What a line lacks before the books take it; a settlement or fee names no party. */
+/** What a line lacks before the books take it; a fee or settlement on a party account takes the rules’ party. */
 export function missingOf(line: LineRow, books: Books): BankLineMissing[] {
   const missing: BankLineMissing[] = [];
   const account =
     line.counterAccountId === null ? undefined : books.accounts.get(line.counterAccountId);
   if (!account) missing.push('account');
-  if (
-    line.kind === 'NORMAL' &&
-    account?.journal === 'RECEIVABLE_PAYABLE' &&
-    line.customerId === null &&
-    line.supplierId === null
-  ) {
-    missing.push('party');
+  if (account?.journal === 'RECEIVABLE_PAYABLE') {
+    const party = partyOf(line, account, books);
+    if (party.customerId === null && party.supplierId === null) missing.push('party');
   }
   if (line.description.trim() === '') missing.push('description');
   if (line.action === null) missing.push('action');
   if (line.debit.gt(0) && line.exportType === null) missing.push('export');
   return missing;
+}
+
+/**
+ * The party of a line's counter account: its own, or for a fee or settlement on a receivable or
+ * payable (the settlement on «Кассир посын борлуулалт») the rules' «Харилцагчийн код», as Erkhet's
+ * file writes it; the Finance Core takes no party account without a party.
+ */
+function partyOf(
+  line: Pick<LineRow, 'kind' | 'customerId' | 'supplierId'>,
+  account: GlAccount,
+  books: Books,
+): { customerId: number | null; supplierId: number | null } {
+  if (line.kind === 'NORMAL' || line.customerId !== null || line.supplierId !== null) {
+    return { customerId: line.customerId, supplierId: line.supplierId };
+  }
+  if (account.journal !== 'RECEIVABLE_PAYABLE') return { customerId: null, supplierId: null };
+  return account.kind === 'ASSET'
+    ? { customerId: books.ruleParty.customerId, supplierId: null }
+    : { customerId: null, supplierId: books.ruleParty.supplierId };
 }
 
 /** The statement's money account: the link, the number on the account, the number in its name. */
