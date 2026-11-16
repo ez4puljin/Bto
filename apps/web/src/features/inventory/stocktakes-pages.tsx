@@ -446,9 +446,10 @@ function BinPreviewLine({
 }
 
 /** One stocktake: the step its status and the reader's rights call for. */
-export function StocktakePage() {
+export function StocktakePage({ id: given }: { id?: number } = {}) {
   const { t } = useTranslation();
-  const id = Number.parseInt(useParams().id ?? '', 10);
+  const routeId = useParams().id;
+  const id = given ?? Number.parseInt(routeId ?? '', 10);
   const canManage = useHasPermission('inventory.stocktakes.manage');
   const canApprove = useHasPermission('inventory.stocktakes.approve');
   const canWrite = useCanWrite();

@@ -215,10 +215,13 @@ describe('finance pages (ADR-0060 #11)', () => {
     const ledger = await screen.findByRole('row', { name: /Н-20261016-0001/ });
     // The debit and the balance after it read the same on the first entry.
     expect(within(ledger).getAllByText('150,000')).toHaveLength(2);
-    expect(within(ledger).getByRole('link', { name: 'Н-20261016-0001' })).toHaveAttribute(
-      'href',
-      '/finance/invoices?invoice=11',
-    );
+    // The invoice opens over the ledger, which stays (2026-11-16, the owner).
+    await user.click(within(ledger).getByRole('button', { name: 'Н-20261016-0001' }));
+    expect(
+      await screen.findByRole('dialog', {
+        name: mn.finance.invoices.panelTitle.replace('{{number}}', 'Н-20261016-0001'),
+      }),
+    ).toBeInTheDocument();
   });
 
   it('shows the home tile of overdue receivables to the accountant', async () => {

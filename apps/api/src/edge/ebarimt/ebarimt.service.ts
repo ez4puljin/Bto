@@ -22,6 +22,7 @@ import type {
   ReceiptType,
   SaleDocWire,
 } from '@tugeel/shared/pos';
+import { businessInstant } from '@tugeel/shared/time';
 import { and, asc, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { AppError, notFound } from '../../common/errors/app-error';
 import { EdgeConfig } from '../config/edge-env';
@@ -49,6 +50,16 @@ const ERROR_RETRY_MS = 24 * 3_600_000;
 const MAX_BACKOFF_MS = 30 * 60_000;
 /** Waiting longer than this for PosAPI counts as needing a look. */
 const STALE_MS = 60_000;
+/**
+ * The automatic send to the tax office (ADR-0065 #11): once PosAPI's last send is this old the
+ * edge asks for one, and asks again only this much later while the date does not move (the
+ * internet away, nothing to send).
+ */
+const AUTO_SEND_AFTER_MS = 6 * 3_600_000;
+const AUTO_SEND_RETRY_MS = 3_600_000;
+
+/** What one look at PosAPI's last send did. */
+export type AutoSendStep = 'fresh' | 'sent' | 'waiting' | 'away';
 
 /** What a sale gives its receipt: the lines as sold, the payments, the buyer. */
 export interface IssueInput {
@@ -84,6 +95,8 @@ export class EbarimtService implements OnApplicationBootstrap {
   private readonly logger = new Logger(EbarimtService.name);
   private merchant: { tin: string; name: string; posNo: string | null } | null = null;
   private running: Promise<number> | null = null;
+  /** When the edge last asked PosAPI to send by itself; memory only, a restart may ask once more. */
+  private autoSendAskedAt: number | null = null;
 
   constructor(
     @Inject(EDGE_DB) private readonly db: EdgeDb,
@@ -637,6 +650,33 @@ export class EbarimtService implements OnApplicationBootstrap {
       });
     }
     return this.refreshInfo();
+  }
+
+  /**
+   * The `posapi-info` loop's step (ADR-0065 #11): reads PosAPI's facts and, when its last send to
+   * the tax office is older than six hours, asks it to send now, so a day's receipts never wait
+   * for a person. PosAPI away, or a send that did not go, only waits for the next look.
+   */
+  async sendIfStale(now: Date = new Date()): Promise<AutoSendStep> {
+    const info = await this.refreshInfo();
+    if (!info.version) return 'away';
+    const sentAt = info.lastSentDate ? businessInstant(info.lastSentDate).getTime() : Number.NaN;
+    if (now.getTime() - sentAt < AUTO_SEND_AFTER_MS) return 'fresh';
+    if (this.autoSendAskedAt !== null && now.getTime() - this.autoSendAskedAt < AUTO_SEND_RETRY_MS)
+      return 'waiting';
+    this.autoSendAskedAt = now.getTime();
+    try {
+      await this.posapi.sendData();
+    } catch (error) {
+      this.logger.warn(
+        { error: error instanceof Error ? error.message.slice(0, 200) : 'unknown' },
+        'PosAPI did not send to the tax office; asked again in an hour',
+      );
+      return 'away';
+    }
+    await this.refreshInfo();
+    this.logger.log({ lastSentDate: info.lastSentDate }, 'PosAPI asked to send to the tax office');
+    return 'sent';
   }
 
   // ------------------------------------------------------------- PosAPI's own facts

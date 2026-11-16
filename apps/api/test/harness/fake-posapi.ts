@@ -25,6 +25,9 @@ export class FakePosapi {
   readonly calls: FakePosapiCall[] = [];
   mode: FakeReceiptMode = 'ok';
   lookupOffline = false;
+  /** What `/rest/info` names as the last send, and what a `sendData` moves it to (null: it stays). */
+  lastSentDate = '2026-10-26 09:00:00';
+  sendMovesTo: string | null = null;
   private issued = 0;
   private server: Server | null = null;
   private readonly sockets = new Set<Socket>();
@@ -89,7 +92,7 @@ export class FakePosapi {
         operatorName: 'TEST OPERATOR',
         posNo: '00000001',
         version: '3.2.50',
-        lastSentDate: '2026-10-26 09:00:00',
+        lastSentDate: this.lastSentDate,
         leftLotteries: 9000,
         merchants: [{ ...FAKE_MERCHANT, vatPayer: true, customers: [] }],
       });
@@ -121,6 +124,7 @@ export class FakePosapi {
       return;
     }
     if (route === 'GET /rest/sendData') {
+      if (this.sendMovesTo) this.lastSentDate = this.sendMovesTo;
       send(200, {});
       return;
     }

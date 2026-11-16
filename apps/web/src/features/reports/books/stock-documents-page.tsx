@@ -56,7 +56,7 @@ import {
   TextCell,
   TotalRow,
 } from './book-kit';
-import { stockDocHref } from './book-links';
+import { stockDocHref, stockDocPeek } from './book-links';
 import { idParamOf, idsParam, useBookParams, useDrill, usePromptDates } from './book-state';
 
 const DOC_TYPES: readonly StockDocType[] = ['GR', 'GI', 'TR', 'ADJ', 'ST', 'SO', 'POS', 'CN'];
@@ -478,6 +478,7 @@ function DocumentDetail(props: {
     );
   }
   const href = stockDocHref(props.row.docType, props.row.docId, props.row.invoiceId);
+  const peek = stockDocPeek(props.row.docType, props.row.docId, props.row.invoiceId);
   return (
     <>
       {lines.data.map((line) => {
@@ -492,6 +493,7 @@ function DocumentDetail(props: {
           <DetailRow
             key={`${line.productId}:${line.warehouseId}`}
             href={href}
+            peek={peek}
             label={detailText(line.sku, parts)}
           >
             <DetailLabel number={line.sku} parts={parts} colSpan={3} />

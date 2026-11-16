@@ -56,6 +56,7 @@ import {
   ROW_NAME,
 } from './report-kit';
 import { ReportViews } from './report-views';
+import { PeekLink, usePeek } from './books/record-peek';
 
 const AMOUNTS = ['purchases', 'purchasesExVat', 'otherBills', 'payments', 'balance'] as const;
 
@@ -145,8 +146,6 @@ function SuppliersTable(props: {
   return props.onOpen ? <ListTable columns={COLUMNS}>{body}</ListTable> : <Table>{body}</Table>;
 }
 
-const LINK = 'text-link underline-offset-2 hover:underline';
-
 /** One supplier's entries in the period: a purchase opens its goods receipt, the rest the journal. */
 function EntriesSheet(props: {
   row: SupplierReportRow | null;
@@ -156,6 +155,8 @@ function EntriesSheet(props: {
 }) {
   const { t } = useTranslation();
   const entries = useSupplierEntries(props.partyId, props.range);
+  // A receipt or entry opens over the list (2026-11-16, the owner).
+  const peek = usePeek();
   const { row } = props;
   const columns = 'reports.suppliers.entries';
   return (
@@ -215,16 +216,16 @@ function EntriesSheet(props: {
                       ) : null}
                     </TableCell>
                     <TableCell className="font-mono">
-                      <Link
-                        className={LINK}
-                        to={
+                      <PeekLink
+                        peek={
                           entry.receiptId
-                            ? `/inventory/receipts/${entry.receiptId}`
-                            : `/finance/journal?entry=${entry.entryId}`
+                            ? { kind: 'receipt', id: entry.receiptId }
+                            : { kind: 'entry', id: entry.entryId }
                         }
+                        onOpen={peek.open}
                       >
                         {number}
-                      </Link>
+                      </PeekLink>
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {formatMnt(entry.amount)}
@@ -239,6 +240,7 @@ function EntriesSheet(props: {
           </Table>
         )}
       </div>
+      {peek.panel}
     </RecordSheet>
   );
 }

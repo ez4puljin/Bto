@@ -6,6 +6,7 @@ import type { Db } from '../../../common/db/db.types';
 import type { AuthContext } from '../../identity';
 import { docNumberSql, idsIn, inCategory, warehouseMovement } from './book-sql';
 import { ReportContext } from './report-context';
+import { headerSql } from './stock-documents.service';
 import { checkedRange, type DateRange } from './report-periods';
 import { allOf, dateText, dec, int, intOrNull, money, rowsOf, textOrNull } from './report-sql';
 
@@ -66,6 +67,8 @@ export interface StockBalanceLine {
   docNumber: string | null;
   warehouseId: number;
   warehouseName: string;
+  /** The document's supplier, customer or recipient. */
+  partyName: string | null;
   inQty: string;
   outQty: string;
   value: string | null;
@@ -194,17 +197,21 @@ export class StockBalanceService {
     );
     const rows = await rowsOf(
       this.db,
-      sql`SELECT l.effective_date AS day, l.doc_type, l.doc_id, l.warehouse_id, w.name AS warehouse_name,
-                 ${docNumberSql(sql`l.doc_type`, sql`l.doc_id`)} AS doc_number,
-                 sum(l.qty_base) FILTER (WHERE l.qty_base > 0) AS in_qty,
-                 sum(-l.qty_base) FILTER (WHERE l.qty_base < 0) AS out_qty,
-                 sum(l.qty_base * l.unit_cost) AS value, min(l.id) AS first_id
-            FROM public.stock_ledger l
-            JOIN public.warehouses w ON w.id = l.warehouse_id
-           WHERE ${where} AND l.effective_date BETWEEN ${range.from}::date AND ${range.to}::date
-           GROUP BY l.effective_date, l.doc_type, l.doc_id, l.warehouse_id, w.name
-           ORDER BY l.effective_date, first_id
-           LIMIT ${MAX_LINES + 1}`,
+      sql`WITH d AS (
+            SELECT l.effective_date AS day, l.doc_type, l.doc_id, l.warehouse_id, w.name AS warehouse_name,
+                   ${docNumberSql(sql`l.doc_type`, sql`l.doc_id`)} AS doc_number,
+                   sum(l.qty_base) FILTER (WHERE l.qty_base > 0) AS in_qty,
+                   sum(-l.qty_base) FILTER (WHERE l.qty_base < 0) AS out_qty,
+                   sum(l.qty_base * l.unit_cost) AS value, min(l.id) AS first_id
+              FROM public.stock_ledger l
+              JOIN public.warehouses w ON w.id = l.warehouse_id
+             WHERE ${where} AND l.effective_date BETWEEN ${range.from}::date AND ${range.to}::date
+             GROUP BY l.effective_date, l.doc_type, l.doc_id, l.warehouse_id, w.name
+             ORDER BY l.effective_date, first_id
+             LIMIT ${MAX_LINES + 1})
+          SELECT d.*, h.party_name
+            FROM d LEFT JOIN LATERAL (${headerSql}) h ON TRUE
+           ORDER BY d.day, d.first_id`,
     );
     let balance = dec(opening?.qty);
     const openingQty = balance.toFixed();
@@ -223,6 +230,7 @@ export class StockBalanceService {
           docNumber: textOrNull(row.doc_number),
           warehouseId: int(row.warehouse_id),
           warehouseName: textOrNull(row.warehouse_name) ?? '',
+          partyName: textOrNull(row.party_name),
           inQty: inQty.toFixed(),
           outQty: outQty.toFixed(),
           value: scope.margins ? money(dec(row.value).abs()) : null,

@@ -3,10 +3,12 @@ import type { ReportViewPage } from '@tugeel/shared/reports';
 import { businessDate, businessDateTime } from '@tugeel/shared/time';
 import { Popover } from 'radix-ui';
 import {
+  createContext,
   type CSSProperties,
   type FormEvent,
   type KeyboardEvent,
   type ReactNode,
+  useContext,
   useEffect,
   useId,
   useState,
@@ -36,6 +38,8 @@ import { useCompanyName } from '@/features/company/api';
 import { useMediaQuery } from '@/lib/use-media-query';
 import { cn } from '@/lib/utils';
 import { DATE } from '../report-helpers';
+import type { RecordPeek } from './book-links';
+import { RecordPeekPanel } from './record-peek';
 import { ReportViews } from '../report-views';
 import {
   BOOK_TABLE,
@@ -450,6 +454,8 @@ export function BookPage({
   columns: readonly BookColumn[] | null;
   children: ReactNode;
 }) {
+  // A detail line's record opens over the report, which stays as it was (2026-11-16, the owner).
+  const [peek, setPeek] = useState<RecordPeek | null>(null);
   const style =
     columns === null
       ? undefined
@@ -465,10 +471,14 @@ export function BookPage({
       )}
       style={style}
     >
-      {children}
+      <PeekContext.Provider value={setPeek}>{children}</PeekContext.Provider>
+      <RecordPeekPanel peek={peek} onClose={() => setPeek(null)} />
     </div>
   );
 }
+
+/** Opens a record over the report; null outside a `BookPage`. */
+const PeekContext = createContext<((peek: RecordPeek) => void) | null>(null);
 
 /**
  * What a finger gets instead of the hover that says a cut text whole (ADR-0201): the text takes
@@ -827,21 +837,23 @@ const DETAIL_ROW =
 /** A detail row: small and lighter under the row it opened; a click opens the document behind it. */
 export function DetailRow(props: {
   href: string | null;
-  /** Opens the record over the report (a side panel) instead of going to `href`. */
-  onOpen?: (() => void) | null;
+  /** The record to open over the report (a side panel) instead of going to `href`. */
+  peek?: RecordPeek | null;
   label: string;
   children: ReactNode;
 }) {
   const navigate = useNavigate();
-  const opens = Boolean(props.onOpen ?? props.href);
+  const openPeek = useContext(PeekContext);
+  const peek = openPeek && props.peek ? props.peek : null;
+  const opens = Boolean(peek ?? props.href);
   const open = () => {
-    if (props.onOpen) props.onOpen();
+    if (peek && openPeek) openPeek(peek);
     else if (props.href) void navigate(props.href);
   };
   return (
     <tr
       data-slot="table-row"
-      role={props.onOpen ? 'button' : props.href ? 'link' : undefined}
+      role={peek ? 'button' : props.href ? 'link' : undefined}
       aria-label={props.label}
       tabIndex={opens ? 0 : undefined}
       onClick={open}

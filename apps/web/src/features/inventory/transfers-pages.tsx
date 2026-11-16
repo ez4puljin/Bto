@@ -437,9 +437,10 @@ function TransferCreateDialog({ onCancel }: { onCancel: () => void }) {
  * One transfer: the editor of the step the user's warehouse takes, and a printable list. A push
  * being prepared for shipping keeps `?ship=1` in the URL, so a reload stays on the ship editor.
  */
-export function TransferPage() {
+export function TransferPage({ id: given }: { id?: number } = {}) {
   const { t } = useTranslation();
-  const id = Number.parseInt(useParams().id ?? '', 10);
+  const routeId = useParams().id;
+  const id = given ?? Number.parseInt(routeId ?? '', 10);
   const [params, setParams] = useSearchParams();
   const location = useLocation();
   const canManage = useHasPermission('inventory.transfers.manage');

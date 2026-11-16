@@ -20,7 +20,10 @@ import { VoucherStore } from './voucher.store';
 
 const BATCH = 50;
 const HEARTBEAT_MS = 30_000;
-/** The store PosAPI: due receipts every 10 s, its own facts every 5 minutes (ADR-0065). */
+/**
+ * The store PosAPI: due receipts every 10 s; its own facts every 5 minutes, with a send to the tax
+ * office when its last one is six hours old (ADR-0065).
+ */
 const EBARIMT_MS = 10_000;
 const POSAPI_INFO_MS = 5 * 60_000;
 /** The wholesale relay (ADR-0185): asks the centre every 5 s, sooner after work, later when it is away. */
@@ -84,7 +87,7 @@ export class SyncRunner implements OnApplicationBootstrap, OnApplicationShutdown
     });
     if (!this.ebarimt.enabled) return;
     this.loop('posapi-info', 2_000, async () => {
-      await this.ebarimt.refreshInfo();
+      await this.ebarimt.sendIfStale();
       return POSAPI_INFO_MS;
     });
     this.loop('ebarimt', 3_000, async () => {

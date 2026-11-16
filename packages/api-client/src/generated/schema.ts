@@ -22635,6 +22635,8 @@ export interface components {
             docNumber: string | null;
             warehouseId: number;
             warehouseName: string;
+            /** @description The supplier, customer or recipient */
+            partyName: string | null;
             inQty: string;
             outQty: string;
             value: string | null;

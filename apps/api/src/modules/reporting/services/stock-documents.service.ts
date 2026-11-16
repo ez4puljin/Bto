@@ -229,11 +229,12 @@ export class StockDocumentsService {
 }
 
 /**
- * A document's header by the ledger's `d.doc_type` / `d.doc_id`: number, note, reason (ADJ), the
+ * A document's header by the ledger's `d.doc_type` / `d.doc_id` (a lateral join's alias `d`):
+ * number, note, reason (ADJ), the
  * transfer's warehouses, author, party and, for a sale or a return, the amounts with and without
  * VAT.
  */
-const headerSql = sql`
+export const headerSql = sql`
   SELECT g.number, g.note, NULL::text AS reason, NULL::text AS source_wh, NULL::text AS dest_wh,
          g.created_by AS author_id, 'SUPPLIER'::text AS party_kind, g.supplier_id AS party_id,
          s.name::text AS party_name, NULL::bigint AS invoice_id, NULL::numeric AS total, NULL::numeric AS net

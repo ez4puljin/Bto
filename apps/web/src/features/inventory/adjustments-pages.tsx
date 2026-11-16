@@ -311,9 +311,10 @@ function AdjustmentCreateDialog({ onCancel }: { onCancel: () => void }) {
 }
 
 /** One adjustment: the scan editor while a draft, the approver's decision once submitted. */
-export function AdjustmentPage() {
+export function AdjustmentPage({ id: given }: { id?: number } = {}) {
   const { t } = useTranslation();
-  const id = Number.parseInt(useParams().id ?? '', 10);
+  const routeId = useParams().id;
+  const id = given ?? Number.parseInt(routeId ?? '', 10);
   const location = useLocation();
   const canManage = useHasPermission('inventory.adjustments.manage');
   const adjustment = useAdjustment(id);

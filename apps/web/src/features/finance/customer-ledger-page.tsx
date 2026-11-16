@@ -34,6 +34,7 @@ import {
   useCustomerLedger,
 } from './api';
 import { PaymentDialog } from './payment-dialog';
+import { PeekLink, type RecordPeek, usePeek } from '@/features/reports/books/record-peek';
 
 /** The ledger's columns (ADR-0119): date, kind, document number, two sides, balance after. */
 const LEDGER_COLUMNS: readonly ColumnSpec[] = [
@@ -61,6 +62,8 @@ export function CustomerLedgerPage() {
   const from = params.get('from') ?? undefined;
   const to = params.get('to') ?? undefined;
   const allocating = params.get('allocate') === '1';
+  // A document opens over the ledger, which stays as it was (2026-11-16, the owner).
+  const peek = usePeek();
   const balance = useCustomerBalance(customerId);
   const ledger = useCustomerLedger(customerId, { from, to });
   const rows = ledger.data?.pages.flatMap((page) => page.data) ?? [];
@@ -155,7 +158,7 @@ export function CustomerLedgerPage() {
                   <TableCell className="font-mono">{entry.entryDate}</TableCell>
                   <TableCell>{t(`finance.arKinds.${entry.kind}`)}</TableCell>
                   <TableCell className="font-mono">
-                    <DocumentLink entry={entry} />
+                    <DocumentLink entry={entry} onOpen={peek.open} />
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {entry.debit === '0.00' ? '' : formatMnt(entry.debit)}
@@ -187,6 +190,7 @@ export function CustomerLedgerPage() {
         party={{ kind: 'customer', id: summary.customerId }}
         onClose={() => setParam('allocate', null)}
       />
+      {peek.panel}
     </div>
   );
 }
@@ -300,19 +304,26 @@ export function BalanceCard({
   );
 }
 
-function DocumentLink({ entry }: { entry: LedgerEntry }) {
-  const to =
+/** A document's number; a click opens it over the ledger (2026-11-16, the owner). */
+function DocumentLink({
+  entry,
+  onOpen,
+}: {
+  entry: LedgerEntry;
+  onOpen: (peek: RecordPeek) => void;
+}) {
+  const peek: RecordPeek | null =
     entry.docType === 'INVOICE'
-      ? `/finance/invoices?invoice=${entry.docId}`
+      ? { kind: 'invoice', id: entry.docId }
       : entry.docType === 'PAYMENT'
-        ? `/finance/payments?payment=${entry.docId}`
+        ? { kind: 'payment', id: entry.docId }
         : entry.docType === 'JOURNAL'
-          ? `/finance/journal?entry=${entry.docId}`
+          ? { kind: 'entry', id: entry.docId }
           : null;
-  return to ? (
-    <Link className="text-link underline-offset-2 hover:underline" to={to}>
+  return peek ? (
+    <PeekLink peek={peek} onOpen={onOpen}>
       {entry.docNumber}
-    </Link>
+    </PeekLink>
   ) : (
     <span>{entry.docNumber}</span>
   );

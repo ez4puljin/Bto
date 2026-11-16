@@ -71,17 +71,52 @@ export function ledgerLineHref(line: LedgerLine): string {
   }
 }
 
-/** A record a report opens in its own side panel, over the report (no page change). */
-export type RecordPeek =
-  | { kind: 'payment'; id: number }
-  | { kind: 'entry'; id: number }
-  | { kind: 'invoice'; id: number }
-  | { kind: 'shift'; id: number };
+/** A record a report opens in a side panel over itself (no page change, 2026-11-16). */
+export type RecordPeek = {
+  kind:
+    | 'payment'
+    | 'entry'
+    | 'invoice'
+    | 'shift'
+    | 'sale'
+    | 'order'
+    | 'receipt'
+    | 'issue'
+    | 'transfer'
+    | 'adjustment'
+    | 'stocktake';
+  id: number;
+};
 
-/**
- * The panel a journal line opens over the report: its voucher, invoice or till shift, or the
- * entry itself; null for a stock document, which has a page of its own (`ledgerLineHref`).
- */
+/** The panel of a stock document by the ledger's document code (`stockDocHref`'s pages). */
+export function stockDocPeek(
+  docType: string,
+  docId: number,
+  invoiceId?: number | null,
+): RecordPeek | null {
+  switch (docType) {
+    case 'GR':
+      return { kind: 'receipt', id: docId };
+    case 'GI':
+      return { kind: 'issue', id: docId };
+    case 'TR':
+      return { kind: 'transfer', id: docId };
+    case 'ADJ':
+      return { kind: 'adjustment', id: docId };
+    case 'ST':
+      return { kind: 'stocktake', id: docId };
+    case 'SO':
+      return { kind: 'order', id: docId };
+    case 'POS':
+      return { kind: 'sale', id: docId };
+    case 'CN':
+      return invoiceId ? { kind: 'invoice', id: invoiceId } : null;
+    default:
+      return null;
+  }
+}
+
+/** The panel a journal line opens: its voucher, invoice, receipt, issue, shift or stock document. */
 export function ledgerLinePeek(line: LedgerLine): RecordPeek | null {
   const entry: RecordPeek = { kind: 'entry', id: line.entryId };
   if (line.system === 'FIN') {
@@ -94,18 +129,38 @@ export function ledgerLinePeek(line: LedgerLine): RecordPeek | null {
   switch (line.sourceDocType) {
     case 'SALES_INVOICE':
       return id ? { kind: 'invoice', id } : entry;
-    case 'POS_SHIFT':
-      return id ? { kind: 'shift', id } : entry;
     case 'GOODS_RECEIPT':
     case 'RECEIPT_RECOST':
     case 'STOCK_REVALUE':
+      return id ? { kind: 'receipt', id } : entry;
     case 'SUPPLIER_RETURN':
     case 'DAMAGE_CHARGE':
-      return id ? null : entry;
-    case 'STOCK':
-      return ledgerLineHref(line).startsWith('/finance/journal') ? entry : null;
+      return id ? { kind: 'issue', id } : entry;
+    case 'POS_SHIFT':
+      return id ? { kind: 'shift', id } : entry;
+    case 'STOCK': {
+      const match = /^([A-Z]+):(\d+):/.exec(line.sourceDocId ?? '');
+      const peek =
+        match?.[1] && match[2] ? stockDocPeek(match[1], Number.parseInt(match[2], 10)) : null;
+      return peek ?? entry;
+    }
     default:
       return entry;
+  }
+}
+
+/** The panel of a sales document of «Борлуулалт /Бараагаар/». */
+export function salesDocPeek(doc: ProductSalesDocument): RecordPeek | null {
+  switch (doc.kind) {
+    case 'INVOICE':
+      return { kind: 'invoice', id: doc.id };
+    case 'CREDIT_NOTE':
+      return doc.invoiceId ? { kind: 'invoice', id: doc.invoiceId } : null;
+    case 'POS_SALE':
+    case 'POS_RETURN':
+      return { kind: 'sale', id: doc.id };
+    default:
+      return null;
   }
 }
 

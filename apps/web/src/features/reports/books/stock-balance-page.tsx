@@ -56,7 +56,7 @@ import {
   TextCell,
   TotalRow,
 } from './book-kit';
-import { stockDocHref } from './book-links';
+import { stockDocHref, stockDocPeek } from './book-links';
 import { idParamOf, idsParam, useBookParams, useDrill, usePromptDates } from './book-state';
 
 type Grouping = 'product' | 'warehouse' | 'category';
@@ -495,16 +495,20 @@ function StockBalanceDetail(props: {
     <>
       {lines.data.rows.map((line, index) => {
         const type = t(`reports.books.docTypes.${line.docType}`, { defaultValue: line.docType });
-        const number = line.docNumber ?? String(line.docId);
-        const parts = detailParts(number, [line.date, type, line.warehouseName], props.omit);
+        const parts = detailParts(
+          null,
+          [line.date, line.partyName, type, line.warehouseName],
+          props.omit,
+        );
         const incoming = !isZero(line.inQty);
         return (
           <DetailRow
             key={`${line.docType}:${line.docId}:${line.warehouseId}:${index}`}
             href={stockDocHref(line.docType, line.docId)}
-            label={detailText(number, parts)}
+            peek={stockDocPeek(line.docType, line.docId)}
+            label={detailText(null, parts)}
           >
-            <DetailLabel number={number} parts={parts} colSpan={3} />
+            <DetailLabel number={null} parts={parts} colSpan={3} />
             <TableCell colSpan={blank} className={GROUP_END} />
             <TableCell className={end(!props.values)}>{quantity(line.inQty)}</TableCell>
             {props.values ? (

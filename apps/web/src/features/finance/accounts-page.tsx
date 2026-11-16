@@ -69,6 +69,7 @@ import {
 import { SourceBadge } from './badges';
 import { IssueAccountsDialog } from './issue-accounts-dialog';
 import { StockCountAccountsDialog } from './stock-count-accounts-dialog';
+import { PeekLink, usePeek } from '@/features/reports/books/record-peek';
 
 const CODE = /^[0-9A-Za-z][0-9A-Za-z._-]{0,15}$/;
 const isRole = (value: string): value is GlRole => GL_ROLES.some((role) => role === value);
@@ -554,6 +555,8 @@ export function AccountLedgerPage() {
   const from = params.get('from') ?? undefined;
   const to = params.get('to') ?? undefined;
   const partyId = params.get('partyId') ?? undefined;
+  // An entry opens over the ledger, which stays as it was (2026-11-16, the owner).
+  const peek = usePeek();
   const accounts = useGlAccounts();
   const account = accounts.data?.find((entry) => entry.id === accountId);
   // The account report by account and party (ADR-0117 #2).
@@ -624,12 +627,9 @@ export function AccountLedgerPage() {
               <TableRow key={line.id}>
                 <TableCell className="font-mono">{line.entryDate}</TableCell>
                 <TableCell className="font-mono">
-                  <Link
-                    className="text-link underline-offset-2 hover:underline"
-                    to={`/finance/journal?entry=${line.entryId}`}
-                  >
+                  <PeekLink peek={{ kind: 'entry', id: line.entryId }} onOpen={peek.open}>
                     {line.entryNumber}
-                  </Link>
+                  </PeekLink>
                 </TableCell>
                 <TruncateCell
                   text={[
@@ -661,6 +661,7 @@ export function AccountLedgerPage() {
         ) : null}
         <LoadMore query={ledger} />
       </ListCard>
+      {peek.panel}
     </div>
   );
 }

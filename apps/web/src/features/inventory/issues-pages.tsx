@@ -428,9 +428,10 @@ function ExpenseTypesDialog(props: { open: boolean; onClose: () => void }) {
  * receipt: a new issue takes its draft's address once its first line is added and the page stays
  * mounted, so the scan box keeps the cursor and the active shelf.
  */
-export function IssuePage() {
+export function IssuePage({ id: given }: { id?: number } = {}) {
   const { t } = useTranslation();
-  const param = useParams().id ?? '';
+  const routeId = useParams().id;
+  const param = given ? String(given) : (routeId ?? '');
   const isNew = param === 'new';
   const id = isNew ? Number.NaN : Number.parseInt(param, 10);
   const location = useLocation();

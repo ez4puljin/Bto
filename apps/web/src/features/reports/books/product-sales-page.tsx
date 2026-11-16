@@ -73,7 +73,7 @@ import {
   TextCell,
   TotalRow,
 } from './book-kit';
-import { salesDocHref } from './book-links';
+import { salesDocHref, salesDocPeek } from './book-links';
 import { idParamOf, idsParam, useBookParams, useDrill, usePromptDates } from './book-state';
 import {
   buildCube,
@@ -950,10 +950,9 @@ function SalesDetail(props: {
   return (
     <>
       {documents.rows.map((doc) => {
-        const number = doc.number ?? String(doc.id);
         const parts = detailParts(
-          number,
-          [doc.date, t(`reports.books.salesKinds.${doc.kind}`), doc.customerName],
+          null,
+          [doc.date, doc.customerName, t(`reports.books.salesKinds.${doc.kind}`)],
           props.omit,
         );
         const isReturn = RETURN_KINDS.includes(doc.kind);
@@ -961,9 +960,10 @@ function SalesDetail(props: {
           <DetailRow
             key={`${doc.kind}:${doc.id}`}
             href={salesDocHref(doc)}
-            label={detailText(number, parts)}
+            peek={salesDocPeek(doc)}
+            label={detailText(null, parts)}
           >
-            <DetailLabel number={number} parts={parts} colSpan={3} />
+            <DetailLabel number={null} parts={parts} colSpan={3} />
             <TableCell className={NUM}>{quantity(doc.qty)}</TableCell>
             <TableCell />
             <TableCell className={NUM}>{amount(doc.sales, props.precision)}</TableCell>

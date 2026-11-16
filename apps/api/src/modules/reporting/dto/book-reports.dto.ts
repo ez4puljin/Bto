@@ -151,6 +151,8 @@ export class StockBalanceLineDto {
   @ApiProperty({ type: String, nullable: true }) docNumber: string | null;
   @ApiProperty() warehouseId: number;
   @ApiProperty() warehouseName: string;
+  @ApiProperty({ type: String, nullable: true, description: 'The supplier, customer or recipient' })
+  partyName: string | null;
   @ApiProperty() inQty: string;
   @ApiProperty() outQty: string;
   @ApiProperty({ type: String, nullable: true }) value: string | null;

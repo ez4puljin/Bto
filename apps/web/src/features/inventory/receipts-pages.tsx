@@ -286,9 +286,10 @@ export function ReceiptsPage() {
  * address once its first line is added and the page stays mounted (same route, same key), so the
  * scan box keeps the cursor, the active shelf and what the last scan did.
  */
-export function ReceiptPage() {
+export function ReceiptPage({ id: given }: { id?: number } = {}) {
   const { t } = useTranslation();
-  const param = useParams().id ?? '';
+  const routeId = useParams().id;
+  const param = given ? String(given) : (routeId ?? '');
   const isNew = param === 'new';
   const id = isNew ? Number.NaN : Number.parseInt(param, 10);
   const location = useLocation();

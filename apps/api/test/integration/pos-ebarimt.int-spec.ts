@@ -337,6 +337,35 @@ describe('pos e-Barimt on the edge', () => {
     });
   });
 
+  it('asks PosAPI to send by itself once its last send is six hours old', async () => {
+    const sends = () => posapi.calls.filter((call) => call.path === '/rest/sendData').length;
+    const before = sends();
+    const now = new Date('2026-10-26T12:00:00+08:00');
+    // Three hours old: nothing to do.
+    expect(await ebarimt.sendIfStale(now)).toBe('fresh');
+    expect(sends()).toBe(before);
+    // Seven hours old: one send, and the new date reaches the state row.
+    const evening = new Date('2026-10-26T16:00:00+08:00');
+    posapi.sendMovesTo = '2026-10-26 16:00:01';
+    expect(await ebarimt.sendIfStale(evening)).toBe('sent');
+    expect(sends()).toBe(before + 1);
+    expect(await ebarimt.info()).toMatchObject({ lastSentDate: '2026-10-26 16:00:01' });
+    expect(await ebarimt.sendIfStale(new Date('2026-10-26T16:05:00+08:00'))).toBe('fresh');
+    // A date that does not move (nothing to send, the internet away): asked once an hour.
+    posapi.sendMovesTo = null;
+    expect(await ebarimt.sendIfStale(new Date('2026-10-26T22:10:00+08:00'))).toBe('sent');
+    expect(await ebarimt.sendIfStale(new Date('2026-10-26T22:15:00+08:00'))).toBe('waiting');
+    expect(sends()).toBe(before + 2);
+    expect(await ebarimt.sendIfStale(new Date('2026-10-26T23:11:00+08:00'))).toBe('sent');
+    expect(sends()).toBe(before + 3);
+    // PosAPI away: nothing thrown, nothing counted as asked.
+    await posapi.stop();
+    expect(await ebarimt.sendIfStale(new Date('2026-10-27T09:00:00+08:00'))).toBe('away');
+    await posapi.start();
+    posapi.lastSentDate = '2026-10-26 09:00:00';
+    await ebarimt.refreshInfo();
+  });
+
   it('keeps the lottery and the QR data in neither database', async () => {
     await sync.pushOnce();
     const edgeTables = await edgeDb.execute<{ table_name: string }>(

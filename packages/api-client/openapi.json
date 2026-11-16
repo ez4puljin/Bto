@@ -85669,6 +85669,11 @@
           "warehouseName": {
             "type": "string"
           },
+          "partyName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The supplier, customer or recipient"
+          },
           "inQty": {
             "type": "string"
           },
@@ -85690,6 +85695,7 @@
           "docNumber",
           "warehouseId",
           "warehouseName",
+          "partyName",
           "inQty",
           "outQty",
           "value",

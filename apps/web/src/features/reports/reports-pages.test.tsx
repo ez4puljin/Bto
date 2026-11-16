@@ -268,7 +268,7 @@ describe('management reports (ADR-0108)', () => {
     expect(screen.queryByRole('button', { name: mn.common.loadMore })).toBeNull();
   });
 
-  it('charts the ten largest suppliers and links their entries', async () => {
+  it('charts the ten largest suppliers and opens their entries', async () => {
     const user = userEvent.setup();
     renderApp(
       '/reports/suppliers?from=2026-10-01&to=2026-10-24',
@@ -287,14 +287,9 @@ describe('management reports (ADR-0108)', () => {
     const table = screen.getByRole('table');
     await user.click(within(table).getByRole('button', { name: 'Туршилтын нийлүүлэгч 1' }));
     const sheet = within(await screen.findByRole('dialog'));
-    expect(await sheet.findByRole('link', { name: 'О-20261005-0001' })).toHaveAttribute(
-      'href',
-      '/inventory/receipts/61',
-    );
-    expect(sheet.getByRole('link', { name: 'Ж-20261012-0004' })).toHaveAttribute(
-      'href',
-      '/finance/journal?entry=902',
-    );
+    // The receipt and the entry open over the list, not on their pages (2026-11-16, the owner).
+    expect(await sheet.findByRole('button', { name: 'О-20261005-0001' })).toBeInTheDocument();
+    expect(sheet.getByRole('button', { name: 'Ж-20261012-0004' })).toBeInTheDocument();
     expect(sheet.getByRole('link', { name: r.suppliers.openSupplier })).toHaveAttribute(
       'href',
       '/partners/suppliers/301',
