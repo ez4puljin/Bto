@@ -1,12 +1,21 @@
 import { hoursAndMinutes } from '@tugeel/shared/hr';
 import { useRouter } from 'expo-router';
-import { Bell, CalendarCheck, ChevronRight, Clock3, LogIn, Plus } from 'lucide-react-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Bell,
+  CalendarCheck,
+  ChevronRight,
+  Clock3,
+  LogIn,
+  LogOut,
+  Plus,
+} from 'lucide-react-native';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useMyAttendance } from '../../../src/api/attendance';
 import { feedCount, useCalendar, useFeed, useToday } from '../../../src/api/community';
 import { useNotificationSummary } from '../../../src/api/notifications';
+import { usePunchNow } from '../../../src/attendance/punch-now';
 import { isWorkdayFlag, liveWorkedMinutes } from '../../../src/attendance/status';
 import { isOnDay } from '../../../src/community/calendar-day';
 import { calendarItemTitle, CalendarItemIcon } from '../../../src/community/calendar-item';
@@ -15,6 +24,7 @@ import { initialsOf } from '../../../src/format/format';
 import { StaffWordmarkHeader } from '../../../src/staff/brand';
 import { firstNameOf, greetingOf, monthDayOf } from '../../../src/staff/home';
 import type { MenuItem } from '../../../src/staff/menu';
+import { MyPhoto } from '../../../src/staff/my-photo';
 import { MENU_LOOK, useFavourites, useStaffMenu } from '../../../src/staff/menu-parts';
 import { isRep } from '../../../src/state/phase';
 import { useRoleName } from '../../../src/state/role';
@@ -28,8 +38,7 @@ import { HeaderIconButton, StoreHeaderBand } from '../../../src/ui/store-header'
 import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 import { Text } from '../../../src/ui/text';
 import { UpdateCard } from '../../../src/updates/update-card';
-import { UpdateCheckPanel } from '../../../src/updates/update-check';
-import { useAppUpdate, useUpdateCheck } from '../../../src/updates/use-app-update';
+import { useAppUpdate } from '../../../src/updates/use-app-update';
 
 type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -37,8 +46,9 @@ type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
  * «Нүүр» of the staff app, where everyone lands (ADR-0174; the Main board of 2026-11-16): the
  * wordmark with the bell, a greeting with today's date, today's attendance with the hours and the
  * work time, what is new for the person as chips, their favourite menu rows in one card, today's
- * events as a grouped list, and at the bottom the app's version with «Шалгах» (#10). A newer
- * version found by the server, or by that button, shows on top.
+ * events as a grouped list. The card punches by itself: «Ирлээ» until the person is in, «Явлаа»
+ * once they are (owner 2026-11-16). A newer version the server names shows on top; the version and
+ * its «Шалгах» live on «Профайл», not here (owner 2026-11-16).
  */
 export default function StaffHomeScreen() {
   const { t } = useTranslation();
@@ -55,24 +65,18 @@ export default function StaffHomeScreen() {
   const { groups, countOf, open } = useStaffMenu();
   const { favourites } = useFavourites(groups);
   const update = useAppUpdate();
-  const updateCheck = useUpdateCheck();
-  const scroll = useRef<ScrollView>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [clock, setClock] = useState(() => Date.now());
 
   const data = attendance.data;
   const state = data?.state ?? null;
+  const punchNow = usePunchNow(data);
 
   // The worked time and the greeting follow the clock: once a minute while the screen is open.
   useEffect(() => {
     const timer = setInterval(() => setClock(Date.now()), 60_000);
     return () => clearInterval(timer);
   }, []);
-
-  // A press that found a newer version: the card on top starts it, so the page goes up to it.
-  useEffect(() => {
-    if (updateCheck.found > 0) scroll.current?.scrollTo({ y: 0, animated: true });
-  }, [updateCheck.found]);
 
   const events = useMemo(
     () => (calendar.data ?? []).filter((item) => isOnDay(item, today)),
@@ -165,6 +169,7 @@ export default function StaffHomeScreen() {
         >
           <View style={styles.avatar}>
             <Text style={styles.initials}>{initialsOf(me.fullName)}</Text>
+            <MyPhoto size={52} />
           </View>
           <View style={styles.grow}>
             <Text style={styles.onBlueSoft} numberOfLines={1}>
@@ -182,12 +187,11 @@ export default function StaffHomeScreen() {
       </StoreHeaderBand>
 
       <ScrollView
-        ref={scroll}
         contentContainerStyle={[styles.body, { paddingBottom: inset + spacing.xl }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
       >
         {/* A newer APK on the server (ADR-0174 #7, #10): the press downloads and installs it. */}
-        {update ? <UpdateCard release={update} autoStart={updateCheck.found} /> : null}
+        {update ? <UpdateCard release={update} /> : null}
 
         {/* Today's attendance: the page punches. */}
         <Card
@@ -230,14 +234,28 @@ export default function StaffHomeScreen() {
               </View>
             ) : null}
           </View>
-          {/* Not punched on a workday: the card's one action, a real button. */}
-          {waiting ? (
-            <PillButton
-              height={44}
-              icon={<LogIn size={18} strokeWidth={2.2} color={colors.primaryForeground} />}
-              title={t('mobile.staffHome.punchNow')}
-              onPress={() => router.push('/attendance')}
-            />
+          {/* The next punch, ready to press: «Ирлээ» until the person is in, then «Явлаа». */}
+          {data?.tracked ? (
+            punchNow.kind === 'IN' ? (
+              <PillButton
+                height={48}
+                icon={<LogIn size={18} strokeWidth={2.2} color={colors.primaryForeground} />}
+                title={t('mobile.staffHome.punchIn')}
+                loading={punchNow.busy}
+                loadingTitle={t('mobile.staffHome.punching')}
+                onPress={punchNow.press}
+              />
+            ) : (
+              <PillButton
+                height={48}
+                variant="destructive"
+                icon={<LogOut size={18} strokeWidth={2.2} color={colors.destructive} />}
+                title={t('mobile.staffHome.punchOut')}
+                loading={punchNow.busy}
+                loadingTitle={t('mobile.staffHome.punching')}
+                onPress={punchNow.press}
+              />
+            )
           ) : null}
         </Card>
 
@@ -353,9 +371,6 @@ export default function StaffHomeScreen() {
             </Card>
           )}
         </View>
-
-        {/* The app's version and «Шалгах» (ADR-0174 #10). */}
-        <UpdateCheckPanel state={updateCheck.state} onCheck={() => void updateCheck.check()} />
       </ScrollView>
     </Page>
   );
@@ -435,6 +450,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.onPrimaryHairline,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   initials: { ...type.title3, fontFamily: fonts.semibold, color: colors.primaryForeground },
   name: { ...type.title2, color: colors.primaryForeground },

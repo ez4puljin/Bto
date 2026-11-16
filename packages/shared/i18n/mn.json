@@ -8700,7 +8700,9 @@
       "date": "{{month}}-р сарын {{day}}, {{weekday}}",
       "schedule": "{{start}}–{{end}}",
       "worked": "Ажилласан {{hours}} ц {{minutes}} мин",
-      "punchNow": "Ирц бүртгэх",
+      "punchIn": "Ирлээ",
+      "punchOut": "Явлаа",
+      "punching": "Байршил шалгаж байна…",
       "fresh": "Шинэ мэдээлэл"
     },
     "update": {

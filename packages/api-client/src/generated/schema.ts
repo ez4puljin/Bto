@@ -16392,6 +16392,7 @@ export interface components {
             maritalStatus: components["schemas"]["HrMaritalStatus"] | null;
             district: string | null;
             children: components["schemas"]["HrChild"][];
+            photoUrl: string | null;
         };
         HrProfileRequest: {
             birthDate?: string | null;

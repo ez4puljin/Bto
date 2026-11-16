@@ -36,6 +36,45 @@ export function isHealthAnswer(body: unknown): body is HealthAnswer {
   );
 }
 
+/** A LAN address by number: it never moves to https by itself, so it is not asked. */
+const NUMBERED = /^http:\/\/(?:\d{1,3}(?:\.\d{1,3}){3}|\[[0-9a-f:.]+\])(?::|$)/i;
+
+/**
+ * The origin a server really answered from. A name typed without «https://» is called over plain
+ * http; the outside name answers that with a redirect to https (ADR-0189), and Android then sends
+ * the redirected call without the sign-in token, so every call after the sign-in is refused. When
+ * the answer to `server` came from the same host over https, that is the address to keep.
+ */
+export function answeredOrigin(server: string, answeredUrl: string | null | undefined): string {
+  if (!/^http:\/\//i.test(server) || !answeredUrl) return server;
+  const secure = `https://${server.slice('http://'.length)}`.toLowerCase();
+  const answered = answeredUrl.toLowerCase();
+  return answered === secure || answered.startsWith(`${secure}/`) ? secure : server;
+}
+
+/**
+ * A stored address moved to https when its server now answers there: one GET /health within
+ * `timeoutMs`. An https address, a numbered LAN address and a server that did not answer stay as
+ * they are.
+ */
+export async function secureOrigin(
+  server: string,
+  fetcher: (url: string, init: { signal: AbortSignal }) => Promise<{ url: string }>,
+  timeoutMs = 4_000,
+): Promise<string> {
+  if (!/^http:\/\//i.test(server) || NUMBERED.test(server)) return server;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetcher(`${server}/health`, { signal: controller.signal });
+    return answeredOrigin(server, response.url);
+  } catch {
+    return server;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** A server the phone connected to: its origin (as `normalizeServerUrl` gives it) and when (ms). */
 export interface RecentServer {
   url: string;

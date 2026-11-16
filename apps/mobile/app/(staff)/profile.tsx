@@ -18,6 +18,7 @@ import { useNotificationSummary } from '../../src/api/notifications';
 import { useRepContext } from '../../src/api/rep';
 import { initialsOf } from '../../src/format/format';
 import { useRoleName } from '../../src/state/role';
+import { MyPhoto } from '../../src/staff/my-photo';
 import { useSignedIn } from '../../src/state/session';
 import { useShop } from '../../src/state/shop';
 import { colors, fonts, spacing, tabular, type } from '../../src/theme/tokens';
@@ -67,6 +68,7 @@ export default function ProfileScreen() {
         >
           <View style={styles.avatar}>
             <Text style={styles.initials}>{initialsOf(me.fullName)}</Text>
+            <MyPhoto size={60} />
           </View>
           <View style={styles.grow}>
             <Text style={type.title3} numberOfLines={2}>
@@ -211,6 +213,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.tint.blue,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   initials: { ...type.title2, fontFamily: fonts.semibold, color: colors.primaryForeground },
 });

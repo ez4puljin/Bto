@@ -63377,6 +63377,10 @@
             "items": {
               "$ref": "#/components/schemas/HrChild"
             }
+          },
+          "photoUrl": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -63385,7 +63389,8 @@
           "education",
           "maritalStatus",
           "district",
-          "children"
+          "children",
+          "photoUrl"
         ]
       },
       "HrProfileRequest": {

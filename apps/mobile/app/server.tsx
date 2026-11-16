@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { readRecentServers, writeRecentServers } from '../src/device/storage';
 import {
+  answeredOrigin,
   forgetServer,
   isHealthAnswer,
   normalizeServerUrl,
@@ -99,11 +100,14 @@ export default function ServerScreen() {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8_000);
     let outcome: Check | 'ok';
+    // The address that answered: https when plain http was sent on to it (`answeredOrigin`).
+    let origin = server;
     try {
       const response = await fetch(`${server}/health`, {
         headers: { Accept: 'application/json' },
         signal: controller.signal,
       });
+      origin = answeredOrigin(server, response.url);
       try {
         outcome = isHealthAnswer(await response.json()) ? 'ok' : 'notBto';
       } catch {
@@ -119,8 +123,8 @@ export default function ServerScreen() {
       setCheck(outcome);
       return;
     }
-    await writeRecentServers(rememberServer(recent, server, Date.now()));
-    await setServer(server);
+    await writeRecentServers(rememberServer(forgetServer(recent, server), origin, Date.now()));
+    await setServer(origin);
   };
 
   const pick = (item: RecentServer) => {

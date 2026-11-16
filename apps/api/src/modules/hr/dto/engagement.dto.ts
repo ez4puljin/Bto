@@ -567,6 +567,7 @@ export class HrProfileDto {
   maritalStatus: MaritalStatus | null;
   @ApiProperty({ type: String, nullable: true }) district: string | null;
   @ApiProperty({ type: [HrChildDto] }) children: HrChildDto[];
+  @ApiProperty({ type: String, nullable: true }) photoUrl: string | null;
 }
 
 @ApiSchema({ name: 'HrProfileRequest' })

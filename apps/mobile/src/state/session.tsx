@@ -21,6 +21,7 @@ import {
 import { APP } from '../config/app';
 import { clientUserAgent } from '../device/install';
 import { readJson, SERVER_KEY, secureTokenStore, writeJson } from '../device/storage';
+import { secureOrigin } from '../server/server-url';
 
 interface SessionValue {
   /** undefined while the stored address is read; null when none is set. */
@@ -60,8 +61,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (fixed !== null) return;
-    void readJson(SERVER_KEY).then((value) => {
-      setServerState(typeof value === 'string' ? value : null);
+    void readJson(SERVER_KEY).then(async (value) => {
+      if (typeof value !== 'string') {
+        setServerState(null);
+        return;
+      }
+      // An outside name stored without https: every call after the sign-in was refused (see
+      // `answeredOrigin`). The address moves to https before the session starts on it.
+      const server = await secureOrigin(value, fetch);
+      if (server !== value) await writeJson(SERVER_KEY, server);
+      setServerState(server);
     });
   }, [fixed]);
 

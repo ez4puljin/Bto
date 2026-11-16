@@ -8,6 +8,7 @@ import { dayNameOf, monthDay } from '../../src/dates/calendar';
 import { ubDate, ubTime } from '../../src/dates/dates';
 import { initialsOf } from '../../src/format/format';
 import { useRoleName } from '../../src/state/role';
+import { MyPhoto } from '../../src/staff/my-photo';
 import { useSignedIn } from '../../src/state/session';
 import { colors, fonts, spacing, tabular, type } from '../../src/theme/tokens';
 import { PillButton } from '../../src/ui/controls';
@@ -48,6 +49,7 @@ export default function ProfileInfoScreen() {
         <View style={styles.head}>
           <View style={styles.avatar}>
             <Text style={styles.initials}>{initialsOf(me.fullName)}</Text>
+            <MyPhoto size={72} />
           </View>
           <Text style={[type.title3, styles.name]} numberOfLines={2}>
             {me.fullName}
@@ -141,6 +143,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.onPrimaryHairline,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   initials: { ...type.title, fontFamily: fonts.semibold, color: colors.primaryForeground },
   name: { color: colors.primaryForeground, textAlign: 'center' },

@@ -109,6 +109,8 @@ export interface EmployeeProfile {
   maritalStatus: MaritalStatus | null;
   district: string | null;
   children: EmployeeChild[];
+  /** The person's own photo, set by HR: the staff app draws it where it greets them. */
+  photoUrl: string | null;
 }
 
 export interface EmployeeProfileInput {
@@ -471,7 +473,10 @@ export class WorkforceService implements OnApplicationBootstrap {
       .from(hrEmployeeChildren)
       .where(eq(hrEmployeeChildren.userId, userId))
       .orderBy(asc(hrEmployeeChildren.birthDate));
+    const photoFileId = card?.photoFileId ?? null;
+    const photos = await this.storage.publicUrls(photoFileId === null ? [] : [photoFileId]);
     return {
+      photoUrl: photoFileId === null ? null : (photos.get(photoFileId) ?? null),
       birthDate: card?.birthDate ?? null,
       gender: card?.gender ?? null,
       education: card?.education ?? null,

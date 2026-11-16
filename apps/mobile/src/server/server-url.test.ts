@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  answeredOrigin,
   fieldAddress,
   forgetServer,
   isHealthAnswer,
@@ -7,6 +8,7 @@ import {
   recentServersFrom,
   recentServerWhen,
   rememberServer,
+  secureOrigin,
   serverHost,
 } from './server-url';
 
@@ -129,5 +131,43 @@ describe('recent servers', () => {
       today: false,
       date: '10/17',
     });
+  });
+});
+
+describe('a server that answers over https', () => {
+  it('keeps https when plain http was redirected to the same host', () => {
+    expect(answeredOrigin('http://app.example.mn', 'https://app.example.mn/health')).toBe(
+      'https://app.example.mn',
+    );
+    expect(answeredOrigin('http://app.example.mn', 'http://app.example.mn/health')).toBe(
+      'http://app.example.mn',
+    );
+    expect(answeredOrigin('http://app.example.mn', 'https://other.example.mn/health')).toBe(
+      'http://app.example.mn',
+    );
+    expect(answeredOrigin('http://app.example.mn', '')).toBe('http://app.example.mn');
+    expect(answeredOrigin('https://app.example.mn', 'https://app.example.mn/health')).toBe(
+      'https://app.example.mn',
+    );
+  });
+
+  it('asks a named http server once and never a numbered or an https one', async () => {
+    const asked: string[] = [];
+    const fetcher = (url: string) => {
+      asked.push(url);
+      return Promise.resolve({ url: url.replace('http://', 'https://') });
+    };
+    expect(await secureOrigin('http://app.example.mn', fetcher)).toBe('https://app.example.mn');
+    expect(await secureOrigin('http://192.168.1.250', fetcher)).toBe('http://192.168.1.250');
+    expect(await secureOrigin('http://192.168.1.250:3300', fetcher)).toBe(
+      'http://192.168.1.250:3300',
+    );
+    expect(await secureOrigin('https://app.example.mn', fetcher)).toBe('https://app.example.mn');
+    expect(asked).toEqual(['http://app.example.mn/health']);
+  });
+
+  it('keeps the address when nothing answers', async () => {
+    const fetcher = () => Promise.reject(new Error('offline'));
+    expect(await secureOrigin('http://app.example.mn', fetcher)).toBe('http://app.example.mn');
   });
 });
