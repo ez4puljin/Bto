@@ -1,18 +1,58 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Bell, Newspaper } from 'lucide-react-native';
+import { Megaphone, Newspaper } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { type MessageKind, type MyMessage, useMyMessages } from '../../../src/api/community';
 import { FirstLoad, useAt } from '../../../src/community/parts';
 import { useSignedIn } from '../../../src/state/session';
-import { colors, radii, spacing, type } from '../../../src/theme/tokens';
-import { Segmented } from '../../../src/ui/controls';
+import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme/tokens';
+import { Group } from '../../../src/ui/grouped';
 import { EmptyState } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
+import { PAGE } from '../../../src/ui/staff-kit';
 import { StoreHeader } from '../../../src/ui/store-header';
 import { Text } from '../../../src/ui/text';
+
+const PICTURE = 56;
+
+/** The two lists' switch in the blue header: a translucent track, the chosen part white. */
+function KindSwitch({
+  options,
+  value,
+  onChange,
+  label,
+}: {
+  options: readonly { value: MessageKind; label: string }[];
+  value: MessageKind;
+  onChange: (value: MessageKind) => void;
+  label: string;
+}) {
+  return (
+    <View style={styles.switchPad}>
+      <View accessibilityRole="radiogroup" accessibilityLabel={label} style={styles.track}>
+        {options.map((option) => {
+          const on = option.value === value;
+          return (
+            <Pressable
+              key={option.value}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: on }}
+              onPress={() => onChange(option.value)}
+              hitSlop={{ top: 5, bottom: 5 }}
+              style={[styles.segment, on && styles.segmentOn]}
+            >
+              <Text numberOfLines={1} style={on ? styles.segmentTextOn : styles.segmentText}>
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
 
 /**
  * Notices and news as two lists (ADR-0146): a picture, the title, the date and an unread dot.
@@ -34,10 +74,12 @@ export default function MessagesScreen() {
     return n > 0 ? t('mobile.community.messages.withCount', { label: name, n }) : name;
   };
 
-  const renderMessage = ({ item }: { item: MyMessage }) => {
-    const Icon = item.kind === 'NOTICE' ? Bell : Newspaper;
+  const renderMessage = (item: MyMessage) => {
+    const notice = item.kind === 'NOTICE';
+    const Icon = notice ? Megaphone : Newspaper;
     return (
       <Pressable
+        key={item.id}
         accessibilityRole="button"
         accessibilityLabel={
           item.read ? item.title : `${item.title}, ${t('mobile.community.messages.unread')}`
@@ -53,15 +95,25 @@ export default function MessagesScreen() {
             cachePolicy="memory-disk"
           />
         ) : (
-          <View style={[styles.picture, styles.noPicture]}>
-            <Icon size={24} strokeWidth={1.8} color={colors.input} />
+          <View
+            style={[
+              styles.picture,
+              styles.noPicture,
+              !item.read && (notice ? styles.unreadNotice : styles.unreadNews),
+            ]}
+          >
+            <Icon
+              size={24}
+              strokeWidth={1.8}
+              color={item.read ? colors.input : notice ? colors.tint.red : colors.link}
+            />
           </View>
         )}
         <View style={styles.grow}>
           <Text style={item.read ? type.row : type.rowStrong} numberOfLines={2}>
             {item.title}
           </Text>
-          <Text style={type.secondary} numberOfLines={1}>
+          <Text style={[type.secondary, tabular]} numberOfLines={1}>
             {at(item.publishAt)}
           </Text>
         </View>
@@ -72,13 +124,8 @@ export default function MessagesScreen() {
 
   return (
     <Page edges={[]}>
-      <StoreHeader
-        title={t('mobile.community.messages.title')}
-        onBack={() => router.back()}
-        right={null}
-      />
-      <View style={styles.tabs}>
-        <Segmented
+      <StoreHeader title={t('mobile.community.messages.title')} onBack={() => router.back()}>
+        <KindSwitch
           label={t('mobile.community.messages.title')}
           options={[
             { value: 'NOTICE', label: label('NOTICE') },
@@ -87,27 +134,26 @@ export default function MessagesScreen() {
           value={kind}
           onChange={setKind}
         />
-      </View>
-      <FlatList
-        data={rows}
-        keyExtractor={(message) => String(message.id)}
-        renderItem={renderMessage}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        contentContainerStyle={styles.list}
+      </StoreHeader>
+      <ScrollView
+        contentContainerStyle={styles.body}
         refreshControl={
           <RefreshControl
             refreshing={messages.isRefetching}
             onRefresh={() => void messages.refetch()}
           />
         }
-        ListEmptyComponent={
+      >
+        {rows.length > 0 ? (
+          <Group inset={spacing.lg + PICTURE + spacing.md}>{rows.map(renderMessage)}</Group>
+        ) : (
           <FirstLoad query={messages}>
             <EmptyState
               icon={
                 kind === 'NOTICE' ? (
-                  <Bell size={44} strokeWidth={1.5} color={colors.input} />
+                  <Megaphone size={40} strokeWidth={1.5} color={colors.muted} />
                 ) : (
-                  <Newspaper size={44} strokeWidth={1.5} color={colors.input} />
+                  <Newspaper size={40} strokeWidth={1.5} color={colors.muted} />
                 )
               }
               title={t(
@@ -117,32 +163,54 @@ export default function MessagesScreen() {
               )}
             />
           </FirstLoad>
-        }
-      />
+        )}
+      </ScrollView>
     </Page>
   );
 }
 
 const styles = StyleSheet.create({
-  tabs: { paddingHorizontal: 14, paddingTop: spacing.md },
-  list: { paddingHorizontal: 14, paddingTop: spacing.md, paddingBottom: 40 },
+  switchPad: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  track: {
+    flexDirection: 'row',
+    padding: 3,
+    borderRadius: 12,
+    backgroundColor: colors.onPrimaryHairline,
+  },
+  segment: {
+    flex: 1,
+    height: 34,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xs,
+  },
+  segmentOn: { backgroundColor: colors.card },
+  segmentText: { ...type.chip, color: colors.primaryForeground },
+  segmentTextOn: { ...type.chip, fontFamily: fonts.semibold, color: colors.link },
+  body: { padding: PAGE.padding, paddingBottom: 40 },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.md,
-    minHeight: 76,
-    padding: 10,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
   pressed: { backgroundColor: colors.accent },
-  picture: { width: 56, height: 56, borderRadius: 10 },
+  picture: { width: PICTURE, height: PICTURE, borderRadius: radii.field },
   noPicture: {
     backgroundColor: colors.imageFill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  grow: { flex: 1, minWidth: 0, gap: 2 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
-  separator: { height: spacing.sm },
+  unreadNotice: { backgroundColor: colors.destructiveSoft },
+  unreadNews: { backgroundColor: colors.secondary },
+  grow: { flex: 1, minWidth: 0, gap: spacing.xs },
+  dot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    marginTop: 6,
+    backgroundColor: colors.primary,
+  },
 });

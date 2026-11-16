@@ -12,7 +12,6 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   useHomeWarehouses,
   useNextSku,
@@ -52,7 +51,7 @@ import {
 } from '../../../src/products/rules';
 import { useSignedIn } from '../../../src/state/session';
 import { useDebounced } from '../../../src/state/use-debounced';
-import { colors, radii, spacing, TOUCH, type } from '../../../src/theme/tokens';
+import { colors, fonts, radii, shadows, spacing, tabular, type } from '../../../src/theme/tokens';
 import { ScanSheet } from '../../../src/transfers/scan-sheet';
 import { PillButton, Segmented } from '../../../src/ui/controls';
 import { TextField } from '../../../src/ui/field';
@@ -60,9 +59,13 @@ import { Group, Row } from '../../../src/ui/grouped';
 import { ProblemText } from '../../../src/ui/kit';
 import { Page, SectionHeader } from '../../../src/ui/layout';
 import { ActionSheet } from '../../../src/ui/sheet';
+import { Card, FooterBar } from '../../../src/ui/staff-kit';
 import { StoreHeader } from '../../../src/ui/store-header';
 import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
+
+/** Every button inside the form is this high; the page's own «Хадгалах» is the 50 px one. */
+const BUTTON = 44;
 
 type Phase = 'idle' | 'uploading' | 'reading' | 'picture';
 type Picking = 'category' | 'supplier' | 'warehouse' | null;
@@ -87,7 +90,6 @@ export default function NewProductScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const navigation = useNavigation();
-  const insets = useSafeAreaInsets();
   const toast = useToast();
   const { me } = useSignedIn();
   const status = useProductAiStatus();
@@ -275,39 +277,42 @@ export default function NewProductScreen() {
   const filled = outcome?.proposal ? filledBy(outcome.proposal) : [];
   const loadProblem = uoms.error ?? categories.error ?? warehouses.error;
 
+  /** «2 · Бараа»: a section's label with its place in the form. */
+  const numbered = (n: number, title: string) => t('mobile.productNew.numbered', { n, title });
+
   const barcodes = (slot: BarcodeSlot, label: string) => (
     <View style={styles.codes}>
-      <View style={styles.codesHead}>
-        <Text style={type.label}>{label}</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('mobile.productNew.barcode.scan', { unit: label })}
-          onPress={() => setScanning(slot)}
-          style={({ pressed }) => [styles.scan, pressed && styles.faded]}
-        >
-          <ScanLine size={18} strokeWidth={2} color={colors.primary} />
-          <Text style={styles.scanText}>{t('mobile.productNew.barcode.add')}</Text>
-        </Pressable>
+      <View style={styles.codesText}>
+        <Text style={type.secondary}>{label}</Text>
+        {form[slot].length === 0 ? (
+          <Text style={[type.body, styles.muted]}>{t('mobile.productNew.barcode.none')}</Text>
+        ) : (
+          <View style={styles.chips}>
+            {form[slot].map((code) => (
+              <View key={code} style={styles.chip}>
+                <Text style={styles.chipText}>{code}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('mobile.productNew.barcode.remove', { code })}
+                  hitSlop={10}
+                  onPress={() => setForm((current) => withoutBarcode(current, slot, code))}
+                >
+                  <X size={14} strokeWidth={2.4} color={colors.foreground} />
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
-      {form[slot].length === 0 ? (
-        <Text style={type.secondary}>{t('mobile.productNew.barcode.none')}</Text>
-      ) : (
-        <View style={styles.chips}>
-          {form[slot].map((code) => (
-            <View key={code} style={styles.chip}>
-              <Text style={styles.chipText}>{code}</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('mobile.productNew.barcode.remove', { code })}
-                hitSlop={spacing.sm}
-                onPress={() => setForm((current) => withoutBarcode(current, slot, code))}
-              >
-                <X size={16} strokeWidth={2.4} color={colors.muted} />
-              </Pressable>
-            </View>
-          ))}
-        </View>
-      )}
+      <PillButton
+        title={t('mobile.productNew.barcode.add')}
+        accessibilityLabel={t('mobile.productNew.barcode.scan', { unit: label })}
+        variant="soft"
+        height={BUTTON}
+        icon={<ScanLine size={16} strokeWidth={2.2} color={colors.link} />}
+        onPress={() => setScanning(slot)}
+        style={styles.scan}
+      />
     </View>
   );
 
@@ -324,8 +329,15 @@ export default function NewProductScreen() {
             style={styles.flat}
           />
 
-          <View style={styles.card}>
-            <Text style={type.heading}>{t('mobile.productNew.photos.title')}</Text>
+          <SectionHeader
+            style={styles.section}
+            right={
+              <Text style={[type.secondary, tabular]}>{`${photos.length} / ${MAX_AI_PHOTOS}`}</Text>
+            }
+          >
+            {numbered(1, t('mobile.productNew.photos.title'))}
+          </SectionHeader>
+          <Card style={styles.card}>
             <Text style={type.secondary}>{t('mobile.productNew.photos.hint')}</Text>
             {photos.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -354,16 +366,10 @@ export default function NewProductScreen() {
                   ? t('mobile.productNew.photos.take')
                   : t('mobile.productNew.photos.more')
               }
-              variant={photos.length === 0 ? 'primary' : 'soft'}
-              height={46}
+              variant="soft"
+              height={BUTTON}
               disabled={busy || photos.length >= MAX_AI_PHOTOS}
-              icon={
-                <Camera
-                  size={20}
-                  strokeWidth={2.2}
-                  color={photos.length === 0 ? colors.primaryForeground : colors.primary}
-                />
-              }
+              icon={<Camera size={20} strokeWidth={2.2} color={colors.link} />}
               onPress={() => setShooting(true)}
             />
             {photos.length > 0 ? (
@@ -371,10 +377,11 @@ export default function NewProductScreen() {
                 title={
                   canRead ? t('mobile.productNew.ai.button') : t('mobile.productNew.ai.pictureOnly')
                 }
-                height={46}
+                variant="soft"
+                height={BUTTON}
                 loading={busy}
                 loadingTitle={busy ? t(`mobile.productNew.ai.phase.${phase}`) : undefined}
-                icon={<Sparkles size={20} strokeWidth={2.2} color={colors.primaryForeground} />}
+                icon={<Sparkles size={20} strokeWidth={2.2} color={colors.link} />}
                 onPress={() => void run()}
               />
             ) : null}
@@ -388,10 +395,10 @@ export default function NewProductScreen() {
               problem={problem && phase === 'idle' && !checked ? problem : null}
               style={styles.flat}
             />
-          </View>
+          </Card>
 
           {outcome ? (
-            <View style={styles.card}>
+            <Card style={styles.card}>
               {outcome.proposal ? (
                 <View style={styles.note}>
                   <Text style={styles.noteText}>
@@ -435,11 +442,11 @@ export default function NewProductScreen() {
                   {t(`mobile.productNew.ai.pictureFailure.${outcome.pictureFailure}`)}
                 </Text>
               ) : null}
-            </View>
+            </Card>
           ) : null}
 
           {picture ? (
-            <View style={styles.card}>
+            <Card style={styles.card}>
               <Text style={type.heading}>{t('mobile.productNew.picture.title')}</Text>
               <Image source={{ uri: picture.uri }} style={styles.picture} contentFit="contain" />
               <Text style={type.secondary}>
@@ -447,14 +454,16 @@ export default function NewProductScreen() {
                   ? t('mobile.productNew.picture.made')
                   : t('mobile.productNew.picture.original')}
               </Text>
-            </View>
+            </Card>
           ) : checked && problems.picture ? (
             <View accessibilityRole="alert" style={styles.warn}>
               <Text style={styles.warnText}>{t('mobile.productNew.problems.picture')}</Text>
             </View>
           ) : null}
 
-          <SectionHeader>{t('mobile.productNew.sections.product')}</SectionHeader>
+          <SectionHeader style={styles.section}>
+            {numbered(2, t('mobile.productNew.sections.product'))}
+          </SectionHeader>
           <Group>
             <Row
               title={t('mobile.productNew.fields.category')}
@@ -463,7 +472,7 @@ export default function NewProductScreen() {
               onPress={() => setPicking('category')}
             />
           </Group>
-          <View style={styles.card}>
+          <Card style={styles.fields}>
             <TextField
               label={t('mobile.productNew.fields.name')}
               value={form.name}
@@ -485,10 +494,12 @@ export default function NewProductScreen() {
               }
               keyboardType="number-pad"
             />
-          </View>
+          </Card>
 
-          <SectionHeader>{t('mobile.productNew.sections.units')}</SectionHeader>
-          <View style={styles.card}>
+          <SectionHeader style={styles.section}>
+            {numbered(3, t('mobile.productNew.sections.units'))}
+          </SectionHeader>
+          <Card style={styles.fields}>
             <Text style={type.label}>{t('mobile.productNew.fields.baseUnit')}</Text>
             <Segmented
               label={t('mobile.productNew.fields.baseUnit')}
@@ -521,18 +532,22 @@ export default function NewProductScreen() {
               hint={t('mobile.productNew.fields.blockHint')}
               keyboardType="decimal-pad"
             />
-          </View>
+          </Card>
 
-          <SectionHeader>{t('mobile.productNew.sections.barcodes')}</SectionHeader>
-          <View style={styles.card}>
+          <SectionHeader style={styles.section}>
+            {numbered(4, t('mobile.productNew.sections.barcodes'))}
+          </SectionHeader>
+          <Group>
             {barcodes('baseBarcodes', t('mobile.productNew.fields.baseBarcodes'))}
             {barcodes('boxBarcodes', t('mobile.productNew.fields.boxBarcodes'))}
             {form.blockFactor.trim() !== ''
               ? barcodes('blockBarcodes', t('mobile.productNew.fields.blockBarcodes'))
               : null}
-          </View>
+          </Group>
 
-          <SectionHeader>{t('mobile.productNew.sections.place')}</SectionHeader>
+          <SectionHeader style={styles.section}>
+            {numbered(5, t('mobile.productNew.sections.place'))}
+          </SectionHeader>
           <Group>
             <Row
               title={t('mobile.productNew.fields.supplier')}
@@ -548,21 +563,20 @@ export default function NewProductScreen() {
             />
           </Group>
         </ScrollView>
-        <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+        <FooterBar column>
           <ProblemText problem={checked ? problem : null} style={styles.flat} />
           {checked && hasProblems(problems) ? (
-            <Text style={[type.secondary, styles.failure]}>
+            <Text style={[type.secondary, styles.failure, styles.center]}>
               {t('mobile.productNew.incomplete')}
             </Text>
           ) : null}
           <PillButton
             title={t('common.save')}
-            height={48}
             loading={register.isPending}
             disabled={busy || register.isPending}
             onPress={() => void save()}
           />
-        </View>
+        </FooterBar>
       </KeyboardAvoidingView>
 
       <PhotoCamera
@@ -644,26 +658,25 @@ export default function NewProductScreen() {
   );
 }
 
-const THUMB = 76;
+const THUMB = 72;
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  faded: { opacity: 0.7 },
   flat: { marginTop: 0 },
-  body: { padding: 14, paddingBottom: 24, gap: spacing.md },
-  card: {
-    padding: spacing.lg,
-    gap: spacing.md,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
-  },
+  center: { textAlign: 'center' },
+  muted: { color: colors.muted },
+  body: { padding: spacing.lg, paddingBottom: spacing.xl, gap: spacing.md },
+  // A label sits 8 px over its card inside the page's 12 px rhythm.
+  section: { marginTop: spacing.xs, marginBottom: -spacing.xs },
+  card: { gap: spacing.md },
+  fields: { gap: spacing.lg },
   strip: {
     flexDirection: 'row',
     gap: spacing.sm,
     paddingTop: spacing.xs,
     paddingRight: spacing.xs,
   },
-  thumb: { width: THUMB, height: THUMB, borderRadius: radii.control, backgroundColor: colors.fill },
+  thumb: { width: THUMB, height: THUMB, borderRadius: radii.field, backgroundColor: colors.fill },
   thumbRemove: {
     position: 'absolute',
     top: -4,
@@ -671,7 +684,8 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: colors.floatingFill,
+    backgroundColor: colors.card,
+    boxShadow: shadows.stepper,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -693,34 +707,28 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: 220,
     height: 220,
-    borderRadius: radii.control,
+    borderRadius: radii.field,
     backgroundColor: colors.fill,
   },
-  codes: { gap: spacing.sm },
-  codesHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  scan: {
-    height: TOUCH,
+  codes: {
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
+    gap: spacing.md,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.lg,
   },
-  scanText: { ...type.bodyStrong, color: colors.primary },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  codesText: { flex: 1, minWidth: 0, gap: spacing.xs },
+  scan: { paddingHorizontal: spacing.lg },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
+    height: 24,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.pill,
+    gap: 6,
+    paddingHorizontal: 10,
+    borderRadius: 12,
     backgroundColor: colors.fill,
   },
-  chipText: { ...type.chip, color: colors.foreground },
-  bar: {
-    gap: spacing.sm,
-    paddingHorizontal: 14,
-    paddingTop: spacing.sm,
-    backgroundColor: colors.canvas,
-  },
+  chipText: { ...type.secondary, ...tabular, fontFamily: fonts.semibold, color: colors.foreground },
 });

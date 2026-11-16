@@ -26,15 +26,17 @@ import {
 } from '../../../src/api/visits';
 import { shortDate, ubTime } from '../../../src/dates/dates';
 import { formatMnt } from '../../../src/format/format';
-import { colors, fonts, radii, spacing, type } from '../../../src/theme/tokens';
+import { colors, radii, spacing, tabular, type } from '../../../src/theme/tokens';
 import { ChoiceChip, PillButton, SearchField, Segmented } from '../../../src/ui/controls';
 import { InputRow, Separator } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
-import { Page } from '../../../src/ui/layout';
+import { Page, SectionHeader } from '../../../src/ui/layout';
 import { Sheet, SheetClose, SheetHeader } from '../../../src/ui/sheet';
+import { Card, FooterBar, Pill, ProgressBar, type Tone } from '../../../src/ui/staff-kit';
 import { StoreHeader } from '../../../src/ui/store-header';
 import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
+import { BandSegmented } from '../../../src/visits/band-segmented';
 import { amountOf, orderedStops, progressOf } from '../../../src/visits/stops';
 
 const RESULTS: readonly VisitResult[] = ['ORDERED', 'NO_ORDER', 'CLOSED', 'PAYMENT'];
@@ -47,10 +49,18 @@ interface Store {
   address: string | null;
 }
 
-const STATUS_COLOR: Record<RepCollection['status'], string> = {
-  PENDING: colors.warningText,
-  RECORDED: colors.success,
-  REJECTED: colors.destructiveText,
+const STATUS_TONE: Record<RepCollection['status'], Tone> = {
+  PENDING: 'warn',
+  RECORDED: 'ok',
+  REJECTED: 'bad',
+};
+
+/** What a visit came to, as its pill colours it (the Visits board). */
+const RESULT_TONE: Record<VisitResult, Tone> = {
+  ORDERED: 'ok',
+  NO_ORDER: 'warn',
+  CLOSED: 'neutral',
+  PAYMENT: 'info',
 };
 
 /**
@@ -123,7 +133,7 @@ export default function VisitsScreen() {
 
   const stopRow = (stop: RepTodayStop, index: number) => (
     <View key={stop.customerId}>
-      {index > 0 ? <Separator /> : null}
+      {index > 0 ? <Separator inset={spacing.lg + 24 + spacing.md} /> : null}
       <Pressable
         accessibilityRole="button"
         onPress={() =>
@@ -132,35 +142,39 @@ export default function VisitsScreen() {
         style={({ pressed }) => [styles.row, pressed && styles.pressed]}
       >
         <View style={[styles.dot, stop.visit ? styles.dotDone : null]}>
-          {stop.visit ? <Check size={14} strokeWidth={3} color={colors.primaryForeground} /> : null}
+          {stop.visit ? <Check size={16} strokeWidth={3} color={colors.primaryForeground} /> : null}
         </View>
         <View style={styles.grow}>
-          <Text style={[type.rowStrong, styles.rowTitle]} numberOfLines={1}>
+          <Text style={stop.visit ? type.row : type.rowStrong} numberOfLines={1}>
             {stop.name}
           </Text>
-          {stop.address ? (
+          {stop.visit ? (
+            <Text style={[type.secondary, tabular]} numberOfLines={1}>
+              {[
+                ubTime(stop.visit.visitedAt),
+                stop.planned ? null : t('mobile.visits.extra'),
+                stop.visit.note,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </Text>
+          ) : stop.address ? (
             <Text style={type.secondary} numberOfLines={1}>
               {stop.address}
             </Text>
           ) : null}
-          <Text
-            style={[type.secondary, stop.creditHold && !stop.visit ? styles.hold : null]}
-            numberOfLines={1}
-          >
-            {stop.visit
-              ? [
-                  t(`mobile.visits.results.${stop.visit.result}`),
-                  ubTime(stop.visit.visitedAt),
-                  stop.planned ? null : t('mobile.visits.extra'),
-                  stop.visit.note,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')
-              : stop.creditHold
-                ? t('mobile.visits.hold')
-                : t('mobile.visits.notVisited')}
-          </Text>
         </View>
+        {stop.visit ? (
+          <Pill
+            label={t(`mobile.visits.results.${stop.visit.result}`)}
+            tone={RESULT_TONE[stop.visit.result]}
+            style={styles.pill}
+          />
+        ) : stop.creditHold ? (
+          <Pill label={t('mobile.visits.hold')} tone="dark" style={styles.pill} />
+        ) : (
+          <Pill label={t('mobile.visits.notVisited')} style={styles.pill} />
+        )}
       </Pressable>
     </View>
   );
@@ -173,40 +187,54 @@ export default function VisitsScreen() {
           <Text style={[type.rowStrong, styles.rowTitle]} numberOfLines={1}>
             {row.customerName}
           </Text>
-          <Text style={type.rowStrong}>{`${formatMnt(row.amount)}₮`}</Text>
+          <Text style={[type.rowStrong, tabular]}>{`${formatMnt(row.amount)}₮`}</Text>
         </View>
-        <Text style={type.secondary} numberOfLines={1}>
-          {[shortDate(row.collectedOn), t(`mobile.visits.methods.${row.method}`), row.note]
-            .filter(Boolean)
-            .join(' · ')}
-        </Text>
-        <Text style={[type.secondary, styles.status, { color: STATUS_COLOR[row.status] }]}>
-          {row.status === 'REJECTED' && row.decisionNote
-            ? t('mobile.visits.rejectedWhy', { reason: row.decisionNote })
-            : row.status === 'RECORDED' && row.paymentNumber
-              ? t('mobile.visits.recordedAs', { number: row.paymentNumber })
-              : t(`mobile.visits.statuses.${row.status}`)}
-        </Text>
+        <View style={styles.rowTop}>
+          <Text style={[type.secondary, styles.rowTitle]} numberOfLines={1}>
+            {[shortDate(row.collectedOn), t(`mobile.visits.methods.${row.method}`), row.note]
+              .filter(Boolean)
+              .join(' · ')}
+          </Text>
+          <Pill
+            label={t(`mobile.visits.statuses.${row.status}`)}
+            tone={STATUS_TONE[row.status]}
+            style={styles.pill}
+          />
+        </View>
+        {row.status === 'REJECTED' && row.decisionNote ? (
+          <Text style={[type.secondary, styles.rejected]}>
+            {t('mobile.visits.rejectedWhy', { reason: row.decisionNote })}
+          </Text>
+        ) : row.status === 'RECORDED' && row.paymentNumber ? (
+          <Text style={type.secondary}>
+            {t('mobile.visits.recordedAs', { number: row.paymentNumber })}
+          </Text>
+        ) : null}
       </View>
     </View>
   );
 
   const query = tab === 'today' ? today : collections;
+  const total = stops.open.length + stops.done.length;
   return (
     <Page edges={[]}>
-      <StoreHeader title={t('mobile.visits.title')} onBack={() => router.back()} />
-      <View style={styles.tabs}>
-        <Segmented
+      <StoreHeader title={t('mobile.visits.title')} onBack={() => router.back()}>
+        <BandSegmented
           options={[
             { value: 'today', label: t('mobile.visits.tabs.today') },
             { value: 'money', label: t('mobile.visits.tabs.money') },
           ]}
           value={tab}
           onChange={setTab}
+          label={t('mobile.visits.title')}
         />
-      </View>
+      </StoreHeader>
       <ScrollView
-        contentContainerStyle={[styles.list, { paddingBottom: spacing.xl * 3 + insets.bottom }]}
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.list,
+          tab === 'today' ? null : { paddingBottom: spacing.xl + insets.bottom },
+        ]}
         refreshControl={
           <RefreshControl refreshing={query.isRefetching} onRefresh={() => void query.refetch()} />
         }
@@ -217,54 +245,66 @@ export default function VisitsScreen() {
           <ProblemText problem={problemFrom(query.error)} style={styles.problem} />
         ) : tab === 'today' ? (
           <>
-            <Text accessibilityRole="header" style={[type.sectionHeader, styles.sectionHeader]}>
-              {t('mobile.visits.progress', {
-                day: t(
-                  `mobile.weekdaysLong.${((today.data?.weekday ?? 1) % 7) as 0 | 1 | 2 | 3 | 4 | 5 | 6}`,
-                ),
-                visited: progress.visited,
-                planned: progress.planned,
-              })}
-            </Text>
-            {stops.open.length + stops.done.length === 0 ? (
+            <Card style={styles.progress}>
+              <View style={styles.rowTop}>
+                <Text accessibilityRole="header" style={[type.rowStrong, styles.rowTitle]}>
+                  {t(
+                    `mobile.weekdaysLong.${((today.data?.weekday ?? 1) % 7) as 0 | 1 | 2 | 3 | 4 | 5 | 6}`,
+                  )}
+                </Text>
+                <Text style={[type.rowStrong, tabular, styles.link]}>
+                  {t('mobile.visits.progressCount', {
+                    visited: progress.visited,
+                    planned: progress.planned,
+                  })}
+                </Text>
+              </View>
+              <ProgressBar value={progress.planned > 0 ? progress.visited / progress.planned : 0} />
+            </Card>
+            {total === 0 ? (
               <EmptyState
-                icon={<MapPinned size={44} strokeWidth={1.5} color={colors.input} />}
+                icon={<MapPinned size={44} strokeWidth={1.5} color={colors.muted} />}
                 title={t('mobile.visits.empty')}
                 hint={t('mobile.visits.emptyHint')}
               />
             ) : null}
             {stops.open.length > 0 ? (
-              <View style={styles.card}>{stops.open.map(stopRow)}</View>
+              <>
+                <SectionHeader style={styles.section}>
+                  {t('mobile.visits.open', { n: stops.open.length })}
+                </SectionHeader>
+                <Card flush>{stops.open.map(stopRow)}</Card>
+              </>
             ) : null}
             {stops.done.length > 0 ? (
               <>
-                <Text accessibilityRole="header" style={[type.sectionHeader, styles.sectionHeader]}>
+                <SectionHeader style={styles.section}>
                   {t('mobile.visits.done', { n: stops.done.length })}
-                </Text>
-                <View style={styles.card}>{stops.done.map(stopRow)}</View>
+                </SectionHeader>
+                <Card flush>{stops.done.map(stopRow)}</Card>
               </>
             ) : null}
           </>
         ) : (collections.data ?? []).length === 0 ? (
           <EmptyState
-            icon={<MapPinned size={44} strokeWidth={1.5} color={colors.input} />}
+            icon={<MapPinned size={44} strokeWidth={1.5} color={colors.muted} />}
             title={t('mobile.visits.noMoney')}
             hint={t('mobile.visits.noMoneyHint')}
           />
         ) : (
-          <View style={[styles.card, styles.cardTop]}>
-            {(collections.data ?? []).map(moneyRow)}
-          </View>
+          <Card flush>{(collections.data ?? []).map(moneyRow)}</Card>
         )}
       </ScrollView>
       {tab === 'today' ? (
-        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+        <FooterBar>
           <PillButton
             title={t('mobile.visits.addStore')}
-            icon={<Plus size={18} strokeWidth={2.4} color={colors.primaryForeground} />}
+            variant="soft"
+            icon={<Plus size={18} strokeWidth={2.4} color={colors.link} />}
             onPress={() => setPicking(true)}
+            style={styles.fill}
           />
-        </View>
+        </FooterBar>
       ) : null}
       <StorePicker
         visible={picking}
@@ -405,46 +445,41 @@ function StorePicker(props: {
 }
 
 const styles = StyleSheet.create({
-  tabs: { paddingHorizontal: 14, paddingTop: spacing.md },
-  list: { paddingHorizontal: 14, flexGrow: 1 },
-  grow: { flex: 1, minWidth: 0, gap: 2 },
+  scroll: { flex: 1 },
+  list: { padding: spacing.lg, gap: spacing.md, flexGrow: 1 },
+  fill: { flex: 1 },
+  grow: { flex: 1, minWidth: 0, gap: 1 },
   pressed: { backgroundColor: colors.accent },
-  problem: { marginTop: spacing.md },
+  problem: { marginTop: 0 },
   loading: { marginTop: spacing.xl },
-  sectionHeader: { paddingTop: spacing.lg, paddingBottom: spacing.sm, paddingHorizontal: 2 },
+  // A label sits 8 px over its card inside the page's 12 px rhythm.
+  section: { marginTop: spacing.xs, marginBottom: -spacing.xs },
+  progress: { gap: spacing.sm, paddingVertical: 14 },
+  link: { color: colors.link },
   card: { backgroundColor: colors.card, borderRadius: radii.card, overflow: 'hidden' },
-  cardTop: { marginTop: spacing.lg },
   row: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: spacing.md,
-    minHeight: 64,
+    minHeight: 56,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: 10,
   },
   rowTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowTitle: { flex: 1, minWidth: 0 },
+  pill: { alignSelf: 'center', flexShrink: 0 },
   dot: {
     width: 24,
     height: 24,
-    marginTop: 1,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: colors.input,
+    borderColor: colors.fieldBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dotDone: { backgroundColor: colors.success, borderColor: colors.success },
-  hold: { color: colors.destructiveText },
-  moneyRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: 2 },
-  status: { fontFamily: fonts.semibold },
-  footer: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    backgroundColor: colors.canvas,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.input,
-  },
+  dotDone: { backgroundColor: colors.tint.green, borderColor: colors.tint.green },
+  moneyRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: spacing.xs },
+  rejected: { color: colors.destructiveText },
   sheetBody: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.md },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   pickerSearch: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },

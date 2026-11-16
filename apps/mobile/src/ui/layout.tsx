@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Text } from './text';
 import { type Edge, SafeAreaView } from 'react-native-safe-area-context';
+import { STAFF_LOOK } from '../theme/look';
 import { colors, spacing, type } from '../theme/tokens';
 
 /**
@@ -142,7 +143,10 @@ export function SectionHeader({
 }) {
   return (
     <View style={[styles.section, style]}>
-      <Text accessibilityRole="header" style={[type.sectionHeader, styles.grow]}>
+      <Text
+        accessibilityRole="header"
+        style={[type.sectionHeader, styles.grow, STAFF_LOOK && styles.sectionUpper]}
+      >
         {children}
       </Text>
       {right}
@@ -211,6 +215,7 @@ const styles = StyleSheet.create({
   },
   action: { color: colors.primary },
   grow: { flex: 1 },
+  sectionUpper: { textTransform: 'uppercase', letterSpacing: 0.3 },
   footNote: { marginTop: 10, marginHorizontal: spacing.xs },
   center: { textAlign: 'center' },
 });

@@ -1,18 +1,16 @@
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { ScanLine } from 'lucide-react-native';
+import { Package, ScanLine } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   useBaseUnitFractional,
   useCreateExpiryItem,
@@ -22,7 +20,6 @@ import {
 } from '../../../src/api/expiry';
 import { type AppProblem, problemFrom } from '../../../src/api/problem';
 import { useBarcodeLookup } from '../../../src/api/transfers';
-import { StatusPill } from '../../../src/community/parts';
 import { useLeaveGuard } from '../../../src/expiry/leave-guard';
 import { ExpiryFields, ExpiryRecordRow, HeaderSearch, LeaveSheet } from '../../../src/expiry/parts';
 import {
@@ -40,13 +37,14 @@ import {
   problemsOfNew,
 } from '../../../src/expiry/rules';
 import { useDebounced } from '../../../src/state/use-debounced';
-import { colors, fonts, radii, spacing, TOUCH, type } from '../../../src/theme/tokens';
+import { colors, radii, spacing, TOUCH, type } from '../../../src/theme/tokens';
 import { ScanSheet } from '../../../src/transfers/scan-sheet';
 import { PillButton } from '../../../src/ui/controls';
 import { Group, Row } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page, SectionHeader } from '../../../src/ui/layout';
 import { ActionSheet } from '../../../src/ui/sheet';
+import { Card, FooterBar, Notice, Pill } from '../../../src/ui/staff-kit';
 import { StoreHeader } from '../../../src/ui/store-header';
 import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
@@ -65,7 +63,6 @@ export default function NewExpiryRecordScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const navigation = useNavigation();
-  const insets = useSafeAreaInsets();
   const toast = useToast();
   const params = useLocalSearchParams<{ scan?: string }>();
   const today = useExpirySummary().data?.today ?? null;
@@ -211,16 +208,8 @@ export default function NewExpiryRecordScreen() {
             placeholder={t('mobile.expiry.new.search')}
             label={t('mobile.shop.searchLabel')}
             autoFocus={!scanning}
-            trailing={
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('mobile.expiry.scan')}
-                onPress={() => setScanning(true)}
-                style={({ pressed }) => [styles.scanButton, pressed && styles.faded]}
-              >
-                <ScanLine size={22} strokeWidth={1.9} color={colors.primary} />
-              </Pressable>
-            }
+            onScan={() => setScanning(true)}
+            scanLabel={t('mobile.expiry.scan')}
           />
         )}
       </StoreHeader>
@@ -235,44 +224,43 @@ export default function NewExpiryRecordScreen() {
             contentContainerStyle={styles.body}
             keyboardShouldPersistTaps="handled"
           >
-            <View style={styles.card}>
+            <Card style={styles.product}>
               <View style={styles.productHead}>
+                <View style={styles.thumb}>
+                  <Package size={24} strokeWidth={1.5} color={colors.input} />
+                </View>
                 <View style={styles.grow}>
-                  <Text style={type.heading} numberOfLines={3}>
+                  <Text style={type.rowStrong} numberOfLines={3}>
                     {product.name}
                   </Text>
-                  <Text style={type.secondary} numberOfLines={1}>
-                    {product.sku}
+                  <Text style={type.secondary} numberOfLines={2}>
+                    {`${product.sku} · ${t('mobile.expiry.new.baseUnit', { unit: product.baseUnit })}`}
                   </Text>
                 </View>
-                <Pressable
-                  accessibilityRole="button"
+                <PillButton
+                  title={t('mobile.expiry.new.change')}
+                  variant="soft"
+                  height={36}
+                  style={styles.change}
                   onPress={changeProduct}
-                  style={({ pressed }) => [styles.change, pressed && styles.faded]}
-                >
-                  <Text style={styles.changeText}>{t('mobile.expiry.new.change')}</Text>
-                </Pressable>
+                />
               </View>
-              <Text style={type.body}>
-                {t('mobile.expiry.new.baseUnit', { unit: product.baseUnit })}
-              </Text>
               {product.pack ? (
-                <View style={styles.pack}>
-                  <Text style={styles.packText}>
-                    {t('mobile.expiry.new.pack', {
-                      unit: product.pack.unit,
-                      n: product.pack.n,
-                      base: product.baseUnit,
-                    })}
-                  </Text>
-                </View>
+                <Pill
+                  tone="info"
+                  label={t('mobile.expiry.new.pack', {
+                    unit: product.pack.unit,
+                    n: product.pack.n,
+                    base: product.baseUnit,
+                  })}
+                />
               ) : null}
-            </View>
+            </Card>
 
             {openRecords.length > 0 ? (
               <View>
                 <SectionHeader style={styles.head}>{t('mobile.expiry.new.open')}</SectionHeader>
-                <View style={styles.openRows}>
+                <Group inset={spacing.lg + 44 + spacing.md}>
                   {openRecords.map((item) => (
                     <ExpiryRecordRow
                       key={item.id}
@@ -281,38 +269,34 @@ export default function NewExpiryRecordScreen() {
                       onPress={() => router.push(`/expiry/${item.id}`)}
                     />
                   ))}
-                </View>
+                </Group>
               </View>
             ) : null}
 
-            <View style={styles.card}>
-              <ExpiryFields
-                form={form}
-                onChange={change}
-                problems={problems}
-                checked={checked}
-                today={today}
-                fractional={fractional}
-                unit={product.baseUnit}
-              />
+            <View>
+              <SectionHeader style={styles.head}>{t('mobile.expiry.new.newDate')}</SectionHeader>
+              <Card>
+                <ExpiryFields
+                  form={form}
+                  onChange={change}
+                  problems={problems}
+                  checked={checked}
+                  today={today}
+                  fractional={fractional}
+                  unit={product.baseUnit}
+                />
+              </Card>
             </View>
           </ScrollView>
-          <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+          <FooterBar column>
             <ProblemText problem={problem} style={styles.barProblem} />
             {landed ? (
               <>
-                <View accessibilityRole="alert" style={styles.landed}>
-                  <Text style={styles.landedText}>{t('mobile.expiry.new.landed')}</Text>
-                </View>
-                <PillButton
-                  title={t('mobile.expiry.new.addAnyway')}
-                  height={46}
-                  onPress={addAnother}
-                />
+                <Notice tone="warn">{t('mobile.expiry.new.landed')}</Notice>
+                <PillButton title={t('mobile.expiry.new.addAnyway')} onPress={addAnother} />
                 <PillButton
                   title={t('common.cancel')}
                   variant="soft"
-                  height={46}
                   onPress={() => setLanded(null)}
                 />
               </>
@@ -320,7 +304,6 @@ export default function NewExpiryRecordScreen() {
               <>
                 <PillButton
                   title={t('mobile.expiry.new.saveNext')}
-                  height={46}
                   loading={saving === 'next'}
                   disabled={saving !== null}
                   onPress={() => void save('next')}
@@ -328,14 +311,13 @@ export default function NewExpiryRecordScreen() {
                 <PillButton
                   title={t('common.save')}
                   variant="soft"
-                  height={46}
                   loading={saving === 'back'}
                   disabled={saving !== null}
                   onPress={() => void save('back')}
                 />
               </>
             )}
-          </View>
+          </FooterBar>
         </KeyboardAvoidingView>
       ) : (
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
@@ -366,11 +348,7 @@ export default function NewExpiryRecordScreen() {
                   minHeight={TOUCH + spacing.sm}
                   right={
                     item.status === 'INACTIVE' ? (
-                      <StatusPill
-                        label={t('catalog.products.status.INACTIVE')}
-                        background={colors.fill}
-                        color={colors.muted}
-                      />
+                      <Pill label={t('catalog.products.status.INACTIVE')} />
                     ) : null
                   }
                   onPress={() => choose(chosenFromLookup(item))}
@@ -425,50 +403,21 @@ export default function NewExpiryRecordScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   grow: { flex: 1, minWidth: 0, gap: 2 },
-  faded: { opacity: 0.7 },
-  body: { padding: 14, paddingBottom: 24, gap: spacing.md },
+  body: { padding: spacing.lg, paddingBottom: spacing.xl, gap: spacing.lg },
   loading: { marginTop: spacing.xl },
   lead: { color: colors.muted, textAlign: 'center' },
   searchProblem: { marginTop: 0 },
-  scanButton: {
-    width: TOUCH,
-    height: TOUCH,
+  product: { gap: 10 },
+  productHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  thumb: {
+    width: 52,
+    height: 52,
     borderRadius: radii.field,
-    backgroundColor: colors.card,
+    backgroundColor: colors.imageFill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  card: {
-    padding: spacing.lg,
-    gap: spacing.sm,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
-  },
-  productHead: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  change: { height: TOUCH, justifyContent: 'center', paddingHorizontal: spacing.sm },
-  changeText: { ...type.bodyStrong, color: colors.primary },
-  pack: {
-    alignSelf: 'flex-start',
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radii.control,
-    backgroundColor: colors.secondary,
-  },
-  packText: { ...type.body, fontFamily: fonts.medium, color: colors.secondaryForeground },
-  head: { marginTop: spacing.xs },
-  openRows: { gap: spacing.sm },
-  bar: {
-    gap: spacing.sm,
-    paddingHorizontal: 14,
-    paddingTop: spacing.sm,
-    backgroundColor: colors.canvas,
-  },
+  change: { paddingHorizontal: spacing.lg },
+  head: { marginTop: 0 },
   barProblem: { marginTop: 0 },
-  landed: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.field,
-    backgroundColor: colors.warningSoft,
-  },
-  landedText: { ...type.body, color: colors.warningText },
 });

@@ -7,17 +7,17 @@ import {
 } from '@tugeel/shared/expiry';
 import { isIsoDate } from '@tugeel/shared/time';
 import { ChevronRight } from 'lucide-react-native';
-import { type ReactNode, useRef } from 'react';
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, type TextInputProps, View } from 'react-native';
 import type { ExpiryItem } from '../api/expiry';
-import { StatusPill } from '../community/parts';
 import { maskDate } from '../dates/mask';
 import { formatQty } from '../format/format';
-import { colors, fonts, radii, spacing, tabular, TOUCH, type } from '../theme/tokens';
-import { SearchField } from '../ui/controls';
+import { colors, spacing, tabular, TOUCH, type } from '../theme/tokens';
 import { TextField } from '../ui/field';
 import { ActionSheet } from '../ui/sheet';
+import { Notice, Pill, type Tone } from '../ui/staff-kit';
+import { HeaderSearch as HeaderSearchField } from '../transfers/header-search';
 import { Text, type TextInput } from '../ui/text';
 import type { LeaveGuard } from './leave-guard';
 import {
@@ -28,7 +28,6 @@ import {
   type ExpiryEdits,
   type ExpiryForm,
   type FormProblems,
-  STATUS_TONES,
   URGENCY_TONES,
 } from './rules';
 
@@ -51,63 +50,73 @@ export function LeaveSheet({ guard }: { guard: LeaveGuard }) {
   );
 }
 
+const STATUS_PILLS: Record<ExpiryStatus, Tone> = {
+  REVIEW: 'info',
+  CITY_RETURN: 'violet',
+  INTERNAL_SALE: 'warn',
+  ARCHIVED: 'neutral',
+};
+
 /** A record's status on its soft colour. */
 export function ExpiryStatusPill({ status }: { status: ExpiryStatus }) {
   const { t } = useTranslation();
-  const tone = STATUS_TONES[status];
-  return (
-    <StatusPill
-      label={t(`expiry.status.${status}`)}
-      background={tone.background}
-      color={tone.text}
-    />
-  );
+  return <Pill label={t(`expiry.status.${status}`)} tone={STATUS_PILLS[status]} />;
 }
 
-/** «12 хоног үлдсэн» in the colour of how close the date is. */
-export function DaysText({ daysLeft }: { daysLeft: number }) {
+/** «12 хоног үлдсэн» on a pill in the colour of how close the date is, beside a typed date. */
+export function DaysPill({ daysLeft }: { daysLeft: number }) {
   const { t } = useTranslation();
   const words = daysWords(daysLeft);
   return (
-    <Text style={[type.bodyStrong, { color: URGENCY_TONES[expiryUrgency(daysLeft)].text }]}>
-      {t(words.key, { n: words.n })}
-    </Text>
+    <Pill label={t(words.key, { n: words.n })} tone={URGENCY_PILLS[expiryUrgency(daysLeft)]} />
   );
 }
 
-/** «Заал · Агуулах · Нийт», each with the base unit. */
-export function QtyCells({
-  floor,
-  warehouse,
-  total,
-  unit,
-}: {
-  floor: string;
-  warehouse: string;
-  total: string;
-  unit: string;
-}) {
+const URGENCY_PILLS = { EXPIRED: 'bad', URGENT: 'warn', SOON: 'info', OK: 'ok' } as const;
+
+/**
+ * The days left on a tile in the urgency's tone (red past, orange within a week, blue within a
+ * month, green beyond): the number over «хоног», a past date with its minus. 52 px in a list,
+ * 44 px in a product's own records, 60 px on the record's page.
+ */
+export function DaysTile({ daysLeft, size = 52 }: { daysLeft: number; size?: 44 | 52 | 60 }) {
   const { t } = useTranslation();
-  const cell = (label: string, qty: string, strong = false) => (
-    <View style={styles.cell}>
-      <Text style={type.caption} numberOfLines={1}>
-        {label}
-      </Text>
-      <Text style={[strong ? type.bodyStrong : type.body, tabular]} numberOfLines={1}>
-        {t('mobile.expiry.row.qty', { qty: formatQty(qty), unit })}
-      </Text>
-    </View>
-  );
+  const tone = URGENCY_TONES[expiryUrgency(daysLeft)];
+  const words = daysWords(daysLeft);
   return (
-    <View style={styles.cells}>
-      {cell(t('mobile.expiry.row.floor'), floor)}
-      {cell(t('mobile.expiry.row.warehouse'), warehouse)}
-      {cell(t('mobile.expiry.row.total'), total, true)}
+    <View
+      accessible
+      accessibilityLabel={t(words.key, { n: words.n })}
+      style={[
+        styles.tile,
+        { width: size, height: size, borderRadius: size >= 60 ? 16 : size >= 52 ? 14 : 12 },
+        { backgroundColor: tone.background },
+      ]}
+    >
+      <Text
+        style={[
+          size >= 60 ? type.title3 : type.heading,
+          tabular,
+          styles.tileNumber,
+          { color: tone.text },
+        ]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+      >
+        {String(daysLeft)}
+      </Text>
+      <Text style={[type.caption, { color: tone.text }]} numberOfLines={1}>
+        {t('mobile.expiry.daysUnit')}
+      </Text>
     </View>
   );
 }
 
-/** One record in a list; a product's own open records leave out its name and code. */
+/**
+ * One record as a row of a grouped list: the days tile, the product with the status pill, the code
+ * and the date, the two counts and the total. A product's own open records leave out its name and
+ * code: the date, the two counts and a chevron.
+ */
 export function ExpiryRecordRow({
   item,
   onPress,
@@ -117,43 +126,58 @@ export function ExpiryRecordRow({
   onPress: () => void;
   showProduct?: boolean;
 }) {
+  const { t } = useTranslation();
+  const unit = item.product.baseUomName;
+  const counts = [
+    `${t('mobile.expiry.row.floor')} ${formatQty(item.qtyFloor)}`,
+    `${t('mobile.expiry.row.warehouse')} ${formatQty(item.qtyWarehouse)}`,
+    `${t('mobile.expiry.row.total')} ${t('mobile.expiry.row.qty', { qty: formatQty(item.qtyTotal), unit })}`,
+  ].join(' · ');
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.row,
+        !showProduct && styles.rowSmall,
+        pressed && styles.pressed,
+      ]}
     >
-      <View style={styles.rowBody}>
-        {showProduct ? (
-          <View>
-            <Text style={type.rowStrong} numberOfLines={2}>
+      <DaysTile daysLeft={item.daysLeft} size={showProduct ? 52 : 44} />
+      {showProduct ? (
+        <View style={styles.rowBody}>
+          <View style={styles.rowLine}>
+            <Text style={[type.rowStrong, styles.rowTitle]} numberOfLines={2}>
               {item.product.name}
             </Text>
-            <Text style={type.secondary} numberOfLines={1}>
-              {item.product.sku}
-            </Text>
+            <ExpiryStatusPill status={item.status} />
           </View>
-        ) : null}
-        <View style={styles.rowLine}>
-          <Text style={[type.bodyStrong, tabular]}>{displayDate(item.expiryDate)}</Text>
-          <DaysText daysLeft={item.daysLeft} />
-          <ExpiryStatusPill status={item.status} />
+          <Text style={[type.secondary, tabular]} numberOfLines={1}>
+            {`${item.product.sku} · ${displayDate(item.expiryDate)}`}
+          </Text>
+          <Text style={[type.secondary, tabular, styles.counts2]} numberOfLines={1}>
+            {counts}
+          </Text>
         </View>
-        <QtyCells
-          floor={item.qtyFloor}
-          warehouse={item.qtyWarehouse}
-          total={item.qtyTotal}
-          unit={item.product.baseUomName}
-        />
-      </View>
-      <ChevronRight size={16} strokeWidth={2.6} color={colors.input} />
+      ) : (
+        <View style={styles.rowBodySmall}>
+          <View style={styles.rowLine}>
+            <Text style={[type.row, tabular]}>{displayDate(item.expiryDate)}</Text>
+            <ExpiryStatusPill status={item.status} />
+          </View>
+          <Text style={[type.secondary, tabular]} numberOfLines={1}>
+            {counts}
+          </Text>
+        </View>
+      )}
+      {showProduct ? null : <ChevronRight size={18} strokeWidth={2.4} color={colors.input} />}
     </Pressable>
   );
 }
 
 /**
- * The white search of a blue header, 44 px and all of it pressable (the field's own text is less
- * than that tall), with an optional button beside it.
+ * The white search of a blue header, with the scan icon inside it when the page scans (the
+ * warehouse boards' `hdr-search`).
  */
 export function HeaderSearch({
   value,
@@ -161,34 +185,26 @@ export function HeaderSearch({
   placeholder,
   label,
   autoFocus = false,
-  trailing,
+  onScan,
+  scanLabel,
 }: Pick<TextInputProps, 'placeholder'> & {
   value: string;
   onChangeText: (text: string) => void;
   label: string;
   autoFocus?: boolean;
-  trailing?: ReactNode;
+  onScan?: () => void;
+  scanLabel?: string;
 }) {
-  const input = useRef<TextInput>(null);
   return (
-    <View style={styles.searchRow}>
-      <Pressable
-        accessible={false}
-        onPress={() => input.current?.focus()}
-        style={styles.searchPress}
-      >
-        <SearchField
-          inputRef={input}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          accessibilityLabel={label}
-          autoFocus={autoFocus}
-          style={styles.search}
-        />
-      </Pressable>
-      {trailing}
-    </View>
+    <HeaderSearchField
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      accessibilityLabel={label}
+      autoFocus={autoFocus}
+      {...(onScan ? { onScan } : {})}
+      {...(scanLabel ? { scanLabel } : {})}
+    />
   );
 }
 
@@ -265,12 +281,8 @@ export function ExpiryFields({
         />
         {daysLeft !== null && dateError === null ? (
           <View style={styles.days}>
-            <DaysText daysLeft={daysLeft} />
-            {daysLeft < 0 ? (
-              <View style={styles.past}>
-                <Text style={styles.pastText}>{t('mobile.expiry.fields.past')}</Text>
-              </View>
-            ) : null}
+            <DaysPill daysLeft={daysLeft} />
+            {daysLeft < 0 ? <Notice tone="bad">{t('mobile.expiry.fields.past')}</Notice> : null}
           </View>
         ) : null}
       </View>
@@ -317,40 +329,25 @@ export function ExpiryFields({
 }
 
 const styles = StyleSheet.create({
-  cells: { flexDirection: 'row', gap: spacing.sm },
-  cell: { flex: 1, minWidth: 0, gap: 1 },
+  tile: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
+  tileNumber: { lineHeight: 20 },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+    alignItems: 'flex-start',
+    gap: spacing.md,
     minHeight: TOUCH,
     paddingVertical: spacing.md,
-    paddingLeft: spacing.lg,
-    paddingRight: spacing.md,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
+    paddingHorizontal: spacing.lg,
   },
-  rowBody: { flex: 1, minWidth: 0, gap: spacing.sm },
-  rowLine: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
+  rowSmall: { alignItems: 'center', paddingVertical: 10 },
+  rowBody: { flex: 1, minWidth: 0, gap: spacing.xs },
+  rowBodySmall: { flex: 1, minWidth: 0, gap: 2 },
+  rowLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  rowTitle: { flex: 1, minWidth: 0 },
+  counts2: { color: colors.label2 },
   pressed: { backgroundColor: colors.accent },
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: 14,
-    paddingBottom: spacing.md,
-  },
-  searchPress: { flex: 1 },
-  search: { height: TOUCH, backgroundColor: colors.card },
-  fields: { gap: spacing.md },
+  fields: { gap: spacing.lg },
   days: { marginTop: spacing.sm, gap: spacing.sm },
-  past: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.field,
-    backgroundColor: colors.destructiveSoft,
-  },
-  pastText: { ...type.body, fontFamily: fonts.medium, color: colors.destructiveText },
   counts: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   count: { flex: 1, minWidth: 0 },
   countsError: { ...type.secondary, color: colors.destructive },

@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { StatusBar } from 'expo-status-bar';
 import { CircleX, History, Server, X } from 'lucide-react-native';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,13 +24,17 @@ import {
   fieldAddress,
   serverHost,
 } from '../src/server/server-url';
+import { HERO_OVERLAP, StaffHero } from '../src/staff/brand';
 import { useSession } from '../src/state/session';
-import { colors, radii, tabular, TOUCH, type } from '../src/theme/tokens';
+import { STAFF_LOOK } from '../src/theme/look';
+import { colors, radii, shadows, spacing, tabular, TOUCH, type } from '../src/theme/tokens';
 import { APP } from '../src/config/app';
 import { BrandLockup } from '../src/ui/brand';
 import { PillButton } from '../src/ui/controls';
 import { TextField } from '../src/ui/field';
+import { Group, ICON_INSET, IconTile } from '../src/ui/grouped';
 import { Page, SectionHeader } from '../src/ui/layout';
+import { Card, PAGE } from '../src/ui/staff-kit';
 import { Text, type TextInput } from '../src/ui/text';
 
 /** The PC's address the build put in (`pnpm mobile:apk`), else empty. */
@@ -49,7 +54,8 @@ const ERRORS = {
 /**
  * The API server the app talks to (ADR-0061 #2, ADR-0068): on the office Wi-Fi the PC's address,
  * later the production address. It is saved, and put on top of «Сүүлд ашигласан», only after
- * GET /health answers as Bto's API.
+ * GET /health answers as Bto's API. Both apps open with it: the staff app draws the Server board of
+ * 2026-11-16 (the blue band, one card, the recent servers as a grouped list), «Bto300» its own.
  */
 export default function ServerScreen() {
   const { t } = useTranslation();
@@ -158,6 +164,127 @@ export default function ServerScreen() {
     </Pressable>
   ) : null;
 
+  const versionLine = (
+    <Text style={[type.caption, styles.version]}>
+      {t(
+        APP.variant === 'customer' ? 'mobile.customer.versionLine' : 'mobile.profile.versionLine',
+        {
+          version: Constants.expoConfig?.version ?? '',
+          build: Constants.expoConfig?.android?.versionCode ?? '',
+        },
+      )}
+    </Text>
+  );
+
+  if (STAFF_LOOK) {
+    return (
+      <Page edges={['bottom']}>
+        <StatusBar style="light" />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.grow}
+        >
+          <ScrollView
+            contentContainerStyle={styles.staffScroll}
+            keyboardShouldPersistTaps="handled"
+          >
+            <StaffHero />
+            <View style={styles.staffBody}>
+              <Card style={styles.staffCard}>
+                <Text accessibilityRole="header" style={type.title3}>
+                  {t('mobile.server.title')}
+                </Text>
+                <Text style={[type.body, styles.staffLead]}>{t('mobile.server.lead')}</Text>
+                <TextField
+                  inputRef={inputRef}
+                  label={t('mobile.server.label')}
+                  icon={Server}
+                  value={address}
+                  onChangeText={edit}
+                  placeholder={t('mobile.server.placeholder')}
+                  keyboardType="url"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  importantForAutofill="no"
+                  returnKeyType="go"
+                  onSubmitEditing={() => void connect(address)}
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => setFocused(false)}
+                  readOnly={checking}
+                  error={
+                    check === 'invalid' || check === 'noAnswer' || check === 'notBto'
+                      ? t(ERRORS[check])
+                      : null
+                  }
+                  hint={checking ? t('mobile.server.checking') : null}
+                  trailing={trailing}
+                />
+                <PillButton
+                  title={t('mobile.server.connect')}
+                  loading={checking}
+                  loadingTitle={t('mobile.server.checking')}
+                  disabled={address.trim() === ''}
+                  onPress={() => void connect(address)}
+                />
+              </Card>
+
+              {recent.length > 0 ? (
+                <View style={styles.staffBlock}>
+                  <SectionHeader style={styles.staffLabel}>
+                    {t('mobile.server.recent')}
+                  </SectionHeader>
+                  <Group inset={ICON_INSET}>
+                    {recent.map((item) => (
+                      <Pressable
+                        key={item.url}
+                        accessibilityRole="button"
+                        accessibilityLabel={serverHost(item.url)}
+                        accessibilityHint={usedLabel(item.usedAt)}
+                        accessibilityState={{ disabled: checking }}
+                        disabled={checking}
+                        onPress={() => pick(item)}
+                        onLongPress={() => askToForget(item)}
+                        style={({ pressed }) => [
+                          styles.staffRow,
+                          pressed && styles.staffRowPressed,
+                        ]}
+                      >
+                        <IconTile color={colors.fill}>
+                          <History size={18} strokeWidth={2} color={colors.label2} />
+                        </IconTile>
+                        <View style={styles.rowText}>
+                          <Text numberOfLines={1} style={[type.row, tabular]}>
+                            {serverHost(item.url)}
+                          </Text>
+                          <Text numberOfLines={1} style={type.secondary}>
+                            {usedLabel(item.usedAt)}
+                          </Text>
+                        </View>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={t('mobile.server.forgetLabel')}
+                          disabled={checking}
+                          onPress={() => forget(item)}
+                          style={styles.trailingButton}
+                        >
+                          <X size={18} strokeWidth={2.2} color={colors.muted} />
+                        </Pressable>
+                      </Pressable>
+                    ))}
+                  </Group>
+                </View>
+              ) : null}
+
+              <View style={styles.staffSpacer} />
+              {versionLine}
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Page>
+    );
+  }
+
   return (
     <Page white edges={['top', 'bottom']}>
       <KeyboardAvoidingView
@@ -253,17 +380,7 @@ export default function ServerScreen() {
           ) : null}
 
           <View style={styles.spacer} />
-          <Text style={[type.caption, styles.version]}>
-            {t(
-              APP.variant === 'customer'
-                ? 'mobile.customer.versionLine'
-                : 'mobile.profile.versionLine',
-              {
-                version: Constants.expoConfig?.version ?? '',
-                build: Constants.expoConfig?.android?.versionCode ?? '',
-              },
-            )}
-          </Text>
+          {versionLine}
         </ScrollView>
       </KeyboardAvoidingView>
     </Page>
@@ -301,4 +418,20 @@ const styles = StyleSheet.create({
   trailingButton: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
   spacer: { flex: 1, minHeight: 24 },
   version: { textAlign: 'center' },
+  staffScroll: { flexGrow: 1 },
+  staffBody: { flex: 1, ...PAGE, marginTop: -HERO_OVERLAP },
+  staffCard: { gap: spacing.md, boxShadow: shadows.floating },
+  staffLead: { color: colors.muted },
+  staffBlock: { gap: spacing.sm },
+  staffLabel: { marginTop: 0, marginBottom: 0 },
+  staffRow: {
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingLeft: spacing.lg,
+    paddingRight: 6,
+  },
+  staffRowPressed: { backgroundColor: colors.accent },
+  staffSpacer: { flex: 1, minHeight: spacing.sm },
 });

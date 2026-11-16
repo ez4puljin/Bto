@@ -1,8 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { PackageSearch } from 'lucide-react-native';
+import { ArrowRight, PackageSearch } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { problemFrom } from '../../../src/api/problem';
 import { useRepCategoryPage } from '../../../src/api/rep';
 import { lineOf } from '../../../src/cart/cart';
@@ -12,12 +12,13 @@ import { formatCount } from '../../../src/format/format';
 import { useAddOne } from '../../../src/shop/use-add';
 import { useSignedIn } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
-import { colors, spacing, storeType } from '../../../src/theme/tokens';
+import { colors, spacing } from '../../../src/theme/tokens';
+import { PillButton } from '../../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
 import { ProductCard } from '../../../src/ui/product-card';
-import { StoreHeader } from '../../../src/ui/store-header';
-import { Text } from '../../../src/ui/text';
+import { Card } from '../../../src/ui/staff-kit';
+import { HeaderCart, StoreHeader } from '../../../src/ui/store-header';
 
 /**
  * A category's page in the rep app (ADR-0100 #9, «Bto300»'s Category board): the category and its
@@ -52,17 +53,14 @@ export default function RepCategoryScreen() {
   };
 
   return (
-    <Page white edges={[]}>
+    <Page edges={[]}>
       <StoreHeader
-        title={
-          data
-            ? t('mobile.customer.list.titleCount', {
-                title: data.category.name,
-                n: formatCount(data.productCount),
-              })
-            : ''
+        title={data ? data.category.name : ''}
+        subtitle={
+          data ? t('mobile.customer.list.count', { n: formatCount(data.productCount) }) : null
         }
         onBack={() => router.back()}
+        right={<HeaderCart />}
       />
       <ScrollView
         contentContainerStyle={styles.body}
@@ -70,23 +68,27 @@ export default function RepCategoryScreen() {
       >
         {data ? (
           <>
-            <BannerCarousel banners={data.banners} server={server} />
+            {data.banners.length > 0 ? (
+              <BannerCarousel banners={data.banners} server={server} inset={spacing.lg} />
+            ) : null}
 
             {data.subcategories.length > 0 ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.subs}
-              >
-                {data.subcategories.map((sub) => (
-                  <SubcategoryTile
-                    key={sub.id}
-                    category={sub}
-                    server={server}
-                    onPress={() => shop(sub.id)}
-                  />
-                ))}
-              </ScrollView>
+              <Card flush style={styles.side}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.subs}
+                >
+                  {data.subcategories.map((sub) => (
+                    <SubcategoryTile
+                      key={sub.id}
+                      category={sub}
+                      server={server}
+                      onPress={() => shop(sub.id)}
+                    />
+                  ))}
+                </ScrollView>
+              </Card>
             ) : null}
 
             {data.sections.map((section) => (
@@ -109,15 +111,13 @@ export default function RepCategoryScreen() {
               />
             ))}
 
-            <Pressable
-              accessibilityRole="button"
+            <PillButton
+              title={t('mobile.customer.category.all', { n: formatCount(data.productCount) })}
+              variant="soft"
+              trailing={<ArrowRight size={20} strokeWidth={2.2} color={colors.link} />}
               onPress={() => shop(data.category.id)}
-              style={({ pressed }) => [styles.all, pressed && styles.allPressed]}
-            >
-              <Text style={[storeType.wideButton, styles.upper]} numberOfLines={1}>
-                {t('mobile.customer.category.all', { n: formatCount(data.productCount) })}
-              </Text>
-            </Pressable>
+              style={styles.side}
+            />
           </>
         ) : page.isLoading ? (
           <ActivityIndicator style={styles.loading} color={colors.primary} />
@@ -135,18 +135,10 @@ export default function RepCategoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  body: { paddingBottom: 40 },
-  upper: { textTransform: 'uppercase' },
-  subs: { gap: spacing.md, paddingTop: 14, paddingHorizontal: 14 },
-  all: {
-    height: 44,
-    marginTop: 22,
-    marginHorizontal: 14,
-    backgroundColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  allPressed: { backgroundColor: colors.fill },
+  // 16 px between blocks; a block keeps 16 px from the edges, a strip of cards runs to them.
+  body: { paddingTop: spacing.lg, paddingBottom: 40, gap: spacing.lg },
+  side: { marginHorizontal: spacing.lg },
+  subs: { gap: spacing.sm, padding: spacing.md },
   loading: { marginTop: spacing.xxl },
-  problem: { marginTop: spacing.lg, marginHorizontal: spacing.lg },
+  problem: { marginTop: 0, marginHorizontal: spacing.lg },
 });

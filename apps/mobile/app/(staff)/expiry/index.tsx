@@ -10,7 +10,6 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type ExpiryItem, useExpiryItems, useExpirySummary } from '../../../src/api/expiry';
 import { problemFrom } from '../../../src/api/problem';
 import { ExpiryRecordRow, HeaderSearch } from '../../../src/expiry/parts';
@@ -22,10 +21,12 @@ import {
 } from '../../../src/expiry/rules';
 import { formatCount } from '../../../src/format/format';
 import { useDebounced } from '../../../src/state/use-debounced';
-import { colors, spacing } from '../../../src/theme/tokens';
+import { colors, radii, spacing } from '../../../src/theme/tokens';
 import { ChoiceChip, PillButton } from '../../../src/ui/controls';
+import { Separator } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
+import { FooterBar } from '../../../src/ui/staff-kit';
 import { StoreHeader } from '../../../src/ui/store-header';
 import { useKeyboardShown } from '../../../src/ui/store-tab-bar';
 
@@ -34,14 +35,14 @@ const CHIP_SLOP = { top: 6, bottom: 6 };
 
 /**
  * «Хугацаа илрүүлэлт» (ADR-0172 #9): the search, the chips with the summary's counts, the records
- * soonest first (the date, the days in their colour, the two counts and the total, the status), and
- * «Скан хийх» or «Хайх» to write a new one. Opened from «Нүүр» or «Цэс» by everyone (ADR-0174),
+ * soonest first in one grouped list (a tile with the days left in the urgency's tone, the product
+ * and its status, the code and the date, the two counts and the total), and «Скан хийж бүртгэх» in
+ * the bar under the page to write a new one (that page also searches by name). Opened from «Нүүр» or «Цэс» by everyone (ADR-0174),
  * with the back arrow.
  */
 export default function ExpiryHomeScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const keyboard = useKeyboardShown();
   const [chip, setChip] = useState<ExpiryChip>('ACTIVE');
   const [text, setText] = useState('');
@@ -51,8 +52,17 @@ export default function ExpiryHomeScreen() {
   const rows = useMemo(() => (items.data?.pages ?? []).flatMap((page) => page.data), [items.data]);
   const awaiting = isAwaitingRows(items, rows.length);
 
-  const renderItem = ({ item }: { item: ExpiryItem }) => (
-    <ExpiryRecordRow item={item} onPress={() => router.push(`/expiry/${item.id}`)} />
+  const renderItem = ({ item, index }: { item: ExpiryItem; index: number }) => (
+    <View
+      style={[
+        styles.cell,
+        index === 0 && styles.firstCell,
+        index === rows.length - 1 && styles.lastCell,
+      ]}
+    >
+      {index > 0 ? <Separator inset={spacing.lg + 52 + spacing.md} /> : null}
+      <ExpiryRecordRow item={item} onPress={() => router.push(`/expiry/${item.id}`)} />
+    </View>
   );
 
   return (
@@ -63,6 +73,8 @@ export default function ExpiryHomeScreen() {
           onChangeText={setText}
           placeholder={t('mobile.expiry.search')}
           label={t('mobile.shop.searchLabel')}
+          onScan={() => router.push('/expiry/new?scan=1')}
+          scanLabel={t('mobile.expiry.scanNew')}
         />
       </StoreHeader>
 
@@ -100,12 +112,9 @@ export default function ExpiryHomeScreen() {
         data={rows}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        style={styles.fill}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[
-          styles.list,
-          { paddingBottom: Math.max(insets.bottom, spacing.md) + 90 },
-        ]}
+        contentContainerStyle={styles.list}
         onEndReachedThreshold={0.5}
         onEndReached={() => {
           if (items.hasNextPage && !items.isFetchingNextPage) void items.fetchNextPage();
@@ -152,45 +161,28 @@ export default function ExpiryHomeScreen() {
       />
 
       {keyboard ? null : (
-        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+        <FooterBar>
           <PillButton
-            title={t('mobile.expiry.scan')}
+            title={t('mobile.expiry.scanNew')}
             icon={<ScanLine size={20} strokeWidth={2.2} color={colors.primaryForeground} />}
-            style={styles.action}
+            style={styles.fill}
             onPress={() => router.push('/expiry/new?scan=1')}
           />
-          <PillButton
-            title={t('mobile.expiry.find')}
-            variant="soft"
-            icon={<Search size={20} strokeWidth={2.2} color={colors.secondaryForeground} />}
-            style={styles.action}
-            onPress={() => router.push('/expiry/new')}
-          />
-        </View>
+        </FooterBar>
       )}
     </Page>
   );
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
   // A ScrollView shrinks by default: beside a long list it lost its lower padding to the list.
   chipRow: { flexGrow: 0, flexShrink: 0 },
-  chips: { gap: spacing.sm, paddingHorizontal: 14, paddingVertical: spacing.md },
-  list: { paddingHorizontal: 14 },
-  separator: { height: spacing.sm },
+  chips: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, flexGrow: 1 },
+  cell: { backgroundColor: colors.card, overflow: 'hidden' },
+  firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
+  lastCell: { borderBottomLeftRadius: radii.card, borderBottomRightRadius: radii.card },
   loading: { marginTop: spacing.xl },
   failed: { gap: spacing.md },
-  footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingHorizontal: 14,
-    paddingTop: spacing.md,
-    // Opaque, the page's own colour: the rows pass behind it.
-    backgroundColor: colors.canvas,
-  },
-  action: { flex: 1, paddingHorizontal: spacing.md },
 });

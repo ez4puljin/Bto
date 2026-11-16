@@ -4,14 +4,15 @@ import {
   CalendarCheck,
   CalendarClock,
   ChevronRight,
+  KeyRound,
+  LogOut,
   Send,
   Server,
-  User,
   UsersRound,
 } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { feedCount, useFeed } from '../../src/api/community';
 import { useNotificationSummary } from '../../src/api/notifications';
 import { useRepContext } from '../../src/api/rep';
@@ -19,20 +20,22 @@ import { initialsOf } from '../../src/format/format';
 import { useRoleName } from '../../src/state/role';
 import { useSignedIn } from '../../src/state/session';
 import { useShop } from '../../src/state/shop';
-import { colors, fonts, radii, spacing, type } from '../../src/theme/tokens';
-import { CountBadge } from '../../src/ui/controls';
+import { colors, fonts, spacing, tabular, type } from '../../src/theme/tokens';
+import { CountBadge, PillButton } from '../../src/ui/controls';
 import { Group, ICON_INSET, IconTile, Row } from '../../src/ui/grouped';
-import { Page } from '../../src/ui/layout';
+import { Page, SectionHeader } from '../../src/ui/layout';
 import { ActionSheet } from '../../src/ui/sheet';
+import { Card, PAGE, Pill } from '../../src/ui/staff-kit';
 import { StoreHeader } from '../../src/ui/store-header';
 import { Text } from '../../src/ui/text';
 import { UpdateCheck } from '../../src/updates/update-check';
 
 /**
- * «Профайл» (the Profile board, ADR-0068; ADR-0062 #3; a page opened from the home's header since
- * ADR-0100, in «Bto300»'s profile layout): who is signed in (a tap opens their details), the
- * notifications with the unread count, the user's details and the order settings, the server,
- * «Гарах» with its question, and the app's version.
+ * «Профайл» (the Profile board of 2026-11-16; ADR-0068, ADR-0062 #3; a page opened from the home's
+ * header since ADR-0100): who is signed in (a tap opens their details), «Ирц», «Хугацаа
+ * илрүүлэлт», «Хамт олон» and the notifications with the unread count; under «Тохиргоо» the order
+ * settings with the chosen place, the password and the server; the app's version, and «Гарах» with
+ * its question.
  */
 export default function ProfileScreen() {
   const { t } = useTranslation();
@@ -44,61 +47,60 @@ export default function ProfileScreen() {
   const community = feedCount(useFeed().data);
   const roleName = useRoleName();
   const [leaving, setLeaving] = useState(false);
-  const stageName =
-    context.data?.boards
-      .flatMap((board) => board.pipelines)
-      .flatMap((pipeline) => pipeline.stages)
-      .find((stage) => stage.id === stageId)?.name ?? t('mobile.profile.noStage');
+  // «Бөөний борлуулалт › Батлагдсан»: the pipeline and the stage the next order lands in.
+  const pipeline = context.data?.boards
+    .flatMap((board) => board.pipelines)
+    .find((entry) => entry.stages.some((stage) => stage.id === stageId));
+  const stage = pipeline?.stages.find((entry) => entry.id === stageId);
+  const place =
+    pipeline && stage ? `${pipeline.name} › ${stage.name}` : t('mobile.profile.noStage');
+  const phone = me.phone?.replace(/^\+976/, '');
 
   return (
     <Page edges={[]}>
       <StoreHeader title={t('mobile.tabs.profile')} onBack={() => router.back()} />
       <ScrollView contentContainerStyle={styles.body}>
-        <Pressable
-          accessibilityRole="button"
+        <Card
+          accessibilityLabel={`${me.fullName}, ${t('mobile.profileInfo.title')}`}
           onPress={() => router.push('/profile-info')}
-          style={({ pressed }) => [styles.user, pressed && styles.pressed]}
+          style={styles.user}
         >
           <View style={styles.avatar}>
             <Text style={styles.initials}>{initialsOf(me.fullName)}</Text>
           </View>
           <View style={styles.grow}>
-            <Text style={styles.name} numberOfLines={2}>
+            <Text style={type.title3} numberOfLines={2}>
               {me.fullName}
             </Text>
-            <Text style={[type.body, styles.muted]} numberOfLines={2}>
-              {[me.phone?.replace(/^\+976/, ''), roleName].filter(Boolean).join(' · ')}
-            </Text>
+            {phone ? <Text style={[type.secondary, tabular]}>{phone}</Text> : null}
+            {roleName ? <Pill tone="info" label={roleName} /> : null}
           </View>
-          <ChevronRight size={16} strokeWidth={2.6} color={colors.input} />
-        </Pressable>
+          <ChevronRight size={18} strokeWidth={2.4} color={colors.input} />
+        </Card>
 
-        <Group inset={ICON_INSET} style={styles.group}>
+        <Group inset={ICON_INSET}>
           <Row
-            minHeight={52}
             icon={
               <IconTile color={colors.tint.green}>
-                <CalendarCheck size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+                <CalendarCheck size={18} strokeWidth={2.2} color={colors.primaryForeground} />
               </IconTile>
             }
             title={t('mobile.attendance.title')}
             onPress={() => router.push('/attendance')}
           />
           <Row
-            minHeight={52}
             icon={
-              <IconTile color={colors.tint.amber}>
-                <CalendarClock size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+              <IconTile color={colors.tint.red}>
+                <CalendarClock size={18} strokeWidth={2.2} color={colors.primaryForeground} />
               </IconTile>
             }
             title={t('mobile.expiry.title')}
             onPress={() => router.push('/expiry')}
           />
           <Row
-            minHeight={52}
             icon={
               <IconTile color={colors.tint.indigo}>
-                <UsersRound size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+                <UsersRound size={18} strokeWidth={2.2} color={colors.primaryForeground} />
               </IconTile>
             }
             title={t('mobile.community.title')}
@@ -111,13 +113,12 @@ export default function ProfileScreen() {
             onPress={() => router.push('/community')}
           />
           <Row
-            minHeight={52}
             icon={
               <IconTile color={colors.tint.red}>
-                <Bell size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+                <Bell size={18} strokeWidth={2.2} color={colors.primaryForeground} />
               </IconTile>
             }
-            title={t('mobile.notifications.title')}
+            title={t('mobile.staffMenu.items.repNotifications')}
             accessibilityLabel={
               unread > 0
                 ? t('mobile.notifications.bellUnread', { n: unread })
@@ -126,56 +127,52 @@ export default function ProfileScreen() {
             right={<CountBadge count={unread} ring={colors.card} />}
             onPress={() => router.push('/notifications')}
           />
-          <Row
-            minHeight={52}
-            icon={
-              <IconTile color={colors.tint.blue}>
-                <User size={16} strokeWidth={2.2} color={colors.primaryForeground} />
-              </IconTile>
-            }
-            title={t('mobile.profileInfo.title')}
-            onPress={() => router.push('/profile-info')}
-          />
-          <Row
-            minHeight={52}
-            icon={
-              <IconTile color={colors.tint.orange}>
-                <Send size={16} strokeWidth={2.2} color={colors.primaryForeground} />
-              </IconTile>
-            }
-            title={t('mobile.settings.title')}
-            value={stageName}
-            onPress={() => router.push('/settings')}
-          />
         </Group>
 
-        <Group inset={ICON_INSET} style={styles.group}>
-          <Row
-            minHeight={52}
-            icon={
-              <IconTile color={colors.tint.gray}>
-                <Server size={16} strokeWidth={2.2} color={colors.primaryForeground} />
-              </IconTile>
-            }
-            title={t('mobile.profile.server')}
-            value={server.replace(/^https?:\/\//, '')}
-          />
-        </Group>
-
-        {/* The app's version and «Шинэчлэл шалгах» (ADR-0174 #10). */}
-        <UpdateCheck style={styles.group} />
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setLeaving(true)}
-          style={({ pressed }) => [styles.logout, pressed && styles.pressed]}
-        >
-          <Text style={[type.button, styles.logoutText]}>{t('mobile.profile.logout')}</Text>
-        </Pressable>
-
-        <View style={styles.footer}>
-          <Text style={type.caption}>{t('mobile.profile.company')}</Text>
+        <View style={styles.block}>
+          <SectionHeader style={styles.label}>{t('mobile.profile.settings')}</SectionHeader>
+          <Group inset={ICON_INSET}>
+            <Row
+              icon={
+                <IconTile color={colors.tint.orange}>
+                  <Send size={18} strokeWidth={2.2} color={colors.primaryForeground} />
+                </IconTile>
+              }
+              title={t('mobile.settings.title')}
+              subtitle={place}
+              onPress={() => router.push('/settings')}
+            />
+            <Row
+              icon={
+                <IconTile color={colors.tint.gray}>
+                  <KeyRound size={18} strokeWidth={2.2} color={colors.primaryForeground} />
+                </IconTile>
+              }
+              title={t('mobile.password.title')}
+              onPress={() => router.push('/password')}
+            />
+            <Row
+              icon={
+                <IconTile color={colors.tint.gray}>
+                  <Server size={18} strokeWidth={2.2} color={colors.primaryForeground} />
+                </IconTile>
+              }
+              title={t('mobile.profile.server')}
+              value={server.replace(/^https?:\/\//, '')}
+            />
+          </Group>
         </View>
+
+        {/* The app's version and «Шалгах» (ADR-0174 #10). */}
+        <UpdateCheck />
+
+        <PillButton
+          variant="destructive"
+          icon={<LogOut size={18} strokeWidth={2.2} color={colors.destructive} />}
+          title={t('mobile.profile.logout')}
+          onPress={() => setLeaving(true)}
+        />
+        <Text style={[type.caption, styles.center]}>{t('mobile.profile.company')}</Text>
       </ScrollView>
       <ActionSheet
         visible={leaving}
@@ -201,38 +198,19 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  body: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  grow: { flex: 1, gap: 2 },
-  muted: { color: colors.muted },
-  pressed: { backgroundColor: colors.accent },
-  user: {
-    marginTop: spacing.md,
-    padding: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderRadius: radii.tile,
-    backgroundColor: colors.card,
-  },
+  body: { ...PAGE, paddingBottom: 40 },
+  grow: { flex: 1, minWidth: 0, gap: spacing.xs },
+  block: { gap: spacing.sm },
+  label: { marginTop: 0, marginBottom: 0 },
+  center: { textAlign: 'center' },
+  user: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   avatar: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.tint.blue,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  initials: { ...type.title2, fontFamily: fonts.bold, color: colors.primaryForeground },
-  name: type.title3,
-  group: { marginTop: 22 },
-  logout: {
-    marginTop: 22,
-    minHeight: 52,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoutText: { color: colors.destructive },
-  footer: { marginTop: spacing.lg, alignItems: 'center', gap: 3 },
+  initials: { ...type.title2, fontFamily: fonts.semibold, color: colors.primaryForeground },
 });

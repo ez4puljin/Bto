@@ -10,20 +10,20 @@ import { useNotificationSummary } from '../../../src/api/notifications';
 import { isWorkdayFlag, liveWorkedMinutes } from '../../../src/attendance/status';
 import { isOnDay } from '../../../src/community/calendar-day';
 import { calendarItemTitle, CalendarItemIcon } from '../../../src/community/calendar-item';
-import { Avatar } from '../../../src/community/parts';
-import { ListHeading } from '../../../src/customer/home-parts';
 import { monthOf, ubTime, weekdayOf } from '../../../src/dates/dates';
+import { initialsOf } from '../../../src/format/format';
+import { StaffWordmarkHeader } from '../../../src/staff/brand';
 import { firstNameOf, greetingOf, monthDayOf } from '../../../src/staff/home';
 import type { MenuItem } from '../../../src/staff/menu';
 import { MENU_LOOK, useFavourites, useStaffMenu } from '../../../src/staff/menu-parts';
 import { isRep } from '../../../src/state/phase';
 import { useRoleName } from '../../../src/state/role';
 import { useSignedIn } from '../../../src/state/session';
-import { colors, fonts, radii, spacing, storeType, tabular, type } from '../../../src/theme/tokens';
-import { CompanyMark, useAppName } from '../../../src/ui/brand';
-import { CountBadge } from '../../../src/ui/controls';
+import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme/tokens';
+import { CountBadge, PillButton } from '../../../src/ui/controls';
 import { Group, ICON_INSET, IconTile, Row } from '../../../src/ui/grouped';
-import { Page } from '../../../src/ui/layout';
+import { Page, SectionHeader } from '../../../src/ui/layout';
+import { Card, PAGE, Pill, TONES } from '../../../src/ui/staff-kit';
 import { HeaderIconButton, StoreHeaderBand } from '../../../src/ui/store-header';
 import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 import { Text } from '../../../src/ui/text';
@@ -34,16 +34,16 @@ import { useAppUpdate, useUpdateCheck } from '../../../src/updates/use-app-updat
 type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 /**
- * «Нүүр» of the staff app, where everyone lands (ADR-0174): the company, a greeting with today's
- * date, today's attendance with the hours and the work time, what is new for the person, their
- * favourite menu rows, today's events, and at the bottom the app's version with «Шинэчлэл
- * шалгах» (#10). A newer version found by the server, or by that button, shows on top.
+ * «Нүүр» of the staff app, where everyone lands (ADR-0174; the Main board of 2026-11-16): the
+ * wordmark with the bell, a greeting with today's date, today's attendance with the hours and the
+ * work time, what is new for the person as chips, their favourite menu rows in one card, today's
+ * events as a grouped list, and at the bottom the app's version with «Шалгах» (#10). A newer
+ * version found by the server, or by that button, shows on top.
  */
 export default function StaffHomeScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const inset = useStoreTabBarInset();
-  const appName = useAppName();
   const { me } = useSignedIn();
   const rep = isRep(me);
   const roleName = useRoleName();
@@ -128,8 +128,9 @@ export default function StaffHomeScreen() {
             ? t('mobile.attendance.offDay')
             : t('mobile.staffHome.notPunched');
   const stateColor = state === 'IN' ? colors.success : waiting ? colors.warning : colors.foreground;
-  const tileColor =
-    state === 'IN' ? colors.tint.green : waiting ? colors.tint.amber : colors.tint.gray;
+  // The tile is soft, in the state's tone: green once in, orange while waiting, grey otherwise.
+  const tile = state === 'IN' ? TONES.ok : waiting ? TONES.warn : TONES.neutral;
+  const tileIcon = state === 'IN' || waiting ? tile.text : colors.label2;
   const worked = data
     ? hoursAndMinutes(liveWorkedMinutes(data.day.workedMinutes, state, data.now, clock))
     : null;
@@ -142,37 +143,28 @@ export default function StaffHomeScreen() {
   return (
     <Page edges={[]}>
       <StoreHeaderBand>
-        <View style={styles.brandRow}>
-          <View style={styles.plate}>
-            <CompanyMark size={30} />
-          </View>
-          <View style={styles.grow}>
-            <Text accessibilityRole="header" style={styles.appName} numberOfLines={1}>
-              {appName}
-            </Text>
-            <Text style={styles.onBlueSoft} numberOfLines={1}>
-              {t('brand.company')}
-            </Text>
-          </View>
-          <HeaderIconButton
-            icon={<Bell size={22} strokeWidth={1.9} color={colors.primaryForeground} />}
-            label={
-              bell > 0
-                ? t('mobile.notifications.bellUnread', { n: bell })
-                : t('mobile.notifications.title')
-            }
-            badge={bell}
-            onPress={() => router.push(rep ? '/notifications' : '/community')}
-          />
-        </View>
+        <StaffWordmarkHeader
+          right={
+            <HeaderIconButton
+              icon={<Bell size={23} strokeWidth={1.9} color={colors.primaryForeground} />}
+              label={
+                bell > 0
+                  ? t('mobile.notifications.bellUnread', { n: bell })
+                  : t('mobile.notifications.title')
+              }
+              badge={bell}
+              onPress={() => router.push(rep ? '/notifications' : '/community')}
+            />
+          }
+        />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${me.fullName}, ${t('mobile.tabs.profile')}`}
           onPress={() => router.push(rep ? '/profile' : '/me')}
           style={({ pressed }) => [styles.person, pressed && styles.pressed]}
         >
-          <View style={styles.avatarRing}>
-            <Avatar name={me.fullName} photoUrl={null} size={50} />
+          <View style={styles.avatar}>
+            <Text style={styles.initials}>{initialsOf(me.fullName)}</Text>
           </View>
           <View style={styles.grow}>
             <Text style={styles.onBlueSoft} numberOfLines={1}>
@@ -185,7 +177,7 @@ export default function StaffHomeScreen() {
               {[roleName, dateLine].filter(Boolean).join(' · ')}
             </Text>
           </View>
-          <ChevronRight size={18} strokeWidth={2.4} color={colors.primaryForeground} />
+          <ChevronRight size={20} strokeWidth={2.2} color={colors.onPrimaryMuted} />
         </Pressable>
       </StoreHeaderBand>
 
@@ -195,67 +187,68 @@ export default function StaffHomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
       >
         {/* A newer APK on the server (ADR-0174 #7, #10): the press downloads and installs it. */}
-        {update ? (
-          <UpdateCard release={update} autoStart={updateCheck.found} style={styles.update} />
-        ) : null}
+        {update ? <UpdateCard release={update} autoStart={updateCheck.found} /> : null}
 
         {/* Today's attendance: the page punches. */}
-        <Pressable
-          accessibilityRole="button"
+        <Card
           accessibilityLabel={`${t('mobile.staffHome.attendance')}: ${stateLine}`}
           onPress={() => router.push('/attendance')}
-          style={({ pressed }) => [styles.card, styles.attendance, pressed && styles.pressedCard]}
+          style={styles.attendance}
         >
           <View style={styles.attendanceHead}>
-            <IconTile color={tileColor}>
-              <CalendarCheck size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+            <IconTile color={tile.background}>
+              <CalendarCheck size={18} strokeWidth={2.2} color={tileIcon} />
             </IconTile>
-            <Text style={[type.rowStrong, styles.grow]} numberOfLines={1}>
+            <Text style={[type.heading, styles.grow]} numberOfLines={1}>
               {t('mobile.staffHome.attendance')}
             </Text>
             {data?.tracked ? (
-              <View style={styles.chip}>
-                <Clock3 size={13} strokeWidth={2.2} color={colors.muted} />
-                <Text style={[type.chip, tabular, styles.muted]}>
-                  {t('mobile.staffHome.schedule', {
-                    start: data.schedule.workStart,
-                    end: data.schedule.workEnd,
-                  })}
-                </Text>
+              <Pill
+                icon={Clock3}
+                label={t('mobile.staffHome.schedule', {
+                  start: data.schedule.workStart,
+                  end: data.schedule.workEnd,
+                })}
+                style={styles.schedule}
+              />
+            ) : null}
+          </View>
+          <View style={styles.stateBlock}>
+            <Text style={[styles.state, { color: stateColor }]} numberOfLines={2}>
+              {stateLine}
+            </Text>
+            {showWorked || lateLine ? (
+              <View style={styles.figures}>
+                {showWorked && worked ? (
+                  <Text style={[type.secondary, tabular]}>
+                    {t('mobile.staffHome.worked', { hours: worked.hours, minutes: worked.minutes })}
+                  </Text>
+                ) : null}
+                {lateLine ? (
+                  <Text style={[type.secondary, tabular, styles.late]}>{lateLine}</Text>
+                ) : null}
               </View>
             ) : null}
           </View>
-          <Text style={[styles.state, { color: stateColor }]} numberOfLines={2}>
-            {stateLine}
-          </Text>
-          {showWorked || lateLine ? (
-            <View style={styles.figures}>
-              {showWorked && worked ? (
-                <Text style={[type.body, tabular]}>
-                  {t('mobile.staffHome.worked', { hours: worked.hours, minutes: worked.minutes })}
-                </Text>
-              ) : null}
-              {lateLine ? <Text style={[type.body, tabular, styles.late]}>{lateLine}</Text> : null}
-            </View>
-          ) : null}
-          {/* Not punched on a workday: the card's one action, said as a button. */}
+          {/* Not punched on a workday: the card's one action, a real button. */}
           {waiting ? (
-            <View style={styles.punch}>
-              <LogIn size={18} strokeWidth={2.2} color={colors.primaryForeground} />
-              <Text style={[type.button, styles.punchText]}>{t('mobile.staffHome.punchNow')}</Text>
-            </View>
+            <PillButton
+              height={44}
+              icon={<LogIn size={18} strokeWidth={2.2} color={colors.primaryForeground} />}
+              title={t('mobile.staffHome.punchNow')}
+              onPress={() => router.push('/attendance')}
+            />
           ) : null}
-        </Pressable>
+        </Card>
 
         {/* What is new: unread notices, news, open polls, the rep's notifications. */}
         {fresh.length > 0 ? (
-          <View style={styles.section}>
-            <Text accessibilityRole="header" style={[storeType.sectionTitle, styles.title]}>
-              {t('mobile.staffHome.fresh')}
-            </Text>
+          <View style={styles.block}>
+            <SectionHeader style={styles.label}>{t('mobile.staffHome.fresh')}</SectionHeader>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
+              style={styles.freshScroll}
               contentContainerStyle={styles.freshRow}
             >
               {fresh.map(({ item, count }) => (
@@ -266,13 +259,20 @@ export default function StaffHomeScreen() {
         ) : null}
 
         {/* The person's favourites, chosen with the stars on «Цэс». */}
-        <View style={styles.section}>
-          <ListHeading
-            title={t('mobile.staffHome.favourites')}
-            label={t('mobile.staffHome.editFavourites')}
-            onPress={() => router.navigate('/menu')}
-          />
-          <View style={[styles.card, styles.tiles]}>
+        <View style={styles.block}>
+          <SectionHeader
+            style={styles.label}
+            right={
+              <LabelLink
+                title={t('common.edit')}
+                label={t('mobile.staffHome.editFavourites')}
+                onPress={() => router.navigate('/menu')}
+              />
+            }
+          >
+            {t('mobile.staffHome.favourites')}
+          </SectionHeader>
+          <Card style={styles.tiles}>
             {favourites.map((item) => {
               const { Icon, color } = MENU_LOOK[item.key];
               const label = t(`mobile.staffMenu.items.${item.key}`);
@@ -286,7 +286,7 @@ export default function StaffHomeScreen() {
                   style={({ pressed }) => [styles.tile, pressed && styles.pressedTile]}
                 >
                   <View style={[styles.tileIcon, { backgroundColor: color }]}>
-                    <Icon size={22} strokeWidth={2} color={colors.primaryForeground} />
+                    <Icon size={24} strokeWidth={2} color={colors.primaryForeground} />
                     <CountBadge count={count} ring={colors.card} style={styles.tileBadge} />
                   </View>
                   <Text style={styles.tileLabel} numberOfLines={2}>
@@ -303,37 +303,46 @@ export default function StaffHomeScreen() {
               style={({ pressed }) => [styles.tile, pressed && styles.pressedTile]}
             >
               <View style={[styles.tileIcon, styles.addIcon]}>
-                <Plus size={22} strokeWidth={2.2} color={colors.primary} />
+                <Plus size={24} strokeWidth={2.2} color={colors.link} />
               </View>
               <Text style={[styles.tileLabel, styles.addLabel]} numberOfLines={2}>
                 {t('mobile.staffHome.addFavourite')}
               </Text>
             </Pressable>
-          </View>
+          </Card>
         </View>
 
         {/* Today's events. */}
-        <View style={styles.section}>
-          <ListHeading
-            title={t('mobile.staffHome.events')}
-            label={t('mobile.customer.home.seeAll', { title: t('mobile.staffHome.events') })}
-            onPress={() => router.push('/community/calendar')}
-          />
+        <View style={styles.block}>
+          <SectionHeader
+            style={styles.label}
+            right={
+              <LabelLink
+                title={t('common.all')}
+                label={t('mobile.customer.home.seeAll', { title: t('mobile.staffHome.events') })}
+                onPress={() => router.push('/community/calendar')}
+              />
+            }
+          >
+            {t('mobile.staffHome.events')}
+          </SectionHeader>
           {events.length > 0 ? (
-            <Group inset={ICON_INSET} style={styles.panel}>
+            <Group inset={ICON_INSET}>
               {events.map((item, index) => (
                 <Row
                   key={`${item.kind}-${item.eventId ?? item.userId ?? index}`}
-                  minHeight={52}
+                  minHeight={56}
                   icon={<CalendarItemIcon item={item} />}
                   title={calendarItemTitle(t, item)}
+                  titleStyle={type.rowStrong}
                   subtitle={item.typeName ?? t(`mobile.community.calendar.kinds.${item.kind}`)}
+                  chevron={false}
                   onPress={() => router.push('/community/calendar')}
                 />
               ))}
             </Group>
           ) : (
-            <View style={[styles.card, styles.empty]}>
+            <Card>
               <Text style={[type.body, styles.muted]}>
                 {calendar.isLoading
                   ? t('common.loading')
@@ -341,24 +350,41 @@ export default function StaffHomeScreen() {
                     ? t('mobile.staffHome.eventsUnknown')
                     : t('mobile.staffHome.noEvents')}
               </Text>
-            </View>
+            </Card>
           )}
         </View>
 
-        {/* The app's version and «Шинэчлэл шалгах» (ADR-0174 #10). */}
-        <View style={styles.section}>
-          <UpdateCheckPanel
-            state={updateCheck.state}
-            onCheck={() => void updateCheck.check()}
-            style={styles.panel}
-          />
-        </View>
+        {/* The app's version and «Шалгах» (ADR-0174 #10). */}
+        <UpdateCheckPanel state={updateCheck.state} onCheck={() => void updateCheck.check()} />
       </ScrollView>
     </Page>
   );
 }
 
-/** A row of «Шинэ мэдээлэл»: the menu row's tile, its name and its count. */
+/** The link at the right of a section's label: «Засах», «Бүгд». */
+function LabelLink({
+  title,
+  label,
+  onPress,
+}: {
+  title: string;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={label}
+      onPress={onPress}
+      hitSlop={14}
+      style={({ pressed }) => pressed && styles.pressed}
+    >
+      <Text style={styles.link}>{title}</Text>
+    </Pressable>
+  );
+}
+
+/** A chip of «Шинэ мэдээлэл»: the menu row's icon in its tint, its name and its count. */
 function FreshChip({
   item,
   count,
@@ -376,12 +402,10 @@ function FreshChip({
       accessibilityRole="button"
       accessibilityLabel={`${label}, ${count}`}
       onPress={onPress}
-      style={({ pressed }) => [styles.fresh, pressed && styles.pressedCard]}
+      style={({ pressed }) => [styles.fresh, pressed && styles.pressedChip]}
     >
-      <IconTile color={color}>
-        <Icon size={16} strokeWidth={2.2} color={colors.primaryForeground} />
-      </IconTile>
-      <Text style={type.bodyStrong} numberOfLines={1}>
+      <Icon size={16} strokeWidth={2.2} color={color} />
+      <Text style={styles.freshText} numberOfLines={1}>
         {label}
       </Text>
       <CountBadge count={count} ring={colors.card} />
@@ -393,122 +417,90 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   pressed: { opacity: 0.7 },
   muted: { color: colors.muted },
-  brandRow: {
-    height: 54,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingLeft: 14,
-    paddingRight: spacing.xs,
-  },
-  // The logo is dark green: on the blue it needs a white ground (ADR-0166).
-  plate: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  appName: { ...type.heading, color: colors.primaryForeground },
-  onBlueSoft: { ...type.secondary, color: colors.primaryForeground, opacity: 0.88 },
+  onBlueSoft: { ...type.secondary, color: colors.primaryForeground, opacity: 0.82 },
   person: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingHorizontal: 14,
-    paddingTop: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: 10,
     paddingBottom: 18,
   },
-  avatarRing: {
-    padding: 2,
-    borderRadius: 28,
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 2,
+    borderColor: colors.dotOnImageIdle,
     backgroundColor: colors.onPrimaryHairline,
-  },
-  name: { ...type.title2, color: colors.primaryForeground },
-  body: { paddingTop: 14 },
-  update: { marginHorizontal: 14, marginTop: 0, marginBottom: 14 },
-  card: {
-    marginHorizontal: 14,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
-  },
-  attendance: { padding: spacing.lg, gap: spacing.sm },
-  attendanceHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  chip: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radii.pill,
-    backgroundColor: colors.accent,
+    justifyContent: 'center',
   },
-  pressedCard: { backgroundColor: colors.accent },
+  initials: { ...type.title3, fontFamily: fonts.semibold, color: colors.primaryForeground },
+  name: { ...type.title2, color: colors.primaryForeground },
+  body: PAGE,
+  block: { gap: spacing.sm },
+  label: { marginTop: 0, marginBottom: 0 },
+  link: { ...type.chip, color: colors.link },
+  attendance: { gap: spacing.md },
+  attendanceHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  schedule: { alignSelf: 'center' },
+  stateBlock: { gap: spacing.xs },
   state: { ...type.title2, ...tabular },
   figures: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.lg, rowGap: 2 },
   late: { color: colors.warning },
-  punch: {
-    marginTop: spacing.xs,
-    height: 46,
-    borderRadius: radii.pill,
-    backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-  punchText: { color: colors.primaryForeground },
-  section: { paddingTop: 20 },
-  title: { marginHorizontal: 14, marginBottom: spacing.sm, textTransform: 'uppercase' },
-  freshRow: { paddingHorizontal: 14, gap: spacing.sm },
+  // The chips run to the screen's edges: the row undoes the page's side padding.
+  freshScroll: { marginHorizontal: -PAGE.padding },
+  freshRow: { paddingHorizontal: PAGE.padding, gap: spacing.sm },
   fresh: {
-    minHeight: 48,
+    height: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingLeft: spacing.sm,
-    paddingRight: spacing.md,
-    borderRadius: radii.card,
+    gap: 6,
+    paddingHorizontal: 14,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
     backgroundColor: colors.card,
   },
-  panel: { marginHorizontal: 14 },
-  empty: { padding: spacing.lg },
+  pressedChip: { backgroundColor: colors.accent },
+  freshText: { ...type.chip, color: colors.label2 },
   tiles: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xs,
+    rowGap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
   },
   // Three a row: the labels are long words.
   tile: {
     width: `${100 / 3}%`,
-    minHeight: 96,
-    padding: spacing.sm,
+    minHeight: 88,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.xs,
     alignItems: 'center',
     gap: spacing.sm,
-    borderRadius: radii.card,
+    borderRadius: 14,
   },
   pressedTile: { backgroundColor: colors.accent },
   tileIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   addIcon: {
     borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: colors.input,
+    borderColor: colors.rangeFill,
     backgroundColor: colors.secondary,
   },
-  tileBadge: { position: 'absolute', top: -4, right: -4 },
+  tileBadge: { position: 'absolute', top: -6, right: -6 },
   tileLabel: {
     ...type.secondary,
     fontFamily: fonts.medium,
     color: colors.foreground,
     textAlign: 'center',
   },
-  addLabel: { color: colors.primary },
+  addLabel: { color: colors.link },
 });

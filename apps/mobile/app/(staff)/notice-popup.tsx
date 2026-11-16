@@ -1,7 +1,7 @@
 import { addDays } from '@tugeel/shared/time';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Package, X } from 'lucide-react-native';
+import { ArrowRight, Package, X } from 'lucide-react-native';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -18,7 +18,7 @@ import {
 } from '../../src/notifications/feed';
 import { KIND_STYLES, KindIcon, useNoticeEyebrow } from '../../src/notifications/kinds';
 import { useSignedIn } from '../../src/state/session';
-import { colors, fonts, radii, shadows, spacing, type } from '../../src/theme/tokens';
+import { colors, fonts, shadows, spacing, TOUCH, type } from '../../src/theme/tokens';
 import { PillButton } from '../../src/ui/controls';
 import { useToast } from '../../src/ui/toast';
 
@@ -26,11 +26,11 @@ import { useToast } from '../../src/ui/toast';
 const LISTED = 3;
 
 /**
- * The notices that pop up when the app opens (the Launch board; ADR-0062 #3, ADR-0068 #8; drawn as
- * «Bto300»'s popup since ADR-0100), one at a time in the middle of the screen: a picture by kind,
- * the kind and days on a chip, the title, the text, a price drop's old and new prices, the dots,
- * then «Хаах» and «Дараагийнх» — on the last one «Бараа харах» when it lists products (before the
- * last, its products are a link above the buttons). A notice counts as read once shown. After the
+ * The notices that pop up when the app opens (the NoticePopup board of 2026-11-16; ADR-0062 #3,
+ * ADR-0068 #8), one at a time in the middle of the screen: a picture by kind, the kind and days on
+ * a pill, the title, the text, a price drop's old and new prices, the dots, then «Хаах» and
+ * «Дараагийнх» — on the last one «Бараа харах» when it lists products (before the last, its
+ * products are a link under the buttons). A notice counts as read once shown. After the
  * last, a toast says they are kept under the bell and offers them again («Дахин харах», `?ids=`).
  */
 export default function NoticePopup() {
@@ -97,14 +97,6 @@ export default function NoticePopup() {
                   ))}
                 </View>
               ) : null}
-              {hasNext && notice.productIds.length > 0 ? (
-                // Not the last one: its products stay one tap away above the pager's buttons.
-                <Pressable accessibilityRole="button" onPress={viewProducts} style={styles.link}>
-                  <Text style={[type.row, styles.linkText]}>
-                    {t(`mobile.notifications.cta.${notice.kind}`)}
-                  </Text>
-                </Pressable>
-              ) : null}
               <View style={styles.buttons}>
                 <Pressable
                   accessibilityRole="button"
@@ -121,14 +113,17 @@ export default function NoticePopup() {
                 </Pressable>
                 {hasNext ? (
                   <PillButton
-                    height={48}
+                    height={44}
                     style={styles.button}
                     title={t('mobile.notifications.next')}
+                    trailing={
+                      <ArrowRight size={18} strokeWidth={2.2} color={colors.primaryForeground} />
+                    }
                     onPress={() => setIndex(index + 1)}
                   />
                 ) : notice.productIds.length > 0 ? (
                   <PillButton
-                    height={48}
+                    height={44}
                     style={styles.button}
                     title={t('mobile.notifications.viewProducts')}
                     accessibilityLabel={t(`mobile.notifications.cta.${notice.kind}`)}
@@ -136,6 +131,14 @@ export default function NoticePopup() {
                   />
                 ) : null}
               </View>
+              {hasNext && notice.productIds.length > 0 ? (
+                // Not the last one: its products stay one tap away under the pager's buttons.
+                <Pressable accessibilityRole="button" onPress={viewProducts} style={styles.link}>
+                  <Text style={[type.bodyStrong, styles.linkText]}>
+                    {t(`mobile.notifications.cta.${notice.kind}`)}
+                  </Text>
+                </Pressable>
+              ) : null}
             </>
           }
         />
@@ -208,7 +211,9 @@ function NoticeCard({
         ) : percent ? (
           <View style={styles.percent}>
             <Text style={[styles.percentText, { color: style.strong }]}>{`${percent}%`}</Text>
-            <Text style={styles.percentLabel}>{t('mobile.notifications.discount')}</Text>
+            <Text style={[styles.percentLabel, { color: style.strong }]}>
+              {t('mobile.notifications.discount')}
+            </Text>
           </View>
         ) : (
           <View style={styles.kindIcon}>
@@ -229,14 +234,15 @@ function NoticeCard({
           accessibilityRole="button"
           accessibilityLabel={t('mobile.notifications.close')}
           onPress={onClose}
-          hitSlop={8}
+          hitSlop={4}
           style={styles.close}
         >
-          <X size={14} strokeWidth={3} color={colors.label2} />
+          <X size={18} strokeWidth={2.4} color={colors.foreground} />
         </Pressable>
       </View>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.text}>
         <View style={[styles.chip, { backgroundColor: style.soft }]}>
+          <KindIcon kind={notice.kind} size={13} />
           <Text style={[styles.chipText, { color: style.strong }]} numberOfLines={1}>
             {eyebrow}
           </Text>
@@ -275,16 +281,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.popupBackdrop,
     justifyContent: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
   },
   card: {
     maxHeight: '88%',
-    borderRadius: radii.hero,
+    borderRadius: 24,
     backgroundColor: colors.card,
     overflow: 'hidden',
     boxShadow: shadows.popup,
   },
-  hero: { height: 192, alignItems: 'center', justifyContent: 'center' },
+  hero: { height: 190, alignItems: 'center', justifyContent: 'center' },
   heroImage: { width: '100%', height: '100%' },
   heroProduct: { width: '80%', height: 176 },
   tiles: { flexDirection: 'row', gap: spacing.md },
@@ -299,16 +305,16 @@ const styles = StyleSheet.create({
   },
   tileImage: { width: '100%', height: '100%' },
   percent: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 124,
+    height: 124,
+    borderRadius: 62,
     backgroundColor: colors.card,
-    boxShadow: shadows.hero,
+    boxShadow: shadows.floating,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  percentText: type.display,
-  percentLabel: { ...type.chip, color: colors.label2 },
+  percentText: type.hero,
+  percentLabel: { ...type.secondary, fontFamily: fonts.semibold },
   kindIcon: {
     width: 96,
     height: 96,
@@ -333,26 +339,28 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: spacing.md,
     right: spacing.md,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.floatingFill,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.glassFill,
     alignItems: 'center',
     justifyContent: 'center',
   },
   scroll: { flexGrow: 0 },
-  text: { paddingTop: 18, paddingHorizontal: 20, paddingBottom: 20, gap: spacing.sm },
+  text: { paddingTop: 18, paddingHorizontal: 20, paddingBottom: 20, gap: 10 },
   chip: {
     alignSelf: 'flex-start',
     maxWidth: '100%',
     height: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     paddingHorizontal: 10,
     borderRadius: 12,
-    justifyContent: 'center',
   },
-  chipText: { ...type.secondary, fontFamily: fonts.semibold },
+  chipText: { ...type.secondary, fontFamily: fonts.semibold, flexShrink: 1 },
   title: type.title3,
-  body: { ...type.row, color: colors.label2 },
+  body: { ...type.body, color: colors.label2 },
   prices: {
     borderRadius: 14,
     backgroundColor: colors.imageFill,
@@ -376,19 +384,19 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   newPrice: { ...type.rowStrong, fontFamily: fonts.bold, color: colors.cancelled },
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: spacing.xs },
-  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.input },
+  dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: 6 },
+  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.dotIdle },
   dotOn: { width: 20, backgroundColor: colors.primary },
-  link: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  linkText: { color: colors.primary, textAlign: 'center' },
-  buttons: { flexDirection: 'row', gap: 10, marginTop: spacing.xs },
+  link: { minHeight: TOUCH, alignItems: 'center', justifyContent: 'center' },
+  linkText: { color: colors.link, textAlign: 'center' },
+  buttons: { flexDirection: 'row', gap: 10 },
   button: { flex: 1, paddingHorizontal: spacing.md },
   closeButton: {
-    height: 48,
-    borderRadius: 24,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.closeFill,
+    backgroundColor: colors.fill,
   },
-  closePressed: { backgroundColor: colors.fill },
+  closePressed: { backgroundColor: colors.border },
 });

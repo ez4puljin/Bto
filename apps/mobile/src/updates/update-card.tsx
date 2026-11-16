@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
 import { CompanyMark, useAppName } from '../ui/brand';
-import { colors, spacing, storeType, type } from '../theme/tokens';
+import { STAFF_LOOK } from '../theme/look';
+import { colors, radii, shadows, spacing, storeType, type } from '../theme/tokens';
 import { PillButton } from '../ui/controls';
 import { Text } from '../ui/text';
 import { type AppRelease, megabytesOf } from './update';
@@ -80,15 +81,24 @@ export function UpdateCard({
 }
 
 const styles = StyleSheet.create({
-  card: {
-    marginTop: spacing.md,
-    padding: 14,
-    gap: spacing.md,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-  },
+  // The staff app's card is the boards' white card (2026-11-16); «Bto300» keeps its bordered panel.
+  card: STAFF_LOOK
+    ? {
+        padding: spacing.lg,
+        gap: spacing.md,
+        borderRadius: radii.card,
+        backgroundColor: colors.card,
+        boxShadow: shadows.card,
+      }
+    : {
+        marginTop: spacing.md,
+        padding: 14,
+        gap: spacing.md,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.card,
+      },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   text: { flex: 1, gap: 2 },
   line: { color: colors.label2 },

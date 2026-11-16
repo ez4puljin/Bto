@@ -161,6 +161,18 @@ In «Цэс → Ажил» for holders of `catalog.products.register` (`mayRegis
 - **«Хадгалах»** checks the form (`problemsOf`; the fields say what they lack), posts `POST /product-registrations` with one Idempotency-Key per product, replaces a code taken meanwhile by the next free one, and after a save keeps the category, supplier, home and unit for the next product. Leaving with photos or typed fields asks first (`useLeaveGuard`).
 - The two AI calls have 120 s in `MobileSession` (`SLOW_ROUTES`, `timeoutFor`); every other call keeps 10 s.
 
+
+## 1m. The staff app's look of 2026-11-16 (0.22.0)
+
+The owner asked for every screen's design to be improved with Claude Design, chose the staff app first and the present look polished rather than a new one, and approved 57 boards (the Design canvas «Bto ажилтны апп — шинэчилсэн загвар»). No rule, flow or right changed, so there is no ADR.
+
+- **One kit.** `src/ui/staff-kit.tsx` holds `Card`, `Pill`, `Notice`, `ProgressBar`, `StatTile`, `FooterBar` and `PAGE`. A staff page is the blue `StoreHeader` (title, an optional `subtitle`), the grey canvas, 16 px padding and 16 px between blocks, white cards of radius 18 with `shadows.card`, section labels above their cards, capsule buttons with the page's main one in `FooterBar` (in flow, never absolute), and a status as a pill with a word.
+- **`STAFF_LOOK`** (`src/theme/look.ts`) is true in the staff build. Pieces both apps share (`StoreHeader`, `Group`/`IconTile`/`Row`, `PillButton`'s destructive form, `SectionHeader`, `EmptyState`, `TextField`, `StatusPill`, `StatRow`, the product card's frame, the home's section rows, the update card, the server and offline pages) draw the staff form under it and «Bto300»'s E-mart form (ADR-0095) otherwise. A change to a shared piece keeps that split.
+- **The cart in the header** is no longer the default in the staff app: the shopping pages (shop, categories, category, section, product, a notice's products) pass `<HeaderCart />` themselves.
+- **Small additions:** «Цэс» filters its rows by a search on the phone; the scanner has a torch and «Кодоор хайх»; «Нууц үг солих» is open to every staff member (the route was already `@Authenticated()`); «Ачилт» can tick every store at once.
+- **Tokens:** `muted` is the web's `#636366`; `fieldBorder` `#8E8E93` edges a white field.
+- **Left for a phone walk:** nothing was run on a device. The bottom bars with the keyboard up, the lists that are now one card, and «Bto300» looking as before are the first things to look at.
+
 ## 2. Pins (2026-10-15)
 
 | Package | Version |

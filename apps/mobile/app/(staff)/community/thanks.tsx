@@ -2,11 +2,10 @@ import { ENGAGEMENT_LIMITS } from '@tugeel/shared/hr';
 import { addDays, addMonths } from '@tugeel/shared/time';
 import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
-import { HeartHandshake, Plus } from 'lucide-react-native';
+import { ArrowRight, Heart, HeartHandshake, Plus, Send } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   type Colleague,
   type ThanksEntry,
@@ -20,13 +19,14 @@ import { Avatar, FirstLoad } from '../../../src/community/parts';
 import { monthOf } from '../../../src/dates/dates';
 import { useDebounced } from '../../../src/state/use-debounced';
 import { useSignedIn } from '../../../src/state/session';
-import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme/tokens';
+import { colors, fonts, spacing, tabular, type } from '../../../src/theme/tokens';
 import { PillButton, SearchField } from '../../../src/ui/controls';
 import { TextField } from '../../../src/ui/field';
 import { Group, Row } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
-import { Page } from '../../../src/ui/layout';
+import { Page, SectionHeader } from '../../../src/ui/layout';
 import { Sheet, SheetClose, SheetHeader } from '../../../src/ui/sheet';
+import { FooterBar, PAGE, Pill } from '../../../src/ui/staff-kit';
 import { StoreHeader } from '../../../src/ui/store-header';
 import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
@@ -76,6 +76,7 @@ function SendThanksSheet({ visible, onClose }: { visible: boolean; onClose: () =
       footer={
         <PillButton
           title={t('mobile.community.thanks.send')}
+          icon={<Send size={18} strokeWidth={2.2} color={colors.primaryForeground} />}
           disabled={!colleague || note.trim() === ''}
           loading={send.isPending}
           onPress={() => void submit()}
@@ -145,7 +146,6 @@ function SendThanksSheet({ visible, onClose }: { visible: boolean; onClose: () =
 export default function ThanksScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const today = useToday();
   const first = `${monthOf(today)}-01`;
   const thanks = useThanks(first, addDays(addMonths(first, 1), -1));
@@ -153,31 +153,48 @@ export default function ThanksScreen() {
   const ranking = thanks.data?.ranking ?? [];
   const items = thanks.data?.items ?? [];
 
+  /** «Өнөөдөр» or «11-р сарын 13»: the day in words, never the raw date. */
+  const dayLabel = (day: string): string => {
+    if (day === today) return t('mobile.days.today');
+    const [, month = '1', date = '1'] = day.split('-');
+    return t('mobile.calendar.day', {
+      month: Number.parseInt(month, 10),
+      day: Number.parseInt(date, 10),
+    });
+  };
+
   const renderEntry = (entry: ThanksEntry) => (
     <View key={entry.id} style={styles.entry}>
-      <Avatar name={entry.toName} photoUrl={entry.toPhotoUrl} />
+      <Avatar name={entry.toName} photoUrl={entry.toPhotoUrl} size={32} />
       <View style={styles.grow}>
-        <Text style={type.rowStrong} numberOfLines={2}>
-          {t('mobile.community.thanks.fromTo', { from: entry.fromName, to: entry.toName })}
-        </Text>
-        <Text style={type.body}>{entry.note}</Text>
-        <Text style={[type.secondary, tabular]}>{entry.day}</Text>
+        <View
+          accessible
+          accessibilityLabel={t('mobile.community.thanks.fromTo', {
+            from: entry.fromName,
+            to: entry.toName,
+          })}
+          style={styles.names}
+        >
+          <Text style={[type.rowStrong, styles.name]} numberOfLines={1}>
+            {entry.fromName}
+          </Text>
+          <ArrowRight size={14} strokeWidth={2.2} color={colors.muted} />
+          <Text style={[type.rowStrong, styles.name]} numberOfLines={1}>
+            {entry.toName}
+          </Text>
+        </View>
+        <Text style={[type.body, styles.note]}>{entry.note}</Text>
+        <Text style={type.caption}>{dayLabel(entry.day)}</Text>
       </View>
     </View>
   );
 
   return (
     <Page edges={[]}>
-      <StoreHeader
-        title={t('mobile.community.thanks.title')}
-        onBack={() => router.back()}
-        right={null}
-      />
+      <StoreHeader title={t('mobile.community.thanks.title')} onBack={() => router.back()} />
       <ScrollView
-        contentContainerStyle={[
-          styles.body,
-          { paddingBottom: Math.max(insets.bottom, spacing.md) + 72 },
-        ]}
+        style={styles.flex}
+        contentContainerStyle={styles.body}
         refreshControl={
           <RefreshControl
             refreshing={thanks.isRefetching}
@@ -188,82 +205,100 @@ export default function ThanksScreen() {
         <FirstLoad query={thanks}>
           {items.length === 0 ? (
             <EmptyState
-              icon={<HeartHandshake size={44} strokeWidth={1.5} color={colors.input} />}
+              icon={<HeartHandshake size={40} strokeWidth={1.5} color={colors.muted} />}
               title={t('mobile.community.thanks.empty')}
               hint={t('mobile.community.thanks.emptyHint')}
             />
           ) : null}
           {ranking.length > 0 ? (
             <>
-              <Text style={[type.sectionHeader, styles.head]}>
+              <SectionHeader style={styles.section}>
                 {t('mobile.community.thanks.ranking')}
-              </Text>
-              <Group>
+              </SectionHeader>
+              <Group inset={spacing.lg}>
                 {ranking.map((rank, index) => (
-                  <Row
+                  <View
                     key={rank.userId}
-                    minHeight={52}
-                    icon={
-                      <View style={styles.ranked}>
-                        <Text style={[styles.place, tabular]}>
-                          {t('mobile.community.thanks.rank', { n: index + 1 })}
-                        </Text>
-                        <Avatar name={rank.fullName} photoUrl={rank.photoUrl} size={32} />
-                      </View>
-                    }
-                    title={rank.fullName}
-                    value={t('mobile.community.thanks.count', { n: rank.count })}
-                  />
+                    accessible
+                    accessibilityLabel={`${t('mobile.community.thanks.rank', { n: index + 1 })} ${rank.fullName}, ${t('mobile.community.thanks.count', { n: rank.count })}`}
+                    style={styles.rank}
+                  >
+                    <View style={[styles.place, index === 0 && styles.placeFirst]}>
+                      <Text style={[styles.placeText, tabular]}>{String(index + 1)}</Text>
+                    </View>
+                    <Avatar name={rank.fullName} photoUrl={rank.photoUrl} size={32} />
+                    <Text
+                      style={[index === 0 ? type.rowStrong : type.row, styles.name]}
+                      numberOfLines={1}
+                    >
+                      {rank.fullName}
+                    </Text>
+                    <Pill icon={Heart} tone="bad" label={String(rank.count)} style={styles.pill} />
+                  </View>
                 ))}
               </Group>
             </>
           ) : null}
           {items.length > 0 ? (
             <>
-              <Text style={[type.sectionHeader, styles.head]}>
+              <SectionHeader style={styles.section}>
                 {t('mobile.community.thanks.newest')}
-              </Text>
-              <View style={styles.entries}>{items.slice(0, 50).map(renderEntry)}</View>
+              </SectionHeader>
+              <Group inset={spacing.lg + 32 + spacing.md}>
+                {items.slice(0, 50).map(renderEntry)}
+              </Group>
             </>
           ) : null}
         </FirstLoad>
       </ScrollView>
-      <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+      <FooterBar>
         <PillButton
+          style={styles.flex}
           title={t('mobile.community.thanks.new')}
           icon={<Plus size={18} strokeWidth={2.4} color={colors.primaryForeground} />}
           onPress={() => setOpen(true)}
         />
-      </View>
+      </FooterBar>
       <SendThanksSheet visible={open} onClose={() => setOpen(false)} />
     </Page>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { paddingHorizontal: 14, paddingTop: spacing.xs },
-  grow: { flex: 1, minWidth: 0, gap: 2 },
-  head: { marginTop: spacing.md, marginBottom: 6, paddingHorizontal: spacing.xs },
-  ranked: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  place: { ...type.bodyStrong, minWidth: 22, textAlign: 'right' },
-  entries: { gap: spacing.sm },
+  flex: { flex: 1 },
+  body: { padding: PAGE.padding, gap: PAGE.gap },
+  grow: { flex: 1, minWidth: 0, gap: spacing.xs },
+  /** A label sits 16 px under the block above it and 8 px over its own list. */
+  section: { marginTop: 0, marginBottom: -spacing.sm },
+  rank: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
+  place: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.fill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  placeFirst: { backgroundColor: colors.tint.amber },
+  placeText: { ...type.chip, fontFamily: fonts.bold, color: colors.label2 },
+  name: { flexShrink: 1, minWidth: 0 },
+  pill: { alignSelf: 'center', marginLeft: 'auto' },
   entry: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
-  bar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 14,
-    paddingTop: spacing.sm,
-    backgroundColor: colors.canvas,
-  },
+  names: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  note: { color: colors.label2 },
   form: { padding: spacing.lg, gap: spacing.md },
   change: { ...type.body, color: colors.link, fontFamily: fonts.semibold },
 });

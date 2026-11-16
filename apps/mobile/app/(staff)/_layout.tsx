@@ -92,6 +92,8 @@ export default function StaffLayout() {
           <Stack.Screen name="community/profile" />
           {/* The profile without the rep's context: a seller's and any other staff member's. */}
           <Stack.Screen name="me" />
+          {/* «Нууц үг солих»: everyone's own password (the route is `@Authenticated()`). */}
+          <Stack.Screen name="password" />
           <Stack.Protected guard={rep}>
             <Stack.Screen
               name="product/[id]"
@@ -115,7 +117,6 @@ export default function StaffLayout() {
             <Stack.Screen name="profile" />
             <Stack.Screen name="settings" />
             <Stack.Screen name="profile-info" />
-            <Stack.Screen name="password" />
             <Stack.Screen name="notifications" />
             <Stack.Screen name="notice/[id]" />
             <Stack.Screen name="map" />

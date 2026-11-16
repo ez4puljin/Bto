@@ -1,19 +1,25 @@
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { ClipboardCheck, ScanLine } from 'lucide-react-native';
+import {
+  CircleCheck,
+  ClipboardCheck,
+  Package,
+  Plus,
+  ScanLine,
+  Send,
+  TriangleAlert,
+} from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   type StockCountEntry,
   useCountMutations,
@@ -24,7 +30,6 @@ import {
 import { useProductSearch } from '../../../src/api/expiry';
 import { type AppProblem, problemFrom } from '../../../src/api/problem';
 import { useBarcodeLookup } from '../../../src/api/transfers';
-import { StatusPill } from '../../../src/community/parts';
 import { baseQtyOf, isPack, sameQty, totalAfter } from '../../../src/counts/rules';
 import { ubTime } from '../../../src/dates/dates';
 import { useLeaveGuard } from '../../../src/expiry/leave-guard';
@@ -32,14 +37,15 @@ import { HeaderSearch } from '../../../src/expiry/parts';
 import { cleanQty, createTurns, isAwaitingRows } from '../../../src/expiry/rules';
 import { formatCount, formatQty } from '../../../src/format/format';
 import { useDebounced } from '../../../src/state/use-debounced';
-import { colors, radii, spacing, TOUCH, type } from '../../../src/theme/tokens';
+import { colors, radii, spacing, tabular, type } from '../../../src/theme/tokens';
 import { ScanSheet } from '../../../src/transfers/scan-sheet';
-import { ChoiceChip, PillButton } from '../../../src/ui/controls';
+import { PillButton, Segmented } from '../../../src/ui/controls';
 import { TextField } from '../../../src/ui/field';
 import { Group, Row } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page, SectionHeader } from '../../../src/ui/layout';
 import { ActionSheet } from '../../../src/ui/sheet';
+import { Card, FooterBar, Notice, Pill } from '../../../src/ui/staff-kit';
 import { StoreHeader } from '../../../src/ui/store-header';
 import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
@@ -67,13 +73,14 @@ interface Last {
  * search picks a product and its number is typed at once, in pieces or by the box. A product read
  * again adds to its number, and every number typed stays its own row of the history, where an
  * unsent one can be taken back. «Илгээх» adds the session to the count window, and it must be
- * pressed even when nothing was counted: leaving before it reminds.
+ * pressed even when nothing was counted: leaving before it reminds. The three states of the screen
+ * (not begun, a product chosen, the history) share the cards, the bar under the page and one
+ * button height.
  */
 export default function CountScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const navigation = useNavigation();
-  const insets = useSafeAreaInsets();
   const toast = useToast();
   const params = useLocalSearchParams<{ id: string }>();
   const id = Number.parseInt(params.id, 10);
@@ -217,8 +224,8 @@ export default function CountScreen() {
   const header = (
     <StoreHeader
       title={count?.warehouseName ?? t('mobile.counts.title')}
+      subtitle={count?.scopeLabel ?? null}
       onBack={() => router.back()}
-      right={null}
     >
       {counting && !product ? (
         <HeaderSearch
@@ -226,16 +233,8 @@ export default function CountScreen() {
           onChangeText={setText}
           placeholder={t('mobile.counts.search')}
           label={t('mobile.shop.searchLabel')}
-          trailing={
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('mobile.counts.scan')}
-              onPress={() => setScanning(true)}
-              style={({ pressed }) => [styles.scanButton, pressed && styles.faded]}
-            >
-              <ScanLine size={22} strokeWidth={1.9} color={colors.primary} />
-            </Pressable>
-          }
+          onScan={() => setScanning(true)}
+          scanLabel={t('mobile.counts.scan')}
         />
       ) : null}
     </StoreHeader>
@@ -327,11 +326,11 @@ export default function CountScreen() {
   }
 
   const about = (
-    <View style={styles.card}>
+    <Card style={styles.about}>
       <Text style={type.heading}>{count.warehouseName}</Text>
       <Text style={type.secondary}>{count.scopeLabel}</Text>
       {count.note ? <Text style={type.body}>{count.note}</Text> : null}
-    </View>
+    </Card>
   );
 
   // Not counting: the count was closed, or this person has not begun (or has sent and may go on).
@@ -339,33 +338,33 @@ export default function CountScreen() {
     return (
       <Page edges={[]}>
         {header}
-        <ScrollView contentContainerStyle={styles.body}>
+        <ScrollView style={styles.flex} contentContainerStyle={styles.body}>
           {about}
           {!open ? (
             <EmptyState title={t('mobile.counts.closed')} hint={t('mobile.counts.closedHint')} />
+          ) : count.mine === 'SENT' ? (
+            <EmptyState
+              icon={<ClipboardCheck size={44} strokeWidth={1.5} color={colors.success} />}
+              title={t('mobile.counts.sentTitle')}
+              hint={t('mobile.counts.sentHint')}
+            />
           ) : (
-            <>
-              {count.mine === 'SENT' ? (
-                <EmptyState
-                  icon={<ClipboardCheck size={44} strokeWidth={1.5} color={colors.success} />}
-                  title={t('mobile.counts.sentTitle')}
-                  hint={t('mobile.counts.sentHint')}
-                />
-              ) : (
-                <Text style={[type.body, styles.lead]}>{t('mobile.counts.startHint')}</Text>
-              )}
-              <ProblemText problem={problem} style={styles.flat} />
-              <PillButton
-                title={
-                  count.mine === 'SENT' ? t('mobile.counts.startAgain') : t('mobile.counts.start')
-                }
-                variant={count.mine === 'SENT' ? 'soft' : 'primary'}
-                loading={start.isPending}
-                onPress={() => void begin()}
-              />
-            </>
+            <Notice tone="info">{t('mobile.counts.startHint')}</Notice>
           )}
         </ScrollView>
+        {open ? (
+          <FooterBar column>
+            <ProblemText problem={problem} style={styles.flat} />
+            <PillButton
+              title={
+                count.mine === 'SENT' ? t('mobile.counts.startAgain') : t('mobile.counts.start')
+              }
+              variant={count.mine === 'SENT' ? 'soft' : 'primary'}
+              loading={start.isPending}
+              onPress={() => void begin()}
+            />
+          </FooterBar>
+        ) : null}
         {sheets}
       </Page>
     );
@@ -379,6 +378,16 @@ export default function CountScreen() {
       shown && shown.expectedQty !== null && total !== null && typedBase !== null
         ? !sameQty(shown.expectedQty, total)
         : false;
+    const hint = [
+      unit && isPack(unit) && typedBase !== null
+        ? t('mobile.counts.inBase', { qty: formatQty(typedBase), unit: base })
+        : null,
+      total !== null && typedBase !== null
+        ? t('mobile.counts.totalAfter', { qty: formatQty(total), unit: base })
+        : null,
+    ]
+      .filter((part): part is string => part !== null)
+      .join(' · ');
     return (
       <Page edges={[]}>
         {header}
@@ -386,24 +395,31 @@ export default function CountScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.flex}
         >
-          <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-            <View style={styles.card}>
+          <ScrollView
+            style={styles.flex}
+            contentContainerStyle={styles.body}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Card style={styles.product}>
               <View style={styles.productHead}>
+                <View style={styles.thumb}>
+                  <Package size={24} strokeWidth={1.5} color={colors.input} />
+                </View>
                 <View style={styles.grow}>
-                  <Text style={type.heading} numberOfLines={3}>
+                  <Text style={type.rowStrong} numberOfLines={3}>
                     {product.name}
                   </Text>
                   <Text style={type.secondary} numberOfLines={1}>
                     {product.sku}
                   </Text>
                 </View>
-                <Pressable
-                  accessibilityRole="button"
+                <PillButton
+                  title={t('mobile.counts.change')}
+                  variant="soft"
+                  height={36}
+                  style={styles.change}
                   onPress={() => setProduct(null)}
-                  style={({ pressed }) => [styles.change, pressed && styles.faded]}
-                >
-                  <Text style={styles.changeText}>{t('mobile.counts.change')}</Text>
-                </Pressable>
+                />
               </View>
               {shown ? (
                 <View style={styles.facts}>
@@ -416,9 +432,7 @@ export default function CountScreen() {
                   ) : null}
                 </View>
               ) : null}
-            </View>
-
-            <View style={styles.card}>
+              <View style={styles.rule} />
               {units.isPending ? (
                 <ActivityIndicator color={colors.primary} />
               ) : units.error ? (
@@ -426,27 +440,25 @@ export default function CountScreen() {
               ) : (
                 <>
                   {(units.data?.length ?? 0) > 1 ? (
-                    <View style={styles.units}>
-                      {units.data?.map((entry) => (
-                        <ChoiceChip
-                          key={entry.id}
-                          onWhite
-                          label={
-                            isPack(entry)
-                              ? t('mobile.counts.pack', {
-                                  unit: entry.uomName,
-                                  n: formatQty(entry.factorToBase),
-                                })
-                              : entry.uomName
-                          }
-                          selected={unit?.id === entry.id}
-                          onPress={() => {
-                            setProduct({ ...product, unitId: entry.id });
-                            setQty((current) => cleanQty(current, entry.fractional));
-                          }}
-                        />
-                      ))}
-                    </View>
+                    <Segmented
+                      small={(units.data?.length ?? 0) > 2}
+                      options={(units.data ?? []).map((entry) => ({
+                        value: String(entry.id),
+                        label: isPack(entry)
+                          ? t('mobile.counts.pack', {
+                              unit: entry.uomName,
+                              n: formatQty(entry.factorToBase),
+                            })
+                          : entry.uomName,
+                      }))}
+                      value={unit ? String(unit.id) : null}
+                      onChange={(value) => {
+                        const entry = units.data?.find((option) => String(option.id) === value);
+                        if (!entry) return;
+                        setProduct({ ...product, unitId: entry.id });
+                        setQty((current) => cleanQty(current, entry.fractional));
+                      }}
+                    />
                   ) : null}
                   <TextField
                     label={t('mobile.counts.qty', { unit: unit?.uomName ?? '' })}
@@ -457,36 +469,29 @@ export default function CountScreen() {
                     selectTextOnFocus
                     returnKeyType="done"
                     onSubmitEditing={() => void save()}
-                    hint={
-                      unit && isPack(unit) && typedBase !== null
-                        ? t('mobile.counts.inBase', { qty: formatQty(typedBase), unit: base })
-                        : null
-                    }
+                    hint={hint === '' ? null : hint}
                   />
-                  {total !== null && typedBase !== null ? (
-                    <Text style={type.body}>
-                      {t('mobile.counts.totalAfter', { qty: formatQty(total), unit: base })}
-                    </Text>
-                  ) : null}
                   {differs ? (
-                    <View accessibilityRole="alert" style={styles.warning}>
-                      <Text style={styles.warningText}>{t('mobile.counts.mismatch')}</Text>
+                    <View accessibilityRole="alert">
+                      <Notice icon={TriangleAlert} tone="warn">
+                        {t('mobile.counts.mismatch')}
+                      </Notice>
                     </View>
                   ) : null}
                 </>
               )}
-            </View>
+            </Card>
           </ScrollView>
-          <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+          <FooterBar column>
             <ProblemText problem={problem} style={styles.flat} />
             <PillButton
               title={t('mobile.counts.add')}
-              height={46}
+              icon={<Plus size={20} strokeWidth={2.4} color={colors.primaryForeground} />}
               loading={add.isPending}
               disabled={typedBase === null || unit === null}
               onPress={() => void save()}
             />
-          </View>
+          </FooterBar>
         </KeyboardAvoidingView>
         {sheets}
       </Page>
@@ -497,6 +502,7 @@ export default function CountScreen() {
     <Page edges={[]}>
       {header}
       <ScrollView
+        style={styles.flex}
         contentContainerStyle={styles.body}
         keyboardShouldPersistTaps="handled"
         refreshControl={
@@ -519,7 +525,6 @@ export default function CountScreen() {
                   key={item.id}
                   title={item.name}
                   subtitle={`${item.sku} · ${item.baseUnit.uomName}`}
-                  minHeight={TOUCH + spacing.sm}
                   onPress={() =>
                     choose({
                       id: item.id,
@@ -536,13 +541,13 @@ export default function CountScreen() {
         ) : (
           <>
             {last ? (
-              <View
-                accessibilityRole={last.mismatch ? 'alert' : undefined}
-                style={last.mismatch ? styles.warning : styles.note}
-              >
-                <Text style={last.mismatch ? styles.warningText : styles.noteText}>
+              <View accessibilityRole={last.mismatch ? 'alert' : undefined}>
+                <Notice
+                  icon={last.mismatch ? TriangleAlert : CircleCheck}
+                  tone={last.mismatch ? 'warn' : 'ok'}
+                >
                   {lastText(last)}
-                </Text>
+                </Notice>
               </View>
             ) : null}
             <PillButton
@@ -563,18 +568,13 @@ export default function CountScreen() {
                       key={entry.id}
                       title={entry.name}
                       subtitle={`${entry.sku} · ${ubTime(entry.createdAt)}`}
-                      minHeight={TOUCH + spacing.sm}
                       chevron={false}
                       titleStyle={entry.voided ? styles.struck : undefined}
                       right={
                         entry.voided ? (
-                          <StatusPill
-                            label={t('mobile.counts.voided')}
-                            background={colors.fill}
-                            color={colors.muted}
-                          />
+                          <Pill label={t('mobile.counts.voided')} />
                         ) : (
-                          <Text style={type.bodyStrong}>
+                          <Text style={[type.rowStrong, tabular]}>
                             {t('mobile.counts.entryQty', {
                               qty: formatQty(entry.enteredQty),
                               unit: entry.unitName,
@@ -592,16 +592,16 @@ export default function CountScreen() {
         )}
       </ScrollView>
       {q === '' ? (
-        <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
-          <Text style={[type.secondary, styles.center]}>{t('mobile.counts.mustSend')}</Text>
+        <FooterBar>
+          <Text style={[type.secondary, styles.flex]}>{t('mobile.counts.mustSend')}</Text>
           <PillButton
             title={t('mobile.counts.send.button')}
             variant="soft"
-            height={46}
+            icon={<Send size={18} strokeWidth={2.2} color={colors.link} />}
             loading={send.isPending}
             onPress={() => setConfirming(true)}
           />
-        </View>
+        </FooterBar>
       ) : null}
       {sheets}
     </Page>
@@ -611,8 +611,10 @@ export default function CountScreen() {
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.fact}>
-      <Text style={type.secondary}>{label}</Text>
-      <Text style={type.heading}>{value}</Text>
+      <Text style={[type.heading, tabular]}>{value}</Text>
+      <Text style={[type.caption, styles.factLabel]} numberOfLines={2}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -620,52 +622,26 @@ function Fact({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   grow: { flex: 1, minWidth: 0, gap: 2 },
-  faded: { opacity: 0.7 },
-  center: { textAlign: 'center' },
-  body: { padding: 14, paddingBottom: 24, gap: spacing.md },
+  body: { padding: spacing.lg, paddingBottom: spacing.xl, gap: spacing.md },
   loading: { marginTop: spacing.xl },
   lead: { color: colors.muted, textAlign: 'center' },
   flat: { marginTop: 0 },
   head: { marginTop: spacing.xs },
-  scanButton: {
-    width: TOUCH,
-    height: TOUCH,
+  about: { gap: spacing.xs },
+  product: { gap: spacing.md },
+  productHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  thumb: {
+    width: 52,
+    height: 52,
     borderRadius: radii.field,
-    backgroundColor: colors.card,
+    backgroundColor: colors.imageFill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  card: {
-    padding: spacing.lg,
-    gap: spacing.sm,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
-  },
-  productHead: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  change: { height: TOUCH, justifyContent: 'center', paddingHorizontal: spacing.sm },
-  changeText: { ...type.bodyStrong, color: colors.primary },
-  facts: { flexDirection: 'row', gap: spacing.lg },
-  fact: { gap: 2 },
-  units: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  warning: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.field,
-    backgroundColor: colors.warningSoft,
-  },
-  warningText: { ...type.body, color: colors.warningText },
-  note: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.field,
-    backgroundColor: colors.successSoft,
-  },
-  noteText: { ...type.body, color: colors.success },
+  change: { paddingHorizontal: spacing.lg },
+  facts: { flexDirection: 'row', gap: 10 },
+  fact: { flex: 1, minWidth: 0, alignItems: 'center', gap: 2 },
+  factLabel: { textAlign: 'center' },
+  rule: { height: StyleSheet.hairlineWidth, backgroundColor: colors.hairlineStrong },
   struck: { textDecorationLine: 'line-through', color: colors.muted },
-  bar: {
-    gap: spacing.sm,
-    paddingHorizontal: 14,
-    paddingTop: spacing.sm,
-    backgroundColor: colors.canvas,
-  },
 });

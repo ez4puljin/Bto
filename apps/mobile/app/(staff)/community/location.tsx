@@ -2,21 +2,28 @@ import { ENGAGEMENT_LIMITS } from '@tugeel/shared/hr';
 import * as Crypto from 'expo-crypto';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import { MapPin } from 'lucide-react-native';
+import { Info, MapPin, MapPinOff } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Linking, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+} from 'react-native';
 import { useMyLocations, useShareLocation } from '../../../src/api/community';
 import { type AppProblem, problemFrom } from '../../../src/api/problem';
 import { FirstLoad, useAt } from '../../../src/community/parts';
-import { colors, radii, spacing, type } from '../../../src/theme/tokens';
+import { colors, spacing, tabular } from '../../../src/theme/tokens';
 import { PillButton } from '../../../src/ui/controls';
 import { TextField } from '../../../src/ui/field';
 import { Group, ICON_INSET, IconTile, Row } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
-import { Page } from '../../../src/ui/layout';
+import { Page, SectionHeader } from '../../../src/ui/layout';
+import { Card, FooterBar, Notice, PAGE, TONES } from '../../../src/ui/staff-kit';
 import { StoreHeader } from '../../../src/ui/store-header';
-import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
 
 /** How long the phone may look for a fix before its last known position is taken. */
@@ -107,100 +114,112 @@ export default function LocationScreen() {
 
   return (
     <Page edges={[]}>
-      <StoreHeader
-        title={t('mobile.community.location.title')}
-        onBack={() => router.back()}
-        right={null}
-      />
-      <ScrollView
-        contentContainerStyle={styles.body}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl
-            refreshing={locations.isRefetching}
-            onRefresh={() => void locations.refetch()}
-          />
-        }
+      <StoreHeader title={t('mobile.community.location.title')} onBack={() => router.back()} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.flex}
       >
-        <View style={styles.card}>
-          <Text style={type.body}>{t('mobile.community.location.lead')}</Text>
-          <TextField
-            label={t('mobile.community.location.note')}
-            placeholder={t('mobile.community.location.notePlaceholder')}
-            value={note}
-            onChangeText={setNote}
-            maxLength={ENGAGEMENT_LIMITS.maxNote}
-          />
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={styles.body}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              refreshing={locations.isRefetching}
+              onRefresh={() => void locations.refetch()}
+            />
+          }
+        >
+          <Notice icon={Info} tone="info">
+            {t('mobile.community.location.lead')}
+          </Notice>
+          <Card style={styles.card}>
+            <TextField
+              label={t('mobile.community.location.note')}
+              placeholder={t('mobile.community.location.notePlaceholder')}
+              value={note}
+              onChangeText={setNote}
+              maxLength={ENGAGEMENT_LIMITS.maxNote}
+            />
+            {blocked === 'denied' ? (
+              <>
+                <Notice icon={MapPinOff} tone="bad">
+                  {t('mobile.community.location.denied')}
+                </Notice>
+                <PillButton
+                  variant="soft"
+                  height={44}
+                  title={t('mobile.community.location.openSettings')}
+                  onPress={() => void Linking.openSettings()}
+                />
+              </>
+            ) : null}
+            {blocked === 'off' ? (
+              <Notice icon={MapPinOff} tone="bad">
+                {t('mobile.community.location.off')}
+              </Notice>
+            ) : null}
+            <ProblemText problem={problem} style={styles.problem} />
+          </Card>
+
+          <SectionHeader style={styles.section}>
+            {t('mobile.community.location.recent')}
+          </SectionHeader>
+          <FirstLoad query={locations}>
+            {rows.length === 0 ? (
+              <EmptyState
+                icon={<MapPin size={40} strokeWidth={1.5} color={colors.muted} />}
+                title={t('mobile.community.location.empty')}
+              />
+            ) : (
+              <Group inset={ICON_INSET}>
+                {rows.map((row) => (
+                  <Row
+                    key={row.id}
+                    minHeight={56}
+                    icon={
+                      <IconTile color={TONES.ok.background}>
+                        <MapPin size={18} strokeWidth={2.2} color={TONES.ok.text} />
+                      </IconTile>
+                    }
+                    title={at(row.createdAt)}
+                    titleStyle={tabular}
+                    subtitle={
+                      [
+                        row.note,
+                        row.accuracyM !== null
+                          ? t('mobile.community.location.accuracy', { m: row.accuracyM })
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ') || null
+                    }
+                  />
+                ))}
+              </Group>
+            )}
+          </FirstLoad>
+        </ScrollView>
+        <FooterBar>
           <PillButton
+            style={styles.flex}
             title={t('mobile.community.location.send')}
             icon={<MapPin size={18} strokeWidth={2.2} color={colors.primaryForeground} />}
             loading={finding}
             loadingTitle={t('mobile.community.location.finding')}
             onPress={() => void send()}
           />
-          {blocked === 'denied' ? (
-            <>
-              <Text style={[type.body, styles.error]}>{t('mobile.community.location.denied')}</Text>
-              <PillButton
-                variant="soft"
-                title={t('mobile.community.location.openSettings')}
-                onPress={() => void Linking.openSettings()}
-              />
-            </>
-          ) : null}
-          {blocked === 'off' ? (
-            <Text style={[type.body, styles.error]}>{t('mobile.community.location.off')}</Text>
-          ) : null}
-          <ProblemText problem={problem} style={styles.problem} />
-        </View>
-
-        <Text style={[type.sectionHeader, styles.head]}>
-          {t('mobile.community.location.recent')}
-        </Text>
-        <FirstLoad query={locations}>
-          {rows.length === 0 ? (
-            <EmptyState title={t('mobile.community.location.empty')} />
-          ) : (
-            <Group inset={ICON_INSET}>
-              {rows.map((row) => (
-                <Row
-                  key={row.id}
-                  minHeight={52}
-                  icon={
-                    <IconTile color={colors.tint.green}>
-                      <MapPin size={16} strokeWidth={2.2} color={colors.primaryForeground} />
-                    </IconTile>
-                  }
-                  title={at(row.createdAt)}
-                  subtitle={
-                    [
-                      row.note,
-                      row.accuracyM !== null
-                        ? t('mobile.community.location.accuracy', { m: row.accuracyM })
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ') || null
-                  }
-                />
-              ))}
-            </Group>
-          )}
-        </FirstLoad>
-      </ScrollView>
+        </FooterBar>
+      </KeyboardAvoidingView>
     </Page>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { padding: 14, paddingBottom: 40 },
-  card: {
-    padding: spacing.lg,
-    gap: spacing.md,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
-  },
-  error: { color: colors.destructiveText },
+  flex: { flex: 1 },
+  body: { padding: PAGE.padding, gap: PAGE.gap },
+  card: { gap: spacing.md },
   problem: { marginTop: 0 },
-  head: { marginTop: spacing.lg, marginBottom: 6, paddingHorizontal: spacing.xs },
+  /** A label sits 16 px under the block above it and 8 px over its own list. */
+  section: { marginTop: 0, marginBottom: -spacing.sm },
 });

@@ -12,7 +12,7 @@ import { useSignedIn } from '../../src/state/session';
 import { useShop } from '../../src/state/shop';
 import { useDebounced } from '../../src/state/use-debounced';
 import { colors, radii, spacing, storeType, TOUCH, type } from '../../src/theme/tokens';
-import { Separator } from '../../src/ui/grouped';
+import { ICON_INSET, ICON_TILE, Separator } from '../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../src/ui/kit';
 import { Page } from '../../src/ui/layout';
 import { StoreHeader } from '../../src/ui/store-header';
@@ -20,7 +20,8 @@ import { StoreHeader } from '../../src/ui/store-header';
 /**
  * Picks the cart's customer among the active ones (ADR-0061 #5): name, code or phone. The pick
  * brings the default address (ADR-0068); the order takes no contact person (the owner, 2026-10-18).
- * Bto300's blue header with ← and the search field in the band, like its shop (ADR-0100).
+ * The blue header with ← and the white search field in the band; the chosen customer's row is
+ * soft blue with its check (the Customers board of 2026-11-16).
  */
 export default function CustomersScreen() {
   const { t } = useTranslation();
@@ -67,12 +68,12 @@ export default function CustomersScreen() {
     <Page edges={[]}>
       <StoreHeader title={t('mobile.customers.title')} onBack={() => router.back()} right={null}>
         <View style={styles.search}>
-          <Search size={17} strokeWidth={2.2} color={colors.muted} />
+          <Search size={18} strokeWidth={2.2} color={colors.placeholder} />
           <TextInput
             value={text}
             onChangeText={setText}
             placeholder={t('mobile.customers.search')}
-            placeholderTextColor={colors.muted}
+            placeholderTextColor={colors.placeholder}
             accessibilityLabel={t('mobile.customers.search')}
             autoCorrect={false}
             returnKeyType="search"
@@ -94,18 +95,30 @@ export default function CustomersScreen() {
               index === rows.length - 1 && styles.lastCell,
             ]}
           >
-            {index > 0 ? <Separator inset={spacing.lg + 34 + spacing.md} /> : null}
+            {index > 0 ? <Separator inset={ICON_INSET} /> : null}
             <Pressable
               accessibilityRole="button"
+              accessibilityState={{ selected: cart.customer?.id === item.id }}
               onPress={() => void pick(item)}
               disabled={picking !== null}
-              style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.row,
+                cart.customer?.id === item.id && styles.chosen,
+                pressed && styles.pressed,
+              ]}
             >
-              <View style={styles.icon}>
-                <Store size={18} strokeWidth={2} color={colors.primaryForeground} />
+              <View style={[styles.icon, cart.customer?.id === item.id && styles.iconChosen]}>
+                <Store
+                  size={18}
+                  strokeWidth={2}
+                  color={cart.customer?.id === item.id ? colors.primaryForeground : colors.link}
+                />
               </View>
               <View style={styles.grow}>
-                <Text style={type.row} numberOfLines={1}>
+                <Text
+                  style={cart.customer?.id === item.id ? type.rowStrong : type.row}
+                  numberOfLines={1}
+                >
                   {item.name}
                 </Text>
                 <Text style={type.secondary} numberOfLines={1}>
@@ -117,7 +130,7 @@ export default function CustomersScreen() {
               {picking === item.id ? (
                 <ActivityIndicator color={colors.primary} />
               ) : cart.customer?.id === item.id ? (
-                <Check size={20} strokeWidth={2.6} color={colors.primary} />
+                <Check size={20} strokeWidth={2.6} color={colors.link} />
               ) : null}
             </Pressable>
           </View>
@@ -143,16 +156,16 @@ export default function CustomersScreen() {
 }
 
 const styles = StyleSheet.create({
-  // Bto300's shop search: a white 34 px field in the blue band.
+  // The white 40 px search field in the blue band.
   search: {
-    height: 34,
-    marginHorizontal: 14,
-    marginBottom: 10,
+    height: 40,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    borderRadius: 17,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.field,
     backgroundColor: colors.card,
   },
   searchInput: { flex: 1, minWidth: 0, height: TOUCH, padding: 0, color: colors.foreground },
@@ -164,19 +177,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    minHeight: 60,
-    paddingLeft: spacing.lg,
-    paddingRight: 14,
+    minHeight: 56,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.lg,
   },
+  chosen: { backgroundColor: colors.secondary },
   pressed: { backgroundColor: colors.accent },
   icon: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    backgroundColor: colors.tint.blue,
+    width: ICON_TILE,
+    height: ICON_TILE,
+    borderRadius: 10,
+    backgroundColor: colors.secondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  grow: { flex: 1, gap: 1 },
+  iconChosen: { backgroundColor: colors.primary },
+  grow: { flex: 1, minWidth: 0, gap: 1 },
   loading: { marginTop: spacing.xxl },
 });

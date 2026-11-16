@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './text';
-import { colors, radii, spacing, tabular, type } from '../theme/tokens';
+import { STAFF_LOOK } from '../theme/look';
+import { colors, radii, shadows, spacing, tabular, type } from '../theme/tokens';
 
 /** The MyOrders board's three numbers in one white card: «захиалга · батлагдсан дүн · ноорог». */
 export function StatRow({
@@ -41,6 +42,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
     borderRadius: radii.card,
     backgroundColor: colors.card,
+    ...(STAFF_LOOK ? { boxShadow: shadows.card } : null),
   },
   pressed: { backgroundColor: colors.accent },
   label: { textAlign: 'center' },

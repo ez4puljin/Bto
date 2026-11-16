@@ -69,6 +69,25 @@ export const MENU_LOOK: Record<MenuKey, { Icon: LucideIcon; color: string }> = {
   profile: { Icon: UserRound, color: colors.tint.gray },
 };
 
+/**
+ * «Цэс хайх»: the groups with only the rows whose name holds what was typed, on the phone alone
+ * (no letter case, an empty search keeps everything); a group left without rows is gone.
+ */
+export function searchedMenu(
+  groups: readonly MenuGroup[],
+  labelOf: (key: MenuKey) => string,
+  search: string,
+): MenuGroup[] {
+  const wanted = search.trim().toLocaleLowerCase();
+  if (wanted === '') return [...groups];
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => labelOf(item.key).toLocaleLowerCase().includes(wanted)),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
 /** The person's menu, the unread counts on its rows, and opening a row. */
 export function useStaffMenu(): {
   groups: MenuGroup[];

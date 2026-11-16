@@ -1,7 +1,15 @@
 import { Decimal } from '@tugeel/shared/money';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Package } from 'lucide-react-native';
+import {
+  CircleAlert,
+  Info,
+  Package,
+  StickyNote,
+  Store,
+  Truck,
+  Warehouse,
+} from 'lucide-react-native';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
@@ -13,10 +21,11 @@ import { dayNameOf, monthDay } from '../../../src/dates/calendar';
 import { ubDate, ubTime } from '../../../src/dates/dates';
 import { formatMnt, formatQty } from '../../../src/format/format';
 import { useSignedIn } from '../../../src/state/session';
-import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme/tokens';
-import { Group, Row } from '../../../src/ui/grouped';
+import { colors, fonts, radii, spacing, storeType, tabular, type } from '../../../src/theme/tokens';
+import { Group, ICON_INSET, ICON_TILE, IconTile, Row } from '../../../src/ui/grouped';
 import { ProblemText } from '../../../src/ui/kit';
-import { FootNote, Page, SectionHeader } from '../../../src/ui/layout';
+import { Page, SectionHeader } from '../../../src/ui/layout';
+import { Notice, PAGE, Pill } from '../../../src/ui/staff-kit';
 import { PaymentDot, StatusPill } from '../../../src/ui/status';
 import { StoreHeader } from '../../../src/ui/store-header';
 
@@ -29,8 +38,9 @@ const LINE_INSET = spacing.lg + THUMB + spacing.md;
  * customer, delivery, payment and where it sits, the lines (the owner, 2026-10-18: each with its
  * picture, name, «qty unit × price» per part and its total, and «Дутуу …» only when something is
  * short), and the totals. A draft has no prices yet: its lines and total show the estimate at
- * today's prices («≈ …₮»), with a note that the office's confirmation fixes them. Bto300's blue
- * header with ← and the cart (ADR-0100).
+ * today's prices («≈ …₮»), with a note that the office's confirmation fixes them. The blue header
+ * carries the number as its title and, in the band under it, the amount, when it was made and the
+ * status (the Order board of 2026-11-16).
  */
 export default function OrderScreen() {
   const { t } = useTranslation();
@@ -68,32 +78,48 @@ export default function OrderScreen() {
 
   return (
     <Page edges={[]}>
-      <StoreHeader title={t('mobile.tabs.orders')} onBack={() => router.back()} />
-      {order.isLoading ? <ActivityIndicator color={colors.primary} /> : null}
-      <View style={styles.pad}>
-        {order.error ? <ProblemText problem={problemFrom(order.error)} /> : null}
-      </View>
+      <StoreHeader
+        title={data ? (data.number ?? t('common.none')) : t('mobile.tabs.orders')}
+        onBack={() => router.back()}
+      >
+        {data ? (
+          // The amount and the status in the blue band, under the order's number.
+          <View style={styles.band}>
+            <View style={styles.grow}>
+              <Text style={styles.bandAmount} numberOfLines={1} adjustsFontSizeToFit>
+                {estimate !== null ? approx(estimate) : money(data.total)}
+              </Text>
+              <Text style={storeType.headerSubtitle} numberOfLines={1}>
+                {t('mobile.order.created', {
+                  date: day(ubDate(data.createdAt)),
+                  time: ubTime(data.createdAt),
+                })}
+              </Text>
+            </View>
+            <StatusPill status={data.status} />
+          </View>
+        ) : null}
+      </StoreHeader>
+      {order.isLoading ? <ActivityIndicator style={styles.loading} color={colors.primary} /> : null}
+      {order.error ? (
+        <View style={styles.pad}>
+          <ProblemText problem={problemFrom(order.error)} />
+        </View>
+      ) : null}
       {data ? (
         <ScrollView
           contentContainerStyle={[styles.body, { paddingBottom: spacing.xxl + insets.bottom }]}
         >
-          <View style={styles.head}>
-            <Text accessibilityRole="header" style={[type.title, styles.number]}>
-              {data.number ?? t('common.none')}
-            </Text>
-            <StatusPill status={data.status} />
-          </View>
-          <Text style={[type.body, styles.muted, styles.created]}>
-            {t('mobile.order.created', {
-              date: day(ubDate(data.createdAt)),
-              time: ubTime(data.createdAt),
-            })}
-          </Text>
-
-          <SectionHeader style={styles.section}>{t('mobile.checkout.customer')}</SectionHeader>
-          <Group>
+          <SectionHeader style={styles.section}>{t('mobile.order.customerDelivery')}</SectionHeader>
+          <Group inset={ICON_INSET}>
             <Row
+              icon={
+                <IconTile color={colors.primary}>
+                  <Store size={18} strokeWidth={2} color={colors.primaryForeground} />
+                </IconTile>
+              }
               title={data.customerName}
+              titleStyle={styles.strong}
               subtitle={t('mobile.checkout.code', { code: data.customerCode })}
             />
             {data.contactName || data.contactPhone ? (
@@ -102,13 +128,20 @@ export default function OrderScreen() {
                 value={[data.contactName, data.contactPhone].filter(Boolean).join(' · ')}
               />
             ) : null}
-          </Group>
-
-          <SectionHeader style={styles.section}>{t('mobile.checkout.delivery')}</SectionHeader>
-          <Group>
             <Row
+              icon={
+                <View style={styles.greyTile}>
+                  {data.fulfilment === 'DELIVERY' ? (
+                    <Truck size={18} strokeWidth={2} color={colors.label2} />
+                  ) : (
+                    <Warehouse size={18} strokeWidth={2} color={colors.label2} />
+                  )}
+                </View>
+              }
               title={t(`sales.fulfilments.${data.fulfilment}`)}
-              value={data.fulfilment === 'DELIVERY' ? (data.addressText ?? t('common.none')) : null}
+              subtitle={
+                data.fulfilment === 'DELIVERY' ? (data.addressText ?? t('common.none')) : null
+              }
             />
             <Row
               title={
@@ -116,30 +149,38 @@ export default function OrderScreen() {
                   ? t('mobile.checkout.pickupDay')
                   : t('mobile.checkout.deliveryDay')
               }
-              value={day(data.deliveryDate)}
+              titleStyle={styles.muted}
+              right={<Text style={[type.row, tabular]}>{day(data.deliveryDate)}</Text>}
             />
             <Row
               title={t('mobile.checkout.payment')}
+              titleStyle={styles.muted}
               right={
                 <View style={styles.payment}>
-                  <PaymentDot method={data.paymentMethod} size={9} />
-                  <Text style={[type.body, styles.muted]}>
-                    {t(`sales.paymentMethods.${data.paymentMethod}`)}
-                  </Text>
+                  <PaymentDot method={data.paymentMethod} size={8} />
+                  <Text style={type.row}>{t(`sales.paymentMethods.${data.paymentMethod}`)}</Text>
                 </View>
               }
             />
             <Row
               title={t('mobile.order.place')}
-              value={
-                [data.pipelineName, data.stageName].filter(Boolean).join(' › ') || t('common.none')
+              titleStyle={styles.muted}
+              right={
+                <Text style={[type.row, styles.place]} numberOfLines={2}>
+                  {[data.pipelineName, data.stageName].filter(Boolean).join(' › ') ||
+                    t('common.none')}
+                </Text>
               }
             />
           </Group>
-          {data.note ? <FootNote>{data.note}</FootNote> : null}
-          {data.status === 'DRAFT' ? <FootNote>{t('mobile.order.draftHint')}</FootNote> : null}
+          {data.note ? <Notice icon={StickyNote}>{data.note}</Notice> : null}
+          {data.status === 'DRAFT' ? (
+            <Notice icon={Info}>{t('mobile.order.draftHint')}</Notice>
+          ) : null}
           {data.cancelReason ? (
-            <Text style={[type.body, styles.cancelled]}>{data.cancelReason}</Text>
+            <Notice tone="bad" icon={CircleAlert}>
+              {data.cancelReason}
+            </Notice>
           ) : null}
 
           <SectionHeader style={styles.section}>
@@ -184,14 +225,14 @@ export default function OrderScreen() {
                       </Text>
                     ))}
                     {short ? (
-                      <View style={styles.shortPill}>
-                        <Text style={styles.shortText}>
-                          {t('mobile.order.short', {
-                            short: formatQty(line.qtyBackordered),
-                            unit: line.baseUnitName,
-                          })}
-                        </Text>
-                      </View>
+                      <Pill
+                        tone="warn"
+                        label={t('mobile.order.short', {
+                          short: formatQty(line.qtyBackordered),
+                          unit: line.baseUnitName,
+                        })}
+                        style={styles.shortPill}
+                      />
                     ) : null}
                   </View>
                   {line.total !== null ? (
@@ -212,26 +253,34 @@ export default function OrderScreen() {
             })}
           </Group>
 
-          <SectionHeader style={styles.section}>{t('mobile.cart.totals')}</SectionHeader>
           <Group>
             <Row
               title={t('mobile.order.items')}
-              value={t('mobile.order.kinds', { n: data.lines.length })}
+              right={
+                <Text style={[type.row, tabular]}>
+                  {t('mobile.order.kinds', { n: data.lines.length })}
+                </Text>
+              }
             />
             {data.discountTotal && new Decimal(data.discountTotal).gt(0) ? (
-              <Row title={t('mobile.cart.discount')} value={money(data.discountTotal)} />
+              <Row
+                title={t('mobile.cart.discount')}
+                right={
+                  <Text style={[type.row, tabular, styles.green]}>{money(data.discountTotal)}</Text>
+                }
+              />
             ) : null}
             <View style={styles.totalRow}>
-              <Text style={type.heading}>{t('mobile.cart.total')}</Text>
+              <Text style={type.rowStrong}>{t('mobile.cart.total')}</Text>
               <Text style={[styles.total, estimate !== null && styles.estimate]} numberOfLines={1}>
                 {estimate !== null ? approx(estimate) : money(data.total)}
               </Text>
             </View>
           </Group>
           {data.total === null ? (
-            <FootNote>
+            <Text style={[type.secondary, styles.foot]}>
               {t(estimate !== null ? 'mobile.order.estimateNote' : 'mobile.order.priceLater')}
-            </FootNote>
+            </Text>
           ) : null}
         </ScrollView>
       ) : null}
@@ -240,28 +289,38 @@ export default function OrderScreen() {
 }
 
 const styles = StyleSheet.create({
-  pad: { paddingHorizontal: spacing.lg },
-  body: { paddingHorizontal: spacing.lg },
-  head: {
+  band: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    marginHorizontal: spacing.xs,
+    gap: 10,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
   },
-  number: { flexShrink: 1, ...tabular },
-  created: { marginTop: 2, marginHorizontal: spacing.xs },
+  bandAmount: { ...type.largeTitle, ...tabular, color: colors.primaryForeground },
+  loading: { marginTop: spacing.xl },
+  pad: { paddingHorizontal: spacing.lg },
+  body: { ...PAGE },
+  // A label sits 8 px over its card inside the page's 16 px rhythm.
+  section: { marginTop: 0, marginBottom: -spacing.sm },
+  strong: { fontFamily: fonts.semibold },
   muted: { color: colors.muted },
-  section: { marginTop: 22 },
+  green: { color: colors.success },
+  greyTile: {
+    width: ICON_TILE,
+    height: ICON_TILE,
+    borderRadius: 10,
+    backgroundColor: colors.fill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   payment: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  cancelled: { marginTop: 10, marginHorizontal: spacing.xs, color: colors.destructive },
+  place: { flexShrink: 1, maxWidth: '65%', textAlign: 'right' },
   line: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.md,
     paddingVertical: spacing.md,
-    paddingLeft: spacing.lg,
-    paddingRight: 14,
+    paddingHorizontal: spacing.lg,
   },
   thumb: {
     width: THUMB,
@@ -273,29 +332,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   image: { width: '100%', height: '100%' },
-  grow: { flex: 1, gap: 2 },
+  grow: { flex: 1, minWidth: 0, gap: 2 },
   lineName: { ...type.rowStrong, marginBottom: 2 },
   part: { ...type.secondary, ...tabular },
-  shortPill: {
-    alignSelf: 'flex-start',
-    marginTop: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radii.pill,
-    backgroundColor: colors.warningSoft,
-  },
-  shortText: { ...type.caption, fontFamily: fonts.semibold, color: colors.warningText },
+  shortPill: { marginTop: spacing.xs },
   lineTotal: { ...type.rowStrong, ...tabular, textAlign: 'right' },
   // A draft's estimate: softer than a confirmed price.
   estimate: { color: colors.muted },
   totalRow: {
-    minHeight: 54,
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.md,
-    paddingLeft: spacing.lg,
-    paddingRight: 14,
+    paddingHorizontal: spacing.lg,
   },
   total: { ...type.title3, ...tabular, flexShrink: 1, textAlign: 'right' },
+  foot: { marginTop: -spacing.sm, marginHorizontal: spacing.xs },
 });

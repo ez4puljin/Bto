@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ChevronRight, PackageOpen, Plus } from 'lucide-react-native';
+import { ChevronRight, PackageOpen, Plus, ScanLine } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -11,16 +11,15 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { problemFrom } from '../../../src/api/problem';
 import { useTransferContext, useTransferRequests } from '../../../src/api/transfers';
-import { ubDate, ubTime } from '../../../src/dates/dates';
+import { shortDate, ubDate, ubTime } from '../../../src/dates/dates';
 import { initialsOf } from '../../../src/format/format';
 import { isRep } from '../../../src/state/phase';
 import { useSignedIn } from '../../../src/state/session';
-import { colors, fonts, radii, spacing, storeType, type } from '../../../src/theme/tokens';
+import { colors, fonts, radii, spacing, storeType, tabular, type } from '../../../src/theme/tokens';
 import { numbersLabel } from '../../../src/transfers/grouping';
-import { DraftPill, TransferStatusPill } from '../../../src/transfers/pills';
+import { DraftPill, TransferStatusPill, TransferStatusTile } from '../../../src/transfers/pills';
 import {
   HOME_FILTERS,
   type HomeFilter,
@@ -29,21 +28,23 @@ import {
 } from '../../../src/transfers/statuses';
 import type { TransferRequestSummary } from '../../../src/transfers/types';
 import { ChoiceChip, PillButton, Segmented } from '../../../src/ui/controls';
+import { ICON_INSET, Separator } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
+import { FooterBar, Pill } from '../../../src/ui/staff-kit';
 import { StoreHeader } from '../../../src/ui/store-header';
 import { Text } from '../../../src/ui/text';
 
 /**
- * «Шилжүүлэг» (ADR-0116 #1): the store (a switch when the seller has several), the status chips,
- * the store's requests newest first (the date, the TR- numbers, the status, «N бараа»), and «Шинэ
- * хүсэлт». A user without a STORE warehouse in their scope (a keeper) sees why there is nothing
+ * «Шилжүүлэг» (ADR-0116 #1): the store (the header's second line, or a switch when the seller has
+ * several), the status chips, the store's requests newest first in one grouped list (a tile in
+ * the status's tone, the TR- numbers, the status, the date, «N бараа»), and «Шинэ хүсэлт» in the
+ * bar under the page. A user without a STORE warehouse in their scope (a keeper) sees why there is nothing
  * here. The initials open the profile.
  */
 export default function TransfersHomeScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { me } = useSignedIn();
   const rep = isRep(me);
   const context = useTransferContext();
@@ -69,41 +70,62 @@ export default function TransfersHomeScreen() {
   );
   const keeper = context.data !== undefined && stores.length === 0;
 
-  const renderRequest = ({ item }: { item: TransferRequestSummary }) => {
+  const renderRequest = ({ item, index }: { item: TransferRequestSummary; index: number }) => {
     const label = numbersLabel(item.numbers);
     const at = item.requestedAt ?? item.createdAt;
     return (
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => router.push(`/transfers/${item.id}`)}
-        style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      <View
+        style={[
+          styles.cell,
+          index === 0 && styles.firstCell,
+          index === rows.length - 1 && styles.lastCell,
+        ]}
       >
-        <View style={styles.grow}>
-          <View style={styles.rowTop}>
-            <Text style={[type.rowStrong, styles.rowTitle]} numberOfLines={1}>
-              {label ?? t('inventory.docStatus.DRAFT')}
+        {index > 0 ? <Separator inset={ICON_INSET} /> : null}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push(`/transfers/${item.id}`)}
+          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+        >
+          <TransferStatusTile status={label ? item.status : 'DRAFT'} />
+          <View style={styles.grow}>
+            <View style={styles.rowTop}>
+              <Text
+                style={[type.rowStrong, tabular, styles.rowTitle, !label && styles.muted]}
+                numberOfLines={1}
+              >
+                {label ?? t('inventory.docStatus.DRAFT')}
+              </Text>
+              {label ? <TransferStatusPill status={item.status} /> : <DraftPill />}
+            </View>
+            <Text style={[type.secondary, tabular]} numberOfLines={1}>
+              {[
+                `${shortDate(ubDate(at))} ${ubTime(at)}`,
+                t('mobile.transfers.home.items', { n: item.lineCount }),
+                item.groupCount > 1
+                  ? t('mobile.transfers.home.groups', { n: item.groupCount })
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </Text>
-            {label ? <TransferStatusPill status={item.status} /> : <DraftPill />}
+            {item.note ? (
+              <Text style={type.secondary} numberOfLines={1}>
+                {item.note}
+              </Text>
+            ) : null}
+            {item.status === 'SHIPPED' ? (
+              <Pill
+                label={t('mobile.transfers.home.readyToReceive')}
+                tone="info"
+                icon={ScanLine}
+                style={styles.ready}
+              />
+            ) : null}
           </View>
-          <Text style={type.secondary} numberOfLines={1}>
-            {[
-              `${ubDate(at)} ${ubTime(at)}`,
-              t('mobile.transfers.home.items', { n: item.lineCount }),
-              item.groupCount > 1
-                ? t('mobile.transfers.home.groups', { n: item.groupCount })
-                : null,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
-          </Text>
-          {item.note ? (
-            <Text style={type.secondary} numberOfLines={1}>
-              {item.note}
-            </Text>
-          ) : null}
-        </View>
-        <ChevronRight size={16} strokeWidth={2.6} color={colors.input} />
-      </Pressable>
+          <ChevronRight size={18} strokeWidth={2.4} color={colors.input} style={styles.chevron} />
+        </Pressable>
+      </View>
     );
   };
 
@@ -111,6 +133,7 @@ export default function TransfersHomeScreen() {
     <Page edges={[]}>
       <StoreHeader
         title={t('mobile.transfers.title')}
+        subtitle={stores.length === 1 ? (stores[0]?.name ?? null) : null}
         onBack={() => router.back()}
         right={
           rep ? (
@@ -179,11 +202,8 @@ export default function TransfersHomeScreen() {
             data={rows}
             keyExtractor={(request) => String(request.id)}
             renderItem={renderRequest}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-            contentContainerStyle={[
-              styles.list,
-              { paddingBottom: Math.max(insets.bottom, spacing.md) + 90 },
-            ]}
+            style={styles.fill}
+            contentContainerStyle={styles.list}
             onEndReachedThreshold={0.5}
             onEndReached={() => {
               if (requests.hasNextPage && !requests.isFetchingNextPage) {
@@ -218,16 +238,17 @@ export default function TransfersHomeScreen() {
               ) : null
             }
           />
-          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+          <FooterBar>
             <PillButton
               title={t('mobile.transfers.home.newRequest')}
               icon={<Plus size={20} strokeWidth={2.4} color={colors.primaryForeground} />}
+              style={styles.fill}
               disabled={storeId === null}
               onPress={() => {
                 if (storeId !== null) router.push(`/transfers/new?store=${storeId}`);
               }}
             />
-          </View>
+          </FooterBar>
         </>
       )}
     </Page>
@@ -235,7 +256,7 @@ export default function TransfersHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  grow: { flex: 1, minWidth: 0, gap: 2 },
+  grow: { flex: 1, minWidth: 0, gap: spacing.xs },
   faded: { opacity: 0.7 },
   avatar: {
     width: 30,
@@ -247,34 +268,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: { ...storeType.badge, fontFamily: fonts.bold, color: colors.primary },
-  stores: { paddingHorizontal: 14, paddingBottom: spacing.md },
+  stores: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   keeper: { flex: 1, justifyContent: 'center', padding: spacing.lg, gap: spacing.md },
+  fill: { flex: 1 },
+  muted: { color: colors.muted },
   chipRow: { flexGrow: 0 },
-  chips: { gap: spacing.sm, paddingHorizontal: 14, paddingVertical: spacing.md },
-  list: { paddingHorizontal: 14 },
+  chips: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, flexGrow: 1 },
+  cell: { backgroundColor: colors.card, overflow: 'hidden' },
+  firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
+  lastCell: { borderBottomLeftRadius: radii.card, borderBottomRightRadius: radii.card },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.md,
     minHeight: 64,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
   },
   rowTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowTitle: { flex: 1, minWidth: 0 },
+  ready: { marginTop: 2 },
+  chevron: { marginTop: spacing.sm },
   pressed: { backgroundColor: colors.accent },
-  separator: { height: spacing.sm },
   loading: { marginTop: spacing.xl },
   problem: { marginTop: spacing.md },
-  footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 14,
-    paddingTop: spacing.md,
-    backgroundColor: colors.sheetBarFill,
-  },
 });

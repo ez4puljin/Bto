@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { KeyRound } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '../../src/ui/text';
@@ -8,17 +9,19 @@ import { ubDate, ubTime } from '../../src/dates/dates';
 import { initialsOf } from '../../src/format/format';
 import { useRoleName } from '../../src/state/role';
 import { useSignedIn } from '../../src/state/session';
-import { colors, fonts, spacing, type } from '../../src/theme/tokens';
-import { Group, Row } from '../../src/ui/grouped';
-import { FootNote, Page, SectionHeader } from '../../src/ui/layout';
+import { colors, fonts, spacing, tabular, type } from '../../src/theme/tokens';
+import { PillButton } from '../../src/ui/controls';
+import { Group } from '../../src/ui/grouped';
+import { Page, SectionHeader } from '../../src/ui/layout';
+import { PAGE } from '../../src/ui/staff-kit';
 import { StoreHeader } from '../../src/ui/store-header';
 
 const HOUR_MS = 3_600_000;
 
 /**
- * «Хэрэглэгчийн мэдээлэл» (the ProfileInfo board, ADR-0068): the name, the login, the role and the
- * branches; when the session signed in and when it ends; the server; «Нууц үг солих». Under the
- * blue header with ← since ADR-0100.
+ * «Хэрэглэгчийн мэдээлэл» (the ProfileInfo board of 2026-11-16; ADR-0068): the person's initials,
+ * name and role on the blue header; the name, the login, the role and the branches; when the
+ * session signed in and when it ends; the server; «Нууц үг солих».
  */
 export default function ProfileInfoScreen() {
   const { t } = useTranslation();
@@ -41,93 +44,124 @@ export default function ProfileInfoScreen() {
 
   return (
     <Page edges={[]}>
-      <StoreHeader title={t('mobile.profileInfo.title')} onBack={() => router.back()} />
-      <ScrollView contentContainerStyle={styles.body}>
+      <StoreHeader title={t('mobile.profileInfo.title')} onBack={() => router.back()}>
         <View style={styles.head}>
           <View style={styles.avatar}>
             <Text style={styles.initials}>{initialsOf(me.fullName)}</Text>
           </View>
-          <Text style={[type.title3, styles.center]}>{me.fullName}</Text>
+          <Text style={[type.title3, styles.name]} numberOfLines={2}>
+            {me.fullName}
+          </Text>
           {roleName ? (
             <View style={styles.rolePill}>
-              <Text style={styles.roleText}>{roleName}</Text>
+              <Text style={styles.roleText} numberOfLines={1}>
+                {roleName}
+              </Text>
             </View>
           ) : null}
         </View>
+      </StoreHeader>
+      <ScrollView contentContainerStyle={styles.body}>
+        <View style={styles.block}>
+          <SectionHeader style={styles.label}>{t('mobile.profileInfo.account')}</SectionHeader>
+          <Group>
+            <InfoRow label={t('mobile.profileInfo.name')} value={me.fullName} />
+            <InfoRow
+              label={t('mobile.profileInfo.phone')}
+              value={me.phone?.replace(/^\+976/, '') || t('common.none')}
+            />
+            <InfoRow label={t('mobile.profileInfo.role')} value={roleName || t('common.none')} />
+            <InfoRow
+              label={t('mobile.profileInfo.branch')}
+              value={
+                branches.length > 0 ? branches.join(', ') : t('mobile.profileInfo.allBranches')
+              }
+            />
+          </Group>
+        </View>
 
-        <SectionHeader>{t('mobile.profileInfo.account')}</SectionHeader>
-        <Group>
-          <Row title={t('mobile.profileInfo.name')} value={me.fullName} minHeight={50} />
-          <Row
-            title={t('mobile.profileInfo.phone')}
-            value={me.phone?.replace(/^\+976/, '') || t('common.none')}
-            minHeight={50}
-          />
-          <Row
-            title={t('mobile.profileInfo.role')}
-            value={roleName || t('common.none')}
-            minHeight={50}
-          />
-          <Row
-            title={t('mobile.profileInfo.branch')}
-            value={branches.length > 0 ? branches.join(', ') : t('mobile.profileInfo.allBranches')}
-            minHeight={50}
-          />
-        </Group>
+        <View style={styles.block}>
+          <SectionHeader style={styles.label}>{t('mobile.profileInfo.session')}</SectionHeader>
+          <Group>
+            <InfoRow label={t('mobile.profileInfo.signedIn')} value={when(me.sessionStartedAt)} />
+            <InfoRow
+              label={t('mobile.profileInfo.ends')}
+              value={t('mobile.profileInfo.endsAt', { at: when(me.sessionExpiresAt), hours })}
+            />
+            <InfoRow
+              label={t('mobile.profile.server')}
+              value={server.replace(/^https?:\/\//, '')}
+            />
+          </Group>
+        </View>
 
-        <SectionHeader>{t('mobile.profileInfo.session')}</SectionHeader>
-        <Group>
-          <Row
-            title={t('mobile.profileInfo.signedIn')}
-            value={when(me.sessionStartedAt)}
-            minHeight={50}
-          />
-          <Row
-            title={t('mobile.profileInfo.ends')}
-            value={t('mobile.profileInfo.endsAt', { at: when(me.sessionExpiresAt), hours })}
-            minHeight={50}
-          />
-          <Row
-            title={t('mobile.profile.server')}
-            value={server.replace(/^https?:\/\//, '')}
-            minHeight={50}
-          />
-        </Group>
-
-        <Group style={styles.password}>
-          <Row
-            title={t('mobile.password.title')}
-            accent
-            minHeight={50}
-            onPress={() => router.push('/password')}
-          />
-        </Group>
-        <FootNote>{t('mobile.profileInfo.adminEdits')}</FootNote>
+        <PillButton
+          variant="soft"
+          icon={<KeyRound size={18} strokeWidth={2.2} color={colors.secondaryForeground} />}
+          title={t('mobile.password.title')}
+          onPress={() => router.push('/password')}
+        />
+        <Text style={[type.secondary, styles.note]}>{t('mobile.profileInfo.adminEdits')}</Text>
       </ScrollView>
     </Page>
   );
 }
 
+/** A row of the details: the grey label, then its value at the right. */
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View accessible accessibilityLabel={`${label}: ${value}`} style={styles.row}>
+      <Text style={[type.row, styles.rowLabel]} numberOfLines={1}>
+        {label}
+      </Text>
+      <Text style={[type.row, tabular, styles.rowValue]} numberOfLines={2}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  body: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  head: { alignItems: 'center', gap: spacing.sm, paddingTop: 20 },
+  body: { ...PAGE, paddingBottom: 40 },
+  block: { gap: spacing.sm },
+  label: { marginTop: 0, marginBottom: 0 },
+  head: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingTop: 6,
+    paddingBottom: 20,
+    paddingHorizontal: spacing.lg,
+  },
   avatar: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: colors.primary,
+    borderWidth: 2,
+    borderColor: colors.dotOnImageIdle,
+    backgroundColor: colors.onPrimaryHairline,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  initials: { ...type.title, fontFamily: fonts.bold, color: colors.primaryForeground },
-  center: { textAlign: 'center', marginTop: spacing.xs },
+  initials: { ...type.title, fontFamily: fonts.semibold, color: colors.primaryForeground },
+  name: { color: colors.primaryForeground, textAlign: 'center' },
   rolePill: {
-    height: 26,
+    height: 24,
+    maxWidth: '100%',
     paddingHorizontal: 10,
-    borderRadius: 13,
-    backgroundColor: colors.secondary,
+    borderRadius: 12,
+    backgroundColor: colors.onPrimaryHairline,
     justifyContent: 'center',
   },
-  roleText: { ...type.chip, fontFamily: fonts.semibold, color: colors.link },
-  password: { marginTop: spacing.xl },
+  roleText: { ...type.secondary, fontFamily: fonts.semibold, color: colors.primaryForeground },
+  row: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.lg,
+  },
+  rowLabel: { width: 96, color: colors.muted },
+  rowValue: { flex: 1, textAlign: 'right' },
+  note: { marginHorizontal: spacing.xs },
 });

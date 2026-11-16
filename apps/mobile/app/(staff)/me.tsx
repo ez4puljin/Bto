@@ -1,25 +1,27 @@
 import { useRouter } from 'expo-router';
-import { Server, UsersRound } from 'lucide-react-native';
+import { CalendarCheck, IdCard, KeyRound, LogOut, Server, UsersRound } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { feedCount, useFeed } from '../../src/api/community';
 import { initialsOf } from '../../src/format/format';
 import { useRoleName } from '../../src/state/role';
 import { useSignedIn } from '../../src/state/session';
-import { colors, fonts, radii, spacing, type } from '../../src/theme/tokens';
-import { CountBadge } from '../../src/ui/controls';
+import { colors, fonts, spacing, tabular, type } from '../../src/theme/tokens';
+import { CountBadge, PillButton } from '../../src/ui/controls';
 import { Group, ICON_INSET, IconTile, Row } from '../../src/ui/grouped';
-import { Page } from '../../src/ui/layout';
+import { Page, SectionHeader } from '../../src/ui/layout';
 import { ActionSheet } from '../../src/ui/sheet';
+import { Card, PAGE, Pill } from '../../src/ui/staff-kit';
 import { StoreHeader } from '../../src/ui/store-header';
 import { Text } from '../../src/ui/text';
 import { UpdateCheck } from '../../src/updates/update-check';
 
 /**
  * «Профайл» of a store's seller (ADR-0116 #1) and of any staff member without the rep's context
- * (ADR-0131): who is signed in and their role, «Ирц», the server, «Гарах» with its question, and
- * the app's version — none of the rep's stages or notices.
+ * (ADR-0131; the Me board of 2026-11-16): who is signed in and their role, «Ирц», «Хамт олон» and
+ * «Миний мэдээлэл», then the password and the server, the app's version, and «Гарах» with its
+ * question — none of the rep's stages or notices.
  */
 export default function StoreProfileScreen() {
   const { t } = useTranslation();
@@ -28,31 +30,39 @@ export default function StoreProfileScreen() {
   const community = feedCount(useFeed().data);
   const roleName = useRoleName();
   const [leaving, setLeaving] = useState(false);
+  const phone = me.phone?.replace(/^\+976/, '');
 
   return (
     <Page edges={[]}>
       <StoreHeader title={t('mobile.tabs.profile')} onBack={() => router.back()} right={null} />
       <ScrollView contentContainerStyle={styles.body}>
-        <View style={styles.user}>
+        <Card style={styles.user}>
           <View style={styles.avatar}>
             <Text style={styles.initials}>{initialsOf(me.fullName)}</Text>
           </View>
           <View style={styles.grow}>
-            <Text style={styles.name} numberOfLines={2}>
+            <Text style={type.title3} numberOfLines={2}>
               {me.fullName}
             </Text>
-            <Text style={[type.body, styles.muted]} numberOfLines={2}>
-              {[me.phone?.replace(/^\+976/, ''), roleName].filter(Boolean).join(' · ')}
-            </Text>
+            {phone ? <Text style={[type.secondary, tabular]}>{phone}</Text> : null}
+            {roleName ? <Pill tone="info" label={roleName} /> : null}
           </View>
-        </View>
+        </Card>
 
-        <Group inset={ICON_INSET} style={styles.group}>
+        <Group inset={ICON_INSET}>
           <Row
-            minHeight={52}
+            icon={
+              <IconTile color={colors.tint.green}>
+                <CalendarCheck size={18} strokeWidth={2.2} color={colors.primaryForeground} />
+              </IconTile>
+            }
+            title={t('mobile.attendance.title')}
+            onPress={() => router.push('/attendance')}
+          />
+          <Row
             icon={
               <IconTile color={colors.tint.indigo}>
-                <UsersRound size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+                <UsersRound size={18} strokeWidth={2.2} color={colors.primaryForeground} />
               </IconTile>
             }
             title={t('mobile.community.title')}
@@ -64,35 +74,51 @@ export default function StoreProfileScreen() {
             right={<CountBadge count={community} ring={colors.card} />}
             onPress={() => router.push('/community')}
           />
-        </Group>
-
-        <Group inset={ICON_INSET} style={styles.group}>
           <Row
-            minHeight={52}
             icon={
               <IconTile color={colors.tint.gray}>
-                <Server size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+                <IdCard size={18} strokeWidth={2.2} color={colors.primaryForeground} />
               </IconTile>
             }
-            title={t('mobile.profile.server')}
-            value={server.replace(/^https?:\/\//, '')}
+            title={t('mobile.staffMenu.items.myDetails')}
+            onPress={() => router.push('/community/profile')}
           />
         </Group>
 
-        {/* The app's version and «Шинэчлэл шалгах» (ADR-0174 #10). */}
-        <UpdateCheck style={styles.group} />
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setLeaving(true)}
-          style={({ pressed }) => [styles.logout, pressed && styles.pressed]}
-        >
-          <Text style={[type.button, styles.logoutText]}>{t('mobile.profile.logout')}</Text>
-        </Pressable>
-
-        <View style={styles.footer}>
-          <Text style={type.caption}>{t('mobile.profile.company')}</Text>
+        <View style={styles.block}>
+          <SectionHeader style={styles.label}>{t('mobile.profile.settings')}</SectionHeader>
+          <Group inset={ICON_INSET}>
+            <Row
+              icon={
+                <IconTile color={colors.tint.gray}>
+                  <KeyRound size={18} strokeWidth={2.2} color={colors.primaryForeground} />
+                </IconTile>
+              }
+              title={t('mobile.password.title')}
+              onPress={() => router.push('/password')}
+            />
+            <Row
+              icon={
+                <IconTile color={colors.tint.gray}>
+                  <Server size={18} strokeWidth={2.2} color={colors.primaryForeground} />
+                </IconTile>
+              }
+              title={t('mobile.profile.server')}
+              value={server.replace(/^https?:\/\//, '')}
+            />
+          </Group>
         </View>
+
+        {/* The app's version and «Шалгах» (ADR-0174 #10). */}
+        <UpdateCheck />
+
+        <PillButton
+          variant="destructive"
+          icon={<LogOut size={18} strokeWidth={2.2} color={colors.destructive} />}
+          title={t('mobile.profile.logout')}
+          onPress={() => setLeaving(true)}
+        />
+        <Text style={[type.caption, styles.center]}>{t('mobile.profile.company')}</Text>
       </ScrollView>
       <ActionSheet
         visible={leaving}
@@ -115,38 +141,19 @@ export default function StoreProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  body: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  grow: { flex: 1, gap: 2 },
-  muted: { color: colors.muted },
-  pressed: { backgroundColor: colors.accent },
-  user: {
-    marginTop: spacing.md,
-    padding: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderRadius: radii.tile,
-    backgroundColor: colors.card,
-  },
+  body: { ...PAGE, paddingBottom: 40 },
+  grow: { flex: 1, minWidth: 0, gap: spacing.xs },
+  block: { gap: spacing.sm },
+  label: { marginTop: 0, marginBottom: 0 },
+  center: { textAlign: 'center' },
+  user: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   avatar: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.tint.blue,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  initials: { ...type.title2, fontFamily: fonts.bold, color: colors.primaryForeground },
-  name: type.title3,
-  group: { marginTop: 22 },
-  logout: {
-    marginTop: 22,
-    minHeight: 52,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoutText: { color: colors.destructive },
-  footer: { marginTop: spacing.lg, alignItems: 'center', gap: 3 },
+  initials: { ...type.title2, fontFamily: fonts.semibold, color: colors.primaryForeground },
 });

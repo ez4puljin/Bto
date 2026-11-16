@@ -1,20 +1,12 @@
-import {
-  ChevronRight,
-  History,
-  Lock,
-  MapPin,
-  Phone,
-  ShoppingCart,
-  Store,
-  UserRound,
-} from 'lucide-react-native';
+import { Lock, MapPin, Phone, ShoppingCart, Store, UserRound } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { problemFrom } from '../api/problem';
 import { useCustomer, useStoreOrders } from '../api/rep';
 import { StoreOrderRow } from '../orders/store-order-row';
-import { colors, radii, spacing, storeType, type } from '../theme/tokens';
+import { SectionHeading } from '../shop/section-heading';
+import { colors, radii, spacing, type } from '../theme/tokens';
 import { PillButton } from '../ui/controls';
 import { Group, ICON_INSET, IconTile, Row } from '../ui/grouped';
 import { ProblemText } from '../ui/kit';
@@ -25,7 +17,7 @@ import { lastOrderOf, type MapStore, startAddressOf } from './stores';
 /** How tall the store card is drawn; the map keeps its pin in view above it. */
 export const STORE_SHEET_HEIGHT = 510;
 
-/** How many of the store's orders the card shows; the heading's › opens the rest. */
+/** How many of the store's orders the card shows; the heading's «Бүгд» opens the rest. */
 const HISTORY_ROWS = 3;
 
 /**
@@ -34,8 +26,8 @@ const HISTORY_ROWS = 3;
  * persons' (a tap calls at once), when the rep last ordered there, and its latest orders, anyone's,
  * with who took them and when (only the rep's own open; drawn above the address and phones so they
  * show without scrolling). Three ways on: start an order for it (at
- * this point's address), its whole order history, call it. «Bto300»'s type (ADR-0100): the name
- * at the heading's size, the history under an upper-case heading with ›.
+ * this point's address, the main button), its whole order history (the heading's «Бүгд»), call it
+ * (the round button beside the main one, and the phone rows). The MapStore board of 2026-11-16.
  */
 export function StoreSheet({
   store: selected,
@@ -72,7 +64,6 @@ export function StoreSheet({
   const customer = useCustomer(store?.customerId ?? null);
   const history = useStoreOrders(store?.customerId ?? null);
   const latest = history.data?.pages[0]?.data ?? [];
-  const more = latest.length > HISTORY_ROWS || history.hasNextPage;
   // The contact persons with a phone, after the store's own (the same number once).
   const contacts = (customer.data?.contacts ?? []).filter(
     (contact): contact is { name: string | null; phone: string } =>
@@ -114,37 +105,26 @@ export function StoreSheet({
       footer={
         store ? (
           <View style={styles.actions}>
+            {store.phone ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('mobile.map.call')}
+                onPress={() => {
+                  if (store.phone) onCall(store.phone);
+                }}
+                style={({ pressed }) => [styles.call, pressed && styles.callPressed]}
+              >
+                <Phone size={20} strokeWidth={2.2} color={colors.link} />
+              </Pressable>
+            ) : null}
             <PillButton
               title={t('mobile.map.startOrder')}
               icon={<ShoppingCart size={18} strokeWidth={2.2} color={colors.primaryForeground} />}
               loading={customer.isLoading}
               disabled={sendPending || !customer.data}
               onPress={start}
+              style={styles.start}
             />
-            <View style={styles.pair}>
-              {/* «Түүх» beside «Залгах»: the long title is cut in half a 360 dp row at 1.15×. */}
-              <PillButton
-                title={t(store.phone ? 'mobile.storeOrders.short' : 'mobile.storeOrders.title')}
-                accessibilityLabel={t('mobile.storeOrders.title')}
-                variant="soft"
-                height={46}
-                style={styles.half}
-                icon={<History size={17} strokeWidth={2.2} color={colors.link} />}
-                onPress={() => onHistory(store)}
-              />
-              {store.phone ? (
-                <PillButton
-                  title={t('mobile.map.call')}
-                  variant="soft"
-                  height={46}
-                  style={styles.half}
-                  icon={<Phone size={17} strokeWidth={2.2} color={colors.link} />}
-                  onPress={() => {
-                    if (store.phone) onCall(store.phone);
-                  }}
-                />
-              ) : null}
-            </View>
           </View>
         ) : null
       }
@@ -173,10 +153,10 @@ export function StoreSheet({
               />
             </View>
             <View style={styles.grow}>
-              <Text style={storeType.heading} numberOfLines={2}>
+              <Text style={type.title3} numberOfLines={2}>
                 {store.name}
               </Text>
-              <Text style={storeType.cardPack} numberOfLines={1}>
+              <Text style={type.secondary} numberOfLines={1}>
                 {t('mobile.map.code', { code: store.code })}
               </Text>
             </View>
@@ -224,26 +204,13 @@ export function StoreSheet({
           </View>
 
           {/* Right below the status: on a 360x740 phone the footer leaves the body ~265 dp. */}
-          <Pressable
-            accessibilityRole={more ? 'link' : undefined}
-            accessibilityLabel={
-              more
-                ? `${t('mobile.storeOrders.title')}, ${t('mobile.home.seeAll')}`
-                : t('mobile.storeOrders.title')
-            }
-            disabled={!more}
+          {/* The whole history opens from the heading's «Бүгд», whether or not the card shows it all. */}
+          <SectionHeading
+            title={t('mobile.storeOrders.title')}
+            label={`${t('mobile.storeOrders.title')}, ${t('mobile.home.seeAll')}`}
             onPress={() => onHistory(store)}
-            style={({ pressed }) => [styles.historyTitle, pressed && styles.pressed]}
-          >
-            <Text
-              accessibilityRole="header"
-              style={[storeType.sectionTitle, styles.upper, styles.grow]}
-              numberOfLines={1}
-            >
-              {t('mobile.storeOrders.title')}
-            </Text>
-            {more ? <ChevronRight size={22} strokeWidth={1.8} color={colors.foreground} /> : null}
-          </Pressable>
+            style={styles.historyTitle}
+          />
           {latest.length > 0 ? (
             <Group>
               {latest.slice(0, HISTORY_ROWS).map((order) => (
@@ -265,7 +232,7 @@ export function StoreSheet({
                   key="address"
                   icon={
                     <IconTile color={colors.tint.orange}>
-                      <MapPin size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+                      <MapPin size={18} strokeWidth={2.2} color={colors.primaryForeground} />
                     </IconTile>
                   }
                   title={store.address}
@@ -277,7 +244,7 @@ export function StoreSheet({
                   key="phone"
                   icon={
                     <IconTile color={colors.tint.green}>
-                      <Phone size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+                      <Phone size={18} strokeWidth={2.2} color={colors.primaryForeground} />
                     </IconTile>
                   }
                   title={store.phone}
@@ -294,7 +261,7 @@ export function StoreSheet({
                   key={'contact-' + String(index)}
                   icon={
                     <IconTile color={colors.tint.blue}>
-                      <UserRound size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+                      <UserRound size={18} strokeWidth={2.2} color={colors.primaryForeground} />
                     </IconTile>
                   }
                   title={contact.phone}
@@ -324,7 +291,7 @@ const styles = StyleSheet.create({
   avatar: {
     width: 48,
     height: 48,
-    borderRadius: radii.field,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -351,21 +318,24 @@ const styles = StyleSheet.create({
   onBlocked: { color: colors.primaryForeground },
   onBlockedMuted: { color: colors.onPrimaryMuted },
   group: { marginTop: spacing.lg },
+  // Inside the sheet's own 16 px sides: the label keeps 4 px, as over any card.
   historyTitle: {
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
     paddingHorizontal: spacing.xs,
-    borderRadius: radii.field,
   },
-  pressed: { backgroundColor: colors.accent },
-  upper: { textTransform: 'uppercase' },
   loading: { marginTop: spacing.sm },
   flush: { marginTop: 0 },
   note: { marginTop: spacing.md, marginHorizontal: spacing.xs },
-  actions: { gap: 10 },
-  pair: { flexDirection: 'row', gap: 10 },
-  half: { flex: 1, paddingHorizontal: spacing.md },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  call: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  callPressed: { backgroundColor: colors.fill },
+  start: { flex: 1 },
 });

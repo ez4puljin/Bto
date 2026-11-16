@@ -21,7 +21,7 @@ import { StorePicker } from '../../src/map/store-picker';
 import { STORE_SHEET_HEIGHT, StoreSheet } from '../../src/map/store-sheet';
 import { countsOf, type MapPoint, pinsOf, storesWithIds } from '../../src/map/stores';
 import { useShop } from '../../src/state/shop';
-import { colors, radii, shadows, spacing, tabular, type } from '../../src/theme/tokens';
+import { colors, fonts, radii, shadows, spacing, tabular, type } from '../../src/theme/tokens';
 import { ChoiceChip, CircleButton, PillButton } from '../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../src/ui/kit';
 import { Page } from '../../src/ui/layout';
@@ -266,6 +266,34 @@ export default function MapScreen() {
         />
 
         <View style={styles.top} pointerEvents="box-none">
+          <View style={styles.legend} accessibilityRole="summary">
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <>
+                <View style={styles.legendItem}>
+                  <View style={[styles.dot, { backgroundColor: colors.tint.red }]} />
+                  <Text style={styles.legendText}>
+                    {t('mobile.map.legendStale', { n: counts.stale })}
+                  </Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.dot, { backgroundColor: colors.tint.green }]} />
+                  <Text style={styles.legendText}>
+                    {t('mobile.map.legendFresh', { n: counts.fresh })}
+                  </Text>
+                </View>
+                {counts.blocked > 0 ? (
+                  <View style={styles.legendItem}>
+                    <View style={[styles.dot, { backgroundColor: colors.blocked }]} />
+                    <Text style={styles.legendText}>
+                      {t('mobile.map.legendBlocked', { n: counts.blocked })}
+                    </Text>
+                  </View>
+                ) : null}
+              </>
+            )}
+          </View>
           <View style={styles.raised}>
             <ChoiceChip
               label={t('mobile.map.onlyStale')}
@@ -280,34 +308,6 @@ export default function MapScreen() {
                 />
               }
             />
-          </View>
-          <View style={styles.legend} accessibilityRole="summary">
-            {loading ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <>
-                <View style={styles.legendItem}>
-                  <View style={[styles.dot, { backgroundColor: colors.tint.red }]} />
-                  <Text style={[type.chip, tabular]}>
-                    {t('mobile.map.legendStale', { n: counts.stale })}
-                  </Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.dot, { backgroundColor: colors.tint.green }]} />
-                  <Text style={[type.chip, tabular]}>
-                    {t('mobile.map.legendFresh', { n: counts.fresh })}
-                  </Text>
-                </View>
-                {counts.blocked > 0 ? (
-                  <View style={styles.legendItem}>
-                    <View style={[styles.dot, { backgroundColor: colors.blocked }]} />
-                    <Text style={[type.chip, tabular]}>
-                      {t('mobile.map.legendBlocked', { n: counts.blocked })}
-                    </Text>
-                  </View>
-                ) : null}
-              </>
-            )}
           </View>
           {map.error ? (
             <ProblemText problem={problemFrom(map.error)} style={styles.problem} />
@@ -345,7 +345,7 @@ export default function MapScreen() {
         <CircleButton
           icon={
             <LocateFixed
-              size={22}
+              size={24}
               strokeWidth={2}
               color={where === 'on' ? colors.primary : colors.muted}
             />
@@ -408,23 +408,37 @@ const styles = StyleSheet.create({
   },
   raised: { borderRadius: 17, boxShadow: shadows.floating },
   problem: { marginTop: 0, alignSelf: 'stretch' },
-  dot: { width: 10, height: 10, borderRadius: 5 },
+  dot: { width: 9, height: 9, borderRadius: 5 },
+  // The counts as one white card across the map's top (the Map board).
   legend: {
-    minWidth: 64,
-    height: 32,
+    alignSelf: 'stretch',
+    minHeight: 36,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
+    columnGap: spacing.md,
+    rowGap: spacing.xs,
+    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    borderRadius: radii.pill,
-    backgroundColor: colors.floatingFill,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairlineSoft,
+    borderRadius: 14,
+    backgroundColor: colors.card,
     boxShadow: shadows.floating,
   },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  locate: { position: 'absolute', right: spacing.md },
+  legendText: {
+    ...type.secondary,
+    ...tabular,
+    fontFamily: fonts.semibold,
+    color: colors.foreground,
+  },
+  locate: {
+    position: 'absolute',
+    right: spacing.lg,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: colors.card,
+  },
   emptyWrap: {
     position: 'absolute',
     top: 0,

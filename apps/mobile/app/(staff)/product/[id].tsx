@@ -15,7 +15,6 @@ import {
   View,
 } from 'react-native';
 import { Text } from '../../../src/ui/text';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { problemFrom } from '../../../src/api/problem';
 import { cachedProduct, useCategories, useProductsOf, useRepContext } from '../../../src/api/rep';
 import { lineOf } from '../../../src/cart/cart';
@@ -30,28 +29,29 @@ import { useLineQuote } from '../../../src/shop/use-line-quote';
 import { useSignedIn } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
 import { useToast } from '../../../src/ui/toast';
-import { colors, fonts, spacing, tabular, type } from '../../../src/theme/tokens';
+import { colors, fonts, shadows, spacing, tabular, type } from '../../../src/theme/tokens';
 import { PillButton, Segmented } from '../../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
-import { StoreHeader } from '../../../src/ui/store-header';
+import { Card, FooterBar, Notice, Pill, PAGE } from '../../../src/ui/staff-kit';
+import { HeaderCart, StoreHeader } from '../../../src/ui/store-header';
 
 const MAX_QTY = 9999;
-const HERO_HEIGHT = 250;
+const HERO_HEIGHT = 230;
 
 /**
- * One product (the Product board, ADR-0068, in «Bto300»'s structure and sizes since ADR-0100): the
- * blue header with ← and the cart, its pictures edge to edge, the code and category, the name, the
- * free stock and the home warehouse, its discount program in words as «Bto300» says it (the owner,
- * 2026-10-23), the unit switch, the unit's price with − n + (the keypad on the number), what goes
- * short, the server's total and «Сагсанд нэмэх». The product keeps one line in the cart, in the unit
+ * One product (the Product board of 2026-11-16 on ADR-0068 and ADR-0100): the blue header with ←,
+ * the name over its category and the cart; a card with its pictures, the code and category, the
+ * name, the free stock and the home warehouse and its discount program in words as «Bto300» says it
+ * (the owner, 2026-10-23); a card with the unit switch, the unit's price and − n + (the keypad on
+ * the number); what goes short; and the bar with the server's total beside «Сагсанд нэмэх». The
+ * product keeps one line in the cart, in the unit
  * chosen here; 0 takes it out. A product whose home warehouse the staff app does not count
  * (ADR-0173 #1) reads «Дууссан» with the server's refusal, and «+» and the keypad only say so.
  */
 export default function ProductScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const params = useLocalSearchParams<{ id: string; unit?: string; from?: string }>();
   const productId = Number.parseInt(params.id ?? '', 10);
@@ -96,7 +96,7 @@ export default function ProductScreen() {
   if (!product || !unit) {
     return (
       <Page edges={[]}>
-        <StoreHeader title="" onBack={() => router.back()} />
+        <StoreHeader title="" onBack={() => router.back()} right={<HeaderCart />} />
         <View style={styles.missing}>
           {query.isLoading ? <ActivityIndicator color={colors.primary} /> : null}
           {query.error ? <ProblemText problem={problemFrom(query.error)} /> : null}
@@ -166,114 +166,127 @@ export default function ProductScreen() {
     else router.back();
   };
 
-  return (
-    <Page white edges={[]}>
-      <StoreHeader title={category ?? ''} onBack={() => router.back()} />
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
-        <View style={styles.hero}>
-          {images.length > 0 ? (
-            <FlatList
-              data={images}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(item) => item.url}
-              initialNumToRender={1}
-              maxToRenderPerBatch={1}
-              windowSize={3}
-              onMomentumScrollEnd={(event) =>
-                setPage(pageAt(event.nativeEvent.contentOffset.x, width, images.length))
-              }
-              renderItem={({ item, index }) => (
-                <Image
-                  source={{ uri: `${server}${item.url}` }}
-                  placeholder={item.placeholder ? { uri: `${server}${item.placeholder}` } : null}
-                  placeholderContentFit="contain"
-                  cachePolicy="memory-disk"
-                  priority={index === 0 ? 'high' : 'normal'}
-                  recyclingKey={item.url}
-                  style={{ width, height: HERO_HEIGHT }}
-                  contentFit="contain"
-                  transition={150}
-                />
-              )}
-            />
-          ) : (
-            <View style={[styles.noPicture, { height: HERO_HEIGHT }]}>
-              <Package size={72} strokeWidth={1.2} color={colors.input} />
-            </View>
-          )}
-          {images.length > 1 ? (
-            <View style={styles.dots} pointerEvents="none">
-              {images.map((image, index) => (
-                <View key={image.url} style={[styles.dot, index === page && styles.dotOn]} />
-              ))}
-            </View>
-          ) : null}
-        </View>
+  const heroWidth = width - spacing.lg * 2;
+  const totalText = quote.total
+    ? t('pricing.money', { amount: formatMnt(quote.total) })
+    : quote.loading
+      ? t('mobile.product.pricing')
+      : t('common.none');
 
-        <View style={styles.body}>
-          <Text style={type.secondary}>
-            {category
-              ? t('mobile.product.codeCategory', { sku: product.sku, category })
-              : product.sku}
-          </Text>
-          <Text accessibilityRole="header" style={[type.title2, styles.name]}>
-            {product.name}
-          </Text>
-          <View style={styles.chips}>
-            <View style={[styles.chip, out ? styles.outChip : styles.stockChip]}>
-              <View
-                style={[
-                  styles.stockDot,
-                  { backgroundColor: out ? colors.destructive : colors.success },
-                ]}
+  return (
+    <Page edges={[]}>
+      <StoreHeader
+        title={product.name}
+        subtitle={category ?? null}
+        onBack={() => router.back()}
+        right={<HeaderCart />}
+      />
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <Card flush>
+          <View style={styles.hero}>
+            {images.length > 0 ? (
+              <FlatList
+                data={images}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(item) => item.url}
+                initialNumToRender={1}
+                maxToRenderPerBatch={1}
+                windowSize={3}
+                onMomentumScrollEnd={(event) =>
+                  setPage(pageAt(event.nativeEvent.contentOffset.x, heroWidth, images.length))
+                }
+                renderItem={({ item, index }) => (
+                  <Image
+                    source={{ uri: `${server}${item.url}` }}
+                    placeholder={item.placeholder ? { uri: `${server}${item.placeholder}` } : null}
+                    placeholderContentFit="contain"
+                    cachePolicy="memory-disk"
+                    priority={index === 0 ? 'high' : 'normal'}
+                    recyclingKey={item.url}
+                    style={{ width: heroWidth, height: HERO_HEIGHT }}
+                    contentFit="contain"
+                    transition={150}
+                  />
+                )}
               />
-              <Text style={[styles.chipText, { color: out ? colors.destructive : colors.success }]}>
-                {out
-                  ? t('mobile.shop.outOfStock')
-                  : t('mobile.product.stock', {
-                      n: formatQty(product.available),
-                      unit: words(base).name,
-                    })}
-              </Text>
-            </View>
-            {home ? (
-              <View style={[styles.chip, styles.placeChip]}>
-                <MapPin size={14} strokeWidth={2} color={colors.label2} />
-                <Text style={[styles.chipText, styles.placeText]}>{home.name}</Text>
+            ) : (
+              <View style={[styles.noPicture, { height: HERO_HEIGHT }]}>
+                <Package size={72} strokeWidth={1.2} color={colors.input} />
+              </View>
+            )}
+            {images.length > 1 ? (
+              <View style={styles.dots} pointerEvents="none">
+                {images.map((image, index) => (
+                  <View key={image.url} style={[styles.dot, index === page && styles.dotOn]} />
+                ))}
               </View>
             ) : null}
           </View>
-          {product.deal ? <DealNote deal={product.deal} /> : null}
-
-          {product.units.length > 1 ? (
-            <View style={styles.units}>
-              <Segmented
-                options={unitOptions(product.units)}
-                value={String(unit.id)}
-                onChange={(next) => setUnitId(Number.parseInt(next, 10))}
-                label={t('mobile.product.unit')}
-              />
+          <View style={styles.about}>
+            <Text style={type.secondary}>
+              {category
+                ? t('mobile.product.codeCategory', { sku: product.sku, category })
+                : product.sku}
+            </Text>
+            <Text accessibilityRole="header" style={type.title2}>
+              {product.name}
+            </Text>
+            <View style={styles.chips}>
+              <View style={[styles.chip, out ? styles.outChip : styles.stockChip]}>
+                <View
+                  style={[
+                    styles.stockDot,
+                    { backgroundColor: out ? colors.destructive : colors.success },
+                  ]}
+                />
+                <Text
+                  style={[styles.chipText, { color: out ? colors.destructive : colors.success }]}
+                >
+                  {out
+                    ? t('mobile.shop.outOfStock')
+                    : t('mobile.product.stock', {
+                        n: formatQty(product.available),
+                        unit: words(base).name,
+                      })}
+                </Text>
+              </View>
+              {home ? <Pill label={home.name} icon={MapPin} /> : null}
             </View>
-          ) : null}
+            {product.deal ? <DealNote deal={product.deal} /> : null}
+          </View>
+        </Card>
 
-          <View style={styles.priceCard}>
+        <Card style={styles.buy}>
+          {product.units.length > 1 ? (
+            <Segmented
+              options={unitOptions(product.units)}
+              value={String(unit.id)}
+              onChange={(next) => setUnitId(Number.parseInt(next, 10))}
+              label={t('mobile.product.unit')}
+            />
+          ) : null}
+          <View style={styles.priceBlock}>
+            {unit.wholesale ? (
+              <View style={styles.priceRow}>
+                <Text style={styles.price}>
+                  {t('pricing.money', { amount: formatMnt(unit.wholesale) })}
+                </Text>
+                <Text style={type.secondary}>
+                  {t('mobile.product.per', { unit: words(unit).name })}
+                </Text>
+              </View>
+            ) : (
+              <Text style={[type.heading, styles.muted]}>{t('mobile.product.noPrice')}</Text>
+            )}
+            {note ? <Text style={[type.secondary, tabular]}>{note}</Text> : null}
+          </View>
+          <View style={styles.rule} />
+          <View style={styles.qtyRow}>
             <View style={styles.grow}>
-              {unit.wholesale ? (
-                <View style={styles.priceRow}>
-                  <Text style={styles.price}>
-                    {t('pricing.money', { amount: formatMnt(unit.wholesale) })}
-                  </Text>
-                  <Text style={[type.body, styles.muted]}>
-                    {t('mobile.product.per', { unit: words(unit).name })}
-                  </Text>
-                </View>
-              ) : (
-                <Text style={[type.heading, styles.muted]}>{t('mobile.product.noPrice')}</Text>
-              )}
-              {note ? <Text style={type.secondary}>{note}</Text> : null}
-              <Text style={type.secondary}>
+              <Text style={type.row}>{t('mobile.product.qty')}</Text>
+              <Text style={[type.secondary, tabular]}>
                 {unit.isBase
                   ? (words(unit).instrumental ??
                     t('mobile.product.byUnit', { unit: words(unit).name }))
@@ -289,7 +302,7 @@ export default function ProductScreen() {
                 onPress={() => set(qty - 1)}
                 style={[styles.minus, qty === 0 && styles.faded]}
               >
-                <Minus size={20} strokeWidth={2.4} color={colors.foreground} />
+                <Minus size={18} strokeWidth={2.4} color={colors.foreground} />
               </Pressable>
               <Pressable
                 accessibilityRole="button"
@@ -307,56 +320,46 @@ export default function ProductScreen() {
                 onPress={() => (blocked ? refuse() : set(qty + 1))}
                 style={[styles.plus, blocked && styles.faded]}
               >
-                <Plus size={20} strokeWidth={2.4} color={colors.primaryForeground} />
+                <Plus size={18} strokeWidth={2.4} color={colors.primaryForeground} />
               </Pressable>
             </View>
           </View>
+        </Card>
 
-          {!blocked && short.gt(0) ? (
-            <View accessibilityRole="alert" style={styles.warning}>
-              <TriangleAlert size={19} strokeWidth={2} color={colors.warningText} />
-              <Text style={[type.body, styles.warningText]}>
-                {t('mobile.product.short', {
-                  stock: formatQty(product.available),
-                  short: short.toFixed(),
-                  unit: words(base).name,
-                })}
-              </Text>
-            </View>
-          ) : null}
-          {!product.sellable ? (
-            <View style={[styles.warning, styles.outBox]}>
-              <TriangleAlert size={19} strokeWidth={2} color={colors.destructive} />
-              <Text style={[type.body, styles.outText]}>{t('mobile.shop.notSellable')}</Text>
-            </View>
-          ) : blocked ? (
-            <View style={[styles.warning, styles.outBox]}>
-              <TriangleAlert size={19} strokeWidth={2} color={colors.destructive} />
-              <Text style={[type.body, styles.outText]}>
-                {t('errors.PRODUCT_OUT_OF_APP_STOCK')}
-              </Text>
-            </View>
-          ) : null}
-
-          <View style={styles.totalRow}>
-            <Text style={[type.row, styles.muted]}>{t('mobile.product.total')}</Text>
-            <Text style={styles.total}>
-              {quote.total
-                ? t('pricing.money', { amount: formatMnt(quote.total) })
-                : quote.loading
-                  ? t('mobile.product.pricing')
-                  : t('common.none')}
-            </Text>
+        {!blocked && short.gt(0) ? (
+          <View accessibilityRole="alert">
+            <Notice tone="warn" icon={TriangleAlert}>
+              {t('mobile.product.short', {
+                stock: formatQty(product.available),
+                short: short.toFixed(),
+                unit: words(base).name,
+              })}
+            </Notice>
           </View>
+        ) : null}
+        {!product.sellable ? (
+          <Notice tone="bad" icon={TriangleAlert}>
+            {t('mobile.shop.notSellable')}
+          </Notice>
+        ) : blocked ? (
+          <Notice tone="bad" icon={TriangleAlert}>
+            {t('errors.PRODUCT_OUT_OF_APP_STOCK')}
+          </Notice>
+        ) : null}
+      </ScrollView>
+
+      <FooterBar>
+        <View style={styles.footerTotal}>
+          <Text style={type.secondary}>{t('mobile.product.total')}</Text>
+          <Text style={styles.total} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            {totalText}
+          </Text>
           {quote.breakdown ? (
-            <Text style={[type.caption, styles.breakdown]} numberOfLines={1}>
+            <Text style={type.caption} numberOfLines={1}>
               {quote.breakdown}
             </Text>
           ) : null}
         </View>
-      </ScrollView>
-
-      <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, spacing.md) + 18 }]}>
         <PillButton
           title={
             qty === 0 && line
@@ -369,9 +372,9 @@ export default function ProductScreen() {
           disabled={(!canSell && !removing) || (qty === 0 && !line) || quote.unpriced}
           onPress={save}
           height={50}
-          style={styles.square}
+          style={styles.addButton}
         />
-      </View>
+      </FooterBar>
 
       <QtyKeypad
         visible={keypad}
@@ -391,11 +394,9 @@ export default function ProductScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    backgroundColor: colors.card,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
+  scroll: { flex: 1 },
+  content: { ...PAGE },
+  hero: { backgroundColor: colors.imageFill },
   noPicture: { alignItems: 'center', justifyContent: 'center' },
   dots: {
     position: 'absolute',
@@ -408,47 +409,44 @@ const styles = StyleSheet.create({
   },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.dotIdle },
   dotOn: { width: 18, backgroundColor: colors.foreground },
-  body: { paddingTop: spacing.lg, paddingHorizontal: spacing.lg },
-  name: { marginTop: 2 },
+  about: { padding: spacing.lg, gap: spacing.sm },
   muted: { color: colors.muted },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: {
-    height: 28,
+    height: 24,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 10,
-    borderRadius: 14,
+    borderRadius: 12,
   },
   stockChip: { backgroundColor: colors.successSoft },
   outChip: { backgroundColor: colors.destructiveSoft },
-  placeChip: { backgroundColor: colors.canvas },
-  stockDot: { width: 7, height: 7, borderRadius: 4 },
-  chipText: { ...type.chip, fontFamily: fonts.semibold },
-  placeText: { fontFamily: fonts.medium, color: colors.label2 },
-  units: { marginTop: spacing.lg },
-  // «Bto300»'s price card: a hairline and 10 px corners (ADR-0095 #4).
-  priceCard: {
-    marginTop: 14,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.lg,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
+  stockDot: { width: 6, height: 6, borderRadius: 3 },
+  chipText: { ...type.secondary, fontFamily: fonts.semibold },
+  buy: { gap: spacing.md },
+  priceBlock: { gap: 2 },
+  grow: { flex: 1, minWidth: 0, gap: 2 },
+  priceRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6 },
+  price: { ...type.title2, ...tabular },
+  rule: { height: StyleSheet.hairlineWidth, backgroundColor: colors.hairlineStrong },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  // The boards' stepper: a 50 px grey track, white − and blue + of 44 px, the number between.
+  stepper: {
+    height: 50,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: 2,
+    padding: 3,
+    borderRadius: 25,
+    backgroundColor: colors.fieldFill,
   },
-  grow: { flex: 1, gap: 2 },
-  priceRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 5 },
-  price: { ...type.title3, ...tabular },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   minus: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.fieldFill,
+    backgroundColor: colors.card,
+    boxShadow: shadows.stepper,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -461,41 +459,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   faded: { opacity: 0.4 },
-  qtyBox: { minWidth: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  qtyText: { ...type.title2, fontFamily: fonts.bold, ...tabular },
-  warning: {
-    marginTop: 10,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    paddingVertical: spacing.md,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    backgroundColor: colors.warningSoft,
-  },
-  warningText: { flex: 1, color: colors.warningText },
-  outBox: { backgroundColor: colors.destructiveSoft },
-  outText: { flex: 1, color: colors.destructive },
-  totalRow: {
-    marginTop: 10,
-    paddingHorizontal: spacing.xs,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  total: { ...type.rowStrong, ...tabular },
-  breakdown: { paddingHorizontal: spacing.xs, textAlign: 'right' },
-  bottom: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingTop: 14,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.card,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.input,
-  },
+  qtyBox: { minWidth: 56, height: 44, alignItems: 'center', justifyContent: 'center' },
+  qtyText: { ...type.title2, ...tabular },
+  footerTotal: { flexShrink: 1, minWidth: 84, maxWidth: '45%' },
+  total: { ...type.title3, ...tabular },
+  addButton: { flex: 1 },
   missing: { flex: 1, gap: spacing.lg, paddingTop: spacing.xl, paddingHorizontal: spacing.lg },
-  square: { borderRadius: 10 },
 });

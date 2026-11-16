@@ -10,6 +10,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Text, TextInput } from './text';
+import { STAFF_LOOK } from '../theme/look';
 import { colors, fonts, radii, TOUCH, type } from '../theme/tokens';
 
 /**
@@ -121,8 +122,9 @@ const styles = StyleSheet.create({
     paddingRight: 6,
     borderRadius: radii.field,
     borderWidth: 1.5,
-    borderColor: colors.field,
-    backgroundColor: colors.field,
+    // The staff app's field is white with a visible edge; «Bto300»'s a grey box.
+    borderColor: STAFF_LOOK ? colors.fieldBorder : colors.field,
+    backgroundColor: STAFF_LOOK ? colors.card : colors.field,
   },
   boxActive: { backgroundColor: colors.card },
   boxFocused: { borderColor: colors.primary },

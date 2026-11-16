@@ -2,15 +2,17 @@ import { useRouter } from 'expo-router';
 import { KeyRound, LockKeyhole } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../../src/ui/text';
 import type { TextInput } from '../../src/ui/text';
 import { type AppProblem, NETWORK, problemOf } from '../../src/api/problem';
 import { useSignedIn } from '../../src/state/session';
-import { spacing } from '../../src/theme/tokens';
+import { colors, spacing, type } from '../../src/theme/tokens';
 import { PillButton } from '../../src/ui/controls';
 import { PasswordToggle, TextField } from '../../src/ui/field';
 import { ProblemText } from '../../src/ui/kit';
-import { FootNote, Page } from '../../src/ui/layout';
+import { Page } from '../../src/ui/layout';
+import { Card, FooterBar, PAGE } from '../../src/ui/staff-kit';
 import { StoreHeader } from '../../src/ui/store-header';
 import { useToast } from '../../src/ui/toast';
 
@@ -19,7 +21,8 @@ type Which = 'current' | 'next' | 'again';
 /**
  * «Нууц үг солих» (ADR-0068): the current password and the new one twice, each with its eye. The
  * server checks the rules (the phone has no `normalize()` for the shared check); this session
- * stays, the others end. Under the blue header with ← since ADR-0100, as «Bto300»'s.
+ * stays, the others end. The fields sit in one card and «Хадгалах» in the bar under the page (the
+ * Password board of 2026-11-16).
  */
 export default function PasswordScreen() {
   const { t } = useTranslation();
@@ -75,77 +78,78 @@ export default function PasswordScreen() {
   );
 
   return (
-    <Page white edges={[]}>
+    <Page edges={[]}>
       <StoreHeader title={t('mobile.password.title')} onBack={() => router.back()} right={null} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.grow}
       >
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          <TextField
-            style={styles.first}
-            label={t('mobile.password.current')}
-            icon={LockKeyhole}
-            value={current}
-            onChangeText={typed(setCurrent)}
-            secureTextEntry={!shown.current}
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="current-password"
-            textContentType="password"
-            returnKeyType="next"
-            submitBehavior="submit"
-            onSubmitEditing={() => nextRef.current?.focus()}
-            readOnly={busy}
-            trailing={eye('current')}
-          />
-          <TextField
-            style={styles.field}
-            inputRef={nextRef}
-            label={t('mobile.password.next')}
-            icon={KeyRound}
-            value={next}
-            onChangeText={typed(setNext)}
-            secureTextEntry={!shown.next}
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="new-password"
-            textContentType="newPassword"
-            returnKeyType="next"
-            submitBehavior="submit"
-            onSubmitEditing={() => againRef.current?.focus()}
-            readOnly={busy}
-            trailing={eye('next')}
-          />
-          <TextField
-            style={styles.field}
-            inputRef={againRef}
-            label={t('mobile.password.again')}
-            icon={KeyRound}
-            value={again}
-            onChangeText={typed(setAgain)}
-            secureTextEntry={!shown.again}
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="new-password"
-            textContentType="newPassword"
-            returnKeyType="done"
-            onSubmitEditing={() => void save()}
-            readOnly={busy}
-            error={mismatch ? t('mobile.password.mismatch') : null}
-            trailing={eye('again')}
-          />
-          <FootNote>{t('mobile.password.hint')}</FootNote>
+          <Card style={styles.card}>
+            <TextField
+              label={t('mobile.password.current')}
+              icon={LockKeyhole}
+              value={current}
+              onChangeText={typed(setCurrent)}
+              secureTextEntry={!shown.current}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="current-password"
+              textContentType="password"
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => nextRef.current?.focus()}
+              readOnly={busy}
+              trailing={eye('current')}
+            />
+            <View style={styles.hairline} />
+            <TextField
+              inputRef={nextRef}
+              label={t('mobile.password.next')}
+              icon={KeyRound}
+              value={next}
+              onChangeText={typed(setNext)}
+              secureTextEntry={!shown.next}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="new-password"
+              textContentType="newPassword"
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => againRef.current?.focus()}
+              readOnly={busy}
+              trailing={eye('next')}
+            />
+            <TextField
+              inputRef={againRef}
+              label={t('mobile.password.again')}
+              icon={KeyRound}
+              value={again}
+              onChangeText={typed(setAgain)}
+              secureTextEntry={!shown.again}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="new-password"
+              textContentType="newPassword"
+              returnKeyType="done"
+              onSubmitEditing={() => void save()}
+              readOnly={busy}
+              error={mismatch ? t('mobile.password.mismatch') : null}
+              trailing={eye('again')}
+            />
+          </Card>
+          <Text style={[type.secondary, styles.note]}>{t('mobile.password.hint')}</Text>
           <ProblemText problem={problem} style={styles.problem} />
+        </ScrollView>
+        <FooterBar>
           <PillButton
-            style={styles.save}
-            height={50}
+            style={styles.grow}
             title={t('common.save')}
             loading={busy}
             disabled={!ready}
             onPress={() => void save()}
           />
-        </ScrollView>
+        </FooterBar>
       </KeyboardAvoidingView>
     </Page>
   );
@@ -153,9 +157,9 @@ export default function PasswordScreen() {
 
 const styles = StyleSheet.create({
   grow: { flex: 1 },
-  body: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  first: { marginTop: 22 },
-  field: { marginTop: spacing.lg },
-  problem: { marginTop: spacing.lg },
-  save: { marginTop: spacing.xl },
+  body: PAGE,
+  card: { gap: spacing.lg },
+  hairline: { height: StyleSheet.hairlineWidth, backgroundColor: colors.hairlineStrong },
+  note: { marginHorizontal: spacing.xs },
+  problem: { marginTop: 0 },
 });

@@ -1,6 +1,14 @@
 import type { RepProductSort } from '@tugeel/shared/sales';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { PackageSearch, ScanLine, Search } from 'lucide-react-native';
+import {
+  ArrowDownUp,
+  ChevronDown,
+  ChevronUp,
+  PackageSearch,
+  ScanLine,
+  Search,
+  SlidersHorizontal,
+} from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -22,9 +30,10 @@ import {
   useSuppliers,
 } from '../../../src/api/rep';
 import { lineOf } from '../../../src/cart/cart';
-import { FloatingPill, SortSheet } from '../../../src/customer/list-sheets';
+import { SortSheet } from '../../../src/customer/list-sheets';
 import { shopRouteParams } from '../../../src/customer/shop';
 import { formatCount } from '../../../src/format/format';
+import { Chip } from '../../../src/shop/chip';
 import { FilterSheet } from '../../../src/shop/filter-sheet';
 import { activeCount, EMPTY_FILTERS, type ShopFilters } from '../../../src/shop/filters';
 import { useAddOne } from '../../../src/shop/use-add';
@@ -32,20 +41,21 @@ import { useShopFilters } from '../../../src/shop/use-filters';
 import { useSignedIn } from '../../../src/state/session';
 import { useDebounced } from '../../../src/state/use-debounced';
 import { useShop } from '../../../src/state/shop';
-import { colors, spacing, storeType, TOUCH, type } from '../../../src/theme/tokens';
-import { ActiveChip, MenuChip, PillButton } from '../../../src/ui/controls';
+import { colors, fonts, radii, spacing, storeType, TOUCH, type } from '../../../src/theme/tokens';
+import { CircleButton, PillButton } from '../../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
 import { ProductCard } from '../../../src/ui/product-card';
-import { StoreHeaderBand } from '../../../src/ui/store-header';
+import { HeaderCart, StoreHeader } from '../../../src/ui/store-header';
 import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 
-const GAP = 10;
+const GAP = 12;
 
 /**
- * «Бараа» (the Main board, ADR-0068, in «Bto300»'s look since ADR-0100): the title with the count,
- * the search with the scanner in the blue header, the chosen filters as chips with «Ангилал» and
- * «Нийлүүлэгч», the order, the products two by two and the floating «Эрэмбэлэх | Шүүлтүүр». The
+ * «Бараа» (the Shop board of 2026-11-16 on ADR-0068 and ADR-0100): the title and the cart, the
+ * search with the scanner in the blue header, «Шүүлтүүр» and the chosen filters as chips with
+ * «Ангилал» and «Нийлүүлэгч», the count with the order (it opens «Эрэмбэлэх»), the products two by
+ * two and a round «дээш» once the list is scrolled. The
  * cart on a card adds one of a product's default unit, a card opens the product. A link may focus
  * the search (`?search=1`, «Нүүр»'s search field) or choose categories (`?categoryIds=5`, a
  * category page's «бүх бараа»).
@@ -120,8 +130,9 @@ export default function ShopScreen() {
   ];
   const sortLabel = sorts.find((option) => option.value === shown.sort)?.label ?? '';
 
+  const active = activeCount(shown);
   const header = (
-    <View>
+    <View style={styles.head}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -129,8 +140,16 @@ export default function ShopScreen() {
         contentContainerStyle={styles.chips}
         keyboardShouldPersistTaps="handled"
       >
+        <Chip
+          tone={active > 0 ? 'primary' : 'plain'}
+          icon={SlidersHorizontal}
+          label={active > 0 ? `${t('mobile.filter.title')} · ${active}` : t('mobile.filter.title')}
+          accessibilityLabel={t('mobile.shop.filterButton', { n: active })}
+          onPress={() => setSheet('filters')}
+        />
         {warehouse ? (
-          <ActiveChip
+          <Chip
+            tone="chosen"
             label={warehouse.name}
             onPress={() => setSheet('filters')}
             onRemove={() => set({ warehouseId: null })}
@@ -138,7 +157,8 @@ export default function ShopScreen() {
           />
         ) : null}
         {categoryNames.length > 0 ? (
-          <ActiveChip
+          <Chip
+            tone="chosen"
             label={
               categoryNames.length === 1
                 ? (categoryNames[0] ?? '')
@@ -150,7 +170,8 @@ export default function ShopScreen() {
           />
         ) : null}
         {shown.supplierIds.length > 0 ? (
-          <ActiveChip
+          <Chip
+            tone="chosen"
             label={
               supplierName ?? t('mobile.shop.suppliersChosen', { n: shown.supplierIds.length })
             }
@@ -160,7 +181,8 @@ export default function ShopScreen() {
           />
         ) : null}
         {shown.inStock ? (
-          <ActiveChip
+          <Chip
+            tone="chosen"
             label={t('mobile.shop.inStockChip')}
             onPress={() => setSheet('filters')}
             onRemove={() => set({ inStock: false })}
@@ -168,46 +190,52 @@ export default function ShopScreen() {
           />
         ) : null}
         {categoryNames.length === 0 ? (
-          <MenuChip
+          <Chip
             label={t('mobile.filter.categories')}
-            chevron
+            trailing={ChevronDown}
             onPress={() => setSheet('filters')}
           />
         ) : null}
         {shown.supplierIds.length === 0 ? (
-          <MenuChip
+          <Chip
             label={t('mobile.filter.suppliers')}
-            chevron
+            trailing={ChevronDown}
             onPress={() => setSheet('suppliers')}
           />
         ) : null}
       </ScrollView>
-      <Text style={[type.chip, styles.sortLine]}>{sortLabel}</Text>
-      {products.error ? <ProblemText problem={problemFrom(products.error)} /> : null}
+      <View style={styles.sortLine}>
+        <Text style={[type.secondary, styles.grow]} numberOfLines={1}>
+          {total !== null ? t('mobile.customer.list.count', { n: formatCount(total) }) : ''}
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${t('mobile.filter.sort')}: ${sortLabel}`}
+          onPress={() => setSheet('sort')}
+          hitSlop={12}
+          style={({ pressed }) => [styles.sort, pressed && styles.pressed]}
+        >
+          <ArrowDownUp size={14} strokeWidth={2.2} color={colors.link} />
+          <Text style={styles.sortText}>{sortLabel}</Text>
+        </Pressable>
+      </View>
+      {products.error ? (
+        <ProblemText problem={problemFrom(products.error)} style={styles.problem} />
+      ) : null}
     </View>
   );
 
   return (
-    <Page white edges={[]}>
-      <StoreHeaderBand>
-        <View style={styles.titleRow}>
-          <Text accessibilityRole="header" style={storeType.headerTitle}>
-            {t('mobile.tabs.shop')}
-          </Text>
-          {total !== null ? (
-            <Text style={[storeType.search, styles.count]}>
-              {t('mobile.customer.list.count', { n: formatCount(total) })}
-            </Text>
-          ) : null}
-        </View>
+    <Page edges={[]}>
+      <StoreHeader title={t('mobile.tabs.shop')} right={<HeaderCart />}>
         <View style={styles.search}>
-          <Search size={17} strokeWidth={2.2} color={colors.muted} />
+          <Search size={18} strokeWidth={2.2} color={colors.placeholder} />
           <TextInput
             ref={search}
             value={text}
             onChangeText={setText}
             placeholder={t('mobile.shop.search')}
-            placeholderTextColor={colors.muted}
+            placeholderTextColor={colors.placeholder}
             accessibilityLabel={t('mobile.shop.searchLabel')}
             autoCorrect={false}
             returnKeyType="search"
@@ -220,10 +248,10 @@ export default function ShopScreen() {
             hitSlop={6}
             style={styles.searchScan}
           >
-            <ScanLine size={19} strokeWidth={1.8} color={colors.label2} />
+            <ScanLine size={20} strokeWidth={1.8} color={colors.label2} />
           </Pressable>
         </View>
-      </StoreHeaderBand>
+      </StoreHeader>
       <FlatList
         ref={list}
         onScroll={(event) => setScrolled(event.nativeEvent.contentOffset.y > 600)}
@@ -233,7 +261,7 @@ export default function ShopScreen() {
         keyExtractor={(product) => String(product.id)}
         ListHeaderComponent={header}
         columnWrapperStyle={styles.columns}
-        contentContainerStyle={[styles.list, { paddingBottom: inset + 48 + spacing.xl }]}
+        contentContainerStyle={[styles.list, { paddingBottom: inset + spacing.xl }]}
         ItemSeparatorComponent={() => <View style={styles.rowGap} />}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -264,9 +292,9 @@ export default function ShopScreen() {
                 title={t('mobile.shop.empty')}
                 hint={t('mobile.shop.emptyHint')}
               />
-              {activeCount(shown) > 0 ? (
+              {active > 0 ? (
                 <PillButton
-                  title={t('mobile.shop.clearFilters')}
+                  title={t('mobile.orders.clearFilters')}
                   variant="soft"
                   height={44}
                   onPress={() => setFilters({ ...EMPTY_FILTERS, sort: shown.sort })}
@@ -281,13 +309,14 @@ export default function ShopScreen() {
           ) : null
         }
       />
-      <FloatingPill
-        bottom={inset}
-        onTop={scrolled ? () => list.current?.scrollToOffset({ offset: 0, animated: true }) : null}
-        active={activeCount(shown)}
-        onSort={() => setSheet('sort')}
-        onFilter={() => setSheet('filters')}
-      />
+      {scrolled ? (
+        <CircleButton
+          icon={<ChevronUp size={20} strokeWidth={2.4} color={colors.foreground} />}
+          label={t('mobile.customer.list.toTop')}
+          onPress={() => list.current?.scrollToOffset({ offset: 0, animated: true })}
+          style={[styles.top, { bottom: inset + spacing.md }]}
+        />
+      ) : null}
       <SortSheet
         visible={sheet === 'sort'}
         options={sorts}
@@ -314,40 +343,40 @@ export default function ShopScreen() {
 }
 
 const styles = StyleSheet.create({
+  grow: { flex: 1, minWidth: 0 },
+  pressed: { opacity: 0.6 },
   list: { paddingHorizontal: spacing.lg },
-  titleRow: {
+  search: {
     height: 40,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-  },
-  count: { color: colors.onPrimaryMuted },
-  search: {
-    height: 34,
-    marginHorizontal: 14,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingLeft: 12,
-    borderRadius: 17,
+    paddingLeft: spacing.md,
+    borderRadius: radii.field,
     backgroundColor: colors.card,
   },
   searchInput: { flex: 1, minWidth: 0, height: TOUCH, padding: 0, color: colors.foreground },
-  searchScan: { width: 36, height: 34, alignItems: 'center', justifyContent: 'center' },
+  searchScan: { width: 42, height: 40, alignItems: 'center', justifyContent: 'center' },
+  head: { paddingBottom: spacing.md },
   // Edge to edge: the list pads its content, the chips scroll under the margins.
   chipRow: { marginHorizontal: -spacing.lg },
-  chips: {
-    gap: spacing.sm,
+  chips: { gap: spacing.sm, paddingTop: spacing.md, paddingHorizontal: spacing.lg },
+  sortLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
     paddingTop: spacing.md,
-    paddingBottom: 2,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.xs,
   },
-  sortLine: { paddingTop: 10, paddingBottom: spacing.md, color: colors.label2 },
+  sort: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  sortText: { ...type.secondary, fontFamily: fonts.medium, color: colors.link },
+  problem: { marginTop: spacing.md },
   columns: { gap: GAP },
-  rowGap: { height: 12 },
+  rowGap: { height: GAP },
   loading: { marginTop: spacing.xxl },
   more: { marginTop: spacing.lg },
   empty: { alignItems: 'center', gap: spacing.md },
+  top: { position: 'absolute', right: spacing.lg },
 });

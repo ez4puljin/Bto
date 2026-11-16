@@ -5,6 +5,7 @@ import {
   CircleCheck,
   FilePenLine,
   Lock,
+  type LucideIcon,
   MapPin,
   PackageCheck,
   SquareKanban,
@@ -18,30 +19,27 @@ import { problemFrom } from '../../src/api/problem';
 import { useRepContext } from '../../src/api/rep';
 import { useShop } from '../../src/state/shop';
 import { colors, fonts, radii, shadows, spacing, tabular, type } from '../../src/theme/tokens';
-import { ChoiceChip } from '../../src/ui/controls';
 import { Group, Row } from '../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../src/ui/kit';
-import { FootNote, Page } from '../../src/ui/layout';
+import { Page, SectionHeader } from '../../src/ui/layout';
 import { ActionSheet } from '../../src/ui/sheet';
+import { Card, Notice, PAGE, type Tone, TONES } from '../../src/ui/staff-kit';
 import { StoreHeader } from '../../src/ui/store-header';
 
 /** Up to this many pipelines are chips; more open an action sheet. */
 const PIPELINE_CHIPS = 4;
 
-/** The stepper's numbered circle. */
+/** A stage's numbered circle. */
 const DOT = 28;
 
-/** The stepper's line above a circle; the name's padding starts from it, so the two line up. */
-const STEP_TOP = 12;
-
 /**
- * «Захиалга илгээх тохиргоо» (the OrderSettings board, ADR-0061 #6, ADR-0068; redrawn after the
- * owner's look at 0.3.0, 2026-10-18): a card on top tells where the next order lands and what
- * happens to it (a CONFIRM stage confirms and reserves at once, a NONE stage leaves a draft), then
- * three steps: the board (cards with their branch), its pipeline (chips, or a sheet past
- * PIPELINE_CHIPS) and the stage (a vertical stepper in the pipeline's order). Choosing another
- * board or pipeline takes its first stage, so the next order always has a place; nothing changes
- * while a send waits for its answer. Under the blue header with ← since ADR-0100.
+ * «Захиалга илгээх тохиргоо» (the Settings board of 2026-11-16; ADR-0061 #6, ADR-0068): a card on
+ * top tells where the next order lands and what happens to it (a CONFIRM stage confirms and
+ * reserves at once, a NONE stage leaves a draft), then three steps under their labels: the board
+ * (cards with their branch), its pipeline (chips, or a sheet past PIPELINE_CHIPS) and the stage
+ * (a grouped list in the pipeline's order, the chosen row tinted). Choosing another board or
+ * pipeline takes its first stage, so the next order always has a place; nothing changes while a
+ * send waits for its answer.
  */
 export default function SettingsScreen() {
   const { t } = useTranslation();
@@ -74,10 +72,10 @@ export default function SettingsScreen() {
       <StoreHeader title={t('mobile.settings.title')} onBack={() => router.back()} />
       <ScrollView contentContainerStyle={styles.body}>
         <Text style={[type.body, styles.hint]}>{t('mobile.settings.hint')}</Text>
-        {context.isLoading ? (
-          <ActivityIndicator color={colors.primary} style={styles.loading} />
+        {context.isLoading ? <ActivityIndicator color={colors.primary} /> : null}
+        {context.error ? (
+          <ProblemText problem={problemFrom(context.error)} style={styles.problem} />
         ) : null}
-        {context.error ? <ProblemText problem={problemFrom(context.error)} /> : null}
         {context.data && boards.length === 0 ? (
           <EmptyState title={t('mobile.settings.none')} hint={t('mobile.settings.noneHint')} />
         ) : null}
@@ -90,49 +88,45 @@ export default function SettingsScreen() {
               confirms={stage?.action === 'CONFIRM'}
             />
             {locked ? (
-              <View style={styles.locked}>
-                <Lock size={13} strokeWidth={2.2} color={colors.muted} />
-                <Text style={[type.secondary, styles.grow]}>{t('mobile.settings.locked')}</Text>
-              </View>
+              <Notice icon={Lock} tone="warn">
+                {t('mobile.settings.locked')}
+              </Notice>
             ) : null}
 
-            <StepHeader n={1} title={t('mobile.settings.board')} />
-            <View accessibilityRole="radiogroup" style={styles.boards}>
-              {boards.map((entry) => (
-                <BoardCard
-                  key={entry.id}
-                  name={entry.name}
-                  branch={entry.branchName}
-                  selected={entry.id === board?.id}
-                  disabled={locked}
-                  onPress={() => {
-                    // The chosen board keeps its stage; another one starts on its first.
-                    if (entry.id === board?.id) return;
-                    const first = entry.pipelines[0];
-                    const next = first ? firstStage(first.id) : null;
-                    if (next !== null) setStageId(next);
-                  }}
-                />
-              ))}
+            <View style={styles.block}>
+              <StepLabel n={1} title={t('mobile.settings.board')} />
+              <View accessibilityRole="radiogroup" style={styles.boards}>
+                {boards.map((entry) => (
+                  <BoardCard
+                    key={entry.id}
+                    name={entry.name}
+                    branch={entry.branchName}
+                    selected={entry.id === board?.id}
+                    disabled={locked}
+                    onPress={() => {
+                      // The chosen board keeps its stage; another one starts on its first.
+                      if (entry.id === board?.id) return;
+                      const first = entry.pipelines[0];
+                      const next = first ? firstStage(first.id) : null;
+                      if (next !== null) setStageId(next);
+                    }}
+                  />
+                ))}
+              </View>
             </View>
           </>
         ) : null}
 
         {board ? (
-          <>
-            <StepHeader n={2} title={t('mobile.settings.pipeline')} />
+          <View style={styles.block}>
+            <StepLabel n={2} title={t('mobile.settings.pipeline')} />
             {board.pipelines.length <= PIPELINE_CHIPS ? (
               <View accessibilityRole="radiogroup" style={[styles.chips, locked && styles.dimmed]}>
                 {board.pipelines.map((entry) => (
-                  <ChoiceChip
+                  <PipelineChip
                     key={entry.id}
                     label={entry.name}
                     selected={entry.id === pipeline?.id}
-                    icon={
-                      entry.id === pipeline?.id ? (
-                        <Check size={15} strokeWidth={2.8} color={colors.primaryForeground} />
-                      ) : undefined
-                    }
                     onPress={() => choosePipeline(entry.id)}
                   />
                 ))}
@@ -144,37 +138,34 @@ export default function SettingsScreen() {
                   chevron={false}
                   right={<ChevronDown size={16} strokeWidth={2.6} color={colors.input} />}
                   disabled={locked}
-                  minHeight={50}
                   onPress={() => setChoosingPipeline(true)}
                 />
               </Group>
             )}
-          </>
+          </View>
         ) : null}
 
         {pipeline ? (
-          <>
-            <StepHeader n={3} title={t('mobile.settings.stage')} />
-            <View accessibilityRole="radiogroup" style={styles.stepper}>
+          <View style={styles.block}>
+            <StepLabel n={3} title={t('mobile.settings.stage')} />
+            <Group>
               {pipeline.stages.map((entry, index) => (
-                <StageStep
+                <StageRow
                   key={entry.id}
                   n={index + 1}
                   name={entry.name}
                   rule={ruleOf(entry.action)}
                   confirms={entry.action === 'CONFIRM'}
-                  first={index === 0}
-                  last={index === pipeline.stages.length - 1}
                   selected={entry.id === stageId}
                   disabled={locked}
                   onPress={() => setStageId(entry.id)}
                 />
               ))}
-            </View>
-          </>
+            </Group>
+          </View>
         ) : null}
 
-        <FootNote>{t('mobile.settings.footer')}</FootNote>
+        <Text style={[type.secondary, styles.hint]}>{t('mobile.settings.footer')}</Text>
       </ScrollView>
 
       <ActionSheet
@@ -208,41 +199,37 @@ function PlaceCard({
   confirms: boolean;
 }) {
   const { t } = useTranslation();
-  const tone =
+  const look: { tone: Tone; Icon: LucideIcon; Small: LucideIcon; rule: string } =
     stageName === null
       ? {
-          tint: colors.tint.red,
-          soft: colors.destructiveSoft,
-          text: colors.destructive,
-          icon: (color: string) => <TriangleAlert size={22} strokeWidth={2} color={color} />,
-          small: (color: string) => <TriangleAlert size={15} strokeWidth={2.2} color={color} />,
+          tone: 'bad',
+          Icon: TriangleAlert,
+          Small: TriangleAlert,
           rule: t('mobile.settings.chooseBelow'),
         }
       : confirms
         ? {
-            tint: colors.tint.green,
-            soft: colors.successSoft,
-            text: colors.success,
-            icon: (color: string) => <PackageCheck size={22} strokeWidth={2} color={color} />,
-            small: (color: string) => <CircleCheck size={15} strokeWidth={2.2} color={color} />,
+            tone: 'ok',
+            Icon: PackageCheck,
+            Small: CircleCheck,
             rule: t('mobile.settings.confirms'),
           }
         : {
-            tint: colors.tint.orange,
-            soft: colors.warningSoft,
-            text: colors.warningText,
-            icon: (color: string) => <FilePenLine size={22} strokeWidth={2} color={color} />,
-            small: (color: string) => <FilePenLine size={15} strokeWidth={2.2} color={color} />,
+            tone: 'warn',
+            Icon: FilePenLine,
+            Small: FilePenLine,
             rule: t('mobile.settings.drafts'),
           };
+  const palette = TONES[look.tone];
+  const ruleColor = look.tone === 'warn' ? colors.warningText : palette.text;
   return (
-    <View style={styles.place}>
+    <Card style={styles.place}>
       <View style={styles.placeTop}>
-        <View style={[styles.placeIcon, { backgroundColor: tone.tint }]}>
-          {tone.icon(colors.primaryForeground)}
+        <View style={[styles.placeIcon, { backgroundColor: palette.background }]}>
+          <look.Icon size={24} strokeWidth={2} color={palette.text} />
         </View>
         <View style={styles.placeText}>
-          <Text style={type.sectionHeader}>{t('mobile.settings.next')}</Text>
+          <Text style={type.secondary}>{t('mobile.settings.next')}</Text>
           <Text style={type.title3} numberOfLines={2}>
             {stageName ?? t('mobile.settings.notChosen')}
           </Text>
@@ -253,29 +240,20 @@ function PlaceCard({
           ) : null}
         </View>
       </View>
-      <View style={[styles.outcome, { backgroundColor: tone.soft }]}>
-        {tone.small(tone.text)}
-        <Text style={[type.bodyStrong, styles.grow, { color: tone.text }]}>{tone.rule}</Text>
+      <View style={[styles.outcome, { backgroundColor: palette.background }]}>
+        <look.Small size={16} strokeWidth={2.2} color={palette.text} />
+        <Text style={[type.bodyStrong, styles.grow, { color: ruleColor }]}>{look.rule}</Text>
       </View>
-    </View>
+    </Card>
   );
 }
 
-/** «① САМБАР»: a step's number in a soft badge and its name. */
-function StepHeader({ n, title }: { n: number; title: string }) {
-  return (
-    <View style={styles.stepHeader}>
-      <View style={styles.stepBadge}>
-        <Text style={styles.stepBadgeText}>{String(n)}</Text>
-      </View>
-      <Text accessibilityRole="header" style={[type.sectionHeader, styles.grow]}>
-        {title}
-      </Text>
-    </View>
-  );
+/** «1 · САМБАР»: a step's number and its name, above the step's choices. */
+function StepLabel({ n, title }: { n: number; title: string }) {
+  return <SectionHeader style={styles.label}>{`${n} · ${title}`}</SectionHeader>;
 }
 
-/** A board to choose: its icon, name and branch, and a round check when chosen. */
+/** A board to choose: its tile, name and branch, and a round check when chosen. */
 function BoardCard({
   name,
   branch,
@@ -304,14 +282,10 @@ function BoardCard({
       ]}
     >
       <View style={[styles.boardIcon, selected && styles.boardIconSelected]}>
-        <SquareKanban
-          size={18}
-          strokeWidth={2}
-          color={selected ? colors.primaryForeground : colors.label2}
-        />
+        <SquareKanban size={18} strokeWidth={2} color={selected ? colors.link : colors.label2} />
       </View>
       <View style={styles.boardText}>
-        <Text style={type.heading} numberOfLines={1}>
+        <Text style={type.rowStrong} numberOfLines={1}>
           {name}
         </Text>
         {branch ? (
@@ -324,23 +298,47 @@ function BoardCard({
         ) : null}
       </View>
       <View style={[styles.radio, selected && styles.radioSelected]}>
-        {selected ? <Check size={13} strokeWidth={3} color={colors.primaryForeground} /> : null}
+        {selected ? <Check size={16} strokeWidth={3} color={colors.primaryForeground} /> : null}
       </View>
     </Pressable>
   );
 }
 
+/** A pipeline to choose: a white capsule with an edge, blue with a check when chosen. */
+function PipelineChip({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      hitSlop={{ top: 4, bottom: 4 }}
+      style={[styles.chip, selected && styles.chipOn]}
+    >
+      {selected ? <Check size={15} strokeWidth={2.8} color={colors.primaryForeground} /> : null}
+      <Text style={[styles.chipText, selected && styles.chipTextOn]} numberOfLines={1}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 /**
- * A stage of the stepper: its number in a circle on the line that joins the pipeline's stages (the
- * chosen one filled with the accent), its name and, under it, what sending there does.
+ * A stage of the pipeline: its number in a circle (filled when chosen), its name and, under it,
+ * what sending there does, in green for a confirming stage and orange for a draft.
  */
-function StageStep({
+function StageRow({
   n,
   name,
   rule,
   confirms,
-  first,
-  last,
   selected,
   disabled,
   onPress,
@@ -349,8 +347,6 @@ function StageStep({
   name: string;
   rule: string;
   confirms: boolean;
-  first: boolean;
-  last: boolean;
   selected: boolean;
   disabled: boolean;
   onPress: () => void;
@@ -363,53 +359,40 @@ function StageStep({
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
-        styles.step,
-        pressed && styles.stepPressed,
+        styles.stage,
+        pressed && styles.stagePressed,
+        selected && styles.stageSelected,
         disabled && !selected && styles.dimmed,
       ]}
     >
-      <View style={styles.rail}>
-        <View style={[styles.lineTop, first && styles.lineNone]} />
-        <View style={[styles.dot, selected && styles.dotSelected]}>
-          <Text style={[styles.dotText, selected && styles.onPrimary]}>{String(n)}</Text>
-        </View>
-        <View style={[styles.lineBottom, last && styles.lineNone]} />
+      <View style={[styles.dot, selected && styles.dotSelected]}>
+        <Text style={[styles.dotText, selected && styles.onPrimary]}>{String(n)}</Text>
       </View>
-      <View style={styles.stepText}>
+      <View style={styles.stageText}>
         <Text style={selected ? type.rowStrong : type.row} numberOfLines={2}>
           {name}
         </Text>
-        <View style={styles.rule}>
-          <View
-            style={[
-              styles.ruleDot,
-              { backgroundColor: confirms ? colors.tint.green : colors.tint.orange },
-            ]}
-          />
-          <Text style={[type.secondary, styles.shrink]}>{rule}</Text>
-        </View>
+        <Text style={[type.secondary, { color: confirms ? colors.success : colors.warning }]}>
+          {rule}
+        </Text>
       </View>
+      {selected ? <Check size={20} strokeWidth={2.4} color={colors.link} /> : null}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  hint: { marginTop: spacing.lg, marginHorizontal: spacing.xs, color: colors.muted },
-  loading: { marginTop: spacing.xl },
+  body: { ...PAGE, paddingBottom: 40 },
+  block: { gap: spacing.sm },
+  label: { marginTop: 0, marginBottom: 0 },
+  hint: { marginHorizontal: spacing.xs, color: colors.muted },
+  problem: { marginTop: 0 },
   grow: { flex: 1 },
   shrink: { flexShrink: 1 },
   dimmed: { opacity: 0.5 },
   onPrimary: { color: colors.primaryForeground },
-  place: {
-    marginTop: 20,
-    padding: spacing.lg,
-    gap: 14,
-    borderRadius: radii.tile,
-    backgroundColor: colors.card,
-    boxShadow: shadows.floating,
-  },
-  placeTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
+  place: { gap: spacing.md },
+  placeTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   placeIcon: {
     width: 48,
     height: 48,
@@ -426,108 +409,79 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     borderRadius: radii.field,
   },
-  locked: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 10,
-    marginHorizontal: spacing.xs,
-  },
-  stepHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: 26,
-    marginBottom: 10,
-    marginHorizontal: spacing.xs,
-  },
-  stepBadge: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.secondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepBadgeText: { ...type.badge, ...tabular, color: colors.link },
-  boards: { gap: 10 },
+  boards: { gap: spacing.sm },
+  // The 2 px edge is always there (in the card's white when idle), so choosing moves nothing.
   board: {
-    minHeight: 68,
+    minHeight: 64,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingLeft: spacing.md,
-    paddingRight: spacing.lg,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: radii.card,
     borderWidth: 2,
     borderColor: colors.card,
     backgroundColor: colors.card,
+    boxShadow: shadows.card,
   },
   boardPressed: { borderColor: colors.accent, backgroundColor: colors.accent },
   boardSelected: { borderColor: colors.primary },
   boardIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.field,
-    backgroundColor: colors.fieldFill,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: colors.fill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  boardIconSelected: { backgroundColor: colors.primary },
-  boardText: { flex: 1, gap: 3 },
+  boardIconSelected: { backgroundColor: colors.secondary },
+  boardText: { flex: 1, gap: 2 },
   branch: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   radio: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    borderColor: colors.input,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.fieldBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
   radioSelected: { borderWidth: 0, backgroundColor: colors.primary },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  stepper: {
-    paddingVertical: spacing.xs,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
-    overflow: 'hidden',
-  },
-  step: {
+  chip: {
+    height: 36,
     flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: 14,
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  chipOn: { borderColor: colors.primary, backgroundColor: colors.primary },
+  chipText: { ...type.chip, color: colors.label2 },
+  chipTextOn: { color: colors.primaryForeground },
+  stage: {
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: 10,
     paddingHorizontal: spacing.lg,
   },
-  stepPressed: { backgroundColor: colors.accent },
-  rail: { width: DOT, alignItems: 'center' },
-  lineTop: { width: 2, height: STEP_TOP, backgroundColor: colors.border },
-  lineBottom: { width: 2, flex: 1, minHeight: spacing.sm, backgroundColor: colors.border },
-  lineNone: { opacity: 0 },
+  stagePressed: { backgroundColor: colors.accent },
+  stageSelected: { backgroundColor: colors.secondary },
+  stageText: { flex: 1, gap: 1 },
   dot: {
     width: DOT,
     height: DOT,
     borderRadius: DOT / 2,
-    borderWidth: 1.5,
-    borderColor: colors.input,
-    backgroundColor: colors.card,
+    borderWidth: 2,
+    borderColor: colors.fieldBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dotSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary,
-    boxShadow: shadows.brand,
-  },
+  dotSelected: { borderWidth: 0, backgroundColor: colors.primary },
   dotText: { ...type.chip, ...tabular, fontFamily: fonts.semibold, color: colors.muted },
-  // The name's first line centred on the circle: (DOT − its line height) / 2 below the line.
-  stepText: {
-    flex: 1,
-    gap: 3,
-    paddingTop: STEP_TOP + (DOT - type.row.lineHeight) / 2,
-    paddingBottom: 14,
-  },
-  rule: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  ruleDot: { width: 6, height: 6, borderRadius: 3 },
 });

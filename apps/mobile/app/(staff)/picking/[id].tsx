@@ -1,16 +1,15 @@
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { PackageOpen, ScanLine } from 'lucide-react-native';
+import { Check, Minus, PackageOpen, ScanLine, X } from 'lucide-react-native';
 import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useConfirmPart, usePickInfo, usePickOrder, useTakePart } from '../../../src/api/picking';
 import { type AppProblem, problemFrom } from '../../../src/api/problem';
 import { useBarcodeLookup } from '../../../src/api/transfers';
 import { shortDate } from '../../../src/dates/dates';
 import { formatQty } from '../../../src/format/format';
-import { LineCountBadge, PickStatusPill } from '../../../src/picking/pills';
+import { LineCountBadge, ShelfPill } from '../../../src/picking/pills';
 import {
   BASE_UNIT_ID,
   binOf,
@@ -23,7 +22,7 @@ import {
 import type { PickLine } from '../../../src/picking/types';
 import { isPickLead } from '../../../src/state/phase';
 import { useSignedIn } from '../../../src/state/session';
-import { colors, fonts, radii, spacing, type } from '../../../src/theme/tokens';
+import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme/tokens';
 import { ScanSheet } from '../../../src/transfers/scan-sheet';
 import { TransferKeypad } from '../../../src/transfers/transfer-keypad';
 import type { BarcodeResolution } from '../../../src/transfers/types';
@@ -32,9 +31,12 @@ import { Separator } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
 import { ActionSheet } from '../../../src/ui/sheet';
+import { Card, FooterBar, ProgressBar } from '../../../src/ui/staff-kit';
 import { StoreHeader } from '../../../src/ui/store-header';
 import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
+
+const DASH = '—';
 
 /** The keypad is open for a line; the scanned unit (any of the product's) is preselected. */
 interface KeypadFor {
@@ -43,8 +45,10 @@ interface KeypadFor {
 }
 
 /**
- * One warehouse's part of an order (ADR-0126 #2 on the phone, ADR-0132): the order's facts and
- * the part's pill, then the warehouse's lines with what was ordered and the count's badge. An OPEN
+ * One warehouse's part of an order (ADR-0126 #2 on the phone, ADR-0132): the order's number as the
+ * header's title over the customer and the delivery date, a progress card (who picks, the counted
+ * lines, the warehouse and the note), then the warehouse's lines with a round mark, what was
+ * ordered, the count's pill, the shelf's pill and the picked number. An OPEN
  * part is taken with «Бэлдэж эхлэх»; the picker (a lead on any part) counts by scanning — the read
  * code lands on the product's line and opens the keypad in the scanned unit, «Дууссан» = 0 — or
  * by tapping a row, changes the shelf when the line has several, and confirms every line at once:
@@ -54,7 +58,6 @@ interface KeypadFor {
 export default function PickingPartScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const toast = useToast();
   const { me, server } = useSignedIn();
   const { id, warehouse } = useLocalSearchParams<{ id: string; warehouse: string }>();
@@ -149,6 +152,7 @@ export default function PickingPartScreen() {
     const binId = binOf(lineInfo, bins[item.id]);
     const bin = lineInfo?.bins.find((entry) => entry.id === binId);
     const reservedShort = item.qtyApproved !== item.qtyBase;
+    const picked = counts[item.id] ?? item.qtyPicked;
     return (
       <View
         style={[
@@ -165,12 +169,23 @@ export default function PickingPartScreen() {
           onPress={() => setKeypad({ line: item, scanned: null })}
           style={({ pressed }) => [
             styles.line,
-            pressed && styles.pressed,
+            state.kind === 'short' && styles.lineShort,
+            state.kind === 'out' && styles.lineOut,
             highlighted === item.id && styles.highlighted,
+            pressed && styles.pressed,
           ]}
         >
+          <View style={[styles.mark, MARKS[state.kind]]}>
+            {state.kind === 'full' ? (
+              <Check size={16} strokeWidth={3} color={colors.primaryForeground} />
+            ) : state.kind === 'short' ? (
+              <Minus size={16} strokeWidth={3} color={colors.primaryForeground} />
+            ) : state.kind === 'out' ? (
+              <X size={16} strokeWidth={3} color={colors.primaryForeground} />
+            ) : null}
+          </View>
           <View style={styles.grow}>
-            <Text style={type.row} numberOfLines={2}>
+            <Text style={type.rowStrong} numberOfLines={2}>
               {item.productName}
             </Text>
             <Text style={type.secondary} numberOfLines={2}>
@@ -186,17 +201,6 @@ export default function PickingPartScreen() {
                       unit: item.baseUnitName,
                     })
                   : null,
-                state.kind !== 'uncounted' && counts[item.id] !== undefined
-                  ? t('mobile.picking.part.counted', {
-                      qty: formatQty(counts[item.id] ?? '0'),
-                      unit: item.baseUnitName,
-                    })
-                  : item.qtyPicked !== null && counts[item.id] === undefined
-                    ? t('mobile.picking.part.counted', {
-                        qty: formatQty(item.qtyPicked),
-                        unit: item.baseUnitName,
-                      })
-                    : null,
               ]
                 .filter((entry): entry is string => entry !== null)
                 .join(' · ')}
@@ -209,21 +213,36 @@ export default function PickingPartScreen() {
                   accessibilityLabel={t('mobile.picking.part.chooseShelf')}
                   disabled={lineInfo.bins.length < 2}
                   onPress={() => setChoosingBin(item)}
-                  hitSlop={6}
+                  hitSlop={10}
                 >
-                  <Text style={[type.caption, lineInfo.bins.length > 1 && styles.link]}>
-                    {bin
-                      ? t('mobile.picking.part.shelf', { code: bin.code })
-                      : t('mobile.picking.part.noShelf')}
-                  </Text>
+                  <ShelfPill
+                    label={bin ? bin.code : t('mobile.picking.part.noShelf')}
+                    none={!bin}
+                  />
                 </Pressable>
               ) : item.pickBinCode ? (
-                <Text style={type.caption}>
-                  {t('mobile.picking.part.shelf', { code: item.pickBinCode })}
-                </Text>
+                <ShelfPill label={item.pickBinCode} />
               ) : null}
             </View>
           </View>
+          <Text
+            accessibilityLabel={
+              picked !== null && picked !== undefined
+                ? t('mobile.picking.part.counted', {
+                    qty: formatQty(picked),
+                    unit: item.baseUnitName,
+                  })
+                : t('mobile.picking.part.states.uncounted')
+            }
+            style={[
+              styles.picked,
+              state.kind === 'short' && { color: colors.warning },
+              state.kind === 'out' && { color: colors.destructive },
+              state.kind === 'uncounted' && { color: colors.muted },
+            ]}
+          >
+            {picked !== null && picked !== undefined ? formatQty(picked) : DASH}
+          </Text>
         </Pressable>
       </View>
     );
@@ -233,51 +252,74 @@ export default function PickingPartScreen() {
   const title = detail
     ? (detail.number ?? t('mobile.picking.draftNo', { id: detail.id }))
     : t('mobile.picking.part.title');
-  const footerPadding = Math.max(insets.bottom, spacing.md);
+  const countedLines = lines.filter(
+    (line) => lineCountState(line, counts).kind !== 'uncounted',
+  ).length;
 
   return (
     <Page edges={[]}>
-      <StoreHeader title={title} onBack={() => router.back()} right={null} />
+      <StoreHeader
+        title={title}
+        subtitle={
+          detail
+            ? [
+                detail.customerName,
+                t('mobile.picking.deliver', { date: shortDate(detail.deliveryDate) }),
+              ].join(' · ')
+            : null
+        }
+        onBack={() => router.back()}
+        right={
+          part ? (
+            <View style={styles.headerPill}>
+              <Text style={styles.headerPillText} numberOfLines={1}>
+                {t(`mobile.picking.status.${part.status}`)}
+              </Text>
+            </View>
+          ) : null
+        }
+      />
       {problem ? <ProblemText problem={problem} style={styles.problem} /> : null}
       <FlatList<PickLine>
         ref={list}
+        style={styles.fill}
         data={lines}
         keyExtractor={(line) => String(line.id)}
-        contentContainerStyle={[
-          styles.list,
-          { paddingBottom: footerPadding + (canTake || canConfirm ? 140 : 0) },
-        ]}
+        contentContainerStyle={styles.list}
         ListHeaderComponent={
           detail && part ? (
-            <View style={styles.summary}>
+            <Card style={styles.summary}>
               <View style={styles.rowTop}>
-                <Text style={[type.heading, styles.grow]} numberOfLines={2}>
-                  {detail.customerName}
+                <Text style={[type.rowStrong, styles.grow]} numberOfLines={2}>
+                  {part.pickerName
+                    ? part.status === 'DONE'
+                      ? t('mobile.picking.part.done', { name: part.pickerName })
+                      : mine
+                        ? t('mobile.picking.part.mine')
+                        : t('mobile.picking.part.byOther', { name: part.pickerName })
+                    : t(`mobile.picking.status.${part.status}`)}
                 </Text>
-                <PickStatusPill status={part.status} />
+                <Text style={[type.rowStrong, tabular, styles.link]}>
+                  {t('mobile.picking.part.progress', { done: countedLines, total: lines.length })}
+                </Text>
               </View>
-              <Text style={type.secondary}>
+              <ProgressBar value={lines.length > 0 ? countedLines / lines.length : 0} />
+              <Text style={type.secondary} numberOfLines={4}>
                 {[
                   part.warehouseName,
-                  t('mobile.picking.items', { n: lines.length }),
-                  t('mobile.picking.deliver', { date: shortDate(detail.deliveryDate) }),
-                ].join(' · ')}
+                  detail.note ? t('mobile.picking.part.note', { note: detail.note }) : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </Text>
-              {part.pickerName ? (
-                <Text style={type.secondary}>
-                  {part.status === 'DONE'
-                    ? t('mobile.picking.part.done', { name: part.pickerName })
-                    : mine
-                      ? t('mobile.picking.part.mine')
-                      : t('mobile.picking.part.byOther', { name: part.pickerName })}
-                </Text>
-              ) : null}
-              {detail.note ? (
-                <Text style={type.secondary} numberOfLines={3}>
-                  {detail.note}
-                </Text>
-              ) : null}
-            </View>
+            </Card>
+          ) : null
+        }
+        ListFooterComponent={
+          canConfirm && body.uncounted > 0 ? (
+            <Text style={[type.secondary, styles.hint]}>
+              {t('mobile.picking.part.uncountedNote', { n: body.uncounted })}
+            </Text>
           ) : null
         }
         renderItem={renderLine}
@@ -298,22 +340,17 @@ export default function PickingPartScreen() {
         }
       />
       {canTake ? (
-        <View style={[styles.footer, { paddingBottom: footerPadding }]}>
+        <FooterBar>
           <PillButton
             title={t('mobile.picking.part.take')}
-            height={56}
+            style={styles.button}
             loading={take.isPending}
             onPress={() => void takePart()}
           />
-        </View>
+        </FooterBar>
       ) : null}
       {canConfirm ? (
-        <View style={[styles.footer, { paddingBottom: footerPadding }]}>
-          {body.uncounted > 0 ? (
-            <Text style={[type.secondary, styles.center]}>
-              {t('mobile.picking.part.uncountedNote', { n: body.uncounted })}
-            </Text>
-          ) : null}
+        <FooterBar column>
           {info.data && body.missingBins > 0 ? (
             <Text style={[type.secondary, styles.center, styles.warning]}>
               {t('mobile.picking.part.missingShelves', { n: body.missingBins })}
@@ -323,21 +360,20 @@ export default function PickingPartScreen() {
             <PillButton
               title={t('mobile.picking.part.scan')}
               variant="soft"
-              icon={<ScanLine size={22} strokeWidth={2} color={colors.primary} />}
-              height={56}
+              icon={<ScanLine size={20} strokeWidth={2} color={colors.link} />}
               style={styles.button}
               onPress={() => setScanning(true)}
             />
             <PillButton
               title={t('mobile.picking.part.confirm')}
-              height={56}
+              icon={<Check size={20} strokeWidth={2.4} color={colors.primaryForeground} />}
               style={styles.button}
               disabled={!info.data || body.missingBins > 0 || lines.length === 0}
               loading={confirm.isPending}
               onPress={() => void confirmPart()}
             />
           </View>
-        </View>
+        </FooterBar>
       ) : null}
 
       {keypad && opened ? (
@@ -410,53 +446,63 @@ export default function PickingPartScreen() {
 }
 
 const styles = StyleSheet.create({
-  grow: { flex: 1, minWidth: 0, gap: 3 },
+  fill: { flex: 1 },
+  grow: { flex: 1, minWidth: 0, gap: spacing.xs },
   center: { textAlign: 'center' },
   warning: { color: colors.warning, fontFamily: fonts.medium },
-  link: { color: colors.primary, fontFamily: fonts.medium },
+  link: { color: colors.link },
   pressed: { backgroundColor: colors.accent },
   highlighted: { backgroundColor: colors.secondary },
-  problem: { marginHorizontal: 14 },
-  list: { paddingHorizontal: 14, paddingTop: spacing.md },
-  summary: {
-    gap: spacing.xs,
-    marginBottom: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
+  problem: { marginHorizontal: spacing.lg },
+  headerPill: {
+    height: 24,
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    marginRight: spacing.sm,
+    borderRadius: 12,
+    backgroundColor: colors.onPrimaryHairline,
   },
-  rowTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  cell: { backgroundColor: colors.card },
-  firstCell: {
-    borderTopLeftRadius: radii.card,
-    borderTopRightRadius: radii.card,
-    overflow: 'hidden',
+  headerPillText: {
+    ...type.secondary,
+    fontFamily: fonts.semibold,
+    color: colors.primaryForeground,
   },
-  lastCell: {
-    borderBottomLeftRadius: radii.card,
-    borderBottomRightRadius: radii.card,
-    overflow: 'hidden',
-  },
+  list: { padding: spacing.lg, flexGrow: 1 },
+  summary: { gap: spacing.sm, marginBottom: spacing.md, paddingVertical: 14 },
+  rowTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  hint: { paddingHorizontal: spacing.xs, paddingTop: spacing.md },
+  cell: { backgroundColor: colors.card, overflow: 'hidden' },
+  firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
+  lastCell: { borderBottomLeftRadius: radii.card, borderBottomRightRadius: radii.card },
   line: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+    alignItems: 'flex-start',
+    gap: spacing.md,
     minHeight: 64,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
   },
-  badges: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 2 },
+  lineShort: { backgroundColor: colors.warningSoft },
+  lineOut: { backgroundColor: colors.destructiveSoft },
+  mark: {
+    width: 24,
+    height: 24,
+    marginTop: 2,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
+  picked: { ...type.title3, ...tabular, minWidth: 28, textAlign: 'right' },
   loading: { marginTop: spacing.xl },
-  footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    gap: spacing.xs,
-    paddingHorizontal: 14,
-    paddingTop: spacing.md,
-    backgroundColor: colors.sheetBarFill,
-  },
-  buttons: { flexDirection: 'row', gap: spacing.sm },
+  buttons: { flexDirection: 'row', gap: 10 },
   button: { flex: 1 },
+});
+
+/** The round mark before a line: green when full, orange when short, red when out, else a ring. */
+const MARKS = StyleSheet.create({
+  uncounted: { borderWidth: 2, borderColor: colors.fieldBorder },
+  full: { backgroundColor: colors.tint.green },
+  short: { backgroundColor: colors.tint.orange },
+  out: { backgroundColor: colors.tint.red },
 });

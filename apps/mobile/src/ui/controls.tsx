@@ -11,6 +11,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Text, TextInput } from './text';
+import { STAFF_LOOK } from '../theme/look';
 import { colors, fonts, radii, shadows, spacing, TOUCH, type } from '../theme/tokens';
 
 /** The grey 40 px search field with its glass. */
@@ -187,7 +188,10 @@ const PILLS: Record<PillVariant, { fill: string; pressed: string; text: string }
   primary: { fill: colors.primary, pressed: colors.primaryPressed, text: colors.primaryForeground },
   soft: { fill: colors.secondary, pressed: colors.fill, text: colors.secondaryForeground },
   white: { fill: colors.card, pressed: colors.accent, text: colors.primary },
-  destructive: { fill: colors.card, pressed: colors.destructiveSoft, text: colors.destructive },
+  // The staff app's is soft red, so it shows on a white page too; an icon in it is red, not white.
+  destructive: STAFF_LOOK
+    ? { fill: colors.destructiveSoft, pressed: '#FBD5D8', text: colors.destructive }
+    : { fill: colors.card, pressed: colors.destructiveSoft, text: colors.destructive },
 };
 
 /** A red (or accent) count on a button's corner; nothing for 0. */

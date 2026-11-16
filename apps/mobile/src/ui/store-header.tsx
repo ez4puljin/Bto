@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShop } from '../state/shop';
+import { STAFF_LOOK } from '../theme/look';
 import { colors, spacing, storeType, TOUCH } from '../theme/tokens';
 import { CountBadge } from './controls';
 import { Text } from './text';
@@ -90,16 +91,19 @@ export function HeaderTextButton({
 }
 
 /**
- * A page's header: ← (when it goes back), the title, and the right side (the cart by default).
- * `children` are more rows under it in the blue (a search field).
+ * A page's header: ← (when it goes back), the title (and a line under it), and the right side.
+ * «Bto300» shows the cart there by default; the staff app shows nothing, and its shopping pages
+ * pass `<HeaderCart />` themselves. `children` are more rows under it in the blue (a search field).
  */
 export function StoreHeader({
   title,
+  subtitle,
   onBack,
-  right = <HeaderCart />,
+  right = STAFF_LOOK ? null : <HeaderCart />,
   children,
 }: {
   title: string;
+  subtitle?: string | null;
   onBack?: () => void;
   right?: ReactNode;
   children?: ReactNode;
@@ -115,13 +119,20 @@ export function StoreHeader({
             onPress={onBack}
           />
         ) : null}
-        <Text
-          accessibilityRole="header"
-          style={[storeType.headerTitle, styles.title]}
-          numberOfLines={1}
-        >
-          {title}
-        </Text>
+        <View style={styles.title}>
+          <Text
+            accessibilityRole="header"
+            style={STAFF_LOOK ? storeType.headerTitleStrong : storeType.headerTitle}
+            numberOfLines={1}
+          >
+            {title}
+          </Text>
+          {subtitle ? (
+            <Text style={storeType.headerSubtitle} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
         <View style={styles.right}>{right}</View>
       </View>
       {children}
@@ -140,7 +151,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   rowNoBack: { paddingLeft: spacing.lg },
-  title: { flex: 1, minWidth: 0 },
+  title: { flex: 1, minWidth: 0, justifyContent: 'center' },
   right: { flexDirection: 'row', alignItems: 'center' },
   icon: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.6 },

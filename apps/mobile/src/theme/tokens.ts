@@ -5,7 +5,8 @@ export const colors = {
   canvas: '#F2F2F7',
   card: '#FFFFFF',
   foreground: '#1D1D1F',
-  muted: '#6E6E73',
+  /** The web's ADR-0113 value (4.5:1 on the canvas). */
+  muted: '#636366',
   /** Secondary text on a grey chip. */
   label2: '#3A3A3C',
   primary: '#0071E3',
@@ -18,6 +19,8 @@ export const colors = {
   fill: '#E8E8ED',
   border: '#E5E5EA',
   input: '#C7C7CC',
+  /** A text field's edge on white (the web's ADR-0113 `input`, 3.26:1). */
+  fieldBorder: '#8E8E93',
   success: '#1E7B34',
   successSoft: '#E3F5E7',
   warning: '#B25000',
@@ -202,6 +205,9 @@ export const storeType = {
   /** «Bto300» on the home's header. */
   wordmark: face(fonts.bold, 20, 24, -0.5, colors.primaryForeground),
   headerTitle: face(fonts.regular, 17, 22, 0, colors.primaryForeground),
+  /** The staff app's header: a semibold title and the line under it. */
+  headerTitleStrong: face(fonts.semibold, 17, 22, -0.1, colors.primaryForeground),
+  headerSubtitle: face(fonts.regular, 12, 16, 0, colors.onPrimaryMuted),
   /** «Бүгдийг уншсан», «Засах» on the header. */
   headerButton: face(fonts.medium, 15, 20, 0, colors.primaryForeground),
   /** The home's quick links on the header, upper case. */
@@ -238,6 +244,8 @@ export const tabular = { fontVariant: ['tabular-nums' as const] };
 
 /** The boards' shadows (React Native's boxShadow, the New Architecture). */
 export const shadows = {
+  /** A white card or group on the canvas (the staff app's boards of 2026-11-16). */
+  card: '0 1px 2px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.04)',
   floating: '0 1px 2px rgba(0,0,0,0.05), 0 6px 18px rgba(0,0,0,0.08)',
   tabBar: '0 1px 2px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.10)',
   /** The logo tile. */

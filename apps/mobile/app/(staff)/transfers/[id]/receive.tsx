@@ -1,10 +1,18 @@
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { PackageOpen, ScanLine, Trash2 } from 'lucide-react-native';
+import {
+  Check,
+  CloudOff,
+  Minus,
+  PackageOpen,
+  Plus,
+  ScanLine,
+  Trash2,
+  X,
+} from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, SectionList, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type AppProblem, problemFrom } from '../../../../src/api/problem';
 import {
   useAddCountLine,
@@ -15,7 +23,7 @@ import {
 } from '../../../../src/api/transfers';
 import { formatQty } from '../../../../src/format/format';
 import { useSignedIn } from '../../../../src/state/session';
-import { colors, fonts, radii, spacing, TOUCH, type } from '../../../../src/theme/tokens';
+import { colors, radii, spacing, tabular, TOUCH, type } from '../../../../src/theme/tokens';
 import {
   findLineByProduct,
   finishReadiness,
@@ -23,7 +31,7 @@ import {
   queuedByLine,
   shippedGroups,
 } from '../../../../src/transfers/counts';
-import { inUnit, lineQtyWords } from '../../../../src/transfers/grouping';
+import { inUnit, lineQtyWords, numbersLabel } from '../../../../src/transfers/grouping';
 import { LineStateBadge } from '../../../../src/transfers/pills';
 import { ScanSheet } from '../../../../src/transfers/scan-sheet';
 import {
@@ -40,11 +48,14 @@ import { useCountQueue } from '../../../../src/transfers/use-count-queue';
 import { PillButton } from '../../../../src/ui/controls';
 import { Separator } from '../../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../../src/ui/kit';
-import { Page } from '../../../../src/ui/layout';
+import { Page, SectionHeader } from '../../../../src/ui/layout';
 import { ActionSheet } from '../../../../src/ui/sheet';
+import { Card, FooterBar, Notice, ProgressBar } from '../../../../src/ui/staff-kit';
 import { StoreHeader } from '../../../../src/ui/store-header';
 import { Text } from '../../../../src/ui/text';
 import { useToast } from '../../../../src/ui/toast';
+
+const DASH = '—';
 
 interface GroupSection {
   group: TransferRequestGroup;
@@ -63,7 +74,9 @@ type KeypadFor =
   | { kind: 'extra'; group: TransferRequestGroup; found: BarcodeResolution };
 
 /**
- * Receiving by scan (ADR-0116 #4, #5): the shipped groups' lines in one list by sender; a read
+ * Receiving by scan (ADR-0116 #4, #5): a progress card (the counted lines of all), then the shipped
+ * groups' lines in one grouped list per sender, each with a round mark, what was shipped, the
+ * counted number and the state's pill; a read
  * barcode lands on the product's line, shows what was shipped in the scanned unit and opens the
  * keypad for what arrived («Ирээгүй» = 0); a tap on a row does the same. A product not on the
  * request is added as an unrequested line, counted at once. Each count goes into the FIFO queue
@@ -73,7 +86,6 @@ type KeypadFor =
 export default function TransferReceiveScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const toast = useToast();
   const { server } = useSignedIn();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -243,6 +255,8 @@ export default function TransferReceiveScreen() {
           ? t('mobile.transfers.receive.notArrived')
           : t('mobile.transfers.receive.counted', qty.counted)
         : null;
+    const shown = pending ? { kind: 'unchecked' as const } : state;
+    const number = pending ? formatQty(pending.qty) : qty.counted ? qty.counted.qty : null;
     return (
       <View
         style={[
@@ -260,35 +274,58 @@ export default function TransferReceiveScreen() {
           }
           style={({ pressed }) => [
             styles.line,
-            pressed && styles.pressed,
+            (shown.kind === 'short' || shown.kind === 'over') && styles.lineOff,
+            shown.kind === 'notArrived' && styles.lineOut,
             highlighted === item.id && styles.highlighted,
+            pressed && styles.pressed,
           ]}
         >
+          <View style={[styles.mark, MARKS[shown.kind]]}>
+            {shown.kind === 'exact' || shown.kind === 'extra' ? (
+              <Check size={16} strokeWidth={3} color={colors.primaryForeground} />
+            ) : shown.kind === 'short' ? (
+              <Minus size={16} strokeWidth={3} color={colors.primaryForeground} />
+            ) : shown.kind === 'over' ? (
+              <Plus size={16} strokeWidth={3} color={colors.primaryForeground} />
+            ) : shown.kind === 'notArrived' ? (
+              <X size={16} strokeWidth={3} color={colors.primaryForeground} />
+            ) : null}
+          </View>
           <View style={styles.grow}>
-            <Text style={type.row} numberOfLines={2}>
+            <Text style={type.rowStrong} numberOfLines={2}>
               {item.productName}
             </Text>
-            <Text style={type.secondary} numberOfLines={2}>
+            <Text style={[type.secondary, tabular]} numberOfLines={2}>
               {[
                 item.productSku,
                 qty.shipped ? t('mobile.transfers.receive.shippedLine', qty.shipped) : null,
-                countedText,
+                pending ? countedText : null,
               ]
                 .filter((part): part is string => part !== null)
                 .join(' · ')}
             </Text>
-            <LineStateBadge
-              state={pending ? { kind: 'unchecked' } : state}
-              baseUnit={item.baseUnitName}
-            />
+          </View>
+          <View style={styles.side}>
+            <Text
+              accessibilityLabel={countedText ?? t('mobile.transfers.receive.states.unchecked')}
+              style={[
+                type.heading,
+                tabular,
+                (shown.kind === 'short' || shown.kind === 'over') && { color: colors.warning },
+                shown.kind === 'notArrived' && { color: colors.destructive },
+                (number === null || pending !== undefined) && { color: colors.muted },
+              ]}
+            >
+              {number ?? DASH}
+            </Text>
+            <LineStateBadge state={shown} baseUnit={item.baseUnitName} />
           </View>
           {item.unrequested ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('mobile.transfers.receive.removeLine')}
               onPress={() => setRemoving(item)}
-              hitSlop={6}
-              style={styles.trash}
+              style={({ pressed }) => [styles.trash, pressed && styles.faded]}
             >
               <Trash2 size={18} strokeWidth={2} color={colors.destructive} />
             </Pressable>
@@ -306,6 +343,7 @@ export default function TransferReceiveScreen() {
           title={t('mobile.transfers.receive.finish', {
             warehouse: section.group.sourceWarehouseName,
           })}
+          variant="soft"
           height={44}
           disabled={!readiness.ready || finish.isPending}
           loading={finish.isPending && finish.variables === section.group.id}
@@ -320,45 +358,74 @@ export default function TransferReceiveScreen() {
     );
   };
 
+  const allLines = groups.flatMap((group) => group.lines);
+  const countedLines = allLines.filter(
+    (line) => !queued.has(line.id) && lineState(line).kind !== 'unchecked',
+  ).length;
+  const numbers = request.data
+    ? numbersLabel(request.data.groups.map((group) => group.number))
+    : null;
+
   return (
     <Page edges={[]}>
       <StoreHeader
         title={t('mobile.transfers.receive.title')}
+        subtitle={numbers}
         onBack={() => router.back()}
-        right={null}
       />
-      {queue.failed ? (
-        <View style={styles.failed}>
-          <Text style={[type.body, styles.failedText]}>
-            {t('mobile.transfers.receive.unsent', { n: queue.entries.length })}
-          </Text>
-          <PillButton
-            title={t('mobile.transfers.receive.resend')}
-            variant="destructive"
-            height={36}
-            onPress={queue.resend}
-          />
-        </View>
-      ) : null}
       {problem ? <ProblemText problem={problem} style={styles.problem} /> : null}
       <SectionList<TransferLine, GroupSection>
         ref={list}
+        style={styles.fill}
         sections={sections}
         keyExtractor={(line) => String(line.id)}
         stickySectionHeadersEnabled={false}
-        contentContainerStyle={[
-          styles.list,
-          { paddingBottom: Math.max(insets.bottom, spacing.md) + 90 },
-        ]}
+        contentContainerStyle={styles.list}
+        ListHeaderComponent={
+          <View style={styles.top}>
+            {allLines.length > 0 ? (
+              <Card style={styles.progress}>
+                <View style={styles.progressTop}>
+                  <Text style={type.rowStrong}>{t('mobile.transfers.receive.progressTitle')}</Text>
+                  <Text style={[type.rowStrong, tabular, styles.link]}>
+                    {t('mobile.transfers.receive.progress', {
+                      done: countedLines,
+                      total: allLines.length,
+                    })}
+                  </Text>
+                </View>
+                <ProgressBar value={countedLines / allLines.length} />
+              </Card>
+            ) : null}
+            {queue.failed ? (
+              <Notice
+                icon={CloudOff}
+                tone="bad"
+                style={styles.failed}
+                right={
+                  <PillButton
+                    title={t('mobile.transfers.receive.resend')}
+                    variant="white"
+                    height={36}
+                    style={styles.resend}
+                    onPress={queue.resend}
+                  />
+                }
+              >
+                {t('mobile.transfers.receive.unsent', { n: queue.entries.length })}
+              </Notice>
+            ) : null}
+          </View>
+        }
         renderSectionHeader={({ section }) => (
-          <Text accessibilityRole="header" style={[type.sectionHeader, styles.sectionHeader]}>
+          <SectionHeader style={styles.sectionHeader}>
             {section.group.number
               ? t('mobile.transfers.request.group', {
                   warehouse: section.group.sourceWarehouseName,
                   number: section.group.number,
                 })
               : section.group.sourceWarehouseName}
-          </Text>
+          </SectionHeader>
         )}
         renderItem={renderLine}
         renderSectionFooter={renderFooter}
@@ -378,15 +445,15 @@ export default function TransferReceiveScreen() {
           )
         }
       />
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+      <FooterBar>
         <PillButton
           title={t('mobile.transfers.receive.scan')}
-          icon={<ScanLine size={22} strokeWidth={2} color={colors.primaryForeground} />}
-          height={56}
+          icon={<ScanLine size={20} strokeWidth={2.2} color={colors.primaryForeground} />}
+          style={styles.fill}
           disabled={groups.length === 0}
           onPress={() => setScanning(true)}
         />
-      </View>
+      </FooterBar>
 
       {keypad && opened ? (
         <TransferKeypad
@@ -479,55 +546,59 @@ export default function TransferReceiveScreen() {
 }
 
 const styles = StyleSheet.create({
-  grow: { flex: 1, minWidth: 0, gap: 3 },
+  fill: { flex: 1 },
+  grow: { flex: 1, minWidth: 0, gap: spacing.xs },
   center: { textAlign: 'center' },
+  link: { color: colors.link },
+  faded: { opacity: 0.6 },
   pressed: { backgroundColor: colors.accent },
   highlighted: { backgroundColor: colors.secondary },
-  failed: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginHorizontal: 14,
-    marginTop: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingLeft: 14,
-    paddingRight: spacing.sm,
-    borderRadius: radii.field,
-    backgroundColor: colors.destructiveSoft,
-  },
-  failedText: { flex: 1, color: colors.destructive, fontFamily: fonts.medium },
-  problem: { marginHorizontal: 14 },
-  list: { paddingHorizontal: 14 },
-  sectionHeader: { paddingTop: spacing.lg, paddingBottom: spacing.sm, paddingHorizontal: 2 },
-  cell: { backgroundColor: colors.card },
-  firstCell: {
-    borderTopLeftRadius: radii.card,
-    borderTopRightRadius: radii.card,
-    overflow: 'hidden',
-  },
-  lastCell: {
-    borderBottomLeftRadius: radii.card,
-    borderBottomRightRadius: radii.card,
-    overflow: 'hidden',
-  },
+  problem: { marginHorizontal: spacing.lg },
+  list: { padding: spacing.lg, flexGrow: 1 },
+  top: { gap: spacing.md },
+  progress: { gap: spacing.sm, paddingVertical: 14 },
+  progressTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  failed: { alignItems: 'center', paddingRight: spacing.sm },
+  resend: { paddingHorizontal: 14 },
+  sectionHeader: { marginTop: spacing.lg },
+  cell: { backgroundColor: colors.card, overflow: 'hidden' },
+  firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
+  lastCell: { borderBottomLeftRadius: radii.card, borderBottomRightRadius: radii.card },
   line: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.md,
     minHeight: 64,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
   },
-  trash: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
-  sectionFooter: { gap: spacing.xs, paddingTop: spacing.sm },
+  lineOff: { backgroundColor: colors.warningSoft },
+  lineOut: { backgroundColor: colors.destructiveSoft },
+  mark: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  side: { alignItems: 'flex-end', gap: spacing.xs, maxWidth: '42%' },
+  trash: {
+    width: TOUCH,
+    height: TOUCH,
+    marginRight: -spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionFooter: { gap: spacing.sm, paddingTop: spacing.md },
   loading: { marginTop: spacing.xl },
-  footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 14,
-    paddingTop: spacing.md,
-    backgroundColor: colors.sheetBarFill,
-  },
+});
+
+/** The round mark before a line: green when it matches, orange when it differs, red when none came. */
+const MARKS = StyleSheet.create({
+  unchecked: { borderWidth: 2, borderColor: colors.fieldBorder },
+  exact: { backgroundColor: colors.tint.green },
+  extra: { backgroundColor: colors.tint.blue },
+  short: { backgroundColor: colors.tint.orange },
+  over: { backgroundColor: colors.tint.orange },
+  notArrived: { backgroundColor: colors.tint.red },
 });

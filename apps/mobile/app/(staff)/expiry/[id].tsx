@@ -1,5 +1,6 @@
 import { isSystemRole } from '@tugeel/shared/auth';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Archive, ArchiveRestore, PencilLine, Plus } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -11,7 +12,6 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   type ExpiryChange,
   type ExpiryItem,
@@ -27,13 +27,7 @@ import {
 import { type AppProblem, problemFrom } from '../../../src/api/problem';
 import { FirstLoad, useAt } from '../../../src/community/parts';
 import { useLeaveGuard } from '../../../src/expiry/leave-guard';
-import {
-  DaysText,
-  ExpiryFields,
-  ExpiryStatusPill,
-  LeaveSheet,
-  QtyCells,
-} from '../../../src/expiry/parts';
+import { DaysTile, ExpiryFields, ExpiryStatusPill, LeaveSheet } from '../../../src/expiry/parts';
 import {
   displayDate,
   type ExpiryEdits,
@@ -50,12 +44,13 @@ import {
 import { formatQty } from '../../../src/format/format';
 import { mayManageExpiry } from '../../../src/state/phase';
 import { useSignedIn } from '../../../src/state/session';
-import { colors, radii, spacing, tabular, TOUCH, type } from '../../../src/theme/tokens';
+import { colors, spacing, tabular, type } from '../../../src/theme/tokens';
 import { PillButton } from '../../../src/ui/controls';
-import { Group, Row } from '../../../src/ui/grouped';
+import { Group, ICON_INSET, IconTile, Row } from '../../../src/ui/grouped';
 import { ProblemText } from '../../../src/ui/kit';
 import { Page, SectionHeader } from '../../../src/ui/layout';
 import { ActionSheet } from '../../../src/ui/sheet';
+import { Card, FooterBar } from '../../../src/ui/staff-kit';
 import { StoreHeader } from '../../../src/ui/store-header';
 import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
@@ -87,7 +82,7 @@ export default function ExpiryRecordScreen() {
 }
 
 /**
- * The product, the date and its days; a correction that sends only what changed, with the version
+ * A card with the days tile, the product, the date, the status and the three counts; a correction that sends only what changed, with the version
  * it read, and when someone else got there first keeps what was typed, says so until it is saved
  * and shows what stands now beside each typed field; for a holder of the right the status and
  * archive, which asks before it drops what was typed; the liability to read (it is assigned on the
@@ -106,7 +101,6 @@ function RecordBody({
 }) {
   const { t } = useTranslation();
   const toast = useToast();
-  const insets = useSafeAreaInsets();
   const at = useAt();
   const { me } = useSignedIn();
   const manager = mayManageExpiry(me);
@@ -237,41 +231,57 @@ function RecordBody({
           />
         }
       >
-        <View style={styles.card}>
-          <Text style={type.heading} numberOfLines={3}>
-            {item.product.name}
-          </Text>
-          <Text style={type.secondary} numberOfLines={1}>
-            {`${item.product.sku} · ${item.product.baseUomName}`}
-          </Text>
-          {item.supplier ? (
-            <Text style={type.secondary} numberOfLines={1}>
-              {t('mobile.expiry.record.supplier', { name: item.supplier.name })}
-            </Text>
-          ) : null}
-          {item.homeWarehouse ? (
-            <Text style={type.secondary} numberOfLines={1}>
-              {t('mobile.expiry.record.warehouse', { name: item.homeWarehouse.name })}
-            </Text>
-          ) : null}
-          <View style={styles.line}>
-            <Text style={[type.rowStrong, tabular]}>{displayDate(item.expiryDate)}</Text>
-            <DaysText daysLeft={item.daysLeft} />
-            <ExpiryStatusPill status={item.status} />
+        <Card style={styles.top}>
+          <View style={styles.topRow}>
+            <DaysTile daysLeft={item.daysLeft} size={60} />
+            <View style={styles.grow}>
+              <Text style={type.title3} numberOfLines={3}>
+                {item.product.name}
+              </Text>
+              <Text style={type.secondary} numberOfLines={1}>
+                {`${item.product.sku} · ${item.product.baseUomName}`}
+              </Text>
+              <Text style={[type.rowStrong, tabular]}>{displayDate(item.expiryDate)}</Text>
+            </View>
           </View>
-          {archived ? (
-            <QtyCells
-              floor={item.qtyFloor}
-              warehouse={item.qtyWarehouse}
-              total={item.qtyTotal}
-              unit={item.product.baseUomName}
-            />
+          <ExpiryStatusPill status={item.status} />
+          <View style={styles.stats}>
+            {(
+              [
+                [item.qtyFloor, 'mobile.expiry.row.floor'],
+                [item.qtyWarehouse, 'mobile.expiry.row.warehouse'],
+                [item.qtyTotal, 'mobile.expiry.row.total'],
+              ] as const
+            ).map(([qty, label]) => (
+              <View key={label} style={styles.stat}>
+                <Text style={[type.title3, tabular]} numberOfLines={1} adjustsFontSizeToFit>
+                  {formatQty(qty)}
+                </Text>
+                <Text style={type.secondary} numberOfLines={1}>
+                  {t(label)}
+                </Text>
+              </View>
+            ))}
+          </View>
+          {item.supplier || item.homeWarehouse ? (
+            <View style={styles.facts}>
+              {item.supplier ? (
+                <Text style={type.secondary} numberOfLines={1}>
+                  {t('mobile.expiry.record.supplier', { name: item.supplier.name })}
+                </Text>
+              ) : null}
+              {item.homeWarehouse ? (
+                <Text style={type.secondary} numberOfLines={1}>
+                  {t('mobile.expiry.record.warehouse', { name: item.homeWarehouse.name })}
+                </Text>
+              ) : null}
+            </View>
           ) : null}
           {archived && item.note ? <Text style={type.body}>{item.note}</Text> : null}
-        </View>
+        </Card>
 
         {refused ? (
-          <View style={styles.card}>
+          <Card style={styles.card}>
             {archived ? <ProblemText problem={ARCHIVED_PROBLEM} style={styles.barProblem} /> : null}
             <Text style={type.body}>
               {t('mobile.expiry.record.notSaved', { values: typedLine(refused) })}
@@ -279,14 +289,14 @@ function RecordBody({
             <PillButton
               title={t('common.close')}
               variant="soft"
-              height={TOUCH}
+              height={44}
               onPress={() => setRefused(null)}
             />
-          </View>
+          </Card>
         ) : null}
 
         {archived ? (
-          <View style={styles.card}>
+          <Card style={styles.card}>
             {item.archivedAt ? (
               <Text style={type.body}>
                 {item.archivedByName
@@ -304,15 +314,16 @@ function RecordBody({
               <PillButton
                 title={t('mobile.expiry.record.restore')}
                 variant="soft"
+                icon={<ArchiveRestore size={18} strokeWidth={2.2} color={colors.link} />}
                 loading={setStatus.isPending}
                 onPress={() => void decide('REVIEW', t('mobile.expiry.record.restored'))}
               />
             ) : null}
-          </View>
+          </Card>
         ) : (
           <View>
             <SectionHeader style={styles.head}>{t('mobile.expiry.record.correct')}</SectionHeader>
-            <View style={styles.card}>
+            <Card>
               <ExpiryFields
                 form={formOf(item, edits)}
                 onChange={change}
@@ -323,31 +334,20 @@ function RecordBody({
                 unit={item.product.baseUomName}
                 beside={conflict ? standingBeside(item, edits) : null}
               />
-            </View>
+            </Card>
           </View>
         )}
 
-        {manager && !archived ? (
-          <View style={styles.manage}>
-            <Group>
+        <View>
+          <SectionHeader style={styles.head}>{t('mobile.expiry.record.liability')}</SectionHeader>
+          <Group>
+            {manager && !archived ? (
               <Row
                 title={t('mobile.expiry.record.status')}
                 value={t(`expiry.status.${item.status}`)}
                 onPress={() => setChoosing(true)}
               />
-            </Group>
-            <PillButton
-              title={t('mobile.expiry.record.archive')}
-              variant="destructive"
-              loading={setStatus.isPending}
-              onPress={() => setArchiving(true)}
-            />
-          </View>
-        ) : null}
-
-        <View>
-          <SectionHeader style={styles.head}>{t('mobile.expiry.record.liability')}</SectionHeader>
-          <Group>
+            ) : null}
             {/* No line limit: this is the only place on the phone to read who is liable. */}
             <View style={styles.liability}>
               <Text style={type.row}>{t(`expiry.liabilityType.${item.liability.type}`)}</Text>
@@ -356,21 +356,18 @@ function RecordBody({
                 <Text style={type.secondary}>{item.liability.note}</Text>
               ) : null}
             </View>
+            <Row
+              title={t('mobile.expiry.record.addedBy')}
+              subtitle={t('mobile.expiry.record.who', {
+                name: item.createdByName,
+                at: at(item.createdAt),
+              })}
+            />
           </Group>
           <Text style={[type.secondary, styles.hint]}>
             {t('mobile.expiry.record.liabilityHint')}
           </Text>
         </View>
-
-        <Group>
-          <Row
-            title={t('mobile.expiry.record.addedBy')}
-            subtitle={t('mobile.expiry.record.who', {
-              name: item.createdByName,
-              at: at(item.createdAt),
-            })}
-          />
-        </Group>
 
         <View>
           <SectionHeader style={styles.head}>{t('mobile.expiry.record.history')}</SectionHeader>
@@ -381,17 +378,27 @@ function RecordBody({
           ) : (history.data?.data ?? []).length === 0 ? (
             <Text style={[type.secondary, styles.hint]}>{t('mobile.expiry.record.noHistory')}</Text>
           ) : (
-            <Group>
+            <Group inset={ICON_INSET}>
               {(history.data?.data ?? []).map((entry) => (
                 <HistoryRow key={entry.id} change={entry} />
               ))}
             </Group>
           )}
         </View>
+
+        {manager && !archived ? (
+          <PillButton
+            title={t('mobile.expiry.record.archive')}
+            variant="destructive"
+            icon={<Archive size={18} strokeWidth={2.2} color={colors.destructive} />}
+            loading={setStatus.isPending}
+            onPress={() => setArchiving(true)}
+          />
+        ) : null}
       </ScrollView>
 
       {edited || problem ? (
-        <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+        <FooterBar column>
           <ProblemText problem={problem ?? (edited ? conflict : null)} style={styles.barProblem} />
           {edited ? (
             <PillButton
@@ -400,7 +407,7 @@ function RecordBody({
               onPress={() => void save()}
             />
           ) : null}
-        </View>
+        </FooterBar>
       ) : null}
 
       <ActionSheet
@@ -451,51 +458,70 @@ function HistoryRow({ change }: { change: ExpiryChange }) {
   ].filter((line) => line !== null);
   return (
     <View style={styles.change}>
-      <Text style={type.rowStrong}>
-        {change.kind === 'CREATE'
-          ? t('mobile.expiry.record.created')
-          : t('mobile.expiry.record.changed')}
-      </Text>
-      {change.kind === 'CREATE' || lines.length === 0 ? (
-        <Text style={[type.body, tabular]}>
-          {t('mobile.expiry.record.counts', {
-            floor: formatQty(change.qtyFloorNew),
-            warehouse: formatQty(change.qtyWarehouseNew),
+      {change.kind === 'CREATE' ? (
+        <IconTile color={colors.successSoft}>
+          <Plus size={20} strokeWidth={2.2} color={colors.success} />
+        </IconTile>
+      ) : (
+        <IconTile color={colors.secondary}>
+          <PencilLine size={20} strokeWidth={2} color={colors.link} />
+        </IconTile>
+      )}
+      <View style={styles.grow}>
+        <Text style={type.row}>
+          {change.kind === 'CREATE'
+            ? t('mobile.expiry.record.created')
+            : t('mobile.expiry.record.changed')}
+        </Text>
+        {change.kind === 'CREATE' || lines.length === 0 ? (
+          <Text style={[type.secondary, tabular]}>
+            {t('mobile.expiry.record.counts', {
+              floor: formatQty(change.qtyFloorNew),
+              warehouse: formatQty(change.qtyWarehouseNew),
+            })}
+          </Text>
+        ) : (
+          lines.map((line) => (
+            <Text key={line} style={[type.secondary, tabular]}>
+              {line}
+            </Text>
+          ))
+        )}
+        <Text style={type.secondary}>
+          {t('mobile.expiry.record.who', {
+            name: change.changedByName,
+            at: at(change.changedAt),
           })}
         </Text>
-      ) : (
-        lines.map((line) => (
-          <Text key={line} style={[type.body, tabular]}>
-            {line}
-          </Text>
-        ))
-      )}
-      <Text style={type.secondary}>
-        {t('mobile.expiry.record.who', {
-          name: change.changedByName,
-          at: at(change.changedAt),
-        })}
-      </Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  body: { padding: 14, paddingBottom: 24, gap: spacing.md },
-  card: {
-    padding: spacing.lg,
-    gap: spacing.sm,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
+  grow: { flex: 1, minWidth: 0, gap: 1 },
+  body: { padding: spacing.lg, paddingBottom: spacing.xl, gap: spacing.lg },
+  top: { gap: spacing.md },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  stats: { flexDirection: 'row', gap: 10 },
+  // The kit's stat tile, grey and flat inside a card.
+  stat: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+    paddingVertical: spacing.md,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: colors.canvas,
   },
-  line: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
-  head: { marginTop: spacing.xs },
+  facts: { gap: spacing.xs },
+  card: { gap: spacing.sm },
+  head: { marginTop: 0 },
   hint: { marginTop: spacing.sm, marginHorizontal: spacing.xs },
-  manage: { gap: spacing.sm },
   // A group's row in size, without its two-line limit.
   liability: {
-    minHeight: 48,
+    minHeight: 52,
     justifyContent: 'center',
     paddingVertical: 10,
     paddingHorizontal: spacing.lg,
@@ -503,12 +529,12 @@ const styles = StyleSheet.create({
   },
   loading: { marginTop: spacing.md },
   historyProblem: { marginTop: 0 },
-  change: { paddingVertical: 10, paddingHorizontal: spacing.lg, gap: 2 },
-  bar: {
-    gap: spacing.sm,
-    paddingHorizontal: 14,
-    paddingTop: spacing.sm,
-    backgroundColor: colors.canvas,
+  change: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.lg,
   },
   barProblem: { marginTop: 0 },
 });

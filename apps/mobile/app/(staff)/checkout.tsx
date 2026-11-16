@@ -2,9 +2,10 @@ import { addDays } from '@tugeel/shared/time';
 import { useRouter } from 'expo-router';
 import {
   CalendarDays,
-  ChartBar,
   Check,
   ChevronRight,
+  CircleAlert,
+  Send,
   Store,
   Truck,
   Warehouse,
@@ -29,14 +30,24 @@ import { monthOf, weekdayOf } from '../../src/dates/dates';
 import { formatMnt } from '../../src/format/format';
 import { placeOf } from '../../src/state/placement';
 import { useShop } from '../../src/state/shop';
-import { colors, fonts, radii, shadows, spacing, tabular, type } from '../../src/theme/tokens';
-import { PillButton, Segmented } from '../../src/ui/controls';
-import { Group, Row } from '../../src/ui/grouped';
+import {
+  colors,
+  fonts,
+  radii,
+  shadows,
+  spacing,
+  tabular,
+  TOUCH,
+  type,
+} from '../../src/theme/tokens';
+import { PillButton } from '../../src/ui/controls';
+import { Group, ICON_INSET, ICON_TILE, IconTile, Row } from '../../src/ui/grouped';
 import { MonthCalendar } from '../../src/ui/calendar';
 import { ProblemText } from '../../src/ui/kit';
 import { Page, SectionHeader } from '../../src/ui/layout';
 import { PendingSendCard } from '../../src/ui/pending-send';
 import { Sheet, SheetClose, SheetHeader } from '../../src/ui/sheet';
+import { FooterBar, Notice, PAGE } from '../../src/ui/staff-kit';
 import { HeaderTextButton, StoreHeader } from '../../src/ui/store-header';
 
 /** How far ahead a delivery may be set. */
@@ -53,8 +64,9 @@ const PAY_DOTS = {
  * contact person, the owner 2026-10-18), «Хүлээн авах» (delivery or pickup as two cards, the
  * address, and the day as four tiles: today, tomorrow, the day after, another day), the payment, a
  * note, where the order lands, and «Баталгаажуулж илгээх». A sent order shows its number over the
- * page; a send without an answer keeps the cart locked (ADR-0061 #8). Bto300's blue header with ←
- * and, while the note is typed in, «Болсон» (ADR-0100).
+ * page; a send without an answer keeps the cart locked (ADR-0061 #8). The blue header carries the
+ * title once with «N бараа · дүн» under it, ← and, while the note is typed in, «Болсон»; the
+ * total and the send button sit in the bar at the bottom (the Checkout board of 2026-11-16).
  */
 export default function CheckoutScreen() {
   const { t } = useTranslation();
@@ -189,6 +201,7 @@ export default function CheckoutScreen() {
     <Page edges={[]}>
       <StoreHeader
         title={t('mobile.checkout.title')}
+        subtitle={t('mobile.checkout.summary', { n: cart.lines.length, total: totalText })}
         onBack={() => router.back()}
         right={
           noteFocused ? (
@@ -203,19 +216,25 @@ export default function CheckoutScreen() {
         }}
         scrollEventThrottle={32}
         keyboardShouldPersistTaps="handled"
+        style={styles.scroll}
         contentContainerStyle={[
           styles.body,
-          { paddingBottom: (keyboard > 0 ? keyboard : 120) + insets.bottom + spacing.lg },
+          {
+            paddingBottom:
+              keyboard > 0
+                ? keyboard + insets.bottom + spacing.lg
+                : locked
+                  ? insets.bottom + spacing.lg
+                  : spacing.lg,
+          },
         ]}
       >
-        <Text accessibilityRole="header" style={[type.title, styles.title]}>
-          {t('mobile.checkout.title')}
-        </Text>
-        <Text style={[type.body, styles.subtitle]}>
-          {t('mobile.checkout.summary', { n: cart.lines.length, total: totalText })}
-        </Text>
-
-        {locked ? <PendingSendCard onSent={setSent} /> : null}
+        {locked ? (
+          // The shared card brings its own 16 px on top; the page's gap already gives it.
+          <View style={styles.pending}>
+            <PendingSendCard onSent={setSent} />
+          </View>
+        ) : null}
 
         <SectionHeader style={styles.section}>{t('mobile.checkout.customer')}</SectionHeader>
         <Pressable
@@ -224,11 +243,11 @@ export default function CheckoutScreen() {
           onPress={() => router.push('/customers')}
           style={({ pressed }) => [styles.customer, pressed && styles.pressed]}
         >
-          <View style={styles.customerIcon}>
-            <Store size={19} strokeWidth={2} color={colors.primaryForeground} />
-          </View>
+          <IconTile color={colors.primary}>
+            <Store size={18} strokeWidth={2} color={colors.primaryForeground} />
+          </IconTile>
           <View style={styles.grow}>
-            <Text style={[type.row, !cart.customer && styles.accent]}>
+            <Text style={[type.rowStrong, !cart.customer && styles.accent]} numberOfLines={1}>
               {cart.customer ? cart.customer.name : t('mobile.checkout.chooseCustomer')}
             </Text>
             {cart.customer ? (
@@ -238,7 +257,7 @@ export default function CheckoutScreen() {
             ) : null}
           </View>
           {cart.customer ? (
-            <Text style={[type.body, styles.accent]}>{t('mobile.checkout.change')}</Text>
+            <Text style={styles.change}>{t('mobile.checkout.change')}</Text>
           ) : (
             <ChevronRight size={16} strokeWidth={2.6} color={colors.input} />
           )}
@@ -269,12 +288,12 @@ export default function CheckoutScreen() {
 
         {today ? (
           <>
-            <View style={styles.dayHead}>
-              <Text style={[type.sectionHeader, styles.grow]}>
-                {delivery ? t('mobile.checkout.deliveryDay') : t('mobile.checkout.pickupDay')}
-              </Text>
-              <Text style={type.secondary}>{dateText(cart.deliveryDate)}</Text>
-            </View>
+            <SectionHeader
+              style={styles.section}
+              right={<Text style={[type.secondary, tabular]}>{dateText(cart.deliveryDate)}</Text>}
+            >
+              {delivery ? t('mobile.checkout.deliveryDay') : t('mobile.checkout.pickupDay')}
+            </SectionHeader>
             <View style={styles.days}>
               {quickDays.map((day) => (
                 <DayTile
@@ -289,7 +308,7 @@ export default function CheckoutScreen() {
               <DayTile
                 title={otherDay ? monthDay(otherDay) : t('mobile.checkout.otherDay')}
                 line={otherDay ? weekdayName(otherDay) : null}
-                icon={<CalendarDays size={14} strokeWidth={2} color={colors.muted} />}
+                icon={<CalendarDays size={18} strokeWidth={2} color={colors.foreground} />}
                 selected={otherDay !== null}
                 disabled={locked}
                 onPress={() => setSheet('date')}
@@ -299,13 +318,29 @@ export default function CheckoutScreen() {
         ) : null}
 
         <SectionHeader style={styles.section}>{t('mobile.checkout.payment')}</SectionHeader>
-        <Segmented
-          options={payments}
-          value={cart.paymentMethod}
-          onChange={(method) => !locked && dispatch({ type: 'payment', method })}
-          height={44}
-          label={t('mobile.checkout.payment')}
-        />
+        <View
+          accessibilityRole="radiogroup"
+          accessibilityLabel={t('mobile.checkout.payment')}
+          style={styles.payments}
+        >
+          {payments.map((option) => {
+            const on = option.value === cart.paymentMethod;
+            return (
+              <Pressable
+                key={option.value}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: on, disabled: locked }}
+                onPress={() => !locked && dispatch({ type: 'payment', method: option.value })}
+                style={[styles.payment, on && styles.paymentOn]}
+              >
+                <View style={[styles.payDot, { backgroundColor: option.dot }]} />
+                <Text style={[type.chip, on && styles.paymentTextOn]} numberOfLines={1}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
         <SectionHeader
           style={styles.section}
@@ -333,52 +368,63 @@ export default function CheckoutScreen() {
         </View>
 
         <SectionHeader style={styles.section}>{t('mobile.checkout.order')}</SectionHeader>
-        <Group>
+        <Group inset={ICON_INSET}>
           <Row
             title={t('mobile.checkout.lines', { n: cart.lines.length })}
-            right={<Text style={type.heading}>{totalText}</Text>}
+            right={<Text style={[type.row, tabular]}>{totalText}</Text>}
           />
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/settings')}
-            style={styles.place}
-          >
-            <ChartBar size={16} strokeWidth={2} color={colors.muted} />
-            <Text style={[type.secondary, styles.grow]}>
-              {place
+          <Row
+            icon={
+              <View style={styles.placeIcon}>
+                <Send size={18} strokeWidth={2} color={colors.link} />
+              </View>
+            }
+            title={
+              place
                 ? t('mobile.checkout.landsOn', {
                     pipeline: place.pipelineName,
                     stage: place.stageName,
                   })
-                : t('mobile.checkout.noStage')}
-            </Text>
-          </Pressable>
+                : t('mobile.checkout.noStage')
+            }
+            onPress={() => router.push('/settings')}
+          />
         </Group>
 
-        <ProblemText problem={problem} />
+        <ProblemText problem={problem} style={styles.problem} />
         {unknown ? (
-          <Text style={[type.secondary, styles.issue]}>{t('mobile.cart.unknownHint')}</Text>
+          <Notice tone="bad" icon={CircleAlert}>
+            {t('mobile.cart.unknownHint')}
+          </Notice>
         ) : null}
         {!locked && issues.length > 0 && cart.lines.length > 0 ? (
-          <Text style={[type.secondary, styles.issue]}>
+          <Notice tone="bad" icon={CircleAlert}>
             {t(`mobile.cart.issues.${issues[0] ?? 'lines'}`)}
-          </Text>
+          </Notice>
         ) : null}
       </ScrollView>
 
       {keyboard > 0 || locked ? null : (
-        <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, spacing.md) + 18 }]}>
-          <View style={styles.grow}>
+        <FooterBar>
+          <View style={styles.footerTotal}>
             <Text style={type.secondary}>{t('mobile.cart.total')}</Text>
-            <Text style={styles.total}>{totalText}</Text>
+            <Text
+              style={styles.total}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
+              {totalText}
+            </Text>
           </View>
           <PillButton
             title={t('mobile.checkout.send')}
             loading={sending}
             disabled={issues.length > 0 || quote.isLoading}
             onPress={() => void submit()}
+            style={styles.send}
           />
-        </View>
+        </FooterBar>
       )}
 
       <AddressSheet
@@ -549,11 +595,11 @@ function ReceiveCard({
           {icon(selected ? colors.primaryForeground : colors.label2)}
         </View>
         <View style={[styles.radio, selected && styles.radioSelected]}>
-          {selected ? <Check size={13} strokeWidth={3} color={colors.primaryForeground} /> : null}
+          {selected ? <Check size={15} strokeWidth={3} color={colors.primaryForeground} /> : null}
         </View>
       </View>
       <View style={styles.optionText}>
-        <Text style={type.heading} numberOfLines={1}>
+        <Text style={type.rowStrong} numberOfLines={1}>
           {title}
         </Text>
         <View style={styles.optionLine}>
@@ -665,61 +711,57 @@ function DateSheet({
 }
 
 const styles = StyleSheet.create({
-  body: { paddingHorizontal: spacing.lg },
-  title: { marginTop: 2, marginHorizontal: spacing.xs },
-  subtitle: { marginTop: spacing.xs, marginHorizontal: spacing.xs, color: colors.muted },
-  section: { marginTop: 22 },
+  scroll: { flex: 1 },
+  body: { ...PAGE },
+  pending: { marginTop: -spacing.lg },
+  // A label sits 8 px over its block inside the page's 16 px rhythm.
+  section: { marginTop: 0, marginBottom: -spacing.sm },
   customer: {
-    minHeight: 62,
+    minHeight: 60,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingLeft: spacing.lg,
-    paddingRight: 14,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderRadius: radii.card,
     backgroundColor: colors.card,
+    boxShadow: shadows.card,
   },
   pressed: { backgroundColor: colors.accent },
-  customerIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    backgroundColor: colors.tint.blue,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  grow: { flex: 1 },
-  accent: { color: colors.primary },
-  options: { flexDirection: 'row', gap: 10 },
+  grow: { flex: 1, minWidth: 0 },
+  accent: { color: colors.link },
+  change: { ...type.body, fontFamily: fonts.medium, color: colors.link },
+  options: { flexDirection: 'row', gap: spacing.md },
   option: {
     flex: 1,
-    minHeight: 104,
+    minHeight: 108,
     padding: spacing.md,
-    gap: 10,
+    gap: spacing.sm,
     borderRadius: radii.card,
     borderWidth: 2,
     borderColor: colors.card,
     backgroundColor: colors.card,
+    boxShadow: shadows.card,
   },
   optionPressed: { borderColor: colors.accent, backgroundColor: colors.accent },
   optionSelected: { borderColor: colors.primary },
   dimmed: { opacity: 0.5 },
   optionTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   optionIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: radii.control,
-    backgroundColor: colors.fieldFill,
+    width: ICON_TILE,
+    height: ICON_TILE,
+    borderRadius: 10,
+    backgroundColor: colors.fill,
     alignItems: 'center',
     justifyContent: 'center',
   },
   optionIconSelected: { backgroundColor: colors.primary },
   radio: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    borderColor: colors.input,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.fieldBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -728,60 +770,67 @@ const styles = StyleSheet.create({
   optionLine: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   shrink: { flexShrink: 1 },
   link: { color: colors.link },
-  dayHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
-    marginHorizontal: spacing.xs,
-  },
   days: { flexDirection: 'row', gap: spacing.sm },
   day: {
     flex: 1,
-    height: 56,
+    height: 58,
     paddingHorizontal: spacing.xs,
     gap: 2,
-    borderRadius: radii.field,
+    borderRadius: 14,
     backgroundColor: colors.card,
+    boxShadow: shadows.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dayPressed: { backgroundColor: colors.accent },
-  daySelected: { backgroundColor: colors.primary },
-  dayTitle: { ...type.chip, fontFamily: fonts.semibold },
+  daySelected: { backgroundColor: colors.primary, boxShadow: shadows.accentCard },
+  dayTitle: { ...type.bodyStrong },
   onPrimary: { color: colors.primaryForeground },
-  counter: { ...type.secondary, color: colors.tint.gray },
+  // The payment as the boards draw it: a white card, the chosen part soft blue.
+  payments: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    padding: spacing.xs,
+    borderRadius: 14,
+    backgroundColor: colors.card,
+    boxShadow: shadows.card,
+  },
+  payment: {
+    flex: 1,
+    height: TOUCH,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.xs,
+    borderRadius: radii.control,
+  },
+  paymentOn: { backgroundColor: colors.secondary },
+  paymentTextOn: { fontFamily: fonts.semibold, color: colors.link },
+  payDot: { width: 8, height: 8, borderRadius: 2 },
+  counter: { ...type.secondary, ...tabular },
   note: {
-    minHeight: 92,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.card,
+    minHeight: 96,
+    paddingVertical: spacing.md,
+    paddingHorizontal: 14,
+    borderRadius: radii.field,
+    borderWidth: 1,
+    borderColor: colors.fieldBorder,
     backgroundColor: colors.card,
     textAlignVertical: 'top',
   },
-  place: {
-    minHeight: 48,
-    flexDirection: 'row',
+  placeIcon: {
+    width: ICON_TILE,
+    height: ICON_TILE,
+    borderRadius: 10,
+    backgroundColor: colors.secondary,
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
+    justifyContent: 'center',
   },
-  issue: { marginTop: spacing.md, marginHorizontal: spacing.xs, color: colors.destructive },
-  bottom: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingTop: 14,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.sheetBarFill,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  total: { ...type.title2, ...tabular },
+  problem: { marginTop: 0 },
+  footerTotal: { flexShrink: 1, minWidth: 84, maxWidth: '42%' },
+  total: { ...type.title3, ...tabular },
+  send: { flex: 1 },
   sheetBody: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xs,

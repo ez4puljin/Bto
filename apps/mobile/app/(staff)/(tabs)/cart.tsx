@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import {
   ArrowRight,
   ChevronDown,
+  CircleAlert,
   CircleMinus,
   Package,
   Plus,
@@ -25,19 +26,21 @@ import { Separator } from '../../../src/ui/grouped';
 import { EmptyState } from '../../../src/ui/kit';
 import { Page, SectionHeader } from '../../../src/ui/layout';
 import { PendingSendCard } from '../../../src/ui/pending-send';
+import { Card, FooterBar, Notice, PAGE } from '../../../src/ui/staff-kit';
 import { HeaderTextButton, StoreHeader } from '../../../src/ui/store-header';
-import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
+import { useStoreTabBarHeight, useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 
 /**
  * «Сагс» (the Cart board, ADR-0068; Bto300's look since ADR-0100): the blue header with «Засах»,
  * which shows the remove buttons; one row per product with its pieces, the server's line total and
- * the unit pill that opens the product; the server's total; «Захиалга илгээх» goes on to the
- * customer's details.
+ * the unit pill that opens the product; the server's total; «Захиалга илгээх», in the bar above the
+ * tabs with the total beside it, goes on to the customer's details.
  */
 export default function CartScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const inset = useStoreTabBarInset();
+  const barHeight = useStoreTabBarHeight();
   const { server } = useSignedIn();
   const { cart, dispatch, pending } = useShop();
   const [editing, setEditing] = useState(false);
@@ -70,10 +73,15 @@ export default function CartScreen() {
   const unpriced = quote.data?.lines.some((line) => !line.priced) === true;
   const discount = quote.data ? new Decimal(quote.data.discountTotal) : new Decimal(0);
 
+  const totalText = quote.data
+    ? t('pricing.money', { amount: formatMnt(quote.data.total) })
+    : t('common.none');
+
   return (
     <Page edges={[]}>
       <StoreHeader
         title={t('mobile.tabs.cart')}
+        subtitle={t('mobile.cart.count', { n: cart.lines.length })}
         right={
           locked ? null : (
             <HeaderTextButton
@@ -83,15 +91,22 @@ export default function CartScreen() {
           )
         }
       />
-      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: inset + spacing.lg }]}>
-        <Text style={[type.body, styles.subtitle]}>
-          {t('mobile.cart.count', { n: cart.lines.length })}
-        </Text>
-
-        {locked ? <PendingSendCard /> : null}
+      <ScrollView
+        style={styles.grow}
+        contentContainerStyle={[
+          styles.body,
+          { paddingBottom: locked ? inset + spacing.lg : spacing.lg },
+        ]}
+      >
+        {locked ? (
+          // The shared card brings its own 16 px on top; the page's gap already gives it.
+          <View style={styles.pending}>
+            <PendingSendCard />
+          </View>
+        ) : null}
 
         <SectionHeader style={styles.section}>{t('mobile.cart.lines')}</SectionHeader>
-        <View style={styles.group}>
+        <Card flush>
           {cart.lines.map((line, index) => (
             <View key={line.productUnitId}>
               {index > 0 ? <Separator inset={80} /> : null}
@@ -115,51 +130,61 @@ export default function CartScreen() {
                 onPress={() => router.navigate('/shop')}
                 style={({ pressed }) => [styles.addRow, pressed && styles.pressed]}
               >
-                <Plus size={22} strokeWidth={2.2} color={colors.primary} />
-                <Text style={[type.row, styles.accent]}>{t('mobile.cart.addMore')}</Text>
+                <Plus size={20} strokeWidth={2.2} color={colors.link} />
+                <Text style={styles.addText}>{t('mobile.cart.addMore')}</Text>
               </Pressable>
             </>
           )}
-        </View>
+        </Card>
 
         <SectionHeader style={styles.section}>{t('mobile.cart.totals')}</SectionHeader>
-        <View style={styles.group}>
-          <View style={styles.totalRow}>
-            <Text style={type.heading}>{t('mobile.cart.total')}</Text>
-            <Text style={styles.total}>
-              {quote.data
-                ? t('pricing.money', { amount: formatMnt(quote.data.total) })
-                : t('common.none')}
-            </Text>
-          </View>
+        <Card flush>
           {discount.gt(0) ? (
             <>
-              <Separator />
               <View style={styles.discountRow}>
-                <Text style={type.body}>{t('mobile.cart.discount')}</Text>
-                <Text style={[type.bodyStrong, styles.green]}>
+                <Text style={type.row}>{t('mobile.cart.discount')}</Text>
+                <Text style={[type.row, tabular, styles.green]}>
                   {t('mobile.cart.minus', { amount: formatMnt(discount.toFixed(0)) })}
                 </Text>
               </View>
+              <Separator />
             </>
           ) : null}
-          <Separator />
-          <Text style={[type.secondary, styles.note]}>{t('mobile.cart.priceNote')}</Text>
-        </View>
+          <View style={styles.totalRow}>
+            <View style={styles.text}>
+              <Text style={type.row}>{t('mobile.cart.total')}</Text>
+              <Text style={type.caption}>{t('mobile.cart.priceNote')}</Text>
+            </View>
+            <Text style={styles.total}>{totalText}</Text>
+          </View>
+        </Card>
 
         {unpriced ? (
-          <Text style={[type.secondary, styles.warning]}>{t('mobile.cart.unpriced')}</Text>
+          <Notice tone="bad" icon={CircleAlert}>
+            {t('mobile.cart.unpriced')}
+          </Notice>
         ) : null}
-        {locked ? null : (
-          <PillButton
-            title={t('mobile.cart.next')}
-            trailing={<ArrowRight size={20} strokeWidth={2.2} color={colors.primaryForeground} />}
-            disabled={quote.isLoading || unpriced}
-            onPress={() => router.push('/checkout')}
-            style={styles.next}
-          />
-        )}
       </ScrollView>
+      {locked ? null : (
+        // The page's main button, right above the tab bar, with the total beside it.
+        <View style={{ marginBottom: barHeight }}>
+          <FooterBar style={styles.footer}>
+            <View style={styles.footerTotal}>
+              <Text style={type.secondary}>{t('mobile.cart.total')}</Text>
+              <Text style={styles.footerAmount} numberOfLines={1}>
+                {totalText}
+              </Text>
+            </View>
+            <PillButton
+              title={t('mobile.cart.next')}
+              trailing={<ArrowRight size={20} strokeWidth={2.2} color={colors.primaryForeground} />}
+              disabled={quote.isLoading || unpriced}
+              onPress={() => router.push('/checkout')}
+              style={styles.grow}
+            />
+          </FooterBar>
+        </View>
+      )}
     </Page>
   );
 }
@@ -224,7 +249,7 @@ function CartRow({
           hitSlop={8}
         >
           <CircleMinus
-            size={24}
+            size={26}
             strokeWidth={2}
             color={colors.primaryForeground}
             fill={colors.tint.red}
@@ -250,11 +275,11 @@ function CartRow({
         )}
       </Pressable>
       <View style={styles.text}>
-        <Text style={styles.name} numberOfLines={2}>
+        <Text style={type.rowStrong} numberOfLines={2}>
           {line.name}
         </Text>
         {detail ? (
-          <Text style={type.secondary} numberOfLines={1}>
+          <Text style={[type.secondary, tabular]} numberOfLines={1}>
             {detail}
           </Text>
         ) : null}
@@ -284,72 +309,72 @@ function CartRow({
 }
 
 const styles = StyleSheet.create({
-  body: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
-  subtitle: { marginHorizontal: spacing.xs, color: colors.muted },
-  section: { marginTop: 22 },
-  group: { backgroundColor: colors.card, borderRadius: radii.card, overflow: 'hidden' },
+  grow: { flex: 1 },
+  body: { ...PAGE },
+  pending: { marginTop: -spacing.lg },
+  // A label sits 8 px over its card inside the page's 16 px rhythm.
+  section: { marginTop: 0, marginBottom: -spacing.sm },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingVertical: 10,
-    paddingLeft: spacing.lg,
-    paddingRight: 14,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
   thumb: {
     width: 52,
     height: 52,
-    borderRadius: 14,
+    borderRadius: radii.field,
     backgroundColor: colors.imageFill,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
   image: { width: '100%', height: '100%' },
-  text: { flex: 1 },
-  name: { ...type.heading },
+  text: { flex: 1, minWidth: 0, gap: 2 },
   right: { alignItems: 'flex-end', gap: 6 },
-  lineTotal: { ...type.heading, ...tabular },
+  lineTotal: { ...type.rowStrong, ...tabular },
   red: { ...type.chip, fontFamily: fonts.semibold, color: colors.destructive },
   qtyPill: {
-    height: 28,
+    height: 24,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
     paddingLeft: 10,
     paddingRight: spacing.sm,
-    borderRadius: 14,
-    backgroundColor: colors.fieldFill,
+    borderRadius: 12,
+    backgroundColor: colors.fill,
   },
-  qtyText: { ...type.chip, fontFamily: fonts.semibold },
+  qtyText: { ...type.secondary, fontFamily: fonts.semibold, color: colors.foreground },
   addRow: {
     minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: spacing.md,
     paddingHorizontal: spacing.lg,
   },
+  addText: { ...type.row, fontFamily: fonts.medium, color: colors.link },
   pressed: { backgroundColor: colors.accent },
-  accent: { color: colors.primary },
   totalRow: {
     minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingVertical: 10,
     paddingHorizontal: spacing.lg,
   },
   total: { ...type.title2, ...tabular },
   discountRow: {
-    minHeight: 44,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
   },
   green: { color: colors.success },
-  note: { paddingVertical: 11, paddingHorizontal: spacing.lg },
-  warning: { marginTop: spacing.md, marginHorizontal: spacing.xs, color: colors.destructive },
-  next: { marginTop: 20, borderRadius: 10 },
+  footer: { paddingBottom: spacing.md },
+  footerTotal: { flexShrink: 1, minWidth: 72 },
+  footerAmount: { ...type.title3, ...tabular },
   empty: {
     flex: 1,
     justifyContent: 'center',

@@ -1,13 +1,24 @@
 import { HR_LIMITS, hoursAndMinutes } from '@tugeel/shared/hr';
 import * as Location from 'expo-location';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ClipboardPen, History, LogIn, LogOut, MapPin, PencilLine } from 'lucide-react-native';
+import {
+  ClipboardPen,
+  Clock3,
+  History,
+  LogIn,
+  LogOut,
+  MapPin,
+  MapPinOff,
+  PencilLine,
+  TriangleAlert,
+} from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   AppState,
   Linking,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -26,12 +37,12 @@ import {
   nextKind,
 } from '../../../src/attendance/status';
 import { ubDate, ubTime, weekdayOf } from '../../../src/dates/dates';
-import { colors, radii, spacing, tabular, type } from '../../../src/theme/tokens';
+import { colors, fonts, radii, shadows, spacing, tabular, type } from '../../../src/theme/tokens';
 import { PillButton } from '../../../src/ui/controls';
 import { Group, ICON_INSET, IconTile, Row } from '../../../src/ui/grouped';
 import { ProblemText } from '../../../src/ui/kit';
-import { Page } from '../../../src/ui/layout';
-import { StatRow } from '../../../src/ui/stat-row';
+import { Page, SectionHeader } from '../../../src/ui/layout';
+import { Card, Notice, PAGE, StatTile, StatTiles, TONES } from '../../../src/ui/staff-kit';
 import { StoreHeader } from '../../../src/ui/store-header';
 import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
@@ -216,28 +227,21 @@ export default function AttendanceScreen() {
     const details = office
       ? [t('mobile.attendance.officeEdit'), event.note]
       : [event.siteName, event.distanceM !== null ? formatDistance(event.distanceM) : null];
+    const tone = office ? TONES.neutral : event.kind === 'IN' ? TONES.ok : TONES.bad;
+    const Icon = office ? PencilLine : event.kind === 'IN' ? LogIn : LogOut;
     return (
       <Row
         key={event.id}
-        minHeight={52}
+        minHeight={56}
         icon={
-          <IconTile
-            color={
-              office ? colors.tint.gray : event.kind === 'IN' ? colors.tint.green : colors.tint.red
-            }
-          >
-            {office ? (
-              <PencilLine size={16} strokeWidth={2.2} color={colors.primaryForeground} />
-            ) : event.kind === 'IN' ? (
-              <LogIn size={16} strokeWidth={2.2} color={colors.primaryForeground} />
-            ) : (
-              <LogOut size={16} strokeWidth={2.2} color={colors.primaryForeground} />
-            )}
+          <IconTile color={tone.background}>
+            <Icon size={18} strokeWidth={2.2} color={office ? colors.label2 : tone.text} />
           </IconTile>
         }
         title={t(event.kind === 'IN' ? 'mobile.attendance.eventIn' : 'mobile.attendance.eventOut', {
           time: ubTime(event.at),
         })}
+        titleStyle={styles.eventTitle}
         subtitle={details.filter(Boolean).join(' · ') || null}
       />
     );
@@ -271,104 +275,135 @@ export default function AttendanceScreen() {
           : t('mobile.attendance.notIn');
     const siteLine = state === 'IN' ? (lastIn?.siteName ?? day.siteName) : null;
     const workday = isWorkdayFlag(schedule.workdays, data.today);
+    const blocked = where === 'denied' || where === 'off';
 
     body = (
       <>
-        {/* Today */}
-        <View style={styles.card}>
-          <Text style={type.secondary}>
-            {`${ubDate(data.now) || data.today} · ${t(`mobile.weekdaysLong.${weekdayOf(data.today) as 0 | 1 | 2 | 3 | 4 | 5 | 6}`)}`}
-          </Text>
-          <Text
-            style={[
-              styles.state,
-              state === 'IN' && { color: colors.success },
-              state === null && { color: colors.muted },
-            ]}
-          >
-            {stateLine}
-          </Text>
-          {siteLine ? <Text style={type.body}>{siteLine}</Text> : null}
-          <View style={styles.figures}>
-            <Text style={[type.body, tabular]}>
-              {t('mobile.attendance.worked', { hours: worked.hours, minutes: worked.minutes })}
+        {/* Today, on the blue card */}
+        <View style={styles.today}>
+          <View style={styles.todayHead}>
+            <Text style={[type.body, styles.onBlueMuted, styles.grow]} numberOfLines={1}>
+              {`${ubDate(data.now) || data.today} · ${t(`mobile.weekdaysLong.${weekdayOf(data.today) as 0 | 1 | 2 | 3 | 4 | 5 | 6}`)}`}
             </Text>
-            {day.lateMinutes > 0 ? (
-              <Text style={[type.bodyStrong, tabular, styles.warning]}>
-                {t('mobile.attendance.late', { minutes: day.lateMinutes })}
+            <View
+              accessible
+              accessibilityLabel={t('mobile.attendance.schedule', {
+                start: schedule.workStart,
+                end: schedule.workEnd,
+              })}
+              style={styles.schedule}
+            >
+              <Clock3 size={13} strokeWidth={2.2} color={colors.primaryForeground} />
+              <Text style={[styles.scheduleText, tabular]}>
+                {`${schedule.workStart}–${schedule.workEnd}`}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.stateBlock}>
+            <Text style={[styles.state, tabular]} numberOfLines={1} adjustsFontSizeToFit>
+              {stateLine}
+            </Text>
+            {siteLine ? (
+              <Text style={[type.body, styles.onBlueMuted]} numberOfLines={1}>
+                {siteLine}
               </Text>
             ) : null}
           </View>
-          <Text style={type.secondary}>
-            {[
-              t('mobile.attendance.schedule', { start: schedule.workStart, end: schedule.workEnd }),
-              workday ? null : t('mobile.attendance.offDay'),
-            ]
-              .filter(Boolean)
-              .join(' · ')}
-          </Text>
+          <View style={styles.todayRule} />
+          <View style={styles.figures}>
+            <View style={styles.grow}>
+              <Text style={[type.secondary, styles.onBlueMuted]}>
+                {t('mobile.attendance.workedHours')}
+              </Text>
+              <Text style={[type.heading, tabular, styles.onBlue]}>
+                {t('mobile.attendance.dayWorked', {
+                  hours: worked.hours,
+                  minutes: worked.minutes,
+                })}
+              </Text>
+            </View>
+            <View style={styles.grow}>
+              <Text style={[type.secondary, styles.onBlueMuted]}>
+                {t('mobile.attendance.lateDays')}
+              </Text>
+              <Text style={[type.heading, tabular, styles.onBlue]}>
+                {t('mobile.attendance.minutesValue', { minutes: day.lateMinutes })}
+              </Text>
+            </View>
+          </View>
+          {workday ? null : (
+            <Text style={[type.secondary, styles.onBlueMuted]}>
+              {t('mobile.attendance.offDay')}
+            </Text>
+          )}
           {data.tracked ? null : (
-            <Text style={[type.secondary, styles.warning]}>{t('mobile.attendance.untracked')}</Text>
+            <Text style={[type.secondary, styles.onBlueMuted]}>
+              {t('mobile.attendance.untracked')}
+            </Text>
           )}
         </View>
 
         {/* Where the phone is */}
-        <Text style={styles.sectionTitle}>{t('mobile.attendance.location')}</Text>
-        <View style={styles.card}>
-          {sites.length === 0 ? (
-            <Text style={[type.body, styles.warning]}>{t('mobile.attendance.noSites')}</Text>
-          ) : null}
-          {where === 'denied' || where === 'off' ? (
-            <>
-              <Text style={[type.body, styles.warning]}>
-                {t(
-                  where === 'denied'
-                    ? 'mobile.attendance.locationDenied'
-                    : 'mobile.attendance.locationOff',
-                )}
-              </Text>
-              <PillButton
-                title={t('mobile.attendance.enableLocation')}
-                variant="soft"
-                height={44}
-                onPress={() => void enableLocation()}
+        <SectionHeader style={styles.section}>{t('mobile.attendance.location')}</SectionHeader>
+        {sites.length === 0 ? (
+          <Notice icon={TriangleAlert} tone="warn">
+            {t('mobile.attendance.noSites')}
+          </Notice>
+        ) : null}
+        {blocked ? (
+          <Card style={styles.locationOff}>
+            <Notice icon={MapPinOff} tone="warn">
+              {t(
+                where === 'denied'
+                  ? 'mobile.attendance.locationDenied'
+                  : 'mobile.attendance.locationOff',
+              )}
+            </Notice>
+            <PillButton
+              title={t('mobile.attendance.enableLocation')}
+              variant="soft"
+              height={44}
+              onPress={() => void enableLocation()}
+            />
+          </Card>
+        ) : fix && nearest ? (
+          <Card style={styles.siteRow}>
+            <IconTile color={nearest.inside ? TONES.ok.background : TONES.warn.background}>
+              <MapPin
+                size={18}
+                strokeWidth={2.2}
+                color={nearest.inside ? TONES.ok.text : TONES.warn.text}
               />
-            </>
-          ) : fix && nearest ? (
-            <View style={styles.siteRow}>
-              <IconTile color={nearest.inside ? colors.tint.green : colors.tint.orange}>
-                <MapPin size={16} strokeWidth={2.2} color={colors.primaryForeground} />
-              </IconTile>
-              <View style={styles.grow}>
-                <Text style={type.rowStrong} numberOfLines={1}>
-                  {nearest.site.name}
-                </Text>
-                <Text
-                  style={[type.body, tabular, nearest.inside ? styles.success : styles.warning]}
-                >
-                  {nearest.inside
-                    ? t('mobile.attendance.inside', {
-                        distance: formatDistance(nearest.distanceM),
-                      })
-                    : t('mobile.attendance.outside', {
-                        distance: formatDistance(nearest.distanceM),
-                        radius: nearest.site.radiusM,
-                      })}
-                </Text>
-                {fix.accuracyM !== null ? (
-                  <Text style={[type.secondary, tabular]}>
-                    {t('mobile.attendance.accuracy', { m: fix.accuracyM })}
-                  </Text>
-                ) : null}
-              </View>
+            </IconTile>
+            <View style={styles.site}>
+              <Text style={type.rowStrong} numberOfLines={1}>
+                {nearest.site.name}
+              </Text>
+              <Text
+                style={[type.secondary, tabular, nearest.inside ? styles.success : styles.warning]}
+              >
+                {nearest.inside
+                  ? t('mobile.attendance.inside', {
+                      distance: formatDistance(nearest.distanceM),
+                    })
+                  : t('mobile.attendance.outside', {
+                      distance: formatDistance(nearest.distanceM),
+                      radius: nearest.site.radiusM,
+                    })}
+              </Text>
             </View>
-          ) : sites.length > 0 ? (
-            <View style={styles.siteRow}>
-              <ActivityIndicator color={colors.primary} />
-              <Text style={[type.body, styles.mutedText]}>{t('mobile.attendance.locating')}</Text>
-            </View>
-          ) : null}
-        </View>
+            {fix.accuracyM !== null ? (
+              <Text style={[type.caption, tabular]}>
+                {t('mobile.attendance.accuracy', { m: fix.accuracyM })}
+              </Text>
+            ) : null}
+          </Card>
+        ) : sites.length > 0 ? (
+          <Card style={styles.siteRow}>
+            <ActivityIndicator color={colors.primary} />
+            <Text style={[type.body, styles.mutedText]}>{t('mobile.attendance.locating')}</Text>
+          </Card>
+        ) : null}
 
         {/* The punch */}
         <View style={styles.punch}>
@@ -382,59 +417,71 @@ export default function AttendanceScreen() {
               kind === 'IN' ? (
                 <LogIn size={22} strokeWidth={2.4} color={colors.primaryForeground} />
               ) : (
-                <LogOut size={22} strokeWidth={2.4} color={colors.primaryForeground} />
+                <LogOut size={22} strokeWidth={2.4} color={colors.destructive} />
               )
             }
             onPress={onPunch}
           />
           {blockerText ? <Text style={[type.secondary, styles.center]}>{blockerText}</Text> : null}
-          <ProblemText problem={problem} />
+          <ProblemText problem={problem} style={styles.problem} />
         </View>
 
         {/* Today's punches */}
-        <Text style={styles.sectionTitle}>{t('mobile.attendance.todayEvents')}</Text>
+        <SectionHeader style={styles.section}>{t('mobile.attendance.todayEvents')}</SectionHeader>
         {todayEvents.length > 0 ? (
           <Group inset={ICON_INSET}>{todayEvents.map(renderEvent)}</Group>
         ) : (
-          <View style={styles.card}>
+          <Card>
             <Text style={[type.body, styles.mutedText]}>{t('mobile.attendance.noEvents')}</Text>
-          </View>
+          </Card>
         )}
 
         {/* The month */}
-        <Text style={styles.sectionTitle}>{t('mobile.attendance.month')}</Text>
-        <StatRow
-          items={[
-            {
-              value: t('mobile.attendance.presentOf', { n: month.presentDays, of: month.workdays }),
-              label: t('mobile.attendance.presentDays'),
-            },
-            {
-              value: t('mobile.attendance.daysValue', { n: month.lateDays }),
-              label: t('mobile.attendance.lateDays'),
-            },
-            {
-              value: t('mobile.attendance.hoursValue', { h: monthWorked.hours }),
-              label: t('mobile.attendance.workedHours'),
-            },
-          ]}
-        />
-        <Group inset={ICON_INSET} style={styles.historyGroup}>
+        <SectionHeader
+          style={styles.section}
+          right={
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={t('mobile.attendance.history')}
+              hitSlop={14}
+              onPress={() => router.push(`/attendance/history?today=${data.today}`)}
+            >
+              <Text style={styles.link}>{t('mobile.attendance.historyShort')}</Text>
+            </Pressable>
+          }
+        >
+          {t('mobile.attendance.month')}
+        </SectionHeader>
+        <StatTiles>
+          <StatTile
+            value={t('mobile.attendance.presentOf', { n: month.presentDays, of: month.workdays })}
+            label={t('mobile.attendance.presentDays')}
+          />
+          <StatTile
+            value={t('mobile.attendance.daysValue', { n: month.lateDays })}
+            label={t('mobile.attendance.lateDays')}
+            {...(month.lateDays > 0 ? { color: colors.warning } : {})}
+          />
+          <StatTile
+            value={t('mobile.attendance.hoursValue', { h: monthWorked.hours })}
+            label={t('mobile.attendance.workedHours')}
+          />
+        </StatTiles>
+        <Group inset={ICON_INSET}>
           <Row
-            minHeight={52}
             icon={
               <IconTile color={colors.tint.blue}>
-                <History size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+                <History size={18} strokeWidth={2.2} color={colors.primaryForeground} />
               </IconTile>
             }
             title={t('mobile.attendance.history')}
             onPress={() => router.push(`/attendance/history?today=${data.today}`)}
           />
           <Row
-            minHeight={52}
+            minHeight={56}
             icon={
               <IconTile color={colors.tint.orange}>
-                <ClipboardPen size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+                <ClipboardPen size={18} strokeWidth={2.2} color={colors.primaryForeground} />
               </IconTile>
             }
             title={t('mobile.requests.entry')}
@@ -448,11 +495,11 @@ export default function AttendanceScreen() {
 
   return (
     <Page edges={[]}>
-      <StoreHeader title={t('mobile.attendance.title')} onBack={() => router.back()} right={null} />
+      <StoreHeader title={t('mobile.attendance.title')} onBack={() => router.back()} />
       <ScrollView
         contentContainerStyle={[
           styles.body,
-          { paddingBottom: Math.max(insets.bottom, spacing.md) + 24 },
+          { paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.lg },
         ]}
         refreshControl={
           <RefreshControl
@@ -468,24 +515,45 @@ export default function AttendanceScreen() {
 }
 
 const styles = StyleSheet.create({
-  body: { paddingHorizontal: 14, paddingTop: spacing.md, gap: spacing.md },
-  grow: { flex: 1, minWidth: 0, gap: 2 },
-  centered: { paddingTop: spacing.xl, gap: spacing.md },
+  body: { padding: PAGE.padding, gap: PAGE.gap },
+  grow: { flex: 1, minWidth: 0 },
+  centered: { gap: spacing.md },
   loading: { marginTop: spacing.xl },
-  card: {
+  /** A label sits 16 px under the block above it and 8 px over its own card. */
+  section: { marginTop: 0, marginBottom: -spacing.sm },
+  today: {
     padding: spacing.lg,
-    gap: spacing.xs,
+    gap: spacing.md,
     borderRadius: radii.card,
-    backgroundColor: colors.card,
+    backgroundColor: colors.primary,
+    boxShadow: shadows.accentCard,
   },
-  state: { ...type.title, ...tabular, marginTop: spacing.xs },
-  figures: { marginTop: spacing.sm, gap: 2 },
-  sectionTitle: { ...type.sectionHeader, marginTop: spacing.sm, marginLeft: spacing.xs },
+  todayHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  schedule: {
+    height: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    backgroundColor: colors.onPrimaryHairline,
+  },
+  scheduleText: { ...type.secondary, fontFamily: fonts.semibold, color: colors.primaryForeground },
+  stateBlock: { gap: spacing.xs },
+  state: { ...type.display, color: colors.primaryForeground },
+  todayRule: { height: 1, backgroundColor: colors.onPrimaryHairline },
+  figures: { flexDirection: 'row', gap: spacing.lg },
+  onBlue: { color: colors.primaryForeground },
+  onBlueMuted: { color: colors.onPrimaryMuted },
+  locationOff: { gap: spacing.md },
   siteRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  punch: { gap: spacing.sm, paddingTop: spacing.xs },
+  site: { flex: 1, minWidth: 0, gap: 1 },
+  punch: { gap: spacing.sm },
+  problem: { marginTop: 0 },
+  eventTitle: { ...type.rowStrong, ...tabular },
+  link: { ...type.chip, color: colors.link },
   center: { textAlign: 'center' },
   success: { color: colors.success },
   warning: { color: colors.warning },
   mutedText: { color: colors.muted },
-  historyGroup: { marginTop: 0 },
 });

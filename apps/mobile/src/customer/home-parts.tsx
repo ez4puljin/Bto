@@ -22,9 +22,11 @@ import {
 } from '../api/customer';
 import { lineOf } from '../cart/cart';
 import { pageAt } from '../images/pictures';
+import { SectionHeading } from '../shop/section-heading';
 import { useCustomer } from '../state/session';
 import { useShop } from '../state/shop';
-import { colors, spacing, storeType, TOUCH, type } from '../theme/tokens';
+import { STAFF_LOOK } from '../theme/look';
+import { colors, radii, spacing, storeType, TOUCH, type } from '../theme/tokens';
 import { Text } from '../ui/text';
 import {
   BANNER_SECONDS,
@@ -229,13 +231,23 @@ export function SectionRow<P extends { id: number }>({
   const text = sectionText(section, place);
   return (
     <View style={styles.section}>
-      <ListHeading
-        title={text.title}
-        subtitle={place === 'home' ? text.subtitle : null}
-        icon={place === 'home' ? sectionIconOf(section.kind) : null}
-        label={t('mobile.customer.home.seeAll', { title: text.title })}
-        onPress={onMore}
-      />
+      {STAFF_LOOK ? (
+        // The staff app's boards: the grey upper-case label with «Бүгд», no icon.
+        <SectionHeading
+          title={text.title}
+          subtitle={place === 'home' ? text.subtitle : null}
+          label={t('mobile.customer.home.seeAll', { title: text.title })}
+          onPress={onMore}
+        />
+      ) : (
+        <ListHeading
+          title={text.title}
+          subtitle={place === 'home' ? text.subtitle : null}
+          icon={place === 'home' ? sectionIconOf(section.kind) : null}
+          label={t('mobile.customer.home.seeAll', { title: text.title })}
+          onPress={onMore}
+        />
+      )}
       <FlatList
         horizontal
         data={section.products}
@@ -259,14 +271,18 @@ export function BannerCarousel({
   banners,
   server,
   targetOf = (banner) => bannerTargetOf(banner.link),
+  inset = 0,
 }: {
   banners: readonly StoreBanner[];
   server: string;
   targetOf?: (banner: StoreBanner) => string | null;
+  /** The staff app's pages set the banners in from both edges as a rounded card; 0 runs edge to edge. */
+  inset?: number;
 }) {
   const { t } = useTranslation();
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const { width: screen } = useWindowDimensions();
+  const width = screen - inset * 2;
   const scroller = useRef<ScrollView>(null);
   const [slide, setSlide] = useState(0);
   const [touching, setTouching] = useState(false);
@@ -300,7 +316,11 @@ export function BannerCarousel({
         onMomentumScrollEnd={(event) =>
           setSlide(pageAt(event.nativeEvent.contentOffset.x, width, count))
         }
-        style={[styles.banners, { height: width / 2 }]}
+        style={[
+          styles.banners,
+          { height: width / 2 },
+          inset > 0 && { width, marginHorizontal: inset, borderRadius: radii.card },
+        ]}
       >
         {banners.map((banner) => {
           const target = targetOf(banner);
@@ -446,8 +466,11 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   glyph: { alignSelf: 'flex-start', width: 20, height: 21, justifyContent: 'center' },
-  section: { paddingTop: 18 },
-  cards: { gap: 10, paddingHorizontal: 14, paddingBottom: spacing.xs },
+  // The staff page sets its blocks 16 px apart itself; the strip's cards keep room for their shadow.
+  section: STAFF_LOOK ? { gap: spacing.lg } : { paddingTop: 18 },
+  cards: STAFF_LOOK
+    ? { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: 2, paddingBottom: spacing.sm }
+    : { gap: 10, paddingHorizontal: 14, paddingBottom: spacing.xs },
   banners: { backgroundColor: colors.imageFill },
   bannerImage: { width: '100%', height: '100%' },
   bannerFallback: {

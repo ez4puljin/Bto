@@ -1,19 +1,41 @@
+import {
+  Ban,
+  CircleCheck,
+  ClipboardCheck,
+  type LucideIcon,
+  PencilLine,
+  Send,
+  Truck,
+} from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, View } from 'react-native';
-import { colors, fonts, type } from '../theme/tokens';
-import { Text } from '../ui/text';
+import { IconTile } from '../ui/grouped';
+import { Pill, type Tone, TONES } from '../ui/staff-kit';
 import type { LineState } from './counts';
-import { statusKey, statusTone, type TransferStatus } from './statuses';
+import { statusKey, type TransferStatus } from './statuses';
+
+/** A status's tone on its pill and its tile: grey, blue, violet, orange, green, red. */
+const STATUS_TONES: Record<TransferStatus, Tone> = {
+  DRAFT: 'neutral',
+  REQUESTED: 'info',
+  SHIPPED: 'violet',
+  COUNTED: 'warn',
+  RECEIVED: 'ok',
+  CANCELLED: 'bad',
+};
+
+const STATUS_ICONS: Record<TransferStatus, LucideIcon> = {
+  DRAFT: PencilLine,
+  REQUESTED: Send,
+  SHIPPED: Truck,
+  COUNTED: ClipboardCheck,
+  RECEIVED: CircleCheck,
+  CANCELLED: Ban,
+};
 
 /** A transfer's or a request's status on its pill (ADR-0116). */
 export function TransferStatusPill({ status }: { status: TransferStatus }) {
   const { t } = useTranslation();
-  const tone = statusTone(status);
-  return (
-    <View style={[styles.pill, { backgroundColor: tone.background }]}>
-      <Text style={[styles.pillText, { color: tone.text }]}>{t(statusKey(status))}</Text>
-    </View>
-  );
+  return <Pill label={t(statusKey(status))} tone={STATUS_TONES[status]} />;
 }
 
 /** A draft request without a number yet: «Ноорог» on the grey pill. */
@@ -21,44 +43,35 @@ export function DraftPill() {
   return <TransferStatusPill status="DRAFT" />;
 }
 
-const LINE_TONES: Record<LineState['kind'], { background: string; text: string }> = {
-  unchecked: { background: colors.canvas, text: colors.muted },
-  notArrived: { background: colors.destructiveSoft, text: colors.destructive },
-  short: { background: colors.warningSoft, text: colors.warning },
-  over: { background: colors.warningSoft, text: colors.warning },
-  exact: { background: colors.successSoft, text: colors.success },
-  extra: { background: colors.secondary, text: colors.secondaryForeground },
+/** The soft tile before a request: its status as an icon in the status's tone. */
+export function TransferStatusTile({ status }: { status: TransferStatus }) {
+  const Icon = STATUS_ICONS[status];
+  const tone = TONES[STATUS_TONES[status]];
+  return (
+    <IconTile color={tone.background}>
+      <Icon size={20} strokeWidth={2} color={tone.text} />
+    </IconTile>
+  );
+}
+
+const LINE_TONES: Record<LineState['kind'], Tone> = {
+  unchecked: 'neutral',
+  notArrived: 'bad',
+  short: 'warn',
+  over: 'warn',
+  exact: 'ok',
+  extra: 'info',
 };
 
 /**
- * A shipped line's state as a small badge (ADR-0116 #4): «Тоолоогүй» grey, «Ирээгүй» red, «Дутуу»
- * / «Илүү» orange with the difference in base units, «Таарсан» green, «Хүсэлтэд байхгүй» blue.
+ * A shipped line's state as a pill (ADR-0116 #4): «Тоолоогүй» grey, «Ирээгүй» red, «Дутуу» /
+ * «Илүү» orange with the difference in base units, «Таарсан» green, «Хүсэлтэд байхгүй» blue.
  */
 export function LineStateBadge({ state, baseUnit }: { state: LineState; baseUnit: string }) {
   const { t } = useTranslation();
-  const tone = LINE_TONES[state.kind];
   const label =
     state.kind === 'short' || state.kind === 'over'
       ? t(`mobile.transfers.receive.states.${state.kind}`, { n: state.diffBase, unit: baseUnit })
       : t(`mobile.transfers.receive.states.${state.kind}`);
-  return (
-    <View style={[styles.badge, { backgroundColor: tone.background }]}>
-      <Text style={[styles.badgeText, { color: tone.text }]} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
+  return <Pill label={label} tone={LINE_TONES[state.kind]} />;
 }
-
-const styles = StyleSheet.create({
-  pill: { height: 22, paddingHorizontal: 8, borderRadius: 11, justifyContent: 'center' },
-  pillText: { ...type.secondary, fontFamily: fonts.semibold },
-  badge: {
-    height: 20,
-    paddingHorizontal: 7,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignSelf: 'flex-start',
-  },
-  badgeText: { ...type.caption, fontFamily: fonts.semibold },
-});

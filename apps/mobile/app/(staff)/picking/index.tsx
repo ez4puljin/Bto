@@ -1,31 +1,33 @@
 import { useRouter } from 'expo-router';
-import { ChevronRight, PackageSearch } from 'lucide-react-native';
-import { useMemo } from 'react';
+import { ChevronRight, PackageCheck, PackageOpen, PackageSearch } from 'lucide-react-native';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, SectionList, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePickWork } from '../../../src/api/picking';
 import { problemFrom } from '../../../src/api/problem';
 import { shortDate } from '../../../src/dates/dates';
 import { initialsOf } from '../../../src/format/format';
+import { HeaderSegments } from '../../../src/picking/header-segments';
 import { PickStatusPill } from '../../../src/picking/pills';
-import { type WorkGroup, workGroups } from '../../../src/picking/sections';
+import { WORK_SECTIONS, type WorkSection, workGroups } from '../../../src/picking/sections';
 import type { PickWork } from '../../../src/picking/types';
 import { isRep } from '../../../src/state/phase';
 import { useSignedIn } from '../../../src/state/session';
 import { colors, fonts, radii, spacing, type } from '../../../src/theme/tokens';
-import { Separator } from '../../../src/ui/grouped';
+import { ICON_INSET, IconTile, Separator } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
 import { StoreHeader } from '../../../src/ui/store-header';
 import { Text } from '../../../src/ui/text';
 
 /**
- * «Бэлтгэл» (ADR-0132): the keeper's parts from `GET /sales-picks`, in sections — to take, mine,
- * others', done today — each row the order's number and the part's pill, the customer, the
- * warehouse, «N бараа» and the delivery date; a tap opens the part. Pull to refresh; the list
- * re-reads every 15 s. Opened from «Нүүр» or «Цэс» (ADR-0174); a rep has the initials to the
- * profile.
+ * «Бэлтгэл» (ADR-0132): the keeper's parts from `GET /sales-picks`, in four lists — to take, mine,
+ * others', done today — one shown at a time, chosen on the header's segmented control whose labels
+ * carry the counts (it opens on the first list that has rows). Each row is the order's number and
+ * the part's pill, the customer, the warehouse, «N бараа» and the delivery date; a tap opens the
+ * part. Pull to refresh; the list re-reads every 15 s. Opened from «Нүүр» or «Цэс» (ADR-0174); a
+ * rep has the initials to the profile.
  */
 export default function PickingHomeScreen() {
   const { t } = useTranslation();
@@ -35,29 +37,40 @@ export default function PickingHomeScreen() {
   const rep = isRep(me);
   const work = usePickWork();
   const sections = useMemo(() => workGroups(work.data ?? [], me.id), [work.data, me.id]);
+  const [chosen, setChosen] = useState<WorkSection | null>(null);
+  // Until the keeper picks a list, the first one with rows shows.
+  const shown = chosen ?? sections[0]?.key ?? 'take';
+  const rows = sections.find((section) => section.key === shown)?.data ?? [];
+  const countOf = (key: WorkSection) =>
+    sections.find((section) => section.key === key)?.data.length ?? 0;
 
-  const renderRow = ({
-    item,
-    index,
-    section,
-  }: {
-    item: PickWork;
-    index: number;
-    section: WorkGroup;
-  }) => (
+  const renderRow = ({ item, index }: { item: PickWork; index: number }) => (
     <View
       style={[
         styles.cell,
         index === 0 && styles.firstCell,
-        index === section.data.length - 1 && styles.lastCell,
+        index === rows.length - 1 && styles.lastCell,
       ]}
     >
-      {index > 0 ? <Separator /> : null}
+      {index > 0 ? <Separator inset={ICON_INSET} /> : null}
       <Pressable
         accessibilityRole="button"
         onPress={() => router.push(`/picking/${item.orderId}?warehouse=${item.warehouseId}`)}
         style={({ pressed }) => [styles.row, pressed && styles.pressed]}
       >
+        {item.status === 'DONE' ? (
+          <IconTile color={colors.successSoft}>
+            <PackageCheck size={20} strokeWidth={2} color={colors.success} />
+          </IconTile>
+        ) : item.status === 'PICKING' && item.pickerId === me.id ? (
+          <IconTile color={colors.tint.orange}>
+            <PackageOpen size={20} strokeWidth={2} color={colors.primaryForeground} />
+          </IconTile>
+        ) : (
+          <IconTile color={colors.warningSoft}>
+            <PackageOpen size={20} strokeWidth={2} color={colors.warning} />
+          </IconTile>
+        )}
         <View style={styles.grow}>
           <View style={styles.rowTop}>
             <Text style={[type.rowStrong, styles.rowTitle]} numberOfLines={1}>
@@ -79,7 +92,7 @@ export default function PickingHomeScreen() {
               .join(' · ')}
           </Text>
         </View>
-        <ChevronRight size={16} strokeWidth={2.6} color={colors.input} />
+        <ChevronRight size={18} strokeWidth={2.4} color={colors.input} style={styles.chevron} />
       </Pressable>
     </View>
   );
@@ -102,20 +115,30 @@ export default function PickingHomeScreen() {
             </Pressable>
           ) : null
         }
-      />
-      <SectionList<PickWork, WorkGroup>
-        sections={sections}
+      >
+        <HeaderSegments
+          label={t('mobile.picking.title')}
+          options={WORK_SECTIONS.map((key) => ({
+            value: key,
+            label:
+              countOf(key) > 0
+                ? t('mobile.picking.tabCount', {
+                    label: t(`mobile.picking.tabs.${key}`),
+                    n: countOf(key),
+                  })
+                : t(`mobile.picking.tabs.${key}`),
+          }))}
+          value={shown}
+          onChange={setChosen}
+        />
+      </StoreHeader>
+      <FlatList<PickWork>
+        data={rows}
         keyExtractor={(row) => `${row.orderId}:${row.warehouseId}`}
-        stickySectionHeadersEnabled={false}
         contentContainerStyle={[
           styles.list,
-          { paddingBottom: Math.max(insets.bottom, spacing.md) },
+          { paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.xs },
         ]}
-        renderSectionHeader={({ section }) => (
-          <Text accessibilityRole="header" style={[type.sectionHeader, styles.sectionHeader]}>
-            {t(`mobile.picking.sections.${section.key}`, { n: section.data.length })}
-          </Text>
-        )}
         renderItem={renderRow}
         refreshing={work.isRefetching}
         onRefresh={() => void work.refetch()}
@@ -138,7 +161,7 @@ export default function PickingHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  grow: { flex: 1, minWidth: 0, gap: 2 },
+  grow: { flex: 1, minWidth: 0, gap: spacing.xs },
   pressed: { backgroundColor: colors.accent },
   faded: { opacity: 0.7 },
   avatar: {
@@ -150,28 +173,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: { ...type.secondary, color: colors.primary, fontFamily: fonts.bold },
-  list: { paddingHorizontal: 14, flexGrow: 1 },
-  sectionHeader: { paddingTop: spacing.lg, paddingBottom: spacing.sm, paddingHorizontal: 2 },
-  cell: { backgroundColor: colors.card },
-  firstCell: {
-    borderTopLeftRadius: radii.card,
-    borderTopRightRadius: radii.card,
-    overflow: 'hidden',
-  },
-  lastCell: {
-    borderBottomLeftRadius: radii.card,
-    borderBottomRightRadius: radii.card,
-    overflow: 'hidden',
-  },
+  list: { padding: spacing.lg, flexGrow: 1 },
+  cell: { backgroundColor: colors.card, overflow: 'hidden' },
+  firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
+  lastCell: { borderBottomLeftRadius: radii.card, borderBottomRightRadius: radii.card },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+    alignItems: 'flex-start',
+    gap: spacing.md,
     minHeight: 68,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
   },
   rowTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowTitle: { flex: 1, minWidth: 0 },
+  chevron: { marginTop: spacing.sm },
   loading: { marginTop: spacing.xl },
 });

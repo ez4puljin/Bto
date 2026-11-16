@@ -10,12 +10,11 @@ import { dayNameOf, monthDay } from '../../../src/dates/calendar';
 import { weekdayOf } from '../../../src/dates/dates';
 import { StoreOrderRow } from '../../../src/orders/store-order-row';
 import { byDay } from '../../../src/orders/store-orders';
-import { colors, radii, spacing, type } from '../../../src/theme/tokens';
+import { colors, radii, spacing } from '../../../src/theme/tokens';
 import { Separator } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
-import { FootNote, Page } from '../../../src/ui/layout';
+import { FootNote, Page, SectionHeader } from '../../../src/ui/layout';
 import { StoreHeader } from '../../../src/ui/store-header';
-import { Text } from '../../../src/ui/text';
 
 /**
  * «Захиалгын түүх» of a store (the owner, 2026-10-18), opened from its card on the map: every
@@ -48,7 +47,11 @@ export default function StoreOrdersScreen() {
 
   return (
     <Page edges={[]}>
-      <StoreHeader title={name || t('mobile.storeOrders.title')} onBack={() => router.back()} />
+      <StoreHeader
+        title={name || t('mobile.storeOrders.title')}
+        subtitle={name ? t('mobile.storeOrders.title') : null}
+        onBack={() => router.back()}
+      />
       <SectionList
         sections={sections}
         keyExtractor={(order) => String(order.id)}
@@ -58,9 +61,7 @@ export default function StoreOrdersScreen() {
           orders.error ? <ProblemText problem={problemFrom(orders.error)} /> : null
         }
         renderSectionHeader={({ section }) => (
-          <Text accessibilityRole="header" style={[type.sectionHeader, styles.day]}>
-            {dayTitle(section.day)}
-          </Text>
+          <SectionHeader style={styles.day}>{dayTitle(section.day)}</SectionHeader>
         )}
         renderItem={({ item, index, section }) => (
           <View
@@ -100,7 +101,9 @@ export default function StoreOrdersScreen() {
             {orders.isFetchingNextPage ? (
               <ActivityIndicator style={styles.loading} color={colors.primary} />
             ) : null}
-            {sections.length > 0 ? <FootNote>{t('mobile.storeOrders.footer')}</FootNote> : null}
+            {sections.length > 0 ? (
+              <FootNote center>{t('mobile.storeOrders.footer')}</FootNote>
+            ) : null}
           </View>
         }
       />
@@ -110,7 +113,7 @@ export default function StoreOrdersScreen() {
 
 const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.lg },
-  day: { marginTop: 20, marginBottom: spacing.sm, marginHorizontal: spacing.xs },
+  day: { marginTop: spacing.lg, marginBottom: spacing.sm },
   cell: { backgroundColor: colors.card, overflow: 'hidden' },
   firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
   lastCell: { borderBottomLeftRadius: radii.card, borderBottomRightRadius: radii.card },

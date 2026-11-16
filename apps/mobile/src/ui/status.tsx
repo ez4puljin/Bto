@@ -2,11 +2,12 @@ import type { OrderStatus, PaymentMethod } from '@tugeel/shared/sales';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { Text } from './text';
+import { STAFF_LOOK } from '../theme/look';
 import { colors, fonts, type } from '../theme/tokens';
 
 /** Each order status's pill as the MyOrders board colours it; the stages after them alike. */
 const STATUS_COLORS: Record<OrderStatus, { background: string; text: string }> = {
-  DRAFT: { background: colors.canvas, text: colors.muted },
+  DRAFT: { background: STAFF_LOOK ? colors.fill : colors.canvas, text: colors.muted },
   SUBMITTED: { background: colors.secondary, text: colors.secondaryForeground },
   APPROVAL_PENDING: { background: colors.warningSoft, text: colors.warning },
   CONFIRMED: { background: colors.secondary, text: colors.secondaryForeground },
@@ -53,6 +54,8 @@ export function PaymentDot({ method, size = 8 }: { method: PaymentMethod; size?:
 }
 
 const styles = StyleSheet.create({
-  pill: { height: 22, paddingHorizontal: 8, borderRadius: 11, justifyContent: 'center' },
+  pill: STAFF_LOOK
+    ? { height: 24, paddingHorizontal: 10, borderRadius: 12, justifyContent: 'center' }
+    : { height: 22, paddingHorizontal: 8, borderRadius: 11, justifyContent: 'center' },
   pillText: { ...type.secondary, fontFamily: fonts.semibold },
 });

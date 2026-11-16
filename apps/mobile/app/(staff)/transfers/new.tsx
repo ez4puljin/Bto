@@ -1,11 +1,10 @@
 import { Decimal } from '@tugeel/shared/money';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Package, Plus, ScanLine } from 'lucide-react-native';
+import { Package, Plus, Send, StickyNote } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, SectionList, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type AppProblem, problemFrom } from '../../../src/api/problem';
 import {
   useBarcodeLookup,
@@ -19,7 +18,7 @@ import { formatQty } from '../../../src/format/format';
 import { useUnitWords } from '../../../src/shop/unit-words';
 import { useSignedIn } from '../../../src/state/session';
 import { useDebounced } from '../../../src/state/use-debounced';
-import { colors, fonts, radii, spacing, TOUCH, type } from '../../../src/theme/tokens';
+import { colors, fonts, radii, spacing, tabular, TOUCH, type } from '../../../src/theme/tokens';
 import {
   changeOf,
   type DraftLine,
@@ -31,20 +30,23 @@ import {
   type TransferDraft,
 } from '../../../src/transfers/draft';
 import { type HomeSection, sectionsByHome } from '../../../src/transfers/grouping';
+import { HeaderSearch } from '../../../src/transfers/header-search';
 import { ScanSheet } from '../../../src/transfers/scan-sheet';
 import { keypadUnitsOfRow, TransferKeypad } from '../../../src/transfers/transfer-keypad';
 import type { TransferRequestRow, TransferRequestRowUnit } from '../../../src/transfers/types';
 import { useStoredDraft } from '../../../src/transfers/use-draft';
 import { useRequestSend } from '../../../src/transfers/use-request-send';
-import { PillButton, SearchField } from '../../../src/ui/controls';
+import { PillButton } from '../../../src/ui/controls';
+import { Separator } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
-import { Page } from '../../../src/ui/layout';
+import { Page, SectionHeader } from '../../../src/ui/layout';
 import { ActionSheet } from '../../../src/ui/sheet';
+import { FooterBar, Pill } from '../../../src/ui/staff-kit';
 import { StoreHeader } from '../../../src/ui/store-header';
 import { Text, TextInput } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
 
-const THUMB = 56;
+const THUMB = 52;
 
 /** The unit a product is requested by first: its largest pack, else the base unit. */
 function requestUnitOf(units: readonly TransferRequestRowUnit[]): TransferRequestRowUnit | null {
@@ -56,8 +58,8 @@ function requestUnitOf(units: readonly TransferRequestRowUnit[]): TransferReques
 }
 
 /**
- * The request editor (ADR-0116 #1–#3): the search and the camera, the products as cards grouped
- * by their home warehouse (the store's stock, the home's stock, last month's sales, the unit), a
+ * The request editor (ADR-0116 #1–#3): the header's search field with the camera inside it, the
+ * products in one grouped list per home warehouse (the store's stock, the home's stock, last month's sales, the unit), a
  * tap opens the keypad. A new request (`?store=`) lives on the phone until «Илгээх», which creates
  * it (the idempotent send), asks the server to send it, and opens its page. An existing DRAFT
  * (`?id=`) is edited cell by cell with `PUT …/lines`; a change made meanwhile by someone else is
@@ -66,7 +68,6 @@ function requestUnitOf(units: readonly TransferRequestRowUnit[]): TransferReques
 export default function TransferRequestEditorScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { server } = useSignedIn();
   const toast = useToast();
   const words = useUnitWords();
@@ -238,7 +239,15 @@ export default function TransferRequestEditorScreen() {
     updateNote.mutate({ id: requestId, note });
   };
 
-  const renderRow = ({ item }: { item: TransferRequestRow }) => {
+  const renderRow = ({
+    item,
+    index,
+    section,
+  }: {
+    item: TransferRequestRow;
+    index: number;
+    section: HomeSection<TransferRequestRow>;
+  }) => {
     const line = draftLineOf(draft, item.productId);
     const unit = line
       ? (item.units.find((entry) => entry.id === line.productUnitId) ?? null)
@@ -246,66 +255,76 @@ export default function TransferRequestEditorScreen() {
     const base = item.units.find((entry) => entry.isBase) ?? item.units[0];
     const homeless = item.homeWarehouseId === null;
     const unitWord = unit ? words({ uomCode: unit.uomCode, uomName: unit.name }) : null;
+    const storeOut = !homeless && new Decimal(item.storeOnHand).lte(0);
     return (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={
-          line
-            ? t('mobile.transfers.new.change', { name: item.name })
-            : t('mobile.transfers.new.add', { name: item.name })
-        }
-        accessibilityState={{ disabled: homeless }}
-        disabled={homeless}
-        onPress={() => openKeypad(item)}
-        style={({ pressed }) => [styles.card, pressed && styles.pressed, homeless && styles.dim]}
+      <View
+        style={[
+          styles.cell,
+          index === 0 && styles.firstCell,
+          index === section.data.length - 1 && styles.lastCell,
+          homeless && styles.dim,
+        ]}
       >
-        <View style={styles.thumb}>
-          {item.thumbUrl ? (
-            <Image
-              source={{ uri: `${server}${item.thumbUrl}` }}
-              style={styles.image}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              recyclingKey={item.thumbUrl}
-            />
-          ) : (
-            <Package size={24} strokeWidth={1.5} color={colors.input} />
-          )}
-        </View>
-        <View style={styles.grow}>
-          <Text style={type.row} numberOfLines={2}>
-            {item.name}
-          </Text>
-          <Text style={type.secondary} numberOfLines={1}>
-            {homeless
-              ? `${item.sku} · ${t('mobile.transfers.new.noHome')}`
-              : t('mobile.transfers.new.stockLine', {
-                  store: formatQty(item.storeOnHand),
-                  home: formatQty(item.homeOnHand),
-                  out: formatQty(item.lastMonthOut),
-                  unit: base ? words({ uomCode: base.uomCode, uomName: base.name }).short : '',
-                })}
-          </Text>
-          {unitWord && !homeless ? (
-            <View style={styles.unitPill}>
-              <Text style={styles.unitText} numberOfLines={1}>
-                {unitWord.title}
+        {index > 0 ? <Separator /> : null}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            line
+              ? t('mobile.transfers.new.change', { name: item.name })
+              : t('mobile.transfers.new.add', { name: item.name })
+          }
+          accessibilityState={{ disabled: homeless }}
+          disabled={homeless}
+          onPress={() => openKeypad(item)}
+          style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+        >
+          <View style={styles.thumb}>
+            {item.thumbUrl ? (
+              <Image
+                source={{ uri: `${server}${item.thumbUrl}` }}
+                style={styles.image}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                recyclingKey={item.thumbUrl}
+              />
+            ) : (
+              <Package size={24} strokeWidth={1.5} color={colors.input} />
+            )}
+          </View>
+          <View style={styles.grow}>
+            <Text style={type.rowStrong} numberOfLines={2}>
+              {item.name}
+            </Text>
+            <Text style={[type.secondary, tabular]} numberOfLines={2}>
+              {homeless
+                ? `${item.sku} · ${t('mobile.transfers.new.noHome')}`
+                : t('mobile.transfers.new.stockLine', {
+                    store: formatQty(item.storeOnHand),
+                    home: formatQty(item.homeOnHand),
+                    out: formatQty(item.lastMonthOut),
+                    unit: base ? words({ uomCode: base.uomCode, uomName: base.name }).short : '',
+                  })}
+            </Text>
+            {!homeless && (unitWord || storeOut) ? (
+              <View style={styles.pills}>
+                {unitWord ? <Pill label={unitWord.title} /> : null}
+                {storeOut ? <Pill label={t('mobile.transfers.new.storeOut')} tone="bad" /> : null}
+              </View>
+            ) : null}
+          </View>
+          {homeless ? null : line && unitWord ? (
+            <View style={styles.qty}>
+              <Text style={styles.qtyText} numberOfLines={1}>
+                {`${formatQty(line.qty)} ${unitWord.short}`}
               </Text>
             </View>
-          ) : null}
-        </View>
-        {homeless ? null : line && unitWord ? (
-          <View style={styles.qty}>
-            <Text style={styles.qtyText} numberOfLines={1}>
-              {`${formatQty(line.qty)} ${unitWord.short}`}
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.plus}>
-            <Plus size={20} strokeWidth={2.4} color={colors.primary} />
-          </View>
-        )}
-      </Pressable>
+          ) : (
+            <View style={styles.plus}>
+              <Plus size={20} strokeWidth={2.4} color={colors.link} />
+            </View>
+          )}
+        </Pressable>
+      </View>
     );
   };
 
@@ -319,24 +338,15 @@ export default function TransferRequestEditorScreen() {
         onBack={() => router.back()}
         right={null}
       >
-        <View style={styles.searchRow}>
-          <SearchField
-            inputRef={search}
-            value={text}
-            onChangeText={setText}
-            placeholder={t('mobile.transfers.new.search')}
-            accessibilityLabel={t('mobile.shop.searchLabel')}
-            style={styles.search}
-          />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('mobile.transfers.new.scan')}
-            onPress={() => setScanning(true)}
-            style={({ pressed }) => [styles.scanButton, pressed && styles.faded]}
-          >
-            <ScanLine size={22} strokeWidth={1.9} color={colors.primary} />
-          </Pressable>
-        </View>
+        <HeaderSearch
+          inputRef={search}
+          value={text}
+          onChangeText={setText}
+          placeholder={t('mobile.transfers.new.search')}
+          accessibilityLabel={t('mobile.shop.searchLabel')}
+          onScan={() => setScanning(true)}
+          scanLabel={t('mobile.transfers.new.scan')}
+        />
       </StoreHeader>
 
       {sender.pending && !editing ? (
@@ -346,14 +356,14 @@ export default function TransferRequestEditorScreen() {
           <View style={styles.pendingActions}>
             <PillButton
               title={t('mobile.transfers.new.resend')}
-              height={40}
+              height={44}
               loading={sending}
               onPress={() => void send()}
             />
             <PillButton
               title={t('mobile.transfers.new.forget')}
               variant="destructive"
-              height={40}
+              height={44}
               onPress={() => setForgetting(true)}
             />
           </View>
@@ -365,17 +375,14 @@ export default function TransferRequestEditorScreen() {
         keyExtractor={(row) => String(row.productId)}
         stickySectionHeadersEnabled={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[
-          styles.list,
-          { paddingBottom: Math.max(insets.bottom, spacing.md) + 150 },
-        ]}
+        style={styles.fill}
+        contentContainerStyle={styles.list}
         renderSectionHeader={({ section }) => (
-          <Text accessibilityRole="header" style={[type.sectionHeader, styles.sectionHeader]}>
+          <SectionHeader style={styles.sectionHeader}>
             {section.homeWarehouseName ?? t('mobile.transfers.new.noHomeSection')}
-          </Text>
+          </SectionHeader>
         )}
         renderItem={renderRow}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
         onEndReachedThreshold={0.5}
         onEndReached={() => {
           if (rows.hasNextPage && !rows.isFetchingNextPage) void rows.fetchNextPage();
@@ -402,29 +409,33 @@ export default function TransferRequestEditorScreen() {
         }
       />
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+      <FooterBar column style={styles.footer}>
         {problem ? <ProblemText problem={problem} style={styles.footerProblem} /> : null}
-        <TextInput
-          value={draft.note}
-          onChangeText={(note) => setDraft((current) => setDraftNote(current, note))}
-          onBlur={onNoteBlur}
-          placeholder={t('mobile.transfers.new.notePlaceholder')}
-          placeholderTextColor={colors.placeholder}
-          accessibilityLabel={t('mobile.transfers.new.note')}
-          maxLength={500}
-          style={[type.field, styles.note]}
-        />
+        <View style={styles.note}>
+          <StickyNote size={18} strokeWidth={2} color={colors.muted} />
+          <TextInput
+            value={draft.note}
+            onChangeText={(note) => setDraft((current) => setDraftNote(current, note))}
+            onBlur={onNoteBlur}
+            placeholder={t('mobile.transfers.new.notePlaceholder')}
+            placeholderTextColor={colors.placeholder}
+            accessibilityLabel={t('mobile.transfers.new.note')}
+            maxLength={500}
+            style={[type.row, styles.noteInput]}
+          />
+        </View>
         <PillButton
           title={
             count > 0
               ? t('mobile.transfers.new.send', { n: count })
               : t('mobile.transfers.new.sendEmpty')
           }
+          icon={<Send size={20} strokeWidth={2.2} color={colors.primaryForeground} />}
           disabled={count === 0 || !ready || (sender.pending !== null && !editing)}
           loading={sending}
           onPress={() => void send()}
         />
-      </View>
+      </FooterBar>
 
       {keypad && keypadBase ? (
         <TransferKeypad
@@ -475,28 +486,12 @@ export default function TransferRequestEditorScreen() {
 }
 
 const styles = StyleSheet.create({
-  grow: { flex: 1, minWidth: 0, gap: 3 },
-  faded: { opacity: 0.7 },
+  fill: { flex: 1 },
+  grow: { flex: 1, minWidth: 0, gap: spacing.xs },
   pressed: { backgroundColor: colors.accent },
-  dim: { opacity: 0.5 },
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: 14,
-    paddingBottom: spacing.md,
-  },
-  search: { flex: 1, backgroundColor: colors.card },
-  scanButton: {
-    width: TOUCH,
-    height: 40,
-    borderRadius: radii.field,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  dim: { opacity: 0.55 },
   pendingCard: {
-    marginHorizontal: 14,
+    marginHorizontal: spacing.lg,
     marginTop: spacing.md,
     padding: spacing.lg,
     gap: spacing.sm,
@@ -504,73 +499,66 @@ const styles = StyleSheet.create({
     backgroundColor: colors.warningSoft,
   },
   pendingActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
-  list: { paddingHorizontal: 14 },
-  sectionHeader: { paddingTop: spacing.lg, paddingBottom: spacing.sm, paddingHorizontal: 2 },
+  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, flexGrow: 1 },
+  sectionHeader: { marginTop: spacing.lg },
+  cell: { backgroundColor: colors.card, overflow: 'hidden' },
+  firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
+  lastCell: { borderBottomLeftRadius: radii.card, borderBottomRightRadius: radii.card },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
   thumb: {
     width: THUMB,
     height: THUMB,
-    borderRadius: radii.control,
+    borderRadius: radii.field,
     backgroundColor: colors.imageFill,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
   image: { width: '100%', height: '100%' },
-  unitPill: {
-    alignSelf: 'flex-start',
-    height: 20,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    backgroundColor: colors.canvas,
-    justifyContent: 'center',
-  },
-  unitText: { ...type.caption, fontFamily: fonts.semibold, color: colors.label2 },
+  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   qty: {
     minWidth: TOUCH,
-    height: 32,
-    paddingHorizontal: 10,
-    borderRadius: 16,
+    height: 36,
+    paddingHorizontal: spacing.md,
+    borderRadius: 18,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  qtyText: { ...type.chip, fontFamily: fonts.semibold, color: colors.primaryForeground },
+  qtyText: {
+    ...type.chip,
+    ...tabular,
+    fontFamily: fonts.semibold,
+    color: colors.primaryForeground,
+  },
   plus: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: TOUCH,
+    height: TOUCH,
+    borderRadius: TOUCH / 2,
     backgroundColor: colors.secondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  separator: { height: spacing.sm },
   loading: { marginTop: spacing.xl },
   problem: { marginTop: spacing.md },
-  footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    gap: spacing.sm,
-    paddingHorizontal: 14,
-    paddingTop: spacing.md,
-    backgroundColor: colors.sheetBarFill,
-  },
+  footer: { gap: 10 },
   footerProblem: { marginTop: 0 },
   note: {
-    height: 40,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 0,
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
     borderRadius: radii.field,
+    borderWidth: 1,
+    borderColor: colors.fieldBorder,
     backgroundColor: colors.card,
-    color: colors.foreground,
   },
+  noteInput: { flex: 1, height: 44, paddingVertical: 0 },
 });

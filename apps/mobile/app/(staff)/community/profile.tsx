@@ -6,27 +6,20 @@ import {
 } from '@tugeel/shared/hr';
 import { isIsoDate } from '@tugeel/shared/time';
 import { useRouter } from 'expo-router';
-import { Plus } from 'lucide-react-native';
+import { CalendarDays, Info, Plus, Trash2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { type Profile, useMyProfile, useSaveProfile, useToday } from '../../../src/api/community';
 import { type AppProblem, problemFrom } from '../../../src/api/problem';
 import { FirstLoad } from '../../../src/community/parts';
 import { maskDate } from '../../../src/dates/mask';
-import { colors, fonts, radii, spacing, type } from '../../../src/theme/tokens';
+import { colors, spacing, type } from '../../../src/theme/tokens';
 import { ChoiceChip, PillButton, Segmented } from '../../../src/ui/controls';
 import { TextField } from '../../../src/ui/field';
 import { ProblemText } from '../../../src/ui/kit';
-import { Page } from '../../../src/ui/layout';
+import { Page, SectionHeader } from '../../../src/ui/layout';
+import { Card, FooterBar, Notice, PAGE } from '../../../src/ui/staff-kit';
 import { StoreHeader } from '../../../src/ui/store-header';
 import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
@@ -50,11 +43,7 @@ export default function MyProfileScreen() {
   const profile = useMyProfile();
   return (
     <Page edges={[]}>
-      <StoreHeader
-        title={t('mobile.community.profile.title')}
-        onBack={() => router.back()}
-        right={null}
-      />
+      <StoreHeader title={t('mobile.community.profile.title')} onBack={() => router.back()} />
       {profile.data ? (
         <ProfileForm initial={profile.data} />
       ) : (
@@ -67,7 +56,6 @@ export default function MyProfileScreen() {
 function ProfileForm({ initial }: { initial: Profile }) {
   const { t } = useTranslation();
   const toast = useToast();
-  const insets = useSafeAreaInsets();
   const today = useToday();
   const save = useSaveProfile();
   const nextUid = useRef(initial.children.length);
@@ -128,11 +116,18 @@ function ProfileForm({ initial }: { initial: Profile }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.flex}
     >
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <Text style={type.secondary}>{t('mobile.community.profile.lead')}</Text>
-        <View style={styles.card}>
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.body}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Notice icon={Info} tone="info">
+          {t('mobile.community.profile.lead')}
+        </Notice>
+        <Card style={styles.card}>
           <TextField
             label={t('mobile.community.profile.birthDate')}
+            icon={CalendarDays}
             placeholder={t('mobile.community.profile.datePlaceholder')}
             value={birthDate}
             onChangeText={(text) => setBirthDate(maskDate(text))}
@@ -140,36 +135,42 @@ function ProfileForm({ initial }: { initial: Profile }) {
             maxLength={10}
             error={checked && birthBad ? t('mobile.community.profile.badDate') : null}
           />
-          <Text style={type.label}>{t('mobile.community.profile.gender')}</Text>
-          <Segmented
-            label={t('mobile.community.profile.gender')}
-            options={genders}
-            value={gender}
-            onChange={(value) => setGender(value === gender ? null : value)}
-          />
-          <Text style={type.label}>{t('mobile.community.profile.education')}</Text>
-          <View style={styles.chips}>
-            {EDUCATION_LEVELS.map((value) => (
-              <ChoiceChip
-                key={value}
-                label={t(`mobile.community.profile.educations.${value}`)}
-                selected={education === value}
-                onWhite
-                onPress={() => setEducation(value === education ? null : value)}
-              />
-            ))}
+          <View style={styles.field}>
+            <Text style={type.label}>{t('mobile.community.profile.gender')}</Text>
+            <Segmented
+              label={t('mobile.community.profile.gender')}
+              options={genders}
+              value={gender}
+              onChange={(value) => setGender(value === gender ? null : value)}
+            />
           </View>
-          <Text style={type.label}>{t('mobile.community.profile.marital')}</Text>
-          <View style={styles.chips}>
-            {MARITAL_STATUSES.map((value) => (
-              <ChoiceChip
-                key={value}
-                label={t(`mobile.community.profile.maritals.${value}`)}
-                selected={marital === value}
-                onWhite
-                onPress={() => setMarital(value === marital ? null : value)}
-              />
-            ))}
+          <View style={styles.field}>
+            <Text style={type.label}>{t('mobile.community.profile.education')}</Text>
+            <View style={styles.chips}>
+              {EDUCATION_LEVELS.map((value) => (
+                <ChoiceChip
+                  key={value}
+                  label={t(`mobile.community.profile.educations.${value}`)}
+                  selected={education === value}
+                  onWhite
+                  onPress={() => setEducation(value === education ? null : value)}
+                />
+              ))}
+            </View>
+          </View>
+          <View style={styles.field}>
+            <Text style={type.label}>{t('mobile.community.profile.marital')}</Text>
+            <View style={styles.chips}>
+              {MARITAL_STATUSES.map((value) => (
+                <ChoiceChip
+                  key={value}
+                  label={t(`mobile.community.profile.maritals.${value}`)}
+                  selected={marital === value}
+                  onWhite
+                  onPress={() => setMarital(value === marital ? null : value)}
+                />
+              ))}
+            </View>
           </View>
           <TextField
             label={t('mobile.community.profile.district')}
@@ -177,29 +178,48 @@ function ProfileForm({ initial }: { initial: Profile }) {
             onChangeText={setDistrict}
             maxLength={ENGAGEMENT_LIMITS.maxDistrict}
           />
-        </View>
+        </Card>
 
-        <Text style={[type.sectionHeader, styles.head]}>
+        <SectionHeader style={styles.section}>
           {t('mobile.community.profile.children')}
-        </Text>
-        {children.map((child) => (
-          <View key={child.uid} style={styles.card}>
+        </SectionHeader>
+        {children.map((child, index) => (
+          <Card key={child.uid} style={styles.child}>
+            <View style={styles.childHead}>
+              <Text style={[type.rowStrong, styles.grow]} numberOfLines={1}>
+                {t('mobile.community.profile.childN', { n: index + 1 })}
+              </Text>
+              <PillButton
+                variant="destructive"
+                height={36}
+                style={styles.remove}
+                title={t('mobile.community.profile.removeChild')}
+                icon={<Trash2 size={16} strokeWidth={2.2} color={colors.destructive} />}
+                onPress={() =>
+                  setChildren((current) => current.filter((entry) => entry.uid !== child.uid))
+                }
+              />
+            </View>
             <TextField
               label={t('mobile.community.profile.childName')}
               value={child.name}
               onChangeText={(name) => change(child.uid, { name })}
               maxLength={ENGAGEMENT_LIMITS.maxCategory}
             />
-            <Segmented
-              label={t('mobile.community.profile.gender')}
-              options={genders}
-              value={child.gender}
-              onChange={(value) =>
-                change(child.uid, { gender: value === child.gender ? null : value })
-              }
-            />
+            <View style={styles.field}>
+              <Text style={type.label}>{t('mobile.community.profile.gender')}</Text>
+              <Segmented
+                label={t('mobile.community.profile.gender')}
+                options={genders}
+                value={child.gender}
+                onChange={(value) =>
+                  change(child.uid, { gender: value === child.gender ? null : value })
+                }
+              />
+            </View>
             <TextField
               label={t('mobile.community.profile.childBirthDate')}
+              icon={CalendarDays}
               placeholder={t('mobile.community.profile.datePlaceholder')}
               value={child.birthDate}
               onChangeText={(text) => change(child.uid, { birthDate: maskDate(text) })}
@@ -207,23 +227,13 @@ function ProfileForm({ initial }: { initial: Profile }) {
               maxLength={10}
               error={checked && childBad(child) ? t('mobile.community.profile.badDate') : null}
             />
-            <Pressable
-              accessibilityRole="button"
-              hitSlop={8}
-              onPress={() =>
-                setChildren((current) => current.filter((entry) => entry.uid !== child.uid))
-              }
-              style={styles.remove}
-            >
-              <Text style={styles.removeText}>{t('mobile.community.profile.removeChild')}</Text>
-            </Pressable>
-          </View>
+          </Card>
         ))}
         {children.length < ENGAGEMENT_LIMITS.maxChildren ? (
           <PillButton
-            variant="white"
+            variant="soft"
             title={t('mobile.community.profile.addChild')}
-            icon={<Plus size={18} strokeWidth={2.4} color={colors.primary} />}
+            icon={<Plus size={18} strokeWidth={2.4} color={colors.link} />}
             onPress={() => {
               nextUid.current += 1;
               setChildren((current) => [
@@ -235,30 +245,29 @@ function ProfileForm({ initial }: { initial: Profile }) {
         ) : null}
         <ProblemText problem={problem} style={styles.problem} />
       </ScrollView>
-      <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+      <FooterBar>
         <PillButton
+          style={styles.flex}
           title={t('mobile.community.profile.save')}
           loading={save.isPending}
           onPress={submit}
         />
-      </View>
+      </FooterBar>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  body: { padding: 14, paddingBottom: 24, gap: spacing.md },
-  card: {
-    padding: spacing.lg,
-    gap: spacing.md,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
-  },
+  grow: { flex: 1, minWidth: 0 },
+  body: { padding: PAGE.padding, gap: PAGE.gap },
+  card: { gap: spacing.lg },
+  field: { gap: 6 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  head: { marginTop: spacing.xs, paddingHorizontal: spacing.xs },
-  remove: { alignSelf: 'flex-end', minHeight: 28, justifyContent: 'center' },
-  removeText: { ...type.body, color: colors.destructiveText, fontFamily: fonts.semibold },
+  /** A label sits 16 px under the block above it and 8 px over its own card. */
+  section: { marginTop: 0, marginBottom: -spacing.sm },
+  child: { gap: spacing.md },
+  childHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  remove: { paddingHorizontal: spacing.lg },
   problem: { marginTop: 0 },
-  bar: { paddingHorizontal: 14, paddingTop: spacing.sm, backgroundColor: colors.canvas },
 });

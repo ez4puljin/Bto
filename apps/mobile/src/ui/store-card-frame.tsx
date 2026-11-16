@@ -3,7 +3,8 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { dealToneOf } from '../customer/deals';
-import { colors, spacing, storeType, tabular } from '../theme/tokens';
+import { STAFF_LOOK } from '../theme/look';
+import { colors, shadows, spacing, storeType, tabular } from '../theme/tokens';
 import { CardPictures } from './card-pictures';
 import { Text } from './text';
 
@@ -188,33 +189,50 @@ export function CardAdd({ name, onPress }: { name: string; onPress: () => void }
       hitSlop={6}
       style={styles.add}
     >
-      <ShoppingCart size={22} strokeWidth={1.6} color={colors.foreground} />
+      {STAFF_LOOK ? (
+        <ShoppingCart size={18} strokeWidth={2} color={colors.link} />
+      ) : (
+        <ShoppingCart size={22} strokeWidth={1.6} color={colors.foreground} />
+      )}
     </Pressable>
   );
 }
 
+// The staff app's card (the boards of 2026-11-16): white, radius 16, the card shadow and no edge,
+// the picture on its grey field, a soft-blue round cart and the cart's quantity as a blue capsule.
+// The picture clips itself, so the card's shadow is not cut by `overflow`.
+const STAFF_CARD = {
+  borderRadius: 16,
+  backgroundColor: colors.card,
+  boxShadow: shadows.card,
+} as const;
+const BTO300_CARD = {
+  borderWidth: 1,
+  borderColor: colors.border,
+  borderRadius: 10,
+  backgroundColor: colors.card,
+  overflow: 'hidden',
+} as const;
+
 const styles = StyleSheet.create({
-  card: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    backgroundColor: colors.card,
-    overflow: 'hidden',
-  },
+  card: STAFF_LOOK ? STAFF_CARD : BTO300_CARD,
   fill: { flex: 1 },
   picture: {
-    backgroundColor: colors.card,
+    backgroundColor: STAFF_LOOK ? colors.imageFill : colors.card,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    ...(STAFF_LOOK ? { borderTopLeftRadius: 16, borderTopRightRadius: 16 } : null),
   },
   corner: { position: 'absolute', top: 2, right: 2 },
-  body: { paddingTop: 6, paddingHorizontal: 10, paddingBottom: 6, gap: 1 },
+  body: STAFF_LOOK
+    ? { paddingTop: spacing.sm, paddingHorizontal: spacing.md, paddingBottom: 10, gap: 2 }
+    : { paddingTop: 6, paddingHorizontal: 10, paddingBottom: 6, gap: 1 },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, minHeight: 20 },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 },
   struck: { textDecorationLine: 'line-through', flexShrink: 1 },
   bottom: {
-    minHeight: 32,
+    minHeight: STAFF_LOOK ? 36 : 32,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -242,13 +260,33 @@ const styles = StyleSheet.create({
   promotionText: { color: colors.foreground },
   discount: { backgroundColor: colors.dealDiscount },
   discountText: { color: colors.primaryForeground },
-  add: { width: 36, height: 36, marginRight: -7, alignItems: 'center', justifyContent: 'center' },
-  qty: {
-    height: 24,
-    maxWidth: 76,
-    paddingHorizontal: spacing.sm,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-  },
+  add: STAFF_LOOK
+    ? {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: colors.secondary,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }
+    : { width: 36, height: 36, marginRight: -7, alignItems: 'center', justifyContent: 'center' },
+  qty: STAFF_LOOK
+    ? {
+        height: 36,
+        minWidth: 36,
+        maxWidth: 84,
+        paddingHorizontal: 10,
+        borderRadius: 18,
+        backgroundColor: colors.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }
+    : {
+        height: 24,
+        maxWidth: 76,
+        paddingHorizontal: spacing.sm,
+        borderRadius: 12,
+        backgroundColor: colors.primary,
+        justifyContent: 'center',
+      },
 });

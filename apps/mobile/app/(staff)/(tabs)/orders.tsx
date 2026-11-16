@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { CalendarDays, ClipboardList, SlidersHorizontal } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, SectionList, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, SectionList, StyleSheet, View } from 'react-native';
 import { Text } from '../../../src/ui/text';
 import { problemFrom } from '../../../src/api/problem';
 import { type RepOrderSummary, useOrders, useRepContext } from '../../../src/api/rep';
@@ -28,13 +28,13 @@ import {
   orderFilterParams,
   withoutFilter,
 } from '../../../src/orders/order-filters';
-import { colors, radii, spacing, type } from '../../../src/theme/tokens';
-import { ActiveChip, ChoiceChip, PillButton } from '../../../src/ui/controls';
+import { colors, fonts, radii, shadows, spacing, type } from '../../../src/theme/tokens';
+import { ActiveChip, PillButton } from '../../../src/ui/controls';
 import { Separator } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
-import { Page } from '../../../src/ui/layout';
+import { Page, SectionHeader } from '../../../src/ui/layout';
 import { OrderRow } from '../../../src/ui/order-row';
-import { StatRow } from '../../../src/ui/stat-row';
+import { StatTile, StatTiles } from '../../../src/ui/staff-kit';
 import { HeaderIconButton, StoreHeader } from '../../../src/ui/store-header';
 import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 
@@ -43,9 +43,10 @@ const PAGE_PRESETS: readonly RangePreset[] = ['today', 'week', 'month'];
 type Opened = 'none' | 'filters' | 'dates';
 
 /**
- * «Миний захиалгууд» (the MyOrders board, ADR-0068 #7; filters instead of a search, the owner
- * 2026-10-18): the days (today, a week, this month, or any range from the calendar), the filters
- * that are on as chips, the range's count, confirmed total and drafts, and the rep's own orders
+ * «Миний захиалгууд» (the Orders board of 2026-11-16 on ADR-0068 #7; filters instead of a search,
+ * the owner 2026-10-18): the days in the blue band (today, a week, this month, or any range from
+ * the calendar), the range's count, confirmed total and drafts as three tiles, the filters that
+ * are on as chips, and the rep's own orders
  * by day, newest first. The filter button on Bto300's blue header (ADR-0100) opens customer,
  * product, payment, delivery and state.
  */
@@ -99,7 +100,7 @@ export default function OrdersScreen() {
       ? t('mobile.orders.approx', { amount: shortMoney(t, summary.draftsEstimate) })
       : null;
   const draftsLabel = draftsEstimate
-    ? `${t('mobile.orders.drafts')}\n${draftsEstimate}`
+    ? `${t('mobile.orders.drafts')} · ${draftsEstimate}`
     : t('mobile.orders.drafts');
   // This month follows today (a new day, a new month); only days the rep chose stay put.
   const pick = (days: DateRange) => {
@@ -126,37 +127,15 @@ export default function OrdersScreen() {
   const customRange = preset === null && range !== null;
 
   const header = (
-    <View>
-      <View style={styles.chips}>
-        {today
-          ? PAGE_PRESETS.map((entry) => (
-              <ChoiceChip
-                key={entry}
-                compact
-                label={t(`mobile.dateRange.presets.${entry}`)}
-                selected={preset === entry}
-                onPress={() => pick(presetRange(entry, today))}
-              />
-            ))
-          : null}
-        <ChoiceChip
-          compact
-          label={
-            customRange && range
-              ? t('mobile.orders.range', { from: monthDay(range.from), to: monthDay(range.to) })
-              : t('mobile.orders.pickDates')
-          }
-          selected={customRange}
-          icon={
-            <CalendarDays
-              size={15}
-              strokeWidth={2}
-              color={customRange ? colors.primaryForeground : colors.foreground}
-            />
-          }
-          onPress={() => setOpened('dates')}
+    <View style={styles.head}>
+      <StatTiles>
+        <StatTile
+          value={summary ? String(summary.count) : t('common.none')}
+          label={t('mobile.orders.count')}
         />
-      </View>
+        <StatTile value={totalText} label={t('mobile.orders.confirmed')} />
+        <StatTile value={summary ? String(summary.drafts) : t('common.none')} label={draftsLabel} />
+      </StatTiles>
       {active.length > 0 ? (
         <View style={styles.active}>
           {active.map((key) => {
@@ -173,22 +152,9 @@ export default function OrdersScreen() {
           })}
         </View>
       ) : null}
-      <View style={styles.stats}>
-        <StatRow
-          items={[
-            {
-              value: summary ? String(summary.count) : t('common.none'),
-              label: t('mobile.orders.count'),
-            },
-            { value: totalText, label: t('mobile.orders.confirmed') },
-            {
-              value: summary ? String(summary.drafts) : t('common.none'),
-              label: draftsLabel,
-            },
-          ]}
-        />
-      </View>
-      {orders.error ? <ProblemText problem={problemFrom(orders.error)} /> : null}
+      {orders.error ? (
+        <ProblemText problem={problemFrom(orders.error)} style={styles.problem} />
+      ) : null}
     </View>
   );
 
@@ -206,7 +172,31 @@ export default function OrdersScreen() {
             onPress={() => setOpened('filters')}
           />
         }
-      />
+      >
+        {/* The period in the blue band: today, a week, this month, or days from the calendar. */}
+        <View accessibilityRole="radiogroup" style={styles.periods}>
+          {today
+            ? PAGE_PRESETS.map((entry) => (
+                <Period
+                  key={entry}
+                  label={t(`mobile.dateRange.presets.${entry}`)}
+                  selected={preset === entry}
+                  onPress={() => pick(presetRange(entry, today))}
+                />
+              ))
+            : null}
+          <Period
+            label={
+              customRange && range
+                ? t('mobile.orders.range', { from: monthDay(range.from), to: monthDay(range.to) })
+                : t('mobile.orders.pickDates')
+            }
+            selected={customRange}
+            calendar
+            onPress={() => setOpened('dates')}
+          />
+        </View>
+      </StoreHeader>
       <SectionList
         sections={sections}
         keyExtractor={(order) => String(order.id)}
@@ -214,9 +204,7 @@ export default function OrdersScreen() {
         contentContainerStyle={[styles.list, { paddingBottom: inset + spacing.lg }]}
         ListHeaderComponent={header}
         renderSectionHeader={({ section }) => (
-          <Text accessibilityRole="header" style={[type.sectionHeader, styles.day]}>
-            {dayTitle(section.day)}
-          </Text>
+          <SectionHeader style={styles.day}>{dayTitle(section.day)}</SectionHeader>
         )}
         renderItem={({ item, index, section }) => (
           <View
@@ -293,18 +281,68 @@ export default function OrdersScreen() {
   );
 }
 
+/** One part of the period control on the blue band: white with blue words when chosen. */
+function Period({
+  label,
+  selected,
+  calendar = false,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  calendar?: boolean;
+  onPress: () => void;
+}) {
+  const ink = selected ? colors.link : colors.primaryForeground;
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      onPress={onPress}
+      hitSlop={{ top: 5, bottom: 5 }}
+      style={[styles.period, selected && styles.periodOn]}
+    >
+      {calendar ? <CalendarDays size={15} strokeWidth={2} color={ink} /> : null}
+      <Text
+        style={[type.chip, { color: ink }, selected && styles.periodStrong]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.85}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.lg },
-  chips: {
+  periods: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    paddingTop: spacing.md,
-    paddingBottom: 2,
+    gap: 3,
+    padding: 3,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    borderRadius: radii.field,
+    backgroundColor: colors.onPrimaryHairline,
   },
-  active: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingTop: spacing.sm },
-  stats: { marginTop: spacing.md },
-  day: { marginTop: 20, marginBottom: spacing.sm, marginHorizontal: spacing.xs },
+  period: {
+    flexGrow: 1,
+    flexShrink: 1,
+    height: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: 6,
+    borderRadius: 9,
+  },
+  periodOn: { backgroundColor: colors.card, boxShadow: shadows.segment },
+  periodStrong: { fontFamily: fonts.semibold },
+  head: { paddingTop: spacing.md, gap: spacing.md },
+  active: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  problem: { marginTop: 0 },
+  day: { marginTop: spacing.lg, marginBottom: spacing.sm },
   cell: { backgroundColor: colors.card, overflow: 'hidden' },
   firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
   lastCell: { borderBottomLeftRadius: radii.card, borderBottomRightRadius: radii.card },

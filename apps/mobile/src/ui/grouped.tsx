@@ -10,7 +10,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Text, TextInput } from './text';
-import { colors, radii, spacing, type } from '../theme/tokens';
+import { STAFF_LOOK } from '../theme/look';
+import { colors, radii, shadows, spacing, type } from '../theme/tokens';
 
 /** The white rounded group of the design's lists; rows are separated by inset hairlines. */
 export function Group({
@@ -40,13 +41,16 @@ export function Separator({ inset = spacing.lg }: { inset?: number }) {
   return <View style={[styles.separator, { marginLeft: inset }]} />;
 }
 
-/** A 30 px rounded square in a system tint with a white icon (the design's row icons). */
+/** The tile's side: 36 px in the staff app, 30 px in «Bto300». */
+export const ICON_TILE = STAFF_LOOK ? 36 : 30;
+
+/** A rounded square in a system tint with a white icon (the design's row icons). */
 export function IconTile({ color, children }: { color: string; children: ReactNode }) {
   return <View style={[styles.tile, { backgroundColor: color }]}>{children}</View>;
 }
 
 /** The inset of a group whose rows carry an icon tile. */
-export const ICON_INSET = spacing.lg + 30 + spacing.md;
+export const ICON_INSET = spacing.lg + ICON_TILE + spacing.md;
 
 /** A row with a label and a text field after it (the checkout's contact, a password). */
 export function InputRow({
@@ -86,7 +90,7 @@ export function Row({
   disabled = false,
   role,
   accessibilityLabel,
-  minHeight = 48,
+  minHeight = STAFF_LOOK ? 52 : 48,
   titleStyle,
 }: {
   icon?: ReactNode;
@@ -159,12 +163,17 @@ export function Row({
 }
 
 const styles = StyleSheet.create({
-  group: { backgroundColor: colors.card, borderRadius: radii.card, overflow: 'hidden' },
+  group: {
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    overflow: 'hidden',
+    ...(STAFF_LOOK ? { boxShadow: shadows.card } : null),
+  },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   tile: {
-    width: 30,
-    height: 30,
-    borderRadius: radii.iconTile,
+    width: ICON_TILE,
+    height: ICON_TILE,
+    borderRadius: STAFF_LOOK ? 10 : radii.iconTile,
     alignItems: 'center',
     justifyContent: 'center',
   },
