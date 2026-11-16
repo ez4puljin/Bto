@@ -36,6 +36,7 @@ import {
   type Precision,
   sidesOf,
   textColumn,
+  withoutNumber,
 } from './book-format';
 import {
   BookActions,
@@ -61,8 +62,9 @@ import {
   TextCell,
   TotalRow,
 } from './book-kit';
-import { ledgerLineHref } from './book-links';
+import { ledgerLineHref, ledgerLinePeek, type RecordPeek } from './book-links';
 import { idParamOf, idsParam, useBookParams, useDrill, usePromptDates } from './book-state';
+import { RecordPeekPanel } from './record-peek';
 
 type Grouping = 'ACCOUNT_PARTY' | 'PARTY_ACCOUNT';
 const GROUPINGS: readonly Grouping[] = ['ACCOUNT_PARTY', 'PARTY_ACCOUNT'];
@@ -111,6 +113,8 @@ function LedgerPage({ kind }: { kind: LedgerKind }) {
   const { t } = useTranslation();
   const state = useLedgerQuery(kind);
   const [prompting, setPrompting] = useState(!state.ready);
+  // A line's record opens over the report, which stays as it was (2026-11-16, the owner).
+  const [peek, setPeek] = useState<RecordPeek | null>(null);
   const report = useLedgerReport(state.query);
   const downloads = useBookDownloads();
   const action = useAction();
@@ -172,6 +176,7 @@ function LedgerPage({ kind }: { kind: LedgerKind }) {
               query={state.query}
               precision={state.precision}
               onPrompt={openPrompt}
+              onPeek={setPeek}
             />
           ) : (
             <MoneyTable
@@ -180,6 +185,7 @@ function LedgerPage({ kind }: { kind: LedgerKind }) {
               query={state.query}
               precision={state.precision}
               onPrompt={openPrompt}
+              onPeek={setPeek}
             />
           )}
         </BookSheet>
@@ -191,6 +197,7 @@ function LedgerPage({ kind }: { kind: LedgerKind }) {
           onPrompt={openPrompt}
         />
       )}
+      <RecordPeekPanel peek={peek} onClose={() => setPeek(null)} />
     </BookPage>
   );
 }
@@ -555,6 +562,7 @@ function PartyTable(props: {
   query: LedgerQuery;
   precision: Precision;
   onPrompt: () => void;
+  onPeek: (peek: RecordPeek) => void;
 }) {
   const { t } = useTranslation();
   const drill = useDrill();
@@ -635,6 +643,7 @@ function PartyTable(props: {
                         partyId={row.party?.partyId ?? 'none'}
                         omit={[head.name, label.name]}
                         precision={props.precision}
+                        onPeek={props.onPeek}
                       />
                     ) : null}
                   </Fragment>
@@ -678,6 +687,7 @@ function MoneyTable(props: {
   query: LedgerQuery;
   precision: Precision;
   onPrompt: () => void;
+  onPeek: (peek: RecordPeek) => void;
 }) {
   const drill = useDrill();
   if (props.rows === null || props.totals === null) {
@@ -737,6 +747,7 @@ function MoneyTable(props: {
                   accountId={row.accountId}
                   omit={[row.name]}
                   precision={props.precision}
+                  onPeek={props.onPeek}
                 />
               ) : null}
             </Fragment>
@@ -748,7 +759,10 @@ function MoneyTable(props: {
   );
 }
 
-/** The journal lines behind a row; a click opens the document. */
+/**
+ * The journal lines behind a row, each named by its date, party and description (no number); a
+ * click opens its record in the side panel over the report, a stock document on its own page.
+ */
 function LedgerDetail(props: {
   kind: LedgerKind;
   query: LedgerQuery;
@@ -757,6 +771,7 @@ function LedgerDetail(props: {
   /** Names already on screen (the group's, the row's), left out of the lines. */
   omit: readonly string[];
   precision: Precision;
+  onPeek: (peek: RecordPeek) => void;
 }) {
   const { t } = useTranslation();
   const lines = useLedgerLines(props.query, {
@@ -787,23 +802,25 @@ function LedgerDetail(props: {
   return (
     <>
       {lines.data.data.map((line) => {
-        const number = line.documentNumber ?? line.entryNumber;
+        const party = line.party?.name ?? null;
+        const description = withoutNumber(line.lineDescription ?? line.entryDescription, [
+          line.documentNumber,
+          line.entryNumber,
+        ]);
         const parts = detailParts(
-          number,
-          [
-            line.entryDate,
-            line.lineDescription ?? line.entryDescription,
-            ...(props.kind === 'MONEY' && line.party ? [line.party.name] : []),
-          ],
+          null,
+          [line.entryDate, party, description === party ? null : description],
           props.omit,
         );
+        const peek = ledgerLinePeek(line);
         return (
           <DetailRow
             key={line.lineId}
             href={ledgerLineHref(line)}
-            label={detailText(number, parts)}
+            onOpen={peek ? () => props.onPeek(peek) : null}
+            label={detailText(null, parts)}
           >
-            <DetailLabel number={number} parts={parts} colSpan={2} />
+            <DetailLabel number={null} parts={parts} colSpan={2} />
             <TextCell
               text={counters(line)}
               colSpan={props.kind === 'PARTY' ? 2 : 1}

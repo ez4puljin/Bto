@@ -1,5 +1,5 @@
 import { businessDate } from '@tugeel/shared/time';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { DATE, monthStart } from '../report-helpers';
 import type { Precision } from './book-format';
@@ -68,17 +68,43 @@ export function usePromptDates(from: string, to: string) {
   return { start, setStart, end, setEnd, valid };
 }
 
-/** Which rows show their detail (a row's key in the set). */
+/**
+ * Which rows show their detail (a row's key in the set), kept in the address (`?o=`, replaced in
+ * place): coming back to the report from a document shows it as it was left. A new prompt drops it.
+ */
 export function useDrill() {
-  const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
-  const toggle = useCallback((key: string) => {
-    setOpen((current) => {
-      const next = new Set(current);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }, []);
-  const reset = useCallback(() => setOpen(new Set()), []);
+  const [search, setSearch] = useSearchParams();
+  const open = useMemo<ReadonlySet<string>>(() => new Set(search.getAll(DRILL)), [search]);
+  const toggle = useCallback(
+    (key: string) => {
+      setSearch(
+        (current) => {
+          const next = new URLSearchParams(current);
+          const keys = next.getAll(DRILL);
+          next.delete(DRILL);
+          for (const item of keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key]) {
+            next.append(DRILL, item);
+          }
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearch],
+  );
+  const reset = useCallback(
+    () =>
+      setSearch(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.delete(DRILL);
+          return next;
+        },
+        { replace: true },
+      ),
+    [setSearch],
+  );
   return { open, toggle, reset };
 }
+
+const DRILL = 'o';

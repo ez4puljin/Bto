@@ -727,5 +727,15 @@ describe('bank statements, «Банкны хуулга хаах»', () => {
       customerId: shop.id,
     });
     expect(entry.lines?.find((row) => row.accountId === bank.glAccountId)?.debit).toBe('4500.00');
+
+    // «Мөнгөн хөрөнгийн тайлан» names the bank line by the other side's party (2026-11-16).
+    const lines = (
+      await http()
+        .get('/api/v1/finance/reports/ledger/lines')
+        .query({ kind: 'MONEY', from: yesterday, to: yesterday, accountId: bank.glAccountId })
+        .set(bearer(accountant))
+        .expect(200)
+    ).body as { data: { entryId: number; party: { code: string | null } | null }[] };
+    expect(lines.data.find((row) => row.entryId === entry.id)?.party?.code).toBe(shop.code);
   });
 });

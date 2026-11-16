@@ -13,6 +13,7 @@ import {
   sidesOf,
   tableMinRem,
   textColumn,
+  withoutNumber,
 } from './book-format';
 import { stockDocHref } from './book-links';
 
@@ -92,5 +93,16 @@ describe('the paper of the ledger reports (ADR-0133)', () => {
     expect(stockDocHref('POS', 1)).toBe('/pos/sales?sale=1');
     expect(stockDocHref('CN', 5, 9)).toBe('/finance/invoices?invoice=9');
     expect(stockDocHref('CN', 5)).toBeNull();
+  });
+});
+
+describe('a ledger line named without its number (2026-11-16)', () => {
+  it('drops the number in front of a description', () => {
+    expect(withoutNumber('Т-20261112-0001 — Цахир дэлгүүр', ['Т-20261112-0001'])).toBe(
+      'Цахир дэлгүүр',
+    );
+    expect(withoutNumber('Ж-20261112-0004', [null, 'Ж-20261112-0004'])).toBeNull();
+    expect(withoutNumber('Дансаар - БАТЦЭЦЭГ-с', ['Ж-20261112-0009'])).toBe('Дансаар - БАТЦЭЦЭГ-с');
+    expect(withoutNumber(null, ['Т-1'])).toBeNull();
   });
 });

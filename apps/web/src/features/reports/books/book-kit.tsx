@@ -825,24 +825,32 @@ const DETAIL_ROW =
   'bg-[color-mix(in_oklab,var(--color-muted)_45%,var(--color-card))] text-xs text-muted-foreground [&>td:first-child]:shadow-[inset_2px_0_0_var(--color-primary)]';
 
 /** A detail row: small and lighter under the row it opened; a click opens the document behind it. */
-export function DetailRow(props: { href: string | null; label: string; children: ReactNode }) {
+export function DetailRow(props: {
+  href: string | null;
+  /** Opens the record over the report (a side panel) instead of going to `href`. */
+  onOpen?: (() => void) | null;
+  label: string;
+  children: ReactNode;
+}) {
   const navigate = useNavigate();
+  const opens = Boolean(props.onOpen ?? props.href);
   const open = () => {
-    if (props.href) void navigate(props.href);
+    if (props.onOpen) props.onOpen();
+    else if (props.href) void navigate(props.href);
   };
   return (
     <tr
       data-slot="table-row"
-      role={props.href ? 'link' : undefined}
+      role={props.onOpen ? 'button' : props.href ? 'link' : undefined}
       aria-label={props.label}
-      tabIndex={props.href ? 0 : undefined}
+      tabIndex={opens ? 0 : undefined}
       onClick={open}
       onKeyDown={(event) => {
         if (event.key === 'Enter') open();
       }}
       className={cn(
         DETAIL_ROW,
-        props.href &&
+        opens &&
           'group/detail cursor-pointer hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
       )}
     >

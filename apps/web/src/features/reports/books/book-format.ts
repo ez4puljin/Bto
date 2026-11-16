@@ -83,6 +83,26 @@ export function detailParts(
   );
 }
 
+/**
+ * A description without the document's number in front («Т-20261112-0001 — Цахир дэлгүүр» →
+ * «Цахир дэлгүүр»): the reports name a line by its date and party, not its number.
+ */
+export function withoutNumber(
+  text: string | null | undefined,
+  numbers: readonly (string | null | undefined)[],
+): string | null {
+  if (!text) return null;
+  for (const number of numbers) {
+    if (!number) continue;
+    if (text === number) return null;
+    const match = new RegExp(`^${escapeRegExp(number)}\\s*[—–:-]\\s*`).exec(text);
+    if (match) return text.slice(match[0].length) || null;
+  }
+  return text;
+}
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /** The text a detail row is named by: its number and parts joined with « · ». */
 export function detailText(number: string | null, parts: readonly string[]): string {
   return [number, ...parts].filter(Boolean).join(' · ');

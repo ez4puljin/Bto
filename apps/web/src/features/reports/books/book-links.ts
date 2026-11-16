@@ -71,6 +71,44 @@ export function ledgerLineHref(line: LedgerLine): string {
   }
 }
 
+/** A record a report opens in its own side panel, over the report (no page change). */
+export type RecordPeek =
+  | { kind: 'payment'; id: number }
+  | { kind: 'entry'; id: number }
+  | { kind: 'invoice'; id: number }
+  | { kind: 'shift'; id: number };
+
+/**
+ * The panel a journal line opens over the report: its voucher, invoice or till shift, or the
+ * entry itself; null for a stock document, which has a page of its own (`ledgerLineHref`).
+ */
+export function ledgerLinePeek(line: LedgerLine): RecordPeek | null {
+  const entry: RecordPeek = { kind: 'entry', id: line.entryId };
+  if (line.system === 'FIN') {
+    if ((line.sourceDocType === 'RECEIPT' || line.sourceDocType === 'PAYMENT') && line.documentId) {
+      return { kind: 'payment', id: line.documentId };
+    }
+    return entry;
+  }
+  const id = idOf(line.sourceDocId);
+  switch (line.sourceDocType) {
+    case 'SALES_INVOICE':
+      return id ? { kind: 'invoice', id } : entry;
+    case 'POS_SHIFT':
+      return id ? { kind: 'shift', id } : entry;
+    case 'GOODS_RECEIPT':
+    case 'RECEIPT_RECOST':
+    case 'STOCK_REVALUE':
+    case 'SUPPLIER_RETURN':
+    case 'DAMAGE_CHARGE':
+      return id ? null : entry;
+    case 'STOCK':
+      return ledgerLineHref(line).startsWith('/finance/journal') ? entry : null;
+    default:
+      return entry;
+  }
+}
+
 /** The page of a sales document of «Борлуулалт /Бараагаар/». */
 export function salesDocHref(doc: ProductSalesDocument): string | null {
   switch (doc.kind) {

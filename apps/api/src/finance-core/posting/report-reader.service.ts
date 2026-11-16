@@ -196,6 +196,7 @@ export interface FinLedgerLine {
   /** The core's document behind the entry (a voucher, an opening), its number. */
   documentId: number | null;
   documentNumber: string | null;
+  /** The line's party; on a line without one (a cash or bank line), the other side's one party. */
   partyId: string | null;
   partyName: string | null;
   debit: Decimal;
@@ -605,19 +606,21 @@ export class FinReports {
       SELECT l.id, l.entry_id, e.number, e.entry_date::text AS entry_date,
              e.description AS entry_description, l.description AS line_description,
              s.code AS system, e.source_doc_type, e.source_doc_id, e.document_id,
-             d.number AS document_number, l.party_id, p.name AS party_name,
+             d.number AS document_number, coalesce(l.party_id, c.party_id) AS party_id,
+             p.name AS party_name,
              l.debit::text AS debit, l.credit::text AS credit, c.counters
         FROM fin.journal_lines l
         JOIN fin.journal_entries e ON e.company_id = l.company_id AND e.id = l.entry_id
         JOIN fin.source_systems s ON s.id = e.source_system_id
         LEFT JOIN fin.documents d ON d.company_id = e.company_id AND d.id = e.document_id
-        LEFT JOIN fin.parties p ON p.id = l.party_id
         LEFT JOIN LATERAL (
-          SELECT array_agg(DISTINCT (CASE WHEN o.debit > 0 THEN 'D:' ELSE 'C:' END) || oa.code) AS counters
+          SELECT array_agg(DISTINCT (CASE WHEN o.debit > 0 THEN 'D:' ELSE 'C:' END) || oa.code) AS counters,
+                 CASE WHEN count(DISTINCT o.party_id) = 1 THEN min(o.party_id) END AS party_id
             FROM fin.journal_lines o
             JOIN fin.accounts oa ON oa.company_id = o.company_id AND oa.id = o.account_id
            WHERE o.company_id = l.company_id AND o.entry_id = l.entry_id AND o.id <> l.id
              AND (o.debit > 0) = (l.credit > 0)) c ON TRUE
+        LEFT JOIN fin.parties p ON p.id = coalesce(l.party_id, c.party_id)
        WHERE ${where} AND e.entry_date BETWEEN ${query.from}::date AND ${query.to}::date
        ORDER BY e.entry_date, e.id, l.line_no
        LIMIT ${MAX_LEDGER_LINES + 1}`);
