@@ -4,6 +4,7 @@ import {
   type PosStatus,
   type SnapshotPaymentType,
   type PaymentTypeKind,
+  type CardTerminal,
 } from '@tugeel/shared/pos';
 import { asc, eq, inArray, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
@@ -19,11 +20,20 @@ export interface PaymentType {
   kind: PaymentTypeKind;
   status: PosStatus;
   sort: number;
+  /** ADR-0208: the card terminal the till drives for this CARD type; null: keyed by hand. */
+  terminal: CardTerminal | null;
 }
 
 export interface PaymentTypesInput {
   /** The whole list in the till's order: a row with an id keeps it, one without adds a type. */
-  types: { id: number | null; name: string; kind: PaymentTypeKind; status: PosStatus }[];
+  types: {
+    id: number | null;
+    name: string;
+    kind: PaymentTypeKind;
+    status: PosStatus;
+    /** Left out: the type keeps what it has (a new type: none). */
+    terminal?: CardTerminal | null | undefined;
+  }[];
 }
 
 /**
@@ -66,6 +76,7 @@ export class PosPaymentTypesService implements OnApplicationBootstrap {
         kind: posPaymentTypes.kind,
         status: posPaymentTypes.status,
         sort: posPaymentTypes.sort,
+        terminal: posPaymentTypes.terminal,
       })
       .from(posPaymentTypes)
       .orderBy(asc(posPaymentTypes.sort), asc(posPaymentTypes.id));
@@ -74,7 +85,13 @@ export class PosPaymentTypesService implements OnApplicationBootstrap {
   async forSnapshot(executor: Db | Tx = this.db): Promise<SnapshotPaymentType[]> {
     return (await this.list(executor))
       .filter((type) => type.status === 'ACTIVE')
-      .map((type) => ({ id: type.id, name: type.name, kind: type.kind }));
+      .map((type) => ({
+        id: type.id,
+        name: type.name,
+        kind: type.kind,
+        // Only when set: a snapshot without terminals keeps its version.
+        ...(type.terminal ? { terminal: type.terminal } : {}),
+      }));
   }
 
   /** The types of these ids, for the tenders a replayed sale names. */
@@ -90,6 +107,7 @@ export class PosPaymentTypesService implements OnApplicationBootstrap {
         kind: posPaymentTypes.kind,
         status: posPaymentTypes.status,
         sort: posPaymentTypes.sort,
+        terminal: posPaymentTypes.terminal,
       })
       .from(posPaymentTypes)
       .where(inArray(posPaymentTypes.id, [...new Set(ids)]));
@@ -115,6 +133,9 @@ export class PosPaymentTypesService implements OnApplicationBootstrap {
       if (type.id !== null) {
         if (ids.has(type.id)) throw invalid(`types[${index}].id`, 'unique', 'listed once');
         ids.add(type.id);
+      }
+      if (type.terminal && type.kind !== 'CARD') {
+        throw invalid(`types[${index}].terminal`, 'kind', 'only a card type drives a terminal');
       }
     });
     if (activeOf('CASH') !== 1) throw invalid('types', 'cash', 'exactly one active cash type');
@@ -143,6 +164,7 @@ export class PosPaymentTypesService implements OnApplicationBootstrap {
           kind: type.kind,
           status: type.status,
           sort: sort++,
+          ...(type.terminal !== undefined ? { terminal: type.terminal } : {}),
           updatedAt: sql`now()`,
         };
         if (type.id === null) await tx.insert(posPaymentTypes).values(values);
@@ -164,7 +186,15 @@ export class PosPaymentTypesService implements OnApplicationBootstrap {
         action: 'UPDATE',
         entity: 'pos_payment_types',
         entityId: 0,
-        before: { types: before.map(({ id, name, kind, status }) => ({ id, name, kind, status })) },
+        before: {
+          types: before.map(({ id, name, kind, status, terminal }) => ({
+            id,
+            name,
+            kind,
+            status,
+            terminal,
+          })),
+        },
         after: { types: input.types },
       });
     });

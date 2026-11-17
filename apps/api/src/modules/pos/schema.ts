@@ -6,6 +6,7 @@ import {
   RECEIPT_TYPES,
   SALE_KINDS,
   SHIFT_STATUSES,
+  CARD_TERMINALS,
   PAYMENT_TYPE_KINDS,
   TENDER_KINDS,
   VOID_REASONS,
@@ -875,10 +876,16 @@ export const posPaymentTypes = pgTable(
     kind: text('kind', { enum: PAYMENT_TYPE_KINDS }).notNull(),
     sort: smallint('sort').notNull(),
     status: text('status', { enum: POS_STATUSES }).notNull().default('ACTIVE'),
+    /** ADR-0208: the bank card terminal the till drives for this CARD type; null: keyed by hand. */
+    terminal: text('terminal', { enum: CARD_TERMINALS }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
+    check(
+      'pos_payment_types_terminal',
+      sql`${t.terminal} IS NULL OR (${t.kind} = 'CARD' AND ${inList(t.terminal, CARD_TERMINALS)})`,
+    ),
     uniqueIndex('pos_payment_types_name').on(t.name),
     uniqueIndex('pos_payment_types_one_cash')
       .on(t.kind)

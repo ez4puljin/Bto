@@ -4,6 +4,10 @@ import {
   type EdgeBarcodeHit,
   type EdgeCartLine,
   type EdgeApproval,
+  type EdgeCardAttempt,
+  type EdgeCardAttemptRequest,
+  type EdgeCardAttemptResult,
+  type EdgeCardSettlementRequest,
   type EdgeCustomer,
   type EdgeDayCountRequest,
   type EdgeDaySummary,
@@ -329,6 +333,31 @@ export class EdgeClient {
 
   sale(body: EdgeSaleRequest) {
     return this.request<EdgePrintableReceipt>('POST', '/sales', { body });
+  }
+
+  // ADR-0208: the record around a charge on the till's card terminal.
+
+  /** Before the terminal is asked; 409 `POS_CARD_PENDING` while an earlier charge has no answer. */
+  beginCardAttempt(body: EdgeCardAttemptRequest) {
+    return this.request<EdgeCardAttempt>('POST', '/card-attempts', { body });
+  }
+
+  finishCardAttempt(id: string, body: EdgeCardAttemptResult) {
+    return this.request<EdgeCardAttempt>('POST', `/card-attempts/${id}/result`, { body });
+  }
+
+  /** An approved charge given back on the terminal by hand before a sale used it. */
+  voidCardAttempt(id: string) {
+    return this.request<EdgeCardAttempt>('POST', `/card-attempts/${id}/void`);
+  }
+
+  /** A charge without an answer and approved charges no sale has used. */
+  openCardAttempts(signal?: AbortSignal) {
+    return this.request<EdgeCardAttempt[]>('GET', '/card-attempts/open', { signal });
+  }
+
+  beginCardSettlement(body: EdgeCardSettlementRequest) {
+    return this.request<EdgeCardAttempt>('POST', '/card-settlements', { body });
   }
 
   /** ADR-0110: a supervisor's PIN checked before the payment of a sale with codes. */

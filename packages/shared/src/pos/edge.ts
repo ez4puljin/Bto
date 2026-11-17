@@ -21,6 +21,10 @@ import type {
   SaleKind,
   SyncResult,
   TenderKind,
+  CardAttemptKind,
+  CardAttemptSource,
+  CardAttemptStatus,
+  CardTerminal,
   VoidReason,
 } from './index';
 import type { LoyaltyMemberStatus } from './loyalty';
@@ -353,6 +357,8 @@ export interface SnapshotPaymentType {
   id: number;
   name: string;
   kind: TenderKind;
+  /** ADR-0208: the card terminal the till drives for this type; absent or null: keyed by hand. */
+  terminal?: CardTerminal | null;
 }
 
 /** A quick button: a product unit the admin put on the till's F7 panel (ADR-0104). */
@@ -873,6 +879,56 @@ export interface EdgeTenderInput {
   tendered?: string | null;
   terminalId?: string | null;
   rrn?: string | null;
+  /**
+   * ADR-0208: the approved card charge this tender is (required for a type with a terminal): its
+   * amount is the tender's, and a charge pays one sale once.
+   */
+  cardAttemptId?: string | null;
+}
+
+/** ADR-0208: the till is about to ask its card terminal for money; written before it does. */
+export interface EdgeCardAttemptRequest {
+  /** A uuid the kiosk draws once per charge: a repeated request answers the same attempt. */
+  id: string;
+  /** The payment attempt (the sale's client id) the charge is for. */
+  saleClientId: string;
+  paymentTypeId: number;
+  amount: string;
+  /** The terminal as its service named it (`terminal_id`), when the kiosk has asked. */
+  terminalId?: string | null;
+}
+
+/** ADR-0208: how a charge ended. The terminal's whole answer is kept as it came. */
+export interface EdgeCardAttemptResult {
+  outcome: 'APPROVED' | 'DECLINED' | 'FAILED';
+  source: CardAttemptSource;
+  /** The terminal's answer as received (any JSON); null when there was none. */
+  response?: unknown;
+  message?: string | null;
+}
+
+/** ADR-0208: the terminal's settlement with the bank, as the till ran it. */
+export interface EdgeCardSettlementRequest {
+  id: string;
+  terminalId?: string | null;
+}
+
+/** ADR-0208: a card charge as the till shows it. */
+export interface EdgeCardAttempt {
+  id: string;
+  kind: CardAttemptKind;
+  status: CardAttemptStatus;
+  /** The reference the terminal is given (`db_ref_no`): digits only. */
+  refNo: string;
+  saleClientId: string | null;
+  paymentTypeId: number | null;
+  amount: string;
+  cashierName: string;
+  createdAt: string;
+  /** The sale that used it; null while it pays nothing yet. */
+  usedAt: string | null;
+  source: CardAttemptSource | null;
+  message: string | null;
 }
 
 export interface EdgeSaleRequest {

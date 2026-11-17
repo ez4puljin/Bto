@@ -1,7 +1,9 @@
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { Decimal } from '@tugeel/shared/money';
 import type {
+  CardTerminal,
   EdgeApproval,
+  EdgeCardAttempt,
   EdgeCartLine,
   EdgeCustomer,
   EdgeMember,
@@ -30,7 +32,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react';
-import { type FormEvent, type KeyboardEvent, type ReactNode, useState } from 'react';
+import { type FormEvent, type KeyboardEvent, type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import {
@@ -46,11 +48,14 @@ import { formatMnt, formatTugrik } from '@/lib/money';
 import { useDebounced } from '@/lib/use-debounced';
 import { useScanGuard } from '@/lib/scan/use-wedge-scanner';
 import { fieldMoney, moneyOrZero, quickCash, wireMoney } from '../amounts';
+import { type ChargeResult, chargeOnTerminal, recordOutcome } from '../card-charge';
 import { edgeProblemOf } from '../edge-client';
+import { TerminalUnavailable } from '../khan-terminal';
 import { useKiosk } from '../kiosk-context';
 import { keepFocus, typeDigits } from '../keys';
 import { useProblemText } from '../messages';
 import { useSession } from '../queries';
+import { CardWaiting, TerminalStatusLine, UnansweredPanel, UnusedPanel } from './card-panels';
 import { KioskAlert } from './layout';
 
 export interface PaymentAttempt {
@@ -72,7 +77,22 @@ interface PayType {
   id: number | null;
   name: string;
   kind: TenderKind;
+  /** ADR-0208: the bank terminal the till drives for this card type. */
+  terminal?: CardTerminal | null;
 }
+
+/** A card type whose amount the till sends to its terminal itself (ADR-0208). */
+const driven = (type: PayType): boolean =>
+  type.kind === 'CARD' && type.id !== null && Boolean(type.terminal);
+
+/** Where a card charge of this payment stands (ADR-0208); `idle`: nothing to say. */
+type CardPhase =
+  | { phase: 'idle' }
+  | { phase: 'waiting'; name: string; amount: string }
+  | { phase: 'refused'; message: string | null }
+  | { phase: 'offline' }
+  | { phase: 'blocked'; error: unknown }
+  | { phase: 'unrecorded'; rowKey: number; held: Extract<ChargeResult, { kind: 'UNRECORDED' }> };
 
 /** One payment row the cashier added: its type, its amount, a card's slip facts. */
 interface PayRow {
@@ -86,9 +106,11 @@ interface PayRow {
  * one in that place). It opens with the first type (cash) for the whole amount (owner 2026-11-04:
  * «илүү ухаалаг хялбар»); a tap on another type while one row pays it all swaps that row, otherwise
  * it adds a row with what is left — cash may exceed it (the change), the rest may not; a CREDIT row
- * needs its customer (ADR-0109). A card row asks nothing more: the bank's terminal is set up on the PC. When the
- * rows make the total, «Баримт хэвлэх» asks «Хувь хүн НӨАТ» or «Байгууллага НӨАТ» — a sale with
- * credit prints its slip without VAT at once.
+ * needs its customer (ADR-0109). A card row of a type without a terminal asks nothing more (the
+ * cashier keys the amount on the bank's terminal); one with a terminal (ADR-0208) is sent to the
+ * terminal when the sale is paid, and the sale is written only after the terminal approved. When
+ * the rows make the total, «Баримт хэвлэх» asks «Хувь хүн НӨАТ» or «Байгууллага НӨАТ» — a sale
+ * with credit prints its slip without VAT at once.
  */
 export function PaymentDialog(props: {
   open: boolean;
@@ -100,10 +122,12 @@ export function PaymentDialog(props: {
 }) {
   const { t } = useTranslation();
   const { attempt } = props;
+  // ADR-0208: while the terminal waits for the card the payment cannot be closed.
+  const [locked, setLocked] = useState(false);
   return (
     <Dialog
       open={props.open && attempt !== null}
-      onOpenChange={(open) => (open ? undefined : props.onClose())}
+      onOpenChange={(open) => (open || locked ? undefined : props.onClose())}
     >
       <DialogContent
         size="lg"
@@ -126,6 +150,7 @@ export function PaymentDialog(props: {
             attempt={attempt}
             onCancel={props.onClose}
             onPaid={props.onPaid}
+            onBusy={setLocked}
           />
         ) : null}
       </DialogContent>
@@ -163,9 +188,11 @@ function PaymentForm(props: {
   attempt: PaymentAttempt;
   onCancel: () => void;
   onPaid: (receipt: EdgePrintableReceipt) => void;
+  /** ADR-0208: the terminal is waiting for a card; the dialog stays open. */
+  onBusy: (busy: boolean) => void;
 }) {
   const { t } = useTranslation();
-  const { client } = useKiosk();
+  const { client, terminal } = useKiosk();
   const problemText = useProblemText();
   const vouchers = props.attempt.vouchers ?? [];
   // ADR-0110: no credit beside a partner voucher; partner vouchers may leave nothing to pay.
@@ -206,6 +233,41 @@ function PaymentForm(props: {
     },
   });
 
+  // ADR-0208: the card terminal on this till PC, the charges it approved for this payment
+  // (by row), and what the edge still holds open for this till.
+  const hasTerminalType = types.some(driven);
+  const terminalStatus = useQuery({
+    queryKey: ['kiosk', 'card-terminal', 'status'],
+    queryFn: ({ signal }) => {
+      if (!terminal) throw new TerminalUnavailable();
+      return terminal.checkStatus(signal);
+    },
+    enabled: hasTerminalType,
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
+  });
+  const openAttempts = useQuery({
+    queryKey: ['kiosk', 'card-attempts', 'open'],
+    queryFn: ({ signal }) => client.openCardAttempts(signal),
+    enabled: hasTerminalType,
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
+  });
+  const [charges, setCharges] = useState<Record<number, EdgeCardAttempt>>({});
+  const [card, setCard] = useState<CardPhase>({ phase: 'idle' });
+  // One payment at a time, also between two presses of the same render.
+  const working = useRef(false);
+  const waiting = card.phase === 'waiting';
+  const busy = sale.isPending || waiting;
+  const usedIds = new Set(Object.values(charges).map((attempt) => attempt.id));
+  const unanswered = openAttempts.data?.find((attempt) => attempt.status === 'PENDING') ?? null;
+  const unused = (openAttempts.data ?? []).filter(
+    (attempt) => attempt.status === 'APPROVED' && !usedIds.has(attempt.id),
+  );
+  const canCharge = terminalStatus.isSuccess && !unanswered;
+
   const total = new Decimal(props.attempt.total);
   const nothingDue = total.isZero() && vouchers.length > 0;
   const amounts = rows.map((row) => moneyOrZero(row.amount));
@@ -240,14 +302,26 @@ function PaymentForm(props: {
     Decimal.max(total.minus(pointsAmount), 0),
   );
   const toEarn = earnBase.times(earnPercent).dividedBy(100).floor();
-  const ready = covered && creditReady && pointsReady && (rows.length > 0 || nothingDue);
+  const toCharge = rows.some(
+    (row, index) => driven(row.type) && !charges[row.key] && Boolean(amounts[index]?.gt(0)),
+  );
+  const chargedTotal = sumOf((row) => Boolean(charges[row.key]));
+  const ready =
+    covered &&
+    creditReady &&
+    pointsReady &&
+    (rows.length > 0 || nothingDue) &&
+    (!toCharge || canCharge) &&
+    card.phase !== 'unrecorded';
 
   const addRow = (type: PayType) => {
     if (type.kind === 'CREDIT' && creditRow) return;
     if (type.kind === 'POINTS' && pointsRow) return;
-    // One row paying it all: another type takes its place (cash ↔ card in one tap).
+    if (driven(type) && !canCharge) return;
+    // One row paying it all: another type takes its place (cash ↔ card in one tap) — never a
+    // card row the terminal has already charged.
     const only = rows.length === 1 ? rows[0] : undefined;
-    if (only && amounts[0]?.gte(total)) {
+    if (only && !charges[only.key] && amounts[0]?.gte(total)) {
       if (only.type.id === type.id && only.type.kind === type.kind) return;
       if (only.type.kind === 'CREDIT') setCustomer(null);
       if (only.type.kind === 'POINTS') setPin('');
@@ -269,9 +343,19 @@ function PaymentForm(props: {
     setNextKey((key) => key + 1);
     setOverLimit(null);
   };
-  const updateRow = (key: number, patch: Partial<PayRow>) =>
+  const updateRow = (key: number, patch: Partial<PayRow>) => {
+    if (charges[key]) return;
     setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+  };
   const removeRow = (key: number) => {
+    // A charged row taken off is not lost: the charge goes back to the list of charges no sale
+    // used, to be put into the sale again or marked as given back on the terminal.
+    if (charges[key]) {
+      setCharges((current) =>
+        Object.fromEntries(Object.entries(current).filter(([rowKey]) => rowKey !== String(key))),
+      );
+      void openAttempts.refetch();
+    }
     const removed = rows.find((row) => row.key === key);
     if (removed?.type.kind === 'CREDIT') setCustomer(null);
     if (removed?.type.kind === 'POINTS') setPin('');
@@ -279,7 +363,7 @@ function PaymentForm(props: {
     setOverLimit(null);
   };
 
-  const tenders = (): EdgeTenderInput[] => {
+  const tenders = (charged: Record<number, EdgeCardAttempt>): EdgeTenderInput[] => {
     const list: EdgeTenderInput[] = [];
     // The cash rows are one tender: what the cash pays and what was handed over.
     const cashType = rows.find((row) => row.type.kind === 'CASH')?.type ?? null;
@@ -300,22 +384,101 @@ function PaymentForm(props: {
         amount: wireMoney(amount),
         ...(row.type.kind === 'CARD'
           ? {
-              // The bank's terminal is set up on the POS PC itself (owner 2026-11-04): nothing typed.
+              // Keyed on the bank's terminal by hand (owner 2026-11-04), or the terminal's own
+              // approved charge (ADR-0208): the edge takes the terminal's id from it.
               terminalId: null,
               rrn: null,
+              ...(charged[row.key] ? { cardAttemptId: charged[row.key]?.id ?? null } : {}),
             }
           : {}),
       });
     });
     return list;
   };
-  const pay = (type: ReceiptType, acceptOverLimit = false) => {
-    if (!ready || sale.isPending) return;
-    setOverLimit(null);
+
+  /** What a charge came to: the approved attempt, or null with the reason on the screen. */
+  const landed = (rowKey: number, result: ChargeResult): EdgeCardAttempt | null => {
+    switch (result.kind) {
+      case 'APPROVED':
+        setCharges((current) => ({ ...current, [rowKey]: result.attempt }));
+        return result.attempt;
+      case 'REFUSED':
+        setCard({ phase: 'refused', message: result.message });
+        return null;
+      case 'OFFLINE':
+        setCard({ phase: 'offline' });
+        void terminalStatus.refetch();
+        return null;
+      case 'BLOCKED':
+        setCard({ phase: 'blocked', error: result.error });
+        void openAttempts.refetch();
+        return null;
+      case 'UNKNOWN':
+        // Sent and not answered: the edge holds it PENDING and the panel asks for the slip.
+        setCard({ phase: 'idle' });
+        void openAttempts.refetch();
+        return null;
+      case 'UNRECORDED':
+        setCard({ phase: 'unrecorded', rowKey, held: result });
+        return null;
+    }
+  };
+  /**
+   * Sends every card row with a terminal that is not charged yet to the terminal, one after
+   * another; answers the charges of all rows, or null when one did not go through (the rows the
+   * terminal approved stay charged and are never sent again).
+   */
+  const chargeRows = async (
+    receipt: ReceiptType,
+  ): Promise<Record<number, EdgeCardAttempt> | null> => {
+    let done = charges;
+    for (const [index, row] of rows.entries()) {
+      const amount = amounts[index];
+      if (!driven(row.type) || row.type.id === null || done[row.key] || !amount?.gt(0)) continue;
+      if (!terminal) {
+        setCard({ phase: 'offline' });
+        return null;
+      }
+      setCard({ phase: 'waiting', name: row.type.name, amount: amount.toFixed(2) });
+      props.onBusy(true);
+      let result: ChargeResult;
+      try {
+        result = await chargeOnTerminal(
+          { client, terminal },
+          {
+            saleClientId: props.attempt.clientId,
+            paymentTypeId: row.type.id,
+            amount: wireMoney(amount),
+            // TODO-VERIFY (ADR-0208): «1» a citizen's, «3» a company's, as Erxes sends its
+            // billType; Databank has not confirmed the values.
+            billType: receipt === 'B2B' ? '3' : '1',
+          },
+        );
+      } finally {
+        props.onBusy(false);
+      }
+      const attempt = landed(row.key, result);
+      if (!attempt) return null;
+      done = { ...done, [row.key]: attempt };
+    }
+    setCard({ phase: 'idle' });
+    return done;
+  };
+  const pay = async (type: ReceiptType, acceptOverLimit = false) => {
+    if (!ready || busy || working.current) return;
+    working.current = true;
+    let charged: Record<number, EdgeCardAttempt> | null;
+    try {
+      setOverLimit(null);
+      charged = await chargeRows(creditRow ? 'B2C' : type);
+    } finally {
+      working.current = false;
+    }
+    if (!charged) return;
     sale.mutate({
       clientId: props.attempt.clientId,
       lines: [...props.attempt.lines],
-      tenders: tenders(),
+      tenders: tenders(charged),
       receiptType: creditRow ? 'B2C' : type,
       buyer: !creditRow && type === 'B2B' && buyer ? { tin: buyer.tin } : null,
       customerId: creditRow ? (customer?.id ?? null) : null,
@@ -331,25 +494,82 @@ function PaymentForm(props: {
   };
   // «Баримт хэвлэх»: with credit the slip prints at once; otherwise the receipt is chosen first.
   const printReceipt = () => {
-    if (!ready || sale.isPending) return;
-    if (creditRow) pay('B2C');
+    if (!ready || busy) return;
+    if (creditRow) void pay('B2C');
     else setStep('receipt');
   };
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (step === 'rows') printReceipt();
-    else if (receiptType === 'B2C' || buyer) pay(receiptType);
+    else if (receiptType === 'B2C' || buyer) void pay(receiptType);
   };
+
+  // ADR-0208: an approved charge no sale used pays this one as a row that cannot be changed. A
+  // lone row not charged yet (the cash the dialog opened with) gives way to it.
+  const adopt = (attempt: EdgeCardAttempt) => {
+    const type =
+      types.find((entry) => entry.id !== null && entry.id === attempt.paymentTypeId) ??
+      types.find(driven);
+    if (!type || usedIds.has(attempt.id)) return;
+    const key = nextKey;
+    const amount = new Decimal(attempt.amount);
+    setRows((current) => {
+      const only = current.length === 1 ? current[0] : undefined;
+      const kept =
+        only && !charges[only.key]
+          ? []
+          : current.filter(
+              (row) =>
+                charges[row.key] || !driven(row.type) || !moneyOrZero(row.amount)?.eq(amount),
+            );
+      return [...kept, { key, type, amount: fieldMoney(amount) }];
+    });
+    setNextKey((next) => next + 1);
+    setCharges((current) => ({ ...current, [key]: attempt }));
+    setCard({ phase: 'idle' });
+  };
+  // The cashier read the terminal's slip of a charge that was never answered.
+  const resolve = useMutation({
+    mutationFn: (input: { attempt: EdgeCardAttempt; outcome: 'APPROVED' | 'FAILED' }) =>
+      client.finishCardAttempt(input.attempt.id, {
+        outcome: input.outcome,
+        source: 'CASHIER',
+        response: null,
+        message: null,
+      }),
+    onSuccess: (kept) => {
+      if (
+        kept.kind === 'SALE' &&
+        kept.status === 'APPROVED' &&
+        kept.saleClientId === props.attempt.clientId
+      ) {
+        adopt(kept);
+      }
+      void openAttempts.refetch();
+    },
+  });
+  const release = useMutation({
+    mutationFn: (attempt: EdgeCardAttempt) => client.voidCardAttempt(attempt.id),
+    onSuccess: () => void openAttempts.refetch(),
+  });
+  // The terminal answered but the edge was not told: tell it again, never the terminal.
+  const record = useMutation({
+    mutationFn: (phase: Extract<CardPhase, { phase: 'unrecorded' }>) =>
+      recordOutcome(client, phase.held.attempt, phase.held.outcome),
+    onSuccess: (result, phase) => {
+      if (landed(phase.rowKey, result)) setCard({ phase: 'idle' });
+    },
+  });
   // 1–9 add the type in that place while no field has the focus.
   const onKeyDown = (event: KeyboardEvent<HTMLFormElement>) => {
     // Enter on the form itself (no field, no button) goes on, as in a field.
     if (event.key === 'Enter' && event.target === event.currentTarget) {
       event.preventDefault();
       if (step === 'rows') printReceipt();
-      else if (receiptType === 'B2C' || buyer) pay(receiptType);
+      else if (receiptType === 'B2C' || buyer) void pay(receiptType);
       return;
     }
-    if (step !== 'rows' || event.target instanceof HTMLInputElement) return;
+    if (busy || step !== 'rows' || event.target instanceof HTMLInputElement) return;
     const place = /^[1-9]$/.test(event.key) ? Number.parseInt(event.key, 10) - 1 : -1;
     const type = types[place];
     if (type) {
@@ -426,7 +646,9 @@ function PaymentForm(props: {
         />
       </dl>
 
-      {step === 'rows' && nothingDue ? (
+      {card.phase === 'waiting' ? (
+        <CardWaiting name={card.name} amount={card.amount} />
+      ) : step === 'rows' && nothingDue ? (
         <p className="rounded-xl bg-success-soft px-4 py-3 text-[0.9375rem] text-success">
           {t('posKiosk.vouchers.allPaid')}
         </p>
@@ -453,6 +675,7 @@ function PaymentForm(props: {
                       className="h-12 w-48 text-right font-mono text-xl md:text-xl"
                       value={row.amount}
                       aria-invalid={amounts[index] === null}
+                      disabled={Boolean(charges[row.key])}
                       onChange={(event) => updateRow(row.key, { amount: event.target.value })}
                       onKeyDown={(event) => {
                         const set = (value: string) => updateRow(row.key, { amount: value });
@@ -460,6 +683,11 @@ function PaymentForm(props: {
                         if (!event.defaultPrevented) typeDigits(event, row.amount, set);
                       }}
                     />
+                    {charges[row.key] ? (
+                      <span className="rounded-lg bg-success-soft px-2 py-1 text-[0.8125rem] font-semibold text-success">
+                        {t('posKiosk.pay.card.charged')}
+                      </span>
+                    ) : null}
                     <Button
                       type="button"
                       variant="ghost"
@@ -546,12 +774,19 @@ function PaymentForm(props: {
                     className="h-12 justify-start gap-2 text-[0.9375rem] font-semibold"
                     disabled={
                       (type.kind === 'CREDIT' && creditRow !== null) ||
-                      (type.kind === 'POINTS' && pointsRow !== null)
+                      (type.kind === 'POINTS' && pointsRow !== null) ||
+                      (driven(type) && !canCharge)
                     }
                     title={
                       type.kind === 'CREDIT' && creditRow
                         ? t('posKiosk.pay.rows.creditOnce')
-                        : undefined
+                        : driven(type) && !canCharge
+                          ? t(
+                              unanswered
+                                ? 'posKiosk.pay.card.pendingBlocks'
+                                : 'posKiosk.pay.card.offlineShort',
+                            )
+                          : undefined
                     }
                     onClick={() => addRow(type)}
                   >
@@ -565,6 +800,13 @@ function PaymentForm(props: {
                   </Button>
                 ))}
               </div>
+              {hasTerminalType ? (
+                <TerminalStatusLine
+                  checking={terminalStatus.isFetching}
+                  info={terminalStatus.isSuccess ? terminalStatus.data : null}
+                  onRecheck={() => void terminalStatus.refetch()}
+                />
+              ) : null}
             </div>
           )}
           {nonCashOver ? <KioskAlert>{t('posKiosk.pay.rows.over')}</KioskAlert> : null}
@@ -581,11 +823,11 @@ function PaymentForm(props: {
               variant={receiptType === 'B2C' ? 'default' : 'outline'}
               className="h-14 gap-2 text-base"
               pending={sale.isPending && receiptType === 'B2C'}
-              disabled={sale.isPending}
+              disabled={busy}
               onClick={() => {
                 setReceiptType('B2C');
                 setBuyer(null);
-                pay('B2C');
+                void pay('B2C');
               }}
             >
               <UserRound aria-hidden className="size-5" />
@@ -595,7 +837,7 @@ function PaymentForm(props: {
               type="button"
               variant={receiptType === 'B2B' ? 'default' : 'outline'}
               className="h-14 gap-2 text-base"
-              disabled={sale.isPending}
+              disabled={busy}
               onClick={() => setReceiptType('B2B')}
             >
               <Building2 aria-hidden className="size-5" />
@@ -619,6 +861,57 @@ function PaymentForm(props: {
         </section>
       )}
 
+      {waiting ? null : (
+        <>
+          {unanswered ? (
+            <UnansweredPanel
+              attempt={unanswered}
+              busy={resolve.isPending}
+              onResolve={(outcome) => resolve.mutate({ attempt: unanswered, outcome })}
+            />
+          ) : null}
+          <UnusedPanel
+            attempts={unused}
+            busy={release.isPending || busy}
+            onUse={adopt}
+            onVoid={(attempt) => release.mutate(attempt)}
+          />
+          {card.phase === 'refused' ? (
+            <KioskAlert>
+              {card.message
+                ? t('posKiosk.pay.card.refused', { message: card.message })
+                : t('posKiosk.pay.card.refusedPlain')}
+            </KioskAlert>
+          ) : card.phase === 'offline' ? (
+            <KioskAlert>{t('posKiosk.pay.card.offline')}</KioskAlert>
+          ) : card.phase === 'blocked' ? (
+            <KioskAlert>{problemText(card.error)}</KioskAlert>
+          ) : card.phase === 'unrecorded' ? (
+            <div role="alert" className="space-y-2 rounded-xl bg-warning-soft p-3 text-warning">
+              <p className="text-sm font-medium">{t('posKiosk.pay.card.unrecorded.text')}</p>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11"
+                disabled={record.isPending}
+                onClick={() => record.mutate(card)}
+              >
+                {t('posKiosk.pay.card.unrecorded.retry')}
+              </Button>
+            </div>
+          ) : null}
+          {resolve.isError ? <KioskAlert>{problemText(resolve.error)}</KioskAlert> : null}
+          {release.isError ? <KioskAlert>{problemText(release.error)}</KioskAlert> : null}
+          {chargedTotal.gt(0) ? (
+            <p className="rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning">
+              {t('posKiosk.pay.card.chargedNote', {
+                amount: formatTugrik(chargedTotal.toFixed(2)),
+              })}
+            </p>
+          ) : null}
+        </>
+      )}
+
       {creditRow && step === 'rows' ? (
         <p className="rounded-xl bg-warning-soft px-4 py-3 text-[0.9375rem] text-warning">
           {t('posKiosk.pay.receiptChoice.noVat')}
@@ -636,8 +929,8 @@ function PaymentForm(props: {
             type="button"
             variant="outline"
             className="h-11"
-            disabled={sale.isPending}
-            onClick={() => pay('B2C', true)}
+            disabled={busy}
+            onClick={() => void pay('B2C', true)}
           >
             {t('posKiosk.pay.credit.overLimitConfirm')}
           </Button>
@@ -647,7 +940,13 @@ function PaymentForm(props: {
       ) : null}
 
       <DialogFooter>
-        <Button type="button" variant="ghost" className="h-11" onClick={props.onCancel}>
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-11"
+          disabled={waiting}
+          onClick={props.onCancel}
+        >
           {t('common.cancel')}
         </Button>
         {step === 'rows' ? (
@@ -655,7 +954,7 @@ function PaymentForm(props: {
             type="submit"
             className="h-11 px-6 text-base"
             pending={sale.isPending}
-            disabled={!ready}
+            disabled={!ready || waiting}
           >
             {sale.isPending ? t('posKiosk.pay.pending') : t('posKiosk.pay.print')}
           </Button>
@@ -664,7 +963,7 @@ function PaymentForm(props: {
             type="submit"
             className="h-11 px-6 text-base"
             pending={sale.isPending}
-            disabled={!buyer}
+            disabled={!buyer || waiting}
           >
             {sale.isPending ? t('posKiosk.pay.pending') : t('posKiosk.pay.print')}
           </Button>

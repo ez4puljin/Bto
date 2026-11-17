@@ -64,6 +64,13 @@
       "when": 1794350368588,
       "tag": "0008_wholesale_relay",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794884504710,
+      "tag": "0009_card_attempts",
+      "breakpoints": true
     }
   ]
 }

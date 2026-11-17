@@ -1,0 +1,2 @@
+ALTER TABLE "pos_payment_types" ADD COLUMN "terminal" text;--> statement-breakpoint
+ALTER TABLE "pos_payment_types" ADD CONSTRAINT "pos_payment_types_terminal" CHECK ("pos_payment_types"."terminal" IS NULL OR ("pos_payment_types"."kind" = 'CARD' AND "pos_payment_types"."terminal" IN ('KHAN')));

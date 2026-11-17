@@ -59031,13 +59031,13 @@
           "retailMarkupAmount": {
             "type": "string",
             "example": "1000",
-            "description": "Supermarket: whole tugriks added after the percentage (ADR-0206); 0 by default"
+            "description": "Supermarket: whole tugriks added after the percentage (ADR-0207); 0 by default"
           },
           "retailBulkDiscountPct": {
             "type": "string",
             "nullable": true,
             "example": "9",
-            "description": "Supermarket bulk: % off the supermarket price, in place of the markup (ADR-0206)"
+            "description": "Supermarket bulk: % off the supermarket price, in place of the markup (ADR-0207)"
           },
           "retailRounding": {
             "nullable": true,
@@ -59051,7 +59051,7 @@
               "DOWN_100"
             ],
             "type": "string",
-            "description": "The supermarket price's rounding; null: rounding (ADR-0206)"
+            "description": "The supermarket price's rounding; null: rounding (ADR-0207)"
           },
           "retailBulkRounding": {
             "nullable": true,
@@ -59065,7 +59065,7 @@
               "DOWN_100"
             ],
             "type": "string",
-            "description": "The bulk price's rounding; null: the supermarket price's (ADR-0206)"
+            "description": "The bulk price's rounding; null: the supermarket price's (ADR-0207)"
           },
           "name": {
             "type": "string",
@@ -59125,13 +59125,13 @@
           "retailMarkupAmount": {
             "type": "string",
             "example": "1000",
-            "description": "Supermarket: whole tugriks added after the percentage (ADR-0206); 0 by default"
+            "description": "Supermarket: whole tugriks added after the percentage (ADR-0207); 0 by default"
           },
           "retailBulkDiscountPct": {
             "type": "string",
             "nullable": true,
             "example": "9",
-            "description": "Supermarket bulk: % off the supermarket price, in place of the markup (ADR-0206)"
+            "description": "Supermarket bulk: % off the supermarket price, in place of the markup (ADR-0207)"
           },
           "retailRounding": {
             "nullable": true,
@@ -59145,7 +59145,7 @@
               "DOWN_100"
             ],
             "type": "string",
-            "description": "The supermarket price's rounding; null: rounding (ADR-0206)"
+            "description": "The supermarket price's rounding; null: rounding (ADR-0207)"
           },
           "retailBulkRounding": {
             "nullable": true,
@@ -59159,7 +59159,7 @@
               "DOWN_100"
             ],
             "type": "string",
-            "description": "The bulk price's rounding; null: the supermarket price's (ADR-0206)"
+            "description": "The bulk price's rounding; null: the supermarket price's (ADR-0207)"
           },
           "validFrom": {
             "type": "string",
@@ -59226,13 +59226,13 @@
           "retailMarkupAmount": {
             "type": "string",
             "example": "1000",
-            "description": "Supermarket: whole tugriks added after the percentage (ADR-0206); 0 by default"
+            "description": "Supermarket: whole tugriks added after the percentage (ADR-0207); 0 by default"
           },
           "retailBulkDiscountPct": {
             "type": "string",
             "nullable": true,
             "example": "9",
-            "description": "Supermarket bulk: % off the supermarket price, in place of the markup (ADR-0206)"
+            "description": "Supermarket bulk: % off the supermarket price, in place of the markup (ADR-0207)"
           },
           "retailRounding": {
             "nullable": true,
@@ -59246,7 +59246,7 @@
               "DOWN_100"
             ],
             "type": "string",
-            "description": "The supermarket price's rounding; null: rounding (ADR-0206)"
+            "description": "The supermarket price's rounding; null: rounding (ADR-0207)"
           },
           "retailBulkRounding": {
             "nullable": true,
@@ -59260,7 +59260,7 @@
               "DOWN_100"
             ],
             "type": "string",
-            "description": "The bulk price's rounding; null: the supermarket price's (ADR-0206)"
+            "description": "The bulk price's rounding; null: the supermarket price's (ADR-0207)"
           },
           "name": {
             "type": "string",
@@ -79703,6 +79703,14 @@
           },
           "sort": {
             "type": "number"
+          },
+          "terminal": {
+            "nullable": true,
+            "enum": [
+              "KHAN"
+            ],
+            "type": "string",
+            "description": "ADR-0208: the card terminal the till drives for this type; null: keyed by hand"
           }
         },
         "required": [
@@ -79710,7 +79718,8 @@
           "name",
           "kind",
           "status",
-          "sort"
+          "sort",
+          "terminal"
         ]
       },
       "PosPaymentTypeInput": {
@@ -79742,6 +79751,14 @@
               "INACTIVE"
             ],
             "type": "string"
+          },
+          "terminal": {
+            "nullable": true,
+            "enum": [
+              "KHAN"
+            ],
+            "type": "string",
+            "description": "ADR-0208: a CARD type only; left out keeps what the type has"
           }
         },
         "required": [
@@ -91989,6 +92006,9 @@
           "POS_VOUCHER_WITH_CREDIT",
           "POS_RETURN_VOUCHER_PART",
           "POS_VOUCHER_NOTHING_TO_CHECK",
+          "POS_CARD_PENDING",
+          "POS_CARD_NOT_CHARGED",
+          "POS_CARD_ATTEMPT_STATE",
           "POS_MEMBER_NOT_FOUND",
           "POS_MEMBER_BLOCKED",
           "POS_MEMBER_PHONE_TAKEN",

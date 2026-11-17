@@ -5,6 +5,10 @@ import type {
   RelayOutcome,
 } from '@tugeel/shared/mn';
 import type {
+  CardAttemptKind,
+  CardAttemptSource,
+  CardAttemptStatus,
+  CardTerminal,
   EdgeCartLine,
   EdgeReceipt,
   PosCustomerFeed,
@@ -475,5 +479,69 @@ export const edgeRelayOps = pgTable(
       sql`(${t.status} = 'DONE') = (${t.outcome} IS NOT NULL) AND (${t.outcome} IS NULL OR ${t.outcome} IN ('ISSUED', 'CANCELLED', 'REFUSED', 'NOT_SENT', 'INDETERMINATE'))`,
     ),
     check('edge_relay_ops_reported', sql`${t.reportedAt} IS NULL OR ${t.status} = 'DONE'`),
+  ],
+);
+
+/**
+ * A card charge a till asked its bank terminal for (ADR-0208): written PENDING before the browser
+ * calls the terminal's service on the till PC, so a charge that was never answered leaves its
+ * trace; the terminal's whole answer is kept as it came (`response`). An APPROVED charge pays one
+ * sale once (`used_at`, set in the sale's transaction, `sale_client_id` the sale then). A till has
+ * at most one PENDING charge: nothing is sent to the terminal again until the cashier has read
+ * its slip. A SETTLEMENT row is the terminal's end-of-day settlement with the bank. Never deleted.
+ */
+export const edgeCardAttempts = pgTable(
+  'edge_card_attempts',
+  {
+    id: uuid('id').primaryKey(),
+    kind: text('kind').$type<CardAttemptKind>().notNull().default('SALE'),
+    provider: text('provider').$type<CardTerminal>().notNull(),
+    tillCode: text('till_code').notNull(),
+    shiftClientId: uuid('shift_client_id').references(() => edgeShifts.clientId),
+    cashierUserId: bigint('cashier_user_id', { mode: 'number' }).notNull(),
+    cashierName: text('cashier_name').notNull(),
+    /** The payment attempt the charge was made for; the sale that used it once `used_at` is set. */
+    saleClientId: uuid('sale_client_id'),
+    paymentTypeId: bigint('payment_type_id', { mode: 'number' }),
+    /** What the terminal is given as `db_ref_no`: the day and a number of this edge, digits only. */
+    refNo: text('ref_no').notNull(),
+    amount: money('amount').notNull(),
+    /** The terminal as its service named it before the charge. */
+    terminalId: text('terminal_id'),
+    status: text('status').$type<CardAttemptStatus>().notNull().default('PENDING'),
+    source: text('source').$type<CardAttemptSource>(),
+    /** The terminal's answer exactly as the browser received it. */
+    response: jsonValue('response').$type<unknown>(),
+    message: text('message'),
+    createdAt: createdAt(),
+    answeredAt: timestamp('answered_at', { withTimezone: true }),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    resolvedByUserId: bigint('resolved_by_user_id', { mode: 'number' }),
+  },
+  (t) => [
+    unique('edge_card_attempts_ref_no_key').on(t.refNo),
+    uniqueIndex('edge_card_attempts_one_pending_per_till')
+      .on(t.tillCode)
+      .where(sql`status = 'PENDING'`),
+    index('edge_card_attempts_till_idx').on(t.tillCode, t.createdAt),
+    index('edge_card_attempts_sale_idx').on(t.saleClientId),
+    check('edge_card_attempts_kind', sql`${t.kind} IN ('SALE', 'SETTLEMENT')`),
+    check('edge_card_attempts_provider', sql`${t.provider} IN ('KHAN')`),
+    check(
+      'edge_card_attempts_status',
+      sql`${t.status} IN ('PENDING', 'APPROVED', 'DECLINED', 'FAILED', 'VOIDED')`,
+    ),
+    check(
+      'edge_card_attempts_source',
+      sql`(${t.status} = 'PENDING') = (${t.source} IS NULL) AND (${t.source} IS NULL OR ${t.source} IN ('TERMINAL', 'CASHIER'))`,
+    ),
+    check(
+      'edge_card_attempts_amount',
+      sql`(${t.kind} = 'SALE' AND ${t.amount} > 0) OR (${t.kind} = 'SETTLEMENT' AND ${t.amount} = 0)`,
+    ),
+    check(
+      'edge_card_attempts_used',
+      sql`${t.usedAt} IS NULL OR (${t.kind} = 'SALE' AND ${t.status} = 'APPROVED' AND ${t.saleClientId} IS NOT NULL)`,
+    ),
   ],
 );

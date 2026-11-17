@@ -301,6 +301,26 @@ export function storeRoutes(extra: Record<string, EdgeHandler> = {}): Record<str
   };
 }
 
+/** A route written with a placeholder (`POST /card-attempts/:id/result`) for any one segment. */
+function patternOf(
+  routes: Record<string, EdgeHandler>,
+  method: string,
+  path: string,
+): EdgeHandler | undefined {
+  const parts = path.split('/');
+  for (const [route, handler] of Object.entries(routes)) {
+    const [routeMethod, routePath = ''] = route.split(' ');
+    const wanted = routePath.split('/');
+    if (routeMethod !== method || !routePath.includes('/:') || wanted.length !== parts.length) {
+      continue;
+    }
+    if (wanted.every((part, index) => part.startsWith(':') || part === parts[index])) {
+      return handler;
+    }
+  }
+  return undefined;
+}
+
 /** A fetch for the kiosk's EdgeClient routed by `METHOD /path` (below `/edge/v1`). */
 export function fakeEdge(routes: Record<string, EdgeHandler>) {
   const calls: EdgeCall[] = [];
@@ -313,7 +333,7 @@ export function fakeEdge(routes: Record<string, EdgeHandler>) {
     const body: unknown = typeof init.body === 'string' ? JSON.parse(init.body) : undefined;
     const call: EdgeCall = { method, path, url, headers: new Headers(init.headers), body };
     calls.push(call);
-    const handler = routes[`${method} ${path}`];
+    const handler = routes[`${method} ${path}`] ?? patternOf(routes, method, path);
     return handler ? handler(call) : problem('NOT_FOUND', 404);
   });
   return {

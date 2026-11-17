@@ -1,5 +1,6 @@
 import { createContext, useContext, useSyncExternalStore } from 'react';
 import type { EdgeClient, KioskCredentials, KioskCredentialsState } from './edge-client';
+import type { CardTerminalClient } from './khan-terminal';
 
 export interface KioskServices {
   client: EdgeClient;
@@ -8,6 +9,8 @@ export interface KioskServices {
   addressTill?: string | null;
   /** Goes to another address (a POS's own page); the browser's by default. */
   navigate?: (url: string) => void;
+  /** ADR-0208: the bank card terminal on this till PC; absent: card types are keyed by hand. */
+  terminal?: CardTerminalClient;
 }
 
 export const KioskContext = createContext<KioskServices | null>(null);

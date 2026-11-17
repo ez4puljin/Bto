@@ -1,4 +1,10 @@
-import { PAYMENT_TYPE_KINDS, POS_LIMITS, type PaymentTypeKind } from '@tugeel/shared/pos';
+import {
+  CARD_TERMINALS,
+  type CardTerminal,
+  PAYMENT_TYPE_KINDS,
+  POS_LIMITS,
+  type PaymentTypeKind,
+} from '@tugeel/shared/pos';
 import { ArrowDown, ArrowUp, Plus } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,12 +27,16 @@ interface Draft {
   name: string;
   kind: PaymentTypeKind;
   active: boolean;
+  /** ADR-0208: the bank terminal the till drives for a card type; null: keyed by hand. */
+  terminal: CardTerminal | null;
 }
 
 /**
  * «Төлбөрийн хэлбэрүүд» (ADR-0111): the ways to pay the till lists, in its order — a name, its kind
  * (cash, card terminal, bank transfer, credit), on or off the till. Saved as a whole list; a type is
- * never deleted, only taken off, and keeps its kind once saved. One cash type stays on.
+ * never deleted, only taken off, and keeps its kind once saved. One cash type stays on. A card
+ * type may drive the bank's terminal on the till PC (ADR-0208): the till then sends the amount
+ * itself and records the payment only after the terminal approved.
  */
 export function PaymentTypesCard() {
   const { t } = useTranslation();
@@ -54,7 +64,10 @@ function PaymentTypesView({ types }: { types: PaymentType[] }) {
         <li key={type.id} className="flex items-center gap-3 py-2 text-sm">
           <span className="w-6 font-mono text-muted-foreground">{String(index + 1)}</span>
           <span className="flex-1 font-medium">{type.name}</span>
-          <span className="text-muted-foreground">{t(`pos.tenderKinds.${type.kind}`)}</span>
+          <span className="text-muted-foreground">
+            {t(`pos.tenderKinds.${type.kind}`)}
+            {type.terminal ? ` · ${t(`pos.paymentTypes.terminals.${type.terminal}`)}` : ''}
+          </span>
           <span className={type.status === 'ACTIVE' ? 'text-success' : 'text-muted-foreground'}>
             {t(`pos.statuses.${type.status}`)}
           </span>
@@ -75,6 +88,7 @@ function PaymentTypesForm({ types, onClose }: { types: PaymentType[]; onClose: (
       name: type.name,
       kind: type.kind,
       active: type.status === 'ACTIVE',
+      terminal: type.terminal,
     })),
   );
   const [added, setAdded] = useState(0);
@@ -97,6 +111,7 @@ function PaymentTypesForm({ types, onClose }: { types: PaymentType[]; onClose: (
             name: row.name.trim(),
             kind: row.kind,
             status: row.active ? 'ACTIVE' : 'INACTIVE',
+            terminal: row.kind === 'CARD' ? row.terminal : null,
           })),
         });
         toast.success(t('pos.paymentTypes.saved'));
@@ -108,6 +123,7 @@ function PaymentTypesForm({ types, onClose }: { types: PaymentType[]; onClose: (
   return (
     <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
       <p className="text-sm text-muted-foreground">{t('pos.paymentTypes.hint')}</p>
+      <p className="text-sm text-muted-foreground">{t('pos.paymentTypes.terminalHint')}</p>
       <ol className="space-y-2">
         {rows.map((row, index) => (
           <li key={row.key} className="flex flex-wrap items-center gap-2">
@@ -132,6 +148,25 @@ function PaymentTypesForm({ types, onClose }: { types: PaymentType[]; onClose: (
                 </option>
               ))}
             </NativeSelect>
+            {row.kind === 'CARD' ? (
+              <NativeSelect
+                aria-label={t('pos.paymentTypes.terminal', { place: index + 1 })}
+                className="w-48"
+                value={row.terminal ?? ''}
+                onChange={(event) =>
+                  update(row.key, {
+                    terminal: CARD_TERMINALS.find((entry) => entry === event.target.value) ?? null,
+                  })
+                }
+              >
+                <option value="">{t('pos.paymentTypes.terminals.NONE')}</option>
+                {CARD_TERMINALS.map((entry) => (
+                  <option key={entry} value={entry}>
+                    {t(`pos.paymentTypes.terminals.${entry}`)}
+                  </option>
+                ))}
+              </NativeSelect>
+            ) : null}
             <Switch
               aria-label={t('pos.paymentTypes.active', { place: index + 1 })}
               checked={row.active}
@@ -168,7 +203,7 @@ function PaymentTypesForm({ types, onClose }: { types: PaymentType[]; onClose: (
         onClick={() => {
           setRows((current) => [
             ...current,
-            { key: `new-${added}`, id: null, name: '', kind: 'CARD', active: true },
+            { key: `new-${added}`, id: null, name: '', kind: 'CARD', active: true, terminal: null },
           ]);
           setAdded((count) => count + 1);
         }}

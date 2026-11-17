@@ -1,10 +1,12 @@
+import { useMutation } from '@tanstack/react-query';
 import { Decimal } from '@tugeel/shared/money';
 import { DENOMINATIONS, type EdgeDaySummary, denominationTotal } from '@tugeel/shared/pos';
 import { cn } from 'cn';
 import dayjs from 'dayjs';
-import { Printer, Save } from 'lucide-react';
+import { Landmark, Printer, Save } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -18,10 +20,12 @@ import { Input } from '@/components/ui/input';
 import { BUSINESS_TZ } from '@/lib/dayjs';
 import { formatCount, formatMnt, formatTugrik } from '@/lib/money';
 import { randomUuid } from '@/lib/uuid';
+import { type ChargeResult, settleOnTerminal } from '../card-charge';
 import { todayInUb } from '../day';
+import { useKiosk } from '../kiosk-context';
 import { typeDigits } from '../keys';
 import { useProblemText } from '../messages';
-import { useCountDay, useDaySummary } from '../queries';
+import { useCountDay, useDaySummary, useSession } from '../queries';
 import { DayField } from './day-field';
 import { KioskAlert } from './layout';
 import { usePrint } from './print-context';
@@ -59,6 +63,9 @@ function DaySummaryPanel() {
   const [day, setDay] = useState(todayInUb);
   const summary = useDaySummary(day);
   const data = summary.data;
+  // ADR-0208: a till whose card type drives the bank's terminal closes the terminal's day here.
+  const session = useSession();
+  const hasTerminal = (session.data?.paymentTypes ?? []).some((type) => Boolean(type.terminal));
   return (
     // No scroller of its own: the dialog scrolls, so the count's footer sticks to the dialog's
     // foot. Inside an inner scroller its bleed scrolled sideways and its buttons were cut.
@@ -74,6 +81,7 @@ function DaySummaryPanel() {
         <>
           <Figures summary={data} />
           <CountForm key={`${data.day}:${data.counted?.clientId ?? ''}`} summary={data} />
+          {hasTerminal && day === todayInUb() ? <CardSettlement /> : null}
         </>
       ) : null}
     </div>
@@ -258,6 +266,81 @@ function CountForm({ summary }: { summary: EdgeDaySummary }) {
           {t('posKiosk.daySummary.save')}
         </Button>
       </DialogFooter>
+    </section>
+  );
+}
+
+/**
+ * «Карт уншигчийн өдрийн хаалт» (ADR-0208): the bank terminal's settlement, asked by the cashier
+ * once the day is over — never by itself. Written on the edge before the terminal is asked, like
+ * a charge; an unanswered one is settled from the terminal's slip in the payment.
+ */
+function CardSettlement() {
+  const { t } = useTranslation();
+  const { client, terminal } = useKiosk();
+  const problemText = useProblemText();
+  const [asking, setAsking] = useState(false);
+  const settle = useMutation({
+    mutationFn: (): Promise<ChargeResult> =>
+      terminal ? settleOnTerminal({ client, terminal }) : Promise.resolve({ kind: 'OFFLINE' }),
+  });
+  const result = settle.data ?? null;
+  return (
+    <section
+      aria-labelledby="day-card-settlement-title"
+      className="space-y-2 rounded-xl bg-canvas p-3"
+    >
+      <h3
+        id="day-card-settlement-title"
+        className="flex items-center gap-2 text-[0.9375rem] font-semibold"
+      >
+        <Landmark aria-hidden className="size-5 text-primary" />
+        {t('posKiosk.daySummary.settlement.title')}
+      </h3>
+      <p className="text-sm text-muted-foreground">{t('posKiosk.daySummary.settlement.text')}</p>
+      <Button
+        type="button"
+        variant="outline"
+        className="h-11"
+        disabled={settle.isPending}
+        onClick={() => setAsking(true)}
+      >
+        {settle.isPending
+          ? t('posKiosk.daySummary.settlement.pending')
+          : t('posKiosk.daySummary.settlement.run')}
+      </Button>
+      {settle.isPending || !result ? null : result.kind === 'APPROVED' ? (
+        <p
+          role="status"
+          className="rounded-xl bg-success-soft px-4 py-3 text-sm font-medium text-success"
+        >
+          {t('posKiosk.daySummary.settlement.done')}
+        </p>
+      ) : result.kind === 'REFUSED' ? (
+        <KioskAlert>
+          {result.message
+            ? t('posKiosk.daySummary.settlement.failed', { message: result.message })
+            : t('posKiosk.daySummary.settlement.failedPlain')}
+        </KioskAlert>
+      ) : result.kind === 'OFFLINE' ? (
+        <KioskAlert>{t('posKiosk.pay.card.offline')}</KioskAlert>
+      ) : result.kind === 'BLOCKED' ? (
+        <KioskAlert>{problemText(result.error)}</KioskAlert>
+      ) : (
+        <KioskAlert tone="warning">{t('posKiosk.daySummary.settlement.unknown')}</KioskAlert>
+      )}
+      <ConfirmDialog
+        open={asking}
+        variant="default"
+        title={t('posKiosk.daySummary.settlement.confirmTitle')}
+        description={t('posKiosk.daySummary.settlement.confirmText')}
+        confirmLabel={t('posKiosk.daySummary.settlement.run')}
+        onConfirm={() => {
+          setAsking(false);
+          settle.mutate();
+        }}
+        onClose={() => setAsking(false)}
+      />
     </section>
   );
 }

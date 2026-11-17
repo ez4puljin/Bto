@@ -16,6 +16,7 @@ import {
 import { Decimal } from '@tugeel/shared/money';
 import type {
   EdgeBarcodeHit,
+  EdgeCardAttempt,
   EdgeDeviceInfo,
   EdgeEbarimtQueue,
   EdgeHealth,
@@ -53,6 +54,9 @@ import { EDGE_DB, type EdgeDb } from '../db/edge-db';
 import { edgeState } from '../db/schema';
 import {
   ApprovalDto,
+  CardAttemptDto,
+  CardAttemptResultDto,
+  CardSettlementDto,
   DiscardParkedDto,
   EbarimtResolveDto,
   EbarimtSendDataDto,
@@ -86,6 +90,7 @@ import {
   type KioskContext,
   KioskGuard,
 } from '../guards/kiosk.guard';
+import { CardAttemptsService } from '../services/card-attempts.service';
 import { CheckoutService } from '../services/checkout.service';
 import { CustomerStore } from '../services/customer.store';
 import { LoyaltyStore } from '../services/loyalty.store';
@@ -134,6 +139,7 @@ export class KioskController {
     private readonly link: EdgeLinkService,
     private readonly sync: SyncRunner,
     private readonly photos: CashierPhotosService,
+    private readonly cards: CardAttemptsService,
   ) {}
 
   /** ADR-0136: whether this edge knows its centre (the kiosk's first screen asks). */
@@ -352,6 +358,51 @@ export class KioskController {
   async sell(@Kiosk() kiosk: KioskContext, @Body() body: SaleDto): Promise<EdgePrintableReceipt> {
     const receipt = await this.checkout.sell(kiosk.device.tillCode, cashierOf(kiosk), body);
     return this.ebarimt.afterCommit(kiosk.device.tillCode, receipt.clientId);
+  }
+
+  // ADR-0208: the bank card terminal. The browser asks the terminal; the edge keeps the record.
+
+  /** Written before the terminal is asked; refused while the till's last charge has no answer. */
+  @Post('card-attempts')
+  @HttpCode(200)
+  beginCard(@Kiosk() kiosk: KioskContext, @Body() body: CardAttemptDto): Promise<EdgeCardAttempt> {
+    return this.cards.begin(kiosk.device.tillCode, cashierOf(kiosk), body);
+  }
+
+  /** A charge without an answer, and approved charges no sale has used yet. */
+  @Get('card-attempts/open')
+  openCards(@Kiosk() kiosk: KioskContext): Promise<EdgeCardAttempt[]> {
+    return this.cards.open(kiosk.device.tillCode);
+  }
+
+  @Post('card-attempts/:id/result')
+  @HttpCode(200)
+  finishCard(
+    @Kiosk() kiosk: KioskContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: CardAttemptResultDto,
+  ): Promise<EdgeCardAttempt> {
+    return this.cards.finish(kiosk.device.tillCode, cashierOf(kiosk), id, body);
+  }
+
+  /** An approved charge given back on the terminal by hand, before a sale used it. */
+  @Post('card-attempts/:id/void')
+  @HttpCode(200)
+  voidCard(
+    @Kiosk() kiosk: KioskContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<EdgeCardAttempt> {
+    return this.cards.voidApproved(kiosk.device.tillCode, cashierOf(kiosk), id);
+  }
+
+  /** The terminal's settlement with the bank, written before the terminal is asked. */
+  @Post('card-settlements')
+  @HttpCode(200)
+  beginSettlement(
+    @Kiosk() kiosk: KioskContext,
+    @Body() body: CardSettlementDto,
+  ): Promise<EdgeCardAttempt> {
+    return this.cards.beginSettlement(kiosk.device.tillCode, cashierOf(kiosk), body);
   }
 
   /** ADR-0109: the customers a sale on credit may charge, from the feed (offline too). */

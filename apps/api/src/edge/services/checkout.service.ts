@@ -46,6 +46,7 @@ import { EDGE_DB, type EdgeDb, type EdgeTx, inEdgeTransaction } from '../db/edge
 import { edgeSales, edgeVoucherUses } from '../db/schema';
 import { EbarimtService } from '../ebarimt/ebarimt.service';
 import { TaxpayerClient } from '../ebarimt/taxpayer.client';
+import { CardAttemptsService } from './card-attempts.service';
 import { CreditGate } from './credit-gate.service';
 import { CustomerStore } from './customer.store';
 import { KioskAuthService } from './kiosk-auth.service';
@@ -82,6 +83,7 @@ export class CheckoutService {
     private readonly vouchers: VoucherStore,
     private readonly auth: KioskAuthService,
     private readonly loyalty: LoyaltyStore,
+    private readonly cards: CardAttemptsService,
   ) {}
 
   /**
@@ -320,6 +322,28 @@ export class CheckoutService {
       const day = businessDate(soldAt);
       const number = posSaleNumber(tillCode, day, await nextSequence(tx, `SALE:${tillCode}`, day));
       const points = member ? await this.memberPart(tx, member.id, tenders) : null;
+      // ADR-0208: a card type with a terminal is paid only by a charge the terminal approved,
+      // of exactly its amount, and a charge pays one sale once.
+      for (const tender of tenders.wire) {
+        const attemptId = tenders.charges.get(tender);
+        const terminal = (loaded.snapshot.paymentTypes ?? []).find(
+          (type) => type.id === tender.paymentTypeId,
+        )?.terminal;
+        if (tender.kind !== 'CARD' || (!attemptId && !terminal)) continue;
+        if (!attemptId) {
+          throw new AppError('POS_CARD_NOT_CHARGED', 'the card part was not charged', {
+            amount: tender.amount,
+          });
+        }
+        const charge = await this.cards.claim(
+          tx,
+          tillCode,
+          request.clientId,
+          attemptId,
+          new Decimal(tender.amount),
+        );
+        tender.terminalId = charge.terminalId ?? tender.terminalId;
+      }
       const doc: SaleDocWire = {
         clientId: request.clientId,
         kind: 'SALE',
@@ -632,6 +656,8 @@ export class CheckoutService {
     credit: Decimal;
     points: Decimal;
     change: Decimal;
+    /** ADR-0208: the card charge a tender names. */
+    charges: Map<TenderWire, string>;
   } {
     // ADR-0110: nothing to tender when partner vouchers pay the whole sale.
     const none = request.tenders.length === 0 && total.isZero() && vouchers.length > 0;
@@ -651,6 +677,7 @@ export class CheckoutService {
       POINTS: new Decimal(0),
     };
     let tendered = new Decimal(0);
+    const charges = new Map<TenderWire, string>();
     const wire = request.tenders.map((tender, index): TenderWire => {
       const type =
         tender.paymentTypeId !== undefined && tender.paymentTypeId !== null
@@ -685,7 +712,7 @@ export class CheckoutService {
           maskedPan: null,
         };
       }
-      return {
+      const made: TenderWire = {
         kind,
         ...named,
         amount: amount.toFixed(2),
@@ -694,7 +721,12 @@ export class CheckoutService {
         rrn: kind === 'CARD' ? tender.rrn?.trim() || null : null,
         maskedPan: null,
       };
+      if (kind === 'CARD' && tender.cardAttemptId) charges.set(made, tender.cardAttemptId);
+      return made;
     });
+    if (new Set(charges.values()).size !== charges.size) {
+      throw new AppError('VALIDATION_FAILED', 'a card charge pays one tender');
+    }
     if (wire.filter((tender) => tender.kind === 'CREDIT').length > 1) {
       throw new AppError('VALIDATION_FAILED', 'a sale has at most one credit part');
     }
@@ -717,6 +749,7 @@ export class CheckoutService {
       credit: sums.CREDIT,
       points: sums.POINTS,
       change: tendered.minus(sums.CASH),
+      charges,
     };
   }
 

@@ -736,6 +736,13 @@
       "when": 1794880832786,
       "tag": "0106_price_profiles_erxes",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1794884502296,
+      "tag": "0107_pos_card_terminal",
+      "breakpoints": true
     }
   ]
 }

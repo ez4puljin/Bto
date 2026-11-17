@@ -16,6 +16,7 @@ import { KioskGuard } from './guards/kiosk.guard';
 import { CashierPhotosService } from './services/cashier-photos.service';
 import { CentralClient } from './services/central.client';
 import { EdgeLinkService } from './services/edge-link.service';
+import { CardAttemptsService } from './services/card-attempts.service';
 import { CheckoutService } from './services/checkout.service';
 import { CreditGate } from './services/credit-gate.service';
 import { CustomerStore } from './services/customer.store';
@@ -91,6 +92,7 @@ export class EdgeModule {
         KioskAuthService,
         CashierPhotosService,
         EdgeShiftsService,
+        CardAttemptsService,
         CheckoutService,
         EdgeVoidsService,
         EdgeParkedService,

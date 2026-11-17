@@ -1,4 +1,6 @@
 import {
+  CARD_ATTEMPT_SOURCES,
+  type CardAttemptSource,
   DENOMINATIONS,
   POS_LIMITS,
   RECEIPT_TYPES,
@@ -11,6 +13,7 @@ import {
 } from '@tugeel/shared/pos';
 import { Type } from 'class-transformer';
 import {
+  Allow,
   ArrayMaxSize,
   ArrayMinSize,
   IsBoolean,
@@ -89,6 +92,30 @@ export class TenderDto {
   @IsOptional() @Matches(MONEY) tendered?: string | null;
   @IsOptional() @IsString() @MaxLength(32) terminalId?: string | null;
   @IsOptional() @IsString() @MaxLength(32) rrn?: string | null;
+  /** ADR-0208: the approved card charge this tender is. */
+  @IsOptional() @IsUUID() cardAttemptId?: string | null;
+}
+
+/** ADR-0208: a card charge about to be asked of the till's terminal. */
+export class CardAttemptDto {
+  @IsUUID() id: string;
+  @IsUUID() saleClientId: string;
+  @IsInt() @Min(1) paymentTypeId: number;
+  @Matches(MONEY) amount: string;
+  @IsOptional() @IsString() @MaxLength(32) terminalId?: string | null;
+}
+
+export class CardAttemptResultDto {
+  @IsIn(['APPROVED', 'DECLINED', 'FAILED']) outcome: 'APPROVED' | 'DECLINED' | 'FAILED';
+  @IsIn(CARD_ATTEMPT_SOURCES) source: CardAttemptSource;
+  /** The terminal's answer as received: any JSON, kept whole. */
+  @IsOptional() @Allow() response?: unknown;
+  @IsOptional() @IsString() @MaxLength(2000) message?: string | null;
+}
+
+export class CardSettlementDto {
+  @IsUUID() id: string;
+  @IsOptional() @IsString() @MaxLength(32) terminalId?: string | null;
 }
 
 export class SaleDto {

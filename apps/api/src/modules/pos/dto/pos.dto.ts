@@ -18,6 +18,8 @@ import {
   type SyncResult,
   PAYMENT_TYPE_KINDS,
   type PaymentTypeKind,
+  CARD_TERMINALS,
+  type CardTerminal,
   TENDER_KINDS,
   type TenderKind,
   VOID_REASONS,
@@ -832,6 +834,12 @@ export class PaymentTypeDto {
   @ApiProperty({ enum: PAYMENT_TYPE_KINDS }) kind: PaymentTypeKind;
   @ApiProperty({ enum: POS_STATUSES }) status: PosStatus;
   @ApiProperty() sort: number;
+  @ApiProperty({
+    enum: CARD_TERMINALS,
+    nullable: true,
+    description: 'ADR-0208: the card terminal the till drives for this type; null: keyed by hand',
+  })
+  terminal: CardTerminal | null;
 }
 
 @ApiSchema({ name: 'PosPaymentTypeInput' })
@@ -849,6 +857,14 @@ export class PaymentTypeInputDto {
   name: string;
   @ApiProperty({ enum: PAYMENT_TYPE_KINDS }) @IsIn(PAYMENT_TYPE_KINDS) kind: PaymentTypeKind;
   @ApiProperty({ enum: POS_STATUSES }) @IsIn(POS_STATUSES) status: PosStatus;
+  @ApiPropertyOptional({
+    enum: CARD_TERMINALS,
+    nullable: true,
+    description: 'ADR-0208: a CARD type only; left out keeps what the type has',
+  })
+  @IsOptional()
+  @IsIn(CARD_TERMINALS)
+  terminal?: CardTerminal | null;
 }
 
 @ApiSchema({ name: 'PosPaymentTypesRequest' })

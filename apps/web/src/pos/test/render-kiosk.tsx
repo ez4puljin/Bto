@@ -9,6 +9,7 @@ import {
   KioskCredentials,
   SESSION_STORAGE_KEY,
 } from '../edge-client';
+import type { CardTerminalClient } from '../khan-terminal';
 import { type FakeEdge, TILL } from './fake-edge';
 
 /**
@@ -23,6 +24,8 @@ export function renderKiosk(
     cashierId?: number;
     /** The POS page (`…/K1`); null: the start page. A bound device defaults to К1's page. */
     addressTill?: string | null;
+    /** ADR-0208: the bank card terminal on the till PC (a fake: a real one moves real money). */
+    terminal?: CardTerminalClient;
   } = {},
 ) {
   // A bound device sells on its POS's page (ADR-0138): the start page never does.
@@ -44,7 +47,13 @@ export function renderKiosk(
   const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
   render(
     <KioskApp
-      services={{ client, credentials, addressTill, navigate }}
+      services={{
+        client,
+        credentials,
+        addressTill,
+        navigate,
+        ...(options.terminal ? { terminal: options.terminal } : {}),
+      }}
       queryClient={queryClient}
     />,
   );

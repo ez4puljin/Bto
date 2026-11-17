@@ -5,6 +5,7 @@ import { i18n } from '@/lib/i18n';
 import { tillFromAddress } from './address';
 import { KioskApp } from './app';
 import { EdgeClient, KioskCredentials } from './edge-client';
+import { KhanTerminal } from './khan-terminal';
 import { createKioskQueryClient } from './queries';
 
 const container = document.getElementById('root');
@@ -14,11 +15,13 @@ document.title = i18n.t('posKiosk.title');
 const addressTill = tillFromAddress(window.location);
 const credentials = new KioskCredentials(undefined, addressTill);
 const client = new EdgeClient(credentials);
+// ADR-0208: the bank card terminal on this till PC, asked by this browser.
+const terminal = new KhanTerminal();
 
 createRoot(container).render(
   <StrictMode>
     <KioskApp
-      services={{ client, credentials, addressTill }}
+      services={{ client, credentials, addressTill, terminal }}
       queryClient={createKioskQueryClient()}
     />
   </StrictMode>,

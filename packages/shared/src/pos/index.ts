@@ -25,6 +25,38 @@ export const PAYMENT_TYPE_KINDS = ['CASH', 'CARD', 'TRANSFER', 'CREDIT'] as cons
 export type PaymentTypeKind = (typeof PAYMENT_TYPE_KINDS)[number];
 
 /**
+ * The bank card terminal a CARD payment type drives from the till (ADR-0208): KHAN is Khan Bank's
+ * terminal behind Databank's GoConnection service on the till PC. A type without one is paid on a
+ * terminal the cashier keys by hand.
+ */
+export const CARD_TERMINALS = ['KHAN'] as const;
+export type CardTerminal = (typeof CARD_TERMINALS)[number];
+
+/**
+ * A card charge the till asked its terminal for (ADR-0208). PENDING: written before the terminal
+ * was asked, no answer kept — the charge may have happened. APPROVED: the terminal took the money
+ * (or the cashier read it off the terminal's slip). DECLINED: the terminal answered no. FAILED:
+ * the terminal was never reached, or the cashier found no charge. VOIDED: approved, then given
+ * back on the terminal by hand and never used in a sale.
+ */
+export const CARD_ATTEMPT_STATUSES = [
+  'PENDING',
+  'APPROVED',
+  'DECLINED',
+  'FAILED',
+  'VOIDED',
+] as const;
+export type CardAttemptStatus = (typeof CARD_ATTEMPT_STATUSES)[number];
+
+/** A charge for a sale, or the terminal's end-of-day settlement with the bank. */
+export const CARD_ATTEMPT_KINDS = ['SALE', 'SETTLEMENT'] as const;
+export type CardAttemptKind = (typeof CARD_ATTEMPT_KINDS)[number];
+
+/** Who said how a charge ended: the terminal's own answer, or the cashier from its paper slip. */
+export const CARD_ATTEMPT_SOURCES = ['TERMINAL', 'CASHIER'] as const;
+export type CardAttemptSource = (typeof CARD_ATTEMPT_SOURCES)[number];
+
+/**
  * The till's banknotes for the day summary's count (owner 2026-10-27, ADR-0111), largest first;
  * the counts are only kept, they post nothing.
  */
