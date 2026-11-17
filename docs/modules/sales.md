@@ -90,6 +90,8 @@ ADR-0175 (migration `0092_sales_excluded_lines`): `sales_order_excluded_lines` h
 
 ADR-0178 (migration `0095_sales_original_qty`): `sales_order_lines.original_qty` and `sales_order_excluded_lines.original_qty` (`NUMERIC(14,3)`, the line's unit, nullable, `> 0`): the quantity first ordered; existing rows backfilled from the change versions (ADR-0147).
 
+ADR-0217 (migration `0110_sales_free_qty`): `sales_order_lines.free_qty_base` and `sales_order_excluded_lines.free_qty_base` (`NUMERIC(14,3)`, base units, nullable; on the line `> 0` and `<= qty_base`): the free units an N+M gave the line when its prices were frozen (submit on every channel, a line edit's requote; kept through exclude / restore and reopen). Older lines have none. The order line's `freeQtyBase` lets picking (staff app, office order products, printed pick list) show «34 ш (үндсэн 33 + бонус: 1)»; the picker still picks the total. `GET /sales-rep/products?bonus=true` keeps the products a BONUS program marks in today's deal book («Бонустай бараа»).
+
 ADR-0179 (migration `0096_sales_loading`): `sales_order_loads` is a driver's loading of an order (`driver_id`, `loaded_at`, `from_stage_id` / `to_stage_id` when the card moved, `undone_at` / `undone_by` when taken back; one live row per order by a partial unique index; `REVOKE DELETE, TRUNCATE`). `sales_pipelines.loaded_stage_id` (composite FK to the pipeline's own stage) is the stage a loaded, sold order moves into; the migration set it on SALES pipelines with a no-action stage named «Ачигдсан…».
 
 ## 3. Public API (`modules/sales/index.ts`)

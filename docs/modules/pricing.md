@@ -98,6 +98,7 @@ Other modules never read or write pricing tables.
 - **Completion** (ADR-0044 #3, as amended). Terms in force on the Ulaanbaatar date of the call, their profile's values that day and a working whole unit; terms from tomorrow do not count. Terms cannot be removed, so nothing changes between the check and the update.
 
 - **Plans** (ADR-0159). A program's set is read when a quote runs (`ProgramTargetsService.productSets`): one read per distinct supplier, category or segment; a segment's members at most once a minute per process, afresh when a plan is saved. A priority program reached takes a product's part alone (the newest of several); that part still counts towards category and order thresholds, takes no discount from them, and still takes a till's coupon. N+M is a discount on the line: the quantity, the reservation and the stock movement stay as written. A program naming pipelines or tills counts only there; the calculator, a rep's preview and a card without a place take only those that name none, and the apps' cards count for their channel's default pipeline.
+- **The N+M split of a quote** (ADR-0217). Each quoted line carries an optional `bonus` (N, M, `freeQty`, `paidQty`, `freeQtyBase`, `freeAmount`) from `lineBonuses` in `packages/shared/src/pricing/bonus.ts`; it is for display and for freezing on the order line, and prices nothing.
 
 ## 6. Error codes introduced
 
