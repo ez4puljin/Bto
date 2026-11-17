@@ -30,21 +30,44 @@ function ArticleLink({ article }: { article: Article }) {
   );
 }
 
+const categoryAnchor = (category: GuideCategory) => `guide-${category}`;
+
+/** One row of links under the search box: a category with articles, its count, a jump to its card. */
+function CategoryLinks({ groups }: { groups: { category: GuideCategory; articles: Article[] }[] }) {
+  const { t } = useTranslation();
+  return (
+    <nav aria-label={t('guide.categoryLinks')} className="flex flex-wrap gap-2">
+      {groups.map((group) => (
+        <a
+          key={group.category}
+          href={`#${categoryAnchor(group.category)}`}
+          className="inline-flex h-8.5 items-center gap-1.5 rounded-full bg-fill px-3 text-[0.8125rem] font-medium text-link hover:bg-secondary touch:h-11"
+        >
+          {t(`guide.categories.${group.category}`)}
+          <span className="text-muted-foreground">{group.articles.length}</span>
+        </a>
+      ))}
+    </nav>
+  );
+}
+
 function CategoryCard({ category, articles }: { category: GuideCategory; articles: Article[] }) {
   const { t } = useTranslation();
   return (
-    <ListCard>
-      <h2 className="border-b px-4 py-3 text-base font-semibold">
-        {t(`guide.categories.${category}`)}
-      </h2>
-      <ul className="divide-y">
-        {articles.map((article) => (
-          <li key={article.slug}>
-            <ArticleLink article={article} />
-          </li>
-        ))}
-      </ul>
-    </ListCard>
+    <div id={categoryAnchor(category)} className="scroll-mt-4">
+      <ListCard>
+        <h2 className="border-b px-4 py-3 text-base font-semibold">
+          {t(`guide.categories.${category}`)}
+        </h2>
+        <ul className="divide-y">
+          {articles.map((article) => (
+            <li key={article.slug}>
+              <ArticleLink article={article} />
+            </li>
+          ))}
+        </ul>
+      </ListCard>
+    </div>
   );
 }
 
@@ -54,6 +77,10 @@ export function GuidePage() {
   const [search, setSearch] = useState('');
   const needle = search.trim().toLowerCase();
   const shown = ARTICLES.filter((article) => !needle || article.searchText.includes(needle));
+  const allGroups = GUIDE_CATEGORIES.map((category) => ({
+    category,
+    articles: ARTICLES.filter((article) => article.category === category),
+  })).filter((group) => group.articles.length > 0);
   const groups = GUIDE_CATEGORIES.map((category) => ({
     category,
     articles: shown.filter((article) => article.category === category),
@@ -70,6 +97,7 @@ export function GuidePage() {
             onChange={(event) => setSearch(event.target.value)}
           />
         </FilterBar>
+        {needle ? null : <CategoryLinks groups={allGroups} />}
         {groups.length === 0 ? (
           <ListCard>
             <EmptyState icon={SearchX} title={t('guide.empty')} />

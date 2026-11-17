@@ -1,7 +1,32 @@
 import { describe, expect, it } from 'vitest';
+import mn from '@tugeel/shared/i18n/mn.json';
 import { ARTICLES, articlePath, GUIDE_CATEGORIES } from './content';
 
 describe('guide content', () => {
+  it('registers the 15 categories in order, each with a name', () => {
+    expect([...GUIDE_CATEGORIES]).toEqual([
+      'start',
+      'sales',
+      'inventory',
+      'procurement',
+      'catalog',
+      'pricing',
+      'partners',
+      'finance',
+      'reports',
+      'pos',
+      'hr',
+      'apps',
+      'ai',
+      'system',
+      'setup',
+    ]);
+    for (const key of GUIDE_CATEGORIES) {
+      expect(mn.guide.categories[key], key).toBeTruthy();
+    }
+    expect(Object.keys(mn.guide.categories)).toHaveLength(GUIDE_CATEGORIES.length);
+  });
+
   it('has the seven first articles', () => {
     expect(ARTICLES.map(articlePath)).toEqual([
       '/guide/inventory/receipt-notes',

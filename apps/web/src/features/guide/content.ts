@@ -1,7 +1,23 @@
 import { type Block, parseMarkdown, plainText } from './markdown';
 
 /** The categories in the order they are shown; each has a name `guide.categories.<key>`. */
-export const GUIDE_CATEGORIES = ['inventory', 'catalog', 'setup'] as const;
+export const GUIDE_CATEGORIES = [
+  'start',
+  'sales',
+  'inventory',
+  'procurement',
+  'catalog',
+  'pricing',
+  'partners',
+  'finance',
+  'reports',
+  'pos',
+  'hr',
+  'apps',
+  'ai',
+  'system',
+  'setup',
+] as const;
 export type GuideCategory = (typeof GUIDE_CATEGORIES)[number];
 
 export interface Article {
