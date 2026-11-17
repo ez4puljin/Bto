@@ -1,11 +1,10 @@
 import type { EdgeCardAttempt } from '@tugeel/shared/pos';
 import dayjs from 'dayjs';
-import { CreditCard, RefreshCw, Search, TriangleAlert } from 'lucide-react';
+import { CreditCard, Search, TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { BUSINESS_TZ } from '@/lib/dayjs';
 import { formatTugrik } from '@/lib/money';
-import type { TerminalInfo } from '../khan-terminal';
 
 const timeOf = (iso: string) => dayjs(iso).tz(BUSINESS_TZ).format('HH:mm');
 
@@ -27,43 +26,6 @@ export function CardWaiting(props: { name: string; amount: string }) {
         {t('posKiosk.pay.card.waitingText', { name: props.name })}
       </p>
       <p className="text-sm font-medium text-warning">{t('posKiosk.pay.card.waitingHint')}</p>
-    </div>
-  );
-}
-
-/** Whether the terminal on this till PC answers; a card type with a terminal needs it. */
-export function TerminalStatusLine(props: {
-  checking: boolean;
-  info: TerminalInfo | null;
-  onRecheck: () => void;
-}) {
-  const { t } = useTranslation();
-  if (props.checking) {
-    return (
-      <p role="status" className="text-[0.8125rem] text-muted-foreground">
-        {t('posKiosk.pay.card.checking')}
-      </p>
-    );
-  }
-  if (props.info) {
-    return (
-      <p className="text-[0.8125rem] text-success">
-        {t('posKiosk.pay.card.ready', {
-          name: props.info.terminalName ?? props.info.terminalId ?? '',
-        })}
-      </p>
-    );
-  }
-  return (
-    <div
-      role="alert"
-      className="flex flex-wrap items-center gap-3 rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning"
-    >
-      <span className="min-w-0 flex-1">{t('posKiosk.pay.card.offline')}</span>
-      <Button type="button" variant="outline" className="h-11" onClick={props.onRecheck}>
-        <RefreshCw />
-        {t('posKiosk.pay.card.recheck')}
-      </Button>
     </div>
   );
 }

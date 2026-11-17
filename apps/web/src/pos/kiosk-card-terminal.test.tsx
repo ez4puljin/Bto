@@ -35,6 +35,7 @@ import { renderKiosk } from './test/render-kiosk';
 
 const k = mn.posKiosk;
 const c = k.pay.card;
+const pill = (status: string) => k.terminal.label.replace('{{status}}', status);
 
 /** «Khaanbank terminal» drives the bank's terminal on the till PC (ADR-0208). */
 const TYPES: SnapshotPaymentType[] = [
@@ -273,9 +274,6 @@ describe('kiosk: a card type that drives the bank terminal (ADR-0208)', () => {
     const held = () => new Promise<TerminalOutcome>((resolve) => (answer = resolve));
     const { terminal, sales } = fakeTerminal([held]);
     const { edge, user, pay, cards } = await openPayment(terminal);
-    expect(await within(pay).findByText(c.ready.replace('{{name}}', INFO.terminalName ?? ''))).toBe(
-      within(pay).getByText(/Orgil buunii tuv 1/),
-    );
     await payByCard(user, pay);
 
     // The terminal has the amount; the payment waits and nothing can be pressed twice.
@@ -478,8 +476,10 @@ describe('kiosk: a card type that drives the bank terminal (ADR-0208)', () => {
     const { terminal, state } = fakeTerminal([APPROVED]);
     state.ready = false;
     const { edge, user, pay } = await openPayment(terminal);
-    expect(await within(pay).findByText(c.offline)).toBeInTheDocument();
     const card = typeButton(pay, 'Khaanbank terminal');
+    await waitFor(() => expect(card).toHaveAttribute('title', c.offlineShort));
+    // The status line is gone from the dialog: the header's pill says it (ADR-0208).
+    expect(within(pay).queryByText(c.offline)).toBeNull();
     expect(card).toBeDisabled();
     expect(card).toHaveAttribute('title', c.offlineShort);
     // The key of its place does nothing either.
@@ -488,10 +488,58 @@ describe('kiosk: a card type that drives the bank terminal (ADR-0208)', () => {
     expect(terminal.sale).not.toHaveBeenCalled();
     expect(edge.callsTo('POST /card-attempts')).toHaveLength(0);
 
+    // One check from the pill's panel updates the dialog too (the same query).
     state.ready = true;
-    await user.click(within(pay).getByRole('button', { name: c.recheck }));
-    await waitFor(() => expect(typeButton(pay, 'Khaanbank terminal')).toBeEnabled());
-    expect(within(pay).queryByText(c.offline)).toBeNull();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: k.pay.title })).toBeNull());
+    await user.click(await screen.findByRole('button', { name: pill(k.terminal.offline) }));
+    await user.click(await screen.findByRole('button', { name: k.terminal.recheck }));
+    await user.keyboard('{Escape}');
+    await screen.findByRole('button', { name: pill(k.terminal.ready) });
+  });
+
+  it('the header pill: not reachable, then «Холболт шалгах» finds it ready; no terminal type, no pill', async () => {
+    const { terminal, state } = fakeTerminal();
+    state.ready = false;
+    const edge = fakeEdge(
+      storeRoutes({ 'GET /session': () => json({ ...SESSION, paymentTypes: TYPES }) }),
+    );
+    renderKiosk(edge, {
+      device: 'device-1',
+      session: 'session-1',
+      cashierId: CASHIER.userId,
+      terminal,
+    });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: pill(k.terminal.offline) }));
+    const panel = await screen.findByRole('dialog', { name: k.terminal.title });
+    expect(within(panel).getByText(k.terminal.hint)).toBeInTheDocument();
+    state.ready = true;
+    await user.click(within(panel).getByRole('button', { name: k.terminal.recheck }));
+    await within(panel).findByText(
+      k.terminal.info.replace('{{name}}', INFO.terminalName ?? '').replace('{{port}}', INFO.port ?? '—'),
+    );
+    await user.keyboard('{Escape}');
+    expect(await screen.findByRole('button', { name: pill(k.terminal.ready) })).toBeInTheDocument();
+  });
+
+  it('no payment type drives a terminal: no pill and no request to the terminal', async () => {
+    const { terminal } = fakeTerminal();
+    const edge = fakeEdge(
+      storeRoutes({
+        'GET /session': () =>
+          json({ ...SESSION, paymentTypes: [{ id: 2, name: 'Card', kind: 'CARD' }] }),
+      }),
+    );
+    renderKiosk(edge, {
+      device: 'device-1',
+      session: 'session-1',
+      cashierId: CASHIER.userId,
+      terminal,
+    });
+    await screen.findByLabelText(k.sale.scanLabel);
+    expect(screen.queryByRole('button', { name: /Карт уншигч/ })).toBeNull();
+    expect(terminal.checkStatus).not.toHaveBeenCalled();
   });
 
   it('a split payment sends only the card part', async () => {

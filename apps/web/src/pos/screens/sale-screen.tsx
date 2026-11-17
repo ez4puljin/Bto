@@ -561,6 +561,8 @@ export function SaleScreen(props: {
     <div ref={root} className="flex h-dvh flex-col bg-canvas">
       <KioskHeader
         session={props.session}
+        onOpenCards={() => setDialog('cards')}
+        onCloseAutoFocus={refocus}
         center={
           <div className="w-full max-w-xl">
             <ProductFinder

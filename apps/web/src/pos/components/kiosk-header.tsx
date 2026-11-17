@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BrandMark } from './layout';
 import { useHealth } from '../queries';
+import { TerminalPill } from './terminal-pill';
 
 /**
  * «Холбогдсон» while the edge reaches the centre, «Офлайн · N хүлээгдэж буй» while its outbox
@@ -60,6 +61,9 @@ export function KioskHeader(props: {
   session: EdgeSession;
   center?: ReactNode;
   actions?: ReactNode;
+  /** Opens the card charges list (the card terminal pill's panel). */
+  onOpenCards?: () => void;
+  onCloseAutoFocus?: (event: Event) => void;
 }) {
   const { t } = useTranslation();
   const { session } = props;
@@ -83,6 +87,13 @@ export function KioskHeader(props: {
         </div>
         <div className="flex min-w-0 flex-1 justify-center">{props.center}</div>
         <div className="flex shrink-0 items-center gap-3">
+          {props.onOpenCards ? (
+            <TerminalPill
+              session={session}
+              onOpenCards={props.onOpenCards}
+              {...(props.onCloseAutoFocus ? { onCloseAutoFocus: props.onCloseAutoFocus } : {})}
+            />
+          ) : null}
           <StatusPill />
           <div className="flex items-center gap-2">
             <UserRound aria-hidden className="size-5 text-muted-foreground" />

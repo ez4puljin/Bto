@@ -55,12 +55,11 @@ import {
   recordOutcome,
 } from '../card-charge';
 import { edgeProblemOf } from '../edge-client';
-import { TerminalUnavailable } from '../khan-terminal';
 import { useKiosk } from '../kiosk-context';
 import { keepFocus, typeDigits } from '../keys';
 import { useProblemText } from '../messages';
-import { useSession } from '../queries';
-import { CardWaiting, TerminalStatusLine, UnansweredPanel, UnusedPanel } from './card-panels';
+import { useCardTerminalStatus, useSession } from '../queries';
+import { CardWaiting, UnansweredPanel, UnusedPanel } from './card-panels';
 import { KioskAlert } from './layout';
 
 export interface PaymentAttempt {
@@ -241,17 +240,7 @@ function PaymentForm(props: {
   // ADR-0208: the card terminal on this till PC, the charges it approved for this payment
   // (by row), and what the edge still holds open for this till.
   const hasTerminalType = types.some(driven);
-  const terminalStatus = useQuery({
-    queryKey: ['kiosk', 'card-terminal', 'status'],
-    queryFn: ({ signal }) => {
-      if (!terminal) throw new TerminalUnavailable();
-      return terminal.checkStatus(signal);
-    },
-    enabled: hasTerminalType,
-    retry: false,
-    staleTime: 0,
-    gcTime: 0,
-  });
+  const terminalStatus = useCardTerminalStatus(hasTerminalType);
   const openAttempts = useQuery({
     queryKey: ['kiosk', 'card-attempts', 'open'],
     queryFn: ({ signal }) => client.openCardAttempts(signal),
@@ -832,13 +821,6 @@ function PaymentForm(props: {
                   </Button>
                 ))}
               </div>
-              {hasTerminalType ? (
-                <TerminalStatusLine
-                  checking={terminalStatus.isFetching}
-                  info={terminalStatus.isSuccess ? terminalStatus.data : null}
-                  onRecheck={() => void terminalStatus.refetch()}
-                />
-              ) : null}
             </div>
           )}
           {nonCashOver ? <KioskAlert>{t('posKiosk.pay.rows.over')}</KioskAlert> : null}

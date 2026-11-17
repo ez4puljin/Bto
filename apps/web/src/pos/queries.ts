@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 import type { EdgeCartLine, EdgeDayCountRequest } from '@tugeel/shared/pos';
 import { EdgeError } from './edge-client';
+import { type TerminalInfo, TerminalUnavailable } from './khan-terminal';
 import { useCredentials, useKiosk } from './kiosk-context';
 
 /** How often the header asks the edge whether the centre is reachable. */
@@ -246,5 +247,30 @@ export function useEbarimtQueue(enabled: boolean) {
     enabled,
     staleTime: 0,
     refetchInterval: enabled ? HEALTH_POLL_MS : false,
+  });
+}
+
+/** Re-check the card terminal this often while it does not answer, and while it is ready. */
+export const CARD_TERMINAL_DOWN_POLL_MS = 60_000;
+export const CARD_TERMINAL_READY_POLL_MS = 300_000;
+
+/**
+ * ADR-0208: whether the bank's card terminal on this till PC answers. One query for the header's
+ * pill and the payment dialog, so one check updates both. `get-status-info` is free to ask.
+ */
+export function useCardTerminalStatus(enabled: boolean) {
+  const { terminal } = useKiosk();
+  return useQuery<TerminalInfo>({
+    queryKey: ['kiosk', 'card-terminal', 'status'],
+    queryFn: ({ signal }) => {
+      if (!terminal) throw new TerminalUnavailable();
+      return terminal.checkStatus(signal);
+    },
+    enabled,
+    refetchInterval: (query) =>
+      query.state.status === 'success' ? CARD_TERMINAL_READY_POLL_MS : CARD_TERMINAL_DOWN_POLL_MS,
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
   });
 }
