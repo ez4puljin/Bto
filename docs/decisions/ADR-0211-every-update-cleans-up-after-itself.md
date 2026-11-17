@@ -17,7 +17,7 @@ The watchman (ADR-0195) had seen the disk at its 85 % from 09:57 that day, round
 
 ## Decision
 
-1. **Every update ends with the housekeeping.** `deploy/store/setup.sh` (both the full and the `--only-web` update) and `deploy/edge/setup.sh` run `housekeeping.sh --quiet` as their last step; `auto-deploy.sh` runs it after an update that failed; `setup.sh` runs it before building when under 15 GB is free. `backup.sh` runs it every night instead of Sundays, for what builds outside an update leave (`pnpm docker:build`, `pnpm ci:rehearse`). No timer of its own: the disk grows only when something is built.
+1. **The housekeeping is the last step of every automatic round.** `auto-deploy.sh` runs `housekeeping.sh --quiet` once at the end of every round that built (after the till server's build, after the round's result is written), and after a round that failed; `setup.sh` runs it only before building when under 15 GB is free; `deploy/edge/setup.sh` does not run it. An update by hand is followed by `bash deploy/store/housekeeping.sh` or left to the night. `backup.sh` runs it every night instead of Sundays, for what builds outside an update leave (`pnpm docker:build`, `pnpm ci:rehearse`). No timer of its own: the disk grows only when something is built.
 2. **Images: only those without a tag** (`docker image prune -f`, never `-a`). The images the stacks run and `bto-api:store-previous`, `bto-web:store-previous` carry tags and stay, so `rollback.sh` (ADR-0196) is unchanged.
 3. **Build cache: a limit by size, not by age.** `docker builder prune -f --max-used-space <N>gb`, N = `STORE_BUILD_CACHE_GB` of `deploy/store/.env`, default 10; the least recently used records go first. What makes a build fast (the base images, the layer that installs pnpm, pnpm's store mount of 0.9 GB) is used by every build and stays; the layers of older commits are never used again. A limit by age would empty the cache after a quiet week and make the next update a first build of 10–20 minutes.
 4. **Never a volume, never a container.** The databases and the uploaded files are out of its reach.
@@ -27,6 +27,7 @@ The watchman (ADR-0195) had seen the disk at its 85 % from 09:57 that day, round
 
 | Alternative | Why rejected |
 |---|---|
+| At the end of `setup.sh` and of `deploy/edge/setup.sh` (as first built, 48e47d0e) | The prune between the centre's build and the till server's took the build-stage layers the edge build reuses (BuildKit does not go strictly least recently used: fresh single-use layers went before older ones), so the edge ran `pnpm install` and its build again: the till server's part went from 41 s to 179 s in the first round. |
 | A timer of its own (hourly) | The disk grows only at a build; a timer would also prune while another build runs, and is one more unit to install. The nightly backup already is the second net. |
 | A shorter age filter (`until=24h`) | Twenty updates in a day still leave 80 GB inside the window; a quiet week empties the cache. |
 | Docker's own limit (`builder.gc` in `/etc/docker/daemon.json`) | Needs sudo and a restart of Docker, which stops the real system; it does nothing about untagged images. |
@@ -36,7 +37,7 @@ The watchman (ADR-0195) had seen the disk at its 85 % from 09:57 that day, round
 
 - Run by hand that day: 34 GB → 110 GB free in two minutes, `/var/lib/containerd` 88 GB → 12 GB; every tagged image, `:store-previous` included, and every container untouched.
 - Docker now holds the running images, the way back and at most 10 GB of cache, plus what the update at work adds (about 6 GB) until it ends.
-- An update takes a few seconds longer at its end.
+- The cleaning runs after the round's result is written, so the update's own times are unchanged (centre 269 s against 253–262 s before).
 - The old ERP's backup in the owner's `~/Desktop` (46 GB) is not Bto's and is left alone.
 
 ## Related

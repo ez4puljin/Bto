@@ -121,8 +121,6 @@ if [ "$ONLY_WEB" = "yes" ]; then
   echo "== Вэбийн хаалгыг солиж байна (1 секунд орчим)"
   "${COMPOSE[@]}" up -d --no-deps --wait --timeout 2 web
   record_deployed "$APP_VERSION"
-  # What this update replaced is left behind without a tag (ADR-0211).
-  bash deploy/store/housekeeping.sh --quiet || true
   echo "Бэлэн: вэб хуудас $APP_VERSION. Api өмнөх хувилбараараа ажиллаж байна."
   exit 0
 fi
@@ -177,9 +175,9 @@ if command -v systemctl >/dev/null 2>&1 && [ "$(id -u)" != "0" ]; then
     echo "Харуулын timer суусангүй. Гараар:  bash deploy/store/install-watch-timer.sh"
 fi
 
-# Every update leaves the images it replaced and their build cache behind (ADR-0211): they go
-# now, and the images kept as the way back stay.
-bash deploy/store/housekeeping.sh --quiet || true
+# The images this update replaced and their build cache are cleaned as the last step of the round
+# in auto-deploy.sh (and nightly in backup.sh), not here: the till server is built next from these
+# layers (ADR-0211). After an update by hand:  bash deploy/store/housekeeping.sh
 
 IP=$(hostname -I 2>/dev/null | awk '{print $1}' || true)
 SUFFIX=""

@@ -50,9 +50,6 @@ PORT=${PORT:-7400}
 echo "== Edge-ийг бүтээж асааж байна (эхний удаа 10-20 минут)"
 "${DOCKER[@]}" compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build --wait
 
-# The images this update replaced and their build cache (ADR-0211); the images in use stay.
-bash deploy/store/housekeeping.sh --quiet || true
-
 if command -v ufw >/dev/null 2>&1 && sudo ufw status 2>/dev/null | grep -q '^Status: active'; then
   sudo ufw allow "$PORT/tcp" >/dev/null
 fi

@@ -125,7 +125,7 @@ sudo bash deploy/store/restore-drill.sh
 
 `DRILL OK` is the proof; `FEWER` or `MISSING` lines name the tables that are not whole.
 
-**Disk housekeeping** (ADR-0211) is done by itself: every update ends with `housekeeping.sh --quiet`, and the nightly backup runs it too. It removes the images an update replaced (those without a tag; the running ones and `:store-previous`, the way back, stay) and holds Docker's build cache to `STORE_BUILD_CACHE_GB` (10 GB), the least recently used going first. It never touches a volume. By hand, `bash deploy/store/housekeeping.sh` shows the disk before and after. The watchman tells the owner's Telegram when the disk is 85 % full (`STORE_ALERT_DISK_PERCENT`).
+**Disk housekeeping** (ADR-0211) is done by itself: `housekeeping.sh --quiet` is the last step of every automatic update round (after the till server's build) and runs every night with the backup. After an update by hand, run `bash deploy/store/housekeeping.sh` by hand (or leave it to the night). It removes the images an update replaced (those without a tag; the running ones and `:store-previous`, the way back, stay) and holds Docker's build cache to `STORE_BUILD_CACHE_GB` (10 GB), the least recently used going first. It never touches a volume. By hand, `bash deploy/store/housekeeping.sh` shows the disk before and after. The watchman tells the owner's Telegram when the disk is 85 % full (`STORE_ALERT_DISK_PERCENT`).
 
 ## 5. Move the edge to the new centre
 

@@ -10,8 +10,9 @@
 #     next build is as fast as the last. Not by age: a quiet week would empty the cache.
 #   - never a volume: the databases and the uploaded files stay.
 #
-# Run by setup.sh and deploy/edge/setup.sh at the end of every update, by auto-deploy.sh after an
-# update that failed, and by backup.sh every night.
+# Run by auto-deploy.sh as the last step of every round (after the till server's build, and after a
+# round that failed), by setup.sh before a build when under 15 GB is free, and by backup.sh every
+# night. An update by hand is followed by `bash deploy/store/housekeeping.sh` or left to the night.
 #
 #   bash deploy/store/housekeeping.sh            before and after, in full
 #   bash deploy/store/housekeeping.sh --quiet    one line, never fails (what the scripts run)

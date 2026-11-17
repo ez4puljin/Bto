@@ -15,8 +15,10 @@
 # rollback.sh to the version before. rollback.sh refuses when a migration stands between them: then the
 # red version stays until a fix is pushed, and the log says so (the owner's choice, ADR-0206).
 # Each update writes a log with the time of every line, so the slow step can be seen.
-# Every update ends by removing the images it replaced and the build cache above its limit
-# (housekeeping.sh, ADR-0211): the disk does not grow with the number of updates.
+# The last step of every round that built, after its result is written (and also of one that
+# failed), removes the images it replaced and the build cache above its limit (housekeeping.sh,
+# ADR-0211): the disk does not grow with the number of updates. Not between the centre's build and
+# the till server's: the edge is built from the centre's fresh layers.
 #
 #   bash deploy/store/auto-deploy.sh            one round (what the timer runs)
 #   bash deploy/store/auto-deploy.sh --check    what a round would do now, without doing it
@@ -228,6 +230,8 @@ esac
 # web or deploy
 RUN="$DEPLOY_STATE/runs/$SHORT.log"
 stamp() { while IFS= read -r line; do printf '%s %s\n' "$(date +%T)" "$line"; done; }
+# The round's last step (ADR-0211): never fails the round, never counted in its times.
+tidy() { timeout 600 bash deploy/store/housekeeping.sh --quiet 2>&1 | stamp >>"$RUN" || true; }
 EDGE=$(needs_edge "${CHANGED[@]}")
 started=$(date +%s)
 say "$SHORT: тавьж эхэллээ ($PLAN, ${#CHANGED[@]} файл, касс: $EDGE, CI $VERDICT)"
@@ -235,9 +239,10 @@ git merge --ff-only -q "$TARGET"
 SETUP=(bash deploy/store/setup.sh)
 if [ "$PLAN" = web ]; then SETUP+=(--only-web); fi
 if ! "${SETUP[@]}" 2>&1 | stamp >"$RUN"; then
-  # setup.sh cleans up at its end (ADR-0211); a build that stopped half-way left its cache too.
-  bash deploy/store/housekeeping.sh --quiet 2>&1 | stamp >>"$RUN" || true
-  say "$SHORT: төв систем ТАВИГДСАНГҮЙ ($(($(date +%s) - started)) сек): runs/$SHORT.log"
+  # A build that stopped half-way left its cache too.
+  failed_after=$(($(date +%s) - started))
+  tidy
+  say "$SHORT: төв систем ТАВИГДСАНГҮЙ ($failed_after сек): runs/$SHORT.log"
   exit 0
 fi
 store_done=$(date +%s)
@@ -257,5 +262,6 @@ else
   say "$SHORT: тавьсан боловч /health «${running:-хариугүй}» гэж хариулж байна ($note): runs/$SHORT.log"
 fi
 if [ "$VERDICT" != success ]; then printf '%s\n' "$TARGET" >"$DEPLOY_STATE/auto-ci-watch"; fi
+tidy
 exit 0
 }
