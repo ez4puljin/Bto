@@ -44,6 +44,9 @@ const COLUMNS: readonly ColumnSpec[] = [
   { key: 'chevron', kind: 'chevron' },
 ];
 
+type HistoryColumn =
+  'when' | 'who' | 'group' | 'template' | 'total' | 'sent' | 'failed' | 'skipped' | 'status';
+
 const BATCH_TONE = { QUEUED: 'secondary', SENDING: 'default', DONE: 'success' } as const;
 const MESSAGE_TONE = {
   QUEUED: 'secondary',
@@ -60,7 +63,7 @@ export function SmsHistory() {
   const batches = useSmsBatches();
   const rows = batches.data?.pages.flatMap((page) => page.data) ?? [];
   const open = Number.parseInt(params.get('batch') ?? '', 10);
-  const columnHead = (key: string, numeric = false) => (
+  const columnHead = (key: HistoryColumn, numeric = false) => (
     <TableHead className={numeric ? 'text-right' : undefined}>
       {t(`sms.history.columns.${key}`)}
     </TableHead>
