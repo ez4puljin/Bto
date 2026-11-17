@@ -44,3 +44,6 @@ Thumbs.db
 
 # graphify (the local code graph, rebuilt by its git hooks; never committed)
 graphify-out/
+
+# the fast check's memory (ADR-0213)
+.fastcheck/

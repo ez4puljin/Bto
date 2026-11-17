@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "incremental": true,
+    "tsBuildInfoFile": "../../.fastcheck/web.tsbuildinfo"
+  },
+  "exclude": ["src/types/i18next.d.ts"]
+}

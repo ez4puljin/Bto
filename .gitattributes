@@ -16,3 +16,6 @@
 *.jks binary
 *.keystore binary
 graphify-out/graph.json merge=graphify
+
+# Two tasks that add translation keys never conflict (tools/brain/merge-json.mjs, ADR-0213).
+packages/shared/i18n/mn.json merge=bto-json
