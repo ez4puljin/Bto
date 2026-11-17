@@ -7,6 +7,7 @@
   "scripts": {
     "apk": "node scripts/build-apk.mjs",
     "publish-apk": "node scripts/publish-apk.mjs",
+    "web": "node scripts/web.mjs",
     "expo": "node scripts/expo.mjs",
     "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.node.json",
     "test": "vitest run"

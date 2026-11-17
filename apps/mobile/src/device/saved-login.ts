@@ -1,5 +1,5 @@
 import * as LocalAuthentication from 'expo-local-authentication';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from './secure-store';
 
 // «Нууц үг сануулах» and the fingerprint sign-in of the staff app (ADR-0174): the login and the
 // password the person chose to keep, in the phone's secure storage (Android Keystore), for the one

@@ -193,47 +193,54 @@ export default function StaffHomeScreen() {
         {/* A newer APK on the server (ADR-0174 #7, #10): the press downloads and installs it. */}
         {update ? <UpdateCard release={update} /> : null}
 
-        {/* Today's attendance: the page punches. */}
-        <Card
-          accessibilityLabel={`${t('mobile.staffHome.attendance')}: ${stateLine}`}
-          onPress={() => router.push('/attendance')}
-          style={styles.attendance}
-        >
-          <View style={styles.attendanceHead}>
-            <IconTile color={tile.background}>
-              <CalendarCheck size={18} strokeWidth={2.2} color={tileIcon} />
-            </IconTile>
-            <Text style={[type.heading, styles.grow]} numberOfLines={1}>
-              {t('mobile.staffHome.attendance')}
-            </Text>
-            {data?.tracked ? (
-              <Pill
-                icon={Clock3}
-                label={t('mobile.staffHome.schedule', {
-                  start: data.schedule.workStart,
-                  end: data.schedule.workEnd,
-                })}
-                style={styles.schedule}
-              />
-            ) : null}
-          </View>
-          <View style={styles.stateBlock}>
-            <Text style={[styles.state, { color: stateColor }]} numberOfLines={2}>
-              {stateLine}
-            </Text>
-            {showWorked || lateLine ? (
-              <View style={styles.figures}>
-                {showWorked && worked ? (
-                  <Text style={[type.secondary, tabular]}>
-                    {t('mobile.staffHome.worked', { hours: worked.hours, minutes: worked.minutes })}
-                  </Text>
-                ) : null}
-                {lateLine ? (
-                  <Text style={[type.secondary, tabular, styles.late]}>{lateLine}</Text>
-                ) : null}
-              </View>
-            ) : null}
-          </View>
+        {/* Today's attendance: its top opens «Ирц»; the button under it punches. A button never
+            sits inside another (a screen reader would skip it, a browser refuses it). */}
+        <Card style={styles.attendance}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${t('mobile.staffHome.attendance')}: ${stateLine}`}
+            onPress={() => router.push('/attendance')}
+            style={({ pressed }) => [styles.attendance, pressed && styles.pressed]}
+          >
+            <View style={styles.attendanceHead}>
+              <IconTile color={tile.background}>
+                <CalendarCheck size={18} strokeWidth={2.2} color={tileIcon} />
+              </IconTile>
+              <Text style={[type.heading, styles.grow]} numberOfLines={1}>
+                {t('mobile.staffHome.attendance')}
+              </Text>
+              {data?.tracked ? (
+                <Pill
+                  icon={Clock3}
+                  label={t('mobile.staffHome.schedule', {
+                    start: data.schedule.workStart,
+                    end: data.schedule.workEnd,
+                  })}
+                  style={styles.schedule}
+                />
+              ) : null}
+            </View>
+            <View style={styles.stateBlock}>
+              <Text style={[styles.state, { color: stateColor }]} numberOfLines={2}>
+                {stateLine}
+              </Text>
+              {showWorked || lateLine ? (
+                <View style={styles.figures}>
+                  {showWorked && worked ? (
+                    <Text style={[type.secondary, tabular]}>
+                      {t('mobile.staffHome.worked', {
+                        hours: worked.hours,
+                        minutes: worked.minutes,
+                      })}
+                    </Text>
+                  ) : null}
+                  {lateLine ? (
+                    <Text style={[type.secondary, tabular, styles.late]}>{lateLine}</Text>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+          </Pressable>
           {/* The next punch, ready to press: «Ирлээ» until the person is in, then «Явлаа». */}
           {data?.tracked ? (
             punchNow.kind === 'IN' ? (

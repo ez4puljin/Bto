@@ -26,6 +26,25 @@ Over SSH without a login shell, name Node's folder and the user's runtime folder
 export PATH="$HOME/.local/opt/node/bin:$PATH" XDG_RUNTIME_DIR=/run/user/$(id -u)
 ```
 
+## The staff app in a browser (`bto-mobile-web`)
+
+A second user service, `tools/dev-server/bto-mobile-web.service`, runs `pnpm mobile:web`: Expo's
+dev server bundles the staff app for the web and reloads it on every saved change, and a small
+proxy on `127.0.0.1:8090` (`apps/mobile/scripts/web.mjs`) passes `/api` and `/health` to the
+development api on 3300. It listens on this PC only (the firewall is unchanged): from the laptop
+open an SSH tunnel and then `http://localhost:8090` in Chrome (F12 → the phone toolbar for a phone's
+size); localhost is a secure page, so the browser gives the position and `crypto.randomUUID`.
+
+```bash
+ssh -N -L 8090:127.0.0.1:8090 nvme-server@192.168.1.250
+```
+
+It is for looking at the screens and their flows with the development data. A phone's own parts are
+not there: the APK update, the fingerprint, the camera scanner as on a phone; the sign-in is kept
+only until the tab closes (sessionStorage). Status, restart and log as for `bto-dev`
+(`systemctl --user status bto-mobile-web`, `journalctl --user -u bto-mobile-web -f`). It never talks
+to the real system: the script refuses an api that is not a development port on this PC.
+
 ## Setting it up on another Linux PC
 
 1. Node 26 in `~/.local/opt/node` (the unit's `PATH` names it) and `npm i -g pnpm@11.28.2`; Docker

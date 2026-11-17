@@ -33,7 +33,7 @@ import { Text, type TextInput } from '../src/ui/text';
  */
 export default function LoginScreen() {
   const { t } = useTranslation();
-  const { session, state, server, setServer } = useSession();
+  const { session, state, server, setServer, serverFixed } = useSession();
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [shown, setShown] = useState(false);
@@ -190,11 +190,13 @@ export default function LoginScreen() {
               ) : null}
             </Card>
             <View style={styles.spacer} />
-            <ServerChip
-              server={server}
-              onPress={() => void setServer(null)}
-              style={styles.server}
-            />
+            {serverFixed ? null : (
+              <ServerChip
+                server={server}
+                onPress={() => void setServer(null)}
+                style={styles.server}
+              />
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

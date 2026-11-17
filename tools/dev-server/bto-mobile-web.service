@@ -1,0 +1,18 @@
+[Unit]
+Description=Bto staff app in a browser (pnpm mobile:web, http://localhost:8090 through SSH)
+After=bto-dev.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/bto-dev
+Environment=PATH=%h/.local/opt/node/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PORT=8090
+ExecStart=%h/.local/opt/node/bin/pnpm mobile:web
+Nice=10
+Restart=on-failure
+RestartSec=10
+KillMode=control-group
+TimeoutStopSec=20
+
+[Install]
+WantedBy=default.target

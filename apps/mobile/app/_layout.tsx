@@ -7,12 +7,14 @@ import { I18nextProvider } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { APP } from '../src/config/app';
+import { setUpWeb } from '../src/config/web-setup';
 import { i18n } from '../src/i18n/i18n';
 import { phaseOf } from '../src/state/phase';
 import { SessionProvider, useSession } from '../src/state/session';
 import { colors } from '../src/theme/tokens';
 
 void SplashScreen.preventAutoHideAsync();
+setUpWeb();
 
 /** Which app this build is (ADR-0085): the other app's screens are never reachable. */
 const STAFF = APP.variant === 'staff';
