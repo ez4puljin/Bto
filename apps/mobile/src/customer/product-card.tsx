@@ -6,7 +6,7 @@ import type { CartLine } from '../cart/cart';
 import { formatMnt, formatQty } from '../format/format';
 import { cardPictures } from '../images/pictures';
 import { useUnitWords } from '../shop/unit-words';
-import { baseUnitOf, defaultUnitOf, packOf } from '../shop/units';
+import { baseUnitOf, defaultUnitOf, knownUnit, packOf } from '../shop/units';
 import { colors, fonts, spacing, type } from '../theme/tokens';
 import { CardAdd, CardQty, DealBadge, NewBadge, StoreCardFrame } from '../ui/store-card-frame';
 import { Text } from '../ui/text';
@@ -131,7 +131,7 @@ export function FavouriteButton({
  * label, «ШИНЭ»), the name on one line, the pack, the price per base unit (the old one struck
  * through beside a deal price), the stock word (or number, ADR-0173 #2) with its dot and the cart
  * or the cart's quantity.
- * The cart adds one of the default unit; the card opens the product. `width` sets a row's card
+ * The cart opens the product or the list's quantity sheet (the cart mode); the card opens the product. `width` sets a row's card
  * (164 on the home's rows); a grid's card fills its column.
  */
 export function CustomerProductCard({
@@ -141,6 +141,7 @@ export function CustomerProductCard({
   locked,
   onOpen,
   onAdd,
+  onEdit,
   onFavourite,
   width,
   pictureHeight = 164,
@@ -153,6 +154,8 @@ export function CustomerProductCard({
   locked: boolean;
   onOpen: () => void;
   onAdd: () => void;
+  /** «Хялбар горим»: the quantity reads as «120ш» and opens the list's quantity sheet. */
+  onEdit?: () => void;
   onFavourite: () => void;
   width?: number;
   pictureHeight?: number;
@@ -166,6 +169,9 @@ export function CustomerProductCard({
   const tone = STOCK_TONES[product.stock];
   const canAdd = canOrder(product, defaultUnitOf(product.units));
   const money = (amount: string) => t('pricing.money', { amount: formatMnt(amount) });
+  // «120ш», «20ха»: the quantity beside a very short unit (a unit the app has no word for keeps its name).
+  const known = line ? knownUnit(line.uomCode) : null;
+  const badge: string = line ? (known ? t(`mobile.units.${known}.badge`) : line.uomName) : '';
   return (
     <StoreCardFrame
       name={product.name}
@@ -213,13 +219,13 @@ export function CustomerProductCard({
       action={
         locked ? null : line ? (
           <CardQty
-            text={`${line.qty} ${words(line).short}`}
+            text={onEdit ? `${line.qty}${badge}` : `${line.qty} ${words(line).short}`}
             label={t('mobile.shop.inCart', {
               name: product.name,
               qty: line.qty,
               unit: words(line).name,
             })}
-            onPress={onOpen}
+            onPress={onEdit ?? onOpen}
           />
         ) : canAdd ? (
           <CardAdd name={product.name} onPress={onAdd} />

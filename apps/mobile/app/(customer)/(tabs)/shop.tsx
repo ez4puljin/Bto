@@ -34,7 +34,7 @@ import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 import { formatCount } from '../../../src/format/format';
 import { useDebounced } from '../../../src/state/use-debounced';
 import { colors, spacing, storeType, TOUCH, type } from '../../../src/theme/tokens';
-import { ActiveChip, ChoiceChip, PillButton } from '../../../src/ui/controls';
+import { ActiveChip, ChoiceChip, PillButton, Segmented } from '../../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
 import { Text, TextInput } from '../../../src/ui/text';
@@ -217,6 +217,19 @@ export default function StoreShopScreen() {
           </Pressable>
         </View>
       </StoreHeaderBand>
+      <View style={styles.modeRow}>
+        <Segmented
+          small
+          height={32}
+          label={t('mobile.shop.modeLabel')}
+          options={[
+            { value: 'normal', label: t('mobile.shop.modeNormal') },
+            { value: 'easy', label: t('mobile.shop.modeEasy') },
+          ]}
+          value={actions.mode}
+          onChange={actions.setMode}
+        />
+      </View>
       <FlatList
         ref={list}
         onScroll={(event) => setScrolled(event.nativeEvent.contentOffset.y > 600)}
@@ -281,6 +294,7 @@ export default function StoreShopScreen() {
           ) : null
         }
       />
+      {actions.sheet}
       <FloatingPill
         bottom={inset}
         onTop={scrolled ? () => list.current?.scrollToOffset({ offset: 0, animated: true }) : null}
@@ -317,6 +331,7 @@ export default function StoreShopScreen() {
 }
 
 const styles = StyleSheet.create({
+  modeRow: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   list: { paddingHorizontal: spacing.lg },
   titleRow: {
     height: 40,

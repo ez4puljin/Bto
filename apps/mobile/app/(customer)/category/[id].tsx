@@ -123,6 +123,7 @@ export default function CategoryScreen() {
           <ProblemText problem={problem} style={styles.problem} />
         ) : null}
       </ScrollView>
+      {actions.sheet}
     </Page>
   );
 }

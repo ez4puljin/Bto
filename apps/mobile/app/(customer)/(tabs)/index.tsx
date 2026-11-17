@@ -228,6 +228,7 @@ export default function CustomerHomeScreen() {
           </View>
         ) : null}
       </ScrollView>
+      {actions.sheet}
     </Page>
   );
 }

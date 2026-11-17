@@ -195,6 +195,7 @@ export default function SectionListScreen() {
         }}
         onClose={() => setSheet(null)}
       />
+      {actions.sheet}
     </Page>
   );
 }

@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { RepProduct } from '../api/rep';
@@ -13,15 +13,19 @@ import { defaultUnitOf } from './units';
 /** The list's cart mode, read from the phone once and written on each change. */
 export function useCartMode(): [CartMode, (mode: CartMode) => void] {
   const [mode, setMode] = useState<CartMode>(DEFAULT_CART_MODE);
-  useEffect(() => {
-    let live = true;
-    void readJson(CART_MODE_KEY).then((stored) => {
-      if (live) setMode(cartModeFrom(stored));
-    });
-    return () => {
-      live = false;
-    };
-  }, []);
+  // Read again whenever the screen comes into focus: tabs stay mounted, so a switch made on the
+  // shop tab reaches the other tabs' lists.
+  useFocusEffect(
+    useCallback(() => {
+      let live = true;
+      void readJson(CART_MODE_KEY).then((stored) => {
+        if (live) setMode(cartModeFrom(stored));
+      });
+      return () => {
+        live = false;
+      };
+    }, []),
+  );
   const change = useCallback((next: CartMode) => {
     setMode(next);
     void writeJson(CART_MODE_KEY, next);

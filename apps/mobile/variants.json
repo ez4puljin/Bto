@@ -12,7 +12,7 @@
   "customer": {
     "name": "Bto300",
     "slug": "bto300",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "package": "mn.butenorgil.bto300",
     "assets": "./assets/customer",
     "apkPrefix": "bto300",

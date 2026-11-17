@@ -39,25 +39,32 @@ import {
   sectionTitleOf,
 } from './home-sections';
 import { CustomerProductCard } from './product-card';
-import { useAddOneStore } from './use-add';
+import { useStoreCartHost } from './list-qty-sheet';
 
 // The parts «Нүүр», a section's full list and a category's page share (ADR-0092, in the E-mart
 // structure of ADR-0095): a product card wired to the cart and ♡, a section's row, the banner
 // carousel and the category tiles.
 
-/** What a card does: open the product, add one of its default unit, ♡. */
+/**
+ * What a card does: open the product, its cart (the product page or the quantity sheet, by the
+ * saved cart mode; render `actions.sheet` once in the page), ♡.
+ */
 export function useCardActions() {
   const router = useRouter();
   const { server } = useCustomer();
   const { cart, pending } = useShop();
   const favourite = useToggleFavourite();
-  const add = useAddOneStore();
+  const host = useStoreCartHost(server);
   return {
     server,
     locked: pending !== null,
     lineOf: (productId: number) => lineOf(cart, productId),
     open: (product: StoreProduct) => router.push(`/product/${product.id}`),
-    add,
+    add: host.add,
+    edit: host.edit,
+    mode: host.mode,
+    setMode: host.setMode,
+    sheet: host.sheet,
     favourite: (product: StoreProduct) =>
       favourite.mutate({ productId: product.id, favourite: !product.favourite }),
   };
@@ -85,6 +92,7 @@ export function StoreCard({
       locked={actions.locked}
       onOpen={() => actions.open(product)}
       onAdd={() => actions.add(product)}
+      {...(actions.edit ? { onEdit: () => actions.edit?.(product) } : {})}
       onFavourite={() => actions.favourite(product)}
       {...(width !== undefined ? { width } : {})}
       {...(pictureHeight !== undefined ? { pictureHeight } : {})}
