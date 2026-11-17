@@ -34,6 +34,10 @@ const version = (
   retailBulkMinQty: '24',
   retailBulkMarkupPct: '20.00',
   rounding: 'UP_50',
+  retailMarkupAmount: '0.00',
+  retailBulkDiscountPct: null,
+  retailRounding: null,
+  retailBulkRounding: null,
   ...fields,
 });
 const profile = (fields: Partial<Schemas['PriceProfile']> = {}): Schemas['PriceProfile'] => ({
@@ -255,6 +259,10 @@ describe('price profiles list', () => {
       retailBulkMinQty: '24',
       retailBulkMarkupPct: '20',
       rounding: 'UP_50',
+      retailMarkupAmount: '0',
+      retailBulkDiscountPct: null,
+      retailRounding: null,
+      retailBulkRounding: null,
       validFrom: TODAY,
     });
     expect(posted?.headers.get('Idempotency-Key')).toMatch(UUID);
@@ -333,6 +341,10 @@ describe('price profile page', () => {
       retailBulkMinQty: '24',
       retailBulkMarkupPct: '20',
       rounding: 'UP_50',
+      retailMarkupAmount: '0',
+      retailBulkDiscountPct: null,
+      retailRounding: null,
+      retailBulkRounding: null,
       validFrom: TODAY,
     });
     expect(await screen.findByRole('status')).toHaveTextContent(mn.pricing.profiles.saved);

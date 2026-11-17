@@ -115,6 +115,10 @@ const DRINK_VALUES: Schemas['PriceProfileValues'] = {
   retailBulkMinQty: '24',
   retailBulkMarkupPct: '20.00',
   rounding: 'UP_50',
+  retailMarkupAmount: '0.00',
+  retailBulkDiscountPct: null,
+  retailRounding: null,
+  retailBulkRounding: null,
 };
 const priceProfile = (
   id: number,
@@ -140,6 +144,10 @@ const FOOD = priceProfile(5, 'Хүнс', {
   retailBulkMinQty: null,
   retailBulkMarkupPct: null,
   rounding: 'WHOLE',
+  retailMarkupAmount: '0.00',
+  retailBulkDiscountPct: null,
+  retailRounding: null,
+  retailBulkRounding: null,
 });
 const PROFILE_ROUTES = { 'GET /api/v1/price-profiles': () => list([DRINKS, FOOD]) };
 const DRINKS_SUMMARY = [
