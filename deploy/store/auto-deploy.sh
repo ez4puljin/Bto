@@ -3,7 +3,8 @@
 # checkout owner's timer (install-auto-deploy-timer.sh). Nobody waits for CI or says «yes»:
 #
 #   - nothing new on origin/main                      → nothing
-#   - only docs (docs/, *.md, .claude/, .github/)     → the checkout moves, nothing is rebuilt
+#   - only what no image is built from (docs/, *.md, .claude/, .github/, tools/, ci/, the tests,
+#     the staff app's sources: outside_system, ADR-0215) → the checkout moves, nothing is rebuilt
 #   - only the office's pages (apps/web)              → only the web image and its door (about a minute)
 #   - anything else, a new migration included         → setup.sh at once (it still refuses a commit
 #                                                        CI has already found red), then the edge;
@@ -29,6 +30,33 @@ set -euo pipefail
 
 # --- what a round decides, from the changed files and CI's word (auto-deploy.test.sh) ----------
 
+# True when no image is built from the file and no deploy script runs it: a change of it alone moves
+# the checkout and rebuilds nothing (ADR-0205, ADR-0215). Checked against the build configs:
+#   - docs/, .claude/, .github/, tools/, ci/: outside the build context (.dockerignore).
+#   - apps/api/test/: the api's build compiles src/ only and its image holds dist/ only ("files").
+#   - apps/api/src/**/*.spec.ts: excluded by apps/api/tsconfig.build.json. Not .test.ts or
+#     .int-spec.ts there: that build would compile them.
+#   - packages/{shared,fin-contract,api-client}/src/**/*.test.ts: excluded by their build configs
+#     (api-client has no build); nothing imports them.
+#   - apps/web/src/**/*.test.ts(x): Vite bundles only what index.html and pos.html import.
+#   - deploy/**/*.test.sh: no deploy script runs one.
+#   - apps/mobile/: built on the owner's PC (ADR-0061); no image reads it. Its package.json and
+#     tsconfig files stay a whole update (the lockfile, and to be safe).
+# Every package.json, tsconfig, Dockerfile and anything else is part of the system.
+outside_system() {
+  case "$1" in
+    docs/* | .claude/* | .github/* | *.md | tools/* | ci/*) return 0 ;;
+    */package.json | */tsconfig*.json | */Dockerfile) return 1 ;;
+    apps/api/test/* | apps/api/src/*.spec.ts) return 0 ;;
+    packages/shared/src/*.test.ts | packages/fin-contract/src/*.test.ts) return 0 ;;
+    packages/api-client/src/*.test.ts) return 0 ;;
+    apps/web/src/*.test.ts | apps/web/src/*.test.tsx) return 0 ;;
+    deploy/*.test.sh) return 0 ;;
+    apps/mobile/*) return 0 ;;
+  esac
+  return 1
+}
+
 # Prints one of: none, docs, web, deploy, refuse.
 #   $1: CI's verdict on the target (success, failure, pending, cancelled, unknown); then the changed
 #   files. Only a verdict already red holds code back; a migration does not wait for CI (ADR-0206).
@@ -40,8 +68,8 @@ plan_update() {
   [ "$#" -gt 0 ] || { echo none; return 0; }
   local file code=no other=no
   for file in "$@"; do
+    if outside_system "$file"; then continue; fi
     case "$file" in
-      docs/* | .claude/* | .github/* | *.md) ;;
       apps/web/Dockerfile | apps/web/package.json) code=yes; other=yes ;;
       apps/web/*) code=yes ;;
       *) code=yes; other=yes ;;
@@ -58,8 +86,8 @@ plan_update() {
 needs_edge() {
   local file
   for file in "$@"; do
+    if outside_system "$file"; then continue; fi
     case "$file" in
-      docs/* | .claude/* | .github/* | *.md) ;;
       apps/web/src/pos/* | apps/web/pos.html | apps/web/Dockerfile | apps/web/package.json) echo yes; return 0 ;;
       apps/web/*) ;;
       *) echo yes; return 0 ;;
@@ -69,14 +97,14 @@ needs_edge() {
 }
 
 # Of the files between the version the api runs and the checkout, prints those a pages-only update
-# leaves unbuilt (everything but the office's pages and the docs). After a rollback the checkout
+# leaves unbuilt (everything but the office's pages and what is outside the system). After a rollback the checkout
 # stays on the code CI refused while the api runs an older one, and a pages-only push after it
 # would otherwise move the checkout on with that code never built (owner 2026-11-17).
 left_behind() {
   local file
   for file in "$@"; do
+    if outside_system "$file"; then continue; fi
     case "$file" in
-      docs/* | .claude/* | .github/* | *.md) ;;
       apps/web/Dockerfile | apps/web/package.json) printf '%s\n' "$file" ;;
       apps/web/*) ;;
       *) printf '%s\n' "$file" ;;
@@ -222,7 +250,7 @@ case "$PLAN" in
     ;;
   docs)
     git merge --ff-only -q "$TARGET"
-    say "$SHORT: зөвхөн баримт бичиг өөрчлөгдсөн тул шилжүүлээд, дахин бүтээсэнгүй"
+    say "$SHORT: зөвхөн баримт бичиг, тест эсвэл хэрэгсэл өөрчлөгдсөн тул шилжүүлээд, дахин бүтээсэнгүй"
     exit 0
     ;;
 esac

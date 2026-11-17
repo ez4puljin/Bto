@@ -100,14 +100,18 @@ for attempt in 1 2 3; do
     if printf '%s\n' "$changed" | grep -q '^apps/api/src/db/migrations/.*\.sql$'; then
       echo "MIGRATION landed: run «pnpm db:migrate» in ~/bto-dev for the development database."
     fi
-    if printf '%s\n' "$changed" | grep -qvE '^(apps/web/|docs/|\.claude/|\.github/)|\.md$' ||
-      printf '%s\n' "$changed" | grep -qE '^apps/web/(Dockerfile|package\.json)$'; then
-      echo "On the real system in about five minutes (a whole update)."
-    elif printf '%s\n' "$changed" | grep -q '^apps/web/'; then
-      echo "On the real system in about a minute (pages only)."
-    else
-      echo "Documents only: nothing is rebuilt."
-    fi
+    # The real system's own rule decides (ADR-0215): the two can never disagree.
+    mapfile -t files < <(printf '%s\n' "$changed")
+    plan=$(
+      # shellcheck source=deploy/store/auto-deploy.sh
+      . "$GATE/deploy/store/auto-deploy.sh" --source-only
+      plan_update pending "${files[@]}"
+    )
+    case "$plan" in
+      deploy) echo "On the real system in about five minutes (a whole update)." ;;
+      web) echo "On the real system in about a minute (pages only)." ;;
+      *) echo "Nothing is rebuilt (documents, tests, tools or the staff app's sources only)." ;;
+    esac
     for slug in "$@"; do
       git -C "$MAIN" worktree remove --force "$WORK/$slug"
       git -C "$MAIN" branch -q -D "task/$slug" 2>/dev/null || true
