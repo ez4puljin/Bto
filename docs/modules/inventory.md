@@ -6,7 +6,7 @@
 - **Matching.** A line's product unit is the catalogue's of its printed barcode, else what a person saved this supplier's same line as (`receipt_note_aliases`), else the model's choice among the supplier's linked products; else the person chooses at the check.
 - **A supplier's memory.** `receipt_note_aliases (supplier, key) → product unit` and `receipt_note_templates (supplier)` with the model's notes on the form; written only when a reading is saved as a receipt, forgotten by `DELETE /receipt-notes/memory/:supplierId`.
 - **The draft.** `POST /receipt-notes/:id/receipt` calls `ReceiptsService.createInTx` (MANUAL, numbered, `note_total_amount` from the note; never `note_total_qty`) with each line priced from the stored reading; prices are shown only to `inventory.costs.manage`.
-- **Scanners.** `note_scanners` (a name and a private IPv4 address) and `POST /receipt-notes/scanners/:id/scan`: the api asks the device over eSCL (`integrations/scanner`, architecture §9.7) and keeps each sheet as a page of the caller's.
+- **Scanners.** `note_scanners` (a name and a private IPv4 address) and `POST /receipt-notes/scanners/:id/scan`: the api asks the device over eSCL (`integrations/scanner`, architecture §9.7) and keeps each sheet as a page of the caller's. A scanner on USB at an office PC is reached through `tools/scan-bridge` on that PC (ADR-0212): to the api it is one more address, `http://<the PC>:8765`.
 
 **Slice 2 note (2026-10-29, ADR-0116).** Transfer requests from the staff app (`docs/modules/mobile.md` §1b):
 
