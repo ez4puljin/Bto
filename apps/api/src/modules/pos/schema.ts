@@ -315,6 +315,27 @@ export const posCashiers = pgTable(
 );
 
 /**
+ * The tills a cashier works (owner 2026-11-17, chosen when the cashier is added): a cashier with
+ * no rows works every till. It narrows the till's own list (ADR-0124); both must admit the cashier.
+ */
+export const posCashierTills = pgTable(
+  'pos_cashier_tills',
+  {
+    userId: ref('user_id')
+      .notNull()
+      .references(() => posCashiers.userId),
+    tillId: ref('till_id')
+      .notNull()
+      .references(() => posTills.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.tillId] }),
+    index('pos_cashier_tills_till_idx').on(t.tillId),
+  ],
+);
+
+/**
  * A cashier's shift at a till (ADR-0064 #1): opened with a float, closed with a count; its money
  * is booked at the close and handed to the accountant afterwards.
  */

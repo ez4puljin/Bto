@@ -155,18 +155,17 @@ describe('supermarket pages (ADR-0063 #8)', () => {
     const fetchMock = signedIn(undefined, {
       ...routes(),
       'PUT /api/v1/pos/cashiers/7/pin': () => json(CASHIER),
+      'PUT /api/v1/pos/cashiers/7/tills': () => json({ ...CASHIER, tillIds: [TILL.id] }),
     });
     renderApp('/pos/cashiers', fetchMock);
     const row = await screen.findByRole('row', { name: /Кассчин Болор/ });
     expect(within(row).getByText('9911 0007')).toBeInTheDocument();
-    await user.click(
-      within(row).getByRole('button', { name: `${mn.pos.actions.setPin}: Кассчин Болор` }),
-    );
-    const dialog = within(
-      await screen.findByRole('dialog', {
-        name: mn.pos.cashiers.pinTitle.replace('{{name}}', 'Кассчин Болор'),
-      }),
-    );
+    const edit = within(row).getByRole('button', {
+      name: `${mn.pos.actions.edit}: Кассчин Болор`,
+    });
+    await user.click(edit);
+    const title = mn.pos.cashiers.editTitle.replace('{{name}}', 'Кассчин Болор');
+    let dialog = within(await screen.findByRole('dialog', { name: title }));
     await user.type(dialog.getByLabelText(mn.pos.fields.pin), '123456');
     await user.type(dialog.getByLabelText(mn.pos.fields.pinAgain), '123457');
     await user.click(dialog.getByRole('button', { name: mn.common.save }));
@@ -180,8 +179,54 @@ describe('supermarket pages (ADR-0063 #8)', () => {
     );
     expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/pos/cashiers/7/pin')[0])).toEqual({
       pin: '123456',
+      tillIds: [],
     });
     expect(await screen.findByText(mn.pos.cashiers.pinSet)).toBeInTheDocument();
+
+    // The tills alone: the PIN left empty stays as it is.
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: title })).toBeNull());
+    await user.click(edit);
+    dialog = within(await screen.findByRole('dialog', { name: title }));
+    await user.click(dialog.getByLabelText(`${TILL.code} · ${TILL.name}`));
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'PUT', '/api/v1/pos/cashiers/7/tills')).toHaveLength(1),
+    );
+    expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/pos/cashiers/7/tills')[0])).toEqual({
+      tillIds: [TILL.id],
+    });
+    expect(calls(fetchMock, 'PUT', '/api/v1/pos/cashiers/7/pin')).toHaveLength(1);
+  });
+
+  it('finds the new cashier by name and ticks the tills they work', async () => {
+    const user = userEvent.setup();
+    const fetchMock = signedIn(undefined, {
+      ...routes(),
+      'GET /api/v1/pos/cashiers': () => json([]),
+      'GET /api/v1/users': () =>
+        list([
+          { id: 31, username: 'p88112233', fullName: 'Дорж Сүх', phone: '+97688112233' },
+          { id: 32, username: 'oyun', fullName: 'Оюун Цэцэг', phone: null },
+        ]),
+      'PUT /api/v1/pos/cashiers/32/pin': () =>
+        json({ ...CASHIER, userId: 32, fullName: 'Оюун Цэцэг', tillIds: [TILL.id] }),
+    });
+    renderApp('/pos/cashiers?new=1', fetchMock);
+    const dialog = within(await screen.findByRole('dialog', { name: mn.pos.cashiers.dialogTitle }));
+    expect(dialog.queryByLabelText(mn.common.search)).toBeNull();
+    await user.type(dialog.getByLabelText(mn.pos.fields.user), 'оюун');
+    await user.click(await screen.findByRole('option', { name: 'Оюун Цэцэг' }));
+    await user.click(dialog.getByLabelText(`${TILL.code} · ${TILL.name}`));
+    await user.type(dialog.getByLabelText(mn.pos.fields.pin), '246810');
+    await user.type(dialog.getByLabelText(mn.pos.fields.pinAgain), '246810');
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'PUT', '/api/v1/pos/cashiers/32/pin')).toHaveLength(1),
+    );
+    expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/pos/cashiers/32/pin')[0])).toEqual({
+      pin: '246810',
+      tillIds: [TILL.id],
+    });
   });
 
   it('opens a closed shift and lets the accountant receive its cash', async () => {

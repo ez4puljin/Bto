@@ -337,6 +337,8 @@ export interface SnapshotCashier {
   pinHash: string | null;
   /** May approve returns and no-sale drawer openings (`pos.till.supervise`). */
   supervisor: boolean;
+  /** The tills (ids) the cashier works (owner 2026-11-17); empty or absent: every till. */
+  tillIds?: number[];
 }
 
 /** A way to pay the admin offers at the till (ADR-0111), in the order the till lists them. */

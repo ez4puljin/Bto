@@ -48,9 +48,11 @@ export class KioskAuthService {
   /** The till's sign-in list: active cashiers with a PIN, by name — the till's own when it has a list (ADR-0124). */
   cashiers(tillCode?: string): { userId: number; fullName: string }[] {
     const allowed = this.allowedOf(tillCode, 'cashierUserIds');
+    const tillId = this.tillIdOf(tillCode);
     return [...this.store.get().cashiers.values()]
       .filter((cashier) => cashier.status === 'ACTIVE' && cashier.pinHash !== null)
       .filter((cashier) => allowed === null || allowed.has(cashier.userId))
+      .filter((cashier) => worksTill(cashier, tillId))
       .map((cashier) => ({ userId: cashier.userId, fullName: cashier.fullName }))
       .sort((a, b) => a.fullName.localeCompare(b.fullName, 'mn'));
   }
@@ -70,6 +72,12 @@ export class KioskAuthService {
    * may approve their own action when they are one). Without an approval: null when the store's settings do
    * not ask for one, else `POS_SUPERVISOR_REQUIRED`.
    */
+  /** The id of the till with this code, or null (no till named: no narrowing). */
+  private tillIdOf(tillCode: string | undefined): number | null {
+    if (tillCode === undefined) return null;
+    return this.store.get().tills.get(tillCode)?.id ?? null;
+  }
+
   /** A till's list of a role as a set, or null when the till has none (everyone admitted). */
   allowedOf(
     tillCode: string | undefined,
@@ -117,6 +125,14 @@ export class KioskAuthService {
           userId,
           tillCode: device.tillCode,
         },
+      );
+    }
+    const own = this.store.get().cashiers.get(userId);
+    if (own && !worksTill(own, this.tillIdOf(device.tillCode))) {
+      throw new AppError(
+        'POS_CASHIER_NOT_ON_TILL',
+        `cashier ${userId} is not on ${device.tillCode}`,
+        { userId, tillCode: device.tillCode },
       );
     }
     const cashier = await this.verifyPin(userId, pin);
@@ -204,4 +220,10 @@ export class KioskAuthService {
     }
     return { userId: claims.sub, fullName: cashier.fullName, supervisor: cashier.supervisor };
   }
+}
+
+/** Whether a cashier's own list (owner 2026-11-17) admits the till; an empty list admits every till. */
+function worksTill(cashier: { tillIds?: number[] }, tillId: number | null): boolean {
+  const list = cashier.tillIds ?? [];
+  return tillId === null || list.length === 0 || list.includes(tillId);
 }

@@ -207,6 +207,7 @@ export class PosAcceptService {
         },
       );
     }
+    await this.cashiers.assertWorksTill(tx, doc.cashierUserId, till);
     if (
       doc.approvedByUserId !== null &&
       access.supervisors &&

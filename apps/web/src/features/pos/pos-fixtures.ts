@@ -63,6 +63,7 @@ export const CASHIER: Schemas['PosCashier'] = {
   pinSetByName: 'Админ Бат',
   failedCount: 0,
   lockedUntil: null,
+  tillIds: [],
 };
 
 export const SHIFT: Schemas['PosShift'] = {

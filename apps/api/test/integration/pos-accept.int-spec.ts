@@ -517,4 +517,60 @@ describe('pos accept', () => {
     const [inside] = await store.replay([saleEvent(sale(2))]);
     expect(inside).toMatchObject({ status: 'APPLIED' });
   });
+
+  it('keeps a cashier to the tills they work (owner 2026-11-17)', async () => {
+    const till6 = (
+      await store.pos
+        .createTill({
+          edgeNodeId: store.node.id,
+          code: 'К6',
+          name: 'Касс 6',
+          warehouseId: store.store.id,
+        })
+        .expect(201)
+    ).body as { id: number };
+    const tills = (body: Record<string, unknown>) =>
+      store.pos
+        .http()
+        .put(`/api/v1/pos/cashiers/${store.cashierId}/tills`)
+        .set(store.pos.auth)
+        .send(body);
+    // Only active tills of the store.
+    await tills({ tillIds: [999999] }).expect(422);
+    const chosen = (await tills({ tillIds: [till6.id, till6.id] }).expect(200)).body as {
+      tillIds: number[];
+    };
+    expect(chosen.tillIds).toEqual([till6.id]);
+
+    // Off their own list the cashier cannot open a shift (whatever the till's list says).
+    const [refused] = await store.replay([
+      shiftOpenEvent({
+        tillCode: 'К1',
+        cashierUserId: store.cashierId,
+        number: posShiftNumber('К1', store.today, 9),
+        openingFloat: '50000',
+      }),
+    ]);
+    expect(refused).toMatchObject({ status: 'REJECTED', code: 'POS_CASHIER_NOT_ON_TILL' });
+    const [opened] = await store.replay([
+      shiftOpenEvent({
+        tillCode: 'К6',
+        cashierUserId: store.cashierId,
+        number: posShiftNumber('К6', store.today, 1),
+        openingFloat: '50000',
+      }),
+    ]);
+    expect(opened).toMatchObject({ status: 'APPLIED' });
+
+    // A new PIN may carry the tills too; an empty list is every till again.
+    const reset = (
+      await store.pos
+        .http()
+        .put(`/api/v1/pos/cashiers/${store.cashierId}/pin`)
+        .set(store.pos.auth)
+        .send({ pin: '135790', tillIds: [] })
+        .expect(200)
+    ).body as { tillIds: number[] };
+    expect(reset.tillIds).toEqual([]);
+  });
 });

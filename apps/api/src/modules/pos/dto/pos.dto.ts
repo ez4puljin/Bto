@@ -410,6 +410,8 @@ export class CashierDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) lockedUntil: string | null;
   @ApiProperty({ description: 'Holds pos.till.supervise: may approve at a till' })
   supervisor: boolean;
+  @ApiProperty({ type: [Number], description: 'The tills the cashier works; empty: every till' })
+  tillIds: number[];
 }
 
 @ApiSchema({ name: 'PosPinRequest' })
@@ -418,6 +420,24 @@ export class PinRequestDto {
   @IsString()
   @Matches(/^[0-9]{6}$/)
   pin: string;
+  @ApiPropertyOptional({
+    type: [Number],
+    description: 'The tills the cashier works (empty: every till); absent: left as they are',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsInt({ each: true })
+  tillIds?: number[];
+}
+
+@ApiSchema({ name: 'PosCashierTills' })
+export class CashierTillsDto {
+  @ApiProperty({ type: [Number], description: 'The tills the cashier works; empty: every till' })
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsInt({ each: true })
+  tillIds: number[];
 }
 
 @ApiSchema({ name: 'PosCashierStatusRequest' })

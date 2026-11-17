@@ -7929,6 +7929,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pos/cashiers/{userId}/tills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["PosCashiers_setTills"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pos/cashiers/{userId}/status": {
         parameters: {
             query?: never;
@@ -20046,6 +20062,8 @@ export interface components {
             lockedUntil: string | null;
             /** @description Holds pos.till.supervise: may approve at a till */
             supervisor: boolean;
+            /** @description The tills the cashier works; empty: every till */
+            tillIds: number[];
         };
         PosPinRequest: {
             /**
@@ -20053,6 +20071,12 @@ export interface components {
              * @example 123456
              */
             pin: string;
+            /** @description The tills the cashier works (empty: every till); absent: left as they are */
+            tillIds?: number[];
+        };
+        PosCashierTills: {
+            /** @description The tills the cashier works; empty: every till */
+            tillIds: number[];
         };
         PosCashierStatusRequest: {
             /** @enum {string} */
@@ -43394,6 +43418,40 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PosPinRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosCashier"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosCashiers_setTills: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosCashierTills"];
             };
         };
         responses: {

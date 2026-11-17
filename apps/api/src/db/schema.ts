@@ -148,6 +148,7 @@ export {
 } from '../modules/finance/schema';
 export {
   posCashiers,
+  posCashierTills,
   posDayCounts,
   posEdgeNodes,
   posLoyaltyEntries,

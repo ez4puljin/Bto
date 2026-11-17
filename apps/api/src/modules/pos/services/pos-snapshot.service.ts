@@ -13,7 +13,7 @@ import {
   ProductPricesService,
   ProgramTargetsService,
 } from '../../pricing';
-import { posCashiers, posTills } from '../schema';
+import { posCashiers, posCashierTills, posTills } from '../schema';
 import type { EdgeNode } from './pos-edge-nodes.service';
 import { PosPaymentTypesService } from './pos-payment-types.service';
 import { PosQuickButtonsService } from './pos-quick-buttons.service';
@@ -106,6 +106,13 @@ export class PosSnapshotService {
       ),
     );
     const cashierRows = await this.db.select().from(posCashiers).orderBy(asc(posCashiers.userId));
+    const cashierTills = new Map<number, number[]>();
+    for (const row of await this.db
+      .select({ userId: posCashierTills.userId, tillId: posCashierTills.tillId })
+      .from(posCashierTills)
+      .orderBy(asc(posCashierTills.userId), asc(posCashierTills.tillId))) {
+      cashierTills.set(row.userId, [...(cashierTills.get(row.userId) ?? []), row.tillId]);
+    }
     const userIds = cashierRows.map((row) => row.userId);
     const users = await this.names.summariesOf(userIds);
     const supervisors = await this.names.holdersOf('pos.till.supervise', userIds);
@@ -157,6 +164,7 @@ export class PosSnapshotService {
             status: row.status === 'ACTIVE' && user.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
             pinHash: row.pinHash,
             supervisor: supervisors.has(row.userId),
+            tillIds: cashierTills.get(row.userId) ?? [],
           } as const,
         ];
       }),

@@ -17,6 +17,7 @@ import { type AuthContext, CurrentUser, RequirePermission } from '../../identity
 import {
   CashierDto,
   CashierStatusDto,
+  CashierTillsDto,
   EdgeLinkCodeDto,
   EdgeLinkRequestDto,
   EdgeLinkResponseDto,
@@ -246,7 +247,18 @@ export class PosCashiersController {
     @Param('userId', ParseIntPipe) userId: number,
     @Body() body: PinRequestDto,
   ): Promise<CashierDto> {
-    return cashierDto(await this.cashiers.setPin(ctx, userId, body.pin));
+    return cashierDto(await this.cashiers.setPin(ctx, userId, body.pin, body.tillIds));
+  }
+
+  @Put(':userId/tills')
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: CashierDto })
+  async setTills(
+    @CurrentUser() ctx: AuthContext,
+    @Param('userId', ParseIntPipe) userId: number,
+    @Body() body: CashierTillsDto,
+  ): Promise<CashierDto> {
+    return cashierDto(await this.cashiers.setTills(ctx, userId, body.tillIds));
   }
 
   @Put(':userId/status')

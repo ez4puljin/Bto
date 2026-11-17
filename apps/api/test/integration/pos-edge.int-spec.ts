@@ -386,4 +386,38 @@ describe('pos edge', () => {
     const rounded = await quoted(colaUnit(), '1');
     expect(rounded.lines[0]?.unitPrice).toMatch(/^\d*99(\.0+)?$/);
   });
+
+  it('lists and signs in only the cashiers who work this till (owner 2026-11-17)', async () => {
+    const other = (
+      await store.pos
+        .createTill({
+          edgeNodeId: store.node.id,
+          code: 'К2',
+          name: 'Касс 2',
+          warehouseId: store.store.id,
+        })
+        .expect(201)
+    ).body as { id: number };
+    const tillsOf = (tillIds: number[]) =>
+      store.pos
+        .http()
+        .put(`/api/v1/pos/cashiers/${store.supervisorId}/tills`)
+        .set(store.pos.auth)
+        .send({ tillIds })
+        .expect(200);
+    await tillsOf([other.id]);
+    expect(await sync.pullOnce()).toBe('changed');
+    const device = (await kiosk.get('/device').expect(200)).body as EdgeDeviceInfo;
+    expect(device.cashiers.map((cashier) => cashier.userId)).toContain(store.cashierId);
+    expect(device.cashiers.map((cashier) => cashier.userId)).not.toContain(store.supervisorId);
+    const refused = await kiosk
+      .post('/auth/pin', { userId: store.supervisorId, pin: '654321' })
+      .expect(422);
+    expect(refused.body).toMatchObject({ code: 'POS_CASHIER_NOT_ON_TILL' });
+
+    await tillsOf([store.till.id, other.id]);
+    expect(await sync.pullOnce()).toBe('changed');
+    const back = (await kiosk.get('/device').expect(200)).body as EdgeDeviceInfo;
+    expect(back.cashiers.map((cashier) => cashier.userId)).toContain(store.supervisorId);
+  });
 });

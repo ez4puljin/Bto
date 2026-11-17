@@ -373,11 +373,29 @@ export function usePosMutations() {
       onSuccess: () => refresh(POS_KEYS.tills),
     }),
     setPin: useMutation({
-      mutationFn: async ({ userId, pin }: { userId: number; pin: string }) =>
+      mutationFn: async ({
+        userId,
+        pin,
+        tillIds,
+      }: {
+        userId: number;
+        pin: string;
+        tillIds?: number[];
+      }) =>
         unwrap(
           await api.PUT('/api/v1/pos/cashiers/{userId}/pin', {
             params: { path: { userId } },
-            body: { pin },
+            body: { pin, tillIds },
+          }),
+        ),
+      onSuccess: () => refresh(POS_KEYS.cashiers),
+    }),
+    setCashierTills: useMutation({
+      mutationFn: async ({ userId, tillIds }: { userId: number; tillIds: number[] }) =>
+        unwrap(
+          await api.PUT('/api/v1/pos/cashiers/{userId}/tills', {
+            params: { path: { userId } },
+            body: { tillIds },
           }),
         ),
       onSuccess: () => refresh(POS_KEYS.cashiers),

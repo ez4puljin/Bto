@@ -1,13 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { isPin, type PosStatus } from '@tugeel/shared/pos';
-import { eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { AuditService, type AuthContext, UserNamesService } from '../../identity';
 import { PinHasher } from '../pin-hasher';
-import { posCashiers } from '../schema';
+import { posCashiers, posCashierTills, posTills } from '../schema';
 
 export interface Cashier {
   userId: number;
@@ -22,6 +22,8 @@ export interface Cashier {
   lockedUntil: Date | null;
   /** Holds `pos.till.supervise` (ADR-0124: the admin's supervisor picker). */
   supervisor: boolean;
+  /** The tills the cashier works (owner 2026-11-17); empty: every till. */
+  tillIds: number[];
 }
 
 /** Wrong PINs before a cashier waits (the kiosk shows the lock); the count resets on success. */
@@ -51,6 +53,7 @@ export class PosCashiersService {
       'pos.till.supervise',
       rows.map((row) => row.userId),
     );
+    const tills = await this.tillsByCashier();
     const cashiers: Cashier[] = [];
     for (const row of rows) {
       const user = users.get(row.userId);
@@ -67,6 +70,7 @@ export class PosCashiersService {
         failedCount: row.failedCount,
         lockedUntil: row.lockedUntil,
         supervisor: supervisors.has(row.userId),
+        tillIds: tills.get(row.userId) ?? [],
       });
     }
     cashiers.sort((a, b) => a.fullName.localeCompare(b.fullName, 'mn') || a.userId - b.userId);
@@ -79,8 +83,16 @@ export class PosCashiersService {
     return found;
   }
 
-  /** Sets (or replaces) a user's PIN and makes them an active cashier. */
-  async setPin(ctx: AuthContext, userId: number, pin: string): Promise<Cashier> {
+  /**
+   * Sets (or replaces) a user's PIN and makes them an active cashier; `tillIds`, when given, are
+   * the tills they work (empty: every till), saved in the same transaction.
+   */
+  async setPin(
+    ctx: AuthContext,
+    userId: number,
+    pin: string,
+    tillIds?: readonly number[],
+  ): Promise<Cashier> {
     if (!isPin(pin)) throw invalid('pin', 'pattern', 'six digits');
     const user = (await this.names.summariesOf([userId])).get(userId);
     if (!user) throw notFound('user', userId);
@@ -110,8 +122,97 @@ export class PosCashiersService {
         entityId: userId,
         after: { userId },
       });
+      if (tillIds !== undefined) await this.replaceTills(tx, ctx, userId, tillIds);
     });
     return this.get(userId);
+  }
+
+  /** The tills a cashier works (owner 2026-11-17): only active tills; empty means every till. */
+  async setTills(ctx: AuthContext, userId: number, tillIds: readonly number[]): Promise<Cashier> {
+    await inTransaction(this.db, async (tx) => {
+      const [row] = await tx
+        .select({ userId: posCashiers.userId })
+        .from(posCashiers)
+        .where(eq(posCashiers.userId, userId))
+        .for('update');
+      if (!row) throw notFound('pos_cashier', userId);
+      await this.replaceTills(tx, ctx, userId, tillIds);
+    });
+    return this.get(userId);
+  }
+
+  /**
+   * Whether the cashier works this till by their own list (owner 2026-11-17); the till's list
+   * (ADR-0124) is checked apart. Refuses with `POS_CASHIER_NOT_ON_TILL`.
+   */
+  async assertWorksTill(tx: Tx, userId: number, till: { id: number; code: string }): Promise<void> {
+    const rows = await tx
+      .select({ tillId: posCashierTills.tillId })
+      .from(posCashierTills)
+      .where(eq(posCashierTills.userId, userId));
+    if (rows.length === 0 || rows.some((row) => row.tillId === till.id)) return;
+    throw new AppError('POS_CASHIER_NOT_ON_TILL', `cashier ${userId} is not on ${till.code}`, {
+      userId,
+      tillCode: till.code,
+    });
+  }
+
+  /** Every cashier's own tills, in id order; a cashier without rows is absent (every till). */
+  async tillsByCashier(executor: Db | Tx = this.db): Promise<Map<number, number[]>> {
+    const rows = await executor
+      .select({ userId: posCashierTills.userId, tillId: posCashierTills.tillId })
+      .from(posCashierTills)
+      .orderBy(asc(posCashierTills.userId), asc(posCashierTills.tillId));
+    const out = new Map<number, number[]>();
+    for (const row of rows) {
+      const list = out.get(row.userId) ?? [];
+      list.push(row.tillId);
+      out.set(row.userId, list);
+    }
+    return out;
+  }
+
+  private async replaceTills(
+    tx: Tx,
+    ctx: AuthContext,
+    userId: number,
+    tillIds: readonly number[],
+  ): Promise<void> {
+    const wanted = [...new Set(tillIds)].sort((a, b) => a - b);
+    if (wanted.length > 0) {
+      const active = new Set(
+        (
+          await tx
+            .select({ id: posTills.id })
+            .from(posTills)
+            .where(and(inArray(posTills.id, wanted), eq(posTills.status, 'ACTIVE')))
+        ).map((row) => row.id),
+      );
+      const missing = wanted.find((id) => !active.has(id));
+      if (missing !== undefined) {
+        throw invalid('tillIds', 'till', `till ${missing} is not an active till`);
+      }
+    }
+    const before = (
+      await tx
+        .select({ tillId: posCashierTills.tillId })
+        .from(posCashierTills)
+        .where(eq(posCashierTills.userId, userId))
+    )
+      .map((row) => row.tillId)
+      .sort((a, b) => a - b);
+    if (before.length === wanted.length && before.every((id, i) => id === wanted[i])) return;
+    await tx.delete(posCashierTills).where(eq(posCashierTills.userId, userId));
+    if (wanted.length > 0) {
+      await tx.insert(posCashierTills).values(wanted.map((tillId) => ({ userId, tillId })));
+    }
+    await this.audit.record(tx, ctx, {
+      action: 'UPDATE',
+      entity: 'pos_cashiers',
+      entityId: userId,
+      before: { tillIds: before },
+      after: { tillIds: wanted },
+    });
   }
 
   async setStatus(ctx: AuthContext, userId: number, status: PosStatus): Promise<Cashier> {

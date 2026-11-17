@@ -1,7 +1,8 @@
-import { KeyRound, LockOpen, Plus, UserRoundX, UserRoundCheck } from 'lucide-react';
-import { type FormEvent, useState } from 'react';
+import { KeyRound, LockOpen, Pencil, Plus, UserRoundX, UserRoundCheck } from 'lucide-react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHasPermission } from '@/app/auth-context';
+import { CheckboxGroup } from '@/components/checkbox-group';
 import { DialogFormFooter, FormField } from '@/components/form';
 import {
   EmptyState,
@@ -13,9 +14,9 @@ import {
   SpacerCell,
   SpacerHead,
 } from '@/components/list';
-import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
+import { SearchSelect } from '@/components/search-select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,7 +36,7 @@ import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
-import { type Cashier, useCashiers, usePosMutations } from './api';
+import { type Cashier, type Till, useCashiers, usePosMutations, useTills } from './api';
 import { ActiveBadge } from './badges';
 
 /**
@@ -61,6 +62,11 @@ export function PosCashiersPage() {
   const { t } = useTranslation();
   const canManage = useHasPermission('pos.manage');
   const cashiers = useCashiers();
+  const tills = useTills();
+  const tillCodes = useMemo(
+    () => new Map((tills.data ?? []).map((till) => [till.id, till.code])),
+    [tills.data],
+  );
   const [adding, setAdding] = useCreateParam();
   const [editing, setEditing] = useState<Cashier | null>(null);
   const mutations = usePosMutations();
@@ -124,6 +130,15 @@ export function PosCashiersPage() {
                   <TableCell>
                     <span className="flex flex-wrap gap-1">
                       <ActiveBadge status={cashier.status} />
+                      {cashier.tillIds.length > 0 ? (
+                        <Badge variant="outline">
+                          {t('pos.cashiers.tillsBadge', {
+                            codes: cashier.tillIds
+                              .map((id) => tillCodes.get(id) ?? `#${id}`)
+                              .join(', '),
+                          })}
+                        </Badge>
+                      ) : null}
                       {cashier.userStatus === 'DISABLED' ? (
                         <Badge variant="destructive">{t('pos.cashiers.userDisabled')}</Badge>
                       ) : null}
@@ -147,8 +162,8 @@ export function PosCashiersPage() {
                     {canManage ? (
                       <>
                         <RowAction
-                          label={`${t('pos.actions.setPin')}: ${cashier.fullName}`}
-                          icon={KeyRound}
+                          label={`${t('pos.actions.edit')}: ${cashier.fullName}`}
+                          icon={Pencil}
                           onClick={() => setEditing(cashier)}
                         />
                         <RowAction
@@ -177,6 +192,8 @@ export function PosCashiersPage() {
       <PinDialog
         open={adding || editing !== null}
         cashier={editing}
+        cashiers={cashiers.data ?? []}
+        tills={tills.data ?? []}
         onClose={() => {
           if (editing) setEditing(null);
           else setAdding(false);
@@ -189,17 +206,21 @@ export function PosCashiersPage() {
 function PinDialog({
   open,
   cashier,
+  cashiers,
+  tills,
   onClose,
 }: {
   open: boolean;
   cashier: Cashier | null;
+  cashiers: readonly Cashier[];
+  tills: readonly Till[];
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
       {open ? (
-        <PinForm cashier={cashier} onClose={onClose} />
+        <PinForm cashier={cashier} cashiers={cashiers} tills={tills} onClose={onClose} />
       ) : (
         <DialogContent closeLabel={t('common.close')} />
       )}
@@ -207,27 +228,66 @@ function PinDialog({
   );
 }
 
-function PinForm({ cashier, onClose }: { cashier: Cashier | null; onClose: () => void }) {
+/**
+ * A new cashier (a staff member found by typing their name or phone) or an existing one's tills
+ * and PIN (owner 2026-11-17): the tills they work are ticked among the active ones, none ticked
+ * means every till; an existing cashier's PIN changes only when a new one is typed.
+ */
+function PinForm({
+  cashier,
+  cashiers,
+  tills,
+  onClose,
+}: {
+  cashier: Cashier | null;
+  cashiers: readonly Cashier[];
+  tills: readonly Till[];
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
-  const [search, setSearch] = useState('');
-  const users = useUsers({ q: search });
+  const users = useUsers({ status: 'ACTIVE' });
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = users;
+  // The picker filters in the browser, so a staff larger than one page is read to its end.
+  useEffect(() => {
+    if (cashier === null && hasNextPage && !isFetchingNextPage) void fetchNextPage();
+  }, [cashier, hasNextPage, isFetchingNextPage, fetchNextPage]);
   const mutations = usePosMutations();
   const action = useAction();
   const [userId, setUserId] = useState<number | null>(cashier?.userId ?? null);
+  const [tillIds, setTillIds] = useState<number[]>(cashier?.tillIds ?? []);
   const [pin, setPin] = useState('');
   const [again, setAgain] = useState('');
   const [checked, setChecked] = useState(false);
-  const pinOk = /^[0-9]{6}$/.test(pin);
+  const keepPin = cashier !== null && pin === '' && again === '';
+  const pinOk = keepPin || /^[0-9]{6}$/.test(pin);
   const same = pin === again;
+  const activeTills = tills.filter((till) => till.status === 'ACTIVE');
+  const userOptions = useMemo(() => {
+    const taken = new Set(cashiers.map((row) => row.userId));
+    return (users.data?.pages.flatMap((page) => page.data) ?? [])
+      .filter((user) => !taken.has(user.id))
+      .map((user) => ({
+        value: String(user.id),
+        label: user.phone ? `${user.fullName} · ${localPhone(user.phone)}` : user.fullName,
+        keys: user.phone ? [user.phone, localPhone(user.phone).replace(/\s/g, '')] : [],
+      }));
+  }, [users.data, cashiers]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setChecked(true);
     if (userId === null || !pinOk || !same) return;
+    // A till that stopped since the dialog opened is not sent back.
+    const chosen = tillIds.filter((id) => activeTills.some((till) => till.id === id));
     void action
       .run(async () => {
-        await mutations.setPin.mutateAsync({ userId, pin });
-        toast.success(t('pos.cashiers.pinSet'));
+        if (keepPin) {
+          await mutations.setCashierTills.mutateAsync({ userId, tillIds: chosen });
+          toast.success(t('pos.cashiers.saved'));
+        } else {
+          await mutations.setPin.mutateAsync({ userId, pin, tillIds: chosen });
+          toast.success(t('pos.cashiers.pinSet'));
+        }
       })
       .then((ok) => {
         if (ok) onClose();
@@ -239,47 +299,54 @@ function PinForm({ cashier, onClose }: { cashier: Cashier | null; onClose: () =>
       <DialogHeader>
         <DialogTitle>
           {cashier
-            ? t('pos.cashiers.pinTitle', { name: cashier.fullName })
+            ? t('pos.cashiers.editTitle', { name: cashier.fullName })
             : t('pos.cashiers.dialogTitle')}
         </DialogTitle>
-        <DialogDescription>{t('pos.cashiers.dialogDescription')}</DialogDescription>
+        <DialogDescription>
+          {cashier ? t('pos.cashiers.editDescription') : t('pos.cashiers.dialogDescription')}
+        </DialogDescription>
       </DialogHeader>
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
         {cashier ? null : (
-          <>
-            <FormField label={t('common.search')} htmlFor="cashier-search">
-              <Input
-                id="cashier-search"
-                type="search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </FormField>
-            <FormField
-              label={t('pos.fields.user')}
-              htmlFor="cashier-user"
-              error={checked && userId === null ? 'validation.required' : undefined}
-            >
-              <NativeSelect
-                id="cashier-user"
-                value={userId ?? ''}
-                onChange={(event) => setUserId(Number.parseInt(event.target.value, 10) || null)}
-              >
-                <option value="">{t('pos.cashiers.chooseUser')}</option>
-                {(users.data?.pages.flatMap((page) => page.data) ?? []).map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.fullName}
-                    {user.phone ? ` · ${localPhone(user.phone)}` : ''}
-                  </option>
-                ))}
-              </NativeSelect>
-            </FormField>
-          </>
+          <FormField
+            label={t('pos.fields.user')}
+            htmlFor="cashier-user"
+            error={checked && userId === null ? 'validation.required' : undefined}
+          >
+            <SearchSelect
+              id="cashier-user"
+              value={userId === null ? '' : String(userId)}
+              options={userOptions}
+              placeholder={t('pos.cashiers.chooseUser')}
+              invalid={checked && userId === null}
+              onChange={(value) => setUserId(Number.parseInt(value, 10) || null)}
+            />
+          </FormField>
         )}
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className="mb-1.5 text-sm leading-none font-medium">
+            {t('pos.cashiers.tills')}
+          </legend>
+          {activeTills.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('pos.cashiers.noTills')}</p>
+          ) : (
+            <CheckboxGroup
+              name="cashier-till"
+              options={activeTills.map((till) => ({
+                value: till.id,
+                label: `${till.code} · ${till.name}`,
+              }))}
+              value={tillIds}
+              onChange={setTillIds}
+            />
+          )}
+          <p className="text-xs text-muted-foreground">{t('pos.cashiers.tillsHint')}</p>
+        </fieldset>
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField
             label={t('pos.fields.pin')}
             htmlFor="cashier-pin"
+            hint={cashier ? t('pos.cashiers.pinKeep') : undefined}
             error={checked && !pinOk ? 'validation.pin' : undefined}
           >
             <Input
@@ -311,7 +378,10 @@ function PinForm({ cashier, onClose }: { cashier: Cashier | null; onClose: () =>
           </FormField>
         </div>
         <ProblemAlert problem={action.problem} />
-        <DialogFormFooter pending={mutations.setPin.isPending} onCancel={onClose} />
+        <DialogFormFooter
+          pending={mutations.setPin.isPending || mutations.setCashierTills.isPending}
+          onCancel={onClose}
+        />
       </form>
     </DialogContent>
   );

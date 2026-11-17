@@ -32230,6 +32230,61 @@
         ]
       }
     },
+    "/api/v1/pos/cashiers/{userId}/tills": {
+      "put": {
+        "operationId": "PosCashiers_setTills",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosCashierTills"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosCashier"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
     "/api/v1/pos/cashiers/{userId}/status": {
       "put": {
         "operationId": "PosCashiers_setStatus",
@@ -76675,6 +76730,13 @@
           "supervisor": {
             "type": "boolean",
             "description": "Holds pos.till.supervise: may approve at a till"
+          },
+          "tillIds": {
+            "description": "The tills the cashier works; empty: every till",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
           }
         },
         "required": [
@@ -76688,7 +76750,8 @@
           "pinSetByName",
           "failedCount",
           "lockedUntil",
-          "supervisor"
+          "supervisor",
+          "tillIds"
         ]
       },
       "PosPinRequest": {
@@ -76699,10 +76762,34 @@
             "pattern": "^[0-9]{6}$",
             "example": "123456",
             "description": "Six digits"
+          },
+          "tillIds": {
+            "maxItems": 200,
+            "description": "The tills the cashier works (empty: every till); absent: left as they are",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
           }
         },
         "required": [
           "pin"
+        ]
+      },
+      "PosCashierTills": {
+        "type": "object",
+        "properties": {
+          "tillIds": {
+            "maxItems": 200,
+            "description": "The tills the cashier works; empty: every till",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "tillIds"
         ]
       },
       "PosCashierStatusRequest": {

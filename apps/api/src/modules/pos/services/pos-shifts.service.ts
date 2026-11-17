@@ -141,6 +141,7 @@ export class PosShiftsService {
         },
       );
     }
+    await this.cashiers.assertWorksTill(tx, doc.cashierUserId, till);
     if (doc.openingFloat.isNegative() || doc.openingFloat.decimalPlaces() > MONEY_SCALE) {
       throw invalid('openingFloat', 'money', 'a non-negative amount with 2 decimals');
     }
