@@ -38,7 +38,7 @@ import {
 import { shopRouteParams } from '../../../src/customer/shop';
 import { formatCount } from '../../../src/format/format';
 import { Chip } from '../../../src/shop/chip';
-import { useAddOne } from '../../../src/shop/use-add';
+import { useCartHost } from '../../../src/shop/list-qty-sheet';
 import { useSignedIn } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
 import { colors, spacing } from '../../../src/theme/tokens';
@@ -70,7 +70,7 @@ export default function RepSectionScreen() {
   const parsed = parseHomeSectionKey(key);
   const { server } = useSignedIn();
   const { cart, pending } = useShop();
-  const add = useAddOne();
+  const host = useCartHost(server);
   const categories = useCategories();
   const sectionText = useSectionText();
   const [sort, setSort] = useState<HomeSectionSort>('DEFAULT');
@@ -190,7 +190,7 @@ export default function RepSectionScreen() {
             line={lineOf(cart, item.id)}
             locked={pending !== null}
             onOpen={() => router.push(`/product/${item.id}`)}
-            onAdd={() => add(item)}
+            {...host.cardProps(item)}
             width={cardWidth}
           />
         )}
@@ -262,6 +262,7 @@ export default function RepSectionScreen() {
         }}
         onClose={() => setSheet(null)}
       />
+      {host.sheet}
     </Page>
   );
 }

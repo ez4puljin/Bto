@@ -36,13 +36,13 @@ import { formatCount } from '../../../src/format/format';
 import { Chip } from '../../../src/shop/chip';
 import { FilterSheet } from '../../../src/shop/filter-sheet';
 import { activeCount, EMPTY_FILTERS, type ShopFilters } from '../../../src/shop/filters';
-import { useAddOne } from '../../../src/shop/use-add';
+import { useCartHost } from '../../../src/shop/list-qty-sheet';
 import { useShopFilters } from '../../../src/shop/use-filters';
 import { useSignedIn } from '../../../src/state/session';
 import { useDebounced } from '../../../src/state/use-debounced';
 import { useShop } from '../../../src/state/shop';
 import { colors, fonts, radii, spacing, storeType, TOUCH, type } from '../../../src/theme/tokens';
-import { CircleButton, PillButton } from '../../../src/ui/controls';
+import { CircleButton, PillButton, Segmented } from '../../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
 import { ProductCard } from '../../../src/ui/product-card';
@@ -56,7 +56,7 @@ const GAP = 12;
  * search with the scanner in the blue header, «Шүүлтүүр» and the chosen filters as chips with
  * «Ангилал» and «Нийлүүлэгч», the count with the order (it opens «Эрэмбэлэх»), the products two by
  * two and a round «дээш» once the list is scrolled. The
- * cart on a card adds one of a product's default unit, a card opens the product. A link may focus
+ * cart on a card opens the product («Энгийн горим») or the quantity sheet («Хялбар горим»), a card opens the product. A link may focus
  * the search (`?search=1`, «Нүүр»'s search field) or choose categories (`?categoryIds=5`, a
  * category page's «бүх бараа»).
  */
@@ -94,7 +94,8 @@ export default function ShopScreen() {
   const set = (patch: Partial<ShopFilters>) => {
     if (filters !== null) setFilters({ ...filters, ...patch });
   };
-  const add = useAddOne();
+  const host = useCartHost(server);
+  const { mode, setMode } = host;
 
   // A link into the shop is spent once used, so a later one works again. The search is focused at
   // once; the categories wait for the stored filters, then replace only their categories.
@@ -252,6 +253,19 @@ export default function ShopScreen() {
           </Pressable>
         </View>
       </StoreHeader>
+      <View style={styles.modeRow}>
+        <Segmented
+          small
+          height={32}
+          label={t('mobile.shop.modeLabel')}
+          options={[
+            { value: 'normal', label: t('mobile.shop.modeNormal') },
+            { value: 'easy', label: t('mobile.shop.modeEasy') },
+          ]}
+          value={mode}
+          onChange={setMode}
+        />
+      </View>
       <FlatList
         ref={list}
         onScroll={(event) => setScrolled(event.nativeEvent.contentOffset.y > 600)}
@@ -272,7 +286,7 @@ export default function ShopScreen() {
             line={lineOf(cart, item.id)}
             locked={pending !== null}
             onOpen={() => router.push(`/product/${item.id}`)}
-            onAdd={() => add(item)}
+            {...host.cardProps(item)}
             width={cardWidth}
           />
         )}
@@ -317,6 +331,7 @@ export default function ShopScreen() {
           style={[styles.top, { bottom: inset + spacing.md }]}
         />
       ) : null}
+      {host.sheet}
       <SortSheet
         visible={sheet === 'sort'}
         options={sorts}
@@ -343,6 +358,7 @@ export default function ShopScreen() {
 }
 
 const styles = StyleSheet.create({
+  modeRow: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   grow: { flex: 1, minWidth: 0 },
   pressed: { opacity: 0.6 },
   list: { paddingHorizontal: spacing.lg },

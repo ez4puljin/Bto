@@ -9,7 +9,7 @@ import { lineOf } from '../../../src/cart/cart';
 import { BannerCarousel, SectionRow, SubcategoryTile } from '../../../src/customer/home-parts';
 import { sectionRouteOf } from '../../../src/customer/home-sections';
 import { formatCount } from '../../../src/format/format';
-import { useAddOne } from '../../../src/shop/use-add';
+import { useCartHost } from '../../../src/shop/list-qty-sheet';
 import { useSignedIn } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
 import { colors, spacing } from '../../../src/theme/tokens';
@@ -35,7 +35,7 @@ export default function RepCategoryScreen() {
   const page = useRepCategoryPage(id);
   const { server } = useSignedIn();
   const { cart, pending } = useShop();
-  const add = useAddOne();
+  const host = useCartHost(server);
   const [refreshing, setRefreshing] = useState(false);
   const data = page.data;
   const problem = page.error ? problemFrom(page.error) : null;
@@ -103,7 +103,7 @@ export default function RepCategoryScreen() {
                     line={lineOf(cart, product.id)}
                     locked={pending !== null}
                     onOpen={() => router.push(`/product/${product.id}`)}
-                    onAdd={() => add(product)}
+                    {...host.cardProps(product)}
                     {...size}
                   />
                 )}
@@ -130,6 +130,7 @@ export default function RepCategoryScreen() {
           <ProblemText problem={problem} style={styles.problem} />
         ) : null}
       </ScrollView>
+      {host.sheet}
     </Page>
   );
 }

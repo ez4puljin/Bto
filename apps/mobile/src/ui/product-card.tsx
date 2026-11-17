@@ -8,7 +8,7 @@ import { cardPriceOf } from '../customer/deals';
 import { formatMnt, formatQty } from '../format/format';
 import { cardPictures } from '../images/pictures';
 import { type UnitWords, useUnitWords } from '../shop/unit-words';
-import { baseUnitOf, packOf, type UnitLike } from '../shop/units';
+import { baseUnitOf, knownUnit, packOf, type UnitLike } from '../shop/units';
 import { colors } from '../theme/tokens';
 
 /** «хайрцагт 6» (or «1 уут = 10 ш» without word forms); null without a pack. */
@@ -85,6 +85,7 @@ export function ProductCard({
   locked,
   onOpen,
   onAdd,
+  onEdit,
   width,
   pictureHeight,
 }: {
@@ -96,6 +97,11 @@ export function ProductCard({
   locked: boolean;
   onOpen: () => void;
   onAdd: () => void;
+  /**
+   * «Хялбар горим»: the quantity sheet of the list. With it a line in the cart reads as «120ш» and
+   * the quantity opens the sheet; without it the quantity opens the product.
+   */
+  onEdit?: () => void;
   /** A row's card (164 on the home); a grid's fills its column. */
   width?: number;
   pictureHeight?: number;
@@ -107,6 +113,9 @@ export function ProductCard({
   const money = (amount: string) => t('pricing.money', { amount: formatMnt(amount) });
   const stock = useStockLine()(product);
   const pack = packTextOf(product.units, words, t);
+  // «120ш», «20ха»: the quantity beside a very short unit (a unit the app has no word for keeps its name).
+  const known = line ? knownUnit(line.uomCode) : null;
+  const badge: string = line ? (known ? t(`mobile.units.${known}.badge`) : line.uomName) : '';
   return (
     <StoreCardFrame
       name={product.name}
@@ -147,13 +156,13 @@ export function ProductCard({
       action={
         locked ? null : line ? (
           <CardQty
-            text={`${line.qty} ${words(line).short}`}
+            text={onEdit ? `${line.qty}${badge}` : `${line.qty} ${words(line).short}`}
             label={t('mobile.shop.inCart', {
               name: product.name,
               qty: line.qty,
               unit: words(line).name,
             })}
-            onPress={onOpen}
+            onPress={onEdit ?? onOpen}
           />
         ) : (
           <CardAdd name={product.name} onPress={onAdd} />

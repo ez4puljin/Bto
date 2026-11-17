@@ -18,7 +18,7 @@ import { problemFrom } from '../../../src/api/problem';
 import { useProductsOf } from '../../../src/api/rep';
 import { lineOf } from '../../../src/cart/cart';
 import { useNoticeEyebrow } from '../../../src/notifications/kinds';
-import { useAddOne } from '../../../src/shop/use-add';
+import { useCartHost } from '../../../src/shop/list-qty-sheet';
 import { useSignedIn } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
 import { colors, spacing, type } from '../../../src/theme/tokens';
@@ -51,7 +51,7 @@ export default function NoticeScreen() {
   const noticeId = Number.parseInt(id ?? '', 10);
   const { server } = useSignedIn();
   const { cart, pending } = useShop();
-  const add = useAddOne();
+  const host = useCartHost(server);
   const summary = useNotificationSummary();
   const { mutate: markRead } = useMarkRead();
   const eyebrow = useNoticeEyebrow();
@@ -153,7 +153,7 @@ export default function NoticeScreen() {
                     line={lineOf(cart, product.id)}
                     locked={pending !== null}
                     onOpen={() => router.push(`/product/${product.id}`)}
-                    onAdd={() => add(product)}
+                    {...host.cardProps(product)}
                     width={cardWidth}
                   />
                 ))}
@@ -162,6 +162,7 @@ export default function NoticeScreen() {
           ) : null}
         </ScrollView>
       ) : null}
+      {host.sheet}
     </Page>
   );
 }

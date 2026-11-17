@@ -47,7 +47,7 @@ import { formatMillions, formatMnt } from '../../../src/format/format';
 import { allOrdered, countsOf } from '../../../src/map/stores';
 import { shortMoney } from '../../../src/orders/amounts';
 import { SectionHeading, SIDE } from '../../../src/shop/section-heading';
-import { useAddOne } from '../../../src/shop/use-add';
+import { useCartHost } from '../../../src/shop/list-qty-sheet';
 import { mayPick, mayRequestTransfers } from '../../../src/state/phase';
 import { effectiveStage, placeOf } from '../../../src/state/placement';
 import { useSignedIn } from '../../../src/state/session';
@@ -100,7 +100,7 @@ export default function HomeScreen() {
   const orders = useOrders(today ? { ...presetRange('month', today), q: '' } : null);
   const home = useRepHome();
   const sectionText = useSectionText();
-  const add = useAddOne();
+  const host = useCartHost(server);
   const [refreshing, setRefreshing] = useState(false);
 
   // A stage the rep may no longer use is dropped; the default (or the only one) is taken.
@@ -439,7 +439,7 @@ export default function HomeScreen() {
                 line={lineOf(cart, product.id)}
                 locked={pending !== null}
                 onOpen={() => router.push(`/product/${product.id}`)}
-                onAdd={() => add(product)}
+                {...host.cardProps(product)}
                 {...size}
               />
             )}
@@ -565,6 +565,7 @@ export default function HomeScreen() {
           <ProblemText problem={problemFrom(orders.error)} style={[styles.side, styles.problem]} />
         ) : null}
       </ScrollView>
+      {host.sheet}
     </Page>
   );
 }
