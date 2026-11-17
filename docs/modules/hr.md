@@ -55,6 +55,7 @@ Nobody imports hr; the composition root mounts `HrHttpModule`.
 Refusals: `ATTENDANCE_NO_SITE` 409, `ATTENDANCE_OUT_OF_RANGE` 409 (`site`, `distanceM`, `radiusM`), `ATTENDANCE_LOCATION_IMPRECISE` 422 (`accuracyM`), `ATTENDANCE_ALREADY_IN` 409 (`at`), `ATTENDANCE_NOT_IN` 409, `ATTENDANCE_EVENT_ORDER` 409.
 
 | `GET /hr/me/feed` · `GET /hr/me/messages` · `POST /hr/me/messages/read` · `GET /hr/me/polls` · `POST /hr/me/polls/:id/answers` · `PUT /hr/me/mood` · `GET`/`POST /hr/me/feedback` · `GET`/`POST /hr/me/locations` · `GET`/`PUT /hr/me/profile` · `PUT /hr/me/photo` (an `hr.employee_photo` the caller uploaded, ADR-0209) · `GET /hr/calendar` · `GET`/`POST /hr/thanks` | any signed-in staff | the staff's own side (ADR-0146) |
+| `GET /hr/directory?q=` | any signed-in staff | «Манайхан» in the staff app: the employed colleagues with short name, position, division, phone and photo, nothing private; no email is kept yet |
 | `GET`/`POST /hr/messages`, `POST /hr/messages/:id/withdraw` · `GET`/`POST /hr/polls`, `POST /hr/polls/:id/close` · `GET /hr/moods` · `GET /hr/feedback`, `PUT /hr/feedback/:id` · `GET /hr/location-shares` · `POST`/`PUT`/`DELETE /hr/events` · `PUT /hr/staff/:userId/details` · `GET /hr/insights/{workforce,attendance,requests}` | view to read / manage to write | HR's side and the dashboard (ADR-0146) |
 
 ## 5. Invariants
