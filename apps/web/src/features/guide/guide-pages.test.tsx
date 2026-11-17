@@ -4,7 +4,8 @@ import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it } from 'vitest';
 import { findSidebar, renderApp, signedIn, WORKER_ME } from '@/test/render-app';
 
-const COMMAND = 'irm https://raw.githubusercontent.com/ez4puljin/Bto/main/tools/scan-bridge/install.ps1 | iex';
+const COMMAND =
+  'irm https://raw.githubusercontent.com/ez4puljin/Bto/main/tools/scan-bridge/install.ps1 | iex';
 
 describe('the guide', () => {
   it('is in the menu for a person without rights', async () => {
@@ -19,7 +20,9 @@ describe('the guide', () => {
     for (const name of Object.values(mn.guide.categories)) {
       expect(screen.getByRole('heading', { name })).toBeTruthy();
     }
-    const list = screen.getAllByRole('link').filter((link) => link.getAttribute('href')?.split('/').length === 4);
+    const list = screen
+      .getAllByRole('link')
+      .filter((link) => link.getAttribute('href')?.split('/').length === 4);
     expect(list.filter((link) => link.getAttribute('href')?.startsWith('/guide/'))).toHaveLength(7);
   });
 
@@ -50,12 +53,16 @@ describe('the guide', () => {
     expect(screen.getByText(mn.guide.sameCategory)).toBeTruthy();
 
     await user.click(screen.getByRole('link', { name: 'Падааныг scanner-аар оруулах' }));
-    expect(await screen.findByRole('heading', { name: /Падааныг scanner-аар/, level: 1 })).toBeTruthy();
+    expect(
+      await screen.findByRole('heading', { name: /Падааныг scanner-аар/, level: 1 }),
+    ).toBeTruthy();
   });
 
   it('says so for an address that names no article', async () => {
     renderApp('/guide/setup/nothing-here', signedIn(WORKER_ME));
     expect(await screen.findByText(mn.guide.notFound)).toBeTruthy();
-    expect(screen.getByRole('link', { name: mn.guide.backToGuide }).getAttribute('href')).toBe('/guide');
+    expect(screen.getByRole('link', { name: mn.guide.backToGuide }).getAttribute('href')).toBe(
+      '/guide',
+    );
   });
 });

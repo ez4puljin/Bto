@@ -48,7 +48,11 @@ function TerminalPillBody(props: {
         text: t('posKiosk.terminal.checking'),
       }
     : ready
-      ? { tone: 'bg-success-soft text-success', dot: 'bg-success', text: t('posKiosk.terminal.ready') }
+      ? {
+          tone: 'bg-success-soft text-success',
+          dot: 'bg-success',
+          text: t('posKiosk.terminal.ready'),
+        }
       : {
           tone: 'bg-warning-soft text-warning',
           dot: 'bg-warning',

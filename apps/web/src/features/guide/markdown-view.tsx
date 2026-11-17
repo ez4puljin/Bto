@@ -27,7 +27,10 @@ function InlineView({ pieces }: { pieces: readonly Inline[] }): ReactNode {
         );
       case 'code':
         return (
-          <code key={key} className="rounded bg-fill px-1 py-0.5 font-mono text-[0.85em] break-words">
+          <code
+            key={key}
+            className="rounded bg-fill px-1 py-0.5 font-mono text-[0.85em] break-words"
+          >
             {piece.text}
           </code>
         );

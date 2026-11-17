@@ -517,7 +517,9 @@ describe('kiosk: a card type that drives the bank terminal (ADR-0208)', () => {
     state.ready = true;
     await user.click(within(panel).getByRole('button', { name: k.terminal.recheck }));
     await within(panel).findByText(
-      k.terminal.info.replace('{{name}}', INFO.terminalName ?? '').replace('{{port}}', INFO.port ?? '—'),
+      k.terminal.info
+        .replace('{{name}}', INFO.terminalName ?? '')
+        .replace('{{port}}', INFO.port ?? '—'),
     );
     await user.keyboard('{Escape}');
     expect(await screen.findByRole('button', { name: pill(k.terminal.ready) })).toBeInTheDocument();

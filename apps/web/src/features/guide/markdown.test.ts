@@ -77,7 +77,9 @@ describe('guide markdown', () => {
   });
 
   it('keeps unknown syntax as text', () => {
-    expect(parseInline('a **open and `tick')).toEqual([{ kind: 'text', text: 'a **open and `tick' }]);
+    expect(parseInline('a **open and `tick')).toEqual([
+      { kind: 'text', text: 'a **open and `tick' },
+    ]);
     expect(plainText(parseInline('<b>x</b> *y*'))).toBe('<b>x</b> *y*');
     const [block] = parseMarkdown('#### deep');
     expect(block?.kind === 'paragraph' && plainText(block.inline)).toBe('#### deep');

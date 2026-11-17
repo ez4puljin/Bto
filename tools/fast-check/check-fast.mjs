@@ -14,9 +14,11 @@
 //   apps/api/**      tsc -p apps/api/tsconfig.json --noEmit --incremental
 //   mn.json, web or mobile sources   tools/fast-check/i18n-keys.mjs (every named key exists)
 //   changed sources  eslint on those files only; the unit tests beside them (a.tsx → a.test.tsx)
+//   any changed file prettier --check --ignore-unknown on those files (.prettierignore applies),
+//                    the second step of CI's `pnpm check`
 // The compilers' memory lives in .fastcheck/ (gitignored, one per checkout).
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -75,7 +77,8 @@ const changed = [
 ];
 const under = (prefix) => changed.filter((file) => file.startsWith(prefix));
 const SOURCE = /\.(ts|tsx|mts|cts|js|mjs|cjs)$/;
-const sources = changed.filter((file) => SOURCE.test(file) && existsSync(join(root, file)));
+const present = changed.filter((file) => existsSync(join(root, file)));
+const sources = present.filter((file) => SOURCE.test(file));
 
 // The translations are read by the web and the staff app only: a new key is not a change of a package.
 const MN = 'packages/shared/i18n/mn.json';
@@ -140,6 +143,17 @@ if (sources.length > 0) {
     '0',
     '--no-warn-ignored',
     ...sources,
+  ]);
+}
+if (present.length > 0) {
+  // Every changed file of a kind Prettier knows: CI's `prettier --check .` fails on one otherwise.
+  const manifest = inPackage('.', 'prettier', 'package.json');
+  const { bin } = JSON.parse(readFileSync(manifest, 'utf8'));
+  add('prettier (changed files)', '.', [
+    join(dirname(manifest), typeof bin === 'string' ? bin : bin.prettier),
+    '--check',
+    '--ignore-unknown',
+    ...present,
   ]);
 }
 if (TESTS) {

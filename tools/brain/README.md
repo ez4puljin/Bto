@@ -56,6 +56,7 @@ each compiler remembering its last run (`.fastcheck/`, gitignored):
 | `apps/mobile/**` or `mn.json` | staff app types, the key scan, eslint, tests beside |
 | `apps/api/**` | api types (incremental), eslint, the specs beside |
 | `packages/**` | the packages are rebuilt, then every step above |
+| any file | Prettier checks every changed file of a kind it knows (`.prettierignore` applies), as CI's `prettier --check .` does |
 
 Measured on this PC on 2026-11-17: a page edit 29 s, a page edit with a new translation key about
 80 s (the helpers that type menu and form keys from `mn.json` are rechecked), nothing changed 18 s;

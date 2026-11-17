@@ -76,7 +76,11 @@ export function GuidePage() {
           </ListCard>
         ) : (
           groups.map((group) => (
-            <CategoryCard key={group.category} category={group.category} articles={group.articles} />
+            <CategoryCard
+              key={group.category}
+              category={group.category}
+              articles={group.articles}
+            />
           ))
         )}
       </div>
@@ -116,7 +120,11 @@ export function GuideArticlePage() {
         title={article.title}
         crumbs={[
           { label: t('guide.title'), to: '/guide' },
-          { label: isGuideCategory(article.category) ? t(`guide.categories.${article.category}`) : article.category },
+          {
+            label: isGuideCategory(article.category)
+              ? t(`guide.categories.${article.category}`)
+              : article.category,
+          },
         ]}
       />
       <div className="flex flex-col gap-6">
