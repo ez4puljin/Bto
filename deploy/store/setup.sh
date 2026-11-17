@@ -91,7 +91,8 @@ PORT=${PORT:-80}
 
 FREE_GB=$(df -BG --output=avail . | tail -n 1 | tr -dc '0-9')
 if [ "${FREE_GB:-0}" -lt 15 ]; then
-  echo "АНХААР: дискний сул зай ${FREE_GB} GB. Эхлээд: bash deploy/store/housekeeping.sh" >&2
+  echo "АНХААР: дискний сул зай ${FREE_GB} GB тул бүтээхээс өмнө цэвэрлэж байна" >&2
+  bash deploy/store/housekeeping.sh --quiet || true
 fi
 
 APP_VERSION=$(git rev-parse --short HEAD 2>/dev/null || echo local)
@@ -120,6 +121,8 @@ if [ "$ONLY_WEB" = "yes" ]; then
   echo "== Вэбийн хаалгыг солиж байна (1 секунд орчим)"
   "${COMPOSE[@]}" up -d --no-deps --wait --timeout 2 web
   record_deployed "$APP_VERSION"
+  # What this update replaced is left behind without a tag (ADR-0211).
+  bash deploy/store/housekeeping.sh --quiet || true
   echo "Бэлэн: вэб хуудас $APP_VERSION. Api өмнөх хувилбараараа ажиллаж байна."
   exit 0
 fi
@@ -174,8 +177,9 @@ if command -v systemctl >/dev/null 2>&1 && [ "$(id -u)" != "0" ]; then
     echo "Харуулын timer суусангүй. Гараар:  bash deploy/store/install-watch-timer.sh"
 fi
 
-# Old build cache is the one thing on this disk that only grows.
-"${DOCKER[@]}" builder prune -f --filter until=168h >/dev/null 2>&1 || true
+# Every update leaves the images it replaced and their build cache behind (ADR-0211): they go
+# now, and the images kept as the way back stay.
+bash deploy/store/housekeeping.sh --quiet || true
 
 IP=$(hostname -I 2>/dev/null | awk '{print $1}' || true)
 SUFFIX=""

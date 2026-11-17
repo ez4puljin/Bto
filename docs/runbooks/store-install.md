@@ -27,7 +27,7 @@ E="docker compose -f deploy/edge/docker-compose.edge.yml --env-file deploy/edge/
 1. **A fixed address** for the box: a DHCP reservation on the router for `192.168.1.152`. Every till, phone and office PC keeps this address.
 2. **The same commit on both sides.** On the owner's PC the main checkout is on the latest `main`, its dev database migrated (`pnpm db:migrate`). On the box: `cd ~/bto && git pull`. The file `deploy/edge/..env.swp` there is an editor's leftover: leave it alone.
 3. **Outside opening hours.** The first build takes 10–20 minutes and most of the box's memory.
-4. **Free disk:** `df -h /` shows more than 30 GB. Otherwise `bash deploy/store/housekeeping.sh` first (the old build cache is about 40 GB).
+4. **Free disk:** `df -h /` shows more than 30 GB. Otherwise `bash deploy/store/housekeeping.sh` first, which shows what fills the disk.
 
 ## 2. Install the centre
 
@@ -125,7 +125,7 @@ sudo bash deploy/store/restore-drill.sh
 
 `DRILL OK` is the proof; `FEWER` or `MISSING` lines name the tables that are not whole.
 
-**Disk housekeeping:** `bash deploy/store/housekeeping.sh` after an update when `df -h /` is under 30 GB (the backup prunes the build cache every Sunday by itself). It never touches a volume.
+**Disk housekeeping** (ADR-0211) is done by itself: every update ends with `housekeeping.sh --quiet`, and the nightly backup runs it too. It removes the images an update replaced (those without a tag; the running ones and `:store-previous`, the way back, stay) and holds Docker's build cache to `STORE_BUILD_CACHE_GB` (10 GB), the least recently used going first. It never touches a volume. By hand, `bash deploy/store/housekeeping.sh` shows the disk before and after. The watchman tells the owner's Telegram when the disk is 85 % full (`STORE_ALERT_DISK_PERCENT`).
 
 ## 5. Move the edge to the new centre
 

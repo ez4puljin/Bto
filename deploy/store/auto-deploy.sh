@@ -15,6 +15,8 @@
 # rollback.sh to the version before. rollback.sh refuses when a migration stands between them: then the
 # red version stays until a fix is pushed, and the log says so (the owner's choice, ADR-0206).
 # Each update writes a log with the time of every line, so the slow step can be seen.
+# Every update ends by removing the images it replaced and the build cache above its limit
+# (housekeeping.sh, ADR-0211): the disk does not grow with the number of updates.
 #
 #   bash deploy/store/auto-deploy.sh            one round (what the timer runs)
 #   bash deploy/store/auto-deploy.sh --check    what a round would do now, without doing it
@@ -233,6 +235,8 @@ git merge --ff-only -q "$TARGET"
 SETUP=(bash deploy/store/setup.sh)
 if [ "$PLAN" = web ]; then SETUP+=(--only-web); fi
 if ! "${SETUP[@]}" 2>&1 | stamp >"$RUN"; then
+  # setup.sh cleans up at its end (ADR-0211); a build that stopped half-way left its cache too.
+  bash deploy/store/housekeeping.sh --quiet 2>&1 | stamp >>"$RUN" || true
   say "$SHORT: төв систем ТАВИГДСАНГҮЙ ($(($(date +%s) - started)) сек): runs/$SHORT.log"
   exit 0
 fi

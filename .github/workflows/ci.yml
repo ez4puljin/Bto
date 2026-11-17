@@ -110,3 +110,5 @@ jobs:
           bash deploy/store/deploy-lib.test.sh
           # What a round of the automatic update decides (ADR-0204): docs, deploy, wait, refuse.
           bash deploy/store/auto-deploy.test.sh
+          # What the housekeeping asks of Docker (ADR-0211): untagged images, the cache by size.
+          bash deploy/store/housekeeping.test.sh

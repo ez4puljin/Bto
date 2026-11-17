@@ -96,14 +96,14 @@ else
   log "WARNING: $USB_NOTE"
 fi
 
+# Every night: what builds outside an update left behind (ADR-0211; every update cleans up itself).
+if [ -z "${BTO_CENTRE_PG:-}" ]; then
+  bash "$REPO/deploy/store/housekeeping.sh" --quiet >/dev/null 2>&1 || true
+fi
+
 FREE_GB=$(df -BG --output=avail "$BACKUP_DIR" | tail -n 1 | tr -dc '0-9')
 DISK_NOTE="disk: ${FREE_GB} GB free"
-if [ "${FREE_GB:-0}" -lt 20 ]; then DISK_NOTE="$DISK_NOTE — LOW, run deploy/store/housekeeping.sh"; fi
-
-# Sunday: the build cache is the one thing on this disk that only grows.
-if [ "$(date +%u)" = "7" ] && [ -z "${BTO_CENTRE_PG:-}" ]; then
-  docker builder prune -f --filter until=168h >/dev/null 2>&1 || true
-fi
+if [ "${FREE_GB:-0}" -lt 20 ]; then DISK_NOTE="$DISK_NOTE — LOW, see what fills it: bash deploy/store/housekeeping.sh"; fi
 
 trap - ERR
 {
