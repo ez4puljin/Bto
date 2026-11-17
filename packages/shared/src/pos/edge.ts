@@ -1137,6 +1137,18 @@ export interface EdgeReceiptLine {
   qty: string;
   unitPrice: string;
   total: string;
+  /**
+   * A sale's line: from how many base units the bulk price applies, as the quote showed it, and
+   * whether the line was charged it; printed for the customer (owner 2026-11-17). Display only:
+   * it prices nothing. Null without an offer; absent on a return and on older receipts.
+   */
+  bulkOffer?: EdgeReceiptBulkOffer | null;
+}
+
+/** The quote's bulk offer of a receipt line (ADR-0207) and whether the line was charged it. */
+export interface EdgeReceiptBulkOffer extends EdgeBulkOffer {
+  /** The line was charged the bulk price (basis RETAIL_BULK). */
+  atBulk: boolean;
 }
 
 export interface EdgeReceipt {

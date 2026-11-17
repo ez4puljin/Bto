@@ -528,4 +528,61 @@ describe('pos edge', () => {
     expect(served.headers['content-type']).toMatch(/^image\//);
     expect((served.body as Buffer).length).toBeGreaterThan(0);
   });
+
+  it('prints the bulk offer on a sale’s receipt lines, changing no amount (owner 2026-11-17)', async () => {
+    // The store's profile: the supermarket +30 %, from 24 pieces +20 %; the warehouse price 1,000.
+    const juice = await store.product('9304', 'Шүүс касс', '1000', '40');
+    expect(await sync.pullOnce()).toBe('changed');
+    const juiceUnit = unitOf(juice, 'PCS').id;
+    await kiosk.post('/shifts/open', { openingFloat: '0' }).expect(200);
+    const hit = (
+      (await kiosk.get('/products/search?q=шүүс касс').expect(200)).body as EdgeProductHit[]
+    )[0]?.units[0];
+    const offer = { fromQtyBase: '24', baseUom: hit?.uomName, bulkPrice: '1200.00' };
+
+    for (const [qty, unitPrice, total, atBulk] of [
+      ['24', '1200.00', '28800.00', true],
+      ['5', '1300.00', '6500.00', false],
+    ] as const) {
+      const lines = [{ productUnitId: juiceUnit, qty }];
+      const quote = (await kiosk.post('/quote', { lines }).expect(200)).body as EdgeQuoteResponse;
+      const receipt = (
+        await sell(lines, [{ kind: 'CASH', amount: total, tendered: total }]).expect(200)
+      ).body.receipt as EdgeReceipt;
+      expect(receipt.lines).toEqual([
+        {
+          name: 'Шүүс касс',
+          uomName: hit?.uomName,
+          qty,
+          unitPrice,
+          total,
+          bulkOffer: { ...offer, atBulk },
+        },
+      ]);
+      // The amounts are the quote's; the stored receipt is the one printed.
+      expect(receipt).toMatchObject({
+        subtotal: quote.subtotal,
+        discountTotal: quote.discountTotal,
+        total: quote.total,
+        vatTotal: quote.vatTotal,
+      });
+      const db = edge.get<EdgeDb>(EDGE_DB);
+      const [stored] = await db
+        .select({ receipt: edgeSales.receipt, doc: edgeSales.doc })
+        .from(edgeSales)
+        .where(eq(edgeSales.clientId, receipt.clientId));
+      expect(stored?.receipt).toEqual(receipt);
+      // The document for the centre carries no offer.
+      expect(stored?.doc).toMatchObject({ total, vatTotal: quote.vatTotal });
+      expect(stored?.doc.lines).toHaveLength(1);
+      expect(stored?.doc.lines[0]).toMatchObject({
+        qty: `${qty}.000`,
+        basis: atBulk ? 'RETAIL_BULK' : 'RETAIL',
+        unitPrice,
+        total,
+      });
+      expect(stored?.doc.lines[0]).not.toHaveProperty('bulkOffer');
+    }
+    expect(await sync.pushOnce()).toMatchObject({ state: 'sent', rejected: 0 });
+  });
 });

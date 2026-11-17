@@ -3,6 +3,7 @@ import {
   defaultReceiptLayout,
   type EdgePrintSecrets,
   type EdgeReceipt,
+  type EdgeReceiptLine,
   fillReceiptText,
   posReceiptBarcode,
   type ReceiptAlign,
@@ -15,6 +16,7 @@ import {
 } from '@tugeel/shared/pos';
 import { businessDate } from '@tugeel/shared/time';
 import { cn } from 'cn';
+import type { TFunction } from 'i18next';
 import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Code128Svg } from '@/lib/barcode/code128-svg';
@@ -171,39 +173,52 @@ function BlockView({ block, info }: { block: ReceiptBlock; info: Facts }) {
     case 'LINES':
       return (
         <ul className="space-y-1.5 py-1.5">
-          {receipt.lines.map((line, index) => (
-            <li key={index}>
-              {block.compact ? (
-                <p className="flex justify-between gap-3">
-                  <span className="min-w-0 font-sans font-medium">
-                    {line.name}
-                    <span className="block font-mono font-normal text-muted-foreground">
-                      {t('posKiosk.receipt.lineQty', {
-                        qty: formatQty(line.qty),
-                        uom: line.uomName,
-                        price: formatMnt(line.unitPrice),
-                      })}
-                    </span>
-                  </span>
-                  <span className="shrink-0">{formatMnt(line.total)}</span>
-                </p>
-              ) : (
-                <>
-                  <p className="font-sans font-medium">{line.name}</p>
+          {receipt.lines.map((line, index) => {
+            const note = info.refund ? null : bulkNote(t, line);
+            return (
+              <li key={index}>
+                {block.compact ? (
                   <p className="flex justify-between gap-3">
-                    <span className="text-muted-foreground">
-                      {t('posKiosk.receipt.lineQty', {
-                        qty: formatQty(line.qty),
-                        uom: line.uomName,
-                        price: formatMnt(line.unitPrice),
-                      })}
+                    <span className="min-w-0 font-sans font-medium">
+                      {line.name}
+                      <span className="block font-mono font-normal text-muted-foreground">
+                        {t('posKiosk.receipt.lineQty', {
+                          qty: formatQty(line.qty),
+                          uom: line.uomName,
+                          price: formatMnt(line.unitPrice),
+                        })}
+                      </span>
+                      {note ? (
+                        <span className="block text-[0.9em] font-normal break-words text-muted-foreground">
+                          {note}
+                        </span>
+                      ) : null}
                     </span>
-                    <span>{formatMnt(line.total)}</span>
+                    <span className="shrink-0">{formatMnt(line.total)}</span>
                   </p>
-                </>
-              )}
-            </li>
-          ))}
+                ) : (
+                  <>
+                    <p className="font-sans font-medium">{line.name}</p>
+                    <p className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">
+                        {t('posKiosk.receipt.lineQty', {
+                          qty: formatQty(line.qty),
+                          uom: line.uomName,
+                          price: formatMnt(line.unitPrice),
+                        })}
+                      </span>
+                      <span>{formatMnt(line.total)}</span>
+                    </p>
+                    {note ? (
+                      <p className="font-sans text-[0.9em] break-words text-muted-foreground">
+                        {note}
+                      </p>
+                    ) : null}
+                  </>
+                )}
+              </li>
+            );
+          })}
         </ul>
       );
     case 'TOTALS': {
@@ -342,6 +357,20 @@ function BlockView({ block, info }: { block: ReceiptBlock; info: Facts }) {
     case 'SPACE':
       return <div aria-hidden className={SPACE[block.size]} />;
   }
+}
+
+/**
+ * From how many base units the bulk price applies (owner 2026-11-17, ADR-0207): «Бөөний үнэ · 6
+ * ш-ээс дээш» under a line charged it, «6 ш-ээс бөөний 18,010₮» under one below it; nothing on a
+ * line without an offer or one stored before it.
+ */
+function bulkNote(t: TFunction, line: EdgeReceiptLine): string | null {
+  const offer = line.bulkOffer ?? null;
+  if (!offer) return null;
+  const from = { qty: formatQty(offer.fromQtyBase), uom: offer.baseUom };
+  return offer.atBulk
+    ? t('posKiosk.receipt.bulkApplied', from)
+    : t('posKiosk.sale.bulkOffer', { ...from, price: formatTugrik(offer.bulkPrice) });
 }
 
 /** The heading: the title, the seller, its TIN on a real receipt, and every banner that applies. */

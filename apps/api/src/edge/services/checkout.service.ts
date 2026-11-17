@@ -281,6 +281,11 @@ export class CheckoutService {
       (productId) => this.vatRate(loaded, productId),
       lineVat,
     );
+    // The quote's bulk offer of each document line (one per priced part, as `saleDocLinesOf`
+    // makes them), printed on the receipt only (owner 2026-11-17).
+    const offers = result.lines.flatMap((line) =>
+      line.priced ? line.parts.map((part) => this.bulkOffer(loaded, part.unitId, line.parts)) : [],
+    );
     const totals = saleTotals(lines);
     const tenders = this.tenders(loaded, request, totals.total.minus(taken.paid), taken.wire);
     if (tenders.credit.gt(0) && taken.paid.gt(0)) {
@@ -393,14 +398,16 @@ export class CheckoutService {
         tillCode,
         cashierName: cashier.fullName,
         companyName: loaded.snapshot.company.name,
-        lines: lines.map((line) => {
+        lines: lines.map((line, index) => {
           const found = loaded.units.get(line.productUnitId);
+          const offer = offers[index] ?? null;
           return {
             name: found?.product.name ?? '',
             uomName: found?.unit.uomName ?? '',
             qty: new Decimal(line.qty).toString(),
             unitPrice: line.unitPrice,
             total: line.total,
+            bulkOffer: offer ? { ...offer, atBulk: line.basis === 'RETAIL_BULK' } : null,
           };
         }),
         subtotal: doc.subtotal,
