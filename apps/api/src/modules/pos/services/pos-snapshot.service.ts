@@ -207,6 +207,14 @@ export class PosSnapshotService {
           retailBulkMinQty: profile.retailBulkMinQty?.toString() ?? null,
           retailBulkMarkupPct: profile.retailBulkMarkupPct?.toString() ?? null,
           rounding: profile.rounding,
+          ...(profile.retailMarkupAmount && !profile.retailMarkupAmount.isZero()
+            ? { retailMarkupAmount: profile.retailMarkupAmount.toString() }
+            : {}),
+          ...(profile.retailBulkDiscountPct
+            ? { retailBulkDiscountPct: profile.retailBulkDiscountPct.toString() }
+            : {}),
+          ...(profile.retailRounding ? { retailRounding: profile.retailRounding } : {}),
+          ...(profile.retailBulkRounding ? { retailBulkRounding: profile.retailBulkRounding } : {}),
         })),
       programs,
       quickGroups: await this.quickButtons.forSnapshot(),

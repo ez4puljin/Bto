@@ -288,6 +288,11 @@ export interface SnapshotProfile {
   retailBulkMinQty: string | null;
   retailBulkMarkupPct: string | null;
   rounding: PriceRounding;
+  /** ADR-0207: present only when a profile uses them, so other snapshots keep their version. */
+  retailMarkupAmount?: string;
+  retailBulkDiscountPct?: string;
+  retailRounding?: PriceRounding;
+  retailBulkRounding?: PriceRounding;
 }
 
 export interface SnapshotProgram {
@@ -536,6 +541,13 @@ export function quoteContextOf(snapshot: PosSnapshot): {
                     ? null
                     : new Decimal(profile.retailBulkMarkupPct),
                 rounding: profile.rounding,
+                retailMarkupAmount: new Decimal(profile.retailMarkupAmount ?? 0),
+                retailBulkDiscountPct:
+                  profile.retailBulkDiscountPct === undefined
+                    ? null
+                    : new Decimal(profile.retailBulkDiscountPct),
+                retailRounding: profile.retailRounding ?? null,
+                retailBulkRounding: profile.retailBulkRounding ?? null,
               },
             }
           : null,

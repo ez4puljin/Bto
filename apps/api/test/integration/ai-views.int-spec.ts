@@ -2,6 +2,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Client } from 'pg';
 import request from 'supertest';
 import { addDays, businessDate } from '@tugeel/shared/time';
+import { PRICE_ROUNDINGS } from '@tugeel/shared/pricing';
 import { AI_DATASETS, type AiColumnType } from '../../src/modules/ai/semantic/datasets';
 import { connectAs, createHttpApp, sqlStateOf } from '../harness/apps';
 import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
@@ -162,7 +163,7 @@ describe('AI views (ADR-0045)', () => {
     await pricing.terms(cola.id, '1000', await pricing.profile('Ундаа'), box);
     // 5 %, 12.5 % and 7.5 % of 1,010 and 1,234 end in half tugriks: every rounding is exercised.
     let sku = 20;
-    for (const rounding of ['WHOLE', 'UP_10', 'UP_50', 'UP_100']) {
+    for (const rounding of PRICE_ROUNDINGS) {
       const profile = await pricing.profile(`Тоймлолт ${rounding}`, {
         looseMarkupPct: '5',
         retailMarkupPct: '12.5',
@@ -181,6 +182,29 @@ describe('AI views (ADR-0045)', () => {
         await pricing.terms(item.id, price, profile, box);
         priced.push(item);
       }
+    }
+    // ADR-0207: an amount, a rounding per price and the bulk price off the supermarket price.
+    const erxes = await pricing.profile('Erxes шиг', {
+      looseMarkupPct: '0',
+      retailMarkupPct: '11',
+      retailMarkupAmount: '70',
+      retailBulkMarkupPct: null,
+      retailBulkDiscountPct: '4.76',
+      rounding: 'UP_50',
+      retailRounding: 'DOWN_10',
+      retailBulkRounding: 'UP_100',
+    });
+    for (const price of ['1234', '3340']) {
+      sku += 1;
+      const item = await catalog.product({
+        sku: String(sku),
+        name: `Тоймлолт ${sku}`,
+        categoryId: drinks,
+        baseUomId: pcs,
+        units: [{ uomId: box, factorToBase: '24' }],
+      });
+      await pricing.terms(item.id, price, erxes, box);
+      priced.push(item);
     }
 
     const program = async (name: string, validFrom: string) =>
@@ -326,6 +350,9 @@ describe('AI views (ADR-0045)', () => {
         WHERE warehouse_price = 1010 ORDER BY loose_price, rounding`,
     );
     expect(loose.rows.map((row) => `${row.rounding} ${row.loose}`)).toEqual([
+      'DOWN_100 1000.00',
+      'DOWN_50 1050.00',
+      'DOWN_10 1060.00',
       'WHOLE 1061.00',
       'UP_10 1070.00',
       'UP_100 1100.00',

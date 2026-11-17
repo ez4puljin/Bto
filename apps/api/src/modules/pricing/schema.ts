@@ -87,10 +87,20 @@ export const priceProfileVersions = pgTable(
       .references(() => priceProfiles.id),
     looseMarkupPct: percent('loose_markup_pct').notNull(),
     retailMarkupPct: percent('retail_markup_pct').notNull(),
-    /** Base units of a product in a supermarket cart from which the bulk markup applies. */
+    /** Whole tugriks added at the supermarket after the percentage (ADR-0207). */
+    retailMarkupAmount: money('retail_markup_amount')
+      .notNull()
+      .default(sql`0`),
+    /** Base units of a product in a supermarket cart from which the bulk price applies. */
     retailBulkMinQty: qty('retail_bulk_min_qty'),
     retailBulkMarkupPct: percent('retail_bulk_markup_pct'),
+    /** The bulk price as a percentage off the supermarket price, in place of the markup. */
+    retailBulkDiscountPct: percent('retail_bulk_discount_pct'),
     rounding: text('rounding', { enum: PRICE_ROUNDINGS }).notNull(),
+    /** The supermarket price's own rounding; null: `rounding` (ADR-0207). */
+    retailRounding: text('retail_rounding', { enum: PRICE_ROUNDINGS }),
+    /** The bulk price's own rounding; null: the supermarket price's (ADR-0207). */
+    retailBulkRounding: text('retail_bulk_rounding', { enum: PRICE_ROUNDINGS }),
     validFrom: date('valid_from', { mode: 'string' }).notNull(),
     validTo: date('valid_to', { mode: 'string' }),
     createdBy: userRef('created_by'),
@@ -99,16 +109,31 @@ export const priceProfileVersions = pgTable(
   (t) => [
     index('price_profile_versions_profile_idx').on(t.profileId, t.validFrom),
     check('price_profile_versions_rounding', inList(t.rounding, PRICE_ROUNDINGS)),
+    check(
+      'price_profile_versions_retail_rounding',
+      sql`${t.retailRounding} IS NULL OR ${inList(t.retailRounding, PRICE_ROUNDINGS)}`,
+    ),
+    check(
+      'price_profile_versions_bulk_rounding',
+      sql`${t.retailBulkRounding} IS NULL OR (${t.retailBulkMinQty} IS NOT NULL
+        AND ${inList(t.retailBulkRounding, PRICE_ROUNDINGS)})`,
+    ),
     // The same rules as priceProfileIssue() in @tugeel/shared/pricing.
     check(
       'price_profile_versions_markups',
-      sql`${t.looseMarkupPct} >= 0 AND ${t.retailMarkupPct} >= 0`,
+      sql`${t.looseMarkupPct} >= 0 AND ${t.retailMarkupPct} >= 0
+        AND ${t.retailMarkupAmount} >= 0 AND ${t.retailMarkupAmount} = trunc(${t.retailMarkupAmount})`,
     ),
     check(
       'price_profile_versions_bulk',
-      sql`(${t.retailBulkMinQty} IS NULL) = (${t.retailBulkMarkupPct} IS NULL)
-        AND (${t.retailBulkMinQty} IS NULL OR (${t.retailBulkMinQty} > 0
-          AND ${t.retailBulkMarkupPct} >= 0 AND ${t.retailBulkMarkupPct} < ${t.retailMarkupPct}))`,
+      sql`(${t.retailBulkMinQty} IS NULL)
+          = (${t.retailBulkMarkupPct} IS NULL AND ${t.retailBulkDiscountPct} IS NULL)
+        AND (${t.retailBulkMarkupPct} IS NULL OR ${t.retailBulkDiscountPct} IS NULL)
+        AND (${t.retailBulkMinQty} IS NULL OR ${t.retailBulkMinQty} > 0)
+        AND (${t.retailBulkMarkupPct} IS NULL OR (${t.retailBulkMarkupPct} >= 0
+          AND ${t.retailBulkMarkupPct} < ${t.retailMarkupPct}))
+        AND (${t.retailBulkDiscountPct} IS NULL OR (${t.retailBulkDiscountPct} > 0
+          AND ${t.retailBulkDiscountPct} < 100))`,
     ),
     check(
       'price_profile_versions_validity',

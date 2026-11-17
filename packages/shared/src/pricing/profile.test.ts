@@ -116,6 +116,101 @@ describe('profile values', () => {
     });
     expect(priceProfileIssue(profile({ retailBulkMarkupPct: d('29.99') }))).toBeNull();
   });
+
+  it('takes a whole amount, a bulk discount in place of the markup and roundings of its own', () => {
+    const erxes = profile({
+      retailMarkupAmount: d(1000),
+      retailBulkMarkupPct: null,
+      retailBulkDiscountPct: d(9),
+      retailRounding: 'UP_10',
+      retailBulkRounding: 'DOWN_10',
+    });
+    expect(priceProfileIssue(erxes)).toBeNull();
+    expect(priceProfileIssue({ ...erxes, retailMarkupAmount: d('0.5') })).toEqual({
+      issue: 'AMOUNT_RANGE',
+      field: 'retailMarkupAmount',
+    });
+    expect(priceProfileIssue({ ...erxes, retailMarkupAmount: d(-1) })).toEqual({
+      issue: 'AMOUNT_RANGE',
+      field: 'retailMarkupAmount',
+    });
+    expect(priceProfileIssue({ ...erxes, retailBulkMarkupPct: d(5) })).toEqual({
+      issue: 'BULK_PAIR',
+      field: 'retailBulkDiscountPct',
+    });
+    expect(priceProfileIssue({ ...erxes, retailBulkDiscountPct: null })).toEqual({
+      issue: 'BULK_PAIR',
+      field: 'retailBulkMarkupPct',
+    });
+    expect(priceProfileIssue({ ...erxes, retailBulkMinQty: null })).toEqual({
+      issue: 'BULK_PAIR',
+      field: 'retailBulkMinQty',
+    });
+    for (const off of [d(0), d(100), d('1.234')]) {
+      expect(priceProfileIssue({ ...erxes, retailBulkDiscountPct: off })).toEqual({
+        issue: 'BULK_DISCOUNT_RANGE',
+        field: 'retailBulkDiscountPct',
+      });
+    }
+    expect(
+      priceProfileIssue({
+        ...erxes,
+        retailBulkMinQty: null,
+        retailBulkDiscountPct: null,
+      }),
+    ).toEqual({ issue: 'BULK_ROUNDING_WITHOUT_BULK', field: 'retailBulkRounding' });
+  });
+});
+
+describe('prices the way Erxes counted them (ADR-0207)', () => {
+  it('rounds down after rounding up to a whole tugrik, never to nothing', () => {
+    expect(roundPrice(d('3707.4'), 'DOWN_10').toFixed()).toBe('3700');
+    expect(roundPrice(d('3709'), 'DOWN_10').toFixed()).toBe('3700');
+    // 3709.2 is 3710 whole tugriks first, as Erxes counts it.
+    expect(roundPrice(d('3709.2'), 'DOWN_10').toFixed()).toBe('3710');
+    expect(roundPrice(d('1149'), 'DOWN_50').toFixed()).toBe('1100');
+    expect(roundPrice(d('1999'), 'DOWN_100').toFixed()).toBe('1900');
+    expect(roundPrice(d('7.2'), 'DOWN_10').toFixed()).toBe('8');
+  });
+
+  it('derives the supermarket price and the bulk price off it', () => {
+    // «Үндсэн»: +11 % down to 10₮, from 3 pieces 2 % off, down to 10₮ (a real till sale).
+    const main = profile({
+      looseMarkupPct: d(0),
+      retailMarkupPct: d(11),
+      retailBulkMinQty: d(3),
+      retailBulkMarkupPct: null,
+      retailBulkDiscountPct: d(2),
+      rounding: 'UP_50',
+      retailRounding: 'DOWN_10',
+    });
+    const prices = perBasePrices(d(3340), main);
+    expect(prices.loose.toFixed()).toBe('3350');
+    expect(prices.retail.toFixed()).toBe('3700');
+    expect(prices.retailBulk?.toFixed()).toBe('3620');
+    // «Архи»: +10 % up to 10₮, from 2 pieces 9 % off, down to 10₮.
+    const spirits = { ...main, retailMarkupPct: d(10), retailRounding: 'UP_10' as const };
+    const both = perBasePrices(d(2950), {
+      ...spirits,
+      retailBulkMinQty: d(2),
+      retailBulkDiscountPct: d(9),
+      retailBulkRounding: 'DOWN_10',
+    });
+    expect(both.retail.toFixed()).toBe('3250');
+    expect(both.retailBulk?.toFixed()).toBe('2950');
+  });
+
+  it('adds a whole amount after the percentage', () => {
+    const flour = profile({
+      retailMarkupPct: d(0),
+      retailMarkupAmount: d(1000),
+      retailBulkMinQty: null,
+      retailBulkMarkupPct: null,
+      retailRounding: 'DOWN_100',
+    });
+    expect(perBasePrices(d(45250), flour).retail.toFixed()).toBe('46200');
+    expect(perBasePrices(d(45250), flour).loose.toFixed()).toBe('52038');
+  });
 });
 
 describe('the whole unit', () => {

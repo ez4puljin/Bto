@@ -15046,7 +15046,15 @@ export interface components {
             /** @example 20.00 */
             retailBulkMarkupPct: string | null;
             /** @enum {string} */
-            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100";
+            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100";
+            /** @example 0 */
+            retailMarkupAmount: string;
+            /** @example null */
+            retailBulkDiscountPct: string | null;
+            /** @enum {string|null} */
+            retailRounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100" | null;
+            /** @enum {string|null} */
+            retailBulkRounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100" | null;
         };
         ProductPriceProfile: {
             id: number;
@@ -15173,7 +15181,15 @@ export interface components {
             /** @example 20.00 */
             retailBulkMarkupPct: string | null;
             /** @enum {string} */
-            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100";
+            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100";
+            /** @example 0 */
+            retailMarkupAmount: string;
+            /** @example null */
+            retailBulkDiscountPct: string | null;
+            /** @enum {string|null} */
+            retailRounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100" | null;
+            /** @enum {string|null} */
+            retailBulkRounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100" | null;
             id: number;
             /** @example 2026-10-14 */
             validFrom: string;
@@ -15225,7 +15241,27 @@ export interface components {
              */
             retailBulkMarkupPct?: string | null;
             /** @enum {string} */
-            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100";
+            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100";
+            /**
+             * @description Supermarket: whole tugriks added after the percentage (ADR-0207); 0 by default
+             * @example 1000
+             */
+            retailMarkupAmount?: string;
+            /**
+             * @description Supermarket bulk: % off the supermarket price, in place of the markup (ADR-0207)
+             * @example 9
+             */
+            retailBulkDiscountPct?: string | null;
+            /**
+             * @description The supermarket price's rounding; null: rounding (ADR-0207)
+             * @enum {string|null}
+             */
+            retailRounding?: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100" | null;
+            /**
+             * @description The bulk price's rounding; null: the supermarket price's (ADR-0207)
+             * @enum {string|null}
+             */
+            retailBulkRounding?: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100" | null;
             name: string;
             /**
              * @description The first values start this day
@@ -15255,7 +15291,27 @@ export interface components {
              */
             retailBulkMarkupPct?: string | null;
             /** @enum {string} */
-            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100";
+            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100";
+            /**
+             * @description Supermarket: whole tugriks added after the percentage (ADR-0207); 0 by default
+             * @example 1000
+             */
+            retailMarkupAmount?: string;
+            /**
+             * @description Supermarket bulk: % off the supermarket price, in place of the markup (ADR-0207)
+             * @example 9
+             */
+            retailBulkDiscountPct?: string | null;
+            /**
+             * @description The supermarket price's rounding; null: rounding (ADR-0207)
+             * @enum {string|null}
+             */
+            retailRounding?: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100" | null;
+            /**
+             * @description The bulk price's rounding; null: the supermarket price's (ADR-0207)
+             * @enum {string|null}
+             */
+            retailBulkRounding?: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100" | null;
             /**
              * @description Today or later (Ulaanbaatar)
              * @example 2026-10-15
@@ -15287,7 +15343,27 @@ export interface components {
              */
             retailBulkMarkupPct?: string | null;
             /** @enum {string} */
-            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100";
+            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100";
+            /**
+             * @description Supermarket: whole tugriks added after the percentage (ADR-0207); 0 by default
+             * @example 1000
+             */
+            retailMarkupAmount?: string;
+            /**
+             * @description Supermarket bulk: % off the supermarket price, in place of the markup (ADR-0207)
+             * @example 9
+             */
+            retailBulkDiscountPct?: string | null;
+            /**
+             * @description The supermarket price's rounding; null: rounding (ADR-0207)
+             * @enum {string|null}
+             */
+            retailRounding?: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100" | null;
+            /**
+             * @description The bulk price's rounding; null: the supermarket price's (ADR-0207)
+             * @enum {string|null}
+             */
+            retailBulkRounding?: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100" | null;
             name: string;
             /**
              * @description The first values start this day
@@ -33210,7 +33286,7 @@ export interface operations {
                 q?: string;
                 status?: "ACTIVE" | "SCHEDULED" | "ARCHIVED";
                 /** @description Of the values in force today */
-                rounding?: "WHOLE" | "UP_10" | "UP_50" | "UP_100";
+                rounding?: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100";
                 /** @description A bulk price today, or none */
                 bulk?: "WITH" | "WITHOUT";
                 /** @description Products use it today, or none */

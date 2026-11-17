@@ -883,6 +883,10 @@ function valuesOnly(version: PriceProfileValues): PriceProfileValues {
     retailBulkMinQty: version.retailBulkMinQty,
     retailBulkMarkupPct: version.retailBulkMarkupPct,
     rounding: version.rounding,
+    retailMarkupAmount: version.retailMarkupAmount,
+    retailBulkDiscountPct: version.retailBulkDiscountPct,
+    retailRounding: version.retailRounding,
+    retailBulkRounding: version.retailBulkRounding,
   };
 }
 

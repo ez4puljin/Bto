@@ -729,6 +729,13 @@
       "when": 1794879385011,
       "tag": "0105_pos_cashier_tills",
       "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1794880832786,
+      "tag": "0106_price_profiles_erxes",
+      "breakpoints": true
     }
   ]
 }

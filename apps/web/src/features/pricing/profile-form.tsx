@@ -10,7 +10,7 @@ import {
 } from '@tugeel/shared/pricing';
 import { businessDate } from '@tugeel/shared/time';
 import { ExternalLink } from 'lucide-react';
-import { useState } from 'react';
+import { type ComponentProps, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -48,42 +48,62 @@ import {
 /** The NUMERIC(5,2) markups and the NUMERIC(14,3) bulk quantity, as typed. */
 const MARKUP = /^\d{1,3}(\.\d{1,2})?$/;
 const BULK_QTY = /^\d{1,11}(\.\d{1,3})?$/;
+/** Whole tugriks added at the supermarket (ADR-0207). */
+const AMOUNT = /^\d{1,12}$/;
+/** How the bulk price is set: a markup on the warehouse price, or a percentage off the till's. */
+const BULK_MODES = ['MARKUP', 'DISCOUNT'] as const;
+type BulkMode = (typeof BULK_MODES)[number];
+/** A rounding of its own, or '' for the one above it. */
+const OWN_ROUNDINGS = ['', ...PRICE_ROUNDINGS] as const;
+type OwnRounding = (typeof OWN_ROUNDINGS)[number];
 
 const ISSUE_MESSAGES: Record<PriceProfileIssue, ValidationMessage> = {
   PERCENT_RANGE: 'validation.markup',
   BULK_PAIR: 'validation.bulkPair',
   BULK_QTY_RANGE: 'validation.bulkQty',
   BULK_NOT_BELOW_RETAIL: 'validation.bulkBelowRetail',
+  AMOUNT_RANGE: 'validation.markupAmount',
+  BULK_DISCOUNT_RANGE: 'validation.bulkDiscount',
+  BULK_ROUNDING_WITHOUT_BULK: 'validation.bulkRoundingWithoutBulk',
 };
 
 interface TypedValues {
   looseMarkupPct: string;
   retailMarkupPct: string;
+  retailMarkupAmount: string;
   bulk: boolean;
+  bulkMode: BulkMode;
   retailBulkMinQty: string;
   retailBulkMarkupPct: string;
+  retailBulkDiscountPct: string;
   rounding: ProfileValues['rounding'];
+  retailRounding: OwnRounding;
+  retailBulkRounding: OwnRounding;
 }
 
 /** The typed values as the shared rules take them, or null while a number is not one yet. */
 function typedProfileValues(values: TypedValues): ProfileValues | null {
   const numbers = [values.looseMarkupPct, values.retailMarkupPct];
   if (!numbers.every((value) => MARKUP.test(value.trim()))) return null;
+  if (!AMOUNT.test(values.retailMarkupAmount.trim())) return null;
+  const discount = values.bulkMode === 'DISCOUNT';
+  const bulkPct = discount ? values.retailBulkDiscountPct : values.retailBulkMarkupPct;
   if (
     values.bulk &&
-    !(
-      BULK_QTY.test(values.retailBulkMinQty.trim()) &&
-      MARKUP.test(values.retailBulkMarkupPct.trim())
-    )
+    !(BULK_QTY.test(values.retailBulkMinQty.trim()) && MARKUP.test(bulkPct.trim()))
   ) {
     return null;
   }
   return {
     looseMarkupPct: new Decimal(values.looseMarkupPct.trim()),
     retailMarkupPct: new Decimal(values.retailMarkupPct.trim()),
+    retailMarkupAmount: new Decimal(values.retailMarkupAmount.trim()),
     retailBulkMinQty: values.bulk ? new Decimal(values.retailBulkMinQty.trim()) : null,
-    retailBulkMarkupPct: values.bulk ? new Decimal(values.retailBulkMarkupPct.trim()) : null,
+    retailBulkMarkupPct: values.bulk && !discount ? new Decimal(bulkPct.trim()) : null,
+    retailBulkDiscountPct: values.bulk && discount ? new Decimal(bulkPct.trim()) : null,
     rounding: values.rounding,
+    retailRounding: values.retailRounding || null,
+    retailBulkRounding: values.bulk ? values.retailBulkRounding || null : null,
   };
 }
 
@@ -100,21 +120,37 @@ const PROFILE_SCHEMA = z
       .max(MAX_PRICE_PROFILE_NAME, 'validation.tooLong'),
     looseMarkupPct: z.string().trim().regex(MARKUP, 'validation.markup'),
     retailMarkupPct: z.string().trim().regex(MARKUP, 'validation.markup'),
+    retailMarkupAmount: z.string().trim().regex(AMOUNT, 'validation.markupAmount'),
     bulk: z.boolean(),
+    bulkMode: z.enum(BULK_MODES),
     retailBulkMinQty: z.string().trim(),
     retailBulkMarkupPct: z.string().trim(),
+    retailBulkDiscountPct: z.string().trim(),
     rounding: z.enum(PRICE_ROUNDINGS),
+    retailRounding: z.enum(OWN_ROUNDINGS),
+    retailBulkRounding: z.enum(OWN_ROUNDINGS),
     validFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'validation.date'),
   })
   .superRefine((values, ctx) => {
     if (values.bulk && !BULK_QTY.test(values.retailBulkMinQty)) {
       ctx.addIssue({ code: 'custom', path: ['retailBulkMinQty'], message: 'validation.bulkQty' });
     }
-    if (values.bulk && !MARKUP.test(values.retailBulkMarkupPct)) {
+    if (values.bulk && values.bulkMode === 'MARKUP' && !MARKUP.test(values.retailBulkMarkupPct)) {
       ctx.addIssue({
         code: 'custom',
         path: ['retailBulkMarkupPct'],
         message: 'validation.markup',
+      });
+    }
+    if (
+      values.bulk &&
+      values.bulkMode === 'DISCOUNT' &&
+      !MARKUP.test(values.retailBulkDiscountPct)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['retailBulkDiscountPct'],
+        message: 'validation.bulkDiscount',
       });
     }
     const typed = typedProfileValues(values);
@@ -141,12 +177,19 @@ function defaultsOf(profile: PriceProfile | null, today: string): ProfileFormVal
     // Whole packs and loose pieces alike at the warehouse price until someone says otherwise.
     looseMarkupPct: latest ? plainDecimal(latest.looseMarkupPct) : '0',
     retailMarkupPct: latest ? plainDecimal(latest.retailMarkupPct) : '',
+    retailMarkupAmount: latest ? plainDecimal(latest.retailMarkupAmount) : '0',
     bulk: latest ? latest.retailBulkMinQty !== null : false,
+    bulkMode: latest?.retailBulkDiscountPct ? 'DISCOUNT' : 'MARKUP',
     retailBulkMinQty: latest?.retailBulkMinQty ? plainDecimal(latest.retailBulkMinQty) : '',
     retailBulkMarkupPct: latest?.retailBulkMarkupPct
       ? plainDecimal(latest.retailBulkMarkupPct)
       : '',
+    retailBulkDiscountPct: latest?.retailBulkDiscountPct
+      ? plainDecimal(latest.retailBulkDiscountPct)
+      : '',
     rounding: latest?.rounding ?? 'WHOLE',
+    retailRounding: latest?.retailRounding ?? '',
+    retailBulkRounding: latest?.retailBulkRounding ?? '',
     validFrom: today,
   };
 }
@@ -209,13 +252,19 @@ function ProfileForm(props: { profile: PriceProfile | null; crumbs?: readonly Cr
   });
   const watched = useWatch({ control: form.control });
   const bulk = watched.bulk ?? false;
+  const bulkMode = watched.bulkMode ?? 'MARKUP';
   const typing = {
     looseMarkupPct: watched.looseMarkupPct ?? '',
     retailMarkupPct: watched.retailMarkupPct ?? '',
+    retailMarkupAmount: watched.retailMarkupAmount ?? '',
     bulk,
+    bulkMode,
     retailBulkMinQty: watched.retailBulkMinQty ?? '',
     retailBulkMarkupPct: watched.retailBulkMarkupPct ?? '',
+    retailBulkDiscountPct: watched.retailBulkDiscountPct ?? '',
     rounding: watched.rounding ?? 'WHOLE',
+    retailRounding: watched.retailRounding ?? '',
+    retailBulkRounding: watched.retailBulkRounding ?? '',
   };
   // While the bulk fields are being typed the example keeps its other rows.
   const typed = typedProfileValues(typing) ?? typedProfileValues({ ...typing, bulk: false });
@@ -228,9 +277,15 @@ function ProfileForm(props: { profile: PriceProfile | null; crumbs?: readonly Cr
       name: values.name,
       looseMarkupPct: values.looseMarkupPct,
       retailMarkupPct: values.retailMarkupPct,
+      retailMarkupAmount: values.retailMarkupAmount,
       retailBulkMinQty: values.bulk ? values.retailBulkMinQty : null,
-      retailBulkMarkupPct: values.bulk ? values.retailBulkMarkupPct : null,
+      retailBulkMarkupPct:
+        values.bulk && values.bulkMode === 'MARKUP' ? values.retailBulkMarkupPct : null,
+      retailBulkDiscountPct:
+        values.bulk && values.bulkMode === 'DISCOUNT' ? values.retailBulkDiscountPct : null,
       rounding: values.rounding,
+      retailRounding: values.retailRounding || null,
+      retailBulkRounding: values.bulk ? values.retailBulkRounding || null : null,
       validFrom: values.validFrom,
     };
     const saved = await settle(
@@ -325,6 +380,29 @@ function ProfileForm(props: { profile: PriceProfile | null; crumbs?: readonly Cr
                     {...form.register('retailMarkupPct')}
                   />
                 </FormRow>
+                <FormRow
+                  label={t('pricing.profiles.fields.retailAmount')}
+                  htmlFor="profile-retail-amount"
+                  hint={t('pricing.profiles.fields.retailAmountHint')}
+                  error={errors.retailMarkupAmount?.message}
+                >
+                  <Input
+                    id="profile-retail-amount"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    className="w-40 font-mono"
+                    {...form.register('retailMarkupAmount')}
+                  />
+                </FormRow>
+                <FormRow
+                  label={t('pricing.profiles.fields.retailRounding')}
+                  htmlFor="profile-retail-rounding"
+                >
+                  <RoundingSelect
+                    id="profile-retail-rounding"
+                    {...form.register('retailRounding')}
+                  />
+                </FormRow>
                 <FormRow label={t('pricing.profiles.fields.bulk')} htmlFor="profile-bulk">
                   <Controller
                     control={form.control}
@@ -356,23 +434,69 @@ function ProfileForm(props: { profile: PriceProfile | null; crumbs?: readonly Cr
                       />
                     </FormRow>
                     <FormRow
-                      label={t('pricing.profiles.fields.bulkPct')}
-                      htmlFor="profile-bulk-pct"
-                      error={errors.retailBulkMarkupPct?.message}
+                      label={t('pricing.profiles.fields.bulkMode')}
+                      htmlFor="profile-bulk-mode"
                     >
-                      <Input
-                        id="profile-bulk-pct"
-                        inputMode="decimal"
-                        autoComplete="off"
-                        className="w-40 font-mono"
-                        {...form.register('retailBulkMarkupPct')}
+                      <NativeSelect
+                        id="profile-bulk-mode"
+                        className="sm:w-72"
+                        {...form.register('bulkMode')}
+                      >
+                        {BULK_MODES.map((mode) => (
+                          <option key={mode} value={mode}>
+                            {t(`pricing.profiles.fields.bulkModes.${mode}`)}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    </FormRow>
+                    {bulkMode === 'DISCOUNT' ? (
+                      <FormRow
+                        label={t('pricing.profiles.fields.bulkDiscount')}
+                        htmlFor="profile-bulk-discount"
+                        error={errors.retailBulkDiscountPct?.message}
+                      >
+                        <Input
+                          id="profile-bulk-discount"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          className="w-40 font-mono"
+                          {...form.register('retailBulkDiscountPct')}
+                        />
+                      </FormRow>
+                    ) : (
+                      <FormRow
+                        label={t('pricing.profiles.fields.bulkPct')}
+                        htmlFor="profile-bulk-pct"
+                        error={errors.retailBulkMarkupPct?.message}
+                      >
+                        <Input
+                          id="profile-bulk-pct"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          className="w-40 font-mono"
+                          {...form.register('retailBulkMarkupPct')}
+                        />
+                      </FormRow>
+                    )}
+                    <FormRow
+                      label={t('pricing.profiles.fields.bulkRounding')}
+                      htmlFor="profile-bulk-rounding"
+                      error={errors.retailBulkRounding?.message}
+                    >
+                      <RoundingSelect
+                        id="profile-bulk-rounding"
+                        {...form.register('retailBulkRounding')}
                       />
                     </FormRow>
                   </>
                 ) : null}
               </FormSection>
               <FormSection title={t('pricing.profiles.sectionRounding')}>
-                <FormRow label={t('pricing.profiles.fields.rounding')} htmlFor="profile-rounding">
+                <FormRow
+                  label={t('pricing.profiles.fields.rounding')}
+                  htmlFor="profile-rounding"
+                  hint={t('pricing.profiles.fields.roundingHint')}
+                >
                   <NativeSelect
                     id="profile-rounding"
                     className="sm:w-56"
@@ -445,6 +569,19 @@ export function ProfileExample({
   const money = (amount: Decimal) => t('pricing.money', { amount: formatMnt(amount.toFixed(0)) });
   const markup = (pct: Decimal) =>
     t('pricing.profiles.markup', { pct: plainDecimal(pct.toString()) });
+  const amount = values.retailMarkupAmount;
+  const retailMarkup =
+    amount && !amount.isZero()
+      ? t('pricing.profiles.markupAmount', {
+          pct: plainDecimal(values.retailMarkupPct.toString()),
+          amount: formatMnt(amount.toFixed(0)),
+        })
+      : markup(values.retailMarkupPct);
+  const bulkMarkup = values.retailBulkDiscountPct
+    ? t('pricing.profiles.discount', { pct: plainDecimal(values.retailBulkDiscountPct.toString()) })
+    : values.retailBulkMarkupPct
+      ? markup(values.retailBulkMarkupPct)
+      : null;
   const sales = [
     {
       key: 'WAREHOUSE',
@@ -463,17 +600,17 @@ export function ProfileExample({
     {
       key: 'RETAIL',
       basis: t('pricing.bases.RETAIL'),
-      markup: markup(values.retailMarkupPct),
+      markup: retailMarkup,
       price: prices.retail,
     },
-    ...(prices.retailBulk && values.retailBulkMinQty && values.retailBulkMarkupPct
+    ...(prices.retailBulk && values.retailBulkMinQty && bulkMarkup
       ? [
           {
             key: 'RETAIL_BULK',
             basis: t('pricing.profiles.bulkBasis', {
               qty: plainDecimal(values.retailBulkMinQty.toString()),
             }),
-            markup: markup(values.retailBulkMarkupPct),
+            markup: bulkMarkup,
             price: prices.retailBulk,
           },
         ]
@@ -486,9 +623,23 @@ export function ProfileExample({
   const title = t('pricing.profiles.example', { price: formatMnt(EXAMPLE_PRICE.toFixed(0)) });
   const roundingNote = (
     <p className="text-xs text-muted-foreground">
-      {t('pricing.profiles.roundingNote', {
-        rounding: t(`pricing.roundings.${values.rounding}`),
-      })}
+      {[
+        t('pricing.profiles.roundingNote', {
+          rounding: t(`pricing.roundings.${values.rounding}`),
+        }),
+        values.retailRounding
+          ? t('pricing.profiles.summary.retailRounding', {
+              rounding: t(`pricing.roundings.${values.retailRounding}`),
+            })
+          : null,
+        values.retailBulkRounding
+          ? t('pricing.profiles.summary.bulkRounding', {
+              rounding: t(`pricing.roundings.${values.retailBulkRounding}`),
+            })
+          : null,
+      ]
+        .filter((part) => part !== null)
+        .join(' · ')}
     </p>
   );
 
@@ -562,5 +713,21 @@ export function ProfileExample({
       </Table>
       {roundingNote}
     </section>
+  );
+}
+
+/** A rounding of its own for one price, or «the same as above» (ADR-0207). */
+function RoundingSelect(props: ComponentProps<typeof NativeSelect>) {
+  const { t } = useTranslation();
+  return (
+    <NativeSelect className="sm:w-56" {...props}>
+      {OWN_ROUNDINGS.map((rounding) => (
+        <option key={rounding || 'same'} value={rounding}>
+          {rounding
+            ? t(`pricing.roundings.${rounding}`)
+            : t('pricing.profiles.fields.sameRounding')}
+        </option>
+      ))}
+    </NativeSelect>
   );
 }

@@ -27,6 +27,7 @@ import {
 
 const PERCENT = /^\d{1,3}(\.\d{1,2})?$/;
 const QTY = /^\d{1,11}(\.\d{1,3})?$/;
+const AMOUNT = /^\d{1,12}$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const trimmed = ({ value }: { value: unknown }) =>
@@ -64,6 +65,41 @@ export class PriceProfileValuesInputDto {
   @Matches(PERCENT)
   retailBulkMarkupPct?: string | null;
   @ApiProperty({ enum: PRICE_ROUNDINGS }) @IsIn(PRICE_ROUNDINGS) rounding: PriceRounding;
+  @ApiPropertyOptional({
+    example: '1000',
+    description: 'Supermarket: whole tugriks added after the percentage (ADR-0207); 0 by default',
+  })
+  @IsOptional()
+  @Matches(AMOUNT)
+  retailMarkupAmount?: string;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    example: '9',
+    description: 'Supermarket bulk: % off the supermarket price, in place of the markup (ADR-0207)',
+  })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @Matches(PERCENT)
+  retailBulkDiscountPct?: string | null;
+  @ApiPropertyOptional({
+    enum: PRICE_ROUNDINGS,
+    nullable: true,
+    description: "The supermarket price's rounding; null: rounding (ADR-0207)",
+  })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsIn(PRICE_ROUNDINGS)
+  retailRounding?: PriceRounding | null;
+  @ApiPropertyOptional({
+    enum: PRICE_ROUNDINGS,
+    nullable: true,
+    description: "The bulk price's rounding; null: the supermarket price's (ADR-0207)",
+  })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsIn(PRICE_ROUNDINGS)
+  retailBulkRounding?: PriceRounding | null;
 }
 
 @ApiSchema({ name: 'PriceProfileRequest' })
@@ -108,6 +144,11 @@ export class PriceProfileValuesDto {
   @ApiProperty({ type: String, nullable: true, example: '20.00' })
   retailBulkMarkupPct: string | null;
   @ApiProperty({ enum: PRICE_ROUNDINGS }) rounding: PriceRounding;
+  @ApiProperty({ example: '0' }) retailMarkupAmount: string;
+  @ApiProperty({ type: String, nullable: true, example: null })
+  retailBulkDiscountPct: string | null;
+  @ApiProperty({ enum: PRICE_ROUNDINGS, nullable: true }) retailRounding: PriceRounding | null;
+  @ApiProperty({ enum: PRICE_ROUNDINGS, nullable: true }) retailBulkRounding: PriceRounding | null;
 }
 
 @ApiSchema({ name: 'PriceProfileVersion' })

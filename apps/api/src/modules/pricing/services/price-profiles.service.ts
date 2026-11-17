@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { Decimal } from '@tugeel/shared/money';
+import { Decimal } from '@tugeel/shared/money';
 import {
   MAX_PRICE_PROFILE_NAME,
   type PriceProfileValues,
@@ -146,7 +146,15 @@ export class PriceProfilesService {
     if (name) filters.push(ilike(priceProfiles.name, `%${name.replace(/[\\%_]/g, '\\$&')}%`));
     if (query.status === 'ACTIVE') filters.push(versionToday(today));
     if (query.status === 'SCHEDULED') filters.push(sql`NOT ${versionToday(today)}`);
-    if (query.rounding) filters.push(versionToday(today, sql`v.rounding = ${query.rounding}`));
+    if (query.rounding) {
+      const r = query.rounding;
+      filters.push(
+        versionToday(
+          today,
+          sql`(v.rounding = ${r} OR v.retail_rounding = ${r} OR v.retail_bulk_rounding = ${r})`,
+        ),
+      );
+    }
     if (query.bulk) {
       filters.push(
         versionToday(
@@ -585,9 +593,13 @@ function valuesOf(row: VersionRow): PriceProfileValues {
   return {
     looseMarkupPct: row.looseMarkupPct,
     retailMarkupPct: row.retailMarkupPct,
+    retailMarkupAmount: row.retailMarkupAmount,
     retailBulkMinQty: row.retailBulkMinQty,
     retailBulkMarkupPct: row.retailBulkMarkupPct,
+    retailBulkDiscountPct: row.retailBulkDiscountPct,
     rounding: row.rounding,
+    retailRounding: row.retailRounding,
+    retailBulkRounding: row.retailBulkRounding,
   };
 }
 
@@ -599,11 +611,17 @@ function columnsOf(values: PriceProfileValues) {
   return {
     looseMarkupPct: values.looseMarkupPct,
     retailMarkupPct: values.retailMarkupPct,
+    retailMarkupAmount: values.retailMarkupAmount ?? ZERO,
     retailBulkMinQty: values.retailBulkMinQty,
     retailBulkMarkupPct: values.retailBulkMarkupPct,
+    retailBulkDiscountPct: values.retailBulkDiscountPct ?? null,
     rounding: values.rounding,
+    retailRounding: values.retailRounding ?? null,
+    retailBulkRounding: values.retailBulkRounding ?? null,
   };
 }
+
+const ZERO = new Decimal(0);
 
 const sameDecimal = (a: Decimal | null, b: Decimal | null) =>
   a === null || b === null ? a === b : a.eq(b);
@@ -614,7 +632,11 @@ function sameValues(a: PriceProfileValues, b: PriceProfileValues): boolean {
     a.retailMarkupPct.eq(b.retailMarkupPct) &&
     sameDecimal(a.retailBulkMinQty, b.retailBulkMinQty) &&
     sameDecimal(a.retailBulkMarkupPct, b.retailBulkMarkupPct) &&
-    a.rounding === b.rounding
+    a.rounding === b.rounding &&
+    (a.retailMarkupAmount ?? ZERO).eq(b.retailMarkupAmount ?? ZERO) &&
+    sameDecimal(a.retailBulkDiscountPct ?? null, b.retailBulkDiscountPct ?? null) &&
+    (a.retailRounding ?? null) === (b.retailRounding ?? null) &&
+    (a.retailBulkRounding ?? null) === (b.retailBulkRounding ?? null)
   );
 }
 
@@ -625,5 +647,9 @@ function auditValues(values: PriceProfileValues): Record<string, string | null> 
     retailBulkMinQty: values.retailBulkMinQty?.toString() ?? null,
     retailBulkMarkupPct: values.retailBulkMarkupPct?.toFixed(2) ?? null,
     rounding: values.rounding,
+    retailMarkupAmount: (values.retailMarkupAmount ?? ZERO).toFixed(0),
+    retailBulkDiscountPct: values.retailBulkDiscountPct?.toFixed(2) ?? null,
+    retailRounding: values.retailRounding ?? null,
+    retailBulkRounding: values.retailBulkRounding ?? null,
   };
 }

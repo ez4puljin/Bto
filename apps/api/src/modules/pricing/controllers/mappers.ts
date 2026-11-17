@@ -25,6 +25,13 @@ export function toValuesInput(body: PriceProfileValuesInputDto): PriceProfileVal
         ? null
         : new Decimal(body.retailBulkMarkupPct),
     rounding: body.rounding,
+    retailMarkupAmount: new Decimal(body.retailMarkupAmount ?? 0),
+    retailBulkDiscountPct:
+      body.retailBulkDiscountPct === undefined || body.retailBulkDiscountPct === null
+        ? null
+        : new Decimal(body.retailBulkDiscountPct),
+    retailRounding: body.retailRounding ?? null,
+    retailBulkRounding: body.retailBulkRounding ?? null,
   };
 }
 
@@ -35,6 +42,10 @@ export function toValuesDto(values: PriceProfileValues): PriceProfileValuesDto {
     retailBulkMinQty: values.retailBulkMinQty?.toString() ?? null,
     retailBulkMarkupPct: values.retailBulkMarkupPct?.toFixed(2) ?? null,
     rounding: values.rounding,
+    retailMarkupAmount: (values.retailMarkupAmount ?? new Decimal(0)).toFixed(0),
+    retailBulkDiscountPct: values.retailBulkDiscountPct?.toFixed(2) ?? null,
+    retailRounding: values.retailRounding ?? null,
+    retailBulkRounding: values.retailBulkRounding ?? null,
   };
 }
 

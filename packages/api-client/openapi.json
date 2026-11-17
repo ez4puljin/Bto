@@ -14900,7 +14900,10 @@
                 "WHOLE",
                 "UP_10",
                 "UP_50",
-                "UP_100"
+                "UP_100",
+                "DOWN_10",
+                "DOWN_50",
+                "DOWN_100"
               ]
             }
           },
@@ -58362,7 +58365,45 @@
               "WHOLE",
               "UP_10",
               "UP_50",
-              "UP_100"
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
+            ],
+            "type": "string"
+          },
+          "retailMarkupAmount": {
+            "type": "string",
+            "example": "0"
+          },
+          "retailBulkDiscountPct": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "retailRounding": {
+            "nullable": true,
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
+            ],
+            "type": "string"
+          },
+          "retailBulkRounding": {
+            "nullable": true,
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
             ],
             "type": "string"
           }
@@ -58372,7 +58413,11 @@
           "retailMarkupPct",
           "retailBulkMinQty",
           "retailBulkMarkupPct",
-          "rounding"
+          "rounding",
+          "retailMarkupAmount",
+          "retailBulkDiscountPct",
+          "retailRounding",
+          "retailBulkRounding"
         ]
       },
       "ProductPriceProfile": {
@@ -58782,7 +58827,45 @@
               "WHOLE",
               "UP_10",
               "UP_50",
-              "UP_100"
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
+            ],
+            "type": "string"
+          },
+          "retailMarkupAmount": {
+            "type": "string",
+            "example": "0"
+          },
+          "retailBulkDiscountPct": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "retailRounding": {
+            "nullable": true,
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
+            ],
+            "type": "string"
+          },
+          "retailBulkRounding": {
+            "nullable": true,
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
             ],
             "type": "string"
           },
@@ -58805,6 +58888,10 @@
           "retailBulkMinQty",
           "retailBulkMarkupPct",
           "rounding",
+          "retailMarkupAmount",
+          "retailBulkDiscountPct",
+          "retailRounding",
+          "retailBulkRounding",
           "id",
           "validFrom",
           "validTo"
@@ -58934,9 +59021,51 @@
               "WHOLE",
               "UP_10",
               "UP_50",
-              "UP_100"
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
             ],
             "type": "string"
+          },
+          "retailMarkupAmount": {
+            "type": "string",
+            "example": "1000",
+            "description": "Supermarket: whole tugriks added after the percentage (ADR-0206); 0 by default"
+          },
+          "retailBulkDiscountPct": {
+            "type": "string",
+            "nullable": true,
+            "example": "9",
+            "description": "Supermarket bulk: % off the supermarket price, in place of the markup (ADR-0206)"
+          },
+          "retailRounding": {
+            "nullable": true,
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
+            ],
+            "type": "string",
+            "description": "The supermarket price's rounding; null: rounding (ADR-0206)"
+          },
+          "retailBulkRounding": {
+            "nullable": true,
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
+            ],
+            "type": "string",
+            "description": "The bulk price's rounding; null: the supermarket price's (ADR-0206)"
           },
           "name": {
             "type": "string",
@@ -58986,9 +59115,51 @@
               "WHOLE",
               "UP_10",
               "UP_50",
-              "UP_100"
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
             ],
             "type": "string"
+          },
+          "retailMarkupAmount": {
+            "type": "string",
+            "example": "1000",
+            "description": "Supermarket: whole tugriks added after the percentage (ADR-0206); 0 by default"
+          },
+          "retailBulkDiscountPct": {
+            "type": "string",
+            "nullable": true,
+            "example": "9",
+            "description": "Supermarket bulk: % off the supermarket price, in place of the markup (ADR-0206)"
+          },
+          "retailRounding": {
+            "nullable": true,
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
+            ],
+            "type": "string",
+            "description": "The supermarket price's rounding; null: rounding (ADR-0206)"
+          },
+          "retailBulkRounding": {
+            "nullable": true,
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
+            ],
+            "type": "string",
+            "description": "The bulk price's rounding; null: the supermarket price's (ADR-0206)"
           },
           "validFrom": {
             "type": "string",
@@ -59045,9 +59216,51 @@
               "WHOLE",
               "UP_10",
               "UP_50",
-              "UP_100"
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
             ],
             "type": "string"
+          },
+          "retailMarkupAmount": {
+            "type": "string",
+            "example": "1000",
+            "description": "Supermarket: whole tugriks added after the percentage (ADR-0206); 0 by default"
+          },
+          "retailBulkDiscountPct": {
+            "type": "string",
+            "nullable": true,
+            "example": "9",
+            "description": "Supermarket bulk: % off the supermarket price, in place of the markup (ADR-0206)"
+          },
+          "retailRounding": {
+            "nullable": true,
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
+            ],
+            "type": "string",
+            "description": "The supermarket price's rounding; null: rounding (ADR-0206)"
+          },
+          "retailBulkRounding": {
+            "nullable": true,
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
+            ],
+            "type": "string",
+            "description": "The bulk price's rounding; null: the supermarket price's (ADR-0206)"
           },
           "name": {
             "type": "string",

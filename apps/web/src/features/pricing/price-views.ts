@@ -32,14 +32,35 @@ export function useProfileSummaryParts() {
   return (values: PriceProfileValues): string[] =>
     [
       t('pricing.profiles.summary.loose', { pct: plainDecimal(values.looseMarkupPct) }),
-      t('pricing.profiles.summary.retail', { pct: plainDecimal(values.retailMarkupPct) }),
+      Number.parseInt(values.retailMarkupAmount, 10) > 0
+        ? t('pricing.profiles.summary.retailAmount', {
+            pct: plainDecimal(values.retailMarkupPct),
+            amount: plainDecimal(values.retailMarkupAmount),
+          })
+        : t('pricing.profiles.summary.retail', { pct: plainDecimal(values.retailMarkupPct) }),
       values.retailBulkMinQty !== null && values.retailBulkMarkupPct !== null
         ? t('pricing.profiles.summary.bulk', {
             qty: plainDecimal(values.retailBulkMinQty),
             pct: plainDecimal(values.retailBulkMarkupPct),
           })
         : null,
+      values.retailBulkMinQty !== null && values.retailBulkDiscountPct !== null
+        ? t('pricing.profiles.summary.bulkOff', {
+            qty: plainDecimal(values.retailBulkMinQty),
+            pct: plainDecimal(values.retailBulkDiscountPct),
+          })
+        : null,
       t(`pricing.roundings.${values.rounding}`),
+      values.retailRounding
+        ? t('pricing.profiles.summary.retailRounding', {
+            rounding: t(`pricing.roundings.${values.retailRounding}`),
+          })
+        : null,
+      values.retailBulkRounding
+        ? t('pricing.profiles.summary.bulkRounding', {
+            rounding: t(`pricing.roundings.${values.retailBulkRounding}`),
+          })
+        : null,
     ].filter((part) => part !== null);
 }
 
@@ -68,6 +89,11 @@ export function profileValuesOf(values: PriceProfileValues): ProfileValues {
     retailBulkMarkupPct:
       values.retailBulkMarkupPct === null ? null : new Decimal(values.retailBulkMarkupPct),
     rounding: values.rounding,
+    retailMarkupAmount: new Decimal(values.retailMarkupAmount),
+    retailBulkDiscountPct:
+      values.retailBulkDiscountPct === null ? null : new Decimal(values.retailBulkDiscountPct),
+    retailRounding: values.retailRounding,
+    retailBulkRounding: values.retailBulkRounding,
   };
 }
 
