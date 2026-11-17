@@ -3,6 +3,13 @@ import userEvent from '@testing-library/user-event';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it } from 'vitest';
 import { findSidebar, renderApp, signedIn, WORKER_ME } from '@/test/render-app';
+import { ARTICLES, articlePath, GUIDE_CATEGORIES } from './content';
+
+/** The categories that have at least one article, in order, each with its count. */
+const DRAWN = GUIDE_CATEGORIES.flatMap((key) => {
+  const count = ARTICLES.filter((article) => article.category === key).length;
+  return count > 0 ? [{ key, count }] : [];
+});
 
 const COMMAND =
   'irm https://raw.githubusercontent.com/ez4puljin/Bto/main/tools/scan-bridge/install.ps1 | iex';
@@ -14,19 +21,22 @@ describe('the guide', () => {
     expect(await within(sidebar).findByRole('link', { name: mn.nav.guide })).toBeTruthy();
   });
 
-  it('draws only the categories that have articles, and lists the seven articles', async () => {
+  it('draws only the categories that have articles, and lists every article', async () => {
     renderApp('/guide', signedIn(WORKER_ME));
     await screen.findByRole('heading', { name: mn.guide.title });
-    const withArticles = ['inventory', 'catalog', 'setup'] as const;
-    for (const key of withArticles) {
+    for (const { key } of DRAWN) {
       expect(screen.getByRole('heading', { name: mn.guide.categories[key] })).toBeTruthy();
     }
-    expect(screen.queryByRole('heading', { name: mn.guide.categories.sales })).toBeNull();
-    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(withArticles.length);
-    const list = screen
+    for (const key of GUIDE_CATEGORIES) {
+      if (DRAWN.some((drawn) => drawn.key === key)) continue;
+      expect(screen.queryByRole('heading', { name: mn.guide.categories[key] }), key).toBeNull();
+    }
+    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(DRAWN.length);
+    const hrefs = screen
       .getAllByRole('link')
-      .filter((link) => link.getAttribute('href')?.split('/').length === 4);
-    expect(list.filter((link) => link.getAttribute('href')?.startsWith('/guide/'))).toHaveLength(7);
+      .map((link) => link.getAttribute('href'))
+      .filter((href) => href?.startsWith('/guide/') && href.split('/').length === 4);
+    expect(hrefs).toEqual(ARTICLES.map(articlePath));
   });
 
   it('has a row of category links with counts that jump to the cards, hidden while searching', async () => {
@@ -34,16 +44,12 @@ describe('the guide', () => {
     renderApp('/guide', signedIn(WORKER_ME));
     const nav = await screen.findByRole('navigation', { name: mn.guide.categoryLinks });
     const links = within(nav).getAllByRole('link');
-    expect(links.map((link) => link.textContent)).toEqual([
-      `${mn.guide.categories.inventory}2`,
-      `${mn.guide.categories.catalog}2`,
-      `${mn.guide.categories.setup}3`,
-    ]);
-    expect(links.map((link) => link.getAttribute('href'))).toEqual([
-      '#guide-inventory',
-      '#guide-catalog',
-      '#guide-setup',
-    ]);
+    expect(links.map((link) => link.textContent)).toEqual(
+      DRAWN.map(({ key, count }) => `${mn.guide.categories[key]}${count}`),
+    );
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(
+      DRAWN.map(({ key }) => `#guide-${key}`),
+    );
     for (const link of links) {
       expect(document.getElementById(link.getAttribute('href')?.slice(1) ?? '')).toBeTruthy();
     }
@@ -55,11 +61,20 @@ describe('the guide', () => {
     const user = userEvent.setup();
     renderApp('/guide', signedIn(WORKER_ME));
     const box = await screen.findByRole('searchbox', { name: mn.guide.search });
-    await user.type(box, 'scan-bridge');
-    expect(screen.getByRole('link', { name: /USB scanner/ })).toBeTruthy();
-    expect(screen.queryByRole('heading', { name: mn.guide.categories.catalog })).toBeNull();
+    const target = ARTICLES.find((article) => !/[{[]/.test(article.title));
+    if (!target) throw new Error('no article with a typeable title');
+    await user.click(box);
+    await user.paste(target.title);
+    const needle = target.title.trim().toLowerCase();
+    const expected = ARTICLES.filter((article) => article.searchText.includes(needle));
+    expect(expected.length).toBeGreaterThan(0);
+    const hrefs = screen
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href'))
+      .filter((href) => href?.startsWith('/guide/') && href.split('/').length === 4);
+    expect(hrefs).toEqual(expected.map(articlePath));
     await user.clear(box);
-    await user.type(box, 'ЗЭРЭГЛЭЭЭ-ХОЙД');
+    await user.paste('ЗЭРЭГЛЭЭЭ-ХОЙД');
     expect(screen.getByText(mn.guide.empty)).toBeTruthy();
   });
 
