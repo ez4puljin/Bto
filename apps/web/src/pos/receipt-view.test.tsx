@@ -122,32 +122,38 @@ describe('the bulk price on the receipt (owner 2026-11-17, ADR-0207)', () => {
   ];
   const withLines = (receipt: EdgeReceipt): EdgeReceipt => ({ ...receipt, lines });
   const notes = () => screen.queryAllByText(/бөөний|Бөөний үнэ/);
+  const numbers = () =>
+    Array.from(document.querySelectorAll('[data-line-no]')).map((node) => node.textContent);
+  const layoutOf = (compact: boolean): ReceiptLayout => {
+    const base = defaultReceiptLayout();
+    return {
+      ...base,
+      blocks: base.blocks.map((block) => (block.type === 'LINES' ? { ...block, compact } : block)),
+    };
+  };
 
-  it.each([false, true])(
-    'prints the threshold under the lines that have one (compact %s)',
-    (compact) => {
-      const base = defaultReceiptLayout();
-      draw(
-        {
-          ...base,
-          blocks: base.blocks.map((block) =>
-            block.type === 'LINES' ? { ...block, compact } : block,
-          ),
-        },
-        false,
-        withLines,
-      );
-      expect(screen.getByText('Бөөний үнэ · 6 ш-ээс дээш')).toBeInTheDocument();
-      expect(screen.getByText('6 ш-ээс бөөний 18,010₮')).toBeInTheDocument();
-      expect(notes()).toHaveLength(2);
-    },
-  );
+  it('prints a header row and numbers the lines, a «*» after the bulk one', () => {
+    draw(layoutOf(false), false, withLines);
+    for (const head of ['№', 'Бараа', 'Тоо', 'Нэгж үнэ', 'Дүн'])
+      expect(screen.getAllByText(head).length).toBeGreaterThan(0);
+    expect(numbers()).toEqual(['1*', '2', '3', '4']);
+    expect(notes()).toHaveLength(0);
+  });
 
-  it('prints none on a return', () => {
+  it('numbers the compact lines too, with no header and no bulk note', () => {
+    draw(layoutOf(true), false, withLines);
+    expect(screen.getByText(/^1\* Сүү 1л/)).toBeInTheDocument();
+    expect(screen.getByText(/^2 Тос 1л/)).toBeInTheDocument();
+    expect(screen.queryByText('Нэгж үнэ')).toBeNull();
+    expect(notes()).toHaveLength(0);
+  });
+
+  it('prints no «*» on a return', () => {
     draw(defaultReceiptLayout(), false, (receipt) => ({
       ...withLines(receipt),
+      lines: lines.map(({ bulkOffer: _bulk, ...line }) => line),
       kind: 'RETURN',
     }));
-    expect(notes()).toHaveLength(0);
+    expect(numbers()).toEqual(['1', '2', '3', '4']);
   });
 });

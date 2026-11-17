@@ -16,7 +16,6 @@ import {
 } from '@tugeel/shared/pos';
 import { businessDate } from '@tugeel/shared/time';
 import { cn } from 'cn';
-import type { TFunction } from 'i18next';
 import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Code128Svg } from '@/lib/barcode/code128-svg';
@@ -171,55 +170,57 @@ function BlockView({ block, info }: { block: ReceiptBlock; info: Facts }) {
     case 'DOC_INFO':
       return <DocInfo showTill={block.showTill} showCashier={block.showCashier} info={info} />;
     case 'LINES':
-      return (
-        <ul className="space-y-1.5 py-1.5">
-          {receipt.lines.map((line, index) => {
-            const note = info.refund ? null : bulkNote(t, line);
-            return (
+      if (block.compact) {
+        return (
+          <ul className="space-y-1.5 py-1.5">
+            {receipt.lines.map((line, index) => (
               <li key={index}>
-                {block.compact ? (
-                  <p className="flex justify-between gap-3">
-                    <span className="min-w-0 font-sans font-medium">
-                      {line.name}
-                      <span className="block font-mono font-normal text-muted-foreground">
-                        {t('posKiosk.receipt.lineQty', {
-                          qty: formatQty(line.qty),
-                          uom: line.uomName,
-                          price: formatMnt(line.unitPrice),
-                        })}
-                      </span>
-                      {note ? (
-                        <span className="block text-[0.9em] font-normal break-words text-muted-foreground">
-                          {note}
-                        </span>
-                      ) : null}
+                <p className="flex justify-between gap-3">
+                  <span className="min-w-0 font-sans font-medium">
+                    {lineNo(index, line)} {line.name}
+                    <span className="block font-mono font-normal text-muted-foreground">
+                      {t('posKiosk.receipt.lineQty', {
+                        qty: formatQty(line.qty),
+                        uom: line.uomName,
+                        price: formatMnt(line.unitPrice),
+                      })}
                     </span>
-                    <span className="shrink-0">{formatMnt(line.total)}</span>
-                  </p>
-                ) : (
-                  <>
-                    <p className="font-sans font-medium">{line.name}</p>
-                    <p className="flex justify-between gap-3">
-                      <span className="text-muted-foreground">
-                        {t('posKiosk.receipt.lineQty', {
-                          qty: formatQty(line.qty),
-                          uom: line.uomName,
-                          price: formatMnt(line.unitPrice),
-                        })}
-                      </span>
-                      <span>{formatMnt(line.total)}</span>
-                    </p>
-                    {note ? (
-                      <p className="font-sans text-[0.9em] break-words text-muted-foreground">
-                        {note}
-                      </p>
-                    ) : null}
-                  </>
-                )}
+                  </span>
+                  <span className="shrink-0">{formatMnt(line.total)}</span>
+                </p>
               </li>
-            );
-          })}
-        </ul>
+            ))}
+          </ul>
+        );
+      }
+      // One grid for the header and every row, so the columns line up; the name column wraps.
+      return (
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] gap-x-2 gap-y-1 py-1.5">
+          <span className="border-b border-current pb-0.5 text-left">
+            {t('posKiosk.receipt.colNo')}
+          </span>
+          <span className="border-b border-current pb-0.5 text-left font-sans">
+            {t('posKiosk.receipt.colName')}
+          </span>
+          <span className="border-b border-current pb-0.5 text-right font-sans">
+            {t('posKiosk.receipt.colQty')}
+          </span>
+          <span className="border-b border-current pb-0.5 text-right font-sans">
+            {t('posKiosk.receipt.colPrice')}
+          </span>
+          <span className="border-b border-current pb-0.5 text-right font-sans">
+            {t('posKiosk.receipt.colTotal')}
+          </span>
+          {receipt.lines.map((line, index) => (
+            <Fragment key={index}>
+              <span data-line-no>{lineNo(index, line)}</span>
+              <span className="min-w-0 font-sans font-medium break-words">{line.name}</span>
+              <span className="text-right">{formatQty(line.qty)}</span>
+              <span className="text-right">{formatMnt(line.unitPrice)}</span>
+              <span className="text-right">{formatMnt(line.total)}</span>
+            </Fragment>
+          ))}
+        </div>
       );
     case 'TOTALS': {
       const discount = new Decimal(receipt.discountTotal).gt(0);
@@ -359,18 +360,9 @@ function BlockView({ block, info }: { block: ReceiptBlock; info: Facts }) {
   }
 }
 
-/**
- * From how many base units the bulk price applies (owner 2026-11-17, ADR-0207): «Бөөний үнэ · 6
- * ш-ээс дээш» under a line charged it, «6 ш-ээс бөөний 18,010₮» under one below it; nothing on a
- * line without an offer or one stored before it.
- */
-function bulkNote(t: TFunction, line: EdgeReceiptLine): string | null {
-  const offer = line.bulkOffer ?? null;
-  if (!offer) return null;
-  const from = { qty: formatQty(offer.fromQtyBase), uom: offer.baseUom };
-  return offer.atBulk
-    ? t('posKiosk.receipt.bulkApplied', from)
-    : t('posKiosk.sale.bulkOffer', { ...from, price: formatTugrik(offer.bulkPrice) });
+/** The line's sequence number; a «*» after it marks a line charged the bulk price (owner 2026-11-17). */
+function lineNo(index: number, line: EdgeReceiptLine): string {
+  return `${index + 1}${line.bulkOffer?.atBulk ? '*' : ''}`;
 }
 
 /** The heading: the title, the seller, its TIN on a real receipt, and every banner that applies. */

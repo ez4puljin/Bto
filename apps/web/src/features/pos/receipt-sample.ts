@@ -32,7 +32,14 @@ export function sampleReceipt(
     lines: refund
       ? [{ name: 'Сүү 1л', uomName: 'ш', qty: '2', unitPrice: '3500.00', total: '7000.00' }]
       : [
-          { name: 'Сүү 1л', uomName: 'ш', qty: '2', unitPrice: '3500.00', total: '7000.00' },
+          {
+            name: 'Сүү 1л',
+            uomName: 'ш',
+            qty: '2',
+            unitPrice: '3500.00',
+            total: '7000.00',
+            bulkOffer: { fromQtyBase: '2', baseUom: 'ш', bulkPrice: '3500.00', atBulk: true },
+          },
           { name: 'Талх цагаан', uomName: 'ш', qty: '1', unitPrice: '2800.00', total: '2800.00' },
           {
             name: 'Ус ундаа 0.5л (12 ширхэгтэй хайрцаг)',
