@@ -100,7 +100,7 @@ for attempt in 1 2 3; do
     if printf '%s\n' "$changed" | grep -q '^apps/api/src/db/migrations/.*\.sql$'; then
       echo "MIGRATION landed: run «pnpm db:migrate» in ~/bto-dev for the development database."
     fi
-    if printf '%s\n' "$changed" | grep -qvE '^(apps/web/|docs/|\.claude/|\.github/|[^/]*\.md$)' ||
+    if printf '%s\n' "$changed" | grep -qvE '^(apps/web/|docs/|\.claude/|\.github/)|\.md$' ||
       printf '%s\n' "$changed" | grep -qE '^apps/web/(Dockerfile|package\.json)$'; then
       echo "On the real system in about five minutes (a whole update)."
     elif printf '%s\n' "$changed" | grep -q '^apps/web/'; then
