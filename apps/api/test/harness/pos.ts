@@ -135,6 +135,8 @@ export function posApi(app: NestExpressApplication, token: string) {
     cashiers: () => get<Record<string, unknown>[]>('/pos/cashiers'),
     setPin: (userId: number, pin: string) =>
       http().put(`/api/v1/pos/cashiers/${userId}/pin`).set(auth).send({ pin }),
+    setCashierTills: (userId: number, tillIds: number[]) =>
+      http().put(`/api/v1/pos/cashiers/${userId}/tills`).set(auth).send({ tillIds }),
     setCashierStatus: (userId: number, status: string) =>
       http().put(`/api/v1/pos/cashiers/${userId}/status`).set(auth).send({ status }),
     unlock: (userId: number) => http().post(`/api/v1/pos/cashiers/${userId}/unlock`).set(auth),

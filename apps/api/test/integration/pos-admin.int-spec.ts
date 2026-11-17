@@ -1,5 +1,5 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { createHttpApp } from '../harness/apps';
+import { connectAs, createHttpApp } from '../harness/apps';
 import { seedUser } from '../harness/identity';
 import { inventoryApi } from '../harness/inventory';
 import { type EdgeNodeJson, posActors, posApi, type TillJson } from '../harness/pos';
@@ -193,5 +193,73 @@ describe('pos admin', () => {
     expect(
       (await posApi(app, actors.office).cashiers()).some((row) => row.userId === cashier.id),
     ).toBe(true);
+  });
+
+  it('sets the tills a cashier works: managers only, audited once per change, kept by a PIN reset', async () => {
+    const admin = posApi(app, actors.admin);
+    const office = posApi(app, actors.office);
+    const node = (await admin.createNode({ code: 'CTL1', name: 'Кассчны касс' }).expect(201))
+      .body as EdgeNodeJson;
+    const till = async (code: string) =>
+      (
+        (
+          await admin
+            .createTill({
+              edgeNodeId: node.id,
+              warehouseId: storeId,
+              code,
+              name: code,
+              printerHost: null,
+            })
+            .expect(201)
+        ).body as TillJson
+      ).id;
+    const [first, second] = [await till('КТ1'), await till('КТ2')];
+    const cashier = await seedUser(app, { roles: ['POS_CASHIER'] });
+    await admin.setPin(cashier.id, '246810').expect(200);
+    const tillsOf = async () =>
+      (await admin.cashiers()).find((row) => row.userId === cashier.id)?.tillIds;
+    const auditRows = async () => {
+      const db = await connectAs('admin');
+      try {
+        return (
+          await db.query<{ before: unknown; after: unknown }>(
+            `SELECT before, after FROM audit_log
+              WHERE entity = 'pos_cashiers' AND action = 'UPDATE' AND entity_id = $1
+              ORDER BY id`,
+            [String(cashier.id)],
+          )
+        ).rows;
+      } finally {
+        await db.end();
+      }
+    };
+
+    // Only a manager sets them; the office's try changes nothing.
+    await admin.setCashierTills(cashier.id, [first]).expect(200);
+    await office.setCashierTills(cashier.id, [first, second]).expect(403);
+    expect(await tillsOf()).toEqual([first]);
+
+    // An unknown cashier.
+    await admin.setCashierTills(999_999_999, [first]).expect(404);
+
+    // A change writes one audit row with the lists before and after; the same list again writes none.
+    const before = (await auditRows()).length;
+    const saved = (await admin.setCashierTills(cashier.id, [second, first]).expect(200)).body as {
+      tillIds: number[];
+    };
+    expect(saved.tillIds).toEqual([first, second]);
+    const rows = await auditRows();
+    expect(rows).toHaveLength(before + 1);
+    expect(rows.at(-1)).toEqual({
+      before: { tillIds: [first] },
+      after: { tillIds: [first, second] },
+    });
+    await admin.setCashierTills(cashier.id, [first, second]).expect(200);
+    expect(await auditRows()).toHaveLength(before + 1);
+
+    // A new PIN without a list leaves the list as it is.
+    await admin.setPin(cashier.id, '135790').expect(200);
+    expect(await tillsOf()).toEqual([first, second]);
   });
 });
