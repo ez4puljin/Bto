@@ -4,6 +4,7 @@ import mn from '@tugeel/shared/i18n/mn.json';
 import { Decimal } from '@tugeel/shared/money';
 import type { EdgeQuoteRequest } from '@tugeel/shared/pos';
 import type { EdgeSaleRequest } from '@tugeel/shared/pos';
+import { bonusSplit } from '@tugeel/shared/pricing';
 import { describe, expect, it } from 'vitest';
 import { wedgeScan } from '@/test/scan';
 import { SESSION_STORAGE_KEY } from './edge-client';
@@ -11,6 +12,7 @@ import {
   BREAD_BARCODE,
   CASHIER,
   MILK_BARCODE,
+  type EdgeCall,
   type EdgeHandler,
   fakeEdge,
   json,
@@ -346,6 +348,142 @@ describe('kiosk: the sale screen', () => {
         approval: null,
       }),
     ]);
+  });
+
+  describe('an N+M entered by the quantity paid for (owner 2026-11-17)', () => {
+    /** The fake edge with milk pieces on an N+M: the pieces that leave, of which every N+M has M free. */
+    const bonusQuote =
+      (n: number, m: number, paidEntry = true) =>
+      (call: EdgeCall) => {
+        const quote = quoteOf(call.body as EdgeQuoteRequest);
+        const lines = quote.lines.map((line) => {
+          if (line.productUnitId !== 11) return { ...line, bonus: null };
+          const split = bonusSplit(new Decimal(line.qty), new Decimal(n), new Decimal(m));
+          const price = new Decimal(line.unitPrice ?? '0');
+          const total = price.times(split.paid);
+          return {
+            ...line,
+            unitPrice: total.div(line.qty).toDecimalPlaces(2).toFixed(2),
+            total: total.toFixed(2),
+            discount: price.times(split.free).toFixed(2),
+            bonus: {
+              n: String(n),
+              m: String(m),
+              freeQty: split.free.toFixed(),
+              paidQty: split.paid.toFixed(),
+              freeAmount: price.times(split.free).toFixed(2),
+              paidEntry,
+            },
+          };
+        });
+        const total = lines.reduce((sum, line) => sum.plus(line.total ?? '0'), new Decimal(0));
+        return json({ ...quote, lines, total: total.toFixed(2) });
+      };
+    const hint = (free: string, deal: string) =>
+      k.sale.bonusFree.replace('{{free}}', free).replace('{{uom}}', 'ш').replace('{{deal}}', deal);
+
+    it('sends 30 for 20 typed on a 2+1 and shows «20 (10ш урамшуулал 2+1)»', async () => {
+      const edge = await openSale({ 'POST /quote': bonusQuote(2, 1) });
+      const user = userEvent.setup();
+      await wedgeScan(MILK_BARCODE);
+      await waitFor(() => expect(screen.getByTestId('sale-total')).toHaveTextContent('3,500₮'));
+      // One piece: nothing free yet.
+      expect(screen.queryByText(/урамшуулал/)).toBeNull();
+
+      await user.click(qtyField('Сүү 1л (ш)'));
+      await user.keyboard('20{Enter}');
+      await waitFor(() =>
+        expect(lastQuote(edge)).toEqual({ lines: [{ productUnitId: 11, qty: '30' }] }),
+      );
+      await waitFor(() => expect(qtyField('Сүү 1л (ш)')).toHaveValue('20'));
+      expect(await screen.findByText(hint('10', '2+1'))).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByTestId('sale-total')).toHaveTextContent('70,000₮'));
+      // The price is per piece paid for, and the free pieces are not shown as a discount.
+      const row = qtyField('Сүү 1л (ш)').closest('tr') as HTMLElement;
+      expect(within(row).getByText('3,500₮')).toBeInTheDocument();
+      expect(within(row).queryByText(/Хөнгөлөлт/)).toBeNull();
+    });
+
+    it('adds one paid piece a scan: two scans of a 2+1 send 3 and show «2 (1ш урамшуулал 2+1)»', async () => {
+      const edge = await openSale({ 'POST /quote': bonusQuote(2, 1) });
+      await wedgeScan(MILK_BARCODE);
+      await waitFor(() =>
+        expect(lastQuote(edge)).toEqual({ lines: [{ productUnitId: 11, qty: '1' }] }),
+      );
+      await waitFor(() => expect(screen.getByTestId('sale-total')).toHaveTextContent('3,500₮'));
+      await wedgeScan(MILK_BARCODE);
+      await waitFor(() =>
+        expect(lastQuote(edge)).toEqual({ lines: [{ productUnitId: 11, qty: '3' }] }),
+      );
+      await waitFor(() => expect(qtyField('Сүү 1л (ш)')).toHaveValue('2'));
+      expect(await screen.findByText(hint('1', '2+1'))).toBeInTheDocument();
+    });
+
+    it('takes one paid piece off with −, logging the goods that leave the cart', async () => {
+      const edge = await openSale({
+        'POST /quote': bonusQuote(2, 1),
+        'GET /session': () => json({ ...SESSION, approvalRequired: false }),
+      });
+      const user = userEvent.setup();
+      await wedgeScan(MILK_BARCODE);
+      await waitFor(() => expect(screen.getByTestId('sale-total')).toHaveTextContent('3,500₮'));
+      await user.keyboard('+');
+      await waitFor(() =>
+        expect(lastQuote(edge)).toEqual({ lines: [{ productUnitId: 11, qty: '3' }] }),
+      );
+      await waitFor(() => expect(screen.getByTestId('sale-total')).toHaveTextContent('7,000₮'));
+      await user.keyboard('-');
+      await waitFor(() =>
+        expect(lastQuote(edge)).toEqual({ lines: [{ productUnitId: 11, qty: '1' }] }),
+      );
+      expect(qtyField('Сүү 1л (ш)')).toHaveValue('1');
+      expect(edge.callsTo('POST /voids').map((call) => call.body)).toEqual([
+        expect.objectContaining({
+          reason: 'QTY_REDUCED',
+          lines: [{ productUnitId: 11, qty: '2' }],
+        }),
+      ]);
+    });
+
+    it('brings a 1+1’s first piece up to its free one when the edge names the program', async () => {
+      const edge = await openSale({ 'POST /quote': bonusQuote(1, 1) });
+      await wedgeScan(MILK_BARCODE);
+      await waitFor(() =>
+        expect(lastQuote(edge)).toEqual({ lines: [{ productUnitId: 11, qty: '2' }] }),
+      );
+      await waitFor(() => expect(qtyField('Сүү 1л (ш)')).toHaveValue('1'));
+      expect(await screen.findByText(hint('1', '1+1'))).toBeInTheDocument();
+    });
+
+    it('keeps the written quantity of a line the till does not enter by the paid one', async () => {
+      const edge = await openSale({ 'POST /quote': bonusQuote(2, 1, false) });
+      const user = userEvent.setup();
+      await wedgeScan(MILK_BARCODE);
+      await waitFor(() => expect(screen.getByTestId('sale-total')).toHaveTextContent('3,500₮'));
+      await user.click(qtyField('Сүү 1л (ш)'));
+      await user.keyboard('30{Enter}');
+      await waitFor(() =>
+        expect(lastQuote(edge)).toEqual({ lines: [{ productUnitId: 11, qty: '30' }] }),
+      );
+      expect(qtyField('Сүү 1л (ш)')).toHaveValue('30');
+      expect(await screen.findByText(hint('10', '2+1'))).toBeInTheDocument();
+    });
+
+    it('changes nothing for a product without one', async () => {
+      const edge = await openSale({
+        'POST /quote': (call) => json(quoteOf(call.body as EdgeQuoteRequest)),
+      });
+      const user = userEvent.setup();
+      await wedgeScan(MILK_BARCODE);
+      await waitFor(() => expect(screen.getByTestId('sale-total')).toHaveTextContent('3,500₮'));
+      await user.click(qtyField('Сүү 1л (ш)'));
+      await user.keyboard('20{Enter}');
+      await waitFor(() =>
+        expect(lastQuote(edge)).toEqual({ lines: [{ productUnitId: 11, qty: '20' }] }),
+      );
+      expect(qtyField('Сүү 1л (ш)')).toHaveValue('20');
+      expect(screen.queryByText(/урамшуулал/)).toBeNull();
+    });
   });
 
   it('asks before cancelling the sale', async () => {

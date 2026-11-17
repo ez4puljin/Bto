@@ -1,5 +1,6 @@
 import { Decimal } from '@tugeel/shared/money';
 import type { EdgeQuotedLine } from '@tugeel/shared/pos';
+import { bonusLabel } from '@tugeel/shared/pricing';
 import { cn } from 'cn';
 import { Minus, Plus, ScanBarcode, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { formatMnt, formatQty, formatTugrik } from '@/lib/money';
 import { useScanGuard } from '@/lib/scan/use-wedge-scanner';
 import { parseQty } from '../amounts';
-import { type CartLine, canDecrease } from '../cart';
+import { type CartLine, canDecrease, freeQty, paidEntryOf, shownQty } from '../cart';
 import { keepFocus, typeDigits } from '../keys';
 
 interface CartTableProps {
@@ -36,6 +37,10 @@ interface CartTableProps {
  * for: of the cart's 656px the fixed columns take 32 + 80 + 136 + 112 and leave the name 296px
  * (216px beside the code: 19 letters, where a product's name has 25 at the median). The selected
  * line's bar still reads «name · code».
+ *
+ * A line of a product with an N+M (owner 2026-11-17) shows its free units under the name
+ * («(10ш урамшуулал 2+1)»); when the till enters it by the paid quantity, the quantity box shows
+ * and takes what the customer pays for and the unit price is per paid unit, the total unchanged.
  */
 export function CartTable(props: CartTableProps) {
   const { t } = useTranslation();
@@ -97,6 +102,7 @@ export function CartTable(props: CartTableProps) {
       </div>
       <LineActions
         line={props.lines.find((line) => line.productUnitId === props.selected)}
+        quoted={props.selected === null ? undefined : props.quoted.get(props.selected)}
         onStep={props.onStep}
         onRemove={props.onRemove}
       />
@@ -107,6 +113,7 @@ export function CartTable(props: CartTableProps) {
 /** The selected line's buttons, 44px as every button a cashier presses (ADR-0113). */
 function LineActions(props: {
   line: CartLine | undefined;
+  quoted: EdgeQuotedLine | undefined;
   onStep: (unitId: number, delta: 1 | -1) => void;
   onRemove: (unitId: number) => void;
 }) {
@@ -133,7 +140,7 @@ function LineActions(props: {
         className="size-11"
         aria-label={t('posKiosk.sale.decrease', { name: label })}
         title={t('posKiosk.sale.decrease', { name: label })}
-        disabled={!line || !canDecrease(line.qty)}
+        disabled={!line || !canDecrease(shownQty(line.qty, paidEntryOf(props.quoted)))}
         onMouseDown={keepFocus}
         onClick={() => line && props.onStep(line.productUnitId, -1)}
       >
@@ -194,6 +201,25 @@ function CartRow(
   // From how many base units the bulk price applies (owner 2026-11-17); an older edge sends none.
   const offer = quoted?.priced ? (quoted.bulkOffer ?? null) : null;
   const from = offer ? { qty: formatQty(offer.fromQtyBase), uom: offer.baseUom } : null;
+  // The N+M (owner 2026-11-17): a paid-entry line counts its own free units at once; another
+  // line takes them from the edge's answer for its quantity.
+  const bonus = quoted?.bonus ?? null;
+  const entry = paidEntryOf(quoted);
+  const shown = shownQty(line.qty, entry);
+  const free = entry ? freeQty(line.qty, entry) : current && bonus ? bonus.freeQty : '0';
+  const deal = bonus ? bonusLabel(new Decimal(bonus.n), new Decimal(bonus.m)) : null;
+  const paidPrice =
+    entry && bonus && quoted?.total && new Decimal(bonus.paidQty).gt(0)
+      ? new Decimal(quoted.total).div(bonus.paidQty).toDecimalPlaces(2).toFixed(2)
+      : null;
+  // What the N+M took off is the free units', shown as such, not as a discount.
+  const shownDiscount =
+    discount && bonus
+      ? new Decimal(discount).minus(bonus.freeAmount)
+      : discount
+        ? new Decimal(discount)
+        : null;
+  const lineDiscount = shownDiscount?.gt(0) ? shownDiscount.toFixed(2) : null;
 
   useEffect(() => {
     if (props.selected) row.current?.scrollIntoView?.({ block: 'nearest' });
@@ -202,7 +228,7 @@ function CartRow(
   const commit = () => {
     if (draft === null) return;
     const qty = parseQty(draft);
-    if (qty !== null && qty !== line.qty) props.onSetQty(line.productUnitId, qty);
+    if (qty !== null && qty !== shown) props.onSetQty(line.productUnitId, qty);
     setDraft(null);
   };
 
@@ -234,6 +260,11 @@ function CartRow(
             {line.uomName}
           </span>
         </div>
+        {deal && new Decimal(free).gt(0) ? (
+          <span className="block truncate text-xs leading-3.5 font-medium text-success">
+            {t('posKiosk.sale.bonusFree', { free: formatQty(free), uom: line.uomName, deal })}
+          </span>
+        ) : null}
       </td>
       <td className="px-2">
         <input
@@ -241,16 +272,16 @@ function CartRow(
           inputMode="decimal"
           autoComplete="off"
           className="mx-auto block h-7 w-full max-w-20 rounded-md border border-input bg-background px-1 text-center font-mono text-sm font-semibold outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring"
-          value={draft ?? formatQty(line.qty)}
+          value={draft ?? formatQty(shown)}
           onFocus={(event) => {
-            setDraft(line.qty);
+            setDraft(shown);
             props.onSelect(line.productUnitId);
             event.currentTarget.select();
           }}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={commit}
           onKeyDown={(event) => {
-            const value = draft ?? line.qty;
+            const value = draft ?? shown;
             guard(event, value, (restored) => setDraft(restored));
             if (event.defaultPrevented) return;
             if (event.key === 'Enter') {
@@ -293,7 +324,7 @@ function CartRow(
           </>
         ) : quoted.priced && quoted.unitPrice !== null ? (
           <>
-            {formatTugrik(quoted.unitPrice)}
+            {formatTugrik(paidPrice ?? quoted.unitPrice)}
             {offer && from ? (
               // May take two lines in the till's 136px column: «6 ш-ээс бөөний» over the price.
               <span className="block font-sans text-[0.6875rem] leading-3.5 whitespace-normal text-muted-foreground">
@@ -321,13 +352,13 @@ function CartRow(
         ) : quoted.priced && quoted.total !== null ? (
           <>
             {formatTugrik(quoted.total)}
-            {discount ? (
+            {lineDiscount ? (
               // Kept to the cell's right edge with the amount always whole: a line wider than the
               // column and 12px of the gap beside it loses the start of its word. It used to run
               // past the cart's edge, cut, and made the list scroll sideways. 12px only from
               // `xl`, where the column holds the word and the amount.
               <span className="-ml-3 flex justify-end overflow-hidden text-[0.6875rem] leading-3.5 font-medium text-success xl:text-xs">
-                {t('posKiosk.sale.lineDiscount', { amount: formatMnt(discount) })}
+                {t('posKiosk.sale.lineDiscount', { amount: formatMnt(lineDiscount) })}
               </span>
             ) : null}
           </>

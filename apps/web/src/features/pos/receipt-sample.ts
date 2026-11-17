@@ -48,17 +48,27 @@ export function sampleReceipt(
             unitPrice: '14400.00',
             total: '13900.00',
           },
+          // A 2+1 (owner 2026-11-17): 3 leave, 2 are paid, 1 is listed under «УРАМШУУЛАЛ».
+          {
+            name: 'Саван гарын',
+            uomName: 'ш',
+            qty: '3',
+            unitPrice: '2000.00',
+            total: '4000.00',
+            bonus: { n: '2', m: '1', freeQty: '1', paidQty: '2', freeAmount: '2000.00' },
+          },
         ],
-    subtotal: refund ? '7000.00' : '24200.00',
-    discountTotal: refund ? '0.00' : '500.00',
-    total: refund ? '7000.00' : '23700.00',
-    vatTotal: refund ? '636.36' : '2154.55',
+    subtotal: refund ? '7000.00' : '30200.00',
+    discountTotal: refund ? '0.00' : '2500.00',
+    total: refund ? '7000.00' : '27700.00',
+    vatTotal: refund ? '636.36' : '2518.19',
+    ...(refund ? {} : { promotionTotal: '2000.00' }),
     tenders: options.credit
-      ? [{ kind: 'CREDIT', amount: refund ? '7000.00' : '23700.00', tendered: null }]
+      ? [{ kind: 'CREDIT', amount: refund ? '7000.00' : '27700.00', tendered: null }]
       : refund
         ? [{ kind: 'CASH', amount: '7000.00', tendered: null }]
         : [
-            { kind: 'CARD', amount: '13700.00', tendered: null },
+            { kind: 'CARD', amount: '17700.00', tendered: null },
             { kind: 'CASH', amount: '10000.00', tendered: '20000.00' },
           ],
     change: refund || options.credit ? '0.00' : '10000.00',
@@ -80,7 +90,7 @@ export function sampleReceipt(
           customerId: 1,
           customerCode: 'Х00123',
           customerName: 'Номин дэлгүүр',
-          amount: refund ? '7000.00' : '23700.00',
+          amount: refund ? '7000.00' : '27700.00',
         }
       : null,
     title,

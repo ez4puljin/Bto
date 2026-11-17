@@ -180,7 +180,7 @@ function BlockView({ block, info }: { block: ReceiptBlock; info: Facts }) {
                     {lineNo(index, line)} {line.name}
                     <span className="block font-mono font-normal text-muted-foreground">
                       {t('posKiosk.receipt.lineQty', {
-                        qty: formatQty(line.qty),
+                        qty: formatQty(paidQty(line)),
                         uom: line.uomName,
                         price: formatMnt(line.unitPrice),
                       })}
@@ -190,49 +190,60 @@ function BlockView({ block, info }: { block: ReceiptBlock; info: Facts }) {
                 </p>
               </li>
             ))}
+            <PromotionList receipt={receipt} compact />
           </ul>
         );
       }
       // One grid for the header and every row, so the columns line up; the name column wraps.
       return (
-        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] gap-x-2 gap-y-1 py-1.5">
-          <span className="border-b border-current pb-0.5 text-left">
-            {t('posKiosk.receipt.colNo')}
-          </span>
-          <span className="border-b border-current pb-0.5 text-left font-sans">
-            {t('posKiosk.receipt.colName')}
-          </span>
-          <span className="border-b border-current pb-0.5 text-right font-sans">
-            {t('posKiosk.receipt.colQty')}
-          </span>
-          <span className="border-b border-current pb-0.5 text-right font-sans">
-            {t('posKiosk.receipt.colPrice')}
-          </span>
-          <span className="border-b border-current pb-0.5 text-right font-sans">
-            {t('posKiosk.receipt.colTotal')}
-          </span>
-          {receipt.lines.map((line, index) => (
-            <Fragment key={index}>
-              <span data-line-no>{lineNo(index, line)}</span>
-              <span className="min-w-0 font-sans font-medium break-words">{line.name}</span>
-              <span className="text-right">{formatQty(line.qty)}</span>
-              <span className="text-right">{formatMnt(line.unitPrice)}</span>
-              <span className="text-right">{formatMnt(line.total)}</span>
-            </Fragment>
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] gap-x-2 gap-y-1 py-1.5">
+            <span className="border-b border-current pb-0.5 text-left">
+              {t('posKiosk.receipt.colNo')}
+            </span>
+            <span className="border-b border-current pb-0.5 text-left font-sans">
+              {t('posKiosk.receipt.colName')}
+            </span>
+            <span className="border-b border-current pb-0.5 text-right font-sans">
+              {t('posKiosk.receipt.colQty')}
+            </span>
+            <span className="border-b border-current pb-0.5 text-right font-sans">
+              {t('posKiosk.receipt.colPrice')}
+            </span>
+            <span className="border-b border-current pb-0.5 text-right font-sans">
+              {t('posKiosk.receipt.colTotal')}
+            </span>
+            {receipt.lines.map((line, index) => (
+              <Fragment key={index}>
+                <span data-line-no>{lineNo(index, line)}</span>
+                <span className="min-w-0 font-sans font-medium break-words">{line.name}</span>
+                <span className="text-right">{formatQty(paidQty(line))}</span>
+                <span className="text-right">{formatMnt(line.unitPrice)}</span>
+                <span className="text-right">{formatMnt(line.total)}</span>
+              </Fragment>
+            ))}
+          </div>
+          <PromotionList receipt={receipt} compact={false} />
+        </>
       );
     case 'TOTALS': {
-      const discount = new Decimal(receipt.discountTotal).gt(0);
+      // A sale since the N+M receipt (owner 2026-11-17): the N+M is printed as «УРАМШУУЛАЛ», not in
+      // «Хөнгөлөлт», so both the subtotal and the discount leave it out and still make the total.
+      const promotion = promotionOf(receipt);
+      const off = promotion ?? new Decimal(0);
+      const discountTotal = new Decimal(receipt.discountTotal).minus(off);
+      const discount = discountTotal.gt(0);
       const big = block.large ? 'text-[1.15em]' : null;
       return (
         <dl className="grid grid-cols-[1fr_auto] gap-x-3 py-1.5">
           {discount ? (
             <>
               <dt>{t('pos.fields.subtotal')}</dt>
-              <dd className="text-right">{formatMnt(receipt.subtotal)}</dd>
+              <dd className="text-right">
+                {formatMnt(new Decimal(receipt.subtotal).minus(off).toFixed(2))}
+              </dd>
               <dt>{t('pos.fields.discount')}</dt>
-              <dd className="text-right">{`−${formatMnt(receipt.discountTotal)}`}</dd>
+              <dd className="text-right">{`−${formatMnt(discountTotal.toFixed(2))}`}</dd>
             </>
           ) : null}
           {(receipt.vouchers ?? [])
@@ -245,8 +256,30 @@ function BlockView({ block, info }: { block: ReceiptBlock; info: Facts }) {
                 <dd className="text-right text-muted-foreground">{`−${formatMnt(voucher.amount)}`}</dd>
               </Fragment>
             ))}
-          <dt className={cn('font-sans font-semibold', big)}>{t('pos.fields.total')}</dt>
-          <dd className={cn('text-right font-semibold', big)}>{formatTugrik(receipt.total)}</dd>
+          {promotion ? (
+            <>
+              <dt className={cn('flex justify-between gap-2 font-sans font-semibold', big)}>
+                <span>{t('posKiosk.receipt.grandTotal')}</span>
+                <span className="font-normal">
+                  {t('posKiosk.receipt.kinds', { count: receipt.lines.length })}
+                </span>
+              </dt>
+              <dd className={cn('text-right font-semibold', big)}>{formatTugrik(receipt.total)}</dd>
+              {promotion.gt(0) ? (
+                <>
+                  <dt className="font-sans font-semibold">
+                    {t('posKiosk.receipt.promotionTotal')}
+                  </dt>
+                  <dd className="text-right font-semibold">{formatTugrik(promotion.toFixed(2))}</dd>
+                </>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <dt className={cn('font-sans font-semibold', big)}>{t('pos.fields.total')}</dt>
+              <dd className={cn('text-right font-semibold', big)}>{formatTugrik(receipt.total)}</dd>
+            </>
+          )}
           {credit ? null : (
             <>
               <dt className="text-muted-foreground">{t('posKiosk.receipt.vatIncluded')}</dt>
@@ -358,6 +391,77 @@ function BlockView({ block, info }: { block: ReceiptBlock; info: Facts }) {
     case 'SPACE':
       return <div aria-hidden className={SPACE[block.size]} />;
   }
+}
+
+/** What a goods line prints as its quantity: the paid part of an N+M line (owner 2026-11-17). */
+function paidQty(line: EdgeReceiptLine): string {
+  return line.bonus ? line.bonus.paidQty : line.qty;
+}
+
+/**
+ * A sale's N+M total printed apart (owner 2026-11-17); null on a return and on a receipt made
+ * before it, which print their totals as before.
+ */
+function promotionOf(receipt: EdgeReceipt): Decimal | null {
+  if (receipt.kind === 'RETURN' || receipt.promotionTotal === undefined) return null;
+  return new Decimal(receipt.promotionTotal);
+}
+
+/**
+ * «УРАМШУУЛАЛ» after the goods (owner 2026-11-17, as a Nomin receipt has it): each N+M line's
+ * free quantity at its unit price and what it comes to. Nothing on a return or without free goods.
+ */
+function PromotionList({ receipt, compact }: { receipt: EdgeReceipt; compact: boolean }) {
+  const { t } = useTranslation();
+  if (receipt.kind === 'RETURN') return null;
+  const free = receipt.lines.flatMap((line) =>
+    line.bonus && new Decimal(line.bonus.freeQty).gt(0) ? [{ line, bonus: line.bonus }] : [],
+  );
+  if (free.length === 0) return null;
+  const title = (
+    <p className="pt-1 text-center font-sans font-semibold tracking-wide">
+      {t('posKiosk.receipt.promotion')}
+    </p>
+  );
+  if (compact) {
+    return (
+      <li aria-label={t('posKiosk.receipt.promotion')}>
+        {title}
+        <ul className="space-y-1.5">
+          {free.map(({ line, bonus }, index) => (
+            <li key={index} className="flex justify-between gap-3">
+              <span className="min-w-0 font-sans font-medium">
+                {line.name}
+                <span className="block font-mono font-normal text-muted-foreground">
+                  {t('posKiosk.receipt.lineQty', {
+                    qty: formatQty(bonus.freeQty),
+                    uom: line.uomName,
+                    price: formatMnt(line.unitPrice),
+                  })}
+                </span>
+              </span>
+              <span className="shrink-0">{formatMnt(bonus.freeAmount)}</span>
+            </li>
+          ))}
+        </ul>
+      </li>
+    );
+  }
+  return (
+    <section aria-label={t('posKiosk.receipt.promotion')} className="pb-1.5">
+      {title}
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-2 gap-y-1 border-t border-current pt-0.5">
+        {free.map(({ line, bonus }, index) => (
+          <Fragment key={index}>
+            <span className="min-w-0 font-sans font-medium break-words">{line.name}</span>
+            <span className="text-right">{formatQty(bonus.freeQty)}</span>
+            <span className="text-right">{formatMnt(line.unitPrice)}</span>
+            <span className="text-right">{formatMnt(bonus.freeAmount)}</span>
+          </Fragment>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 /** The line's sequence number; a «*» after it marks a line charged the bulk price (owner 2026-11-17). */

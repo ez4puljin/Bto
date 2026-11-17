@@ -56,7 +56,7 @@ import {
 import { formatMnt, formatTugrik } from '@/lib/money';
 import { isTextField, useWedgeScanner } from '@/lib/scan/use-wedge-scanner';
 import { randomUuid } from '@/lib/uuid';
-import { type Cart, type CartLine, canDecrease } from '../cart';
+import { type Cart, type CartLine, canDecrease, heldQty, paidEntryOf, shownQty } from '../cart';
 import { type ApprovalRequest, ApprovalDialog } from '../components/approval-dialog';
 import { CartTable } from '../components/cart-table';
 import { CardHistoryDialog } from '../components/card-history-dialog';
@@ -188,12 +188,27 @@ export function SaleScreen(props: {
     [focusScan],
   );
 
+  // An N+M line is entered by what the customer pays for (owner 2026-11-17): a quote that finds
+  // the line holding less than its paid quantity's free units (two scans before the first answer,
+  // a 1+1's first piece) brings it up to them. It only ever adds, so it needs no void.
+  const { lines: cartLines, setQty: setCartQty } = cart;
+  useEffect(() => {
+    if (!fresh) return;
+    for (const line of cartLines) {
+      const answer = quoted.get(line.productUnitId);
+      const entry = paidEntryOf(answer);
+      if (!entry || !answer || !new Decimal(answer.qty).eq(line.qty)) continue;
+      const held = heldQty(shownQty(line.qty, entry), entry);
+      if (!new Decimal(held).eq(line.qty)) setCartQty(line.productUnitId, held);
+    }
+  }, [fresh, quoted, cartLines, setCartQty]);
+
   const addProduct = useCallback(
     (product: EdgeProductHit, unitId: number) => {
-      cart.add(product, unitId);
+      cart.add(product, unitId, paidEntryOf(quoted.get(unitId)));
       setScanError(null);
     },
-    [cart],
+    [cart, quoted],
   );
 
   const scan = useCallback(
@@ -364,28 +379,42 @@ export function SaleScreen(props: {
     [lineOf, voidLines, cart],
   );
 
+  // + and − change a paid-entry line by one paid unit; the void logs the goods taken off.
   const stepLine = useCallback(
     (unitId: number, delta: 1 | -1) => {
       const line = lineOf(unitId);
       if (!line) return;
-      if (delta > 0) cart.step(unitId, 1);
+      const entry = paidEntryOf(quoted.get(unitId));
+      if (entry) {
+        const shown = shownQty(line.qty, entry);
+        if (delta < 0 && !canDecrease(shown)) return;
+        const next = heldQty(new Decimal(shown).plus(delta).toFixed(), entry);
+        const less = new Decimal(line.qty).minus(next);
+        if (less.gt(0)) {
+          voidLines('QTY_REDUCED', [{ line, qty: less.toFixed() }], () =>
+            cart.setQty(unitId, next),
+          );
+        } else cart.setQty(unitId, next);
+      } else if (delta > 0) cart.step(unitId, 1);
       else if (canDecrease(line.qty)) {
         voidLines('QTY_REDUCED', [{ line, qty: '1' }], () => cart.step(unitId, -1));
       }
     },
-    [lineOf, voidLines, cart],
+    [lineOf, voidLines, cart, quoted],
   );
 
+  /** A typed quantity: on a paid-entry line the paid one, sent with its free units. */
   const setLineQty = useCallback(
-    (unitId: number, qty: string) => {
+    (unitId: number, typed: string) => {
       const line = lineOf(unitId);
       if (!line) return;
+      const qty = heldQty(typed, paidEntryOf(quoted.get(unitId)));
       const less = new Decimal(line.qty).minus(qty);
       if (less.gt(0)) {
         voidLines('QTY_REDUCED', [{ line, qty: less.toFixed() }], () => cart.setQty(unitId, qty));
       } else cart.setQty(unitId, qty);
     },
-    [lineOf, voidLines, cart],
+    [lineOf, voidLines, cart, quoted],
   );
 
   const clearSale = useCallback(() => {

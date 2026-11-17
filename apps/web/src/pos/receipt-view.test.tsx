@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import mn from '@tugeel/shared/i18n/mn.json';
 import {
   defaultReceiptLayout,
@@ -134,8 +134,11 @@ describe('the bulk price on the receipt (owner 2026-11-17, ADR-0207)', () => {
 
   it('prints a header row and numbers the lines, a «*» after the bulk one', () => {
     draw(layoutOf(false), false, withLines);
-    for (const head of ['№', 'Бараа', 'Тоо', 'Нэгж үнэ', 'Дүн'])
+    const r = mn.posKiosk.receipt;
+    for (const head of [r.colNo, r.colName, r.colQty, r.colPrice, r.colTotal])
       expect(screen.getAllByText(head).length).toBeGreaterThan(0);
+    expect(r.colPrice).toBe('Нэгж үнэ /НӨАТ-тай/');
+    expect(r.colTotal).toBe('Дүн ₮');
     expect(numbers()).toEqual(['1*', '2', '3', '4']);
     expect(notes()).toHaveLength(0);
   });
@@ -144,7 +147,7 @@ describe('the bulk price on the receipt (owner 2026-11-17, ADR-0207)', () => {
     draw(layoutOf(true), false, withLines);
     expect(screen.getByText(/^1\* Сүү 1л/)).toBeInTheDocument();
     expect(screen.getByText(/^2 Тос 1л/)).toBeInTheDocument();
-    expect(screen.queryByText('Нэгж үнэ')).toBeNull();
+    expect(screen.queryByText(mn.posKiosk.receipt.colPrice)).toBeNull();
     expect(notes()).toHaveLength(0);
   });
 
@@ -155,5 +158,92 @@ describe('the bulk price on the receipt (owner 2026-11-17, ADR-0207)', () => {
       kind: 'RETURN',
     }));
     expect(numbers()).toEqual(['1', '2', '3', '4']);
+  });
+});
+
+describe('the N+M on the receipt (owner 2026-11-17)', () => {
+  const r = mn.posKiosk.receipt;
+  const valueOf = (label: string | RegExp) => screen.getByText(label).nextElementSibling;
+  const layoutOf = (compact: boolean): ReceiptLayout => {
+    const base = defaultReceiptLayout();
+    return {
+      ...base,
+      blocks: base.blocks.map((block) => (block.type === 'LINES' ? { ...block, compact } : block)),
+    };
+  };
+
+  it('prints the paid quantity, the free goods apart and the totals that still add up', () => {
+    // The sample: milk 2 × 3,500, bread 2,800, water 13,900 (−500), soap 3 of a 2+1 at 2,000.
+    draw(layoutOf(false), false);
+    const [soap] = screen.getAllByText('Саван гарын');
+    if (!soap) throw new Error('no soap line');
+    // The goods line: 2 paid × 2,000 = 4,000.
+    expect(soap.nextElementSibling).toHaveTextContent(/^2$/);
+    expect(soap.nextElementSibling?.nextElementSibling).toHaveTextContent('2,000');
+    expect(soap.nextElementSibling?.nextElementSibling?.nextElementSibling).toHaveTextContent(
+      '4,000',
+    );
+    const section = screen.getByRole('region', { name: r.promotion });
+    expect(within(section).getByText(r.promotion)).toBeInTheDocument();
+    const free = within(section).getByText('Саван гарын');
+    expect(free.nextElementSibling).toHaveTextContent(/^1$/);
+    expect(free.nextElementSibling?.nextElementSibling).toHaveTextContent('2,000');
+    expect(free.nextElementSibling?.nextElementSibling?.nextElementSibling).toHaveTextContent(
+      '2,000',
+    );
+    expect(within(section).queryByText('Талх цагаан')).toBeNull();
+
+    // 28,200 − 500 = 27,700: the 2+1's 2,000 is not in the discount.
+    expect(valueOf(mn.pos.fields.subtotal)).toHaveTextContent('28,200');
+    expect(valueOf(mn.pos.fields.discount)).toHaveTextContent('−500');
+    expect(screen.getByText(r.grandTotal)).toBeInTheDocument();
+    expect(screen.getByText(r.kinds.replace('{{count}}', '4'))).toBeInTheDocument();
+    expect(screen.getByText(r.grandTotal).parentElement?.nextElementSibling).toHaveTextContent(
+      '27,700₮',
+    );
+    expect(valueOf(r.promotionTotal)).toHaveTextContent('2,000₮');
+    expect(screen.queryByText(mn.pos.fields.total)).toBeNull();
+  });
+
+  it('lists the free goods on a compact receipt too', () => {
+    draw(layoutOf(true), false);
+    const section = screen.getByRole('listitem', { name: r.promotion });
+    expect(within(section).getByText('Саван гарын')).toBeInTheDocument();
+    expect(within(section).getByText(/^1 ш × 2,000$/)).toBeInTheDocument();
+  });
+
+  it('prints a sale without free goods with its kinds and no promotion', () => {
+    draw(layoutOf(false), false, (receipt) => ({
+      ...receipt,
+      lines: receipt.lines.slice(0, 3),
+      subtotal: '24200.00',
+      discountTotal: '500.00',
+      total: '23700.00',
+      promotionTotal: '0.00',
+    }));
+    expect(screen.queryByRole('region', { name: r.promotion })).toBeNull();
+    expect(screen.queryByText(r.promotionTotal)).toBeNull();
+    expect(screen.getByText(r.kinds.replace('{{count}}', '3'))).toBeInTheDocument();
+    expect(valueOf(mn.pos.fields.discount)).toHaveTextContent('−500');
+  });
+
+  it('prints a receipt made before it as before', () => {
+    draw(layoutOf(false), false, ({ promotionTotal: _promotion, ...receipt }) => ({
+      ...receipt,
+      lines: receipt.lines.map(({ bonus: _bonus, ...line }) => line),
+    }));
+    expect(screen.getByText('Саван гарын').nextElementSibling).toHaveTextContent(/^3$/);
+    expect(screen.queryByRole('region', { name: r.promotion })).toBeNull();
+    expect(screen.queryByText(r.grandTotal)).toBeNull();
+    expect(screen.queryByText(/төрөл/)).toBeNull();
+    expect(valueOf(mn.pos.fields.subtotal)).toHaveTextContent('30,200');
+    expect(valueOf(mn.pos.fields.discount)).toHaveTextContent('−2,500');
+    expect(valueOf(mn.pos.fields.total)).toHaveTextContent('27,700₮');
+  });
+
+  it('prints no promotion on a return', () => {
+    draw(layoutOf(false), false, (receipt) => ({ ...receipt, kind: 'RETURN' }));
+    expect(screen.queryByRole('region', { name: r.promotion })).toBeNull();
+    expect(screen.queryByText(r.grandTotal)).toBeNull();
   });
 });

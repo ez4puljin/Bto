@@ -8490,7 +8490,8 @@
       "park": "Хадгалах (F9)",
       "parked": "Сагс ({{count}})",
       "parkedToast": "Сагс түр хадгалагдлаа",
-      "resumedToast": "Хадгалсан сагс дуудагдлаа"
+      "resumedToast": "Хадгалсан сагс дуудагдлаа",
+      "bonusFree": "({{free}}{{uom}} урамшуулал {{deal}})"
     },
     "search": {
       "title": "Бараа хайх",
@@ -8674,8 +8675,8 @@
       "colNo": "№",
       "colName": "Бараа",
       "colQty": "Тоо",
-      "colPrice": "Нэгж үнэ",
-      "colTotal": "Дүн",
+      "colPrice": "Нэгж үнэ /НӨАТ-тай/",
+      "colTotal": "Дүн ₮",
       "vatIncluded": "Үүнд НӨАТ",
       "tendered": "Өгсөн {{amount}}",
       "thanks": "Худалдан авалт хийсэнд баярлалаа!",
@@ -8694,7 +8695,11 @@
       "barcode": "Баримтын баркод {{number}}",
       "signatureHint": "(нэр, гарын үсэг)",
       "copyCustomer": "Харилцагчийн хувь",
-      "copyStore": "Дэлгүүрийн хувь"
+      "copyStore": "Дэлгүүрийн хувь",
+      "promotion": "УРАМШУУЛАЛ",
+      "grandTotal": "НИЙТ ДҮН:",
+      "kinds": "{{count}} төрөл",
+      "promotionTotal": "УРАМШУУЛАЛ:"
     },
     "history": {
       "title": "Борлуулалтын түүх",

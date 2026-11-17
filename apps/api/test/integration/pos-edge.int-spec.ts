@@ -16,6 +16,7 @@ import type {
 } from '@tugeel/shared/pos';
 import { Decimal } from '@tugeel/shared/money';
 import { posSaleNumber } from '@tugeel/shared/pos';
+import { bonusTotalFromPaid } from '@tugeel/shared/pricing';
 import { businessDate } from '@tugeel/shared/time';
 import { eq } from 'drizzle-orm';
 import sharp from 'sharp';
@@ -557,8 +558,10 @@ describe('pos edge', () => {
           unitPrice,
           total,
           bulkOffer: { ...offer, atBulk },
+          bonus: null,
         },
       ]);
+      expect(receipt.promotionTotal).toBe('0.00');
       // The amounts are the quote's; the stored receipt is the one printed.
       expect(receipt).toMatchObject({
         subtotal: quote.subtotal,
@@ -584,5 +587,118 @@ describe('pos edge', () => {
       expect(stored?.doc.lines[0]).not.toHaveProperty('bulkOffer');
     }
     expect(await sync.pushOnce()).toMatchObject({ state: 'sent', rejected: 0 });
+  });
+
+  it('tells the till a 2+1’s free and paid pieces and prints them, the sale unchanged (owner 2026-11-17)', async () => {
+    // The warehouse price 1,000: the supermarket 1,300, from 24 pieces 1,200.
+    const soap = await store.product('9305', 'Саван касс', '1000', '40');
+    await store.pos
+      .http()
+      .post('/api/v1/discount-programs')
+      .set('Authorization', `Bearer ${admin}`)
+      .set('Idempotency-Key', randomUUID())
+      .send({
+        name: 'Саван 2+1',
+        list: 'RETAIL',
+        scope: 'PRODUCT',
+        measure: 'QTY',
+        effect: 'BONUS',
+        targetKind: 'PRODUCT',
+        targetIds: [soap.id],
+        validFrom: businessDate(),
+        steps: [{ threshold: '2', value: '1' }],
+        tillIds: [],
+      })
+      .expect(201);
+    expect(await sync.pullOnce()).toBe('changed');
+    const soapUnit = unitOf(soap, 'PCS').id;
+    const quoted = async (lines: { productUnitId: number; qty: string }[]) =>
+      (await kiosk.post('/quote', { lines }).expect(200)).body as EdgeQuoteResponse;
+
+    // One piece: nothing free yet, but the till learns the 2+1 and enters the line by what is paid.
+    const one = await quoted([
+      { productUnitId: soapUnit, qty: '1' },
+      { productUnitId: colaUnit(), qty: '1' },
+    ]);
+    expect(one.lines[0]?.bonus).toEqual({
+      n: '2',
+      m: '1',
+      freeQty: '0',
+      paidQty: '1',
+      freeAmount: '0.00',
+      paidEntry: true,
+    });
+    expect(one.lines[1]?.bonus).toBeNull();
+
+    // The cashier types 20 paid: the till sends 30, of which 10 are free.
+    const qty = bonusTotalFromPaid(new Decimal(20), new Decimal(2), new Decimal(1)).toString();
+    expect(qty).toBe('30');
+    const lines = [{ productUnitId: soapUnit, qty }];
+    const quote = await quoted(lines);
+    expect(quote.lines[0]).toMatchObject({
+      qty: '30',
+      unitPrice: '800.00',
+      total: '24000.00',
+      discount: '12000.00',
+      bonus: {
+        n: '2',
+        m: '1',
+        freeQty: '10',
+        paidQty: '20',
+        freeAmount: '12000.00',
+        paidEntry: true,
+      },
+    });
+    expect(quote).toMatchObject({
+      subtotal: '36000.00',
+      discountTotal: '12000.00',
+      total: '24000.00',
+    });
+
+    const receipt = (
+      await sell(lines, [{ kind: 'CASH', amount: '24000', tendered: '24000' }]).expect(200)
+    ).body.receipt as EdgeReceipt;
+    expect(receipt.lines).toEqual([
+      expect.objectContaining({
+        name: 'Саван касс',
+        qty: '30',
+        unitPrice: '1200.00',
+        total: '24000.00',
+        bonus: { n: '2', m: '1', freeQty: '10', paidQty: '20', freeAmount: '12000.00' },
+      }),
+    ]);
+    // The totals are the sale's as before; the 2+1 is inside the discount, printed apart.
+    expect(receipt).toMatchObject({
+      subtotal: '36000.00',
+      discountTotal: '12000.00',
+      total: '24000.00',
+      vatTotal: quote.vatTotal,
+      promotionTotal: '12000.00',
+    });
+    const db = edge.get<EdgeDb>(EDGE_DB);
+    const [stored] = await db
+      .select({ receipt: edgeSales.receipt, doc: edgeSales.doc })
+      .from(edgeSales)
+      .where(eq(edgeSales.clientId, receipt.clientId));
+    expect(stored?.receipt).toEqual(receipt);
+    // The document for the centre is the sale of 30 pieces it always was.
+    expect(stored?.doc).toMatchObject({
+      subtotal: '36000.00',
+      discountTotal: '12000.00',
+      total: '24000.00',
+      vatTotal: quote.vatTotal,
+    });
+    expect(stored?.doc.lines).toHaveLength(1);
+    expect(stored?.doc.lines[0]).toMatchObject({
+      qty: '30.000',
+      basis: 'RETAIL_BULK',
+      unitPrice: '1200.00',
+      subtotal: '36000.00',
+      discountAmount: '12000.00',
+      total: '24000.00',
+    });
+    expect(stored?.doc.lines[0]).not.toHaveProperty('bonus');
+    expect(await sync.pushOnce()).toMatchObject({ state: 'sent', rejected: 0 });
+    expect(await centreSaleOf(receipt.number)).toMatchObject({ total: '24000.00' });
   });
 });

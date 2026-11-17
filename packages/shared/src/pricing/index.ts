@@ -8,3 +8,4 @@ export * from './discounts';
 export * from './profile';
 export * from './cart';
 export * from './deals';
+export * from './bonus';

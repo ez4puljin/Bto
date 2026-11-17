@@ -877,6 +877,24 @@ export interface EdgeQuotedLine {
    * supermarket price, or when it is not lower (absent from an older edge).
    */
   bulkOffer?: EdgeBulkOffer | null;
+  /**
+   * The product's N+M program on this line (ADR-0159 #3, owner 2026-11-17), display only: N and M
+   * in base units, the line's free and paid quantities in the line's unit (the free units of the
+   * product's whole quantity, shared over its lines as the engine shares the cut), what the N+M
+   * took off the line, and whether the till enters the line by its paid quantity (`lineBonuses`).
+   * Null without one; absent from an older edge.
+   */
+  bonus?: EdgeLineBonus | null;
+}
+
+/** A line's N+M as the edge tells the till and prints it; quantities and amounts as strings. */
+export interface EdgeLineBonus {
+  n: string;
+  m: string;
+  freeQty: string;
+  paidQty: string;
+  freeAmount: string;
+  paidEntry: boolean;
 }
 
 export interface EdgeQuoteResponse {
@@ -1143,6 +1161,13 @@ export interface EdgeReceiptLine {
    * it prices nothing. Null without an offer; absent on a return and on older receipts.
    */
   bulkOffer?: EdgeReceiptBulkOffer | null;
+  /**
+   * A sale's line of a product with an N+M (owner 2026-11-17): the goods line prints the paid
+   * quantity and the free quantity is listed under «УРАМШУУЛАЛ» at the unit price, for what the
+   * N+M took off (`freeAmount`). Display only; null without one; absent on a return and on older
+   * receipts.
+   */
+  bonus?: Omit<EdgeLineBonus, 'paidEntry'> | null;
 }
 
 /** The quote's bulk offer of a receipt line (ADR-0207) and whether the line was charged it. */
@@ -1167,6 +1192,13 @@ export interface EdgeReceipt {
   discountTotal: string;
   total: string;
   vatTotal: string;
+  /**
+   * A sale's N+M (owner 2026-11-17): the sum of its lines' `bonus.freeAmount`, inside
+   * `discountTotal`; printed as «УРАМШУУЛАЛ» and left out of «Хөнгөлөлт». Set on every sale made
+   * since ("0.00" without one), which also prints «НИЙТ ДҮН: N төрөл»; absent on a return and on
+   * older receipts, which print as before.
+   */
+  promotionTotal?: string;
   tenders: {
     kind: TenderKind;
     amount: string;

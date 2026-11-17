@@ -6,12 +6,14 @@ import {
   type EdgeBulkOffer,
   type EdgeCartLine,
   type EdgeCashier,
+  type EdgeLineBonus,
   type EdgeProductHit,
   type EdgeQuickGroup,
   type EdgeQuotedVoucher,
   type EdgeQuotedLine,
   type EdgeQuoteResponse,
   type EdgeReceipt,
+  type EdgeReceiptLine,
   type EdgeSaleRequest,
   lineVat,
   loyaltyEarnBase,
@@ -30,9 +32,12 @@ import {
   voucherPayments,
 } from '@tugeel/shared/pos';
 import {
+  type LineBonus,
+  lineBonuses,
   type PricedPart,
   type QuoteCoupon,
   type QuoteLineInput,
+  type QuoteProgram,
   type QuoteResult,
   perBasePrices,
   programServes,
@@ -194,8 +199,9 @@ export class CheckoutService {
     tillCode?: string,
   ): EdgeQuoteResponse {
     const loaded = this.store.get();
-    const { inputs, result } = this.price(loaded, lines, couponsOf(facts), tillCode);
+    const { inputs, result, programs } = this.price(loaded, lines, couponsOf(facts), tillCode);
     const vouchers = codesTaken(facts, result);
+    const bonuses = lineBonuses(inputs, result, programs, loaded.quote.products);
     const vat = inputs.map((input, index) => {
       const line = result.lines[index];
       return line?.priced
@@ -223,6 +229,7 @@ export class CheckoutService {
           discount: priced ? line.discountAmount.toFixed(2) : null,
           bulk: priced ? this.bulkPrices(loaded, input, line.parts) : null,
           bulkOffer: priced ? this.bulkOffer(loaded, input.unitId, line.parts) : null,
+          bonus: bonusWire(bonuses[index] ?? null),
         };
       }),
       subtotal: result.subtotal.toFixed(2),
@@ -266,7 +273,12 @@ export class CheckoutService {
     // ADR-0110: a supervisor's PIN once for the sale's codes (owner 2026-10-27), always.
     const approver = codes.length > 0 ? await this.voucherApprover(request) : null;
     const facts = await this.vouchers.resolve(codes);
-    const { inputs, result } = this.price(loaded, request.lines, couponsOf(facts), tillCode);
+    const { inputs, result, programs } = this.price(
+      loaded,
+      request.lines,
+      couponsOf(facts),
+      tillCode,
+    );
     const taken = codesTaken(facts, result);
     result.lines.forEach((line, index) => {
       if (!line.priced) {
@@ -285,6 +297,20 @@ export class CheckoutService {
     // makes them), printed on the receipt only (owner 2026-11-17).
     const offers = result.lines.flatMap((line) =>
       line.priced ? line.parts.map((part) => this.bulkOffer(loaded, part.unitId, line.parts)) : [],
+    );
+    // The N+M of each document line (owner 2026-11-17), printed only: a supermarket line is one
+    // part, so a line's bonus is its one document line's.
+    const quotedBonuses = lineBonuses(inputs, result, programs, loaded.quote.products);
+    const bonuses = result.lines.flatMap((line, index) =>
+      line.priced
+        ? line.parts.map(() =>
+            receiptBonus(line.parts.length === 1 ? (quotedBonuses[index] ?? null) : null),
+          )
+        : [],
+    );
+    const promotionTotal = bonuses.reduce(
+      (sum, bonus) => (bonus ? sum.plus(bonus.freeAmount) : sum),
+      new Decimal(0),
     );
     const totals = saleTotals(lines);
     const tenders = this.tenders(loaded, request, totals.total.minus(taken.paid), taken.wire);
@@ -408,12 +434,14 @@ export class CheckoutService {
             unitPrice: line.unitPrice,
             total: line.total,
             bulkOffer: offer ? { ...offer, atBulk: line.basis === 'RETAIL_BULK' } : null,
+            bonus: bonuses[index] ?? null,
           };
         }),
         subtotal: doc.subtotal,
         discountTotal: doc.discountTotal,
         total: doc.total,
         vatTotal: doc.vatTotal,
+        promotionTotal: promotionTotal.toFixed(2),
         tenders: tenders.wire.map((tender) => ({
           kind: tender.kind,
           amount: tender.amount,
@@ -512,7 +540,7 @@ export class CheckoutService {
     lines: readonly EdgeCartLine[],
     coupons: readonly QuoteCoupon[] = [],
     tillCode?: string,
-  ): { inputs: QuoteLineInput[]; result: QuoteResult } {
+  ): { inputs: QuoteLineInput[]; result: QuoteResult; programs: QuoteProgram[] } {
     if (lines.length === 0 || lines.length > POS_LIMITS.maxLines) {
       throw new AppError('VALIDATION_FAILED', `a cart has 1 to ${POS_LIMITS.maxLines} lines`);
     }
@@ -530,18 +558,19 @@ export class CheckoutService {
         qtyBase: qty.times(found.unit.factor).toDecimalPlaces(3),
       };
     });
+    // ADR-0159 #5: a plan naming tills serves only those.
+    const programs = loaded.quote.programs.filter((program) =>
+      programServes(program, 'RETAIL', {
+        tillId: tillCode === undefined ? null : (loaded.tills.get(tillCode)?.id ?? null),
+      }),
+    );
     const result = resolveQuote(inputs, {
       list: 'RETAIL',
       products: loaded.quote.products,
-      // ADR-0159 #5: a plan naming tills serves only those.
-      programs: loaded.quote.programs.filter((program) =>
-        programServes(program, 'RETAIL', {
-          tillId: tillCode === undefined ? null : (loaded.tills.get(tillCode)?.id ?? null),
-        }),
-      ),
+      programs,
       coupons,
     });
-    return { inputs, result };
+    return { inputs, result, programs };
   }
 
   /**
@@ -836,6 +865,32 @@ export class CheckoutService {
   private vatRate(loaded: LoadedSnapshot, productId: number): Decimal {
     return loaded.vatRates.get(productId) ?? new Decimal(0);
   }
+}
+
+/** A line's N+M as the till reads it (owner 2026-11-17). */
+function bonusWire(bonus: LineBonus | null): EdgeLineBonus | null {
+  return bonus
+    ? {
+        n: bonus.n.toString(),
+        m: bonus.m.toString(),
+        freeQty: bonus.freeQty.toString(),
+        paidQty: bonus.paidQty.toString(),
+        freeAmount: bonus.freeAmount.toFixed(2),
+        paidEntry: bonus.paidEntry,
+      }
+    : null;
+}
+
+/** A receipt line's N+M: printed only when something was free. */
+function receiptBonus(bonus: LineBonus | null): EdgeReceiptLine['bonus'] {
+  if (!bonus || !bonus.freeQty.gt(0)) return null;
+  return {
+    n: bonus.n.toString(),
+    m: bonus.m.toString(),
+    freeQty: bonus.freeQty.toString(),
+    paidQty: bonus.paidQty.toString(),
+    freeAmount: bonus.freeAmount.toFixed(2),
+  };
 }
 
 /** The coupons among a sale's codes, as the resolver takes them (ADR-0110). */

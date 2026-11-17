@@ -382,7 +382,7 @@ export function resolveQuote(lines: readonly QuoteLineInput[], context: QuoteCon
 const notAlone = (state: PartState) => !state.alone;
 
 /** Whether a line's product is in a product program's set: its one product, or its targets. */
-function targetsProduct(program: QuoteProgram, productId: number): boolean {
+export function targetsProduct(program: QuoteProgram, productId: number): boolean {
   return program.productIds ? program.productIds.has(productId) : program.productId === productId;
 }
 
