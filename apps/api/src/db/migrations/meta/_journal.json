@@ -757,6 +757,13 @@
       "when": 1794900097349,
       "tag": "0109_settlement_sms",
       "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1794904610964,
+      "tag": "0110_sales_free_qty",
+      "breakpoints": true
     }
   ]
 }

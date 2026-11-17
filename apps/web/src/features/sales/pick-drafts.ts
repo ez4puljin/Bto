@@ -82,3 +82,16 @@ export function shortOf(line: SalesOrderLine, draftQty?: string): string {
   const short = new Decimal(line.qtyBase).minus(picked);
   return short.lte(0) ? '' : `−${formatQty(short.toFixed())} ${line.baseUnitName}`;
 }
+
+/**
+ * A line's N+M split as it was sold (ADR-0217), in base units: what is picked stays the whole
+ * `qtyBase`, of which `free` was given free; null without free goods (or sold before ADR-0217).
+ */
+export function bonusSplitOf(
+  line: Pick<SalesOrderLine, 'qtyBase' | 'freeQtyBase'>,
+): { main: string; free: string } | null {
+  if (line.freeQtyBase === null || line.freeQtyBase === undefined) return null;
+  const free = new Decimal(line.freeQtyBase);
+  if (!free.gt(0)) return null;
+  return { main: new Decimal(line.qtyBase).minus(free).toFixed(), free: free.toFixed() };
+}

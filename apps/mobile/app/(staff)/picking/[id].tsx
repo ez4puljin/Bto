@@ -13,6 +13,7 @@ import { LineCountBadge, ShelfPill } from '../../../src/picking/pills';
 import {
   BASE_UNIT_ID,
   binOf,
+  bonusSplitOf,
   confirmBody,
   type Counts,
   keypadUnitsOfPickLine,
@@ -153,6 +154,7 @@ export default function PickingPartScreen() {
     const bin = lineInfo?.bins.find((entry) => entry.id === binId);
     const reservedShort = item.qtyApproved !== item.qtyBase;
     const picked = counts[item.id] ?? item.qtyPicked;
+    const split = bonusSplitOf(item);
     return (
       <View
         style={[
@@ -188,13 +190,20 @@ export default function PickingPartScreen() {
             <Text style={type.rowStrong} numberOfLines={2}>
               {item.productName}
             </Text>
-            <Text style={type.secondary} numberOfLines={2}>
+            <Text style={type.secondary} numberOfLines={3}>
               {[
                 item.productSku,
-                t('mobile.picking.part.ordered', {
-                  qty: formatQty(item.qtyBase),
-                  unit: item.baseUnitName,
-                }),
+                split
+                  ? t('mobile.picking.part.orderedSplit', {
+                      qty: formatQty(item.qtyBase),
+                      unit: item.baseUnitName,
+                      main: formatQty(split.main),
+                      free: formatQty(split.free),
+                    })
+                  : t('mobile.picking.part.ordered', {
+                      qty: formatQty(item.qtyBase),
+                      unit: item.baseUnitName,
+                    }),
                 reservedShort
                   ? t('mobile.picking.part.reserved', {
                       qty: formatQty(item.qtyApproved),
@@ -388,18 +397,26 @@ export default function PickingPartScreen() {
           server={server}
           unitId={opened.unitId}
           qty={opened.qty && opened.unitId !== BASE_UNIT_ID ? '' : opened.qty}
-          subtitle={(unit) =>
-            unit.isBase
-              ? t('mobile.picking.part.ordered', {
+          subtitle={(unit) => {
+            const split = bonusSplitOf(keypad.line);
+            return unit.isBase && split
+              ? t('mobile.picking.part.orderedSplit', {
                   qty: formatQty(keypad.line.qtyBase),
                   unit: keypad.line.baseUnitName,
+                  main: formatQty(split.main),
+                  free: formatQty(split.free),
                 })
-              : t('mobile.picking.part.orderedIn', {
-                  qty: formatQty(keypad.line.qtyBase),
-                  base: keypad.line.baseUnitName,
-                  unit: unit.uomName,
-                })
-          }
+              : unit.isBase
+                ? t('mobile.picking.part.ordered', {
+                    qty: formatQty(keypad.line.qtyBase),
+                    unit: keypad.line.baseUnitName,
+                  })
+                : t('mobile.picking.part.orderedIn', {
+                    qty: formatQty(keypad.line.qtyBase),
+                    base: keypad.line.baseUnitName,
+                    unit: unit.uomName,
+                  });
+          }}
           extra={{
             label: t('mobile.picking.part.outOfStock'),
             onPress: () => {

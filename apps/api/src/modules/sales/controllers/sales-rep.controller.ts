@@ -208,6 +208,8 @@ export class SalesRepController {
     @CurrentUser() ctx: AuthContext,
     @Query() query: SalesRepProductQueryDto,
   ): Promise<SalesRepProductPageDto> {
+    // One deal book for the badges and «Бонустай бараа» (ADR-0217), so both say the same.
+    const book = await this.shop.dealBook();
     const page = await this.shop.productPage(await this.shop.staffScope(ctx), {
       ...(query.q ? { q: query.q } : {}),
       ...(query.categoryIds ? { categoryIds: query.categoryIds } : {}),
@@ -217,9 +219,10 @@ export class SalesRepController {
       ...(query.sort === undefined ? {} : { sort: query.sort }),
       ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
       ...(query.limit === undefined ? {} : { limit: query.limit }),
+      ...(query.bonus ? { onlyIds: [...book.bonuses()] } : {}),
     });
     return {
-      data: (await this.shop.withDeals(page.data)).map(toRepProductDto),
+      data: (await this.shop.withDeals(page.data, book)).map(toRepProductDto),
       nextCursor: page.nextCursor,
       total: page.total,
     };

@@ -22,6 +22,7 @@ import { BINS_SOON } from '@/lib/features';
 import { formatMnt, plainDecimal } from '@/lib/money';
 import { QrCode } from '@/pos/components/qr-code';
 import type { SalesOrder, SalesOrderLine } from './api';
+import { bonusSplitOf } from './pick-drafts';
 
 /** The order's facts a document prints (a real order or the editor's made-up one). */
 export type DocumentOrder = Pick<
@@ -57,9 +58,10 @@ export type DocumentOrder = Pick<
     | 'total'
     | 'qtyDelivered'
     | 'qtyBase'
-  > & {
-    parts: Pick<SalesOrderLine['parts'][number], 'qty' | 'uomName' | 'unitPrice' | 'total'>[];
-  })[];
+  > &
+    Partial<Pick<SalesOrderLine, 'freeQtyBase'>> & {
+      parts: Pick<SalesOrderLine['parts'][number], 'qty' | 'uomName' | 'unitPrice' | 'total'>[];
+    })[];
 };
 
 export interface DocumentCompany {
@@ -419,8 +421,18 @@ function Lines({
               </span>
             ))
           : qty(line.qty, line.unitName);
-      case 'BASE_QTY':
-        return qty(line.qtyApproved, line.baseUnitName);
+      case 'BASE_QTY': {
+        // An N+M line says its split where the whole line is reserved (ADR-0217).
+        const split = bonusSplitOf(line);
+        return split && new Decimal(line.qtyApproved).eq(line.qtyBase)
+          ? t('sales.order.qtyBonus', {
+              qty: plainDecimal(line.qtyBase),
+              unit: line.baseUnitName,
+              main: plainDecimal(split.main),
+              free: plainDecimal(split.free),
+            })
+          : qty(line.qtyApproved, line.baseUnitName);
+      }
       case 'BIN':
         return line.pickBinCode ?? '';
       case 'PICKED':

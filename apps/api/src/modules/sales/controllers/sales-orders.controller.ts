@@ -165,6 +165,7 @@ function toDetail(order: OrderDetail): SalesOrderDetailDto {
       subtotal: money(line.subtotal),
       discountAmount: money(line.discountAmount),
       total: money(line.total),
+      freeQtyBase: line.freeQtyBase?.toString() ?? null,
       parts: line.parts.map((part) => ({
         productUnitId: part.productUnitId,
         uomName: part.uomName,

@@ -190,6 +190,17 @@ export default function ShopScreen() {
             removeLabel={t('mobile.shop.removeFilter', { name: t('mobile.shop.inStockChip') })}
           />
         ) : null}
+        {shown.bonus ? (
+          <Chip
+            tone="chosen"
+            label={t('mobile.filter.bonus')}
+            onPress={() => setSheet('filters')}
+            onRemove={() => set({ bonus: false })}
+            removeLabel={t('mobile.shop.removeFilter', { name: t('mobile.filter.bonus') })}
+          />
+        ) : (
+          <Chip label={t('mobile.filter.bonus')} onPress={() => set({ bonus: true })} />
+        )}
         {categoryNames.length === 0 ? (
           <Chip
             label={t('mobile.filter.categories')}

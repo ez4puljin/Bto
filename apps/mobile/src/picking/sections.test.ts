@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BASE_UNIT_ID,
   binOf,
+  bonusSplitOf,
   confirmBody,
   keypadUnitsOfPickLine,
   lineCountState,
@@ -109,5 +110,21 @@ describe('the confirmation body', () => {
     expect(body.missingBins).toBe(1);
     expect(binOf(infos[1], undefined)).toBe(200);
     expect(binOf(undefined, undefined)).toBeNull();
+  });
+});
+
+describe('bonusSplitOf', () => {
+  it('splits a 17+1 line into main and bonus, the total unchanged (ADR-0217)', () => {
+    expect(bonusSplitOf({ qtyBase: '20', freeQtyBase: '1' })).toEqual({ main: '19', free: '1' });
+    expect(bonusSplitOf({ qtyBase: '34', freeQtyBase: '1' })).toEqual({ main: '33', free: '1' });
+    expect(bonusSplitOf({ qtyBase: '36.000', freeQtyBase: '2.000' })).toEqual({
+      main: '34',
+      free: '2',
+    });
+  });
+
+  it('has none without free goods or on a line sold before', () => {
+    expect(bonusSplitOf({ qtyBase: '17', freeQtyBase: null })).toBeNull();
+    expect(bonusSplitOf({ qtyBase: '17', freeQtyBase: '0' })).toBeNull();
   });
 });

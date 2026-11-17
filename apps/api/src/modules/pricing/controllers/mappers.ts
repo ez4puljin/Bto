@@ -205,6 +205,16 @@ export function toQuoteDto(quote: Quote): QuoteDto {
         subtotal: result.priced ? result.subtotal.toFixed(0) : null,
         discountAmount: result.priced ? result.discountAmount.toFixed(0) : null,
         total: result.priced ? result.total.toFixed(0) : null,
+        bonus: line.bonus
+          ? {
+              n: line.bonus.n.toFixed(),
+              m: line.bonus.m.toFixed(),
+              freeQty: line.bonus.freeQty.toFixed(),
+              paidQty: line.bonus.paidQty.toFixed(),
+              freeQtyBase: line.bonus.freeQtyBase.toFixed(),
+              freeAmount: line.bonus.freeAmount.toFixed(0),
+            }
+          : null,
       };
     }),
     subtotal: quote.subtotal.toFixed(0),

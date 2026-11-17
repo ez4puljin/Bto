@@ -68,6 +68,7 @@ function productParams(query: ShopQuery) {
     ...(query.warehouseId !== null ? { warehouseId: query.warehouseId } : {}),
     ...(query.supplierIds.length > 0 ? { supplierIds: [...query.supplierIds] } : {}),
     ...(query.inStock ? { inStock: true } : {}),
+    ...(query.bonus ? { bonus: true } : {}),
     sort: query.sort,
   };
 }

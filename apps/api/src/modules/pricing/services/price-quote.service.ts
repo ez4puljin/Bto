@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal, roundHalfUp } from '@tugeel/shared/money';
 import {
+  type LineBonus,
+  lineBonuses,
   MAX_QUOTE_LINES,
   type PricedPart,
   type PriceList,
@@ -53,6 +55,11 @@ export interface QuotedLine {
   qtyBase: Decimal;
   factorSnapshot: Decimal;
   result: QuotedResult;
+  /**
+   * The line's N+M as the engine counted it (`lineBonuses`, ADR-0217): the free and paid
+   * quantities for display and for the order line's `free_qty_base`; null without one.
+   */
+  bonus: LineBonus | null;
 }
 
 export interface Quote {
@@ -150,6 +157,7 @@ export class PriceQuoteService {
       products,
       programs: quotePrograms,
     });
+    const bonuses = lineBonuses(inputs, result, quotePrograms, products);
     const unitInfo = new Map(
       [...unitsByProduct.values()].flat().map((unit) => [unit.unitId, unit] as const),
     );
@@ -180,6 +188,7 @@ export class PriceQuoteService {
                 total: priced.total,
               }
             : { priced: false, problem: 'PRICE_MISSING' },
+          bonus: priced?.priced ? (bonuses[index] ?? null) : null,
         };
       }),
       subtotal: result.subtotal,

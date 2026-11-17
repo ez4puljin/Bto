@@ -235,6 +235,12 @@ export const salesOrderLines = pgTable(
     subtotal: money('subtotal'),
     discountAmount: money('discount_amount'),
     total: money('total'),
+    /**
+     * Of `qty_base`, the base units an N+M gave free when the prices were frozen (ADR-0159 #3,
+     * ADR-0217): shown to the picker as «үндсэн + бонус», never priced or moved apart; null when
+     * no N+M gave any, and on lines frozen before ADR-0217.
+     */
+    freeQtyBase: qty('free_qty_base'),
     createdAt: createdAt(),
   },
   (t) => [
@@ -245,6 +251,10 @@ export const salesOrderLines = pgTable(
       sql`${t.qty} > 0 AND ${t.qtyBase} > 0 AND ${t.factorSnapshot} > 0`,
     ),
     check('sales_order_lines_original', sql`${t.originalQty} IS NULL OR ${t.originalQty} > 0`),
+    check(
+      'sales_order_lines_free',
+      sql`${t.freeQtyBase} IS NULL OR (${t.freeQtyBase} > 0 AND ${t.freeQtyBase} <= ${t.qtyBase})`,
+    ),
     check(
       'sales_order_lines_split',
       sql`${t.qtyApproved} >= 0 AND ${t.qtyBackordered} >= 0 AND ${t.qtyApproved} + ${t.qtyBackordered} <= ${t.qtyBase}`,
@@ -325,6 +335,8 @@ export const salesOrderExcludedLines = pgTable(
     subtotal: money('subtotal'),
     discountAmount: money('discount_amount'),
     total: money('total'),
+    /** The line's free base units as they were frozen (ADR-0217), written back on a restore. */
+    freeQtyBase: qty('free_qty_base'),
     /** The line's price parts as they were frozen, written back on a restore. */
     parts: jsonValue('parts').notNull(),
     excludedBy: userRef('excluded_by'),

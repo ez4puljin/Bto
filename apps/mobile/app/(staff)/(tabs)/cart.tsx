@@ -6,6 +6,7 @@ import {
   ChevronDown,
   CircleAlert,
   CircleMinus,
+  Gift,
   Package,
   Plus,
   ShoppingCart,
@@ -71,7 +72,19 @@ export default function CartScreen() {
   }
 
   const unpriced = quote.data?.lines.some((line) => !line.priced) === true;
-  const discount = quote.data ? new Decimal(quote.data.discountTotal) : new Decimal(0);
+  // The N+M's free goods stand apart under «Бонус» (ADR-0217): their value is not a discount too.
+  const bonuses = cart.lines.flatMap((line, index) => {
+    const bonus = quote.data?.lines[index]?.bonus;
+    return bonus && new Decimal(bonus.freeQtyBase).gt(0) ? [{ line, bonus }] : [];
+  });
+  const discount = quote.data
+    ? Decimal.max(
+        new Decimal(quote.data.discountTotal).minus(
+          bonuses.reduce((sum, entry) => sum.plus(entry.bonus.freeAmount), new Decimal(0)),
+        ),
+        0,
+      )
+    : new Decimal(0);
 
   const totalText = quote.data
     ? t('pricing.money', { amount: formatMnt(quote.data.total) })
@@ -136,6 +149,24 @@ export default function CartScreen() {
             </>
           )}
         </Card>
+
+        {bonuses.length > 0 ? (
+          <>
+            <SectionHeader style={styles.section}>{t('mobile.cart.bonus')}</SectionHeader>
+            <Card flush>
+              {bonuses.map(({ line, bonus }, index) => (
+                <View key={line.productUnitId}>
+                  {index > 0 ? <Separator inset={80} /> : null}
+                  <BonusRow
+                    line={line}
+                    product={productOf(line.productId)}
+                    freeQtyBase={bonus.freeQtyBase}
+                  />
+                </View>
+              ))}
+            </Card>
+          </>
+        ) : null}
 
         <SectionHeader style={styles.section}>{t('mobile.cart.totals')}</SectionHeader>
         <Card flush>
@@ -215,6 +246,15 @@ function CartRow({
   const baseWords = base ? words(base) : null;
   const pieces = new Decimal(line.factorToBase).times(line.qty).toFixed();
   const parts = priced?.priced ? priced.parts : [];
+  // An N+M line (ADR-0217): the pill keeps the total typed, the text says the paid part.
+  const free = priced?.bonus ? new Decimal(priced.bonus.freeQtyBase) : new Decimal(0);
+  const main =
+    free.gt(0) && baseWords
+      ? t('mobile.cart.mainQty', {
+          qty: new Decimal(pieces).minus(free).toFixed(),
+          unit: baseWords.name,
+        })
+      : null;
   // One part in whole packs costs the warehouse price a piece; loose pieces their own price.
   const perPiece =
     parts.length === 1 && parts[0]?.basis === 'WAREHOUSE'
@@ -222,8 +262,16 @@ function CartRow({
       : parts.length === 1 && parts[0]?.productUnitId === base?.id
         ? parts[0]?.unitPrice
         : null;
-  const detail =
-    parts.length > 1
+  const detail = main
+    ? [
+        main,
+        perPiece && baseWords
+          ? t('mobile.cart.perPiece', { amount: formatMnt(perPiece), unit: baseWords.short })
+          : null,
+      ]
+        .filter((part) => part !== null)
+        .join(' · ')
+    : parts.length > 1
       ? parts
           .map((part) => {
             const unit = product?.units.find((entry) => entry.id === part.productUnitId);
@@ -308,6 +356,39 @@ function CartRow({
   );
 }
 
+/** A line's free goods under «Бонус» (ADR-0217): the product, its free pieces, nothing to pay. */
+function BonusRow({
+  line,
+  product,
+  freeQtyBase,
+}: {
+  line: CartLine;
+  product: RepProduct | undefined;
+  freeQtyBase: string;
+}) {
+  const { t } = useTranslation();
+  const words = useUnitWords();
+  const base = product?.units.find((unit) => unit.isBase);
+  return (
+    <View style={styles.row}>
+      <View style={[styles.thumb, styles.bonusTile]}>
+        <Gift size={24} strokeWidth={1.8} color={colors.success} />
+      </View>
+      <View style={styles.text}>
+        <Text style={type.rowStrong} numberOfLines={2}>
+          {line.name}
+        </Text>
+        <Text style={[type.secondary, tabular]} numberOfLines={1}>
+          {t('mobile.cart.bonusQty', { qty: freeQtyBase, unit: base ? words(base).name : '' })}
+        </Text>
+      </View>
+      <Text style={[styles.lineTotal, styles.green]}>
+        {t('pricing.money', { amount: formatMnt('0') })}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   grow: { flex: 1 },
   body: { ...PAGE },
@@ -372,6 +453,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   green: { color: colors.success },
+  bonusTile: { backgroundColor: colors.fill },
   footer: { paddingBottom: spacing.md },
   footerTotal: { flexShrink: 1, minWidth: 72 },
   footerAmount: { ...type.title3, ...tabular },

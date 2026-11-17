@@ -77,6 +77,14 @@ export class DealBook {
     return this.productsWhere(() => true);
   }
 
+  /**
+   * Products an N+M program marks (ADR-0217, «Бонустай бараа»): a BONUS program, as the «17+1»
+   * badge names it (ADR-0092 #3).
+   */
+  bonuses(): Set<number> {
+    return this.productsWhere((program) => program.effect === 'BONUS');
+  }
+
   /** The programs marking a product, by id. */
   programsOf(productId: number): DiscountProgram[] {
     return (this.marks.get(productId) ?? []).flatMap((id) => {

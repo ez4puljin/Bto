@@ -51,6 +51,8 @@ export interface LineBonus {
   /** The line's share of the product's free units, and the rest, in the line's unit. */
   freeQty: Decimal;
   paidQty: Decimal;
+  /** The line's free units in base units, exact (the share before it is put in the line's unit). */
+  freeQtyBase: Decimal;
   /** What the N+M took off the line, whole MNT. */
   freeAmount: Decimal;
   /**
@@ -141,15 +143,17 @@ export function lineBonuses(
     if (!entry) return null;
     const unit = products.get(line.productId)?.units.find((one) => one.unitId === line.unitId);
     const factor = unit?.factor ?? new Decimal(1);
+    const freeBase = Decimal.min(line.qtyBase, shares.get(index) ?? ZERO);
     const freeQty = Decimal.min(
       line.qty,
-      (shares.get(index) ?? ZERO).div(factor).toDecimalPlaces(3, Decimal.ROUND_DOWN),
+      freeBase.div(factor).toDecimalPlaces(3, Decimal.ROUND_DOWN),
     );
     return {
       n: entry.n,
       m: entry.m,
       freeQty,
       paidQty: line.qty.minus(freeQty),
+      freeQtyBase: freeBase,
       freeAmount: entry.cut,
       paidEntry: unit?.isBase === true && productLines.get(line.productId) === 1,
     };

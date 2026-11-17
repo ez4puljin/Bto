@@ -160,6 +160,40 @@ describe('lineBonuses', () => {
     expect(pieces).toMatchObject({ free: '2', paid: '4', amount: '2000', paidEntry: false });
   });
 
+  it('keeps the exact free base units where the line’s unit cannot hold them', () => {
+    const lines = [line(1, box, 1), line(1, pcs, 6)];
+    const programs = [twoPlusOne];
+    const [boxes, pieces] = lineBonuses(
+      lines,
+      resolveQuote(lines, { list: 'RETAIL', products, programs }),
+      programs,
+      products,
+    );
+    expect(boxes?.freeQtyBase.toFixed()).toBe('4');
+    expect(pieces?.freeQtyBase.toFixed()).toBe('2');
+  });
+
+  it('splits a 17+1 typed by the total as the staff app shows it (ADR-0217)', () => {
+    const seventeen: QuoteProgram = { ...twoPlusOne, steps: [{ threshold: d(17), value: d(1) }] };
+    const split = (total: number) => {
+      const [bonus] = lineBonuses(
+        [line(1, pcs, total)],
+        resolveQuote([line(1, pcs, total)], {
+          list: 'WHOLESALE',
+          products,
+          programs: [seventeen],
+        }),
+        [seventeen],
+        products,
+      );
+      return [bonus?.paidQty.toFixed(), bonus?.freeQty.toFixed(), bonus?.freeQtyBase.toFixed()];
+    };
+    expect(split(17)).toEqual(['17', '0', '0']);
+    expect(split(20)).toEqual(['19', '1', '1']);
+    expect(split(34)).toEqual(['33', '1', '1']);
+    expect(split(36)).toEqual(['34', '2', '2']);
+  });
+
   it('has none when a priority program took the line alone', () => {
     const priority: QuoteProgram = {
       ...twoPlusOne,

@@ -16111,6 +16111,20 @@ export interface components {
             total: string;
             applied: components["schemas"]["AppliedDiscount"][];
         };
+        QuoteLineBonus: {
+            /** @description N, base units */
+            n: string;
+            /** @description M, base units */
+            m: string;
+            /** @description Free units of the line, in its unit */
+            freeQty: string;
+            /** @description The rest, in its unit: what the line is paid for */
+            paidQty: string;
+            /** @description Free units of the line, base units */
+            freeQtyBase: string;
+            /** @description What the N+M took off the line, whole MNT */
+            freeAmount: string;
+        };
         QuoteLine: {
             productId: number;
             productUnitId: number;
@@ -16125,6 +16139,8 @@ export interface components {
             subtotal: string | null;
             discountAmount: string | null;
             total: string | null;
+            /** @description The N+M the line holds, split into free and paid units; null without one */
+            bonus?: components["schemas"]["QuoteLineBonus"] | null;
         };
         Quote: {
             /** @enum {string} */
@@ -17521,6 +17537,8 @@ export interface components {
             subtotal: string | null;
             discountAmount: string | null;
             total: string | null;
+            /** @description Of qtyBase, the base units an N+M gave free at the frozen prices (ADR-0217); null when none */
+            freeQtyBase?: string | null;
             parts: components["schemas"]["SalesOrderPart"][];
         };
         SalesOrderPickPart: {
@@ -40694,6 +40712,8 @@ export interface operations {
                 supplierIds?: number[];
                 /** @description Only products with stock free in their home warehouse */
                 inStock?: boolean;
+                /** @description «Бонустай бараа» (ADR-0217): only products an N+M program marks today for the staff app */
+                bonus?: boolean;
                 /** @description NEW when left out: the latest to become sale-ready first */
                 sort?: "NEW" | "PRICE_ASC" | "PRICE_DESC";
             };

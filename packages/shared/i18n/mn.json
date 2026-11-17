@@ -5453,7 +5453,8 @@
       "loaded": "Ачсан",
       "loadedValue": "{{name}} · {{at}}",
       "invoice": "Нэхэмжлэх",
-      "noInvoice": "Нэхэмжлэх үүсээгүй"
+      "noInvoice": "Нэхэмжлэх үүсээгүй",
+      "qtyBonus": "{{qty}} {{unit}} (үндсэн {{main}} + бонус: {{free}})"
     },
     "stageActions": {
       "NONE": "Үйлдэлгүй",
@@ -9268,7 +9269,10 @@
       "next": "Захиалга илгээх",
       "perPiece": "{{amount}}₮/{{unit}}",
       "removeLine": "{{name}}-г сагснаас хасах",
-      "changeQty": "{{name}}: тоо өөрчлөх"
+      "changeQty": "{{name}}: тоо өөрчлөх",
+      "bonus": "Бонус",
+      "mainQty": "үндсэн {{qty}} {{unit}}",
+      "bonusQty": "{{qty}} {{unit}}"
     },
     "weekdays": {
       "0": "Ня",
@@ -9562,7 +9566,8 @@
       "inStock": "Зөвхөн үлдэгдэлтэй",
       "show": "Бараа харуулах",
       "showCount": "{{n}} бараа харуулах",
-      "none": "Тохирох бараа алга"
+      "none": "Тохирох бараа алга",
+      "bonus": "Бонустай бараа"
     },
     "suppliers": {
       "title": "Нийлүүлэгч",
@@ -10335,7 +10340,8 @@
         "unknownBarcode": "Энэ баркод бүртгэлгүй",
         "notInPart": "{{name}} энэ агуулахын хэсэгт алга",
         "countLine": "Тоолох: {{name}}",
-        "outOfStock": "Дууссан"
+        "outOfStock": "Дууссан",
+        "orderedSplit": "Захиалсан {{qty}} {{unit}} (үндсэн {{main}} + бонус: {{free}})"
       }
     },
     "transfers": {

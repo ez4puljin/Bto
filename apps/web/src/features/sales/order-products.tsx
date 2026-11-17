@@ -38,7 +38,7 @@ import {
 } from './api';
 import { PartGroupHeader, PickDraftCell } from './order-pick';
 import { orderRequestOf } from './order-request';
-import { shortOf, usePickDrafts } from './pick-drafts';
+import { bonusSplitOf, shortOf, usePickDrafts } from './pick-drafts';
 import { usePickerSelf } from './use-picker-self';
 
 /** A line as the table edits it; saved lines keep their id as the key. */
@@ -495,12 +495,7 @@ export function OrderProducts({
                       <TableCell className="text-right font-mono">
                         {stored ? (
                           <>
-                            <div>
-                              {t('sales.order.qtyIn', {
-                                qty: formatQty(stored.qtyApproved),
-                                unit: stored.baseUnitName,
-                              })}
-                            </div>
+                            <ApprovedQty line={stored} />
                             {new Decimal(stored.qtyBackordered).gt(0) ? (
                               <div className="text-xs text-warning">
                                 {t('sales.panel.products.backorderedLine', {
@@ -718,5 +713,42 @@ function OriginalQty({
         unit: stored.unitName,
       })}
     </div>
+  );
+}
+
+/**
+ * The reserved count of a line, the goods to pick; a line an N+M gave free goods says its split
+ * (ADR-0217): «34 ш (үндсэн 33 + бонус: 1)», under the reserved count when part is backordered.
+ */
+function ApprovedQty({ line }: { line: SalesOrderLine }) {
+  const { t } = useTranslation();
+  const split = bonusSplitOf(line);
+  const whole = new Decimal(line.qtyApproved).eq(line.qtyBase);
+  return (
+    <>
+      <div>
+        {split && whole
+          ? t('sales.order.qtyBonus', {
+              qty: formatQty(line.qtyBase),
+              unit: line.baseUnitName,
+              main: formatQty(split.main),
+              free: formatQty(split.free),
+            })
+          : t('sales.order.qtyIn', {
+              qty: formatQty(line.qtyApproved),
+              unit: line.baseUnitName,
+            })}
+      </div>
+      {split && !whole ? (
+        <div className="text-xs text-muted-foreground">
+          {t('sales.order.qtyBonus', {
+            qty: formatQty(line.qtyBase),
+            unit: line.baseUnitName,
+            main: formatQty(split.main),
+            free: formatQty(split.free),
+          })}
+        </div>
+      ) : null}
+    </>
   );
 }

@@ -25849,6 +25849,15 @@
             }
           },
           {
+            "name": "bonus",
+            "required": false,
+            "in": "query",
+            "description": "«Бонустай бараа» (ADR-0217): only products an N+M program marks today for the staff app",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "sort",
             "required": false,
             "in": "query",
@@ -61972,6 +61981,43 @@
           "applied"
         ]
       },
+      "QuoteLineBonus": {
+        "type": "object",
+        "properties": {
+          "n": {
+            "type": "string",
+            "description": "N, base units"
+          },
+          "m": {
+            "type": "string",
+            "description": "M, base units"
+          },
+          "freeQty": {
+            "type": "string",
+            "description": "Free units of the line, in its unit"
+          },
+          "paidQty": {
+            "type": "string",
+            "description": "The rest, in its unit: what the line is paid for"
+          },
+          "freeQtyBase": {
+            "type": "string",
+            "description": "Free units of the line, base units"
+          },
+          "freeAmount": {
+            "type": "string",
+            "description": "What the N+M took off the line, whole MNT"
+          }
+        },
+        "required": [
+          "n",
+          "m",
+          "freeQty",
+          "paidQty",
+          "freeQtyBase",
+          "freeAmount"
+        ]
+      },
       "QuoteLine": {
         "type": "object",
         "properties": {
@@ -62016,6 +62062,16 @@
           "total": {
             "type": "string",
             "nullable": true
+          },
+          "bonus": {
+            "nullable": true,
+            "description": "The N+M the line holds, split into free and paid units; null without one",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/QuoteLineBonus"
+              }
+            ]
           }
         },
         "required": [
@@ -67608,6 +67664,11 @@
           "total": {
             "type": "string",
             "nullable": true
+          },
+          "freeQtyBase": {
+            "type": "string",
+            "nullable": true,
+            "description": "Of qtyBase, the base units an N+M gave free at the frozen prices (ADR-0217); null when none"
           },
           "parts": {
             "type": "array",

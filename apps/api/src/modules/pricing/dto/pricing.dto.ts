@@ -371,6 +371,18 @@ export class QuotePartDto {
   @ApiProperty({ type: [AppliedDiscountDto] }) applied: AppliedDiscountDto[];
 }
 
+/** A quoted line's N+M (ADR-0159 #3, ADR-0217): display only, the line's total already holds it. */
+@ApiSchema({ name: 'QuoteLineBonus' })
+export class QuoteLineBonusDto {
+  @ApiProperty({ description: 'N, base units' }) n: string;
+  @ApiProperty({ description: 'M, base units' }) m: string;
+  @ApiProperty({ description: 'Free units of the line, in its unit' }) freeQty: string;
+  @ApiProperty({ description: 'The rest, in its unit: what the line is paid for' })
+  paidQty: string;
+  @ApiProperty({ description: 'Free units of the line, base units' }) freeQtyBase: string;
+  @ApiProperty({ description: 'What the N+M took off the line, whole MNT' }) freeAmount: string;
+}
+
 @ApiSchema({ name: 'QuoteLine' })
 export class QuoteLineDto {
   @ApiProperty() productId: number;
@@ -386,6 +398,12 @@ export class QuoteLineDto {
   subtotal: string | null;
   @ApiProperty({ type: String, nullable: true }) discountAmount: string | null;
   @ApiProperty({ type: String, nullable: true }) total: string | null;
+  @ApiPropertyOptional({
+    type: QuoteLineBonusDto,
+    nullable: true,
+    description: 'The N+M the line holds, split into free and paid units; null without one',
+  })
+  bonus?: QuoteLineBonusDto | null;
 }
 
 @ApiSchema({ name: 'Quote' })

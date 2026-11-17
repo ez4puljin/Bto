@@ -1,4 +1,4 @@
-import { Package, Truck, Warehouse } from 'lucide-react-native';
+import { Gift, Package, Truck, Warehouse } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -21,7 +21,7 @@ const WAREHOUSE_TINTS = [
 
 /**
  * «Шүүлтүүр» (the Filter board, ADR-0068; «Bto300»'s filter sheet since ADR-0100): categories, the
- * home warehouse, the suppliers and «Зөвхөн үлдэгдэлтэй» on a draft of the filters; «N бараа
+ * home warehouse, the suppliers, «Зөвхөн үлдэгдэлтэй» and «Бонустай бараа» (ADR-0217) on a draft of the filters; «N бараа
  * харуулах» counts the draft and applies it, closing leaves the shop as it was. The order has its
  * own sheet («Эрэмбэлэх» on the floating pill); the draft carries it unchanged.
  */
@@ -165,7 +165,7 @@ export function FilterSheet({
             />
           </Group>
 
-          <Group style={styles.section}>
+          <Group style={styles.section} inset={ICON_INSET}>
             <Row
               icon={
                 <IconTile color={colors.tint.green}>
@@ -178,6 +178,21 @@ export function FilterSheet({
                   value={draft.inStock}
                   onChange={(inStock) => setDraft({ ...draft, inStock })}
                   label={t('mobile.filter.inStock')}
+                />
+              }
+            />
+            <Row
+              icon={
+                <IconTile color={colors.tint.red}>
+                  <Gift size={17} color={colors.primaryForeground} />
+                </IconTile>
+              }
+              title={t('mobile.filter.bonus')}
+              right={
+                <Toggle
+                  value={draft.bonus === true}
+                  onChange={(bonus) => setDraft({ ...draft, bonus })}
+                  label={t('mobile.filter.bonus')}
                 />
               }
             />

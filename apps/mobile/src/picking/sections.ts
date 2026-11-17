@@ -145,3 +145,16 @@ export function confirmBody(
   });
   return { lines: body, uncounted, missingBins };
 }
+
+/**
+ * A line's N+M split as it was sold (ADR-0217), in base units: the total stays what is picked, the
+ * main part is what is paid for; null when the line has no free goods (or was sold before).
+ */
+export function bonusSplitOf(
+  line: Pick<PickLine, 'qtyBase' | 'freeQtyBase'>,
+): { main: string; free: string } | null {
+  if (line.freeQtyBase === null || line.freeQtyBase === undefined) return null;
+  const free = new Decimal(line.freeQtyBase);
+  if (!free.gt(0)) return null;
+  return { main: new Decimal(line.qtyBase).minus(free).toFixed(), free: free.toFixed() };
+}

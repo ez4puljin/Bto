@@ -324,6 +324,13 @@ export class SalesOrderLineDto {
   @ApiProperty({ type: String, nullable: true }) subtotal: string | null;
   @ApiProperty({ type: String, nullable: true }) discountAmount: string | null;
   @ApiProperty({ type: String, nullable: true }) total: string | null;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description:
+      'Of qtyBase, the base units an N+M gave free at the frozen prices (ADR-0217); null when none',
+  })
+  freeQtyBase?: string | null;
   @ApiProperty({ type: [SalesOrderPartDto] }) parts: SalesOrderPartDto[];
 }
 

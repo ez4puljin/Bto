@@ -13,6 +13,8 @@ export interface ShopFilters {
   /** Main suppliers; none: every supplier. */
   supplierIds: number[];
   inStock: boolean;
+  /** «Бонустай бараа» (ADR-0217): only products an N+M program marks today; absent is off. */
+  bonus?: boolean;
 }
 
 /** What the shop asks the server: the filters and the search. */
@@ -55,7 +57,8 @@ export function activeCount(filters: ShopFilters): number {
     (filters.categoryIds.length > 0 ? 1 : 0) +
     (filters.warehouseId !== null ? 1 : 0) +
     (filters.supplierIds.length > 0 ? 1 : 0) +
-    (filters.inStock ? 1 : 0)
+    (filters.inStock ? 1 : 0) +
+    (filters.bonus ? 1 : 0)
   );
 }
 
@@ -92,6 +95,7 @@ export function filtersFrom(value: unknown): ShopFilters | null {
         : null,
     supplierIds: positiveIds(stored.supplierIds),
     inStock: stored.inStock === true,
+    ...(stored.bonus === true ? { bonus: true } : {}),
   };
 }
 

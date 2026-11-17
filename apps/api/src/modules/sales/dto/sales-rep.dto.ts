@@ -371,6 +371,15 @@ export class SalesRepProductQueryDto extends PageQueryDto {
   inStock?: boolean;
 
   @ApiPropertyOptional({
+    description:
+      '«Бонустай бараа» (ADR-0217): only products an N+M program marks today for the staff app',
+  })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  bonus?: boolean;
+
+  @ApiPropertyOptional({
     enum: REP_PRODUCT_SORTS,
     description: 'NEW when left out: the latest to become sale-ready first',
   })

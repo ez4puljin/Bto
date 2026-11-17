@@ -50,7 +50,7 @@ import {
   TransfersService,
 } from '../../inventory';
 import { CustomerAddressesService, CustomersService, type LockedCustomer } from '../../partners';
-import { PriceQuoteService } from '../../pricing';
+import { PriceQuoteService, type QuotedLine } from '../../pricing';
 import {
   type BackorderedLine,
   CREDIT_CHECKER,
@@ -608,6 +608,7 @@ export class SalesOrdersService implements OnModuleInit {
           subtotal: line.subtotal,
           discountAmount: line.discountAmount,
           total: line.total,
+          freeQtyBase: line.freeQtyBase,
           parts: frozen.map(frozenPart),
           excludedBy: ctx.userId,
         });
@@ -624,6 +625,8 @@ export class SalesOrdersService implements OnModuleInit {
             qtyBase: entry.qtyBase,
             qtyApproved: new Decimal(0),
             qtyBackordered: new Decimal(0),
+            // Priced again below, which writes the new split (ADR-0217).
+            freeQtyBase: null,
           })
           .where(eq(salesOrderLines.id, entry.line.id));
       }
@@ -654,6 +657,7 @@ export class SalesOrdersService implements OnModuleInit {
             subtotal: entry.requote ? null : entry.row.subtotal,
             discountAmount: entry.requote ? null : entry.row.discountAmount,
             total: entry.requote ? null : entry.row.total,
+            freeQtyBase: entry.requote ? null : entry.row.freeQtyBase,
           })
           .returning({ id: salesOrderLines.id });
         if (!line) throw new Error('a restored line was not written');
@@ -809,6 +813,7 @@ export class SalesOrdersService implements OnModuleInit {
             subtotal: result.subtotal,
             discountAmount: result.discountAmount,
             total: result.total,
+            freeQtyBase: freeQtyBaseOf(quote.lines[index]),
           })
           .where(eq(salesOrderLines.id, line.lineId));
         result.parts.forEach((part, partIndex) => {
@@ -1194,6 +1199,7 @@ export class SalesOrdersService implements OnModuleInit {
             subtotal: result.subtotal,
             discountAmount: result.discountAmount,
             total: result.total,
+            freeQtyBase: freeQtyBaseOf(quoted),
           })
           .where(eq(salesOrderLines.id, line.id));
         line.warehouseId = warehouseId;
@@ -2098,6 +2104,12 @@ interface FrozenPart {
   discountAmount: string;
   total: string;
   applied: unknown;
+}
+
+/** The free base units an N+M gave a quoted line (ADR-0217); null when none. */
+function freeQtyBaseOf(quoted: QuotedLine | undefined): Decimal | null {
+  const free = quoted?.bonus?.freeQtyBase;
+  return free?.gt(0) ? free : null;
 }
 
 function frozenPart(part: typeof salesOrderLineParts.$inferSelect): FrozenPart {

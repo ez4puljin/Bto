@@ -92,6 +92,8 @@ export interface OrderLine {
   subtotal: Decimal | null;
   discountAmount: Decimal | null;
   total: Decimal | null;
+  /** Of `qtyBase`, the base units an N+M gave free (ADR-0217); null when none or not recorded. */
+  freeQtyBase: Decimal | null;
   parts: OrderPart[];
 }
 
@@ -925,6 +927,7 @@ function lineView(
     subtotal: line.subtotal,
     discountAmount: line.discountAmount,
     total: line.total,
+    freeQtyBase: line.freeQtyBase,
     parts: parts
       .filter((part) => part.lineId === line.id)
       .map((part) => ({
