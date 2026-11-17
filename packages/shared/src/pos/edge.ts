@@ -772,6 +772,20 @@ export interface EdgeShiftCloseRequest {
   note: string | null;
 }
 
+/**
+ * From how many base units the supermarket's bulk price applies (ADR-0207) and what one unit of the
+ * line or the hit then costs, before any discount program; for display only (owner 2026-11-17).
+ * The threshold counts the product's whole base quantity in the cart, every line of it together.
+ */
+export interface EdgeBulkOffer {
+  /** In base units, as the profile says. */
+  fromQtyBase: string;
+  /** The base unit's name («ш»). */
+  baseUom: string;
+  /** One unit of the line's or the hit's own unit at the bulk price, whole MNT. */
+  bulkPrice: string;
+}
+
 export interface EdgeProductUnitHit {
   unitId: number;
   uomName: string;
@@ -781,6 +795,8 @@ export interface EdgeProductUnitHit {
   price: string | null;
   /** Its barcodes as printed. */
   barcodes: string[];
+  /** The bulk price from its threshold; null without one (absent from an older edge). */
+  bulkOffer?: EdgeBulkOffer | null;
 }
 
 export interface EdgeProductHit {
@@ -856,6 +872,11 @@ export interface EdgeQuotedLine {
   discount: string | null;
   /** Set while the line is charged the bulk price: one unit's list prices, to compare on the till. */
   bulk?: { retailPrice: string; bulkPrice: string } | null;
+  /**
+   * The bulk price from its threshold, below it and at it; null without a bulk tier, off the
+   * supermarket price, or when it is not lower (absent from an older edge).
+   */
+  bulkOffer?: EdgeBulkOffer | null;
 }
 
 export interface EdgeQuoteResponse {

@@ -24,10 +24,11 @@ import { edgeOutbox, edgeSales } from '../../src/edge/db/schema';
 import { OutboxService } from '../../src/edge/services/outbox.service';
 import { SyncRunner } from '../../src/edge/services/sync.runner';
 import { createHttpApp } from '../harness/apps';
-import { type ProductJson, unitOf } from '../harness/catalog';
+import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { createEdgeApp, edgeDatabase, kioskApi } from '../harness/edge';
 import { expectReconciled } from '../harness/inventory';
 import { posActors, posStore } from '../harness/pos';
+import { pricingApi } from '../harness/pricing';
 
 /**
  * The store edge against a real centre (ADR-0063, ADR-0067): the snapshot, pairing a browser with
@@ -191,6 +192,73 @@ describe('pos edge', () => {
         .expect(200)
     ).body as EdgeQuoteResponse;
     expect(quote).toMatchObject({ total: '5200.00', vatTotal: '472.72' });
+  });
+
+  it('tells the till from how many pieces the bulk price applies, changing no price (owner 2026-11-17)', async () => {
+    // The store's profile: the supermarket +30 %, from 24 pieces +20 %; the cola's warehouse price is 1,000.
+    const offer = { fromQtyBase: '24', bulkPrice: '1200.00' };
+    const hits = (await kiosk.get('/products/search?q=кола касс').expect(200))
+      .body as EdgeProductHit[];
+    const hit = hits[0]?.units[0];
+    expect(hit).toMatchObject({ price: '1300.00', bulkOffer: offer });
+    expect(hit?.bulkOffer?.baseUom).toBe(hit?.uomName);
+    const quoted = async (productUnitId: number, qty: string) =>
+      (await kiosk.post('/quote', { lines: [{ productUnitId, qty }] }).expect(200))
+        .body as EdgeQuoteResponse;
+
+    const below = await quoted(colaUnit(), '23');
+    expect(below.lines[0]).toMatchObject({
+      unitPrice: '1300.00',
+      total: '29900.00',
+      discount: '0.00',
+      bulk: null,
+      bulkOffer: { ...offer, baseUom: hit?.uomName },
+    });
+    expect(below).toMatchObject({ subtotal: '29900.00', total: '29900.00' });
+
+    const at = await quoted(colaUnit(), '24');
+    expect(at.lines[0]).toMatchObject({
+      unitPrice: '1200.00',
+      total: '28800.00',
+      discount: '0.00',
+      bulk: { retailPrice: '1300.00', bulkPrice: '1200.00' },
+      bulkOffer: { ...offer, baseUom: hit?.uomName },
+    });
+    expect(at).toMatchObject({ subtotal: '28800.00', total: '28800.00' });
+
+    // A profile without a bulk tier offers nothing.
+    const catalog = catalogApi(central, admin);
+    const pricing = pricingApi(central, admin);
+    const plain = await catalog.product({
+      sku: '9303',
+      name: 'Ус касс',
+      categoryId: await catalog.category('Бөөнийгүй PE'),
+      baseUomId: await catalog.uomId('PCS'),
+    });
+    const profile = await pricing.profile('Бөөнийгүй PE', {
+      retailBulkMinQty: null,
+      retailBulkMarkupPct: null,
+    });
+    await pricing.terms(plain.id, '1000', profile, null);
+    await catalog
+      .http()
+      .post('/api/v1/pricing/sale-ready')
+      .set('Authorization', `Bearer ${admin}`)
+      .set(idempotency())
+      .send({ productIds: [plain.id] })
+      .expect(200);
+    expect(await sync.pullOnce()).toBe('changed');
+    const plainHits = (await kiosk.get('/products/search?q=ус касс').expect(200))
+      .body as EdgeProductHit[];
+    expect(plainHits[0]).toMatchObject({ productId: plain.id });
+    expect(plainHits[0]?.units[0]).toMatchObject({ price: '1300.00', bulkOffer: null });
+    const plainQuote = await quoted(unitOf(plain, 'PCS').id, '30');
+    expect(plainQuote.lines[0]).toMatchObject({
+      unitPrice: '1300.00',
+      total: '39000.00',
+      bulk: null,
+      bulkOffer: null,
+    });
   });
 
   it('sells with change and by card; the centre posts them, filling the empty shelf', async () => {

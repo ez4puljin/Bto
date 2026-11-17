@@ -217,6 +217,28 @@ export function unitPriceTable(terms: QuoteTerms, units: readonly QuoteUnit[]): 
   });
 }
 
+/**
+ * What a supermarket line of a unit is charged from the profile's quantity on (ADR-0207): the
+ * threshold in base units (the product's whole quantity in the cart counts, as in `resolveQuote`)
+ * and one unit at the supermarket price and at the bulk price, before any discount program, as the
+ * quote lists them. Null without a bulk tier or when the bulk price is not below the supermarket
+ * price. The till shows it to the cashier and the customer (owner 2026-11-17); it prices nothing.
+ */
+export interface RetailBulkOffer {
+  fromQtyBase: Decimal;
+  retailPrice: Decimal;
+  bulkPrice: Decimal;
+}
+
+export function retailBulkOffer(terms: QuoteTerms, factor: Decimal): RetailBulkOffer | null {
+  const fromQtyBase = terms.profile.retailBulkMinQty;
+  const prices = perBasePrices(terms.warehousePrice, terms.profile);
+  if (fromQtyBase === null || prices.retailBulk === null) return null;
+  const retailPrice = unitPriceOf(basisPrice(prices, 'RETAIL'), factor);
+  const bulkPrice = unitPriceOf(basisPrice(prices, 'RETAIL_BULK'), factor);
+  return bulkPrice.lt(retailPrice) ? { fromQtyBase, retailPrice, bulkPrice } : null;
+}
+
 function basisPrice(prices: PerBasePrices, basis: PriceBasis): Decimal {
   switch (basis) {
     case 'WAREHOUSE':

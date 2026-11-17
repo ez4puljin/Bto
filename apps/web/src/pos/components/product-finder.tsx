@@ -3,7 +3,7 @@ import { cn } from 'cn';
 import { ScanBarcode } from 'lucide-react';
 import { type KeyboardEvent, type RefObject, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatTugrik } from '@/lib/money';
+import { formatQty, formatTugrik } from '@/lib/money';
 import { useDebounced } from '@/lib/use-debounced';
 import { useProblemText } from '../messages';
 import { useProductSearch } from '../queries';
@@ -161,14 +161,28 @@ export function ProductFinder(props: {
                       {option.unit.barcodes?.[0] ? ` · ${option.unit.barcodes[0]}` : null}
                     </p>
                   </div>
-                  <span
-                    className={cn(
-                      'shrink-0 font-mono text-[0.9375rem] font-semibold',
-                      priced ? null : 'font-sans text-warning',
-                    )}
-                  >
-                    {priced ? formatTugrik(option.unit.price ?? '0') : t('posKiosk.sale.unpriced')}
-                  </span>
+                  <div className="shrink-0 text-right">
+                    <span
+                      className={cn(
+                        'block font-mono text-[0.9375rem] font-semibold',
+                        priced ? null : 'font-sans text-warning',
+                      )}
+                    >
+                      {priced
+                        ? formatTugrik(option.unit.price ?? '0')
+                        : t('posKiosk.sale.unpriced')}
+                    </span>
+                    {priced && option.unit.bulkOffer ? (
+                      // The bulk price from its threshold (owner 2026-11-17).
+                      <span className="block text-xs text-muted-foreground">
+                        {t('posKiosk.search.bulkOffer', {
+                          qty: formatQty(option.unit.bulkOffer.fromQtyBase),
+                          uom: option.unit.bulkOffer.baseUom,
+                          price: formatTugrik(option.unit.bulkOffer.bulkPrice),
+                        })}
+                      </span>
+                    ) : null}
+                  </div>
                 </li>
               );
             })}

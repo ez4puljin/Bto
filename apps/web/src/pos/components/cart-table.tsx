@@ -29,7 +29,8 @@ interface CartTableProps {
 /**
  * The basket, one line per product so that as many as possible show (owner 2026-11-05): number,
  * code, name, quantity, unit price and line total. The − / + / remove buttons work the selected line from
- * the bar under the list; a line on the bulk price shows it against the supermarket price.
+ * the bar under the list; a line on the bulk price shows it against the supermarket price, and
+ * from how many pieces it applies, above the threshold and below it (owner 2026-11-17).
  *
  * Below `xl` (a 1024px till, ADR-0201) the code gives its place to the name, which a line is read
  * for: of the cart's 656px the fixed columns take 32 + 80 + 136 + 112 and leave the name 296px
@@ -190,6 +191,9 @@ function CartRow(
   const current = quoted !== undefined && new Decimal(quoted.qty).eq(line.qty);
   const discount = quoted?.discount && new Decimal(quoted.discount).gt(0) ? quoted.discount : null;
   const bulk = quoted?.priced ? (quoted.bulk ?? null) : null;
+  // From how many base units the bulk price applies (owner 2026-11-17); an older edge sends none.
+  const offer = quoted?.priced ? (quoted.bulkOffer ?? null) : null;
+  const from = offer ? { qty: formatQty(offer.fromQtyBase), uom: offer.baseUom } : null;
 
   useEffect(() => {
     if (props.selected) row.current?.scrollIntoView?.({ block: 'nearest' });
@@ -281,9 +285,25 @@ function CartRow(
               <span className="font-sans">{t('posKiosk.sale.priceBulk')}</span>{' '}
               {formatTugrik(bulk.bulkPrice)}
             </span>
+            {from ? (
+              <span className="block font-sans text-[0.6875rem] leading-3.5 text-muted-foreground">
+                {t('posKiosk.sale.bulkFrom', from)}
+              </span>
+            ) : null}
           </>
         ) : quoted.priced && quoted.unitPrice !== null ? (
-          formatTugrik(quoted.unitPrice)
+          <>
+            {formatTugrik(quoted.unitPrice)}
+            {offer && from ? (
+              // May take two lines in the till's 136px column: «6 ш-ээс бөөний» over the price.
+              <span className="block font-sans text-[0.6875rem] leading-3.5 whitespace-normal text-muted-foreground">
+                {t('posKiosk.sale.bulkOffer', {
+                  ...from,
+                  price: formatTugrik(offer.bulkPrice),
+                })}
+              </span>
+            ) : null}
+          </>
         ) : (
           <span className="font-sans font-semibold text-warning">
             {t('posKiosk.sale.unpriced')}

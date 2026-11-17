@@ -8456,6 +8456,8 @@
       "priceRetail": "Жижиглэн",
       "priceBulk": "Бөөний",
       "bulkSaving": "Бөөний хөнгөлөлт",
+      "bulkFrom": "{{qty}} {{uom}}-ээс дээш",
+      "bulkOffer": "{{qty}} {{uom}}-ээс бөөний {{price}}",
       "lineActions": "Сонгосон мөр",
       "noLineSelected": "Мөр сонгоно уу",
       "totals": "Төлөх дүн",
@@ -8485,7 +8487,8 @@
       "searching": "Хайж байна…",
       "empty": "Тохирох бараа олдсонгүй",
       "unitFactor": "{{uom}} ({{factor}})",
-      "barcode": "Баркод {{code}}"
+      "barcode": "Баркод {{code}}",
+      "bulkOffer": "{{qty}} {{uom}}-ээс {{price}}"
     },
     "pay": {
       "buyer": {

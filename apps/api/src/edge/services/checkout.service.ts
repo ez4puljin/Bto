@@ -3,6 +3,7 @@ import { classifyBarcode, cleanBarcode } from '@tugeel/shared/gtin';
 import { Decimal } from '@tugeel/shared/money';
 import {
   type EdgeBarcodeHit,
+  type EdgeBulkOffer,
   type EdgeCartLine,
   type EdgeCashier,
   type EdgeProductHit,
@@ -36,6 +37,7 @@ import {
   perBasePrices,
   programServes,
   resolveQuote,
+  retailBulkOffer,
   unitPriceOf,
 } from '@tugeel/shared/pricing';
 import { matchesQuery, matchesStrictly, queryTerms } from '@tugeel/shared/text';
@@ -220,6 +222,7 @@ export class CheckoutService {
           total: priced ? line.total.toFixed(2) : null,
           discount: priced ? line.discountAmount.toFixed(2) : null,
           bulk: priced ? this.bulkPrices(loaded, input, line.parts) : null,
+          bulkOffer: priced ? this.bulkOffer(loaded, input.unitId, line.parts) : null,
         };
       }),
       subtotal: result.subtotal.toFixed(2),
@@ -771,6 +774,32 @@ export class CheckoutService {
     return { retailPrice: retailPrice.toFixed(2), bulkPrice: part.listPrice.toFixed(2) };
   }
 
+  /**
+   * From how many base units the bulk price applies and one unit of it (owner 2026-11-17), for a
+   * line on the supermarket price; display only, it prices nothing.
+   */
+  private bulkOffer(
+    loaded: LoadedSnapshot,
+    unitId: number,
+    parts: readonly PricedPart[],
+  ): EdgeBulkOffer | null {
+    if (!parts.every((part) => part.basis === 'RETAIL' || part.basis === 'RETAIL_BULK')) {
+      return null;
+    }
+    const found = loaded.units.get(unitId);
+    const terms = found ? loaded.quote.products.get(found.product.id)?.terms : undefined;
+    const base = found?.product.units.find((unit) => unit.isBase);
+    if (!found || !terms || !base) return null;
+    const offer = retailBulkOffer(terms, new Decimal(found.unit.factor));
+    return offer
+      ? {
+          fromQtyBase: offer.fromQtyBase.toString(),
+          baseUom: base.uomName,
+          bulkPrice: offer.bulkPrice.toFixed(2),
+        }
+      : null;
+  }
+
   private hit(loaded: LoadedSnapshot, product: SnapshotProduct, tillCode?: string): EdgeProductHit {
     return {
       productId: product.id,
@@ -791,6 +820,7 @@ export class CheckoutService {
           isBase: unit.isBase,
           price: line?.priced ? line.total.toFixed(2) : null,
           barcodes: unit.codes ?? [],
+          bulkOffer: line?.priced ? this.bulkOffer(loaded, unit.unitId, line.parts) : null,
         };
       }),
     };

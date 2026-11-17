@@ -9,6 +9,7 @@ import {
   type QuoteTerms,
   type QuoteUnit,
   resolveQuote,
+  retailBulkOffer,
   splitWholesale,
   unitPriceTable,
 } from './cart';
@@ -381,6 +382,35 @@ describe('the price table of a product', () => {
       [11, '1150', 'LOOSE', '1300', '1200'],
       [12, '20000', 'WAREHOUSE', '26000', '24000'],
     ]);
+  });
+
+  it('offers the bulk price of one unit from the threshold, as the quote charges it', () => {
+    const offer = retailBulkOffer(terms(1000, BOX), colaBox.factor);
+    expect(offer && [offer.fromQtyBase, offer.retailPrice, offer.bulkPrice].map(String)).toEqual([
+      '24',
+      '26000',
+      '24000',
+    ]);
+    const quoted = resolveQuote([line(COLA, colaPcs, 24)], context([], 'RETAIL'));
+    const piece = retailBulkOffer(terms(1000, BOX), colaPcs.factor);
+    expect(piece?.bulkPrice.toFixed()).toBe('1200');
+    expect(partsOf(quoted, 0)).toEqual(['24×11 RETAIL_BULK 1200→1200 = 28800']);
+  });
+
+  it('offers nothing without a bulk tier or when the bulk price is not lower', () => {
+    expect(
+      retailBulkOffer(
+        terms(1000, BOX, { retailBulkMinQty: null, retailBulkMarkupPct: null }),
+        d(1),
+      ),
+    ).toBeNull();
+    // A whole-tugrik markup of 0.01 % below the supermarket one rounds to the same price.
+    expect(
+      retailBulkOffer(
+        terms(10, null, { retailMarkupPct: d('30'), retailBulkMarkupPct: d('29.99') }),
+        d(1),
+      ),
+    ).toBeNull();
   });
 
   it('marks a unit that is not a whole number of packs', () => {

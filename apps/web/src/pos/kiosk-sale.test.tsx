@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import mn from '@tugeel/shared/i18n/mn.json';
+import { Decimal } from '@tugeel/shared/money';
 import type { EdgeQuoteRequest } from '@tugeel/shared/pos';
 import type { EdgeSaleRequest } from '@tugeel/shared/pos';
 import { describe, expect, it } from 'vitest';
@@ -13,6 +14,7 @@ import {
   type EdgeHandler,
   fakeEdge,
   json,
+  MILK,
   quoteOf,
   printable,
   problem,
@@ -249,6 +251,67 @@ describe('kiosk: the sale screen', () => {
     expect(screen.getByText(/3,675/)).toBeInTheDocument();
     // The totals show what the bulk price takes off: (3,885 − 3,675) × 1.
     expect(screen.getByText(k.sale.bulkSaving).nextElementSibling).toHaveTextContent('−210₮');
+  });
+
+  it('says from how many pieces the bulk price applies, on the line and below it (owner 2026-11-17)', async () => {
+    const offer = { fromQtyBase: '6.000', baseUom: 'ш', bulkPrice: '3200.00' };
+    await openSale({
+      'POST /quote': (call) => {
+        const quote = quoteOf(call.body as EdgeQuoteRequest);
+        return json({
+          ...quote,
+          lines: quote.lines.map((line) => ({
+            ...line,
+            // The fake edge reaches the bulk price at 6 pieces of the cart.
+            bulk: new Decimal(line.qty).gte(6)
+              ? { retailPrice: '3500.00', bulkPrice: '3200.00' }
+              : null,
+            bulkOffer: offer,
+          })),
+        });
+      },
+    });
+    await wedgeScan(MILK_BARCODE);
+    expect(await screen.findByText('6 ш-ээс бөөний 3,200₮')).toBeInTheDocument();
+    expect(screen.queryByText('6 ш-ээс дээш')).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(qtyField('Сүү 1л (ш)'));
+    await user.keyboard('6{Enter}');
+    expect(await screen.findByText('6 ш-ээс дээш')).toBeInTheDocument();
+    expect(screen.getByText(k.sale.priceBulk)).toBeInTheDocument();
+    expect(screen.queryByText('6 ш-ээс бөөний 3,200₮')).not.toBeInTheDocument();
+  });
+
+  it('shows no threshold when the edge sends none', async () => {
+    await openSale();
+    await wedgeScan(MILK_BARCODE);
+    await waitFor(() => expect(screen.getByTestId('sale-total')).toHaveTextContent('3,500₮'));
+    expect(screen.queryByText(/-ээс/)).not.toBeInTheDocument();
+  });
+
+  it('shows the bulk price and its threshold in the search results', async () => {
+    await openSale({
+      'GET /products/search': () =>
+        json([
+          {
+            ...MILK,
+            units: MILK.units.map((unit) => ({
+              ...unit,
+              bulkOffer: unit.isBase
+                ? { fromQtyBase: '12', baseUom: 'ш', bulkPrice: '3200.00' }
+                : null,
+            })),
+          },
+        ]),
+    });
+    const user = userEvent.setup();
+    await user.keyboard('{F6}');
+    await user.type(screen.getByLabelText(k.sale.scanLabel), 'сүү');
+    const options = await screen.findAllByRole('option');
+    expect(options).toHaveLength(1);
+    expect(options[0]).toHaveTextContent('3,500');
+    expect(within(options[0] as HTMLElement).getByText('12 ш-ээс 3,200₮')).toBeInTheDocument();
   });
 
   it('changes the selected line with + / − and removes it with Delete', async () => {
