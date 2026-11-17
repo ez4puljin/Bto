@@ -19,19 +19,19 @@ expect "code goes at once while CI runs" \
   "$(plan_update pending docs/ui.md apps/api/src/main.ts)" "deploy"
 expect "code goes at once when CI cannot be asked" "$(plan_update unknown apps/api/src/main.ts)" "deploy"
 expect "code CI found red is not put" "$(plan_update failure apps/web/src/main.tsx)" "refuse"
-expect "a migration waits for CI" \
-  "$(plan_update pending apps/api/src/db/migrations/0105_x.sql apps/api/src/db/schema.ts)" "wait"
-expect "a migration waits when CI cannot be asked" \
-  "$(plan_update unknown apps/api/src/db/migrations/0105_x.sql)" "wait"
-expect "a migration goes once CI is green" \
+expect "a migration goes at once while CI runs (ADR-0206)" \
+  "$(plan_update pending apps/api/src/db/migrations/0105_x.sql apps/api/src/db/schema.ts)" "deploy"
+expect "a migration goes at once when CI cannot be asked" \
+  "$(plan_update unknown apps/api/src/db/migrations/0105_x.sql)" "deploy"
+expect "a migration goes when CI is green" \
   "$(plan_update success apps/api/src/db/migrations/0105_x.sql)" "deploy"
 expect "a red migration is not put" "$(plan_update failure apps/api/src/db/migrations/0105_x.sql)" "refuse"
 expect "the migrations' journal alone is code, not a migration" \
   "$(plan_update pending apps/api/src/db/migrations/meta/_journal.json)" "deploy"
 expect "red docs still move the checkout" "$(plan_update failure docs/STATUS.md)" "docs"
 expect "a run stopped by a newer push does not hold code back" "$(plan_update cancelled apps/api/src/a.ts)" "deploy"
-expect "a migration whose run was stopped still waits" \
-  "$(plan_update cancelled apps/api/src/db/migrations/0105_x.sql)" "wait"
+expect "a migration whose run was stopped goes at once" \
+  "$(plan_update cancelled apps/api/src/db/migrations/0105_x.sql)" "deploy"
 expect "the office's pages alone build the web only" \
   "$(plan_update pending apps/web/src/features/finance/a.tsx docs/ui.md)" "web"
 expect "the web with the shared package is a whole update" \

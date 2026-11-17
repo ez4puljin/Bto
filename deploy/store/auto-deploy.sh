@@ -5,15 +5,15 @@
 #   - nothing new on origin/main                      → nothing
 #   - only docs (docs/, *.md, .claude/, .github/)     → the checkout moves, nothing is rebuilt
 #   - only the office's pages (apps/web)              → only the web image and its door (about a minute)
-#   - a new migration                                 → waits for CI green first (a migration is
-#                                                        not undone by rollback.sh), refuses a red one
-#   - anything else                                   → setup.sh at once (it still refuses a commit
-#                                                        CI has already found red), then the edge
+#   - anything else, a new migration included         → setup.sh at once (it still refuses a commit
+#                                                        CI has already found red), then the edge;
+#                                                        nothing waits for CI (ADR-0206)
 #   - the till server is rebuilt only when what it is built from changed (the api, packages, the
 #     kiosk's pos.html and src/pos, deploy/edge): otherwise the tills do not pause
 #
 # After an update made while CI was still running, the next rounds look at CI's answer: red →
-# rollback.sh to the version before (which itself refuses when a migration stands between them).
+# rollback.sh to the version before. rollback.sh refuses when a migration stands between them: then the
+# red version stays until a fix is pushed, and the log says so (the owner's choice, ADR-0206).
 # Each update writes a log with the time of every line, so the slow step can be seen.
 #
 #   bash deploy/store/auto-deploy.sh            one round (what the timer runs)
@@ -25,18 +25,18 @@ set -euo pipefail
 
 # --- what a round decides, from the changed files and CI's word (auto-deploy.test.sh) ----------
 
-# Prints one of: none, docs, web, deploy, wait, refuse.
-#   $1: CI's verdict on the target (success, failure, pending, unknown); then the changed files.
+# Prints one of: none, docs, web, deploy, refuse.
+#   $1: CI's verdict on the target (success, failure, pending, cancelled, unknown); then the changed
+#   files. Only a verdict already red holds code back; a migration does not wait for CI (ADR-0206).
 # `web`: only the office's pages changed, so only the web image is built and only its door
 # restarts (setup.sh --only-web: about a minute instead of four or five); the api is left running.
 plan_update() {
   local verdict=$1
   shift
   [ "$#" -gt 0 ] || { echo none; return 0; }
-  local file code=no migration=no other=no
+  local file code=no other=no
   for file in "$@"; do
     case "$file" in
-      apps/api/src/db/migrations/*.sql) migration=yes; code=yes; other=yes ;;
       docs/* | .claude/* | .github/* | *.md) ;;
       apps/web/Dockerfile | apps/web/package.json) code=yes; other=yes ;;
       apps/web/*) code=yes ;;
@@ -45,7 +45,6 @@ plan_update() {
   done
   if [ "$code" = no ]; then echo docs; return 0; fi
   if [ "$verdict" = failure ]; then echo refuse; return 0; fi
-  if [ "$migration" = yes ] && [ "$verdict" != success ]; then echo wait; return 0; fi
   if [ "$other" = no ]; then echo web; return 0; fi
   echo deploy
 }
@@ -99,7 +98,7 @@ say() {
   echo "$line"
   [ "$CHECK" = yes ] || echo "$line" >>"$LOG"
 }
-# A decision that repeats every minute (wait, refuse, a dirty checkout) is written once per target.
+# A decision that repeats every round (refuse, a dirty checkout) is written once per target.
 say_once() {
   local key=$1
   shift
@@ -146,7 +145,7 @@ follow_ci() {
       elif bash deploy/store/rollback.sh >>"$DEPLOY_STATE/runs/${watched:0:8}.log" 2>&1; then
         say "CI улаан: ${watched:0:8} → өмнөх хувилбар руу буцаалаа ($(deployed_version))"
       else
-        say "CI улаан: ${watched:0:8}, БУЦААЖ ЧАДСАНГҮЙ (migration эсвэл өмнөх image алга): runs/${watched:0:8}.log"
+        say "CI улаан: ${watched:0:8}, БУЦААЖ ЧАДСАНГҮЙ (migration эсвэл өмнөх image алга), засвар push хийтэл энэ хувилбар ажиллана: runs/${watched:0:8}.log"
       fi
       ;;
   esac
@@ -182,10 +181,6 @@ fi
 
 case "$PLAN" in
   none) exit 0 ;;
-  wait)
-    say_once "wait-$SHORT" "$SHORT: migration-тэй тул CI ногоон болохыг хүлээж байна (одоо $VERDICT)"
-    exit 0
-    ;;
   refuse)
     say_once "refuse-$SHORT" "$SHORT: CI улаан тул тавихгүй. Засвар push хийхэд түүнийг тавина"
     exit 0
