@@ -87,6 +87,7 @@ import {
 import { CashPage } from '@/features/finance/cash-page';
 import { CustomerBalancesPage } from '@/features/finance/customer-balances-page';
 import { CustomerLedgerPage } from '@/features/finance/customer-ledger-page';
+import { SettlementSmsPage } from '@/features/sms/settlement-sms-page';
 import {
   SupplierBalancesPage,
   SupplierLedgerPage,
@@ -1101,6 +1102,11 @@ function financeRoutes(): RouteObject[] {
       path: 'finance/customers/:id',
       handle: { width: 'wide' },
       element: read(<CustomerLedgerPage />),
+    },
+    {
+      path: 'finance/settlement-sms',
+      handle: { width: 'wide' },
+      element: read(<SettlementSmsPage />),
     },
     {
       path: 'finance/suppliers',

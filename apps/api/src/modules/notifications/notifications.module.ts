@@ -10,18 +10,28 @@ import {
   AppNoticesController,
   MyNotificationsController,
 } from './controllers/notifications.controller';
+import {
+  SettlementSmsController,
+  SmsSettingsController,
+} from './controllers/settlement-sms.controller';
 import { InvoiceRemindersJob } from './jobs/invoice-reminders.job';
+import { SmsSendJob } from './jobs/sms-send.job';
 import { CustomerInboxService } from './services/customer-inbox.service';
 import { CustomerNotifier } from './services/customer-notifier';
 import { InboxService } from './services/inbox.service';
 import { NoticesService } from './services/notices.service';
 import { SaleNotifier } from './services/sale-notifier';
+import { SettlementSmsService } from './services/settlement-sms.service';
+import { SmsSendFlowService } from './services/sms-send-flow.service';
+import { SmsSettingsFlowService } from './services/sms-settings-flow.service';
 
 /**
  * Notifications (docs/modules/notifications.md, ADR-0062, ADR-0079 #8): the admin's notices for the
  * rep app and the customer app, the notifications addressed to one user and to one store. It
  * answers sales' `SALE_LISTENER` and `ORDER_LISTENER` and finance's `PAYMENT_LISTENER`; neither
- * module imports this one. Push comes with go-live; there is no SMS (ADR-0079 #3).
+ * module imports this one. Push comes with go-live. SMS reaches customers only as the settlement
+ * reminders a permitted staff member sends by hand through WeSend (ADR-0216, amending ADR-0079 #3);
+ * `SmsGateway` comes from the global SmsIntegrationModule of the composition roots.
  */
 @Module({
   imports: [IdentityModule, CatalogModule, PartnersModule, FinanceModule],
@@ -31,12 +41,16 @@ import { SaleNotifier } from './services/sale-notifier';
     CustomerInboxService,
     CustomerNotifier,
     SaleNotifier,
+    SmsSettingsFlowService,
+    SettlementSmsService,
     { provide: SALE_LISTENER, useExisting: SaleNotifier },
     { provide: ORDER_LISTENER, useExisting: CustomerNotifier },
     { provide: PAYMENT_LISTENER, useExisting: CustomerNotifier },
   ],
   exports: [
     NoticesService,
+    SmsSettingsFlowService,
+    SettlementSmsService,
     InboxService,
     CustomerInboxService,
     CustomerNotifier,
@@ -50,26 +64,36 @@ export class NotificationsModule {}
 /** The HTTP side of notifications (api only). */
 @Module({
   imports: [NotificationsModule],
-  controllers: [AppNoticesController, MyNotificationsController],
+  controllers: [
+    AppNoticesController,
+    MyNotificationsController,
+    SettlementSmsController,
+    SmsSettingsController,
+  ],
 })
 export class NotificationsHttpModule {}
 
-/** Registers the morning invoice reminders once the worker has started (worker only). */
+/** Registers the morning reminders and the SMS sender once the worker has started (worker only). */
 @Injectable()
 export class NotificationsJobsBootstrap implements OnApplicationBootstrap {
   constructor(
     private readonly worker: JobWorkerService,
     private readonly reminders: InvoiceRemindersJob,
+    private readonly sms: SmsSendJob,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
     await this.worker.register(this.reminders);
+    await this.worker.register(this.sms);
   }
 }
 
-/** The worker side of notifications: the customer app's invoice reminders (ADR-0079 #8). */
+/**
+ * The worker side of notifications: the customer app's invoice reminders (ADR-0079 #8) and the
+ * settlement SMS batches (ADR-0216).
+ */
 @Module({
   imports: [NotificationsModule, JobsWorkerModule],
-  providers: [InvoiceRemindersJob, NotificationsJobsBootstrap],
+  providers: [InvoiceRemindersJob, SmsSendFlowService, SmsSendJob, NotificationsJobsBootstrap],
 })
 export class NotificationsWorkerModule {}

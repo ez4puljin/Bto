@@ -1090,6 +1090,25 @@ export class CustomerBalanceDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) updatedAt: string | null;
 }
 
+@ApiSchema({ name: 'CustomerStatementTotalsQuery' })
+export class CustomerStatementTotalsQueryDto {
+  @ApiProperty({ example: '2026-10-21' }) @Matches(DATE) from: string;
+  @ApiProperty({ example: '2026-11-20', description: 'Cut to today when later' })
+  @Matches(DATE)
+  to: string;
+}
+
+/** A customer's totals for a range (ADR-0216): the customer app's statement, for staff. */
+@ApiSchema({ name: 'CustomerStatementTotals' })
+export class CustomerStatementTotalsDto {
+  @ApiProperty({ example: '2026-10-21' }) from: string;
+  @ApiProperty({ example: '2026-11-17', description: 'The range end, cut to today' }) to: string;
+  @ApiProperty({ example: '100000.00', description: 'The balance before `from`' }) opening: string;
+  @ApiProperty({ example: '250000.00' }) totalDebit: string;
+  @ApiProperty({ example: '50000.00' }) totalCredit: string;
+  @ApiProperty({ example: '300000.00' }) closing: string;
+}
+
 @ApiSchema({ name: 'CustomerBalancesQuery' })
 export class CustomerBalancesQueryDto extends PageQueryDto {
   @ApiPropertyOptional({ description: "Part of a customer's name or code" })

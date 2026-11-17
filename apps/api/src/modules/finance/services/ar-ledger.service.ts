@@ -12,7 +12,7 @@ import { and, eq, gt, inArray, lt, sql, type SQL } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
-import { notFound } from '../../../common/errors/app-error';
+import { invalid, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, encodeCursor } from '../../../common/pagination/page';
 import {
   type FinPartyLedgerRow,
@@ -204,6 +204,53 @@ export class ArLedgerService {
       overdueAmount: row.overdue,
       oldestDueDate: row.oldestDueDate,
       updatedAt: row.updatedAt,
+    };
+  }
+
+  /**
+   * The receivable balance of each customer in one read (settlement SMS, ADR-0216): the same
+   * figure as `balances`' `balance`; a customer without receivable lines is 0.
+   */
+  async balancesOfCustomers(customerIds: readonly number[]): Promise<Map<number, Decimal>> {
+    const result = new Map<number, Decimal>(customerIds.map((id) => [id, new Decimal(0)]));
+    if (customerIds.length === 0) return result;
+    const partyOf = await this.parties.partiesOfCustomers([...new Set(customerIds)]);
+    if (partyOf.size === 0) return result;
+    const customerOfParty = new Map(
+      [...partyOf.entries()].map(([customerId, partyId]) => [String(partyId), customerId]),
+    );
+    const rows = await this.reader.partyBalances(this.books.source(), {
+      company: await this.books.company(),
+      partyIds: [...customerOfParty.keys()].map((id) => Number.parseInt(id, 10)),
+      limit: customerOfParty.size + 1,
+    });
+    for (const row of rows) {
+      const customerId = customerOfParty.get(String(row.partyId));
+      if (customerId !== undefined) result.set(customerId, row.net);
+    }
+    return result;
+  }
+
+  /**
+   * A customer's statement totals for staff (ADR-0216): the opening balance, the debits and the
+   * credits of `from` … `to` and the closing balance, `to` cut to today.
+   */
+  async statementTotals(
+    customerId: number,
+    from: string,
+    to: string,
+    today: string = businessDate(),
+  ): Promise<Omit<CustomerStatement, 'entries'>> {
+    const until = to > today ? today : to;
+    if (from > until) throw invalid('from', 'beforeTo', 'on or before to (and today)');
+    const statement = await this.statement(customerId, from, until);
+    return {
+      from: statement.from,
+      to: statement.to,
+      opening: statement.opening,
+      totalDebit: statement.totalDebit,
+      totalCredit: statement.totalCredit,
+      closing: statement.closing,
     };
   }
 

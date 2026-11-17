@@ -7,6 +7,7 @@ import { CoreModule } from './core.module';
 import { FinanceCoreModule } from './finance-core';
 import { HealthModule } from './health/health.module';
 import { ErkhetIntegrationModule } from './integrations/erkhet';
+import { SmsIntegrationModule } from './integrations/sms';
 import { LlmModule } from './integrations/llm';
 import { PictureModule } from './integrations/picture';
 import { ScannerModule } from './integrations/scanner';
@@ -45,6 +46,7 @@ import { SegmentsHttpModule } from './modules/segments';
     PictureModule,
     ScannerModule,
     ErkhetIntegrationModule,
+    SmsIntegrationModule,
     FinanceCoreModule,
     FinBridgeHttpModule,
     IdentityHttpModule,

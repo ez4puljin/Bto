@@ -45,6 +45,8 @@ declare module './job-catalog' {
     'erkhet.sync': { runId: number };
     /** Nights: starts the day's Erkhet check when its sign-in is saved (ADR-0203 #5). */
     'erkhet.nightly': ScheduledPayload;
+    /** Sends one settlement SMS batch through WeSend, message by message (ADR-0216). */
+    'notifications.sendSms': { batchId: number };
   }
 }
 
@@ -84,6 +86,17 @@ const BTO_JOB_QUEUES = {
     deleteAfterSeconds: 7 * 86_400,
   },
   'erkhet.nightly': scheduledQueue(),
+  // One job per batch (singletonKey = the batch id). A retry skips what is no longer QUEUED and
+  // resends with each message's own Idempotency-Key, so WeSend never sends a text twice.
+  'notifications.sendSms': {
+    policy: 'exclusive',
+    retryLimit: 2,
+    retryDelay: 60,
+    expireInSeconds: 3_600,
+    heartbeatSeconds: 60,
+    retentionSeconds: 7 * 86_400,
+    deleteAfterSeconds: 7 * 86_400,
+  },
 } as const satisfies Readonly<Partial<Record<JobName, QueueOptions>>>;
 
 /** Every owner's queues: a job name without a queue fails typecheck. */

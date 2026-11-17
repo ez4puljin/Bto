@@ -29776,6 +29776,71 @@
         ]
       }
     },
+    "/api/v1/customer-balances/{customerId}/statement-totals": {
+      "get": {
+        "operationId": "CustomerBalances_statementTotals",
+        "parameters": [
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-21",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cut to today when later",
+            "schema": {
+              "example": "2026-11-20",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerStatementTotals"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Эхний үлдэгдэл», «Дебит», «Кредит», «Эцсийн үлдэгдэл» of a range (ADR-0216).",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
     "/api/v1/finance/attention": {
       "get": {
         "operationId": "FinanceAttention_attention",
@@ -36907,6 +36972,427 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/settlement-sms/customers": {
+      "get": {
+        "operationId": "SettlementSms_customers",
+        "parameters": [
+          {
+            "name": "group",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SettlementGroup"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Part of a customer's code, name or phone",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "withBalance",
+            "required": false,
+            "in": "query",
+            "description": "Only customers whose balance is above zero",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettlementSmsCustomers"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/settlement-sms/status": {
+      "get": {
+        "operationId": "SettlementSms_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Whether a key is saved and sending is on; WeSend is not asked.",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/settlement-sms/balance": {
+      "get": {
+        "operationId": "SettlementSms_balance",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsCheck"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "WeSend's balance for the dialog's estimate.",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/settlement-sms/batches": {
+      "post": {
+        "operationId": "SettlementSms_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsBatch"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      },
+      "get": {
+        "operationId": "SettlementSms_batches",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsBatchPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/settlement-sms/batches/{id}": {
+      "get": {
+        "operationId": "SettlementSms_batch",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsBatchDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/sms/settings": {
+      "get": {
+        "operationId": "SmsSettings_view",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      },
+      "patch": {
+        "operationId": "SmsSettings_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsSettingsUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/sms/settings/test": {
+      "post": {
+        "operationId": "SmsSettings_test",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsSettingsTestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsCheck"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Asks WeSend for the balance with the typed key, or the saved one; saves nothing, sends nothing.",
         "tags": [
           "notifications"
         ]
@@ -46336,6 +46822,7 @@
           "finance.settings.manage",
           "finance.periods.close",
           "finance.periods.reopen",
+          "finance.sms.send",
           "pos.read",
           "pos.manage",
           "pos.till.operate",
@@ -75486,6 +75973,45 @@
           "opening"
         ]
       },
+      "CustomerStatementTotals": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2026-10-21"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-11-17",
+            "description": "The range end, cut to today"
+          },
+          "opening": {
+            "type": "string",
+            "example": "100000.00",
+            "description": "The balance before `from`"
+          },
+          "totalDebit": {
+            "type": "string",
+            "example": "250000.00"
+          },
+          "totalCredit": {
+            "type": "string",
+            "example": "50000.00"
+          },
+          "closing": {
+            "type": "string",
+            "example": "300000.00"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "opening",
+          "totalDebit",
+          "totalCredit",
+          "closing"
+        ]
+      },
       "FinanceAttention": {
         "type": "object",
         "properties": {
@@ -83194,6 +83720,464 @@
         "required": [
           "unread"
         ]
+      },
+      "SettlementGroup": {
+        "type": "string",
+        "enum": [
+          "DAY_20",
+          "MONTH_END"
+        ]
+      },
+      "SettlementPeriod": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2026-10-21"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-11-20"
+          },
+          "dueDate": {
+            "type": "string",
+            "example": "2026-11-20"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "dueDate"
+        ]
+      },
+      "SettlementSmsCustomer": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "example": "+97699112233"
+          },
+          "settlementGroup": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SettlementGroup"
+              }
+            ]
+          },
+          "balance": {
+            "type": "string",
+            "example": "1250000.00",
+            "description": "The receivable balance now"
+          },
+          "lastSentAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "customerId",
+          "code",
+          "name",
+          "phone",
+          "settlementGroup",
+          "balance",
+          "lastSentAt"
+        ]
+      },
+      "SettlementSmsCustomers": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SettlementGroup"
+              }
+            ]
+          },
+          "period": {
+            "$ref": "#/components/schemas/SettlementPeriod"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SettlementSmsCustomer"
+            }
+          }
+        },
+        "required": [
+          "group",
+          "period",
+          "data"
+        ]
+      },
+      "SmsStatus": {
+        "type": "object",
+        "properties": {
+          "ready": {
+            "type": "boolean",
+            "description": "A key is saved and opens, and sending is on"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "example": "not_configured"
+          }
+        },
+        "required": [
+          "ready",
+          "reason"
+        ]
+      },
+      "SmsCheck": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "balance": {
+            "type": "number",
+            "nullable": true,
+            "description": "Credits left (1 credit = 1₮)"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "example": "invalid_api_key"
+          }
+        },
+        "required": [
+          "ok",
+          "balance",
+          "reason"
+        ]
+      },
+      "SmsBatchRequest": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SettlementGroup"
+              }
+            ]
+          },
+          "customerIds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "template": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "The text with its placeholders, as typed"
+          },
+          "onlyWithBalance": {
+            "type": "boolean",
+            "description": "Skip a customer whose balance is no longer above zero"
+          }
+        },
+        "required": [
+          "group",
+          "customerIds",
+          "template"
+        ]
+      },
+      "SmsPurpose": {
+        "type": "string",
+        "enum": [
+          "SETTLEMENT"
+        ]
+      },
+      "SmsBatchStatus": {
+        "type": "string",
+        "enum": [
+          "QUEUED",
+          "SENDING",
+          "DONE"
+        ]
+      },
+      "SmsBatch": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "purpose": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SmsPurpose"
+              }
+            ]
+          },
+          "settlementGroup": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SettlementGroup"
+              }
+            ]
+          },
+          "template": {
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SmsBatchStatus"
+              }
+            ]
+          },
+          "totalCount": {
+            "type": "number"
+          },
+          "queuedCount": {
+            "type": "number"
+          },
+          "sentCount": {
+            "type": "number"
+          },
+          "failedCount": {
+            "type": "number"
+          },
+          "skippedCount": {
+            "type": "number"
+          },
+          "creditsUsed": {
+            "type": "number",
+            "description": "WeSend's credits the sent texts took (1 credit = 1₮)"
+          },
+          "stoppedCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Why the batch stopped early"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "purpose",
+          "settlementGroup",
+          "template",
+          "status",
+          "totalCount",
+          "queuedCount",
+          "sentCount",
+          "failedCount",
+          "skippedCount",
+          "creditsUsed",
+          "stoppedCode",
+          "createdBy",
+          "createdAt",
+          "startedAt",
+          "finishedAt"
+        ]
+      },
+      "SmsBatchPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SmsBatch"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "SmsMessageStatus": {
+        "type": "string",
+        "enum": [
+          "QUEUED",
+          "SENT",
+          "FAILED",
+          "SKIPPED"
+        ]
+      },
+      "SmsMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "customerId": {
+            "type": "number"
+          },
+          "customerCode": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "text": {
+            "type": "string",
+            "description": "The text as frozen for this customer"
+          },
+          "balance": {
+            "type": "string",
+            "example": "1250000.00"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SmsMessageStatus"
+              }
+            ]
+          },
+          "parts": {
+            "type": "number",
+            "nullable": true
+          },
+          "credits": {
+            "type": "number",
+            "nullable": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "SMS_ERROR_CODES or a new WeSend code"
+          },
+          "sentAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "customerId",
+          "customerCode",
+          "customerName",
+          "phone",
+          "text",
+          "balance",
+          "status",
+          "parts",
+          "credits",
+          "errorCode",
+          "sentAt"
+        ]
+      },
+      "SmsBatchDetail": {
+        "type": "object",
+        "properties": {
+          "batch": {
+            "$ref": "#/components/schemas/SmsBatch"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SmsMessage"
+            }
+          }
+        },
+        "required": [
+          "batch",
+          "messages"
+        ]
+      },
+      "SmsSettings": {
+        "type": "object",
+        "properties": {
+          "hasKey": {
+            "type": "boolean"
+          },
+          "keyLast4": {
+            "type": "string",
+            "nullable": true,
+            "example": "9f2c"
+          },
+          "keyUnreadable": {
+            "type": "boolean"
+          },
+          "secretReady": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "updatedBy": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "hasKey",
+          "keyLast4",
+          "keyUnreadable",
+          "secretReady",
+          "enabled",
+          "updatedAt",
+          "updatedBy"
+        ]
+      },
+      "SmsSettingsUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": "string",
+            "nullable": true,
+            "description": "WeSend's key; null removes it. Never returned."
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SmsSettingsTestRequest": {
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": "string",
+            "description": "A typed key; without it the saved one"
+          }
+        }
       },
       "CustomerAppCentre": {
         "type": "object",
@@ -93449,6 +94433,10 @@
           "ERKHET_KEY_SECRET_MISSING",
           "ERKHET_SYNC_RUNNING",
           "ERKHET_RUN_SUPERSEDED",
+          "SMS_NOT_CONFIGURED",
+          "SMS_KEY_SECRET_MISSING",
+          "SMS_TEMPLATE_INVALID",
+          "SMS_TOO_LONG",
           "UNIT_SUPERSEDED",
           "PRICE_MISSING",
           "DISCOUNT_OVER_CAP",

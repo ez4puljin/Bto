@@ -107,9 +107,10 @@ export const EnvSchema = z.object({
       }),
   ),
   /**
-   * Seals Erkhet's password saved on the settings screen (ADR-0203): 32 random bytes in base64, a
-   * secret like JWT_SECRET. The api seals with it and the worker opens what it sealed, so both
-   * read it. Without it no sign-in can be saved and no check runs.
+   * Seals Erkhet's password saved on the settings screen (ADR-0203) and WeSend's SMS key saved on
+   * «Тохиргоо → SMS» (ADR-0216), each under its own context: 32 random bytes in base64, a secret
+   * like JWT_SECRET. The api seals with it and the worker opens what it sealed (a check, a batch of
+   * SMS), so both read it. Without it neither can be saved, no check runs and no SMS is sent.
    */
   ERKHET_KEY_SECRET: unsetWhenEmpty(
     z

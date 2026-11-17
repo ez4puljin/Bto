@@ -427,6 +427,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'finance.read',
       },
       {
+        to: '/finance/settlement-sms',
+        label: 'nav.settlementSms',
+        icon: MessageSquareText,
+        permission: 'finance.read',
+      },
+      {
         to: '/finance/suppliers',
         label: 'nav.supplierBalances',
         icon: Truck,

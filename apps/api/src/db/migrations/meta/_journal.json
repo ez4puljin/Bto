@@ -750,6 +750,13 @@
       "when": 1794886778771,
       "tag": "0108_receipt_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1794900097349,
+      "tag": "0109_settlement_sms",
+      "breakpoints": true
     }
   ]
 }

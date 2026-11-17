@@ -188,6 +188,9 @@ export {
   appNoticeReads,
   appNotices,
   customerNotifications,
+  smsBatches,
+  smsMessages,
+  smsSettings,
   userNotifications,
 } from '../modules/notifications/schema';
 export { appBanners, companyContacts, customerFavourites } from '../modules/customer/schema';

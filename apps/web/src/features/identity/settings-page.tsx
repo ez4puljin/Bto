@@ -43,6 +43,7 @@ import { problemFromError, settle } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useDeleteConfirm } from '@/lib/use-delete-confirm';
 import { AiSettingsTab } from '../ai/ai-settings-tab';
+import { SmsSettingsTab } from '../sms/sms-settings-tab';
 import { type SettingView, useIdentityMutations, useSettings } from './api';
 import { DateInput } from '@/components/date-input';
 
@@ -50,13 +51,16 @@ type SettingEntry = SettingView['entries'][number];
 
 /**
  * The system's settings: the effective-dated ones (VAT and city-tax rates, payer flags, session
- * length, SPEC §5.1) and, for who manages it, the AI (ADR-0162). The open tab is in the URL.
+ * length, SPEC §5.1) and, for who manages it, the AI (ADR-0162) and WeSend's SMS key (ADR-0216).
+ * The open tab is in the URL.
  */
 export function SettingsPage() {
   const { t } = useTranslation();
   const mayManageAi = useHasPermission('ai.settings.manage');
   const [search, setSearch] = useSearchParams();
-  const tab = mayManageAi && search.get('tab') === 'ai' ? 'ai' : 'general';
+  // The AI's and WeSend's keys are managed with the same right (ADR-0162, ADR-0216).
+  const asked = search.get('tab');
+  const tab = mayManageAi && (asked === 'ai' || asked === 'sms') ? asked : 'general';
   return (
     <div>
       <PageHeader
@@ -66,17 +70,23 @@ export function SettingsPage() {
       {mayManageAi ? (
         <Tabs
           value={tab}
-          onValueChange={(next) => setSearch(next === 'ai' ? { tab: 'ai' } : {}, { replace: true })}
+          onValueChange={(next) =>
+            setSearch(next === 'ai' || next === 'sms' ? { tab: next } : {}, { replace: true })
+          }
         >
           <TabsList aria-label={t('settings.tabs.label')} className="mb-4">
             <TabsTrigger value="general">{t('settings.tabs.general')}</TabsTrigger>
             <TabsTrigger value="ai">{t('settings.tabs.ai')}</TabsTrigger>
+            <TabsTrigger value="sms">{t('settings.tabs.sms')}</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
             <GeneralSettings />
           </TabsContent>
           <TabsContent value="ai">
             <AiSettingsTab />
+          </TabsContent>
+          <TabsContent value="sms">
+            <SmsSettingsTab />
           </TabsContent>
         </Tabs>
       ) : (

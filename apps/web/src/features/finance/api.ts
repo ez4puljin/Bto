@@ -398,6 +398,29 @@ export function useCustomerLedger(customerId: number, range: { from?: string; to
   });
 }
 
+/**
+ * A customer's totals for a range (ADR-0216): opening, debit, credit and closing, the range's end
+ * cut to today by the server. Only while both ends are chosen.
+ */
+export function useCustomerStatementTotals(
+  customerId: number,
+  range: { from?: string; to?: string },
+) {
+  const api = useApiClient();
+  const { from, to } = range;
+  return useQuery({
+    queryKey: [...KEYS.ledger, customerId, 'totals', range],
+    enabled: customerId > 0 && Boolean(from) && Boolean(to),
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/customer-balances/{customerId}/statement-totals', {
+          params: { path: { customerId }, query: { from: from ?? '', to: to ?? '' } },
+          signal,
+        }),
+      ),
+  });
+}
+
 /** A customer's open receivable items (ADR-0090): invoices and refunds to settle, credits to use. */
 export function useOpenItems(customerId: number, enabled = true) {
   const api = useApiClient();

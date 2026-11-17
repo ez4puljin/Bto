@@ -4,7 +4,11 @@ import {
   NOTICE_KINDS,
   NOTICE_LIMITS,
   USER_NOTIFICATION_KINDS,
+  SMS_BATCH_STATUSES,
+  SMS_MESSAGE_STATUSES,
+  SMS_PURPOSES,
 } from '@tugeel/shared/notifications';
+import { SETTLEMENT_GROUPS } from '@tugeel/shared/finance';
 import { type SQL, sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
@@ -13,6 +17,7 @@ import {
   check,
   date,
   index,
+  integer,
   pgTable,
   primaryKey,
   smallint,
@@ -20,11 +25,13 @@ import {
   timestamp,
   unique,
   uniqueIndex,
+  uuid,
 } from 'drizzle-orm/pg-core';
-import { jsonValue } from '../../common/db/types';
+import { jsonValue, money } from '../../common/db/types';
 import { products } from '../catalog/schema';
 import { invoices } from '../finance/schema';
 import { customerUsers, files, users } from '../identity/schema';
+import { customers } from '../partners/schema';
 import { salesOrders } from '../sales/schema';
 
 // The tables owned by the notifications module (docs/modules/notifications.md, ADR-0062).
@@ -205,6 +212,119 @@ export const userNotifications = pgTable(
     check(
       'user_notifications_order_required',
       sql`${t.kind} <> 'ORDER_SOLD' OR ${t.orderId} IS NOT NULL`,
+    ),
+  ],
+);
+
+// ------------------------------------------------------------------------------------------------
+// Settlement SMS (ADR-0216). Migration 0109_settlement_sms adds by hand the REVOKEs and column grants
+// that keep a batch's template and a message's text, number and balance as they were written.
+
+const at = (name: string) => timestamp(name, { withTimezone: true });
+const SMS_ERROR_CODE = '^[a-z_]{1,64}$';
+
+/** WeSend's key (one row): sealed with ERKHET_KEY_SECRET under its own context, never returned. */
+export const smsSettings = pgTable(
+  'sms_settings',
+  {
+    id: smallint('id').primaryKey(),
+    apiKeySealed: text('api_key_sealed'),
+    /** Off: nothing is sent, a batch waiting is marked FAILED `sms_disabled`. */
+    enabled: boolean('enabled').notNull().default(true),
+    updatedBy: userRef('updated_by'),
+    updatedAt: at('updated_at').notNull().defaultNow(),
+  },
+  (t) => [check('sms_settings_single', sql`${t.id} = 1`)],
+);
+
+/** One press of «Илгээх»: the template as typed, who sent it and how it ended. */
+export const smsBatches = pgTable(
+  'sms_batches',
+  {
+    id: id(),
+    purpose: text('purpose', { enum: SMS_PURPOSES }).notNull(),
+    settlementGroup: text('settlement_group', { enum: SETTLEMENT_GROUPS }),
+    template: text('template').notNull(),
+    status: text('status', { enum: SMS_BATCH_STATUSES }).notNull().default('QUEUED'),
+    totalCount: integer('total_count').notNull(),
+    sentCount: integer('sent_count').notNull().default(0),
+    failedCount: integer('failed_count').notNull().default(0),
+    skippedCount: integer('skipped_count').notNull().default(0),
+    /** WeSend's credits the sent texts took. */
+    creditsUsed: integer('credits_used').notNull().default(0),
+    /** Why the batch stopped early (a refused key, no credits, sending paused). */
+    stoppedCode: text('stopped_code'),
+    createdBy: userRef('created_by').notNull(),
+    createdAt: createdAt(),
+    startedAt: at('started_at'),
+    finishedAt: at('finished_at'),
+  },
+  (t) => [
+    index('sms_batches_list_idx').on(t.createdAt, t.id),
+    check('sms_batches_purpose', inList(t.purpose, SMS_PURPOSES)),
+    check('sms_batches_status', inList(t.status, SMS_BATCH_STATUSES)),
+    check(
+      'sms_batches_group',
+      sql`${t.settlementGroup} IS NULL OR ${inList(t.settlementGroup, SETTLEMENT_GROUPS)}`,
+    ),
+    check('sms_batches_template', sql`length(btrim(${t.template})) BETWEEN 1 AND 1000`),
+    check(
+      'sms_batches_counts',
+      sql`${t.sentCount} + ${t.failedCount} + ${t.skippedCount} <= ${t.totalCount}`,
+    ),
+    check(
+      'sms_batches_stopped',
+      sql`${t.stoppedCode} IS NULL OR ${t.stoppedCode} ~ ${sql.raw(`'${SMS_ERROR_CODE}'`)}`,
+    ),
+  ],
+);
+
+/** One customer's text in a batch, frozen as rendered with that customer's balance. */
+export const smsMessages = pgTable(
+  'sms_messages',
+  {
+    id: id(),
+    batchId: ref('batch_id')
+      .notNull()
+      .references(() => smsBatches.id),
+    customerId: ref('customer_id')
+      .notNull()
+      .references(() => customers.id),
+    customerCode: text('customer_code').notNull(),
+    customerName: text('customer_name').notNull(),
+    /** E.164 as stored on the customer; null when the customer had none (SKIPPED). */
+    phone: text('phone'),
+    text: text('text').notNull(),
+    /** The receivable balance the text was rendered with. */
+    balance: money('balance').notNull(),
+    status: text('status', { enum: SMS_MESSAGE_STATUSES }).notNull(),
+    /** Sent to WeSend as `Idempotency-Key` on every attempt at this message. */
+    idempotencyKey: uuid('idempotency_key').notNull().defaultRandom(),
+    providerMessageId: text('provider_message_id'),
+    parts: smallint('parts'),
+    credits: integer('credits'),
+    errorCode: text('error_code'),
+    createdAt: createdAt(),
+    sentAt: at('sent_at'),
+    updatedAt: at('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    unique('sms_messages_batch_customer').on(t.batchId, t.customerId),
+    uniqueIndex('sms_messages_idempotency_key').on(t.idempotencyKey),
+    index('sms_messages_batch_idx').on(t.batchId, t.status, t.id),
+    index('sms_messages_customer_sent_idx')
+      .on(t.customerId, t.sentAt)
+      .where(sql`${t.status} = 'SENT'`),
+    check('sms_messages_status', inList(t.status, SMS_MESSAGE_STATUSES)),
+    check('sms_messages_phone', sql`${t.phone} IS NULL OR ${t.phone} ~ '^\\+976[0-9]{8}$'`),
+    check(
+      'sms_messages_error',
+      sql`${t.errorCode} IS NULL OR ${t.errorCode} ~ ${sql.raw(`'${SMS_ERROR_CODE}'`)}`,
+    ),
+    check(
+      'sms_messages_outcome',
+      sql`(${t.status} = 'SENT') = (${t.sentAt} IS NOT NULL AND ${t.providerMessageId} IS NOT NULL)
+        AND (${t.status} IN ('FAILED', 'SKIPPED')) = (${t.errorCode} IS NOT NULL)`,
     ),
   ],
 );

@@ -104,6 +104,8 @@ export const PERMISSIONS = [
   // Month close (ADR-0102): closing a month that has ended; reopening the latest closed one.
   'finance.periods.close',
   'finance.periods.reopen',
+  // Settlement SMS (ADR-0216): sending the customers a text about their balance through WeSend.
+  'finance.sms.send',
   // The supermarket POS (ADR-0063): reading tills, shifts and sales; configuring tills, cashiers,
   // PINs and the store's edge node; working a till; approving returns and no-sale drawer opens.
   'pos.read',
@@ -262,6 +264,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     // The month close and its reopen (ADR-0102 #1).
     'finance.periods.close',
     'finance.periods.reopen',
+    // Settlement SMS to the customers (ADR-0216).
+    'finance.sms.send',
     // The supermarket's shifts and their cash (ADR-0064 #3).
     'pos.read',
     // Management reports with margins (ADR-0108 #5).

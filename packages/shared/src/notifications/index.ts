@@ -72,3 +72,30 @@ export function noticeState(
 export function noticeTextLength(value: string): number {
   return [...value.trim()].length;
 }
+
+// Settlement SMS (ADR-0216).
+export {
+  formatSmsAmount,
+  formatSmsDate,
+  isSmsErrorCode,
+  renderSmsTemplate,
+  SMS_BATCH_STATUSES,
+  SMS_DEFAULT_TEMPLATE,
+  SMS_ERROR_CODES,
+  SMS_LIMITS,
+  SMS_MESSAGE_STATUSES,
+  SMS_PLACEHOLDER_KEYS,
+  SMS_PLACEHOLDERS,
+  SMS_PURPOSES,
+  type SmsBatchStatus,
+  type SmsEncoding,
+  type SmsErrorCode,
+  type SmsMessageStatus,
+  type SmsPlaceholderKey,
+  type SmsPurpose,
+  type SmsSize,
+  smsPlaceholderToken,
+  smsSize,
+  type SmsTemplateValues,
+  unknownSmsPlaceholders,
+} from './sms';

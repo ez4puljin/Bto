@@ -6,6 +6,8 @@ import {
   CustomerBalancesPageDto,
   CustomerBalancesQueryDto,
   CustomerLedgerPageDto,
+  CustomerStatementTotalsDto,
+  CustomerStatementTotalsQueryDto,
   DateRangeQueryDto,
   FinanceAttentionDto,
   FinanceNumberingDto,
@@ -57,6 +59,25 @@ export class CustomerBalancesController {
       data: page.data.map(ledgerEntryDto),
       nextCursor: page.nextCursor,
       opening: money(page.opening),
+    };
+  }
+
+  /** «Эхний үлдэгдэл», «Дебит», «Кредит», «Эцсийн үлдэгдэл» of a range (ADR-0216). */
+  @Get(':customerId/statement-totals')
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: CustomerStatementTotalsDto })
+  async statementTotals(
+    @Param('customerId', ParseIntPipe) customerId: number,
+    @Query() query: CustomerStatementTotalsQueryDto,
+  ): Promise<CustomerStatementTotalsDto> {
+    const totals = await this.ledger.statementTotals(customerId, query.from, query.to);
+    return {
+      from: totals.from,
+      to: totals.to,
+      opening: money(totals.opening),
+      totalDebit: money(totals.totalDebit),
+      totalCredit: money(totals.totalCredit),
+      closing: money(totals.closing),
     };
   }
 }

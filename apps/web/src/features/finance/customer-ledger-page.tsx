@@ -32,6 +32,7 @@ import {
   type LedgerEntry,
   useCustomerBalance,
   useCustomerLedger,
+  useCustomerStatementTotals,
 } from './api';
 import { PaymentDialog } from './payment-dialog';
 import { PeekLink, type RecordPeek } from '@/features/reports/books/record-peek';
@@ -67,6 +68,8 @@ export function CustomerLedgerPage() {
   const peek = usePeek();
   const balance = useCustomerBalance(customerId);
   const ledger = useCustomerLedger(customerId, { from, to });
+  // The range's totals (ADR-0216), only when both ends are chosen: the page without them is as before.
+  const totals = useCustomerStatementTotals(customerId, { from, to });
   const rows = ledger.data?.pages.flatMap((page) => page.data) ?? [];
   const summary = balance.data;
 
@@ -139,6 +142,13 @@ export function CustomerLedgerPage() {
             </span>
           ) : null}
         </FilterBar>
+        {from && to ? (
+          <StatementTotals
+            data={totals.data}
+            problem={problemFromError(totals.error)}
+            onRetry={totals.refetch}
+          />
+        ) : null}
         <ProblemAlert problem={problemFromError(ledger.error)} onRetry={ledger.refetch} />
         <ListCard scroll>
           <ListTable columns={LEDGER_COLUMNS}>
@@ -302,6 +312,65 @@ export function BalanceCard({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * «Эхний үлдэгдэл», «Дебит», «Кредит», «Эцсийн үлдэгдэл» of the chosen range (ADR-0216): a strip
+ * of four figures over the ledger, the end cut to today as the server says.
+ */
+function StatementTotals({
+  data,
+  problem,
+  onRetry,
+}: {
+  data:
+    | {
+        from: string;
+        to: string;
+        opening: string;
+        totalDebit: string;
+        totalCredit: string;
+        closing: string;
+      }
+    | undefined;
+  problem: ReturnType<typeof problemFromError>;
+  onRetry: () => unknown;
+}) {
+  const { t } = useTranslation();
+  if (problem) return <ProblemAlert problem={problem} onRetry={onRetry} />;
+  const cells = [
+    { label: t('finance.statementTotals.opening'), value: data?.opening },
+    { label: t('finance.fields.debit'), value: data?.totalDebit },
+    { label: t('finance.fields.credit'), value: data?.totalCredit },
+    { label: t('finance.statementTotals.closing'), value: data?.closing, strong: true },
+  ];
+  return (
+    <section aria-label={t('finance.statementTotals.label')} className="@container">
+      <dl className="grid grid-cols-2 gap-2 @2xl:grid-cols-4">
+        {cells.map((cell) => (
+          <div
+            key={cell.label}
+            className="min-w-0 rounded-lg border border-border bg-card px-3 py-2 shadow-card"
+          >
+            <dt className="text-xs text-muted-foreground">{cell.label}</dt>
+            <dd
+              className={cn(
+                'truncate font-mono text-[0.9375rem]',
+                cell.strong ? 'font-semibold' : 'font-medium',
+              )}
+            >
+              {cell.value === undefined ? '…' : formatMnt(cell.value)}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {data ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          {t('finance.statementTotals.range', { from: data.from, to: data.to })}
+        </p>
+      ) : null}
+    </section>
   );
 }
 
