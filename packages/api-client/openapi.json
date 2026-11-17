@@ -21624,6 +21624,56 @@
         ]
       }
     },
+    "/api/v1/hr/directory": {
+      "get": {
+        "operationId": "Directory_list",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Name, position, division, phone or email",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HrDirectoryEntry"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
     "/api/v1/segments": {
       "get": {
         "operationId": "Segments_list",
@@ -66932,6 +66982,53 @@
           "employees",
           "months",
           "statuses"
+        ]
+      },
+      "HrDirectoryEntry": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "number"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "«Г. Энхтуяа»: the family name initial and the given name"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "position": {
+            "type": "string",
+            "nullable": true
+          },
+          "divisionName": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "description": "E.164"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "description": "Not kept yet: always null"
+          },
+          "photoUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "userId",
+          "displayName",
+          "fullName",
+          "position",
+          "divisionName",
+          "phone",
+          "email",
+          "photoUrl"
         ]
       },
       "Segment": {

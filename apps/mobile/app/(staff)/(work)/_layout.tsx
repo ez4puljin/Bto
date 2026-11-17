@@ -1,14 +1,15 @@
 import { Tabs } from 'expo-router/js-tabs';
-import { House, LayoutGrid } from 'lucide-react-native';
+import { Building2, House, LayoutGrid, Timer } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import type { ColorValue } from 'react-native';
 import { colors } from '../../../src/theme/tokens';
 import { StoreTabBar } from '../../../src/ui/store-tab-bar';
 
 /**
- * The staff app's two tabs (ADR-0173): «Нүүр», where everyone lands, and «Цэс», where every screen
- * the person's rights open is listed. Those screens open over the tabs with a back arrow; a rep's
- * order tabs are one of them, «ХТ захиалга».
+ * The staff app's four tabs (ADR-0173): «Нүүр», where everyone lands; «Ирц», the attendance screen;
+ * «Байгууллага», the company's people and news; and «Цэс», where every screen the person's rights
+ * open is listed. Those screens open over the tabs with a back arrow; a rep's order tabs are one of
+ * them, «ХТ захиалга».
  */
 export default function WorkTabsLayout() {
   const { t } = useTranslation();
@@ -29,6 +30,14 @@ export default function WorkTabsLayout() {
       <Tabs.Screen
         name="index"
         options={{ title: t('mobile.tabs.home'), tabBarIcon: icon(House) }}
+      />
+      <Tabs.Screen
+        name="clock"
+        options={{ title: t('mobile.attendance.title'), tabBarIcon: icon(Timer) }}
+      />
+      <Tabs.Screen
+        name="org"
+        options={{ title: t('mobile.org.title'), tabBarIcon: icon(Building2) }}
       />
       <Tabs.Screen
         name="menu"

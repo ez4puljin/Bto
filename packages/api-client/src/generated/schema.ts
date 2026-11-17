@@ -5410,6 +5410,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/hr/directory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Directory_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/segments": {
         parameters: {
             query?: never;
@@ -17332,6 +17348,19 @@ export interface components {
             employees: components["schemas"]["HrRequestEmployeeCount"][];
             months: components["schemas"]["HrRequestMonth"][];
             statuses: components["schemas"]["HrCount"][];
+        };
+        HrDirectoryEntry: {
+            userId: number;
+            /** @description «Г. Энхтуяа»: the family name initial and the given name */
+            displayName: string;
+            fullName: string;
+            position: string | null;
+            divisionName: string | null;
+            /** @description E.164 */
+            phone: string | null;
+            /** @description Not kept yet: always null */
+            email: string | null;
+            photoUrl: string | null;
         };
         Segment: {
             id: number;
@@ -38275,6 +38304,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HrRequestInsights"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Directory_list: {
+        parameters: {
+            query?: {
+                /** @description Name, position, division, phone or email */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrDirectoryEntry"][];
                 };
             };
             /** @description RFC 9457 problem details */

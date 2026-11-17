@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { IdentityModule } from '../identity';
+import { DirectoryController } from './controllers/directory.controller';
 import { EngagementController } from './controllers/engagement.controller';
 import { AttendanceController, HrSetupController } from './controllers/hr.controller';
 import { WorkforceController } from './controllers/workforce.controller';
 import { AttendanceService } from './services/attendance.service';
+import { DirectoryService } from './services/directory.service';
 import { EngagementService } from './services/engagement.service';
 import { HrExportsService } from './services/hr-exports.service';
 import { HrSettingsService } from './services/hr-settings.service';
@@ -42,7 +44,13 @@ export class HrModule {}
 /** The HTTP side of hr (api only). */
 @Module({
   imports: [HrModule, IdentityModule],
-  controllers: [HrSetupController, AttendanceController, WorkforceController, EngagementController],
-  providers: [HrExportsService, EngagementService, HrInsightsService],
+  controllers: [
+    HrSetupController,
+    AttendanceController,
+    WorkforceController,
+    EngagementController,
+    DirectoryController,
+  ],
+  providers: [HrExportsService, EngagementService, HrInsightsService, DirectoryService],
 })
 export class HrHttpModule {}
