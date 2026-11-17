@@ -72,8 +72,9 @@ export function ReceiptNotePage() {
     { label: t('inventory.noteReading.title'), to: NOTES },
   ];
   const data = reading.data;
+  // The header keeps its own margin: it never sits in the column's gap (docs/ui.md §4).
   return (
-    <div className="flex flex-col gap-3">
+    <div>
       <PageHeader
         dense
         title={
@@ -84,8 +85,10 @@ export function ReceiptNotePage() {
         crumbs={crumbs}
         meta={data ? <NoteStatusBadge reading={data} /> : undefined}
       />
-      <ProblemAlert problem={problemFromError(reading.error)} />
-      {data ? <ReadingBody key={`${data.id}-${data.status}`} reading={data} /> : null}
+      <div className="flex flex-col gap-3">
+        <ProblemAlert problem={problemFromError(reading.error)} />
+        {data ? <ReadingBody key={`${data.id}-${data.status}`} reading={data} /> : null}
+      </div>
     </div>
   );
 }
