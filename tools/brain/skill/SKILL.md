@@ -43,6 +43,11 @@ words. You direct the work; workers do it. Decided in ADR-0213; the tools are in
    | the api, stock, money, rights, a migration, shared packages, deploy scripts, or the api and a client together | `bto-core` | Opus |
    | where is it, how does it work now | `bto-scout` | Haiku |
 
+   A session that started before the workers were installed does not know these worker names
+   (the Agent tool answers «Agent type 'bto-ui' not found»). Then use `general-purpose` with
+   `model: "sonnet"` (`"opus"` for `bto-core`, `"haiku"` for `bto-scout`) and begin the brief with
+   «Read ~/.claude/agents/<worker>.md first: it is your role and its rules bind you.»
+
    Pass `model: "fable"` on the Agent call only for a guarded task whose design is hard (a new
    module, a change of the books). Never give a guarded task to `bto-ui`.
 6. **Stay free.** While workers run, answer the owner's next message and open the next tasks.
