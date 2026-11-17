@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { EDGE_DEVICE_HEADER } from '@tugeel/shared/pos';
@@ -7,6 +7,7 @@ import { tillFromAddress } from './address';
 import { DEVICE_STORAGE_KEY, SESSION_STORAGE_KEY } from './edge-client';
 import {
   CASHIER,
+  DEVICE,
   SESSION,
   SHIFT,
   TILL,
@@ -213,5 +214,28 @@ describe('kiosk: pairing, PIN and the shift', () => {
     expect(await screen.findByRole('button', { name: k.pair.submit })).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(mn.errors.POS_DEVICE_UNKNOWN);
     await waitFor(() => expect(localStorage.getItem(DEVICE_STORAGE_KEY)).toBeNull());
+  });
+
+  it('shows a cashier’s card photo, and the initial when it does not load (owner 2026-11-17)', async () => {
+    const edge = fakeEdge(
+      storeRoutes({
+        'GET /device': () =>
+          json({
+            ...DEVICE,
+            cashiers: [
+              { userId: 7, fullName: 'Сараа Бат', photo: true },
+              { userId: 8, fullName: 'Дорж Сүх', photo: false },
+            ],
+          }),
+      }),
+    );
+    renderKiosk(edge, { device: 'device-1' });
+    const sarah = await screen.findByRole('button', { name: /Сараа Бат/ });
+    const img = sarah.querySelector('img');
+    expect(img?.getAttribute('src')).toMatch(/\/edge\/v1\/cashiers\/7\/photo$/);
+    expect(screen.getByRole('button', { name: /Дорж Сүх/ }).querySelector('img')).toBeNull();
+    fireEvent.error(img!);
+    await waitFor(() => expect(sarah.querySelector('img')).toBeNull());
+    expect(sarah).toHaveTextContent('С');
   });
 });

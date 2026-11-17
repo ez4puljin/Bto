@@ -23,6 +23,38 @@ const PAD = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
 interface Cashier {
   userId: number;
   fullName: string;
+  /** The edge has the card photo (owner 2026-11-17). */
+  photo?: boolean;
+}
+
+/**
+ * The cashier's card photo in a circle, or `fallback` (the initial, the person icon) when there
+ * is none or it does not load (the centre away before the edge kept it).
+ */
+function CashierAvatar(props: { cashier: Cashier; className: string; fallback: ReactNode }) {
+  const { client } = useKiosk();
+  const [broken, setBroken] = useState(false);
+  const showPhoto = props.cashier.photo === true && !broken;
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary text-secondary-foreground',
+        props.className,
+      )}
+    >
+      {showPhoto ? (
+        <img
+          src={client.cashierPhotoUrl(props.cashier.userId)}
+          alt=""
+          className="size-full object-cover"
+          onError={() => setBroken(true)}
+        />
+      ) : (
+        props.fallback
+      )}
+    </span>
+  );
 }
 
 /**
@@ -101,12 +133,11 @@ function CashierPicker(props: { cashiers: readonly Cashier[]; onPick: (userId: n
                 className="h-20 w-full justify-start gap-3 px-4 text-left text-base"
                 onClick={() => props.onPick(cashier.userId)}
               >
-                <span
-                  aria-hidden
-                  className="flex size-11 shrink-0 items-center justify-center rounded-full bg-secondary text-base font-semibold text-secondary-foreground"
-                >
-                  {cashier.fullName.charAt(0)}
-                </span>
+                <CashierAvatar
+                  cashier={cashier}
+                  className="size-14 text-base font-semibold"
+                  fallback={cashier.fullName.charAt(0)}
+                />
                 <span className="line-clamp-2 leading-snug font-semibold whitespace-normal">
                   {cashier.fullName}
                 </span>
@@ -189,12 +220,11 @@ function PinEntry(props: {
   return (
     <section aria-labelledby="pin-title" className="space-y-5">
       <div className="text-center">
-        <span
-          aria-hidden
-          className="mx-auto mb-2 flex size-14 items-center justify-center rounded-full bg-secondary text-secondary-foreground"
-        >
-          <UserRound className="size-7" />
-        </span>
+        <CashierAvatar
+          cashier={cashier}
+          className="mx-auto mb-2 size-14"
+          fallback={<UserRound className="size-7" />}
+        />
         <h1 id="pin-title" className="text-xl font-semibold tracking-tight">
           {cashier.fullName}
         </h1>

@@ -61,7 +61,18 @@ const MODULE_DEPS = {
   // ADR-0063: the supermarket POS posts stock through inventory and money through finance;
   // ADR-0109: a credit sale locks its customer (partners) and counts its open orders (sales).
   // ADR-0185: the store edge's sync routes relay the wholesale e-Barimt receipts (ebarimt).
-  pos: ['identity', 'catalog', 'pricing', 'inventory', 'finance', 'partners', 'sales', 'ebarimt'],
+  // Owner 2026-11-17: the cashiers' card photos for the till's sign-in screen (hr, read only).
+  pos: [
+    'identity',
+    'catalog',
+    'pricing',
+    'inventory',
+    'finance',
+    'partners',
+    'sales',
+    'ebarimt',
+    'hr',
+  ],
   delivery: ['identity', 'partners', 'sales', 'inventory', 'finance', 'notifications'],
   procurement: ['identity', 'partners', 'catalog', 'inventory', 'finance'],
   // ADR-0168: suppliers, posted receipts and each supplier's orderer; only reads them, nobody imports it.

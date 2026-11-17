@@ -10,6 +10,7 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { Decimal } from '@tugeel/shared/money';
@@ -45,6 +46,7 @@ import type {
 import { receiptLayoutFor } from '@tugeel/shared/pos';
 import { businessDate } from '@tugeel/shared/time';
 import { eq } from 'drizzle-orm';
+import type { Response as ExpressResponse } from 'express';
 import { AppError } from '../../common/errors/app-error';
 import { EdgeConfig } from '../config/edge-env';
 import { EDGE_DB, type EdgeDb } from '../db/edge-db';
@@ -74,6 +76,7 @@ import {
   VoidDto,
 } from '../dto/kiosk.dto';
 import { EbarimtService } from '../ebarimt/ebarimt.service';
+import { CashierPhotosService } from '../services/cashier-photos.service';
 import { TaxpayerClient } from '../ebarimt/taxpayer.client';
 import {
   cashierOf,
@@ -130,6 +133,7 @@ export class KioskController {
     private readonly records: TillRecordsService,
     private readonly link: EdgeLinkService,
     private readonly sync: SyncRunner,
+    private readonly photos: CashierPhotosService,
   ) {}
 
   /** ADR-0136: whether this edge knows its centre (the kiosk's first screen asks). */
@@ -222,6 +226,29 @@ export class KioskController {
   ): Promise<EdgePairResponse> {
     const { token, till } = await this.devices.open(body.tillCode, userAgent ?? null);
     return { deviceToken: token, till };
+  }
+
+  /**
+   * A cashier's card photo for the sign-in screen (owner 2026-11-17). Public like the centre's
+   * file it copies, so an <img> loads it; 404 shows the initial instead.
+   */
+  @Get('cashiers/:userId/photo')
+  @EdgePublic()
+  async cashierPhoto(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Res() response: ExpressResponse,
+  ): Promise<void> {
+    const photo = await this.photos.photoOf(userId);
+    if (!photo) {
+      response.status(404).end();
+      return;
+    }
+    response
+      .status(200)
+      .type(photo.contentType)
+      .set('cache-control', 'private, max-age=300')
+      .set('x-content-type-options', 'nosniff')
+      .send(photo.bytes);
   }
 
   @Get('device')

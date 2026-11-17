@@ -6,6 +6,7 @@ import { asc, eq } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import { CatalogService, CategoriesService, TaxService } from '../../catalog';
+import { HrSettingsService } from '../../hr';
 import { OrgService, UserNamesService } from '../../identity';
 import {
   DiscountProgramsService,
@@ -47,6 +48,7 @@ export class PosSnapshotService {
     private readonly org: OrgService,
     private readonly tills: PosTillsService,
     private readonly receiptTemplates: PosReceiptTemplatesService,
+    private readonly hr: HrSettingsService,
   ) {}
 
   forNode(node: EdgeNode): Promise<PosSnapshot> {
@@ -106,6 +108,7 @@ export class PosSnapshotService {
       ),
     );
     const cashierRows = await this.db.select().from(posCashiers).orderBy(asc(posCashiers.userId));
+    const photos = await this.hr.photoUrlsOf(cashierRows.map((row) => row.userId));
     const cashierTills = new Map<number, number[]>();
     for (const row of await this.db
       .select({ userId: posCashierTills.userId, tillId: posCashierTills.tillId })
@@ -165,6 +168,7 @@ export class PosSnapshotService {
             pinHash: row.pinHash,
             supervisor: supervisors.has(row.userId),
             tillIds: cashierTills.get(row.userId) ?? [],
+            photoUrl: photos.get(row.userId) ?? null,
           } as const,
         ];
       }),

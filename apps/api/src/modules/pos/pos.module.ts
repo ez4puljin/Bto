@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { CatalogModule } from '../catalog';
 import { EbarimtModule } from '../ebarimt';
 import { FinanceModule } from '../finance';
+import { HrModule } from '../hr';
 import { IdentityModule } from '../identity';
 import { InventoryModule } from '../inventory';
 import { PartnersModule } from '../partners';
@@ -88,6 +89,7 @@ const SERVICES = [
 @Module({
   imports: [
     IdentityModule,
+    HrModule,
     CatalogModule,
     PricingModule,
     InventoryModule,

@@ -1,6 +1,6 @@
 // Public API of the hr module (docs/modules/hr.md, ADR-0131). Other modules import only this
-// file; named exports only (ESLint G2 rejects `export *`). Nobody imports hr today: the composition
-// roots mount its HTTP module.
+// file; named exports only (ESLint G2 rejects `export *`). The composition roots mount its HTTP
+// module; pos reads the card photos for the till's sign-in screen (HrSettingsService.photoUrlsOf).
 export { HrHttpModule, HrModule } from './hr.module';
 export {
   type AttendanceEvent,

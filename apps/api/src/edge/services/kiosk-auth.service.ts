@@ -46,14 +46,18 @@ export class KioskAuthService {
   ) {}
 
   /** The till's sign-in list: active cashiers with a PIN, by name — the till's own when it has a list (ADR-0124). */
-  cashiers(tillCode?: string): { userId: number; fullName: string }[] {
+  cashiers(tillCode?: string): { userId: number; fullName: string; photo: boolean }[] {
     const allowed = this.allowedOf(tillCode, 'cashierUserIds');
     const tillId = this.tillIdOf(tillCode);
     return [...this.store.get().cashiers.values()]
       .filter((cashier) => cashier.status === 'ACTIVE' && cashier.pinHash !== null)
       .filter((cashier) => allowed === null || allowed.has(cashier.userId))
       .filter((cashier) => worksTill(cashier, tillId))
-      .map((cashier) => ({ userId: cashier.userId, fullName: cashier.fullName }))
+      .map((cashier) => ({
+        userId: cashier.userId,
+        fullName: cashier.fullName,
+        photo: Boolean(cashier.photoUrl),
+      }))
       .sort((a, b) => a.fullName.localeCompare(b.fullName, 'mn'));
   }
 

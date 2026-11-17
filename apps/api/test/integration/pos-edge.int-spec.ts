@@ -18,6 +18,7 @@ import { Decimal } from '@tugeel/shared/money';
 import { posSaleNumber } from '@tugeel/shared/pos';
 import { businessDate } from '@tugeel/shared/time';
 import { eq } from 'drizzle-orm';
+import sharp from 'sharp';
 import { EDGE_DB, type EdgeDb, inEdgeTransaction } from '../../src/edge/db/edge-db';
 import { edgeOutbox, edgeSales } from '../../src/edge/db/schema';
 import { OutboxService } from '../../src/edge/services/outbox.service';
@@ -419,5 +420,44 @@ describe('pos edge', () => {
     expect(await sync.pullOnce()).toBe('changed');
     const back = (await kiosk.get('/device').expect(200)).body as EdgeDeviceInfo;
     expect(back.cashiers.map((cashier) => cashier.userId)).toContain(store.supervisorId);
+  });
+
+  it('shows a cashier’s card photo on the sign-in screen, kept by the edge (owner 2026-11-17)', async () => {
+    const before = (await kiosk.get('/device').expect(200)).body as EdgeDeviceInfo;
+    expect(before.cashiers.find((row) => row.userId === store.cashierId)?.photo).toBe(false);
+    await kiosk.get(`/cashiers/${store.cashierId}/photo`).expect(404);
+
+    const bytes = await sharp({
+      create: { width: 64, height: 64, channels: 3, background: '#336699' },
+    })
+      .jpeg()
+      .toBuffer();
+    const issued = (
+      await store.pos
+        .http()
+        .post('/api/v1/files/presign')
+        .set(store.pos.auth)
+        .send({ kind: 'hr.employee_photo', contentType: 'image/jpeg', sizeBytes: bytes.length })
+        .expect(201)
+    ).body as { fileId: number; uploadUrl: string };
+    await store.pos
+      .http()
+      .put(issued.uploadUrl)
+      .set('Content-Type', 'image/jpeg')
+      .send(bytes)
+      .expect(204);
+    await store.pos
+      .http()
+      .put(`/api/v1/hr/staff/${store.cashierId}/photo`)
+      .set(store.pos.auth)
+      .send({ fileId: issued.fileId })
+      .expect(200);
+    expect(await sync.pullOnce()).toBe('changed');
+
+    const after = (await kiosk.get('/device').expect(200)).body as EdgeDeviceInfo;
+    expect(after.cashiers.find((row) => row.userId === store.cashierId)?.photo).toBe(true);
+    const served = await kiosk.get(`/cashiers/${store.cashierId}/photo`).expect(200);
+    expect(served.headers['content-type']).toMatch(/^image\//);
+    expect((served.body as Buffer).length).toBeGreaterThan(0);
   });
 });

@@ -285,6 +285,11 @@ export class EdgeClient {
     return this.request<EdgePairResponse>('POST', '/pair', { body });
   }
 
+  /** Where an <img> loads a cashier's card photo (owner 2026-11-17); a 404 means none. */
+  cashierPhotoUrl(userId: number): string {
+    return `${this.baseUrl ?? window.location.origin}${EDGE_API_PREFIX}/cashiers/${userId}/photo`;
+  }
+
   device(signal?: AbortSignal) {
     return this.request<EdgeDeviceInfo>('GET', '/device', { signal });
   }

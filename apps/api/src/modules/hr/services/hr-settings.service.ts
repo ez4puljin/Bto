@@ -24,7 +24,13 @@ import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
-import { type AuthContext, actorUserId, AuditService, UserNamesService } from '../../identity';
+import {
+  type AuthContext,
+  actorUserId,
+  AuditService,
+  StorageService,
+  UserNamesService,
+} from '../../identity';
 import { hrEmployees, hrEmployeeSites, hrSchedules, hrSettings, hrWorkSites } from '../schema';
 import { ATTENDANCE_MANAGE } from './work-sites.service';
 
@@ -97,7 +103,30 @@ export class HrSettingsService {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly names: UserNamesService,
+    private readonly storage: StorageService,
   ) {}
+
+  /**
+   * The public URLs of the people's card photos (ADR-0144), by user; a person without a photo is
+   * absent. The supermarket till shows them on its sign-in screen (owner 2026-11-17).
+   */
+  async photoUrlsOf(userIds: readonly number[]): Promise<Map<number, string>> {
+    if (userIds.length === 0) return new Map();
+    const rows = await this.db
+      .select({ userId: hrEmployees.userId, fileId: hrEmployees.photoFileId })
+      .from(hrEmployees)
+      .where(inArray(hrEmployees.userId, [...userIds]));
+    const withPhoto = rows.flatMap((row) =>
+      row.fileId === null ? [] : [{ userId: row.userId, fileId: row.fileId }],
+    );
+    const urls = await this.storage.publicUrls(withPhoto.map((row) => row.fileId));
+    return new Map(
+      withPhoto.flatMap((row) => {
+        const url = urls.get(row.fileId);
+        return url === undefined ? [] : [[row.userId, url] as const];
+      }),
+    );
+  }
 
   async schedule(executor: Db | Tx = this.db): Promise<CompanySchedule> {
     const [row] = await executor.select().from(hrSettings).where(eq(hrSettings.id, 1)).limit(1);

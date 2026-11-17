@@ -344,6 +344,8 @@ export interface SnapshotCashier {
   supervisor: boolean;
   /** The tills (ids) the cashier works (owner 2026-11-17); empty or absent: every till. */
   tillIds?: number[];
+  /** The card photo's public path on the centre (ADR-0144); null or absent: none. */
+  photoUrl?: string | null;
 }
 
 /** A way to pay the admin offers at the till (ADR-0111), in the order the till lists them. */
@@ -683,7 +685,8 @@ export interface EdgePairResponse {
 
 export interface EdgeDeviceInfo {
   till: { code: string; name: string };
-  cashiers: { userId: number; fullName: string }[];
+  /** `photo`: the edge serves the card photo at `cashiers/:userId/photo` (owner 2026-11-17). */
+  cashiers: { userId: number; fullName: string; photo?: boolean }[];
   companyName: string | null;
 }
 

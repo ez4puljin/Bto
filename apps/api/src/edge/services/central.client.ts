@@ -27,6 +27,9 @@ export class CentralError extends Error {
 }
 
 const TIMEOUT_MS = 30_000;
+/** The centre's public files (StorageService.publicUrl): the only paths `publicFile` fetches. */
+const PUBLIC_FILES_PREFIX = '/api/v1/files/public/';
+const PHOTO_TIMEOUT_MS = 10_000;
 
 /**
  * The edge's only door to the centre (ADR-0063 #4): the snapshot, the ordered documents and the
@@ -95,6 +98,33 @@ export class CentralClient {
 
   async heartbeat(beat: HeartbeatWire): Promise<void> {
     await this.call<unknown>('POST', '/heartbeat', beat);
+  }
+
+  /**
+   * A public file of the centre (a cashier's card photo, owner 2026-11-17) by its public path, or
+   * null when the centre does not have it; throws when the centre is away. At most `maxBytes`.
+   */
+  async publicFile(
+    path: string,
+    maxBytes: number,
+  ): Promise<{ contentType: string; bytes: Buffer } | null> {
+    if (!path.startsWith(PUBLIC_FILES_PREFIX) || path.includes('..')) return null;
+    const link = this.link.current();
+    if (!link) throw new CentralError('edge not linked to a centre', null, 'EDGE_NOT_LINKED');
+    let response: Response;
+    try {
+      response = await fetch(`${link.centralUrl.replace(/\/+$/, '')}${path}`, {
+        signal: AbortSignal.timeout(PHOTO_TIMEOUT_MS),
+      });
+    } catch (error: unknown) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new CentralError(`centre unreachable: ${reason}`, null, null);
+    }
+    if (!response.ok) return null;
+    const contentType = response.headers.get('content-type') ?? '';
+    if (!contentType.startsWith('image/')) return null;
+    const bytes = Buffer.from(await response.arrayBuffer());
+    return bytes.length > maxBytes ? null : { contentType, bytes };
   }
 
   private async call<T>(
