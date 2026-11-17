@@ -570,6 +570,21 @@ export class WorkforceService implements OnApplicationBootstrap {
   }
 
   /**
+   * The employee's own photo, from the staff app (ADR-0209): only a photo they uploaded themselves,
+   * put on their card like HR's; the one it replaces is deleted.
+   */
+  async setOwnPhoto(ctx: AuthContext, fileId: number): Promise<EmployeeProfile> {
+    const file = await this.storage.verifyUploaded(fileId, 'hr.employee_photo');
+    if (file.ownerId !== ctx.userId) {
+      throw new AppError('FORBIDDEN', `file ${fileId} was not uploaded by this user`, {
+        reason: 'OWNER',
+      });
+    }
+    await inTransaction(this.db, async (tx) => this.attachPhoto(tx, ctx, ctx.userId, fileId));
+    return this.profile(ctx.userId);
+  }
+
+  /**
    * Brings records in from another system (ADR-0144: timely): by `externalRef`, else by phone —
    * the card written over (a schedule HR gave kept), the division made when new, the photo
    * attached when the card has none. Idempotent; returns what it did.

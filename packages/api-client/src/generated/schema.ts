@@ -4851,6 +4851,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/hr/me/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** The employee's own photo from the staff app (ADR-0209). */
+        put: operations["Engagement_setMyPhoto"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/hr/events/{id}/done": {
         parameters: {
             query?: never;
@@ -16493,6 +16510,10 @@ export interface components {
             maritalStatus?: components["schemas"]["HrMaritalStatus"] | null;
             district?: string | null;
             children: components["schemas"]["HrChild"][];
+        };
+        HrMyPhotoRequest: {
+            /** @description An hr.employee_photo the caller uploaded (ADR-0209) */
+            fileId: number;
         };
         HrEventDoneRequest: {
             done: boolean;
@@ -36214,6 +36235,38 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["HrProfileRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrProfile"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Engagement_setMyPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrMyPhotoRequest"];
             };
         };
         responses: {

@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { components } from '@tugeel/api-client';
 import { ubDate } from '../dates/dates';
+import { localUpload } from '../device/upload-file';
 import { useSignedIn } from '../state/session';
 import { useMyAttendance } from './attendance';
-import { unwrap } from './problem';
+import { ApiProblem, NETWORK, problemOf, unwrap } from './problem';
 
 // «Хамт олон» (ADR-0146): what every signed-in staff member reads and answers — notices and news,
 // votes and surveys, the day's mood, the calendar, thanks, feedback, a sent location and their own
@@ -239,6 +240,42 @@ export function useMyProfile() {
     queryKey: [...KEY, 'profile'],
     queryFn: async () => unwrap(await session.client.GET('/api/v1/hr/me/profile')),
     staleTime: 15_000,
+  });
+}
+
+/**
+ * The person's own photo (ADR-0209): the square JPEG goes up through a signed upload, then onto
+ * their card; the card's new photo answers at once.
+ */
+export function useSetMyPhoto() {
+  const { session } = useSignedIn();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (uri: string) => {
+      const upload = await localUpload(uri);
+      const issued = unwrap(
+        await session.client.POST('/api/v1/files/presign', {
+          body: { kind: 'hr.employee_photo', contentType: 'image/jpeg', sizeBytes: upload.size },
+        }),
+      );
+      const url = issued.uploadUrl.startsWith('/')
+        ? `${session.server}${issued.uploadUrl}`
+        : issued.uploadUrl;
+      let sent: { status: number; body: string };
+      try {
+        sent = await upload.put(url, { ...issued.headers });
+      } catch {
+        throw new ApiProblem(NETWORK);
+      }
+      if (sent.status < 200 || sent.status >= 300) {
+        throw new ApiProblem(problemOf(null, sent.status));
+      }
+      return unwrap(
+        await session.client.PUT('/api/v1/hr/me/photo', { body: { fileId: issued.fileId } }),
+      );
+    },
+    onSuccess: (profile) => queryClient.setQueryData([...KEY, 'profile'], profile),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: KEY }),
   });
 }
 

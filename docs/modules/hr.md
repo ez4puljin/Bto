@@ -26,7 +26,7 @@ Staff press «Ирсэн» and «Явсан» on the staff app; the press counts
 - `HrSettingsService.schedule() / updateSchedule(ctx, schedule)`; `employees()` (every staff record from identity's `UserNamesService.allStaff()` with its terms and the schedule that applies), `employee(userId)`, `updateEmployee(ctx, userId, terms)`.
 - `AttendanceService.punch(ctx, { kind, lat, lng, accuracyM })` (the geofence and the turn, under a per-user advisory lock), `me(ctx)` (today, the sites, the schedule, this month), `myDays(ctx, month)`, `dashboard(date)`, `days({ from, to, userId? })` (≤ 62 days), `events(userId, date)` (struck-out ones included), `addEvent(ctx, { userId, kind, at, note })` (source OFFICE, must keep the day's turns), `strike(ctx, id, reason)`.
 
-- `WorkforceService` (ADR-0144): divisions, `employees()` (the cards with photo URL, division and schedule names), `create` / `update` (through identity's `StaffAccountsService`), `setLeft`, `setPhoto`, schedules (`list`, `save` assigning members, `archive`), the timely import (`importDivisions`, `importEmployees`, `importSchedule`, `tidyImportedSchedules`).
+- `WorkforceService` (ADR-0144): divisions, `employees()` (the cards with photo URL, division and schedule names), `create` / `update` (through identity's `StaffAccountsService`), `setLeft`, `setPhoto`, `setOwnPhoto` (the employee's own, ADR-0209), schedules (`list`, `save` assigning members, `archive`), the timely import (`importDivisions`, `importEmployees`, `importSchedule`, `tidyImportedSchedules`).
 - `RequestsService`: `types` / `saveType`, `list(filter)`, `mine(ctx)`, `pendingCount`, `create(ctx, input)` (own, or anybody's with manage), `decide(ctx, id, …)` (an approved punch writes the event via `AttendanceService.addRequestEventInTx`), `cancel`, `approvedIn(range)`.
 - `HrReportsService.days({ from, to, userId?, divisionId? })` (≤ 62 days) and `HrExportsService` (api only: the report and the staff list as Excel).
 
@@ -54,7 +54,7 @@ Nobody imports hr; the composition root mounts `HrHttpModule`.
 
 Refusals: `ATTENDANCE_NO_SITE` 409, `ATTENDANCE_OUT_OF_RANGE` 409 (`site`, `distanceM`, `radiusM`), `ATTENDANCE_LOCATION_IMPRECISE` 422 (`accuracyM`), `ATTENDANCE_ALREADY_IN` 409 (`at`), `ATTENDANCE_NOT_IN` 409, `ATTENDANCE_EVENT_ORDER` 409.
 
-| `GET /hr/me/feed` · `GET /hr/me/messages` · `POST /hr/me/messages/read` · `GET /hr/me/polls` · `POST /hr/me/polls/:id/answers` · `PUT /hr/me/mood` · `GET`/`POST /hr/me/feedback` · `GET`/`POST /hr/me/locations` · `GET`/`PUT /hr/me/profile` · `GET /hr/calendar` · `GET`/`POST /hr/thanks` | any signed-in staff | the staff's own side (ADR-0146) |
+| `GET /hr/me/feed` · `GET /hr/me/messages` · `POST /hr/me/messages/read` · `GET /hr/me/polls` · `POST /hr/me/polls/:id/answers` · `PUT /hr/me/mood` · `GET`/`POST /hr/me/feedback` · `GET`/`POST /hr/me/locations` · `GET`/`PUT /hr/me/profile` · `PUT /hr/me/photo` (an `hr.employee_photo` the caller uploaded, ADR-0209) · `GET /hr/calendar` · `GET`/`POST /hr/thanks` | any signed-in staff | the staff's own side (ADR-0146) |
 | `GET`/`POST /hr/messages`, `POST /hr/messages/:id/withdraw` · `GET`/`POST /hr/polls`, `POST /hr/polls/:id/close` · `GET /hr/moods` · `GET /hr/feedback`, `PUT /hr/feedback/:id` · `GET /hr/location-shares` · `POST`/`PUT`/`DELETE /hr/events` · `PUT /hr/staff/:userId/details` · `GET /hr/insights/{workforce,attendance,requests}` | view to read / manage to write | HR's side and the dashboard (ADR-0146) |
 
 ## 5. Invariants

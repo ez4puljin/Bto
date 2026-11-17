@@ -81,6 +81,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: [
     'expo-router',
     ['expo-camera', { recordAudioAndroid: false }],
+    // The staff app's own photo (ADR-0209): the camera or the pictures, never the microphone.
+    ['expo-image-picker', { microphonePermission: false }],
     'expo-secure-store',
     // The staff app's fingerprint sign-in (ADR-0174); Android's USE_BIOMETRIC comes with it.
     'expo-local-authentication',

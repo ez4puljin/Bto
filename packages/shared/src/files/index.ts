@@ -12,9 +12,12 @@ export interface FileKindDefinition {
   visibility: 'public' | 'private';
   /** Permissions allowed to request an upload URL for this kind: any one of them is enough. */
   permissions: readonly Permission[];
+  /** Every signed-in staff member may request one as well, without those permissions (ADR-0209). */
+  anyStaff?: true;
 }
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+export const PDF_CONTENT_TYPE = 'application/pdf';
 /** Office Open XML workbook (.xlsx); the old binary .xls is not accepted (ADR-0036). */
 export const XLSX_CONTENT_TYPE =
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -79,6 +82,16 @@ export const FILE_KINDS = {
     visibility: 'private',
     permissions: ['inventory.receipts.manage', 'inventory.costs.manage'],
   },
+  /**
+   * A page of a supplier's delivery note given to «Падаан унших» (ADR-0210): a photo, a sheet from
+   * the scanner or a PDF file; private, read by the model and shown to receipt and cost holders.
+   */
+  'inventory.note_page': {
+    contentTypes: [...IMAGE_TYPES, PDF_CONTENT_TYPE],
+    maxBytes: 10 * 1024 * 1024,
+    visibility: 'private',
+    permissions: ['inventory.receipts.manage'],
+  },
   /** A supplier's invoice photographed for the AI check (ADR-0122), private: order managers, orderers and cost holders. */
   'procurement.invoice_image': {
     contentTypes: IMAGE_TYPES,
@@ -86,12 +99,17 @@ export const FILE_KINDS = {
     visibility: 'private',
     permissions: ['procurement.orders.manage', 'procurement.orders.edit', 'inventory.costs.manage'],
   },
-  /** An employee's photo (ADR-0144), square, resized in the browser; shown in «Ажилтан» and the staff app. */
+  /**
+   * An employee's photo (ADR-0144), square, resized in the browser or the staff app; shown in
+   * «Ажилтан» and the staff app. HR sets anyone's; every employee may set their own from the staff
+   * app (ADR-0209), so any staff member may upload one.
+   */
   'hr.employee_photo': {
     contentTypes: IMAGE_TYPES,
     maxBytes: 1024 * 1024,
     visibility: 'public',
     permissions: ['hr.attendance.manage'],
+    anyStaff: true,
   },
   /** A notice's, news' or vote's picture in the staff app (ADR-0146), public like the photos. */
   'hr.message_image': {
@@ -140,6 +158,7 @@ const EXTENSIONS: Readonly<Record<string, string>> = {
   'image/png': 'png',
   'image/webp': 'webp',
   [XLSX_CONTENT_TYPE]: 'xlsx',
+  [PDF_CONTENT_TYPE]: 'pdf',
 };
 
 /** File-name extension for a content type the registry allows. */
@@ -149,7 +168,7 @@ export function extensionFor(contentType: string): string {
   return extension;
 }
 
-/** Whether the first bytes of a file match its declared type (JPEG, PNG, WebP; xlsx is a ZIP). */
+/** Whether the first bytes of a file match its declared type (JPEG, PNG, WebP, PDF; xlsx is a ZIP). */
 export function matchesMagicBytes(contentType: string, head: Uint8Array): boolean {
   const starts = (bytes: readonly number[], offset = 0) =>
     bytes.every((byte, index) => head[offset + index] === byte);
@@ -162,6 +181,9 @@ export function matchesMagicBytes(contentType: string, head: Uint8Array): boolea
       return starts([0x52, 0x49, 0x46, 0x46]) && starts([0x57, 0x45, 0x42, 0x50], 8);
     case XLSX_CONTENT_TYPE:
       return starts([0x50, 0x4b, 0x03, 0x04]);
+    case PDF_CONTENT_TYPE:
+      // %PDF-
+      return starts([0x25, 0x50, 0x44, 0x46, 0x2d]);
     default:
       return false;
   }

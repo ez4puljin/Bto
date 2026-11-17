@@ -54,7 +54,10 @@ export class StorageService {
     input: { kind: FileKind; contentType: string; sizeBytes: number },
   ): Promise<StoredFile> {
     const definition = fileKind(input.kind);
-    if (!definition.permissions.some((permission) => ctx.permissions.has(permission))) {
+    const allowed =
+      definition.anyStaff === true ||
+      definition.permissions.some((permission) => ctx.permissions.has(permission));
+    if (!allowed) {
       throw new AppError('FORBIDDEN', `upload of ${input.kind} not permitted`, {
         reason: 'PERMISSION',
       });

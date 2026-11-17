@@ -1,5 +1,6 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { addDays, businessDate } from '@tugeel/shared/time';
+import sharp from 'sharp';
 import request from 'supertest';
 import { connectAs, createHttpApp } from '../harness/apps';
 import { idempotency } from '../harness/catalog';
@@ -22,7 +23,8 @@ interface PollJson {
 /**
  * The staff's own side (ADR-0146): notices to everybody or to some, votes and surveys, the mood
  * that shows only counts, feedback with or without a name, thanks, a sent location, the calendar
- * with birthdays, an employee's own details and the dashboard's figures. Synthetic data.
+ * with birthdays, an employee's own details and photo (ADR-0209) and the dashboard's figures.
+ * Synthetic data.
  */
 describe('hr engagement', () => {
   let app: NestExpressApplication;
@@ -609,5 +611,68 @@ describe('hr engagement', () => {
       .query({ from, to: today })
       .set(bearer(staffA.token))
       .expect(403);
+  });
+
+  it('lets an employee put a photo they uploaded on their own card, and only theirs (ADR-0209)', async () => {
+    const bytes = await sharp({
+      create: { width: 64, height: 64, channels: 3, background: '#336699' },
+    })
+      .jpeg()
+      .toBuffer();
+    const upload = async (token: string) => {
+      const issued = (
+        await http()
+          .post('/api/v1/files/presign')
+          .set(bearer(token))
+          .send({ kind: 'hr.employee_photo', contentType: 'image/jpeg', sizeBytes: bytes.length })
+          .expect(201)
+      ).body as { fileId: number; uploadUrl: string };
+      await http().put(issued.uploadUrl).set('Content-Type', 'image/jpeg').send(bytes).expect(204);
+      return issued.fileId;
+    };
+    // Other kinds stay closed to a plain employee.
+    await http()
+      .post('/api/v1/files/presign')
+      .set(bearer(staffA.token))
+      .send({ kind: 'hr.message_image', contentType: 'image/jpeg', sizeBytes: bytes.length })
+      .expect(403);
+
+    const first = await upload(staffA.token);
+    // B cannot take A's upload for their own card.
+    await http()
+      .put('/api/v1/hr/me/photo')
+      .set(bearer(staffB.token))
+      .send({ fileId: first })
+      .expect(403);
+    const set = (
+      await http()
+        .put('/api/v1/hr/me/photo')
+        .set(bearer(staffA.token))
+        .send({ fileId: first })
+        .expect(200)
+    ).body as { photoUrl: string | null };
+    expect(set.photoUrl).toMatch(/^\/api\/v1\/files\/public\//);
+    await http()
+      .get(set.photoUrl ?? '')
+      .expect(200);
+
+    const second = await upload(staffA.token);
+    const changed = (
+      await http()
+        .put('/api/v1/hr/me/photo')
+        .set(bearer(staffA.token))
+        .send({ fileId: second })
+        .expect(200)
+    ).body as { photoUrl: string | null };
+    expect(changed.photoUrl).not.toBe(set.photoUrl);
+    const profile = (
+      await http().get('/api/v1/hr/me/profile').set(bearer(staffA.token)).expect(200)
+    ).body as { photoUrl: string | null };
+    expect(profile.photoUrl).toBe(changed.photoUrl);
+    const staff = (await http().get('/api/v1/hr/staff').set(bearer(hr)).expect(200)).body as {
+      userId: number;
+      photoUrl: string | null;
+    }[];
+    expect(staff.find((row) => row.userId === staffA.id)?.photoUrl).toBe(changed.photoUrl);
   });
 });

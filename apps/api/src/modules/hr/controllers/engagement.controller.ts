@@ -43,6 +43,7 @@ import {
   HrMoodsDto,
   HrMyMessageDto,
   HrMyMoodDto,
+  HrMyPhotoRequestDto,
   HrPollAnswersRequestDto,
   HrPollDto,
   HrPollRequestDto,
@@ -184,6 +185,17 @@ export class EngagementController {
     @Body() body: HrProfileRequestDto,
   ): Promise<HrProfileDto> {
     return this.workforce.saveProfile(ctx, ctx.userId, body);
+  }
+
+  /** The employee's own photo from the staff app (ADR-0209). */
+  @Put('me/photo')
+  @Authenticated()
+  @ApiOkResponse({ type: HrProfileDto })
+  setMyPhoto(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: HrMyPhotoRequestDto,
+  ): Promise<HrProfileDto> {
+    return this.workforce.setOwnPhoto(ctx, body.fileId);
   }
 
   // ── open to every staff member ─────────────────────────────────────────────

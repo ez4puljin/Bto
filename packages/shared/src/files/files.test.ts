@@ -23,6 +23,13 @@ describe('file kinds (ADR-0029)', () => {
     expect(isFileKind('toString')).toBe(false);
   });
 
+  it('lets every staff member upload only their own photo kind (ADR-0209)', () => {
+    const open = Object.entries(FILE_KINDS).filter(
+      ([, definition]) => 'anyStaff' in definition && definition.anyStaff,
+    );
+    expect(open.map(([kind]) => kind)).toEqual(['hr.employee_photo']);
+  });
+
   it('recognises image signatures', () => {
     expect(matchesMagicBytes('image/jpeg', Uint8Array.from([0xff, 0xd8, 0xff, 0xe0]))).toBe(true);
     const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]);

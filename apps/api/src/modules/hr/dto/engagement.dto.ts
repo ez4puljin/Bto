@@ -602,6 +602,14 @@ export class HrProfileRequestDto {
   children: HrChildDto[];
 }
 
+@ApiSchema({ name: 'HrMyPhotoRequest' })
+export class HrMyPhotoRequestDto {
+  @ApiProperty({ description: 'An hr.employee_photo the caller uploaded (ADR-0209)' })
+  @IsInt()
+  @Min(1)
+  fileId: number;
+}
+
 @ApiSchema({ name: 'HrStaffDetailsRequest' })
 export class HrStaffDetailsRequestDto extends HrProfileRequestDto {
   @ApiPropertyOptional({ enum: JOB_LEVELS, enumName: 'HrJobLevel', nullable: true })

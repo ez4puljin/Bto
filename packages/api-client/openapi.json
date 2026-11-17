@@ -19523,6 +19523,53 @@
         ]
       }
     },
+    "/api/v1/hr/me/photo": {
+      "put": {
+        "operationId": "Engagement_setMyPhoto",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HrMyPhotoRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrProfile"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The employee's own photo from the staff app (ADR-0209).",
+        "tags": [
+          "hr"
+        ]
+      }
+    },
     "/api/v1/hr/events/{id}/done": {
       "put": {
         "operationId": "Engagement_setEventDone",
@@ -63706,6 +63753,19 @@
         },
         "required": [
           "children"
+        ]
+      },
+      "HrMyPhotoRequest": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "An hr.employee_photo the caller uploaded (ADR-0209)"
+          }
+        },
+        "required": [
+          "fileId"
         ]
       },
       "HrEventDoneRequest": {
