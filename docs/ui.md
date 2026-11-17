@@ -212,6 +212,7 @@ Feature pieces other screens reuse (ADR-0044, ADR-0047):
 - **A new menu page:** add it to `NAV_GROUPS` with an icon and its permission. It then appears in the menu, the breadcrumb and the search.
 
 - **Not found, no access, an error.** A page header with the title (the browser tab says it too), a hint and «Нүүр хуудас руу очих»; the error boundary offers «Дахин ачаалах». A record page that is loading or failed keeps its header.
+- **The guide** (`/guide`, `/guide/:category/:article`, `features/guide`, ADR-0214; both pages `reading`, «Систем → Гарын авлага», no right needed). The how-to articles are Markdown files in the code: `features/guide/content/<category>/<NN>-<slug>.md` (the folder is the category, `NN` the order, the file name the address, the first `# ` line the title, the first paragraph the summary in the list). `markdown.ts` reads the subset the articles use — `##`, `###`, paragraphs, `-` and `1.` lists (a numbered list goes on across a code block), `>` a note, fenced code with «Хуулах», `|` tables, `**bold**`, `` `code` ``, `[text](url)` (only `/…` in-app and `http(s)://`) — and anything else stays plain text; no HTML, no library. A new category is a folder, an entry in `GUIDE_CATEGORIES` and a `guide.categories.<folder>` text. An article is written for the person doing the work: the steps first, then «Ажиллахгүй бол» as a table of what they see and what to do. A feature adds its article when it is built (CLAUDE.md).
 
 ## 5. Do and don't
 

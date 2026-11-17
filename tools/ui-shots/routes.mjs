@@ -358,6 +358,8 @@ export const ROUTES = [
   { area: 'system', name: 'imports', path: '/imports' },
   { area: 'system', name: 'import', path: '/imports/{import}' },
   { area: 'system', name: 'system-status', path: '/system/status' },
+  { area: 'system', name: 'guide', path: '/guide' },
+  { area: 'system', name: 'guide-article', path: '/guide/setup/scan-bridge' },
   { area: 'system', name: 'customer-app', path: '/system/customer-app' },
   { area: 'system', name: 'customer-app-banners', path: '/system/customer-app/banners' },
   {

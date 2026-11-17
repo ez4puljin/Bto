@@ -154,6 +154,7 @@ import { PosTillsPage } from '@/features/pos/tills-page';
 import { PosVoidsPage } from '@/features/pos/voids-page';
 import { PosVoucherPrintPage } from '@/features/pos/voucher-print-page';
 import { PosVouchersPage } from '@/features/pos/vouchers-page';
+import { GuideArticlePage, GuidePage } from '@/features/guide/guide-pages';
 import { SystemStatusPage } from '@/features/system/system-status-page';
 import { UsagePage } from '@/features/system/usage-page';
 
@@ -365,6 +366,12 @@ export const routes: RouteObject[] = [
           ...posRoutes(),
           ...appRoutes(),
           ...hrRoutes(),
+          { path: 'guide', handle: { width: 'reading' }, element: <GuidePage /> },
+          {
+            path: 'guide/:category/:article',
+            handle: { width: 'reading' },
+            element: <GuideArticlePage />,
+          },
           { path: 'system/status', handle: { width: 'wide' }, element: <SystemStatusPage /> },
           {
             path: 'system/usage',

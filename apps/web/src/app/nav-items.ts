@@ -37,6 +37,7 @@ import {
   IdCard,
   KeyRound,
   Landmark,
+  LifeBuoy,
   LayoutDashboard,
   LayoutGrid,
   ListChecks,
@@ -692,6 +693,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: 'nav.groups.system',
     items: [
+      // ADR-0214: the how-to articles; open to everyone who is signed in.
+      { to: '/guide', label: 'nav.guide', icon: LifeBuoy },
       { to: '/roles', label: 'nav.roles', icon: ShieldCheck, permission: 'identity.users.read' },
       // ADR-0084: the Finance Core company; everyone reads it, finance.settings.manage edits it.
       { to: '/company', label: 'nav.company', icon: Briefcase, permission: 'finance.read' },

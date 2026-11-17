@@ -22,7 +22,7 @@ Parallel sessions (owner 2026-10-31, «энэ session шиг ажилдаг бо
 2. One slice or screen per session, in its own worktree; start an implementation session in plan mode when the change is guarded or the brief leaves a design choice open.
 3. On a `TODO-VERIFY` item: stop and ask the owner; never resolve a business unknown by guessing. Interview rounds are for new modules; an existing screen is changed from what the owner says after trying it.
 4. Before the pull request: `pnpm check:quick` green (packages, typecheck, lint, unit); a guarded change also runs its integration and integrity suites locally once. The full `pnpm check` is CI's job on the pull request.
-5. Before finishing: `docs/STATUS.md` gets up to three lines (what changed, what the owner clicks on dev, with the test logins' names); a guarded change keeps `docs/modules/<module>.md` current and writes an ADR only when a rule, a structure, a flow or a right changed.
+5. Before finishing: `docs/STATUS.md` gets up to three lines (what changed, what the owner clicks on dev, with the test logins' names); a guarded change keeps `docs/modules/<module>.md` current and writes an ADR only when a rule, a structure, a flow or a right changed. A feature or a changed way of working that people use adds or updates its article in the guide («Систем → Гарын авлага», `apps/web/src/features/guide/content/<category>/<NN>-<slug>.md`, ADR-0214): plain Mongolian steps for the person who does the work, what they see when it fails and what to do.
 
 ## Stack and pinned versions
 
@@ -98,7 +98,7 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): producti
 
 - Money `NUMERIC(14,2)` MNT, quantities `NUMERIC(14,3)` base units, unit costs / `avg_cost` `NUMERIC(14,4)`, factors `NUMERIC(18,6)`; Drizzle custom types `money()` / `qty()` / `cost()` (`apps/api/src/common/db/types.ts`) return `Decimal`; arithmetic only through `@tugeel/shared/money` (decimal.js, HALF_UP); unit prices whole MNT, VAT and city tax 2 decimals per line, summed into the header.
 - `timestamptz` (UTC) in the DB; business dates (`effective_date`, report periods, `billIdSuffix` day, `reportMonth`) in Asia/Ulaanbaatar via dayjs + timezone; `posapi_date` stored verbatim.
-- English identifiers, enum values and error codes in the DB and API; Mongolian only in `packages/shared/i18n/mn.json` and user data; `search_text` normalised in app code.
+- English identifiers, enum values and error codes in the DB and API; Mongolian only in `packages/shared/i18n/mn.json`, in the guide's articles (`apps/web/src/features/guide/content/**/*.md`, ADR-0214) and in user data; `search_text` normalised in app code.
 - Rules the api, the web and the importer share live in `packages/shared` and are never re-implemented: search keys `@tugeel/shared/text`, barcodes `gtin`, unit factors `units`, phones `phone`, TIN / registration / consumer numbers `taxpayer`, GPS parsing `geo`, bin codes, document numbers, adjustment reasons and cost arithmetic `inventory`; the database checks only the generic shapes.
 - `Idempotency-Key` header on every document-creating POST from every client; stored in `idempotency_keys`, response replayed on repeat.
 - Audit rows via `AuditService.record(tx, …)` inside the service transaction; document numbers allocated at SUBMIT/POST inside that tx (drafts have no number; sales orders are numbered at creation in the company format, ADR-0057, goods receipts at their first save, ADR-0153); a POSTed document is immutable, corrections are reversing documents.
