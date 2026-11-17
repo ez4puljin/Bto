@@ -42,6 +42,12 @@ expect "the office's pages leave the tills alone" "$(needs_edge apps/web/src/fea
 expect "the kiosk's pages rebuild the till server" "$(needs_edge apps/web/src/pos/sale.tsx)" "yes"
 expect "the api rebuilds the till server" "$(needs_edge apps/api/src/main.ts)" "yes"
 expect "docs leave the tills alone" "$(needs_edge docs/ui.md)" "no"
+expect "after a rollback the api's code is still to build" \
+  "$(left_behind apps/api/src/a.ts apps/web/src/b.tsx docs/c.md | tr '\n' ' ')" "apps/api/src/a.ts "
+expect "pages already built leave nothing behind" \
+  "$(left_behind apps/web/src/pos/sale.tsx apps/web/src/b.tsx README.md | tr '\n' ' ')" ""
+expect "the web's Dockerfile is left behind by a pages-only update" \
+  "$(left_behind apps/web/Dockerfile | tr '\n' ' ')" "apps/web/Dockerfile "
 
 if [ "$FAILS" -gt 0 ]; then
   echo "$FAILS failed"

@@ -64,6 +64,28 @@ needs_edge() {
   echo no
 }
 
+# Of the files between the version the api runs and the checkout, prints those a pages-only update
+# leaves unbuilt (everything but the office's pages and the docs). After a rollback the checkout
+# stays on the code CI refused while the api runs an older one, and a pages-only push after it
+# would otherwise move the checkout on with that code never built (owner 2026-11-17).
+left_behind() {
+  local file
+  for file in "$@"; do
+    case "$file" in
+      docs/* | .claude/* | .github/* | *.md) ;;
+      apps/web/Dockerfile | apps/web/package.json) printf '%s\n' "$file" ;;
+      apps/web/*) ;;
+      *) printf '%s\n' "$file" ;;
+    esac
+  done
+}
+
+# The version the running api answers with (/health), or nothing when it does not answer.
+api_version() {
+  curl -fsS --max-time 5 http://127.0.0.1/health 2>/dev/null |
+    sed -n 's/.*"version":"\([0-9a-f]\{7,40\}\)".*/\1/p' || true
+}
+
 if [ "${1:-}" = "--source-only" ]; then return 0 2>/dev/null || exit 0; fi
 
 # The round moves this checkout, this file included, while it runs: bash reads a script as it goes,
@@ -171,6 +193,15 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
 fi
 
 mapfile -t CHANGED < <(git diff --name-only HEAD "$TARGET")
+# What the checkout holds but the api never ran (a rollback, see left_behind) is built this round.
+RUNNING=$(api_version)
+if [ -n "$RUNNING" ] && git merge-base --is-ancestor "$RUNNING" HEAD 2>/dev/null; then
+  mapfile -t BETWEEN < <(git diff --name-only "$RUNNING" HEAD)
+  mapfile -t BEHIND < <(left_behind "${BETWEEN[@]}")
+  if [ "${#BEHIND[@]}" -gt 0 ]; then
+    mapfile -t CHANGED < <(printf '%s\n' "${CHANGED[@]}" "${BEHIND[@]}" | sed '/^$/d' | sort -u)
+  fi
+fi
 VERDICT=$(ci_verdict "$TARGET")
 PLAN=$(plan_update "$VERDICT" "${CHANGED[@]}")
 
