@@ -8,6 +8,7 @@ import {
   type LlmMessage,
   type LlmRequest,
   type LlmResult,
+  timeoutOf,
 } from './llm.types';
 
 export const ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
@@ -46,7 +47,7 @@ export class AnthropicClient implements LlmClient {
           output_config: { format: { type: 'json_schema', schema: request.output.schema } },
         }),
       },
-      this.config.timeoutMs,
+      timeoutOf(this.config, request),
       MessagesAnswer,
     );
     if (answer.stop_reason === 'refusal') {
@@ -71,7 +72,10 @@ export class AnthropicClient implements LlmClient {
   }
 }
 
-/** A turn as the Messages API takes it: a string, or content blocks with images as base64. */
+/**
+ * A turn as the Messages API takes it: a string, or content blocks with images and PDF files as
+ * base64.
+ */
 function anthropicMessage(message: LlmMessage) {
   if (typeof message.content === 'string') return message;
   return {
@@ -80,7 +84,7 @@ function anthropicMessage(message: LlmMessage) {
       part.type === 'text'
         ? { type: 'text', text: part.text }
         : {
-            type: 'image',
+            type: part.type,
             source: { type: 'base64', media_type: part.mediaType, data: part.data },
           },
     ),

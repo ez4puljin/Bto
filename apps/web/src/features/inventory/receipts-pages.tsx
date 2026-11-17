@@ -1,4 +1,4 @@
-import { PackagePlus, Plus } from 'lucide-react';
+import { FileText, PackagePlus, Plus, ScanText } from 'lucide-react';
 import { type ReactNode, useDeferredValue, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useLocation, useParams, useSearchParams } from 'react-router';
@@ -40,6 +40,7 @@ import {
 } from './api';
 import { useWarehouseOptions, wantsScanFocus } from './helpers';
 import { ReceiptForm } from './receipt-form';
+import { useReceiptNoteReading } from './receipt-notes-api';
 import { DocStatusBadge, ProductSearch, WarehouseSelect } from './shared';
 
 const RECEIPT_STATUSES: readonly ReceiptStatus[] = ['DRAFT', 'POSTED', 'CANCELLED'];
@@ -112,12 +113,20 @@ export function ReceiptsPage() {
         title={t('inventory.receipts.title')}
         actions={
           canManage ? (
-            <Button asChild>
-              <Link to="/inventory/receipts/new">
-                <Plus />
-                {t('inventory.receipts.create')}
-              </Link>
-            </Button>
+            <>
+              <Button asChild variant="outline">
+                <Link to="/inventory/receipts/notes">
+                  <ScanText />
+                  {t('inventory.noteReading.title')}
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link to="/inventory/receipts/new">
+                  <Plus />
+                  {t('inventory.receipts.create')}
+                </Link>
+              </Button>
+            </>
           ) : null
         }
       />
@@ -370,6 +379,7 @@ function ReceiptScreen(props: {
             {detail.effectiveDate ? (
               <span>{t('inventory.postedOn', { date: detail.effectiveDate })}</span>
             ) : null}
+            <NoteReadingLink receiptId={detail.id} />
             {extra?.meta}
           </>
         ) : undefined
@@ -383,5 +393,22 @@ function ReceiptScreen(props: {
       onCreated={props.onCreated}
       head={head}
     />
+  );
+}
+
+/** A receipt made of a read delivery note (ADR-0210) links to the note's pages and what was read. */
+function NoteReadingLink({ receiptId }: { receiptId: number }) {
+  const { t } = useTranslation();
+  const reading = useReceiptNoteReading(receiptId);
+  const readingId = reading.data?.readingId ?? null;
+  if (readingId === null) return null;
+  return (
+    <Link
+      to={`/inventory/receipts/notes/${readingId}`}
+      className="inline-flex items-center gap-1 underline underline-offset-4"
+    >
+      <FileText aria-hidden className="size-3.5" />
+      {t('inventory.noteReading.ofReceipt')}
+    </Link>
   );
 }

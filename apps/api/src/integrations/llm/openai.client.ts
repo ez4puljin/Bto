@@ -8,6 +8,7 @@ import {
   type LlmMessage,
   type LlmRequest,
   type LlmResult,
+  timeoutOf,
 } from './llm.types';
 
 export const OPENAI_BASE_URL = 'https://api.openai.com/v1';
@@ -71,7 +72,7 @@ export class OpenAiClient implements LlmClient {
           },
         }),
       },
-      this.config.timeoutMs,
+      timeoutOf(this.config, request),
       ResponsesAnswer,
     );
     if (answer.status === 'incomplete') {
@@ -105,15 +106,20 @@ export class OpenAiClient implements LlmClient {
   }
 }
 
-/** A turn as the Responses API takes it: text, or input parts with images as data URLs. */
+/**
+ * A turn as the Responses API takes it: text, or input parts with images and PDF files as data
+ * URLs.
+ */
 function openAiMessage(message: LlmMessage) {
   if (typeof message.content === 'string') return { role: message.role, content: message.content };
   return {
     role: message.role,
-    content: message.content.map((part) =>
-      part.type === 'text'
-        ? { type: 'input_text', text: part.text }
-        : { type: 'input_image', image_url: `data:${part.mediaType};base64,${part.data}` },
-    ),
+    content: message.content.map((part, index) => {
+      if (part.type === 'text') return { type: 'input_text', text: part.text };
+      const url = `data:${part.mediaType};base64,${part.data}`;
+      return part.type === 'image'
+        ? { type: 'input_image', image_url: url }
+        : { type: 'input_file', filename: `file-${index + 1}.pdf`, file_data: url };
+    }),
   };
 }

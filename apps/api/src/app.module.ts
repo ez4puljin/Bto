@@ -9,6 +9,7 @@ import { HealthModule } from './health/health.module';
 import { ErkhetIntegrationModule } from './integrations/erkhet';
 import { LlmModule } from './integrations/llm';
 import { PictureModule } from './integrations/picture';
+import { ScannerModule } from './integrations/scanner';
 import { AiHttpModule } from './modules/ai';
 import { CatalogHttpModule } from './modules/catalog';
 import { EbarimtHttpModule } from './modules/ebarimt';
@@ -42,6 +43,7 @@ import { SegmentsHttpModule } from './modules/segments';
     HealthModule,
     LlmModule,
     PictureModule,
+    ScannerModule,
     ErkhetIntegrationModule,
     FinanceCoreModule,
     FinBridgeHttpModule,

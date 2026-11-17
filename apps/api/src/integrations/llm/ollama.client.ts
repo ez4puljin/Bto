@@ -9,6 +9,7 @@ import {
   type LlmRequest,
   type LlmResult,
   textOf,
+  timeoutOf,
 } from './llm.types';
 
 /** A local Ollama; from a container use http://host.docker.internal:11434/api. */
@@ -52,7 +53,7 @@ export class OllamaClient implements LlmClient {
         options: { num_predict: request.maxOutputTokens },
         ...(request.output && { format: request.output.schema }),
       },
-      this.config.timeoutMs,
+      timeoutOf(this.config, request),
       ChatAnswer,
     );
     if (answer.done_reason === 'length') {
@@ -71,9 +72,15 @@ export class OllamaClient implements LlmClient {
   }
 }
 
-/** A turn as Ollama's chat takes it: the text, with the images as base64 beside it. */
+/**
+ * A turn as Ollama's chat takes it: the text, with the images as base64 beside it. It takes no
+ * files: a PDF is refused here, before a call that would answer about a page it never saw.
+ */
 function ollamaMessage(message: LlmMessage) {
   if (typeof message.content === 'string') return message;
+  if (message.content.some((part) => part.type === 'document')) {
+    throw new LlmError('REFUSED', 'this provider reads pictures only, not PDF files');
+  }
   const images = message.content.flatMap((part) => (part.type === 'image' ? [part.data] : []));
   return {
     role: message.role,

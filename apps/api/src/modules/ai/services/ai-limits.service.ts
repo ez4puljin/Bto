@@ -67,6 +67,8 @@ export interface AiUsageTotals {
   invoiceChecks: number;
   /** Readings of product photos for the registration form (ADR-0198). */
   productReads: number;
+  /** Readings of suppliers' delivery notes (ADR-0210). */
+  receiptReads: number;
   inputTokens: number;
   outputTokens: number;
   costUsd: string;
@@ -165,6 +167,7 @@ export class AiLimitsService {
       .select({
         invoiceChecks: sql<number>`count(*) FILTER (WHERE ${aiUsage.purpose} = 'INVOICE_CHECK')::int`,
         productReads: sql<number>`count(*) FILTER (WHERE ${aiUsage.purpose} = 'PRODUCT_READ')::int`,
+        receiptReads: sql<number>`count(*) FILTER (WHERE ${aiUsage.purpose} = 'RECEIPT_READ')::int`,
         inputTokens: sql<number>`coalesce(sum(${aiUsage.inputTokens}), 0)::int`,
         outputTokens: sql<number>`coalesce(sum(${aiUsage.outputTokens}), 0)::int`,
         costUsd: sql<string>`coalesce(sum(${aiUsage.costUsd}), 0)::text`,
@@ -180,6 +183,7 @@ export class AiLimitsService {
       questions: asked?.questions ?? 0,
       invoiceChecks: usage?.invoiceChecks ?? 0,
       productReads: usage?.productReads ?? 0,
+      receiptReads: usage?.receiptReads ?? 0,
       inputTokens: usage?.inputTokens ?? 0,
       outputTokens: usage?.outputTokens ?? 0,
       costUsd: usage?.costUsd ?? '0',

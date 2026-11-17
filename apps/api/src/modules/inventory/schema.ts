@@ -529,6 +529,151 @@ export const goodsReceiptDiscountLines = pgTable(
   ],
 );
 
+/** Where a reading of a delivery note stands (ADR-0210). */
+export const NOTE_READING_STATUSES = ['READING', 'READY', 'FAILED', 'SAVED', 'DISCARDED'] as const;
+
+/**
+ * A supplier's delivery note given to the model to read (ADR-0210): its pages, what the model read
+ * and how the lines were matched to products (`result`), until a person checks it and saves it as a
+ * draft receipt (`receipt_id`). Nothing here moves stock or money: it is a proposal.
+ */
+export const receiptNoteReadings = pgTable(
+  'receipt_note_readings',
+  {
+    id: id(),
+    status: text('status', { enum: NOTE_READING_STATUSES }).notNull().default('READING'),
+    /** The supplier the person named, else the one recognised on the note; null: not known yet. */
+    supplierId: ref('supplier_id').references(() => suppliers.id),
+    /** The proposal (services/receipt-note-ai.ts `NoteProposal`); null until READY. */
+    result: jsonValue('result'),
+    /** Why a reading FAILED: the provider's reason, status and code, never its words. */
+    failure: jsonValue('failure'),
+    /** The model that answered. */
+    model: text('model'),
+    /** The draft receipt made of it, once SAVED. */
+    receiptId: ref('receipt_id').references(() => goodsReceipts.id),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('receipt_note_readings_open_idx')
+      .on(t.id)
+      .where(sql`${t.status} IN ('READING', 'READY', 'FAILED')`),
+    uniqueIndex('receipt_note_readings_receipt_key')
+      .on(t.receiptId)
+      .where(sql`${t.receiptId} IS NOT NULL`),
+    check('receipt_note_readings_status', inList(t.status, NOTE_READING_STATUSES)),
+    check(
+      'receipt_note_readings_state',
+      sql`(${t.status} = 'SAVED') = (${t.receiptId} IS NOT NULL)
+        AND (${t.status} NOT IN ('READY', 'SAVED') OR ${t.result} IS NOT NULL)
+        AND (${t.status} = 'READING') = (${t.finishedAt} IS NULL)
+        AND (${t.model} IS NULL OR length(${t.model}) BETWEEN 1 AND 100)`,
+    ),
+  ],
+);
+
+/** The pages of a reading in the order they were given: photos, scanned sheets, PDF files. */
+export const receiptNoteReadingPages = pgTable(
+  'receipt_note_reading_pages',
+  {
+    readingId: ref('reading_id')
+      .notNull()
+      .references(() => receiptNoteReadings.id),
+    position: integer('position').notNull(),
+    fileId: ref('file_id')
+      .notNull()
+      .references(() => files.id),
+  },
+  (t) => [
+    primaryKey({ columns: [t.readingId, t.position] }),
+    unique('receipt_note_reading_pages_file_key').on(t.fileId),
+    check('receipt_note_reading_pages_position', sql`${t.position} >= 0`),
+  ],
+);
+
+/**
+ * What the model noted about one supplier's delivery notes (ADR-0210): how they are laid out and
+ * read, in its own words, given back to it with the next note of that supplier.
+ */
+export const receiptNoteTemplates = pgTable(
+  'receipt_note_templates',
+  {
+    supplierId: ref('supplier_id')
+      .primaryKey()
+      .references(() => suppliers.id),
+    /** The model's notes on the layout; null once a person had them forgotten. */
+    notes: text('notes'),
+    /** How many readings of this supplier were saved as receipts. */
+    readings: integer('readings').notNull().default(0),
+    updatedBy: userRef('updated_by'),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check(
+      'receipt_note_templates_values',
+      sql`${t.readings} >= 0 AND (${t.notes} IS NULL OR length(${t.notes}) BETWEEN 1 AND 2000)`,
+    ),
+  ],
+);
+
+/**
+ * A line of a supplier's note as printed, and the product unit a person saved it as (ADR-0210): the
+ * next note of that supplier with the same line is matched without asking the model.
+ */
+export const receiptNoteAliases = pgTable(
+  'receipt_note_aliases',
+  {
+    id: id(),
+    supplierId: ref('supplier_id')
+      .notNull()
+      .references(() => suppliers.id),
+    /** The printed code, name and unit, normalised (`noteLineKey`). */
+    key: text('key').notNull(),
+    /** The line as printed, for people. */
+    label: text('label').notNull(),
+    productUnitId: ref('product_unit_id')
+      .notNull()
+      .references(() => productUnits.id),
+    uses: integer('uses').notNull().default(1),
+    updatedBy: userRef('updated_by'),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('receipt_note_aliases_key').on(t.supplierId, t.key),
+    check(
+      'receipt_note_aliases_values',
+      sql`length(${t.key}) BETWEEN 1 AND 400 AND length(${t.label}) BETWEEN 1 AND 400
+        AND ${t.uses} >= 1`,
+    ),
+  ],
+);
+
+/**
+ * A scanner on the building's network the api may ask for a sheet (ADR-0210): its address is an
+ * http(s) URL of a private address, checked by the service.
+ */
+export const noteScanners = pgTable(
+  'note_scanners',
+  {
+    id: id(),
+    name: text('name').notNull(),
+    url: text('url').notNull(),
+    active: boolean('active').notNull().default(true),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check(
+      'note_scanners_values',
+      sql`length(${t.name}) BETWEEN 1 AND 60 AND length(${t.url}) BETWEEN 8 AND 200`,
+    ),
+  ],
+);
+
 /** Bin moves (BM-): put-away from RECEIVING and any shelf-to-shelf move, posted on creation. */
 export const binMoves = pgTable(
   'bin_moves',

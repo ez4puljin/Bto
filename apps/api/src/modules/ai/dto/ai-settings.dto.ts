@@ -188,6 +188,7 @@ export class AiUsageTotalsDto {
   @ApiProperty() questions: number;
   @ApiProperty() invoiceChecks: number;
   @ApiProperty({ description: 'Readings of product photos (ADR-0198)' }) productReads: number;
+  @ApiProperty({ description: 'Readings of delivery notes (ADR-0210)' }) receiptReads: number;
   @ApiProperty() inputTokens: number;
   @ApiProperty() outputTokens: number;
   @ApiProperty({ description: 'USD, at each day’s price' }) costUsd: string;

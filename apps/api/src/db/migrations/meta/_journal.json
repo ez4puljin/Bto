@@ -743,6 +743,13 @@
       "when": 1794884502296,
       "tag": "0107_pos_card_terminal",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1794886778771,
+      "tag": "0108_receipt_notes",
+      "breakpoints": true
     }
   ]
 }

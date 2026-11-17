@@ -86,6 +86,9 @@ export const ROUTES = [
   { area: 'inventory', name: 'receipts', path: '/inventory/receipts' },
   { area: 'inventory', name: 'receipts-new', path: '/inventory/receipts/new' },
   { area: 'inventory', name: 'receipt', path: '/inventory/receipts/{receipt}' },
+  // «Падаан унших» (ADR-0210); a reading's id comes with `--ids noteReading=<id>`.
+  { area: 'inventory', name: 'receipt-notes', path: '/inventory/receipts/notes' },
+  { area: 'inventory', name: 'receipt-note', path: '/inventory/receipts/notes/{noteReading}' },
   { area: 'inventory', name: 'issues', path: '/inventory/issues' },
   { area: 'inventory', name: 'issues-new', path: '/inventory/issues/new' },
   { area: 'inventory', name: 'issue', path: '/inventory/issues/{issue}' },

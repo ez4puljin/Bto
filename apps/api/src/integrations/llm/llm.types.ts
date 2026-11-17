@@ -2,10 +2,14 @@ import type { LlmProvider } from '../../common/config/env.schema';
 
 export type { LlmProvider };
 
-/** A part of a user turn: text, or an image as base64 bytes with their media type. */
+/**
+ * A part of a user turn: text, an image as base64 bytes with their media type, or a PDF file as
+ * base64 (ADR-0210: a delivery note that came as a file).
+ */
 export type LlmContentPart =
   | { type: 'text'; text: string }
-  | { type: 'image'; mediaType: 'image/jpeg' | 'image/png' | 'image/webp'; data: string };
+  | { type: 'image'; mediaType: 'image/jpeg' | 'image/png' | 'image/webp'; data: string }
+  | { type: 'document'; mediaType: 'application/pdf'; data: string };
 
 /**
  * One turn of the conversation sent to the model; the instructions travel separately. A user turn
@@ -16,7 +20,7 @@ export interface LlmMessage {
   content: string | LlmContentPart[];
 }
 
-/** The text of a turn, images left out (for providers and logs that take text only). */
+/** The text of a turn, images and files left out (for providers and logs that take text only). */
 export function textOf(content: LlmMessage['content']): string {
   if (typeof content === 'string') return content;
   return content
@@ -39,6 +43,16 @@ export interface LlmRequest {
   output?: LlmOutputSchema;
   /** Includes the reasoning tokens of reasoning models. */
   maxOutputTokens: number;
+  /**
+   * A longer limit for this call than the configured one (a many-page reading, ADR-0210); the
+   * larger of the two is used.
+   */
+  timeoutMs?: number;
+}
+
+/** The time one call may take: the configured limit, or the request's own when that is longer. */
+export function timeoutOf(config: Pick<LlmConfig, 'timeoutMs'>, request: LlmRequest): number {
+  return Math.max(config.timeoutMs, request.timeoutMs ?? 0);
 }
 
 export interface LlmUsage {

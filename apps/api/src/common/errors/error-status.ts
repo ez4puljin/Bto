@@ -145,6 +145,11 @@ export const ERROR_HTTP_STATUS = {
   // product pictures: no background service key; the service failed (ADR-0198)
   PICTURE_NOT_CONFIGURED: 503,
   PICTURE_PROVIDER_FAILED: 502,
+  // delivery notes read by the model: the reading is not in the state the step needs; no such
+  // scanner (or it is switched off); the scanner failed (ADR-0210)
+  NOTE_READING_STATE: 409,
+  SCANNER_NOT_FOUND: 404,
+  SCANNER_FAILED: 502,
   // erkhet: no sign-in saved; it cannot be sealed; a check is already running; rows of an older
   // check than the latest (ADR-0203)
   ERKHET_NOT_CONFIGURED: 409,

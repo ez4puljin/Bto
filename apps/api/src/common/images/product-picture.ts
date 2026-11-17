@@ -14,6 +14,8 @@ import type { Sharp, SharpOptions } from 'sharp';
 
 /** Longest side of a photo as it is kept and sent on (ADR-0030: the web scales to the same). */
 export const PHOTO_MAX_SIDE = 1280;
+/** The long side of a document page given to the model (ADR-0210): small print stays readable. */
+export const PAGE_MAX_SIDE = 2000;
 export const THUMB_MAX_SIDE = 256;
 /** A decoded photo larger than this is refused before it takes the memory (a phone's is ~50 MP). */
 const MAX_INPUT_PIXELS = 120_000_000;
@@ -57,22 +59,18 @@ async function reading<T>(work: () => Promise<T>): Promise<T> {
 /**
  * A photo as the rest of the flow wants it: upright, within 1280 px, a JPEG without EXIF. One that
  * already is (the web's uploads) comes back untouched, byte for byte; a phone's camera photo is
- * turned by its EXIF orientation, scaled down and re-encoded.
+ * turned by its EXIF orientation, scaled down and re-encoded. A page of a document keeps more
+ * (`PAGE_MAX_SIDE`): its small print must stay readable.
  */
-export async function normalisedPhoto(bytes: Buffer): Promise<Buffer> {
+export async function normalisedPhoto(bytes: Buffer, maxSide = PHOTO_MAX_SIDE): Promise<Buffer> {
   return reading(async () => {
     const meta = await (await open(bytes)).metadata();
     const upright = meta.orientation === undefined || meta.orientation === 1;
-    const small = Math.max(meta.width, meta.height) <= PHOTO_MAX_SIDE;
+    const small = Math.max(meta.width, meta.height) <= maxSide;
     if (meta.format === 'jpeg' && upright && small) return bytes;
     return (await open(bytes))
       .rotate()
-      .resize({
-        width: PHOTO_MAX_SIDE,
-        height: PHOTO_MAX_SIDE,
-        fit: 'inside',
-        withoutEnlargement: true,
-      })
+      .resize({ width: maxSide, height: maxSide, fit: 'inside', withoutEnlargement: true })
       .flatten({ background: '#ffffff' })
       .jpeg({ quality: 85 })
       .toBuffer();

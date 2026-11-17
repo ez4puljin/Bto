@@ -148,6 +148,7 @@ function Totals({ title, totals }: { title: string; totals: AiUsageTotals }) {
     { label: t('systemStatus.ai.questions'), value: whole.format(totals.questions) },
     { label: t('systemStatus.ai.invoiceChecks'), value: whole.format(totals.invoiceChecks) },
     { label: t('systemStatus.ai.productReads'), value: whole.format(totals.productReads) },
+    { label: t('systemStatus.ai.receiptReads'), value: whole.format(totals.receiptReads) },
     {
       label: t('systemStatus.ai.tokens'),
       value: whole.format(totals.inputTokens + totals.outputTokens),

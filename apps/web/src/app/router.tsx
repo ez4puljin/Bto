@@ -29,6 +29,8 @@ import { BinMovesPage } from '@/features/inventory/moves-page';
 import { IssueConfirmPage } from '@/features/inventory/issue-confirm-page';
 import { IssuePage, IssuesPage } from '@/features/inventory/issues-pages';
 import { ReceiptPrintPage } from '@/features/inventory/receipt-print-page';
+import { ReceiptNotePage } from '@/features/inventory/receipt-note-page';
+import { ReceiptNoteStartPage } from '@/features/inventory/receipt-note-start-page';
 import { ReceiptPage, ReceiptsPage } from '@/features/inventory/receipts-pages';
 import { MovementsPage } from '@/features/inventory/movements-page';
 import { StockPage, StockProductPage } from '@/features/inventory/stock-pages';
@@ -469,6 +471,22 @@ export const routes: RouteObject[] = [
           // draft stays mounted when it takes the draft's address; `?new=1` on the list redirects
           // here. The old costing page is the receipt itself.
           { path: 'inventory/receipts/:id', handle: { width: 'wide' }, element: <ReceiptPage /> },
+          // «Падаан унших» (ADR-0210): a delivery note read by the model, checked and saved as a
+          // draft receipt. Receipt holders gather and check; cost holders may open a reading too.
+          {
+            path: 'inventory/receipts/notes',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="inventory.receipts.manage">
+                <ReceiptNoteStartPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: 'inventory/receipts/notes/:id',
+            handle: { width: 'wide' },
+            element: <ReceiptNotePage />,
+          },
           // The keeper's count against the expected quantities, by scanner (ADR-0115).
           {
             path: 'inventory/receipts/:id/receive',

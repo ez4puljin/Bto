@@ -9130,6 +9130,762 @@
         ]
       }
     },
+    "/api/v1/receipt-notes/status": {
+      "get": {
+        "operationId": "ReceiptNotes_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "What the screen can offer now: reading (a model is set) and the scanners switched on.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipt-notes/scanners": {
+      "get": {
+        "operationId": "ReceiptNotes_scanners",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoteScanner"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "operationId": "ReceiptNotes_createScanner",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteScannerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteScanner"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipt-notes/scanners/check": {
+      "post": {
+        "operationId": "ReceiptNotes_checkScanner",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteScannerCheckRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteScannerCheck"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Asks the device at an address what it is, before it is saved.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipt-notes/scanners/{id}": {
+      "put": {
+        "operationId": "ReceiptNotes_updateScanner",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteScannerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteScanner"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipt-notes/scanners/{id}/scan": {
+      "post": {
+        "operationId": "ReceiptNotes_scan",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteScanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteScanResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Scans what lies on the scanner: one sheet from the glass, every sheet from the feeder. Each\nsheet becomes a page of the caller's, to be given to a reading.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipt-notes/memory/{supplierId}": {
+      "get": {
+        "operationId": "ReceiptNotes_memory",
+        "parameters": [
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteMemory"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "What is remembered of a supplier's notes.",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "delete": {
+        "operationId": "ReceiptNotes_forget",
+        "parameters": [
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteMemory"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Forgets it: the supplier's next note is read as a first one.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipt-notes/of-receipt/{receiptId}": {
+      "get": {
+        "operationId": "ReceiptNotes_ofReceipt",
+        "parameters": [
+          {
+            "name": "receiptId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptNoteReadingRef"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The reading a receipt was made of, for the receipt window's link to its pages.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipt-notes": {
+      "get": {
+        "operationId": "ReceiptNotes_open",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoteReadingSummary"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The readings waiting to be read or checked.",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "operationId": "ReceiptNotes_start",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteReadingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteReading"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Starts a reading; the answer comes at once and the reading goes on in the background.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipt-notes/{id}": {
+      "get": {
+        "operationId": "ReceiptNotes_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteReading"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipt-notes/{id}/retry": {
+      "post": {
+        "operationId": "ReceiptNotes_retry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteReading"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipt-notes/{id}/discard": {
+      "post": {
+        "operationId": "ReceiptNotes_discard",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteReading"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipt-notes/{id}/receipt": {
+      "post": {
+        "operationId": "ReceiptNotes_saveDraft",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteDraftRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteDraftResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Saves the checked reading as a draft receipt and teaches the supplier's memory.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipt-notes/{id}/pages/{fileId}": {
+      "get": {
+        "operationId": "ReceiptNotes_page",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The page"
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One page of a reading: a picture or a PDF file, streamed to receipt and cost holders.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/bin-moves": {
       "get": {
         "operationId": "BinMoves_list",
@@ -47016,6 +47772,7 @@
               "catalog.category_image",
               "customer.banner_image",
               "inventory.receipt_note",
+              "inventory.note_page",
               "procurement.invoice_image",
               "hr.employee_photo",
               "hr.message_image",
@@ -47033,7 +47790,7 @@
           "sizeBytes": {
             "type": "number",
             "minimum": 1,
-            "maximum": 5242880
+            "maximum": 10485760
           }
         },
         "required": [
@@ -53473,6 +54230,708 @@
             "description": "New warehouse price per base unit; null clears it (price holders)"
           }
         }
+      },
+      "NoteScannerBrief": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "NoteStatus": {
+        "type": "object",
+        "properties": {
+          "read": {
+            "type": "boolean",
+            "description": "A model is configured: notes can be read"
+          },
+          "scanners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoteScannerBrief"
+            }
+          }
+        },
+        "required": [
+          "read",
+          "scanners"
+        ]
+      },
+      "NoteScanner": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "example": "http://192.168.1.60"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "url",
+          "active"
+        ]
+      },
+      "NoteScannerCheckRequest": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 7,
+            "maxLength": 200,
+            "example": "http://192.168.1.60"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "NoteScannerCheck": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "The device answers as a scanner"
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "glass": {
+            "type": "boolean"
+          },
+          "feeder": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "description": "A ScannerError reason"
+          }
+        },
+        "required": [
+          "ok",
+          "model",
+          "glass",
+          "feeder",
+          "reason"
+        ]
+      },
+      "NoteScannerRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "url": {
+            "type": "string",
+            "minLength": 7,
+            "maxLength": 200,
+            "example": "http://192.168.1.60",
+            "description": "A private IPv4 address"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "url"
+        ]
+      },
+      "NoteScanRequest": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "enum": [
+              "GLASS",
+              "FEEDER"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "source"
+        ]
+      },
+      "ScannedSheet": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "number",
+            "description": "A file of kind inventory.note_page, the caller's"
+          },
+          "preview": {
+            "type": "string",
+            "description": "A small JPEG in base64"
+          }
+        },
+        "required": [
+          "fileId",
+          "preview"
+        ]
+      },
+      "NoteScanResult": {
+        "type": "object",
+        "properties": {
+          "sheets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScannedSheet"
+            }
+          }
+        },
+        "required": [
+          "sheets"
+        ]
+      },
+      "NoteMemory": {
+        "type": "object",
+        "properties": {
+          "readings": {
+            "type": "number",
+            "description": "Notes of the supplier saved as receipts"
+          },
+          "lines": {
+            "type": "number",
+            "description": "Lines remembered with their product"
+          },
+          "layout": {
+            "type": "boolean",
+            "description": "The model's notes on the layout are kept"
+          }
+        },
+        "required": [
+          "readings",
+          "lines",
+          "layout"
+        ]
+      },
+      "ReceiptNoteReadingRef": {
+        "type": "object",
+        "properties": {
+          "readingId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The reading a receipt was made of"
+          }
+        },
+        "required": [
+          "readingId"
+        ]
+      },
+      "NoteReadingSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "READING",
+              "READY",
+              "FAILED",
+              "SAVED",
+              "DISCARDED"
+            ],
+            "type": "string"
+          },
+          "stale": {
+            "type": "boolean"
+          },
+          "supplierName": {
+            "type": "string",
+            "nullable": true
+          },
+          "pageCount": {
+            "type": "number"
+          },
+          "lineCount": {
+            "type": "number",
+            "nullable": true
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "stale",
+          "supplierName",
+          "pageCount",
+          "lineCount",
+          "createdByName",
+          "createdAt"
+        ]
+      },
+      "NoteReadingRequest": {
+        "type": "object",
+        "properties": {
+          "fileIds": {
+            "minItems": 1,
+            "description": "Uploaded files of kind inventory.note_page, in page order: one delivery note",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "supplierId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The supplier, when the person names it; else it is recognised from the note"
+          }
+        },
+        "required": [
+          "fileIds"
+        ]
+      },
+      "NoteReadingSupplier": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
+      "NoteReadingPage": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "number"
+          },
+          "contentType": {
+            "type": "string",
+            "example": "image/jpeg"
+          }
+        },
+        "required": [
+          "fileId",
+          "contentType"
+        ]
+      },
+      "NoteReadingFailure": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "TIMEOUT, HTTP, REFUSED, UNREADABLE_PAGE, INTERNAL, …"
+          },
+          "status": {
+            "type": "number",
+            "nullable": true
+          },
+          "providerCode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "reason",
+          "status",
+          "providerCode"
+        ]
+      },
+      "NoteSupplierRead": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "regNo": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "regNo"
+        ]
+      },
+      "NoteUnitOption": {
+        "type": "object",
+        "properties": {
+          "unitId": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "factor": {
+            "type": "string",
+            "example": "24"
+          }
+        },
+        "required": [
+          "unitId",
+          "name",
+          "factor"
+        ]
+      },
+      "NoteLineMatch": {
+        "type": "object",
+        "properties": {
+          "how": {
+            "enum": [
+              "BARCODE",
+              "MEMORY",
+              "MODEL"
+            ],
+            "type": "string"
+          },
+          "productUnitId": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoteUnitOption"
+            }
+          }
+        },
+        "required": [
+          "how",
+          "productUnitId",
+          "productId",
+          "sku",
+          "productName",
+          "units"
+        ]
+      },
+      "NoteLine": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true
+          },
+          "barcode": {
+            "type": "string",
+            "nullable": true
+          },
+          "qty": {
+            "type": "string",
+            "nullable": true
+          },
+          "unitPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "Cost holders only"
+          },
+          "amount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Cost holders only"
+          },
+          "free": {
+            "type": "boolean"
+          },
+          "unsure": {
+            "type": "boolean"
+          },
+          "match": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NoteLineMatch"
+              }
+            ]
+          }
+        },
+        "required": [
+          "index",
+          "page",
+          "name",
+          "code",
+          "unit",
+          "barcode",
+          "qty",
+          "unitPrice",
+          "amount",
+          "free",
+          "unsure",
+          "match"
+        ]
+      },
+      "NoteProposal": {
+        "type": "object",
+        "properties": {
+          "supplierRead": {
+            "$ref": "#/components/schemas/NoteSupplierRead"
+          },
+          "docNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "docDate": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalQty": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Cost holders only"
+          },
+          "vat": {
+            "enum": [
+              "INCLUDED",
+              "ADDED",
+              "UNKNOWN"
+            ],
+            "type": "string"
+          },
+          "cut": {
+            "type": "number",
+            "description": "Lines left out beyond the limit"
+          },
+          "remark": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoteLine"
+            }
+          }
+        },
+        "required": [
+          "supplierRead",
+          "docNo",
+          "docDate",
+          "totalQty",
+          "totalAmount",
+          "vat",
+          "cut",
+          "remark",
+          "lines"
+        ]
+      },
+      "NoteReading": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "READING",
+              "READY",
+              "FAILED",
+              "SAVED",
+              "DISCARDED"
+            ],
+            "type": "string"
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "Reading for so long that it must be started again"
+          },
+          "supplier": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NoteReadingSupplier"
+              }
+            ]
+          },
+          "pages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoteReadingPage"
+            }
+          },
+          "failure": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NoteReadingFailure"
+              }
+            ]
+          },
+          "receiptId": {
+            "type": "number",
+            "nullable": true
+          },
+          "receiptNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "proposal": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NoteProposal"
+              }
+            ]
+          },
+          "memory": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NoteMemory"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "stale",
+          "supplier",
+          "pages",
+          "failure",
+          "receiptId",
+          "receiptNumber",
+          "createdByName",
+          "createdAt",
+          "proposal",
+          "memory"
+        ]
+      },
+      "NoteDraftLine": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The line's index in the reading"
+          },
+          "productUnitId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "enteredQty": {
+            "type": "string",
+            "example": "24"
+          }
+        },
+        "required": [
+          "index",
+          "productUnitId",
+          "enteredQty"
+        ]
+      },
+      "NoteDraftRequest": {
+        "type": "object",
+        "properties": {
+          "supplierId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "supplierDocNo": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "supplierDocDate": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 10,
+            "maxLength": 10,
+            "example": "2026-11-17"
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoteDraftLine"
+            }
+          }
+        },
+        "required": [
+          "supplierId",
+          "lines"
+        ]
+      },
+      "NoteDraftResult": {
+        "type": "object",
+        "properties": {
+          "receiptId": {
+            "type": "number",
+            "description": "The draft receipt made of the reading"
+          }
+        },
+        "required": [
+          "receiptId"
+        ]
       },
       "BinMoveSummary": {
         "type": "object",
@@ -60846,6 +62305,10 @@
             "type": "number",
             "description": "Readings of product photos (ADR-0198)"
           },
+          "receiptReads": {
+            "type": "number",
+            "description": "Readings of delivery notes (ADR-0210)"
+          },
           "inputTokens": {
             "type": "number"
           },
@@ -60865,6 +62328,7 @@
           "questions",
           "invoiceChecks",
           "productReads",
+          "receiptReads",
           "inputTokens",
           "outputTokens",
           "costUsd",
@@ -91978,6 +93442,9 @@
           "AI_PRICE_REQUIRED",
           "PICTURE_NOT_CONFIGURED",
           "PICTURE_PROVIDER_FAILED",
+          "NOTE_READING_STATE",
+          "SCANNER_NOT_FOUND",
+          "SCANNER_FAILED",
           "ERKHET_NOT_CONFIGURED",
           "ERKHET_KEY_SECRET_MISSING",
           "ERKHET_SYNC_RUNNING",

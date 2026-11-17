@@ -852,6 +852,13 @@ Keyboard-wedge first everywhere (web global keydown detector; mobile hidden Text
 - Data that leaves the company: one photo of a product per picture. For the office's web the server draws nothing: the browser keeps the product, puts it on white and draws the company's logo.
 - Since ADR-0199 the api draws the same picture for the staff app, which has no canvas: `common/images/product-picture.ts` over `sharp` 0.35.5 (libvips, prebuilt, no install script) turns a phone's photo upright and scales it (`normalisedPhoto`), composes the cut-out (`composedPicture`) and makes the thumbnail. The rules both sides follow (`keepProduct`, `productPlace`, `stampPlace`) are `@tugeel/shared/pictures`.
 
+### 9.7 A network scanner over eSCL (ADR-0210)
+
+- `apps/api/src/integrations/scanner/`: `EsclClient` over Node's `fetch` (no driver, no SDK): `GET /eSCL/ScannerCapabilities`, `POST /eSCL/ScanJobs` with XML settings (colour, 200 dpi, JPEG, `Platen` or `Feeder`), `GET <job>/NextDocument` per sheet until 404 (503 waited out for up to 45 s while the lamp warms), `DELETE <job>` afterwards. Sixty seconds per exchange, at most 20 sheets from the feeder, no redirect followed, and the job's path, never the host, taken from the device's `Location`.
+- `ScannerModule` (global, imported by `app.module.ts` only) provides `ScannerGateway.at(url)`; `inventory`'s `ReceiptNoteFlowService` keeps the scanners (`note_scanners`) and calls the device between transactions. An address is `http(s)://<private IPv4>[:port]` only (`scannerUrlOf`): never a name, a public address or this machine.
+- The api's containers reach the building's network through Docker's NAT; nothing is published and no port is opened. A scanner on USB only is not reachable: plugged into the PC, `ipp-usb` would offer it over eSCL on the host (not set up).
+- The same decision lets the model clients (§9.5) carry a PDF file (`LlmContentPart` `document`: a content block for Anthropic, an `input_file` for OpenAI, refused by the Ollama client) and a longer time limit for one call (`LlmRequest.timeoutMs`, the configured `LLM_TIMEOUT_MS` staying the floor).
+
 ---
 
 ## 10. Environments and deploy

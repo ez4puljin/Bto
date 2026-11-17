@@ -31,7 +31,7 @@ Since ADR-0162 (migration `0079_ai_settings`):
 | Table | What | Guards |
 |---|---|---|
 | `ai_settings` | one row: the switch, provider, model, Ollama's address, the sealed key and its last characters, prices, the month and day limits | never deleted; only the api writes it; `ai_reader` has no access |
-| `ai_usage` | one model call the provider answered: purpose (`ASK`, `INVOICE_CHECK`, `PRODUCT_READ` since ADR-0198), person, provider, model, tokens, cost at that day's price (NULL when no price is known) | append-only like `ai_questions`; never a prompt or an answer |
+| `ai_usage` | one model call the provider answered: purpose (`ASK`, `INVOICE_CHECK`, `PRODUCT_READ` since ADR-0198, `RECEIPT_READ` since ADR-0210), person, provider, model, tokens, cost at that day's price (NULL when no price is known) | append-only like `ai_questions`; never a prompt or an answer |
 
 Since ADR-0198 (migration `0103_product_ai`):
 
@@ -202,3 +202,11 @@ The registration form's «AI ашиглах» uses this module's connection and 
 - **Tests.** `integrations/picture/remove-bg.client.spec.ts` (the request, a non-PNG answer, refusals by code without their words or the key, timeouts, the account), `services/secret-box.spec.ts` (the two bindings), `product-ai.int-spec.ts`, `features/ai/ai-settings.test.tsx` (a typed key checked and saved once, a wrong key explained). No test reaches remove.bg: `PICTURE_FETCH` is scripted.
 - **The staff app (ADR-0199).** «Бараа нэмэх» on the phone uses the same connection, key and logo; its picture is drawn by the api (`POST /product-registrations/ai/image`), which answers with the photo as taken when no key is saved or the service refuses.
 - **Owner's steps on a new installation.** Type the model's key and the remove.bg key on «Тохиргоо → AI», upload the logo. `ai_picture_settings` is not copied by `store:seed` (the key is sealed with that PC's `AI_KEY_SECRET`).
+
+## 14. Delivery notes read by the model (ADR-0210)
+
+- **Where it lives.** inventory's `ReceiptNoteFlowService` (`docs/modules/inventory.md`); this module only meters it: `LlmGateway.forWork({ purpose: 'RECEIPT_READ' })`, under the month's limit, counted as «Падаан уншуулсан» on `/system/status` (`receiptReads`).
+- **What the clients gained.** A user turn may carry a PDF file (`LlmContentPart` `{ type: 'document', mediaType: 'application/pdf', data }`): a `document` content block for Anthropic, an `input_file` with a data URL for OpenAI's Responses API; the Ollama client refuses it before any call. `LlmRequest.timeoutMs` asks for a longer limit for one call (a many-page note: 280 s); `LLM_TIMEOUT_MS` stays the floor.
+- **What is kept.** No prompt, page or raw answer is logged or stored; the checked proposal built from the answer is (`receipt_note_readings.result`), with the model's name and, for a failure, the provider's reason, status and code.
+- **What returns to the model.** Its own notes on a supplier's form (`receipt_note_templates.notes`, at most 2000 characters) go back with that supplier's next note as a hint. They were written from a supplier's document, so they are treated as data: bounded, labelled a hint in the instructions, and able only to shape a proposal a person checks.
+

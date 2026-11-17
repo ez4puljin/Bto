@@ -13,6 +13,7 @@ import {
   BinMovesController,
 } from './controllers/moves-adjustments.controller';
 import { ProductRegistrationsController } from './controllers/product-registrations.controller';
+import { ReceiptNotesController } from './controllers/receipt-notes.controller';
 import { ReceiptLinesController, ReceiptsController } from './controllers/receipts.controller';
 import { StockController } from './controllers/stock.controller';
 import { StockCountsController } from './controllers/stock-counts.controller';
@@ -29,6 +30,7 @@ import { ProductLocationsService } from './services/product-locations.service';
 import { ProductAiFlowService } from './services/product-ai-flow.service';
 import { ProductRegistrationService } from './services/product-registration.service';
 import { PurchaseBooksService } from './services/purchase-books.service';
+import { ReceiptNoteFlowService } from './services/receipt-note-flow.service';
 import { ReceiptsService } from './services/receipts.service';
 import { ReservationService } from './services/reservation.service';
 import { StockPostingService } from './services/stock-posting.service';
@@ -95,8 +97,9 @@ export class InventoryBootstrap implements OnApplicationBootstrap {
 }
 
 /**
- * The HTTP side of inventory (api only). ProductAiFlowService lives here and not in
- * InventoryModule: it needs the model and picture gateways, which only the api's root provides.
+ * The HTTP side of inventory (api only). ProductAiFlowService and ReceiptNoteFlowService live
+ * here and not in InventoryModule: they need the model, picture and scanner gateways, which only
+ * the api's root provides.
  */
 @Module({
   imports: [InventoryModule, IdentityModule, CatalogModule, PartnersModule],
@@ -108,6 +111,7 @@ export class InventoryBootstrap implements OnApplicationBootstrap {
     ProductRegistrationsController,
     ReceiptsController,
     ReceiptLinesController,
+    ReceiptNotesController,
     BinMovesController,
     AdjustmentsController,
     AdjustmentLinesController,
@@ -119,7 +123,7 @@ export class InventoryBootstrap implements OnApplicationBootstrap {
     TransferLinesController,
     InventoryAttentionController,
   ],
-  providers: [InventoryBootstrap, ProductAiFlowService],
+  providers: [InventoryBootstrap, ProductAiFlowService, ReceiptNoteFlowService],
 })
 export class InventoryHttpModule {}
 

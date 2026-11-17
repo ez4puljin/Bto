@@ -127,6 +127,15 @@ export const STORE_SEED_TABLES: Record<string, SeedRule> = {
   'public.goods_receipt_confirmations': empty(DOCUMENT),
   'public.goods_receipt_discounts': empty(DOCUMENT),
   'public.goods_receipt_discount_lines': empty(DOCUMENT),
+  'public.receipt_note_readings': empty(DOCUMENT),
+  'public.receipt_note_reading_pages': empty(DOCUMENT),
+  'public.receipt_note_templates': empty(
+    "What the model noted about a supplier's delivery notes: learnt again from the first notes read.",
+  ),
+  'public.receipt_note_aliases': empty(
+    'Note lines matched to products by people: learnt again as notes are saved.',
+  ),
+  'public.note_scanners': empty('The scanners of the building the installation runs in.'),
   'public.goods_issues': empty(DOCUMENT),
   'public.goods_issue_lines': empty(DOCUMENT),
   'public.goods_issue_confirmations': empty(DOCUMENT),

@@ -1,5 +1,5 @@
 import { createLlmClient, llmConfigFromEnv } from './create-llm-client';
-import { type FetchFn, type LlmConfig, LlmError, type LlmRequest } from './llm.types';
+import { type FetchFn, type LlmConfig, LlmError, type LlmRequest, timeoutOf } from './llm.types';
 
 const KEY = 'sk-test-not-a-real-key';
 
@@ -28,6 +28,15 @@ const IMAGE_TURN: LlmRequest['messages'][number] = {
   content: [
     { type: 'text', text: 'read it' },
     { type: 'image', mediaType: 'image/jpeg', data: 'AAAA' },
+  ],
+};
+
+/** A user turn with a PDF file (ADR-0210). */
+const FILE_TURN: LlmRequest['messages'][number] = {
+  role: 'user',
+  content: [
+    { type: 'text', text: 'read it' },
+    { type: 'document', mediaType: 'application/pdf', data: 'JVBE' },
   ],
 };
 
@@ -131,6 +140,24 @@ describe('OpenAI Responses client', () => {
         content: [
           { type: 'input_text', text: 'read it' },
           { type: 'input_image', image_url: 'data:image/jpeg;base64,AAAA' },
+        ],
+      },
+    ]);
+  });
+
+  it('sends a PDF as an input file with a data URL', async () => {
+    const { fetchFn, calls } = fakeFetch(openAiAnswer());
+    await client('openai', fetchFn).complete({ ...REQUEST, messages: [FILE_TURN] });
+    expect(calls[0]?.body.input).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'input_text', text: 'read it' },
+          {
+            type: 'input_file',
+            filename: 'file-2.pdf',
+            file_data: 'data:application/pdf;base64,JVBE',
+          },
         ],
       },
     ]);
@@ -253,6 +280,23 @@ describe('Anthropic Messages client', () => {
     ]);
   });
 
+  it('sends a PDF as a base64 document block', async () => {
+    const { fetchFn, calls } = fakeFetch(anthropicAnswer());
+    await client('anthropic', fetchFn).complete({ ...REQUEST, messages: [FILE_TURN] });
+    expect(calls[0]?.body.messages).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'read it' },
+          {
+            type: 'document',
+            source: { type: 'base64', media_type: 'application/pdf', data: 'JVBE' },
+          },
+        ],
+      },
+    ]);
+  });
+
   it('turns a refusal or a cut answer into errors and reads the error type', async () => {
     const refused = anthropicAnswer({ stop_reason: 'refusal', content: [] });
     expect(
@@ -316,6 +360,15 @@ describe('Ollama chat client', () => {
     ]);
   });
 
+  it('refuses a PDF before any call: it reads pictures only', async () => {
+    const { fetchFn, calls } = fakeFetch(ollamaAnswer());
+    const error = await failure(
+      client('ollama', fetchFn).complete({ ...REQUEST, messages: [FILE_TURN] }),
+    );
+    expect(error.reason).toBe('REFUSED');
+    expect(calls).toHaveLength(0);
+  });
+
   it('sends a configured key as a bearer token and reports a cut answer', async () => {
     const { fetchFn, calls } = fakeFetch(ollamaAnswer({ done_reason: 'length' }));
     const error = await failure(client('ollama', fetchFn).complete(REQUEST));
@@ -325,6 +378,12 @@ describe('Ollama chat client', () => {
 });
 
 describe('transport', () => {
+  it('waits as long as a request asks when that is longer than the configured limit', () => {
+    expect(timeoutOf({ timeoutMs: 60_000 }, { ...REQUEST, timeoutMs: 240_000 })).toBe(240_000);
+    expect(timeoutOf({ timeoutMs: 60_000 }, { ...REQUEST, timeoutMs: 5_000 })).toBe(60_000);
+    expect(timeoutOf({ timeoutMs: 60_000 }, REQUEST)).toBe(60_000);
+  });
+
   it('stops waiting after the timeout', async () => {
     const hanging: FetchFn = (_url, init) =>
       new Promise((_resolve, reject) => {
