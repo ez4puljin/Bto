@@ -141,6 +141,18 @@ export function useSalesHistory(day: string, q: string) {
   });
 }
 
+/** «Картын гүйлгээ» (ADR-0208): the till's card charges and settlements of `day`. */
+export function useCardAttempts(day: string) {
+  const { client } = useKiosk();
+  const { epoch } = useCredentials();
+  return useQuery({
+    queryKey: ['kiosk', epoch, 'card-attempts', day] as const,
+    queryFn: ({ signal }) => client.cardAttempts(day, signal),
+    placeholderData: keepPreviousData,
+    staleTime: 0,
+  });
+}
+
 /** «Өдрийн нэгтгэл» (ADR-0111): the till's money of `day` by payment type and its count. */
 export function useDaySummary(day: string) {
   const { client } = useKiosk();

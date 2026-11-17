@@ -191,8 +191,8 @@ describe('pos card terminal', () => {
       usedAt: null,
       source: null,
     });
-    // Digits only: the day and a number of this edge.
-    expect(begun.refNo).toBe(`${day}0001`);
+    // Digits only, 14 of them: the day, a 9 and a number of this edge — never Erxes' twelve.
+    expect(begun.refNo).toBe(`${day}900001`);
     // The same request again (a lost reply) is the same charge, not a second one.
     expect(
       ((await begin(totalOf('1'), saleClientId, id).expect(200)).body as EdgeCardAttempt).refNo,
@@ -235,7 +235,7 @@ describe('pos card terminal', () => {
   it('an approved charge pays one sale of exactly its amount, once, with the terminal’s answer kept', async () => {
     const saleClientId = randomUUID();
     const begun = (await begin(totalOf('2'), saleClientId).expect(200)).body as EdgeCardAttempt;
-    expect(begun.refNo).toBe(`${day}0002`);
+    expect(begun.refNo).toBe(`${day}900002`);
     await finish(begun.id, { outcome: 'APPROVED', source: 'TERMINAL', response: APPROVED }).expect(
       200,
     );
@@ -302,6 +302,90 @@ describe('pos card terminal', () => {
     expect(late.body).toMatchObject({ code: 'POS_CARD_ATTEMPT_STATE' });
   });
 
+  it('keeps what the terminal answers about a reference: its facts reach the sale, the centre and the list', async () => {
+    // `getLastTransaction` as the real terminal answered it (2026-11-17), for a given reference.
+    const foundOf = (refNo: string, amount: string) => ({
+      status: true,
+      response: {
+        amount,
+        app_name: 'PASS',
+        batch_no: '000000001529',
+        db_ref_no: refNo,
+        entry_mode: 'Qr',
+        pan: '438054XXXXXX5538',
+        response_code: '000',
+        response_msg: 'Гүйлгээ зөвшөөрөгдсөн.',
+        rrn: '008209672971',
+        terminal_id: '70107480',
+        trace_no: '183607',
+      },
+    });
+    const lookup = (id: string, response: unknown) =>
+      kiosk.post(`/card-attempts/${id}/lookup`, { response });
+    const saleClientId = randomUUID();
+    const begun = (await begin(totalOf('1'), saleClientId).expect(200)).body as EdgeCardAttempt;
+    // An answer about another reference (Erxes' order 87) says nothing of this charge.
+    await lookup(begun.id, foundOf(`${day}0087`, '300')).expect(422);
+    await lookup(begun.id, null).expect(422);
+    const asked = (await lookup(begun.id, foundOf(begun.refNo, '1300')).expect(200))
+      .body as EdgeCardAttempt;
+    // Keeping the answer decides nothing: the charge is still without its own.
+    expect(asked).toMatchObject({ status: 'PENDING', details: null });
+    const approved = (
+      await finish(begun.id, { outcome: 'APPROVED', source: 'TERMINAL', response: null }).expect(
+        200,
+      )
+    ).body as EdgeCardAttempt;
+    expect(approved.details).toEqual({
+      maskedPan: '438054XXXXXX5538',
+      rrn: '008209672971',
+      traceNo: '183607',
+      batchNo: '000000001529',
+      entryMode: 'Qr',
+      appName: 'PASS',
+    });
+    expect((await rowOf(begun.id)).lookup).toEqual(foundOf(begun.refNo, '1300'));
+    const sold = (await sellOn(saleClientId, '1', { cardAttemptId: begun.id }).expect(200))
+      .body as EdgePrintableReceipt;
+    await sync.pushOnce();
+    const centreRow = (await store.pos.sales({ tillId: store.till.id })).data.find(
+      (sale) => sale.number === sold.receipt.number,
+    );
+    const detail = (await store.pos.sale(centreRow?.id ?? 0)) as unknown as {
+      tenders: { terminalId: string | null; rrn: string | null; maskedPan: string | null }[];
+    };
+    expect(detail.tenders).toEqual([
+      expect.objectContaining({
+        terminalId: '70107480',
+        rrn: '008209672971',
+        maskedPan: '438054XXXXXX5538',
+      }),
+    ]);
+
+    // A whole card number is never kept on a charge's facts, whatever an answer holds.
+    const whole = (await begin(totalOf('1')).expect(200)).body as EdgeCardAttempt;
+    const bare = (
+      await finish(whole.id, {
+        outcome: 'APPROVED',
+        source: 'TERMINAL',
+        response: { status: true, response: { response_code: '000', pan: '4380541234565538' } },
+      }).expect(200)
+    ).body as EdgeCardAttempt;
+    expect(bare.details).toMatchObject({ maskedPan: null, rrn: null });
+    await kiosk.post(`/card-attempts/${whole.id}/void`).expect(200);
+
+    // The till's list of the day: newest first, with the sale a charge paid.
+    const list = (await kiosk.get(`/card-attempts?day=${businessDate()}`).expect(200))
+      .body as EdgeCardAttempt[];
+    expect(list.slice(0, 2)).toMatchObject([
+      { id: whole.id, status: 'VOIDED', saleNumber: null },
+      { id: begun.id, status: 'APPROVED', saleNumber: sold.receipt.number },
+    ]);
+    expect(list[1]?.details?.rrn).toBe('008209672971');
+    expect(list.some((attempt) => attempt.status === 'DECLINED')).toBe(true);
+    await kiosk.get('/card-attempts?day=yesterday').expect(422);
+  });
+
   it('an unanswered charge is settled by the cashier from the slip; an unused one is given back', async () => {
     const lost = (await begin(totalOf('1')).expect(200)).body as EdgeCardAttempt;
     const failed = (
@@ -330,7 +414,7 @@ describe('pos card terminal', () => {
       await kiosk.post('/card-settlements', { id, terminalId: '70107480' }).expect(200)
     ).body as EdgeCardAttempt;
     expect(begun).toMatchObject({ kind: 'SETTLEMENT', status: 'PENDING', amount: '0.00' });
-    expect(begun.refNo).toMatch(new RegExp(`^${day}\\d{4}$`));
+    expect(begun.refNo).toMatch(new RegExp(`^${day}9\\d{5}$`));
     await begin(totalOf('1')).expect(409);
     const answer = { status: true, response: { response_code: true } };
     await finish(id, { outcome: 'APPROVED', source: 'TERMINAL', response: answer }).expect(200);

@@ -113,6 +113,11 @@ export class CardAttemptResultDto {
   @IsOptional() @IsString() @MaxLength(2000) message?: string | null;
 }
 
+/** ADR-0208: the terminal's answer to `getLastTransaction`, as the browser received it. */
+export class CardLookupDto {
+  @Allow() response: unknown;
+}
+
 export class CardSettlementDto {
   @IsUUID() id: string;
   @IsOptional() @IsString() @MaxLength(32) terminalId?: string | null;

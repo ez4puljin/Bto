@@ -20,13 +20,14 @@ import {
   Archive,
   ArchiveRestore,
   CalendarCheck,
+  CreditCard,
   Gift,
   History,
-  ReceiptText,
   LayoutGrid,
   LockKeyhole,
   LogOut,
   Menu,
+  ReceiptText,
   Settings,
   Tag,
   Ticket,
@@ -58,6 +59,7 @@ import { randomUuid } from '@/lib/uuid';
 import { type Cart, type CartLine, canDecrease } from '../cart';
 import { type ApprovalRequest, ApprovalDialog } from '../components/approval-dialog';
 import { CartTable } from '../components/cart-table';
+import { CardHistoryDialog } from '../components/card-history-dialog';
 import { DaySummaryDialog } from '../components/day-summary-dialog';
 import { SettingsDialog } from '../components/settings-dialog';
 import { EbarimtDialog } from '../components/ebarimt-dialog';
@@ -86,6 +88,7 @@ type Dialogs =
   | 'receipt'
   | 'cancel'
   | 'history'
+  | 'cards'
   | 'daySummary'
   | 'settings'
   | 'quick'
@@ -551,6 +554,8 @@ export function SaleScreen(props: {
   }, []);
 
   const closeDialog = () => setDialog(null);
+  // ADR-0208: a till whose card type drives the bank's terminal lists its card charges.
+  const hasCardTerminal = (props.session.paymentTypes ?? []).some((type) => Boolean(type.terminal));
 
   return (
     <div ref={root} className="flex h-dvh flex-col bg-canvas">
@@ -614,6 +619,15 @@ export function SaleScreen(props: {
                 <History />
                 {t('posKiosk.menu.history')}
               </DropdownMenuItem>
+              {hasCardTerminal ? (
+                <DropdownMenuItem
+                  className="h-11 text-[0.9375rem]"
+                  onSelect={() => setDialog('cards')}
+                >
+                  <CreditCard />
+                  {t('posKiosk.menu.cards')}
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem
                 className="h-11 text-[0.9375rem]"
                 onSelect={() => setDialog('daySummary')}
@@ -892,6 +906,11 @@ export function SaleScreen(props: {
         onCloseAutoFocus={refocus}
       />
       <HistoryDialog open={dialog === 'history'} onClose={closeDialog} onCloseAutoFocus={refocus} />
+      <CardHistoryDialog
+        open={dialog === 'cards'}
+        onClose={closeDialog}
+        onCloseAutoFocus={refocus}
+      />
       <DaySummaryDialog
         open={dialog === 'daySummary'}
         onClose={closeDialog}

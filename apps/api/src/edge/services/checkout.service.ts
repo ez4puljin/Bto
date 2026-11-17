@@ -343,6 +343,8 @@ export class CheckoutService {
           new Decimal(tender.amount),
         );
         tender.terminalId = charge.terminalId ?? tender.terminalId;
+        tender.rrn = charge.rrn ?? tender.rrn;
+        tender.maskedPan = charge.maskedPan;
       }
       const doc: SaleDocWire = {
         clientId: request.clientId,

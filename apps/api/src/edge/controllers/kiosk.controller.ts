@@ -56,6 +56,7 @@ import {
   ApprovalDto,
   CardAttemptDto,
   CardAttemptResultDto,
+  CardLookupDto,
   CardSettlementDto,
   DiscardParkedDto,
   EbarimtResolveDto,
@@ -383,6 +384,26 @@ export class KioskController {
     @Body() body: CardAttemptResultDto,
   ): Promise<EdgeCardAttempt> {
     return this.cards.finish(kiosk.device.tillCode, cashierOf(kiosk), id, body);
+  }
+
+  /** This till's card charges and settlements of a day, newest first («Картын гүйлгээ»). */
+  @Get('card-attempts')
+  cardsOfDay(
+    @Kiosk() kiosk: KioskContext,
+    @Query() query: DayQueryDto,
+  ): Promise<EdgeCardAttempt[]> {
+    return this.cards.ofDay(kiosk.device.tillCode, query.day);
+  }
+
+  /** What the terminal answered when asked about a charge's reference (`getLastTransaction`). */
+  @Post('card-attempts/:id/lookup')
+  @HttpCode(200)
+  saveCardLookup(
+    @Kiosk() kiosk: KioskContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: CardLookupDto,
+  ): Promise<EdgeCardAttempt> {
+    return this.cards.saveLookup(kiosk.device.tillCode, id, body.response);
   }
 
   /** An approved charge given back on the terminal by hand, before a sale used it. */

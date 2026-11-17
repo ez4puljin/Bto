@@ -13,6 +13,7 @@ import { wedgeScan } from '@/test/scan';
 import {
   type CardTerminalClient,
   type TerminalInfo,
+  type TerminalLookup,
   type TerminalOutcome,
   type TerminalSale,
   TerminalUnavailable,
@@ -54,6 +55,35 @@ const APPROVED: TerminalOutcome = {
   response: { status: true, response: { response_code: '000', response_msg: 'Approved' } },
 };
 
+/**
+ * `getLastTransaction` as the real terminal answered it on 2026-11-17 (the owner's test), with the
+ * reference and the amount of the charge asked about.
+ */
+const foundOf = (refNo: string, amount: string): TerminalLookup => ({
+  found: 'APPROVED',
+  amount,
+  response: {
+    status: true,
+    response: {
+      amount,
+      app_name: 'PASS',
+      batch_no: '000000001529',
+      db_ref_no: refNo,
+      entry_mode: 'Qr',
+      pan: '438054XXXXXX5538',
+      response_code: '000',
+      response_msg: 'Гүйлгээ зөвшөөрөгдсөн.',
+      rrn: '008209672971',
+      terminal_id: '70107480',
+      trace_no: '183607',
+    },
+  },
+});
+const NOT_FOUND: TerminalLookup = {
+  found: 'NONE',
+  response: { status: true, response: { response_code: '38B', response_msg: 'Гүйлгээ олдсонгүй' } },
+};
+
 const amountOf = (name: string) => k.pay.rows.amount.replace('{{name}}', name);
 const typeButton = (pay: HTMLElement, name: string) =>
   within(pay).getByRole('button', { name: new RegExp(`^[0-9]+ ?${name}$`) });
@@ -62,10 +92,15 @@ const typeButton = (pay: HTMLElement, name: string) =>
  * A terminal that never touches a real one: `answers` are given in order (a function is called
  * when the sale arrives, so a test can hold the answer back), `ready` is what the status says.
  */
-function fakeTerminal(answers: (TerminalOutcome | (() => Promise<TerminalOutcome>))[] = []) {
+function fakeTerminal(
+  answers: (TerminalOutcome | (() => Promise<TerminalOutcome>))[] = [],
+  /** What the terminal says of a reference when asked; nothing readable unless given. */
+  lookups: ((refNo: string) => TerminalLookup)[] = [],
+) {
   const state = { ready: true };
   const sales: TerminalSale[] = [];
   const settlements: string[] = [];
+  const asked: string[] = [];
   const next = async (): Promise<TerminalOutcome> => {
     const answer = answers.shift();
     if (!answer) throw new Error('the fake terminal has no answer left');
@@ -83,8 +118,15 @@ function fakeTerminal(answers: (TerminalOutcome | (() => Promise<TerminalOutcome
       settlements.push(refNo);
       return next();
     }),
+    lookup: vi.fn((refNo: string) => {
+      asked.push(refNo);
+      const answer = lookups.shift();
+      return Promise.resolve<TerminalLookup>(
+        answer ? answer(refNo) : { found: 'UNKNOWN', message: null },
+      );
+    }),
   };
-  return { terminal, sales, settlements, state };
+  return { terminal, sales, settlements, asked, state };
 }
 
 /** The edge's record of the till's card charges, as its routes keep it. */
@@ -96,7 +138,7 @@ function cardRoutes(seed: EdgeCardAttempt[] = []) {
     id,
     kind: 'SALE',
     status: 'PENDING',
-    refNo: `20261117${String(attempts.length + 1).padStart(4, '0')}`,
+    refNo: `202611179${String(attempts.length + 1).padStart(5, '0')}`,
     saleClientId: null,
     paymentTypeId: null,
     amount: '0.00',
@@ -140,6 +182,24 @@ function cardRoutes(seed: EdgeCardAttempt[] = []) {
       if (!attempt) return problem('NOT_FOUND', 404);
       const body = call.body as EdgeCardAttemptResult;
       Object.assign(attempt, { status: body.outcome, source: body.source, message: body.message });
+      return json(attempt);
+    },
+    'GET /card-attempts': () => json([...attempts].reverse()),
+    'POST /card-attempts/:id/lookup': (call) => {
+      const attempt = find(call);
+      if (!attempt) return problem('NOT_FOUND', 404);
+      const told = (call.body as { response: { response?: Record<string, string> } }).response
+        .response;
+      if (told?.response_code === '000') {
+        attempt.details = {
+          maskedPan: told.pan ?? null,
+          rrn: told.rrn ?? null,
+          traceNo: told.trace_no ?? null,
+          batchNo: told.batch_no ?? null,
+          entryMode: told.entry_mode ?? null,
+          appName: told.app_name ?? null,
+        };
+      }
       return json(attempt);
     },
     'POST /card-attempts/:id/void': (call) => {
@@ -222,7 +282,7 @@ describe('kiosk: a card type that drives the bank terminal (ADR-0208)', () => {
     const waiting = await within(pay).findByRole('status');
     expect(waiting).toHaveTextContent(c.waitingTitle);
     expect(waiting).toHaveTextContent('7,000₮');
-    expect(sales).toEqual([{ refNo: '202611170001', amount: '7000.00', billType: '1' }]);
+    expect(sales).toEqual([{ refNo: '20261117900001', amount: '7000.00', billType: '1' }]);
     expect(cards.attempts).toMatchObject([{ status: 'PENDING', amount: '7000.00' }]);
     expect(within(pay).getByRole('button', { name: mn.common.cancel })).toBeDisabled();
     expect(within(pay).queryByRole('button', { name: k.pay.receiptChoice.B2C })).toBeNull();
@@ -305,7 +365,7 @@ describe('kiosk: a card type that drives the bank terminal (ADR-0208)', () => {
     await payByCard(user, pay);
     const panel = await within(pay).findByText(c.unknown.title);
     expect(panel).toBeInTheDocument();
-    expect(within(pay).getByText(/202611170001/)).toBeInTheDocument();
+    expect(within(pay).getByText(/20261117900001/)).toBeInTheDocument();
     expect(salesOf(edge)).toHaveLength(0);
     expect(resultsOf(edge)).toHaveLength(0);
     expect(cards.attempts).toMatchObject([{ status: 'PENDING' }]);
@@ -348,6 +408,72 @@ describe('kiosk: a card type that drives the bank terminal (ADR-0208)', () => {
     expect(salesOf(edge)[0]?.tenders[0]).toMatchObject({ cardAttemptId: cards.attempts[0]?.id });
   });
 
+  it('no answer, then the terminal is asked about the reference: approved there, paid here', async () => {
+    const { terminal, asked } = fakeTerminal(
+      [{ outcome: 'UNKNOWN', response: null, message: 'Failed to fetch' }],
+      [(refNo) => foundOf(refNo, '7000')],
+    );
+    const { edge, user, pay, cards } = await openPayment(terminal);
+    await payByCard(user, pay);
+    await user.click(await within(pay).findByRole('button', { name: c.unknown.lookup }));
+    await waitFor(() => expect(within(pay).queryByText(c.unknown.title)).toBeNull());
+    expect(asked).toEqual(['20261117900001']);
+    // The terminal's own word, kept with the charge: its answer, then approved by the terminal.
+    expect(edge.callsTo(`POST /card-attempts/${cards.attempts[0]?.id}/lookup`)).toHaveLength(1);
+    expect(resultsOf(edge)).toEqual([
+      { outcome: 'APPROVED', source: 'TERMINAL', response: null, message: null },
+    ]);
+    expect(cards.attempts[0]?.details).toMatchObject({
+      rrn: '008209672971',
+      maskedPan: '438054XXXXXX5538',
+    });
+    await user.click(within(pay).getByRole('button', { name: k.pay.receiptChoice.back }));
+    expect(within(pay).getByLabelText(amountOf('Khaanbank terminal'))).toBeDisabled();
+    await user.click(within(pay).getByRole('button', { name: k.pay.print }));
+    await user.click(within(pay).getByRole('button', { name: k.pay.receiptChoice.B2C }));
+    await screen.findByRole('dialog', { name: k.receipt.title });
+    expect(terminal.sale).toHaveBeenCalledTimes(1);
+    expect(salesOf(edge)[0]?.tenders[0]).toMatchObject({ cardAttemptId: cards.attempts[0]?.id });
+  });
+
+  it('asked and not found, or found for another amount: nothing is decided for the cashier', async () => {
+    const { terminal } = fakeTerminal(
+      [{ outcome: 'UNKNOWN', response: null, message: 'Failed to fetch' }],
+      [() => NOT_FOUND, (refNo) => foundOf(refNo, '300')],
+    );
+    const { edge, user, pay, cards } = await openPayment(terminal);
+    await payByCard(user, pay);
+    await user.click(await within(pay).findByRole('button', { name: c.unknown.lookup }));
+    expect(await within(pay).findByText(c.unknown.lookupNone)).toBeInTheDocument();
+    // Still open: the card may be in the terminal yet. Only the cashier says it was not paid.
+    expect(cards.attempts).toMatchObject([{ status: 'PENDING' }]);
+    expect(resultsOf(edge)).toHaveLength(0);
+    expect(within(pay).getByText(c.unknown.title)).toBeInTheDocument();
+
+    await user.click(within(pay).getByRole('button', { name: c.unknown.lookup }));
+    expect(await within(pay).findByText(/300₮/)).toBeInTheDocument();
+    expect(cards.attempts).toMatchObject([{ status: 'PENDING' }]);
+    expect(resultsOf(edge)).toHaveLength(0);
+    expect(salesOf(edge)).toHaveLength(0);
+  });
+
+  it('approved without the card’s facts in the answer: the terminal is asked once and they are kept', async () => {
+    const { terminal, asked } = fakeTerminal([APPROVED], [(refNo) => foundOf(refNo, '7000')]);
+    const { edge, user, pay, cards } = await openPayment(terminal);
+    await payByCard(user, pay);
+    await screen.findByRole('dialog', { name: k.receipt.title });
+    expect(asked).toEqual(['20261117900001']);
+    expect(cards.attempts[0]?.details).toMatchObject({ rrn: '008209672971' });
+    // Asked after the approval was recorded, before the sale was written.
+    const paths = edge.calls.map((call) => call.path);
+    expect(paths.findIndex((path) => path.endsWith('/lookup'))).toBeGreaterThan(
+      paths.findIndex((path) => path.endsWith('/result')),
+    );
+    expect(paths.indexOf('/sales')).toBeGreaterThan(
+      paths.findIndex((path) => path.endsWith('/lookup')),
+    );
+  });
+
   it('the terminal is not there: the card type is off and says why, until it answers', async () => {
     const { terminal, state } = fakeTerminal([APPROVED]);
     state.ready = false;
@@ -380,7 +506,7 @@ describe('kiosk: a card type that drives the bank terminal (ADR-0208)', () => {
     await user.click(within(pay).getByRole('button', { name: k.pay.print }));
     await user.click(within(pay).getByRole('button', { name: k.pay.receiptChoice.B2C }));
     await screen.findByRole('dialog', { name: k.receipt.title });
-    expect(sales).toEqual([{ refNo: '202611170001', amount: '5000.00', billType: '1' }]);
+    expect(sales).toEqual([{ refNo: '20261117900001', amount: '5000.00', billType: '1' }]);
     expect(salesOf(edge)[0]?.tenders).toMatchObject([
       { kind: 'CASH', amount: '2000.00', tendered: '2000.00' },
       { kind: 'CARD', amount: '5000.00', cardAttemptId: cards.attempts[0]?.id },
@@ -496,6 +622,84 @@ describe('kiosk: a card type that drives the bank terminal (ADR-0208)', () => {
   });
 });
 
+describe('kiosk: «Картын гүйлгээ», the till’s own list (ADR-0208)', () => {
+  it('lists the day’s charges with what the terminal named and asks the terminal about one', async () => {
+    const paid: EdgeCardAttempt = {
+      id: '0c5a8e0e-6c53-4a53-9f36-0d6c2c3f4a21',
+      kind: 'SALE',
+      status: 'APPROVED',
+      refNo: '20261117900007',
+      saleClientId: '7f0d2e0a-91d5-4b0f-8b62-5b1f3c1d2e41',
+      paymentTypeId: 2,
+      amount: '12500.00',
+      cashierName: CASHIER.fullName,
+      createdAt: '2026-11-17T03:55:00.000Z',
+      usedAt: '2026-11-17T03:55:20.000Z',
+      source: 'TERMINAL',
+      message: null,
+      saleNumber: 'К1-261117-0031',
+      details: {
+        maskedPan: '438054XXXXXX5538',
+        rrn: '008209672971',
+        traceNo: '183607',
+        batchNo: '000000001529',
+        entryMode: 'Qr',
+        appName: 'PASS',
+      },
+    };
+    const declined: EdgeCardAttempt = {
+      ...paid,
+      id: '0c5a8e0e-6c53-4a53-9f36-0d6c2c3f4a22',
+      status: 'DECLINED',
+      refNo: '20261117900008',
+      amount: '3000.00',
+      usedAt: null,
+      saleNumber: null,
+      details: null,
+      message: 'Үлдэгдэл хүрэлцэхгүй',
+    };
+    const { terminal, asked } = fakeTerminal([], [() => NOT_FOUND]);
+    const cards = cardRoutes([paid, declined]);
+    const edge = fakeEdge(
+      storeRoutes({
+        'GET /session': () => json({ ...SESSION, paymentTypes: TYPES }),
+        ...cards.routes,
+      }),
+    );
+    renderKiosk(edge, {
+      device: 'device-1',
+      session: 'session-1',
+      cashierId: CASHIER.userId,
+      terminal,
+    });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: k.menu.label }));
+    await user.click(await screen.findByRole('menuitem', { name: k.menu.cards }));
+    const dialog = await screen.findByRole('dialog', { name: k.cards.title });
+    const rows = await within(dialog).findAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+    // Newest first.
+    expect(rows[0]).toHaveTextContent('3,000₮');
+    expect(rows[0]).toHaveTextContent(k.cards.statuses.DECLINED);
+    expect(rows[0]).toHaveTextContent('Үлдэгдэл хүрэлцэхгүй');
+    expect(rows[1]).toHaveTextContent('12,500₮');
+    expect(rows[1]).toHaveTextContent(k.cards.statuses.APPROVED);
+    expect(rows[1]).toHaveTextContent('К1-261117-0031');
+    expect(rows[1]).toHaveTextContent('438054XXXXXX5538');
+    expect(rows[1]).toHaveTextContent('RRN 008209672971');
+    expect(rows[1]).toHaveTextContent('20261117900007');
+
+    await user.click(
+      within(dialog).getByRole('button', {
+        name: k.cards.lookupOf.replace('{{refNo}}', '20261117900008'),
+      }),
+    );
+    expect(await within(dialog).findByText(k.cards.none)).toBeInTheDocument();
+    expect(asked).toEqual(['20261117900008']);
+    expect(terminal.sale).not.toHaveBeenCalled();
+  });
+});
+
 describe('kiosk: the terminal’s end-of-day settlement (ADR-0208)', () => {
   it('is asked by the cashier from the day summary, confirmed, and kept on the edge', async () => {
     const done: TerminalOutcome = {
@@ -530,7 +734,7 @@ describe('kiosk: the terminal’s end-of-day settlement (ADR-0208)', () => {
     });
     await user.click(within(confirm).getByRole('button', { name: k.daySummary.settlement.run }));
     expect(await within(dialog).findByText(k.daySummary.settlement.done)).toBeInTheDocument();
-    expect(settlements).toEqual(['202611170001']);
+    expect(settlements).toEqual(['20261117900001']);
     expect(cards.attempts).toMatchObject([{ kind: 'SETTLEMENT', status: 'APPROVED' }]);
     expect(resultsOf(edge)).toEqual([
       { outcome: 'APPROVED', source: 'TERMINAL', response: done.response, message: null },

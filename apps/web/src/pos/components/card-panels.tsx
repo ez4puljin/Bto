@@ -1,6 +1,6 @@
 import type { EdgeCardAttempt } from '@tugeel/shared/pos';
 import dayjs from 'dayjs';
-import { CreditCard, RefreshCw, TriangleAlert } from 'lucide-react';
+import { CreditCard, RefreshCw, Search, TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { BUSINESS_TZ } from '@/lib/dayjs';
@@ -76,6 +76,11 @@ export function UnansweredPanel(props: {
   attempt: EdgeCardAttempt;
   busy: boolean;
   onResolve: (outcome: 'APPROVED' | 'FAILED') => void;
+  /** Asks the terminal itself about the charge's reference (free); absent: no terminal here. */
+  onLookup?: (() => void) | undefined;
+  lookingUp?: boolean;
+  /** What the last lookup found, when it decided nothing. */
+  lookupNote?: string | null;
 }) {
   const { t } = useTranslation();
   const { attempt } = props;
@@ -102,7 +107,23 @@ export function UnansweredPanel(props: {
           },
         )}
       </p>
+      {props.lookupNote ? <p className="text-sm font-medium">{props.lookupNote}</p> : null}
       <div className="flex flex-wrap gap-2">
+        {props.onLookup && !settlement ? (
+          <Button
+            type="button"
+            className="h-11"
+            disabled={props.busy || props.lookingUp}
+            onClick={props.onLookup}
+          >
+            <Search />
+            {t(
+              props.lookingUp
+                ? 'posKiosk.pay.card.unknown.lookingUp'
+                : 'posKiosk.pay.card.unknown.lookup',
+            )}
+          </Button>
+        ) : null}
         <Button
           type="button"
           variant="outline"

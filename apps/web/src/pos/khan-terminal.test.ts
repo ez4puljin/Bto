@@ -168,3 +168,85 @@ describe('khan terminal: the settlement', () => {
     });
   });
 });
+
+describe('khan terminal: asking about a reference (getLastTransaction)', () => {
+  /** The real terminal's answer for Erxes' order 20261117_0087 (2026-11-17). */
+  const FOUND = {
+    status: true,
+    response: {
+      aid: '37303130373438305F323032363131313730303837',
+      amount: '300',
+      app_name: 'PASS',
+      bank_mb_code: '05',
+      batch_no: '000000001529',
+      card_holder_name: '',
+      date: '11/17',
+      db_ref_no: '202611170087',
+      entry_mode: 'Qr',
+      merchant_id: '000000010174585',
+      merchant_name: 'Orgil buunii tuv 1',
+      model: 'Q80',
+      pan: '438054XXXXXX5538',
+      pos_firmware: '2.6.102',
+      reader_id: '0800755030',
+      response_code: '000',
+      response_msg: 'Гүйлгээ зөвшөөрөгдсөн.',
+      rrn: '008209672971',
+      term_app_name: 'DtbProlin',
+      terminal_date: '20261117115559',
+      terminal_id: '70107480',
+      time: '11:55:05',
+      trace_no: '183607',
+    },
+  };
+
+  it('finds the approved transaction of the reference, with its amount', async () => {
+    const { terminal, fetch } = terminalWith(() => json(FOUND));
+    await expect(terminal.lookup('202611170087')).resolves.toEqual({
+      found: 'APPROVED',
+      response: FOUND,
+      amount: '300',
+    });
+    expect(sentBy(fetch.mock.calls[0]?.[1])).toEqual({
+      service_name: 'getLastTransaction',
+      service_params: { db_ref_no: '202611170087' },
+    });
+  });
+
+  it('says none on 38B, and decides nothing on anything else', async () => {
+    const none = {
+      status: true,
+      response: { response_code: '38B', response_msg: 'Гүйлгээ олдсонгүй' },
+    };
+    await expect(terminalWith(() => json(none)).terminal.lookup('1')).resolves.toEqual({
+      found: 'NONE',
+      response: none,
+    });
+    // The service's Exception (an empty reference), an unknown service, another code.
+    const exception = { status: false, response: { Exception: { ErrorCode: '003' } } };
+    await expect(terminalWith(() => json(exception)).terminal.lookup('')).resolves.toMatchObject({
+      found: 'OTHER',
+    });
+    const other = {
+      status: true,
+      response: { response_code: 'D09', response_msg: 'Not support command' },
+    };
+    await expect(terminalWith(() => json(other)).terminal.lookup('1')).resolves.toMatchObject({
+      found: 'OTHER',
+      message: 'Not support command',
+    });
+    // An approved answer about another reference is not this charge's.
+    await expect(
+      terminalWith(() => json(FOUND)).terminal.lookup('20261117900087'),
+    ).resolves.toMatchObject({
+      found: 'OTHER',
+    });
+    const broken = terminalWith(() => {
+      throw new TypeError('Failed to fetch');
+    });
+    await expect(broken.terminal.lookup('1')).resolves.toEqual({
+      found: 'UNKNOWN',
+      message: 'Failed to fetch',
+    });
+  });
+});

@@ -1,3 +1,4 @@
+import { Decimal } from '@tugeel/shared/money';
 import type { EdgeCardAttempt, EdgeCardAttemptResult } from '@tugeel/shared/pos';
 import { randomUuid } from '@/lib/uuid';
 import { type EdgeClient, edgeProblemOf } from './edge-client';
@@ -103,7 +104,73 @@ export async function chargeOnTerminal(
     billType: charge.billType,
   });
   if (outcome.outcome === 'UNKNOWN') return { kind: 'UNKNOWN', attempt };
-  return recordOutcome(client, attempt, outcome);
+  const result = await recordOutcome(client, attempt, outcome);
+  // The sale's own answer was not seen to carry the RRN and the card: when it does not, the
+  // terminal is asked once about the reference (free), so the sale's tender can keep them.
+  if (result.kind === 'APPROVED' && !result.attempt.details?.rrn) {
+    const looked = await lookupOnTerminal(services, result.attempt);
+    if (looked.kind === 'APPROVED' || looked.kind === 'NONE') {
+      return { kind: 'APPROVED', attempt: looked.attempt };
+    }
+  }
+  return result;
+}
+
+/**
+ * What asking the terminal about a charge's reference came to (`getLastTransaction`; no money
+ * moves). The terminal's answer is kept on the edge with the charge.
+ */
+export type LookupResult =
+  /** The terminal holds it approved. A charge that had no answer is APPROVED now. */
+  | { kind: 'APPROVED'; attempt: EdgeCardAttempt }
+  /**
+   * The terminal holds no such transaction. A charge without an answer STAYS so: the card may
+   * still be in the terminal, so only the cashier, seeing the terminal idle, says it was not paid.
+   */
+  | { kind: 'NONE'; attempt: EdgeCardAttempt }
+  /** The terminal holds one for another amount: nothing is decided from it. */
+  | { kind: 'MISMATCH'; amount: string | null }
+  /** No usable answer from the terminal, or one the till cannot read. */
+  | { kind: 'UNKNOWN'; message: string | null }
+  /** The edge could not keep the answer. */
+  | { kind: 'ERROR'; error: unknown };
+
+export async function lookupOnTerminal(
+  services: { client: EdgeClient; terminal: CardTerminalClient },
+  attempt: EdgeCardAttempt,
+): Promise<LookupResult> {
+  const { client, terminal } = services;
+  const found = await terminal.lookup(attempt.refNo);
+  if (found.found === 'UNKNOWN' || found.found === 'OTHER') {
+    return { kind: 'UNKNOWN', message: found.message };
+  }
+  try {
+    if (found.found === 'NONE') {
+      return { kind: 'NONE', attempt: await client.saveCardLookup(attempt.id, found.response) };
+    }
+    if (attempt.kind === 'SALE' && !sameAmount(found.amount, attempt.amount)) {
+      return { kind: 'MISMATCH', amount: found.amount };
+    }
+    const kept = await client.saveCardLookup(attempt.id, found.response);
+    if (kept.status !== 'PENDING') return { kind: 'APPROVED', attempt: kept };
+    // The terminal itself says the money was taken: the unanswered charge is approved.
+    return {
+      kind: 'APPROVED',
+      attempt: await client.finishCardAttempt(attempt.id, {
+        outcome: 'APPROVED',
+        source: 'TERMINAL',
+        response: null,
+        message: null,
+      }),
+    };
+  } catch (error) {
+    return { kind: 'ERROR', error };
+  }
+}
+
+function sameAmount(told: string | null, amount: string): boolean {
+  if (told === null || !/^\d+(\.\d+)?$/.test(told)) return false;
+  return new Decimal(told).eq(amount);
 }
 
 /** The terminal's settlement with the bank, kept on the edge like a charge. */

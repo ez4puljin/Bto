@@ -1,0 +1,1 @@
+ALTER TABLE "edge_card_attempts" ADD COLUMN "lookup" jsonb;

@@ -913,12 +913,32 @@ export interface EdgeCardSettlementRequest {
   terminalId?: string | null;
 }
 
+/**
+ * ADR-0208: what the terminal said of a charge, read from its kept answers — the fields
+ * `getLastTransaction` was seen to send on the real terminal (2026-11-17); each null when absent.
+ */
+export interface EdgeCardDetails {
+  /** The card number as the terminal masks it (`438054XXXXXX5538`); never a whole number. */
+  maskedPan: string | null;
+  rrn: string | null;
+  traceNo: string | null;
+  batchNo: string | null;
+  /** How the card was read (`Qr`, …) and the terminal's application (`PASS`, …). */
+  entryMode: string | null;
+  appName: string | null;
+}
+
+/** ADR-0208: the terminal's answer to `getLastTransaction` for a charge's reference, as it came. */
+export interface EdgeCardLookupRequest {
+  response: unknown;
+}
+
 /** ADR-0208: a card charge as the till shows it. */
 export interface EdgeCardAttempt {
   id: string;
   kind: CardAttemptKind;
   status: CardAttemptStatus;
-  /** The reference the terminal is given (`db_ref_no`): digits only. */
+  /** The reference the terminal is given (`db_ref_no`): 14 digits, never one Erxes sends. */
   refNo: string;
   saleClientId: string | null;
   paymentTypeId: number | null;
@@ -929,6 +949,10 @@ export interface EdgeCardAttempt {
   usedAt: string | null;
   source: CardAttemptSource | null;
   message: string | null;
+  /** The terminal's facts of the charge, when one of its answers holds them. */
+  details?: EdgeCardDetails | null;
+  /** The receipt number of the sale it paid (the day's list only). */
+  saleNumber?: string | null;
 }
 
 export interface EdgeSaleRequest {

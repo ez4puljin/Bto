@@ -48,7 +48,12 @@ import { formatMnt, formatTugrik } from '@/lib/money';
 import { useDebounced } from '@/lib/use-debounced';
 import { useScanGuard } from '@/lib/scan/use-wedge-scanner';
 import { fieldMoney, moneyOrZero, quickCash, wireMoney } from '../amounts';
-import { type ChargeResult, chargeOnTerminal, recordOutcome } from '../card-charge';
+import {
+  type ChargeResult,
+  chargeOnTerminal,
+  lookupOnTerminal,
+  recordOutcome,
+} from '../card-charge';
 import { edgeProblemOf } from '../edge-client';
 import { TerminalUnavailable } from '../khan-terminal';
 import { useKiosk } from '../kiosk-context';
@@ -548,6 +553,33 @@ function PaymentForm(props: {
       void openAttempts.refetch();
     },
   });
+  // Or the terminal itself is asked about the reference (free): approved there, the charge is
+  // approved here; not found there decides nothing by itself (the card may still be in it).
+  const [lookupNote, setLookupNote] = useState<string | null>(null);
+  const lookup = useMutation({
+    mutationFn: (attempt: EdgeCardAttempt) => {
+      if (!terminal) return Promise.resolve({ kind: 'UNKNOWN' as const, message: null });
+      return lookupOnTerminal({ client, terminal }, attempt);
+    },
+    onSuccess: (result) => {
+      setLookupNote(
+        result.kind === 'NONE'
+          ? t('posKiosk.pay.card.unknown.lookupNone')
+          : result.kind === 'MISMATCH'
+            ? t('posKiosk.pay.card.unknown.lookupMismatch', {
+                amount: formatTugrik(result.amount ?? '0'),
+              })
+            : result.kind === 'UNKNOWN'
+              ? t('posKiosk.pay.card.unknown.lookupUnknown')
+              : result.kind === 'ERROR'
+                ? problemText(result.error)
+                : null,
+      );
+      if (result.kind !== 'APPROVED') return;
+      if (result.attempt.saleClientId === props.attempt.clientId) adopt(result.attempt);
+      void openAttempts.refetch();
+    },
+  });
   const release = useMutation({
     mutationFn: (attempt: EdgeCardAttempt) => client.voidCardAttempt(attempt.id),
     onSuccess: () => void openAttempts.refetch(),
@@ -868,6 +900,9 @@ function PaymentForm(props: {
               attempt={unanswered}
               busy={resolve.isPending}
               onResolve={(outcome) => resolve.mutate({ attempt: unanswered, outcome })}
+              onLookup={terminal ? () => lookup.mutate(unanswered) : undefined}
+              lookingUp={lookup.isPending}
+              lookupNote={lookupNote}
             />
           ) : null}
           <UnusedPanel

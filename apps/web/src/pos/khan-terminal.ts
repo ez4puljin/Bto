@@ -14,6 +14,10 @@ export const KHAN_TERMINAL_URL_KEY = 'bto.kiosk.khan-terminal-url.v1';
 
 /** The status question creates no transaction and must not hang the payment. */
 const STATUS_TIMEOUT_MS = 4_000;
+/** A lookup answers in about a second; it moves no money, so it may be given up and asked again. */
+const LOOKUP_TIMEOUT_MS = 8_000;
+/** The terminal's code for «no transaction with this reference». */
+const NOT_FOUND_CODE = '38B';
 
 export function khanTerminalUrl(): string {
   try {
@@ -64,11 +68,27 @@ export interface TerminalSale {
   billType: '1' | '3';
 }
 
+/**
+ * What the terminal knows of the transaction with a reference (`getLastTransaction`: despite its
+ * name it answers for the `db_ref_no` given, not for the latest one; no money moves, about a
+ * second). Seen on the real terminal 2026-11-17.
+ * - APPROVED: it holds an approved transaction (`000`) with that reference; `amount` as it says.
+ * - NONE: it holds none (`38B`, «Гүйлгээ олдсонгүй»).
+ * - OTHER: it answered something else (another code, or the service's Exception).
+ * - UNKNOWN: no usable answer.
+ */
+export type TerminalLookup =
+  | { found: 'APPROVED'; response: unknown; amount: string | null }
+  | { found: 'NONE'; response: unknown }
+  | { found: 'OTHER'; response: unknown; message: string | null }
+  | { found: 'UNKNOWN'; message: string | null };
+
 /** What the payment needs of a terminal; the tests give a fake one. */
 export interface CardTerminalClient {
   checkStatus(signal?: AbortSignal): Promise<TerminalInfo>;
   sale(request: TerminalSale): Promise<TerminalOutcome>;
   settlement(refNo: string): Promise<TerminalOutcome>;
+  lookup(refNo: string): Promise<TerminalLookup>;
 }
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
@@ -147,11 +167,43 @@ export class KhanTerminal implements CardTerminalClient {
     return this.ask('doSettlement', { db_ref_no: refNo }, (code) => code === true);
   }
 
+  /** Asks the terminal about the transaction with this reference. Free: asked as often as needed. */
+  async lookup(refNo: string): Promise<TerminalLookup> {
+    const timeout = new AbortController();
+    const timer = setTimeout(() => timeout.abort(), LOOKUP_TIMEOUT_MS);
+    let answer: TerminalOutcome;
+    try {
+      answer = await this.ask(
+        'getLastTransaction',
+        { db_ref_no: refNo },
+        (code) => code === '000',
+        timeout.signal,
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+    if (answer.outcome === 'UNKNOWN') return { found: 'UNKNOWN', message: answer.message };
+    const told = isRecord(answer.response) ? answer.response.response : null;
+    const fields = isRecord(told) ? told : {};
+    if (answer.outcome === 'APPROVED') {
+      // An answer about another reference says nothing of this one.
+      if (text(fields.db_ref_no) !== refNo) {
+        return { found: 'OTHER', response: answer.response, message: null };
+      }
+      return { found: 'APPROVED', response: answer.response, amount: text(fields.amount) };
+    }
+    if (answer.outcome === 'DECLINED' && fields.response_code === NOT_FOUND_CODE) {
+      return { found: 'NONE', response: answer.response };
+    }
+    return { found: 'OTHER', response: answer.response, message: answer.message };
+  }
+
   /** Sends one request, once. Nothing usable back — a broken connection, no JSON — is UNKNOWN. */
   private async ask(
     service: string,
     params: Record<string, string>,
     approved: (code: unknown) => boolean,
+    signal?: AbortSignal,
   ): Promise<TerminalOutcome> {
     let body: unknown;
     try {
@@ -159,6 +211,7 @@ export class KhanTerminal implements CardTerminalClient {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ service_name: service, service_params: params }),
+        ...(signal ? { signal } : {}),
       });
       body = await response.json();
     } catch (error) {

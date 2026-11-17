@@ -356,6 +356,19 @@ export class EdgeClient {
     return this.request<EdgeCardAttempt[]>('GET', '/card-attempts/open', { signal });
   }
 
+  /** This till's card charges and settlements of a day, newest first. */
+  cardAttempts(day: string, signal?: AbortSignal) {
+    const query = new URLSearchParams({ day }).toString();
+    return this.request<EdgeCardAttempt[]>('GET', `/card-attempts?${query}`, { signal });
+  }
+
+  /** Keeps what the terminal answered when asked about a charge's reference. */
+  saveCardLookup(id: string, response: unknown) {
+    return this.request<EdgeCardAttempt>('POST', `/card-attempts/${id}/lookup`, {
+      body: { response },
+    });
+  }
+
   beginCardSettlement(body: EdgeCardSettlementRequest) {
     return this.request<EdgeCardAttempt>('POST', '/card-settlements', { body });
   }

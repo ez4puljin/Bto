@@ -503,7 +503,10 @@ export const edgeCardAttempts = pgTable(
     /** The payment attempt the charge was made for; the sale that used it once `used_at` is set. */
     saleClientId: uuid('sale_client_id'),
     paymentTypeId: bigint('payment_type_id', { mode: 'number' }),
-    /** What the terminal is given as `db_ref_no`: the day and a number of this edge, digits only. */
+    /**
+     * What the terminal is given as `db_ref_no`: the day, a 9 and a five-digit number of this edge —
+     * 14 digits, so it never equals a reference Erxes sends the same terminal (the day and four).
+     */
     refNo: text('ref_no').notNull(),
     amount: money('amount').notNull(),
     /** The terminal as its service named it before the charge. */
@@ -512,6 +515,8 @@ export const edgeCardAttempts = pgTable(
     source: text('source').$type<CardAttemptSource>(),
     /** The terminal's answer exactly as the browser received it. */
     response: jsonValue('response').$type<unknown>(),
+    /** The terminal's answer to `getLastTransaction` for `ref_no`, when the till asked (0010). */
+    lookup: jsonValue('lookup').$type<unknown>(),
     message: text('message'),
     createdAt: createdAt(),
     answeredAt: timestamp('answered_at', { withTimezone: true }),
