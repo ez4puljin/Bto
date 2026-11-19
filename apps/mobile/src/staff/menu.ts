@@ -12,6 +12,7 @@ export type MenuKey =
   | 'transfers'
   | 'expiry'
   | 'counts'
+  | 'labels'
   | 'productNew'
   | 'attendance'
   | 'attendanceRequests'
@@ -57,6 +58,8 @@ export function menuOf(me: Rights): MenuGroup[] {
         ...(mayRequestTransfers(me) ? [{ key: 'transfers' as const, href: '/transfers' }] : []),
         { key: 'expiry', href: '/expiry' },
         { key: 'counts', href: '/counts' },
+        // «Үнийн шошго»: the store seller's, who prints the labels of their till's products.
+        ...(mayRequestTransfers(me) ? [{ key: 'labels' as const, href: '/labels' }] : []),
         ...(mayRegisterProducts(me) ? [{ key: 'productNew' as const, href: '/products/new' }] : []),
       ],
     },

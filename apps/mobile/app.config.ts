@@ -44,6 +44,8 @@ const location = [
   'android.permission.ACCESS_COARSE_LOCATION',
 ];
 
+const bluetooth = ['android.permission.BLUETOOTH', 'android.permission.BLUETOOTH_CONNECT'];
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: variant.name,
@@ -68,6 +70,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     permissions: [
       'android.permission.CALL_PHONE',
       ...(selfUpdate ? ['android.permission.REQUEST_INSTALL_PACKAGES'] : []),
+      // «Үнийн шошго» (staff only): the printers already paired with the phone. Android 12+ asks
+      // BLUETOOTH_CONNECT at the first use; the older BLUETOOTH covers Android 11 and below. Nothing
+      // is scanned for, so neither BLUETOOTH_SCAN nor the location is needed.
+      ...(variantName === 'staff' ? bluetooth : []),
     ],
     // The store map asks for the position only while it is open (foreground, the owner 2026-10-18);
     // the customer app never asks for it.
