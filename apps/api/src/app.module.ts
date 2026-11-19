@@ -13,6 +13,7 @@ import { PictureModule } from './integrations/picture';
 import { ScannerModule } from './integrations/scanner';
 import { AiHttpModule } from './modules/ai';
 import { CatalogHttpModule } from './modules/catalog';
+import { ChatHttpModule } from './modules/chat';
 import { EbarimtHttpModule } from './modules/ebarimt';
 import { EbarimtCheckHttpModule } from './modules/ebarimt-check';
 import { CustomerHttpModule } from './modules/customer';
@@ -71,6 +72,7 @@ import { SegmentsHttpModule } from './modules/segments';
     EbarimtHttpModule,
     ErkhetHttpModule,
     ErxesHttpModule,
+    ChatHttpModule,
   ],
 })
 export class AppModule {}

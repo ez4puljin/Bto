@@ -47740,6 +47740,762 @@
           "erxes"
         ]
       }
+    },
+    "/api/v1/customer-app/chat/open": {
+      "post": {
+        "operationId": "CustomerChat_open",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerChat"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "customer": []
+          }
+        ],
+        "summary": "Opens the chat screen: the conversation (made with the bot's greeting the first time), its\nnewest messages, the buttons to offer and the sales rep «Залгах» calls. Marks what waited as\nread.",
+        "tags": [
+          "customer-app"
+        ]
+      }
+    },
+    "/api/v1/customer-app/chat/messages": {
+      "get": {
+        "operationId": "CustomerChat_messages",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous (newer) page",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessagePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "customer": []
+          }
+        ],
+        "summary": "Older messages: pass `nextCursor` of the open call, then of each page.",
+        "tags": [
+          "customer-app"
+        ]
+      },
+      "post": {
+        "operationId": "CustomerChat_send",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerChatSendRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerChatSendResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "customer": []
+          }
+        ],
+        "summary": "The store writes a text or presses a button. While the bot answers, its answer comes back in\n`messages`; «Ажилтантай холбогдох» (`STAFF`) hands the conversation to staff. 429\nTOO_MANY_REQUESTS past 12 messages a minute; 422 for a button the bot does not offer now.",
+        "tags": [
+          "customer-app"
+        ]
+      }
+    },
+    "/api/v1/customer-app/chat/read": {
+      "post": {
+        "operationId": "CustomerChat_read",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerChatConversation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "customer": []
+          }
+        ],
+        "summary": "The store has seen the messages (the chat screen is open): its unread count goes to 0.",
+        "tags": [
+          "customer-app"
+        ]
+      }
+    },
+    "/api/v1/customer-app/chat/unread": {
+      "get": {
+        "operationId": "CustomerChat_unread",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerChatUnread"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "customer": []
+          }
+        ],
+        "summary": "The badge on the chat button: reads only, and opens nothing.",
+        "tags": [
+          "customer-app"
+        ]
+      }
+    },
+    "/api/v1/customer-app/chat/live": {
+      "get": {
+        "operationId": "CustomerChat_live",
+        "parameters": [
+          {
+            "name": "authorization",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server-sent events (ADR-0224 #7): ready, message and conversation (CustomerChatLiveEvent), resync, ping; ends at the token expiry"
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "customer": []
+          }
+        ],
+        "summary": "The store's live stream: `ready` (refetch with `open`), `message` and `conversation` (data:\nCustomerChatLiveEvent), `resync` (refetch) and `ping`; it ends at the token's expiry and the\nphone reconnects. The phone reads it over XHR, like the live stock.",
+        "tags": [
+          "customer-app"
+        ]
+      }
+    },
+    "/api/v1/chat/conversations": {
+      "get": {
+        "operationId": "StaffChat_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous (newer) page",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30,
+              "type": "number"
+            }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "description": "WAITING: awaiting an answer; STAFF: every conversation with staff; ALL: also those the bot answers (to take one over)",
+            "schema": {
+              "$ref": "#/components/schemas/ChatListState"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffChatPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The conversations with staff (or `state`), the latest message first.",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/chat/unread": {
+      "get": {
+        "operationId": "StaffChat_unread",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffChatUnread"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The badge: conversations awaiting an answer and the stores' unread messages.",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/chat/live": {
+      "get": {
+        "operationId": "StaffChat_live",
+        "parameters": [
+          {
+            "name": "authorization",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server-sent events (ADR-0224 #7): ready, message and conversation (StaffChatLiveEvent), resync, ping; ends at the token expiry"
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The staff's live stream: `ready` (refetch), `message` and `conversation` (data:\nStaffChatLiveEvent, only of the stores in the caller's scope), `resync` (refetch) and `ping`;\nit ends at the token's expiry.",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/chat/conversations/{id}": {
+      "get": {
+        "operationId": "StaffChat_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffChatConversation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/chat/conversations/{id}/messages": {
+      "get": {
+        "operationId": "StaffChat_messages",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous (newer) page",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessagePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The newest messages, oldest first; `nextCursor` reads the older ones.",
+        "tags": [
+          "chat"
+        ]
+      },
+      "post": {
+        "operationId": "StaffChat_reply",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffChatReplyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffChatReplyResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A staff answer. Answering a conversation the bot still holds takes it over (ADR-0224 #6): the\nbot is silent until somebody closes it.",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/chat/conversations/{id}/read": {
+      "post": {
+        "operationId": "StaffChat_read",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffChatConversation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The caller has seen the store's messages: the conversation's unread count goes to 0.",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/chat/conversations/{id}/close": {
+      "post": {
+        "operationId": "StaffChat_close",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffChatConversation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Closes the conversation: it goes back to the bot, the history stays (ADR-0224 #6).",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/chat/settings": {
+      "get": {
+        "operationId": "ChatSettings_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "chat"
+        ]
+      },
+      "put": {
+        "operationId": "ChatSettings_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatSettingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Writes all three texts; a null or empty one goes back to its default.",
+        "tags": [
+          "chat"
+        ]
+      }
     }
   },
   "info": {
@@ -48350,7 +49106,10 @@
           "reports.margins.view",
           "expiry.items.manage",
           "expiry.liability.manage",
-          "expiry.items.carry"
+          "expiry.items.carry",
+          "chat.answer",
+          "chat.answer_own",
+          "chat.settings.manage"
         ]
       },
       "RoleRef": {
@@ -98341,6 +99100,556 @@
           "data",
           "nextCursor"
         ]
+      },
+      "ChatMode": {
+        "type": "string",
+        "enum": [
+          "BOT",
+          "STAFF"
+        ],
+        "description": "Who answers now: the bot, or staff (the bot is then silent)"
+      },
+      "ChatButton": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque: sent back as `buttonId`. The scripted bot offers ORDER_STATUS, DELIVERY_INFO, BALANCE, HOURS_ADDRESS and STAFF"
+          },
+          "label": {
+            "type": "string",
+            "description": "The Mongolian text on the button"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ]
+      },
+      "CustomerChatConversation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "mode": {
+            "description": "Who answers now: the bot, or staff (the bot is then silent)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChatMode"
+              }
+            ]
+          },
+          "awaitingStaff": {
+            "type": "boolean",
+            "description": "With staff, and nobody has answered the store’s last message yet"
+          },
+          "unread": {
+            "type": "number",
+            "description": "Messages that reached the store unasked and unread: staff answers and the closing note"
+          },
+          "handedOffAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "buttons": {
+            "description": "The buttons to offer now: the bot’s latest, «Ажилтантай холбогдох» last; empty while staff answer",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatButton"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "mode",
+          "awaitingStaff",
+          "unread",
+          "handedOffAt",
+          "buttons"
+        ]
+      },
+      "ChatSender": {
+        "type": "string",
+        "enum": [
+          "CUSTOMER",
+          "BOT",
+          "STAFF"
+        ]
+      },
+      "ChatMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "conversationId": {
+            "type": "number"
+          },
+          "sender": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChatSender"
+              }
+            ]
+          },
+          "staffUserId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The staff member of a STAFF message"
+          },
+          "staffName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Their full name"
+          },
+          "body": {
+            "type": "string",
+            "description": "Plain text; line breaks are `\\n`"
+          },
+          "buttons": {
+            "nullable": true,
+            "description": "The quick replies a BOT message carried when it was written; null = none",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatButton"
+            }
+          },
+          "buttonId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The button a CUSTOMER message pressed (its label is the body); null = typed text"
+          },
+          "flowNode": {
+            "type": "string",
+            "nullable": true,
+            "description": "The step of the bot’s flow that wrote a BOT message: GREETING, ORDER_STATUS, DELIVERY_INFO, BALANCE, HOURS_ADDRESS, HANDOFF, FALLBACK or CLOSED"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "conversationId",
+          "sender",
+          "staffUserId",
+          "staffName",
+          "body",
+          "buttons",
+          "buttonId",
+          "flowNode",
+          "createdAt"
+        ]
+      },
+      "CustomerChatLiveEvent": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/CustomerChatConversation"
+          },
+          "message": {
+            "nullable": true,
+            "description": "The new message of a `message` event; null on a `conversation` event",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChatMessage"
+              }
+            ]
+          }
+        },
+        "required": [
+          "conversation",
+          "message"
+        ]
+      },
+      "CustomerChatRep": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "description": "E.164; null when none is on record"
+          }
+        },
+        "required": [
+          "name",
+          "phone"
+        ]
+      },
+      "CustomerChat": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/CustomerChatConversation"
+          },
+          "messages": {
+            "description": "The newest messages, oldest first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "For `GET customer-app/chat/messages`: the older messages; null = none"
+          },
+          "rep": {
+            "nullable": true,
+            "description": "«Залгах»: the store’s sales rep (the weekly round it stands on); null = none, the app then shows «Холбоо барих»",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerChatRep"
+              }
+            ]
+          }
+        },
+        "required": [
+          "conversation",
+          "messages",
+          "nextCursor",
+          "rep"
+        ]
+      },
+      "ChatMessagePage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "Oldest first within the page",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "The cursor of the page of older messages; null = the conversation starts here"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "CustomerChatSendRequest": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "A typed message (characters, trimmed). Exactly one of `text` and `buttonId`"
+          },
+          "buttonId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The id of a pressed button, one of `conversation.buttons`"
+          }
+        }
+      },
+      "CustomerChatSendResult": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/CustomerChatConversation"
+          },
+          "messages": {
+            "description": "The store’s message, then the bot’s answer when it gave one",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            }
+          }
+        },
+        "required": [
+          "conversation",
+          "messages"
+        ]
+      },
+      "CustomerChatUnread": {
+        "type": "object",
+        "properties": {
+          "unread": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "unread"
+        ]
+      },
+      "StaffChatRep": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "StaffChatConversation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "customerId": {
+            "type": "number"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "customerCode": {
+            "type": "string"
+          },
+          "mode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChatMode"
+              }
+            ]
+          },
+          "awaitingStaff": {
+            "type": "boolean",
+            "description": "With staff, and nobody has answered the store’s last message yet"
+          },
+          "unread": {
+            "type": "number",
+            "description": "The store’s messages no staff member has seen since the hand-off"
+          },
+          "handedOffAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "closedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "The last close"
+          },
+          "lastMessage": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChatMessage"
+              }
+            ]
+          },
+          "reps": {
+            "description": "The sales reps on whose weekly round the store stands",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaffChatRep"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "customerId",
+          "customerName",
+          "customerCode",
+          "mode",
+          "awaitingStaff",
+          "unread",
+          "handedOffAt",
+          "closedAt",
+          "lastMessage",
+          "reps"
+        ]
+      },
+      "StaffChatLiveEvent": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/StaffChatConversation"
+          },
+          "message": {
+            "nullable": true,
+            "description": "The new message of a `message` event; null on a `conversation` event",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChatMessage"
+              }
+            ]
+          }
+        },
+        "required": [
+          "conversation",
+          "message"
+        ]
+      },
+      "ChatListState": {
+        "type": "string",
+        "enum": [
+          "WAITING",
+          "STAFF",
+          "ALL"
+        ]
+      },
+      "StaffChatPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaffChatConversation"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "StaffChatUnread": {
+        "type": "object",
+        "properties": {
+          "waiting": {
+            "type": "number",
+            "description": "Conversations awaiting a staff answer"
+          },
+          "unread": {
+            "type": "number",
+            "description": "The stores’ unread messages in the conversations with staff"
+          }
+        },
+        "required": [
+          "waiting",
+          "unread"
+        ]
+      },
+      "StaffChatReplyRequest": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "Characters, trimmed"
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "StaffChatReplyResult": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/StaffChatConversation"
+          },
+          "message": {
+            "$ref": "#/components/schemas/ChatMessage"
+          }
+        },
+        "required": [
+          "conversation",
+          "message"
+        ]
+      },
+      "ChatTexts": {
+        "type": "object",
+        "properties": {
+          "greeting": {
+            "type": "string"
+          },
+          "deliveryText": {
+            "type": "string"
+          },
+          "hoursText": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "greeting",
+          "deliveryText",
+          "hoursText"
+        ]
+      },
+      "ChatSettings": {
+        "type": "object",
+        "properties": {
+          "greeting": {
+            "type": "string",
+            "nullable": true,
+            "description": "null = the default is in force"
+          },
+          "deliveryText": {
+            "type": "string",
+            "nullable": true,
+            "description": "«Хүргэлтийн мэдээлэл»"
+          },
+          "hoursText": {
+            "type": "string",
+            "nullable": true,
+            "description": "«Ажлын цаг, хаяг»"
+          },
+          "defaults": {
+            "description": "What the bot says where a text is null",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChatTexts"
+              }
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "greeting",
+          "deliveryText",
+          "hoursText",
+          "defaults",
+          "updatedAt"
+        ]
+      },
+      "ChatSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "greeting": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000,
+            "description": "Characters, trimmed; null or empty = back to the default"
+          },
+          "deliveryText": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000,
+            "description": "Characters, trimmed; null or empty = back to the default"
+          },
+          "hoursText": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000,
+            "description": "Characters, trimmed; null or empty = back to the default"
+          }
+        }
       },
       "ErrorCode": {
         "type": "string",

@@ -131,6 +131,11 @@ export const PERMISSIONS = [
   'expiry.items.manage',
   'expiry.liability.manage',
   'expiry.items.carry',
+  // The customer chat of «Bto300» (ADR-0224): answering and closing every store's conversation;
+  // only those of the stores on one's own weekly round (the sales rep); the bot's three texts.
+  'chat.answer',
+  'chat.answer_own',
+  'chat.settings.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -207,6 +212,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'pos.loyalty.manage',
     // What happens to goods near their date (ADR-0172 #4).
     'expiry.items.manage',
+    // The office answers the stores' chat when a store asks for a person (ADR-0224 #5).
+    'chat.answer',
   ],
   // Purchase orders by supplier (ADR-0115): managers and senior staff hold this role.
   PROCUREMENT: [
@@ -297,7 +304,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
   ],
   // The rep app only (ADR-0061 #5): not sales.orders.read/manage (other orders), not
   // partners.customers.read (credit data); /sales-rep/* serves what an order needs.
-  SALES_REP: ['sales.orders.rep'],
+  // The chat of the stores on the rep's own round, nobody else's (ADR-0224 #5).
+  SALES_REP: ['sales.orders.rep', 'chat.answer_own'],
   // The staff app's «Ачилт» only (ADR-0179): the picked orders to load, no other order data.
   DRIVER: ['sales.orders.load'],
 };

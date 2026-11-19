@@ -50,8 +50,14 @@ describe('permission catalog', () => {
 });
 
 describe('the sales rep (ADR-0061)', () => {
-  it('holds the rep app only: no other order, no credit data', () => {
-    expect(SYSTEM_ROLE_PERMISSIONS.SALES_REP).toEqual(['sales.orders.rep']);
+  it('holds the rep app and its own stores’ chat only: no other order, no credit data', () => {
+    // ADR-0224 #5 added the chat of the stores on the rep's own round.
+    expect(SYSTEM_ROLE_PERMISSIONS.SALES_REP).toEqual(['sales.orders.rep', 'chat.answer_own']);
+    for (const role of SYSTEM_ROLES) {
+      if (role === 'SALES_REP') continue;
+      const all = role === 'ADMIN';
+      expect(SYSTEM_ROLE_PERMISSIONS[role].includes('chat.answer_own')).toBe(all);
+    }
     for (const role of SYSTEM_ROLES) {
       if (role === 'ADMIN' || role === 'SALES_REP') continue;
       expect(SYSTEM_ROLE_PERMISSIONS[role]).not.toContain('sales.orders.rep');

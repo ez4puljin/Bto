@@ -785,6 +785,13 @@
       "when": 1795067681896,
       "tag": "0113_erkhet_stock_by_location",
       "breakpoints": true
+    },
+    {
+      "idx": 112,
+      "version": "7",
+      "when": 1795073359794,
+      "tag": "0114_chat",
+      "breakpoints": true
     }
   ]
 }

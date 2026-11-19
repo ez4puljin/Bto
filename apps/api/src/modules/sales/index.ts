@@ -53,6 +53,8 @@ export {
   SalesOrderQueryService,
   type StageCards,
 } from './services/sales-order-query.service';
+// The reps' weekly rounds, read by the chat: a store's reps and a rep's stores (ADR-0224).
+export { RepVisitsService } from './services/rep-visits.service';
 export {
   type RepProduct,
   type RepProductQuery,

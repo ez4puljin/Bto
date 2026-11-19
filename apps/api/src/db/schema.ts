@@ -263,6 +263,7 @@ export {
   ebarimtCheckReceiptLinks,
   ebarimtCheckSupplierProfiles,
 } from '../modules/ebarimt-check/schema';
+export { chatConversations, chatMessages, chatSettings } from '../modules/chat/schema';
 export { ebarimtReceipts } from '../modules/ebarimt/schema';
 export {
   erkhetLedgerAllocations,

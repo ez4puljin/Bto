@@ -7,7 +7,7 @@ import {
   WEEKDAYS,
 } from '@tugeel/shared/sales';
 import { businessDate } from '@tugeel/shared/time';
-import { and, asc, desc, eq, gte, lt, lte, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lt, lte, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -96,6 +96,34 @@ export class RepVisitsService {
     return staff
       .filter((user) => holders.has(user.id))
       .map((user) => ({ id: user.id, fullName: user.fullName }));
+  }
+
+  /** The stores on a rep's round, whatever the weekday, ascending (the chat's scope, ADR-0224). */
+  async roundCustomerIds(userId: number): Promise<number[]> {
+    const rows = await this.db
+      .selectDistinct({ customerId: repVisitPlans.customerId })
+      .from(repVisitPlans)
+      .where(eq(repVisitPlans.userId, userId))
+      .orderBy(asc(repVisitPlans.customerId));
+    return rows.map((row) => row.customerId);
+  }
+
+  /**
+   * The users on whose round each of these stores stands, lowest user id first (ADR-0224): «the
+   * store's sales rep», a customer having no rep of its own. A store on no round has no entry.
+   */
+  async roundRepIds(customerIds: readonly number[]): Promise<Map<number, number[]>> {
+    const ids = [...new Set(customerIds)];
+    if (ids.length === 0) return new Map<number, number[]>();
+    const rows = await this.db
+      .selectDistinct({ customerId: repVisitPlans.customerId, userId: repVisitPlans.userId })
+      .from(repVisitPlans)
+      .where(inArray(repVisitPlans.customerId, ids))
+      .orderBy(asc(repVisitPlans.customerId), asc(repVisitPlans.userId));
+    const reps = new Map<number, number[]>();
+    for (const row of rows)
+      reps.set(row.customerId, [...(reps.get(row.customerId) ?? []), row.userId]);
+    return reps;
   }
 
   private async customersOf(ids: readonly number[]): Promise<Map<number, VisitCustomer>> {

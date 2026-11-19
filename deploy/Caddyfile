@@ -5,9 +5,9 @@
 }
 
 (common) {
-	# The apps' live stock streams (ADR-0173 #4, text/event-stream) are never compressed: an encoder
-	# buffers, and every event must reach the phone at once.
-	@compressible not path */stock/live
+	# The apps' live stock streams (ADR-0173 #4, text/event-stream) and the chat's (ADR-0224 #7) are
+	# never compressed: an encoder buffers, and every event must reach the phone at once.
+	@compressible not path */stock/live */chat/live
 	encode @compressible zstd gzip
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"

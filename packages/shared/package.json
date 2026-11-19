@@ -67,6 +67,11 @@
       "types": "./dist/erkhet/index.d.ts",
       "default": "./dist/erkhet/index.js"
     },
+    "./chat": {
+      "@tugeel/source": "./src/chat/index.ts",
+      "types": "./dist/chat/index.d.ts",
+      "default": "./dist/chat/index.js"
+    },
     "./expiry": {
       "@tugeel/source": "./src/expiry/index.ts",
       "types": "./dist/expiry/index.d.ts",
