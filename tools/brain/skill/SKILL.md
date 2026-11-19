@@ -78,6 +78,25 @@ words. You direct the work; workers do it. Decided in ADR-0213; the tools are in
 9. **Tell the owner**, in Mongolian: what changed, where to look (menu and page), and when it is on
    `app.puljika.site` (about a minute for pages, about five for anything else).
 
+## Jobs that run once (ADR-0229)
+
+An APK (the staff app `apk-staff`, «Bto300» `apk-customer`) is built once for every change that
+waits for it, by the job desk, never by you or a worker:
+
+- After landing a task that is part of an APK (`land.sh` prints `JOBS: this changes apk-staff …`),
+  and when the owner wants the APK: `bash ~/bto-dev/tools/brain/job.sh request <kind> --by brain`,
+  with `--publish` when the owner wants the phones to be offered it (the owner's words decide; ask
+  if they do not say). Several tasks of one request: land them all first, then request once.
+- Tell the owner what the desk answered: `STARTED` (built now, about ten minutes), `JOINED` (the
+  build running now has it), `ALREADY` (the last build has it), or `QUEUED` with whom it waits for
+  (a task still working, `~/bto-dev` with unfinished app files, another session's `want`). A queued
+  build starts by itself when the last of them has landed or let go; `job.sh status` shows where it
+  stands, the APK's file and whether it was published.
+- The owner wants it now regardless: `job.sh run <kind> [--publish] --by owner`.
+- Never `pnpm mobile:apk` or `pnpm mobile:publish` (they refuse in `~/bto-dev` and the copies), and
+  no version bump just for a build (a new build is offered to the phones anyway). A version bump the
+  owner asks for is a task like any other, landed before the request.
+
 ## The brief you give a worker
 
 ```

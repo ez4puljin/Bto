@@ -1,0 +1,14 @@
+[Unit]
+Description=Bto job desk: start the joint jobs that are due (tools/brain/job.sh tick, ADR-0229)
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/bto-dev
+Environment=PATH=%h/.local/opt/node/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env bash %h/bto-dev/tools/brain/job.sh tick
+Nice=15
+CPUWeight=20
+IOWeight=20
+# A build tick starts runs on in the background for about ten minutes: only tick itself is stopped.
+KillMode=process
+TimeoutStartSec=300

@@ -122,6 +122,13 @@ for attempt in 1 2 3; do
       rm -f "$STATE/lanes/$slug"
       [ ! -f "$STATE/numbers" ] || sed -i "/ $slug\$/d" "$STATE/numbers"
     done
+    # The job desk (ADR-0229): these tasks no longer hold a job, so one that waited for them may
+    # start now. In the background; it never delays or fails a landing.
+    nohup bash "$BRAIN_DIR/job.sh" tick &>/dev/null 9>&- &
+    kinds=$(bash "$BRAIN_DIR/job.sh" kinds-of "${files[@]}" 2>/dev/null | tr '\n' ' ' || true)
+    if [ -n "$kinds" ]; then
+      echo "JOBS: this changes ${kinds% }. Ask for each: bash $BRAIN_DIR/job.sh request <kind> [--publish] (one build for every change that waits)."
+    fi
     exit 0
   fi
   echo "main moved while landing (try $attempt); starting again on the new main"

@@ -8,8 +8,12 @@
 //      and the production install out of the checkout `pnpm dev` is serving.
 //   3. `expo prebuild --clean` generates apps/mobile/android in the mirror, then Gradle builds.
 //   4. The APK is copied to apps/mobile/build/apk/ in the repository.
+// On the Ubuntu PC an APK is built by the job desk (ADR-0229: `bash ~/bto-dev/tools/brain/job.sh
+// request apk-staff [--publish]`), once for every change that has landed, in a clean copy of
+// origin/main: run by hand in ~/bto-dev or a task's copy this script refuses, unless --here.
 // Options: --variant staff|customer (variants.json; the staff app unless named), --debug (a debug
-// APK instead of release). Environment: BTO_SERVER (the address the app
+// APK instead of release), --here (build from this checkout on purpose, outside the desk, e.g. for
+// an emulator test). Environment: BTO_SERVER (the address the app
 // starts with, default http://<this PC's office-network address>:3300), BTO_ABIS (the native ABIs, default
 // arm64-v8a,armeabi-v7a; x86_64 for the Android emulator), BTO_JAVA_HOME, ANDROID_HOME.
 import { spawnSync } from 'node:child_process';
@@ -39,6 +43,7 @@ import {
   versionCodeAt,
 } from './apk-env.mjs';
 import { EXPO_ENV } from './expo.mjs';
+import { deskRefusal, jobsDirOf, runningJobs } from '../../../tools/brain/jobs/desk.mjs';
 
 const appRoot = path.resolve(import.meta.dirname, '..');
 const workspaceRoot = path.resolve(appRoot, '../..');
@@ -109,6 +114,20 @@ function withJava(env, javaHome) {
 
 if (!WINDOWS && process.platform !== 'linux') {
   fail('This script builds on Windows or Linux only.');
+}
+
+const refusal = deskRefusal({
+  action: 'build',
+  kind: `apk-${variantName}`,
+  root: workspaceRoot,
+  home: os.homedir(),
+  env: process.env,
+  argv: process.argv.slice(2),
+  running: runningJobs(jobsDirOf(os.homedir(), process.env)),
+});
+if (refusal) fail(refusal);
+if (process.argv.includes('--here') && process.env.BTO_JOB_DESK !== '1') {
+  console.log('  --here: built from this checkout, outside the job desk (ADR-0229)');
 }
 
 step('Checking Java and the Android SDK');

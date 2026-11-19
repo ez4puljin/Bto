@@ -2,8 +2,8 @@
 # Puts the brain where every Claude session on this PC finds it (ADR-0213): the workers' and the
 # reviewer's definitions in ~/.claude/agents, the brain's own rules as the skill `tarhi` in
 # ~/.claude/skills, the guard as a PreToolUse hook in ~/.claude/settings.json, git's merge of
-# mn.json by key, and the monitor's page as the user service bto-brain-monitor. Run it again after
-# changing anything under tools/brain/.
+# mn.json by key, the monitor's page as the user service bto-brain-monitor, and the job desk's
+# one-minute timer bto-brain-jobs (ADR-0229). Run it again after changing anything under tools/brain/.
 #   bash tools/brain/install.sh
 set -euo pipefail
 # shellcheck source=tools/brain/lib.sh
@@ -49,6 +49,23 @@ else
 fi
 LAN=$(hostname -I 2>/dev/null | awk '{ print $1 }')
 echo "monitor: http://${LAN:-localhost}:3310"
+# The job desk (job.sh, ADR-0229): a timer runs «job.sh tick» every minute, so a job that waits for
+# a direct session's push or a `done` starts by itself. tick returns at once; a build it starts runs
+# on in the background (KillMode=process).
+mkdir -p "$HOME/.config/systemd/user"
+for unit in bto-brain-jobs.service bto-brain-jobs.timer; do
+  cp "$BRAIN_DIR/jobs/$unit" "$HOME/.config/systemd/user/$unit"
+done
+if command -v systemctl >/dev/null && systemctl --user daemon-reload 2>/dev/null; then
+  systemctl --user enable -q --now bto-brain-jobs.timer 2>/dev/null ||
+    echo "warning: could not enable bto-brain-jobs.timer" >&2
+  if [ "$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null)" != "yes" ]; then
+    echo "warning: the timer runs only while you are signed in; once: sudo loginctl enable-linger $(id -un)" >&2
+  fi
+else
+  echo "warning: systemctl --user is not available; run «bash tools/brain/job.sh tick» after a push" >&2
+fi
+echo "jobs:    bash tools/brain/job.sh status (timer bto-brain-jobs, every minute)"
 # The code graph (graph.sh): never installed or built from here; the build takes three minutes.
 if ! command -v graphify >/dev/null && [ ! -x "$HOME/.local/bin/graphify" ]; then
   echo "graph:   graphify is missing; install it once with «uv tool install graphifyy»"

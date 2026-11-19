@@ -36,17 +36,19 @@ bash tools/brain/land.sh <slug>…                   land finished tasks: one co
 bash tools/brain/land.sh --no-push <slug>…         merge and check only
 bash tools/brain/int.sh <pattern>… | --integrity   the api's suites from a copy, one run at a time
 bash tools/brain/graph.sh explain|affected|path …  the code graph of origin/main (below)
+bash tools/brain/job.sh request|want|done|status|tick|run …   the job desk: an APK once for all (below)
 node tools/brain/monitor/serve.mjs                  the monitor page on :3310 (a user service; below)
 ```
 
 `land.sh` exits 0 when landed, 3 on a conflict, 4 when the check is red, 5 when a task is not
 committed; nothing is pushed unless it exits 0. After a push it fast-forwards `~/bto-dev` when
 nothing there is in the way (the development server then shows the change), says whether the real
-system takes a minute (pages only) or five, and names a landed migration.
+system takes a minute (pages only) or five, names a landed migration, starts the job desk's
+`tick` in the background and names the jobs (APKs) the landing is part of.
 
 The books are in `~/bto-work/.brain/`: `lanes/<slug>` (the paths a task holds), `numbers`, `log`
-(every landing), `land-check.log` (the last check). The gate is `~/bto-work/_gate`, a worktree that
-stands at `origin/main` between landings.
+(every landing), `land-check.log` (the last check), `jobs/` (the job desk, below). The gate is
+`~/bto-work/_gate`, a worktree that stands at `origin/main` between landings.
 
 ## The reviewer and the guard
 
@@ -67,7 +69,106 @@ rewritten for Bto; no file or dependency of it is used.
   `main`; and any command naming 15433 run from `~/bto-dev` or `~/bto-work`. In `~/bto` only
   `down -v` is blocked. Only clear cases: quoted text, heredocs and comments are not commands, and
   any input it cannot read lets the command run. A blocked command is fixed, never worked around.
+  While the job desk builds an APK it also stops `./gradlew` under `~/Android` and
+  `expo run:android` (ADR-0229).
   The tests are in `brain.test.mjs`.
+
+## Jobs that run once: the job desk (ADR-0229)
+
+Some work must run once after several sessions' changes, not once per session: first of all the
+APKs of the staff app and of «Bto300» (ten minutes each, one at a time on this PC, since both use
+`~/Android/m` and Gradle). Owner, 2026-11-20: a session that wants an APK asks first; if nobody is
+about to change the app it builds at once, otherwise it waits and ONE build carries everything.
+`job.sh` is that desk.
+
+```
+bash tools/brain/job.sh request <kind> [--publish] [--by <who>] [--commit <sha>]
+bash tools/brain/job.sh want <kind> --by <who> [--note <text>]
+bash tools/brain/job.sh done <kind> --by <who>
+bash tools/brain/job.sh status [<kind>]
+bash tools/brain/job.sh tick
+bash tools/brain/job.sh run <kind> [--publish] [--by <who>]
+bash tools/brain/job.sh kinds-of <path>…
+```
+
+- **`request`** is called once the change is on `origin/main`. The answer's first word says what
+  happened: `STARTED` (nobody holds it: it runs now, in the background at `nice 15`; the line says
+  where the log and the APK will be), `JOINED` (a job of that kind is running and its commit already
+  carries the change: it is in that APK), `ALREADY` (the last finished job carries it; with
+  `--publish` an unpublished one is published now) — all exit 0 — or `QUEUED`, exit 3, with one
+  `waits for:` line per reason. A queued request starts by itself. Exit 1: the publish of an earlier
+  build failed; 64: usage. «Carries the change» means the job's commit contains the requested commit
+  (`origin/main` after a fetch, or `--commit`), or nothing between the two is part of the kind (a
+  document pushed in between does not need a new APK).
+- **Who holds a job (contributors):** a brain task whose held paths (books: `lanes/<slug>`) are part
+  of the kind, until it lands or is dropped; `~/bto-dev`'s own uncommitted files or unpushed commits
+  on such paths (a session working directly there); a `want` declared by such a session (`done`
+  lets go; the request of the same `--by` too). For the APKs a path is part of the kind when it is
+  under `apps/mobile/` (not a test or `.md` file), or under a folder `packages/shared/src/<x>` the
+  app uses: what `apps/mobile/app` and `apps/mobile/src` import as `@tugeel/shared/<x>` on
+  `origin/main` (read each time the desk runs; a bare `@tugeel/shared` would bring the index's
+  re-exports), and what those folders import of each other in turn (`sales` → `pos` → `finance`).
+  `packages/api-client` does not count: a regenerated schema needs no new APK, and a change of the
+  app's use of it is a change under `apps/mobile`. So an api task never holds an APK. `status` and
+  every `waits for:` line give each contributor's reason: the matching paths and why each is part
+  of the kind. A contributor with no sign of work (a file written, a commit, the claim, the want)
+  for the kind's idle limit (2 hours) stops holding; `status` still shows it as `idle`. A build
+  started by hand (`build-apk.mjs`, Gradle's wrapper) also keeps the desk waiting.
+- **`run`** is the owner's override: now, whoever holds it. Still one job of a group at a time.
+- **`tick`** starts every job that is due (a request waits, nobody holds it, nothing of its group
+  runs). `land.sh` runs it in the background after every landing, `done` runs it, a finished job runs
+  it, and the user timer `bto-brain-jobs.timer` runs it every minute (so a direct session's push
+  also lets a waiting job start). Every command that changes the books takes `jobs/desk.lock`, so
+  two ticks at once start one job.
+- **Other sessions' checkouts are only read:** every git command of the desk runs with
+  `GIT_OPTIONAL_LOCKS=0`, so its `git status` of `~/bto-dev` or a task's copy never takes their
+  `index.lock` (which would make their own `git add` fail at that moment).
+- **Where it runs:** never in `~/bto-dev`. Its own worktree `~/bto-work/_jobs/<group>`
+  (`_jobs/android` for the APKs), set to the `origin/main` fetched just before the start, so one job
+  carries everything landed so far; `node_modules` hard-linked and `apps/api/.env` copied as for a
+  task. The command runs with `BTO_JOB_DESK=1` and the kind's `JOB_ENV`. The newest file matching the
+  kind's `ARTIFACT` is copied to the same place in `~/bto-dev` (`apps/mobile/build/apk/`,
+  gitignored); its path and the commit go into the books.
+- **Publishing:** only when at least one request the job carries asked `--publish` (`status` says
+  `publish: yes|no`, and `now publishing` while it does; the last job's `published` is `yes`, `no`
+  or `failed`). The job publishes before it lets go of its record, so nothing else of its group
+  starts (and resets the copy the publish runs from) until the publish is over; a request that
+  joins meanwhile is published too. For the APKs
+  this is `publish-apk.mjs --storage /var/lib/docker/volumes/bto-store_storage/_data` through
+  `sudo -n` (the volume is root's), then `chown -R 1000:1000` of `releases/<variant>`, as the
+  releases since 0.19.0 were published. The APKs are built with
+  `BTO_SERVER=https://app.puljika.site`, as those releases were.
+- **A failed job** (the command exited non-zero, made no artifact, or ran past the kind's time
+  limit, 45 minutes for an APK: then all its processes are stopped and `status` says so) is
+  recorded with its log and is not tried again by itself: its requests are spent. A new `request`
+  or `run` tries again. A request that joins a running job adds only itself to it; requests
+  waiting for a later commit stay for the next job.
+- **A job that died** (its process is gone without an exit: the PC restarted, it was killed) is not
+  a failed one: the next `tick` puts its requests, `--publish` included, back in the queue ahead of
+  newer ones, once (books: `died`), and starts it again when nobody holds it. A second death in a
+  row is recorded as failed and stops. Any job that ends by itself clears the mark.
+- **Versions are not bumped by the desk.** `apps/mobile/package.json` and `variants.json` change
+  only in a task (their push is a whole update of the real system); every build's `versionCode`
+  (minutes since 2026-01-01) is higher than the last, so phones are offered it anyway.
+- **By hand:** `pnpm mobile:apk` and `pnpm mobile:publish` refuse in `~/bto-dev` and in a task's copy
+  (`jobs/desk.mjs`) and print the `job.sh request` line; `-- --here` builds or publishes from that
+  checkout on purpose (an emulator test), outside the desk, and is refused while the desk builds.
+  The guard also stops `./gradlew` under `~/Android` and `expo run:android` while the desk builds.
+  Another PC (the Windows laptop) is not affected.
+
+The books are in `~/bto-work/.brain/jobs/`: per kind `requests` (waiting), `running` and `carried`
+(the running job and the requests it carries), `died` (the last job died once), `last` (status, reason, commit, artifact, published,
+for whom, log), `wants/<who>`, `logs/<id>.log` (the last 20); and `log`, one line per finished job.
+
+**A new kind** is one file, `tools/brain/jobs/<kind>.job` (bash, sourced by `job.sh`;
+`apk-staff.job` explains every name): `TITLE`, `GROUP` (one job of a group at a time),
+`CONTRIBUTORS` (repository paths), `SHARED_IMPORTED_BY` (optional: folders whose
+`@tugeel/shared/<x>` imports also count) and `EXCLUDE` (patterns of files under them that do not count),
+`COMMAND` (run in the desk's copy), `JOB_ENV`, `ARTIFACT` (optional), `PUBLISH` (optional; gets
+`$ARTIFACT`), `IDLE_HOURS`, `TIME_LIMIT_MINUTES` (default 45), `BUSY_PATTERN` (optional: processes that mean the same work runs by
+hand). A design-system artifact or a rebuild of the development database would be such a file. Its
+test goes into `brain.test.mjs` (the tests replace the command with `BTO_JOB_COMMAND`, the publish
+with `BTO_JOB_PUBLISH`, and run against a scratch repository and scratch books).
 
 ## The monitor: the brain's work on one page
 

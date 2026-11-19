@@ -3,7 +3,9 @@
 // (written last and renamed into place, so a phone never reads a half-written one), then the older
 // APKs go. <storage> is the api's STORAGE_LOCAL_DIR, by default this checkout's .data/storage.
 // A file without the phones' code is refused (an emulator's x86_64 build installs on no phone);
-// --emulator allows one for a test on the Android emulator.
+// --emulator allows one for a test on the Android emulator. On the Ubuntu PC the job desk publishes
+// (ADR-0229: `bash ~/bto-dev/tools/brain/job.sh request apk-staff --publish`): run by hand in
+// ~/bto-dev or a task's copy this script refuses, unless --here.
 import {
   copyFileSync,
   mkdirSync,
@@ -14,8 +16,10 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { hasPhoneCode, publishOptionsOf, releaseOf } from './apk-env.mjs';
+import { deskRefusal } from '../../../tools/brain/jobs/desk.mjs';
 
 const appRoot = path.resolve(import.meta.dirname, '..');
 const workspaceRoot = path.resolve(appRoot, '../..');
@@ -30,6 +34,15 @@ const { apk, storage, emulator } = publishOptionsOf(process.argv.slice(2));
 if (!apk) fail('Name the APK: pnpm mobile:publish -- apps/mobile/build/apk/<file>.apk');
 const release = releaseOf(path.basename(apk), variants);
 if (!release) fail(`${path.basename(apk)} is not a named release APK of variants.json's apps`);
+const refusal = deskRefusal({
+  action: 'publish',
+  kind: `apk-${release.variant}`,
+  root: workspaceRoot,
+  home: os.homedir(),
+  env: process.env,
+  argv: process.argv.slice(2),
+});
+if (refusal) fail(refusal);
 
 const bytes = readFileSync(apk);
 if (!emulator && !hasPhoneCode(bytes)) {

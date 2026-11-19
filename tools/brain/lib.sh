@@ -65,6 +65,7 @@ os.remove(path)  # a hard link: never write through it
 json.dump(data, open(path, "w"), indent=2)
 PY
   fi
+  mkdir -p "$dir/node_modules"
   modules_stamp >"$dir/node_modules/.brain-stamp"
 }
 

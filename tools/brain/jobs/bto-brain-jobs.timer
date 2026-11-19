@@ -1,0 +1,10 @@
+[Unit]
+Description=Bto job desk: look for a due joint job every minute (ADR-0229)
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=1min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

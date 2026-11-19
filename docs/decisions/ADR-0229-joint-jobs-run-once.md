@@ -1,0 +1,43 @@
+# ADR-0229: Joint jobs run once
+
+|           |                                                                                                                                         |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Status    | Accepted                                                                                                                                |
+| Date      | 2026-11-20                                                                                                                              |
+| Deciders  | Owner (2026-11-20: «Би олон session дээр apk дээр олон хүсэлт өгдөг. Зарим түрүүлж дуусаад apk build хийж байхад өөр session дуусаад дахин build хийх гэх мэт. Apk тухай өөр session асууж бусад session apk build хийхээргүй байвал шууд build хийж болно, хэрэв зарим нь apk дээр өөрчлөлт хийж эцэсдээ build хийх бол дууссаны дараа нэгтгэж нэг build хийх хэрэгтэй. Яг энэ ажлын систем бусад тохиолдолд ч тархи удирдаж ажиллах хэрэгтэй байна.»), Claude (the brain's session) |
+| Amends    | ADR-0213 (the brain: what happens after a task lands)                                                                                    |
+
+## Context
+
+The owner gives several sessions changes to the staff app and «Bto300» at once. Each session built its own APK when it finished (`pnpm mobile:apk`, about ten minutes): the first to finish built, another finished and built again, and the owner received several APKs, none with every change. Two builds at once also fight over the build mirror `~/Android/m` and Gradle. And a session built from `~/bto-dev`, which other sessions share, so its APK carried whatever they had left uncommitted under `apps/mobile`. Nothing told a session that another was about to build.
+
+The deploy timer (ADR-0204, ADR-0215) already batches pushes onto the real system, but the APK is built on this PC after the code lands, outside that path: a push of `apps/mobile` sources rebuilds nothing.
+
+## Decision
+
+1. **A job desk, `tools/brain/job.sh`.** A job that must run once after several sessions' changes is requested, not run. Kinds are files, `tools/brain/jobs/<kind>.job`; now `apk-staff` and `apk-customer`. A later kind (the design-system artifact, a rebuild of the development database) is one more file.
+2. **Contributors hold a job.** A kind names the paths that are part of it. For the APKs: `apps/mobile` (without tests and Markdown), and each folder `packages/shared/src/<x>` the app uses, read from `origin/main` whenever the desk runs (what `apps/mobile/app` and `apps/mobile/src` import as `@tugeel/shared/<x>`, then what those folders import of each other). `packages/api-client` does not count: a regenerated schema needs no new APK, and a change of the app's use of it is a change under `apps/mobile`; so an api task never holds an APK. A brain task whose held paths match holds it until it lands or is dropped; `~/bto-dev`'s own uncommitted files or unpushed commits under those paths hold it (a session working directly there); a session can declare `job.sh want` before it has written anything, and `done` lets go. A contributor with no sign of work for the kind's idle limit (two hours) stops holding.
+3. **`request` after the change is on main.** Nobody holds it: it starts now, in the background at low priority. A job of that kind is running: the request joins it only if the job's commit already carries the change (contains it, or nothing between them is part of the kind); otherwise it waits for the next. The last finished job carries it: nothing is built. Contributors hold it: the request waits and the job starts by itself when the last of them has landed or let go, carrying every waiting request. `run` is the owner's override: now, whoever holds it.
+4. **One job of a group at a time** (both APKs are group `android`); a build started by hand outside the desk also keeps the desk waiting. The desk only reads other sessions' checkouts, with `GIT_OPTIONAL_LOCKS=0`, so it never takes their `index.lock`.
+5. **Where a job runs:** the desk's own worktree `~/bto-work/_jobs/<group>`, set to `origin/main` fetched just before the start, so one job carries everything landed so far; never `~/bto-dev`. The APK is copied to `~/bto-dev/apps/mobile/build/apk/` and its file and commit go into the books (`~/bto-work/.brain/jobs/`). The APKs are built with `BTO_SERVER=https://app.puljika.site`, the address every published release since staff 0.19.0 was built with.
+6. **Publishing only when asked:** a job publishes (through `sudo -n` into the real system's storage volume, as before) only when at least one request it carries asked `--publish`; the books say which. It publishes while it still counts as running, so the next job of its group cannot reset the copy the publish runs from.
+7. **Triggers:** `land.sh` runs `job.sh tick` in the background after every landing and names the kinds a landing is part of; a user timer `bto-brain-jobs.timer` runs `tick` every minute, so a direct session's push or a `done` also lets a waiting job start. A failed job (its command exited non-zero, made no APK, or ran past the kind's time limit of 45 minutes, when all its processes are stopped) is recorded with its log and is not retried by itself: its requests are spent until a new `request` or `run`. A job that died (its process gone without an exit: a restart, a kill) is not a failure: its requests, `--publish` included, go back to the queue once and the next `tick` starts it again; a second death in a row is recorded as failed and stops.
+8. **By hand:** `pnpm mobile:apk` and `pnpm mobile:publish` refuse in `~/bto-dev` and in a task's copy without the desk's `BTO_JOB_DESK=1` and print the `job.sh request` line; `--here` builds or publishes from that checkout on purpose (an emulator test), outside the desk, and is refused while the desk builds. The guard (ADR-0213) stops `./gradlew` under `~/Android` and `expo run:android` while the desk builds. The brain requests after landing and reports the desk's answer to the owner; workers never build or publish an APK.
+9. **The desk bumps no version.** A push of `apps/mobile/package.json` is a whole update of the real system (ADR-0215), and every build's `versionCode` (minutes since 2026-01-01) is already higher than the last, so phones are offered it. A version bump the owner wants is a task, landed before the request.
+
+## Alternatives considered
+
+| Alternative                                         | Why rejected                                                                                                                        |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Each session builds its own APK (until today)        | Several ten-minute builds, none with every change; two at once break each other in `~/Android/m`.                                    |
+| A fixed nightly build                               | The owner tests a change the same day; a night's wait is too late, and most nights would build nothing new.                          |
+| The desk builds from `~/bto-dev`                     | It carries other sessions' uncommitted files; the APK would not match any commit on main.                                            |
+| Wait only for brain tasks, not for direct sessions   | Sessions still work directly in `~/bto-dev`; their unfinished app files are exactly the change a build must not miss or half-carry. |
+
+## Consequences
+
+The owner gets one APK for the changes made together, built from main, and is told who it waits for. A session that forgets to `done` holds a job at most two hours; `status` shows it with the paths that make it hold, and `run` overrides. A task changing a shared folder the app uses holds the APK until it lands; one changing only the api, the web or a shared folder the app does not use never does. A shared folder reached only through a path the scan does not follow (a dynamic import, a relative import from the app into `packages/`) is not counted: the app has none today. Publishing runs `sudo -n` from a user timer, which works because this PC's account may use sudo without a password; without it a publish is recorded as failed with its log. The timer needs the account's linger to run while nobody is signed in, as the deploy timer does.
+
+## Related
+
+ADR-0061, ADR-0085, ADR-0166, ADR-0187, ADR-0204, ADR-0213, ADR-0215, `tools/brain/job.sh`, `tools/brain/jobs/`, `tools/brain/README.md`, `docs/modules/mobile.md` §9.

@@ -1,0 +1,35 @@
+# shellcheck shell=bash disable=SC2034
+# The staff app's APK («Bto», variants.json `staff`): a kind of the job desk (ADR-0229,
+# tools/brain/README.md «Jobs that run once»). Sourced by job.sh; every name below is read there.
+
+TITLE="the staff app's APK (Bto)"
+# One job of a group at a time on this PC: both APKs share ~/Android/m and Gradle's cache.
+GROUP=android
+# A task holding one of these (or a folder holding one), uncommitted or unpushed files of ~/bto-dev
+# under them, or a declared `want` keeps the build waiting.
+CONTRIBUTORS=(apps/mobile)
+# Also the folders of packages/shared/src these folders import (`@tugeel/shared/<x>`, read from
+# origin/main whenever the desk runs, with what those folders import in turn). Not
+# packages/api-client: a regenerated schema needs no new APK, and a change of the app's use of it
+# is a change under apps/mobile.
+SHARED_IMPORTED_BY=(apps/mobile/app apps/mobile/src)
+# Files under them that are not in the APK (bash patterns on the whole path).
+EXCLUDE=('*.test.ts' '*.test.tsx' '*.test.mjs' '*.spec.ts' '*.md')
+# Run in the desk's own clean copy of origin/main, with BTO_JOB_DESK=1 and the variables of JOB_ENV.
+COMMAND='node apps/mobile/scripts/build-apk.mjs --variant staff'
+# The address a fresh install starts with: the real system's outside name, as every published
+# release since staff 0.19.0 (2026-11-13) was built; http://192.168.1.250 reaches only the store's Wi-Fi.
+JOB_ENV=(BTO_SERVER=https://app.puljika.site)
+# What the command makes, relative to the copy; the newest match is copied to the same place in ~/bto-dev.
+ARTIFACT='apps/mobile/build/apk/bto-staff-*.apk'
+# Run only when a request the build carries asked --publish; $ARTIFACT is the APK in ~/bto-dev. The
+# real system's storage volume is root's, so through sudo, then given back to the api's user (1000).
+STORE_STORAGE=/var/lib/docker/volumes/bto-store_storage/_data
+PUBLISH='sudo -n env "PATH=$PATH" BTO_JOB_DESK=1 node apps/mobile/scripts/publish-apk.mjs "$ARTIFACT" --storage "$STORE_STORAGE" && sudo -n chown -R 1000:1000 "$STORE_STORAGE/releases/staff"'
+# A contributor that changed nothing for this long stops holding the build.
+IDLE_HOURS=2
+# A build that runs longer is stopped (all its processes) and recorded as failed: it hung.
+TIME_LIMIT_MINUTES=45
+# A build started by hand outside the desk (these processes) also keeps the desk's build waiting:
+# only a program's own command line, never a shell whose command merely names it.
+BUSY_PATTERN='^[^ ]*node [^ ]*build-apk\.mjs|^[^ ]*java .*org\.gradle\.wrapper\.GradleWrapperMain'

@@ -43,6 +43,9 @@ that task in your own copy of the code and report back. You do not talk to the o
    style (`feat(inventory): …`), with the ADR number when there is one.
 6. Never push, merge, deploy or run `tools/brain/task.sh` or `tools/brain/land.sh`, and never run
    `deploy/store/setup.sh`: landing is the brain's.
+7. Never build or publish an APK (`pnpm mobile:apk`, `pnpm mobile:publish`, Gradle,
+   `tools/brain/job.sh`): the job desk builds one for all changes after landing (ADR-0229). A change
+   the staff app or «Bto300» needs a new APK for says so in **Open**.
 
 ## When something is unclear
 

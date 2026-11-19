@@ -1,0 +1,17 @@
+# shellcheck shell=bash disable=SC2034
+# The customer app's APK («Bto300», variants.json `customer`): a kind of the job desk (ADR-0229).
+# The same app folder as the staff app, so the same contributors; apk-staff.job explains each name.
+
+TITLE="the customer app's APK (Bto300)"
+GROUP=android
+CONTRIBUTORS=(apps/mobile)
+SHARED_IMPORTED_BY=(apps/mobile/app apps/mobile/src)
+EXCLUDE=('*.test.ts' '*.test.tsx' '*.test.mjs' '*.spec.ts' '*.md')
+COMMAND='node apps/mobile/scripts/build-apk.mjs --variant customer'
+JOB_ENV=(BTO_SERVER=https://app.puljika.site)
+ARTIFACT='apps/mobile/build/apk/bto300-*.apk'
+STORE_STORAGE=/var/lib/docker/volumes/bto-store_storage/_data
+PUBLISH='sudo -n env "PATH=$PATH" BTO_JOB_DESK=1 node apps/mobile/scripts/publish-apk.mjs "$ARTIFACT" --storage "$STORE_STORAGE" && sudo -n chown -R 1000:1000 "$STORE_STORAGE/releases/customer"'
+IDLE_HOURS=2
+TIME_LIMIT_MINUTES=45
+BUSY_PATTERN='^[^ ]*node [^ ]*build-apk\.mjs|^[^ ]*java .*org\.gradle\.wrapper\.GradleWrapperMain'

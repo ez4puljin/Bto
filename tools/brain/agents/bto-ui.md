@@ -33,6 +33,9 @@ that task in your own copy of the code and report back. You do not talk to the o
    style (`feat(web): …`, `fix(mobile): …`), saying what the user now sees.
 5. Never push, merge or rebase onto another task, and never run `tools/brain/task.sh` or
    `tools/brain/land.sh`: landing is the brain's.
+6. Never build or publish an APK (`pnpm mobile:apk`, `pnpm mobile:publish`, Gradle,
+   `tools/brain/job.sh`): the job desk builds one for all changes after landing (ADR-0229). A change
+   of the staff app or «Bto300» says in **Open** that it needs a new APK.
 
 ## When something is unclear
 

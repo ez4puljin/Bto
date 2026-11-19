@@ -4,6 +4,9 @@
 // blocked: a false block costs more than a miss. The idea is from ECC's block-no-verify hook
 // (github.com/affaan-m/ECC, MIT), rewritten for Bto's rules.
 //
+// While the job desk (ADR-0229) builds an APK it also stops a Gradle build or `expo run:android`
+// started by hand: both would use ~/Android/m at once.
+//
 // Claude Code sends the call as JSON on stdin ({ tool_input: { command }, cwd }). Exit 2 with one
 // line on stderr blocks the command; exit 0 lets it run. Any error lets it run: a broken guard
 // must never break a session.
@@ -12,6 +15,7 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { jobsDirOf, runningJobs } from './jobs/desk.mjs';
 
 // The real system's database port (CLAUDE.md: nothing in the development checkouts names it).
 const REAL_DB_PORT = '15433';
@@ -285,12 +289,27 @@ function checkCompose(words) {
 }
 
 /**
+ * While the job desk builds an APK (ADR-0229) it owns ~/Android/m and Gradle: a Gradle build or
+ * `expo run:android` started by hand would break both builds.
+ */
+function checkAndroid(run, dir, home) {
+  const name = basename(run[0]);
+  const gradle = (name === 'gradlew' || name === 'gradlew.bat') && inside(dir, `${home}/Android`);
+  const expo = run.includes('run:android') && run.some((word) => basename(word) === 'expo');
+  if (gradle || expo) {
+    return 'the job desk is building an APK now in ~/Android/m (ADR-0229): wait for it (bash ~/bto-dev/tools/brain/job.sh status) or ask for yours with job.sh request';
+  }
+  return null;
+}
+
+/**
  * Why this command must not run, or null. Pure: tests call it.
  * @param {string} command  the Bash tool's command
  * @param {string} cwd      the session's working directory
  * @param {string} home     the home directory (~)
+ * @param {{androidBusy?: boolean}} [state]  whether the job desk is building an APK now
  */
-export function check(command, cwd, home) {
+export function check(command, cwd, home, state = {}) {
   if (typeof command !== 'string' || command === '') return null;
   const where = cwd || home;
   if (
@@ -309,11 +328,13 @@ export function check(command, cwd, home) {
       continue;
     }
     if ((name === 'bash' || name === 'sh') && run.length > 2 && /^-[a-z]*c[a-z]*$/.test(run[1])) {
-      const inner = check(run[2], dir, home);
+      const inner = check(run[2], dir, home, state);
       if (inner) return inner;
       continue;
     }
-    const reason = name === 'git' ? checkGit(run, dir, home) : checkCompose(run);
+    const reason =
+      (name === 'git' ? checkGit(run, dir, home) : checkCompose(run)) ??
+      (state.androidBusy ? checkAndroid(run, dir, home) : null);
     if (reason) return reason;
   }
   return null;
@@ -332,7 +353,13 @@ if (isMain()) {
   try {
     const input = JSON.parse(readFileSync(0, 'utf8'));
     if (!input.tool_name || input.tool_name === 'Bash') {
-      reason = check(input.tool_input?.command, input.cwd || process.cwd(), homedir());
+      const command = input.tool_input?.command;
+      // The desk's books are read only for a command that could start an Android build.
+      const androidBusy =
+        typeof command === 'string' &&
+        /gradlew|run:android/.test(command) &&
+        runningJobs(jobsDirOf(homedir(), process.env)).some((job) => job.group === 'android');
+      reason = check(command, input.cwd || process.cwd(), homedir(), { androidBusy });
     }
   } catch {
     reason = null;
