@@ -1,4 +1,5 @@
 import { type ApiClient, type components, createApiClient } from '@tugeel/api-client';
+import { retryDelay } from '../outbox/backoff';
 import { type AppProblem, NETWORK, problemOf } from './problem';
 
 export type Me = components['schemas']['Me'];
@@ -24,12 +25,26 @@ export interface TokenStore {
   clear(): Promise<void>;
 }
 
+/**
+ * Who signed in, as the server last said it (the staff app only): kept per server and user at
+ * every sign-in and restore, so the app opens from it when the server does not answer. No token.
+ */
+export interface IdentityStore {
+  load(server: string, userId: number): Promise<unknown>;
+  save(server: string, userId: number, me: unknown): Promise<void>;
+  clear(server: string, userId: number): Promise<void>;
+}
+
 export type SessionState<P = Me> =
   | { status: 'loading' }
   | { status: 'anonymous'; reason?: 'expired' | 'logout' }
   /** A stored session the server could not be asked about: no connection. */
   | { status: 'offline' }
-  | { status: 'signedIn'; me: P; userId: number };
+  /**
+   * Signed in. `offline`: the server does not answer (opened from the stored identity, or a call
+   * found no connection); the session tries again by itself and drops the flag once answered.
+   */
+  | { status: 'signedIn'; me: P; userId: number; offline?: true };
 
 type RefreshOutcome = 'ok' | 'rejected' | 'offline';
 
@@ -95,6 +110,14 @@ export interface SessionOptions {
   now?: () => number;
   /** Milliseconds before a call is abandoned; `REQUEST_TIMEOUT_MS` unless a test shortens it. */
   timeoutMs?: number;
+  /**
+   * The stored identity (the staff app, owner 2026-11-19): with it a stored session opens without
+   * the server and tries again by itself. «Bto300» passes none and keeps the offline page.
+   */
+  identity?: IdentityStore;
+  /** Timers for the tries again; the platform's unless a test drives them. */
+  setTimer?: (run: () => void, ms: number) => unknown;
+  clearTimer?: (handle: unknown) => void;
 }
 
 /**
@@ -116,6 +139,10 @@ export abstract class MobileSession<P> {
   private state: SessionState<P> = { status: 'loading' };
   private readonly listeners = new Set<() => void>();
   private refreshing: Promise<RefreshOutcome> | null = null;
+  private reconnecting: Promise<void> | null = null;
+  private retryTimer: unknown = null;
+  private retries = 0;
+  private disposed = false;
 
   /** Routes that answer for the token itself: a 401 there is an answer, not a stale access token. */
   protected abstract readonly ownRoutes: RegExp;
@@ -123,6 +150,10 @@ export abstract class MobileSession<P> {
   protected abstract postLogout(refreshToken: string): Promise<unknown>;
   /** Who the session is (a call with the access token); throws when nothing answered. */
   protected abstract whoAmI(userId: number): Promise<Who<P>>;
+  /** A stored identity read back; null when it is not one (the customer session keeps none). */
+  protected identityOf(_value: unknown): P | null {
+    return null;
+  }
 
   constructor(options: SessionOptions) {
     this.options = options;
@@ -144,6 +175,7 @@ export abstract class MobileSession<P> {
 
   /** Signs in again with the stored token, once at start or when the connection comes back. */
   async restore(): Promise<void> {
+    this.disposed = false;
     const stored = await this.options.store.load();
     if (!stored || stored.server !== this.server) {
       this.update({ status: 'anonymous' });
@@ -153,7 +185,7 @@ export abstract class MobileSession<P> {
     this.userId = stored.userId;
     const outcome = await this.refresh();
     if (outcome === 'offline') {
-      this.update({ status: 'offline' });
+      await this.openOffline(stored.userId);
       return;
     }
     if (outcome === 'rejected') {
@@ -162,12 +194,115 @@ export abstract class MobileSession<P> {
     }
     try {
       const who = await this.whoAmI(stored.userId);
-      if ('me' in who) this.update({ status: 'signedIn', me: who.me, userId: stored.userId });
-      else if (serverFailed(who.problem)) this.update({ status: 'offline' });
+      if ('me' in who) await this.online(who.me, stored.userId);
+      else if (serverFailed(who.problem)) await this.openOffline(stored.userId);
       else await this.forget('expired');
     } catch {
-      this.update({ status: 'offline' });
+      await this.openOffline(stored.userId);
     }
+  }
+
+  /**
+   * Asks the server again for a session opened without it (no-op otherwise): answered, the app is
+   * simply online; refused, it goes to the sign-in; no answer, it tries again later. Never blocks a
+   * screen; one at a time.
+   */
+  reconnect(): Promise<void> {
+    const state = this.state;
+    if (state.status !== 'signedIn' || !state.offline || this.disposed) return Promise.resolve();
+    this.reconnecting ??= this.doReconnect(state.userId).finally(() => {
+      this.reconnecting = null;
+    });
+    return this.reconnecting;
+  }
+
+  /** Stops the tries again: the session is no longer used (another server was chosen). */
+  dispose(): void {
+    this.disposed = true;
+    this.stopRetries();
+  }
+
+  /** Is this the staff app's session that may open without the server? */
+  get keepsIdentity(): boolean {
+    return this.options.identity !== undefined;
+  }
+
+  private async doReconnect(userId: number): Promise<void> {
+    const outcome =
+      this.accessToken === null || this.now() > this.accessEndsAt - EARLY_MS
+        ? await this.refresh()
+        : 'ok';
+    if (outcome === 'rejected') {
+      await this.forget('expired');
+      return;
+    }
+    if (outcome === 'offline') {
+      this.scheduleRetry();
+      return;
+    }
+    let who: Who<P>;
+    try {
+      who = await this.whoAmI(userId);
+    } catch {
+      this.scheduleRetry();
+      return;
+    }
+    if ('me' in who) await this.online(who.me, userId);
+    else if (serverFailed(who.problem)) this.scheduleRetry();
+    else await this.forget('expired');
+  }
+
+  /**
+   * A stored session whose server did not answer: open from the stored identity when there is
+   * one for this server and user (and try again by itself), the offline page otherwise.
+   */
+  private async openOffline(userId: number): Promise<void> {
+    const identity = this.options.identity;
+    const me = identity
+      ? this.identityOf(await identity.load(this.server, userId).catch(() => null))
+      : null;
+    if (me === null) {
+      this.update({ status: 'offline' });
+      return;
+    }
+    this.update({ status: 'signedIn', me, userId, offline: true });
+    this.scheduleRetry();
+  }
+
+  /** The server said who: online, and the identity kept for the next start without it. */
+  private async online(me: P, userId: number): Promise<void> {
+    this.stopRetries();
+    this.retries = 0;
+    this.update({ status: 'signedIn', me, userId });
+    await this.options.identity?.save(this.server, userId, me).catch(() => undefined);
+  }
+
+  /** A call found no connection while signed in: the note shows and the tries again start. */
+  private lostConnection(): void {
+    const state = this.state;
+    if (!this.options.identity || state.status !== 'signedIn' || state.offline) return;
+    this.update({ ...state, offline: true });
+    this.scheduleRetry();
+  }
+
+  private scheduleRetry(): void {
+    if (this.disposed || this.retryTimer !== null) return;
+    const delay = retryDelay(this.retries);
+    this.retries += 1;
+    const set = this.options.setTimer ?? ((run: () => void, ms: number) => setTimeout(run, ms));
+    this.retryTimer = set(() => {
+      this.retryTimer = null;
+      void this.reconnect();
+    }, delay);
+  }
+
+  private stopRetries(): void {
+    if (this.retryTimer === null) return;
+    const clear =
+      this.options.clearTimer ??
+      ((handle: unknown) => clearTimeout(handle as ReturnType<typeof setTimeout>));
+    clear(this.retryTimer);
+    this.retryTimer = null;
   }
 
   /** Ends this phone's session; the stored token goes even without a connection. */
@@ -229,7 +364,7 @@ export abstract class MobileSession<P> {
       refreshToken: result.data.refreshToken,
     });
     if (me !== null) {
-      this.update({ status: 'signedIn', me, userId });
+      await this.online(me, userId);
       return null;
     }
     let who;
@@ -241,7 +376,7 @@ export abstract class MobileSession<P> {
       return null;
     }
     if ('me' in who) {
-      this.update({ status: 'signedIn', me: who.me, userId });
+      await this.online(who.me, userId);
       return null;
     }
     if (serverFailed(who.problem)) {
@@ -290,7 +425,7 @@ export abstract class MobileSession<P> {
       if (this.accessToken) request.headers.set('authorization', `Bearer ${this.accessToken}`);
     }
     const retry = own ? null : request.clone();
-    const response = await this.send(request);
+    const response = await this.watched(request);
     if (response.status !== 401 || retry === null || !this.refreshToken) return response;
     const outcome = await this.refresh();
     if (outcome !== 'ok') {
@@ -298,7 +433,23 @@ export abstract class MobileSession<P> {
       return response;
     }
     if (this.accessToken) retry.headers.set('authorization', `Bearer ${this.accessToken}`);
-    return this.send(retry);
+    return this.watched(retry);
+  }
+
+  /**
+   * A call that tells the session about the connection (the staff app): no answer starts the
+   * «no connection» note and the tries again; any answer while it shows asks the server again.
+   */
+  private async watched(request: Request): Promise<Response> {
+    let response: Response;
+    try {
+      response = await this.send(request);
+    } catch (error) {
+      this.lostConnection();
+      throw error;
+    }
+    if (this.state.status === 'signedIn' && this.state.offline) void this.reconnect();
+    return response;
   }
 
   /**
@@ -334,6 +485,12 @@ export abstract class MobileSession<P> {
   }
 
   private async forget(reason: 'expired' | 'logout'): Promise<void> {
+    this.stopRetries();
+    this.retries = 0;
+    const userId = this.userId;
+    if (userId !== null) {
+      await this.options.identity?.clear(this.server, userId).catch(() => undefined);
+    }
     this.accessToken = null;
     this.accessEndsAt = 0;
     this.refreshToken = null;
@@ -371,6 +528,13 @@ export class StaffSession extends MobileSession<Me> {
 
   protected postLogout(refreshToken: string) {
     return this.client.POST('/api/v1/auth/mobile/logout', { body: { refreshToken } });
+  }
+
+  /** The stored `GET /auth/me` answer, when it still looks like one. */
+  protected override identityOf(value: unknown): Me | null {
+    if (typeof value !== 'object' || value === null) return null;
+    const me = value as Partial<Me>;
+    return typeof me.id === 'number' && Array.isArray(me.permissions) ? (value as Me) : null;
   }
 
   protected async whoAmI(): Promise<Who<Me>> {

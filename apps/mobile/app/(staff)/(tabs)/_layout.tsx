@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router/js-tabs';
 import { ClipboardList, House, Package, ShoppingCart } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import type { ColorValue } from 'react-native';
+import { useOutbox } from '../../../src/state/outbox';
 import { useShop } from '../../../src/state/shop';
 import { colors } from '../../../src/theme/tokens';
 import { StoreTabBar } from '../../../src/ui/store-tab-bar';
@@ -9,12 +10,14 @@ import { StoreTabBar } from '../../../src/ui/store-tab-bar';
 /**
  * «ХТ захиалга» (ADR-0174, opened from «Цэс»): «Нүүр», «Бараа», [баркод], «Сагс», «Захиалга» on
  * «Bto300»'s flat bar (ADR-0100 on ADR-0095): the barcode camera raised in the middle, the cart's
- * count on «Сагс»; «Профайл» and the bell (with its unread count, ADR-0062 #3) open from «Нүүр»'s
+ * count on «Сагс», the unsent orders' count on «Захиалга» (the outbox); «Профайл» and the bell (with its unread count, ADR-0062 #3) open from «Нүүр»'s
  * header, and its arrow goes back to the staff's own «Нүүр».
  */
 export default function TabsLayout() {
   const { t } = useTranslation();
   const { cart } = useShop();
+  // The orders not on the server yet: waiting, sending, refused or to check (owner 2026-11-19).
+  const unsent = useOutbox().unsent.length;
   const icon =
     (Icon: typeof House) =>
     ({ color, focused, size }: { color: ColorValue; focused: boolean; size: number }) => (
@@ -45,7 +48,16 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="orders"
-        options={{ title: t('mobile.tabs.orders'), tabBarIcon: icon(ClipboardList) }}
+        options={{
+          title: t('mobile.tabs.orders'),
+          tabBarIcon: icon(ClipboardList),
+          ...(unsent > 0
+            ? {
+                tabBarBadge: unsent,
+                tabBarAccessibilityLabel: t('mobile.outbox.tabBadge', { n: unsent }),
+              }
+            : {}),
+        }}
       />
     </Tabs>
   );

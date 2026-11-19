@@ -49,6 +49,7 @@ import { ubTime } from '../../../src/dates/dates';
 import { formatMillions, formatMnt } from '../../../src/format/format';
 import { allOrdered, countsOf } from '../../../src/map/stores';
 import { shortMoney } from '../../../src/orders/amounts';
+import { UnsentLine } from '../../../src/outbox/unsent-list';
 import { SectionHeading, SIDE } from '../../../src/shop/section-heading';
 import { useCartHost } from '../../../src/shop/list-qty-sheet';
 import { mayPick, mayRequestTransfers } from '../../../src/state/phase';
@@ -94,7 +95,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const inset = useStoreTabBarInset();
   const { me, server } = useSignedIn();
-  const { cart, pending, stageId, setStageId, ready } = useShop();
+  const { cart, stageId, setStageId, ready } = useShop();
   const notifications = useNotificationSummary();
   const attendance = useMyAttendance();
   const unread = notifications.data?.unread ?? 0;
@@ -388,9 +389,7 @@ export default function HomeScreen() {
                 {t('mobile.home.cartTitle', { n: cart.lines.length })}
               </Text>
               <Text style={type.secondary} numberOfLines={1}>
-                {pending !== null
-                  ? t('mobile.home.pending')
-                  : (cart.customer?.name ?? t('mobile.home.noCustomer'))}
+                {cart.customer?.name ?? t('mobile.home.noCustomer')}
               </Text>
             </View>
             <PillButton
@@ -401,6 +400,9 @@ export default function HomeScreen() {
             />
           </Card>
         ) : null}
+
+        {/* The orders not sent yet (the outbox, owner 2026-11-19): one line to «Миний захиалгууд». */}
+        <UnsentLine onPress={() => router.navigate('/orders')} style={styles.side} />
 
         {shopWindow && shopWindow.banners.length > 0 ? (
           <BannerCarousel banners={shopWindow.banners} server={server} inset={spacing.lg} />
@@ -443,7 +445,7 @@ export default function HomeScreen() {
                 product={product}
                 server={server}
                 line={lineOf(cart, product.id)}
-                locked={pending !== null}
+                locked={false}
                 onOpen={() => router.push(`/product/${product.id}`)}
                 {...host.cardProps(product)}
                 {...size}

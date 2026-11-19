@@ -19,6 +19,7 @@ import { ubDate, weekdayOf } from '../../../src/dates/dates';
 import { shortMoney } from '../../../src/orders/amounts';
 import { DateRangeSheet } from '../../../src/orders/date-range-sheet';
 import { OrderFilterSheet } from '../../../src/orders/order-filter-sheet';
+import { UnsentSection } from '../../../src/outbox/unsent-list';
 import {
   activeOrderFilters,
   EMPTY_ORDER_FILTERS,
@@ -48,7 +49,8 @@ type Opened = 'none' | 'filters' | 'dates';
  * the calendar), the range's count, confirmed total and drafts as three tiles, the filters that
  * are on as chips, and the rep's own orders
  * by day, newest first. The filter button on Bto300's blue header (ADR-0100) opens customer,
- * product, payment, delivery and state.
+ * product, payment, delivery and state. On top, from the phone even without the server, the
+ * orders not sent yet: «Илгээгдээгүй (N)» (the outbox, owner 2026-11-19).
  */
 export default function OrdersScreen() {
   const { t } = useTranslation();
@@ -128,6 +130,7 @@ export default function OrdersScreen() {
 
   const header = (
     <View style={styles.head}>
+      <UnsentSection />
       <StatTiles>
         <StatTile
           value={summary ? String(summary.count) : t('common.none')}
@@ -152,8 +155,8 @@ export default function OrdersScreen() {
           })}
         </View>
       ) : null}
-      {orders.error ? (
-        <ProblemText problem={problemFrom(orders.error)} style={styles.problem} />
+      {orders.error || (!range && context.error) ? (
+        <ProblemText problem={problemFrom(orders.error ?? context.error)} style={styles.problem} />
       ) : null}
     </View>
   );
@@ -225,7 +228,7 @@ export default function OrdersScreen() {
         refreshing={orders.isRefetching && !orders.isFetchingNextPage}
         onRefresh={() => void orders.refetch()}
         ListEmptyComponent={
-          orders.isLoading || !range ? (
+          orders.isLoading || (!range && !context.error) ? (
             <ActivityIndicator style={styles.loading} color={colors.primary} />
           ) : (
             <View style={styles.empty}>

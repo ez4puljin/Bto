@@ -6,6 +6,7 @@ import {
   ChevronRight,
   CircleAlert,
   Send,
+  Smartphone,
   Store,
   Truck,
   Warehouse,
@@ -23,12 +24,13 @@ import {
   useQuote,
   useRepContext,
 } from '../../src/api/rep';
-import { type CartIssue, cartIssues, linesOf } from '../../src/cart/cart';
+import { type Cart, type CartIssue, cartIssues, linesOf } from '../../src/cart/cart';
 import { useSendOrder } from '../../src/cart/use-send';
 import { monthDay } from '../../src/dates/calendar';
-import { monthOf, weekdayOf } from '../../src/dates/dates';
+import { monthOf, ubDate, weekdayOf } from '../../src/dates/dates';
 import { formatMnt } from '../../src/format/format';
 import { placeOf } from '../../src/state/placement';
+import { useSignedIn } from '../../src/state/session';
 import { useShop } from '../../src/state/shop';
 import {
   colors,
@@ -45,7 +47,6 @@ import { Group, ICON_INSET, ICON_TILE, IconTile, Row } from '../../src/ui/groupe
 import { MonthCalendar } from '../../src/ui/calendar';
 import { ProblemText } from '../../src/ui/kit';
 import { Page, SectionHeader } from '../../src/ui/layout';
-import { PendingSendCard } from '../../src/ui/pending-send';
 import { Sheet, SheetClose, SheetHeader } from '../../src/ui/sheet';
 import { FooterBar, Notice, PAGE } from '../../src/ui/staff-kit';
 import { HeaderTextButton, StoreHeader } from '../../src/ui/store-header';
@@ -63,8 +64,11 @@ const PAY_DOTS = {
  * «Захиалагчийн мэдээлэл» (the Checkout and CheckoutNote boards, ADR-0068 #6): the customer (no
  * contact person, the owner 2026-10-18), «Хүлээн авах» (delivery or pickup as two cards, the
  * address, and the day as four tiles: today, tomorrow, the day after, another day), the payment, a
- * note, where the order lands, and «Баталгаажуулж илгээх». A sent order shows its number over the
- * page; a send without an answer keeps the cart locked (ADR-0061 #8). The blue header carries the
+ * note, where the order lands, and «Баталгаажуулж илгээх». The order goes into the outbox on the
+ * phone first and the cart is emptied (owner 2026-11-19): answered, its number shows over the
+ * page; without an answer «Захиалга утсанд хадгалагдлаа» says it goes by itself; refused at once,
+ * the cart comes back with the problem, as before. Without the server the day is the phone's
+ * Ulaanbaatar date and the stage the one chosen before. The blue header carries the
  * title once with «N бараа · дүн» under it, ← and, while the note is typed in, «Болсон»; the
  * total and the send button sit in the bar at the bottom (the Checkout board of 2026-11-16).
  */
@@ -72,17 +76,25 @@ export default function CheckoutScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { cart, dispatch, stageId, pending } = useShop();
+  const { cart: liveCart, dispatch, stageId } = useShop();
+  const { offline } = useSignedIn();
+  // While the send runs the page keeps showing what is sent (the cart itself is already empty).
+  const [frozen, setFrozen] = useState<Cart | null>(null);
+  const cart = frozen ?? liveCart;
   const context = useRepContext();
-  const today = context.data?.today ?? null;
+  // Without the server: today in Ulaanbaatar by the phone's clock, and the stage chosen before.
+  const noServer = !context.data && (offline || context.isError);
+  const today = context.data?.today ?? (noServer ? ubDate(new Date().toISOString()) : null);
   const quote = useQuote(linesOf(cart));
   const customer = useCustomer(cart.customer?.id ?? null);
   const ids = useMemo(() => [...new Set(cart.lines.map((line) => line.productId))], [cart.lines]);
   const products = useProductsOf(ids);
   const { send, sending } = useSendOrder();
   const [problem, setProblem] = useState<AppProblem | null>(null);
-  const [unknown, setUnknown] = useState(false);
   const [sent, setSent] = useState<RepOrder | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [notStored, setNotStored] = useState<'read' | 'write' | null>(null);
+  const [refusedKept, setRefusedKept] = useState(false);
   const [sheet, setSheet] = useState<'none' | 'address' | 'date'>('none');
   const [noteFocused, setNoteFocused] = useState(false);
   const [keyboard, setKeyboard] = useState(0);
@@ -90,7 +102,8 @@ export default function CheckoutScreen() {
   const noteRef = useRef<View>(null);
   const scrollY = useRef(0);
   const place = context.data ? placeOf(context.data, stageId) : null;
-  const locked = pending !== null;
+  // Nothing locks the checkout since the outbox (owner 2026-11-19); the parts keep their prop.
+  const locked = frozen !== null;
 
   // Every order starts on today, for delivery and pickup alike (the owner, 2026-10-17); a stored
   // day in the past moves to today too.
@@ -116,7 +129,8 @@ export default function CheckoutScreen() {
     };
   }, []);
 
-  const issues: CartIssue[] = today ? cartIssues(cart, today, place ? stageId : null) : ['lines'];
+  const stageOk = place || noServer ? stageId : null;
+  const issues: CartIssue[] = today ? cartIssues(cart, today, stageOk) : ['lines'];
   const addresses = customer.data?.addresses ?? [];
   const address = addresses.find((entry) => entry.id === cart.addressId);
   const homes = [
@@ -173,17 +187,30 @@ export default function CheckoutScreen() {
 
   const submit = async () => {
     Keyboard.dismiss();
-    const result = await send();
-    if (!result) return;
-    if (result.kind === 'sent') {
+    setFrozen(liveCart);
+    try {
+      const result = await send(place?.stageName ?? null);
+      if (!result) return;
+      if (result.kind === 'notSaved') {
+        // Nothing stored: the cart is exactly as it was.
+        setProblem(null);
+        setNotStored(result.reason);
+        return;
+      }
+      setNotStored(null);
+      if (result.kind === 'refused') {
+        setProblem(result.problem);
+        // The cart could not be stored back: the order waits, refused, in «Миний захиалгууд».
+        setRefusedKept(result.kept);
+        return;
+      }
       setProblem(null);
-      setUnknown(false);
-      setSent(result.order);
-    } else if (result.kind === 'unknown') {
-      setUnknown(true);
-    } else {
-      setUnknown(false);
-      setProblem(result.problem);
+      setRefusedKept(false);
+      if (result.kind === 'sent' && result.order) setSent(result.order);
+      else if (result.kind === 'sent') router.dismissTo('/orders');
+      else setSaved(true);
+    } finally {
+      setFrozen(null);
     }
   };
 
@@ -220,22 +247,10 @@ export default function CheckoutScreen() {
         contentContainerStyle={[
           styles.body,
           {
-            paddingBottom:
-              keyboard > 0
-                ? keyboard + insets.bottom + spacing.lg
-                : locked
-                  ? insets.bottom + spacing.lg
-                  : spacing.lg,
+            paddingBottom: keyboard > 0 ? keyboard + insets.bottom + spacing.lg : spacing.lg,
           },
         ]}
       >
-        {locked ? (
-          // The shared card brings its own 16 px on top; the page's gap already gives it.
-          <View style={styles.pending}>
-            <PendingSendCard onSent={setSent} />
-          </View>
-        ) : null}
-
         <SectionHeader style={styles.section}>{t('mobile.checkout.customer')}</SectionHeader>
         <Pressable
           accessibilityRole="button"
@@ -392,9 +407,14 @@ export default function CheckoutScreen() {
         </Group>
 
         <ProblemText problem={problem} style={styles.problem} />
-        {unknown ? (
+        {refusedKept ? (
           <Notice tone="bad" icon={CircleAlert}>
-            {t('mobile.cart.unknownHint')}
+            {t('mobile.outbox.refusedKept')}
+          </Notice>
+        ) : null}
+        {notStored ? (
+          <Notice tone="bad" icon={CircleAlert}>
+            {notStored === 'read' ? t('mobile.outbox.readFailed') : t('mobile.outbox.notStored')}
           </Notice>
         ) : null}
         {!locked && issues.length > 0 && cart.lines.length > 0 ? (
@@ -404,7 +424,7 @@ export default function CheckoutScreen() {
         ) : null}
       </ScrollView>
 
-      {keyboard > 0 || locked ? null : (
+      {keyboard > 0 ? null : (
         <FooterBar>
           <View style={styles.footerTotal}>
             <Text style={type.secondary}>{t('mobile.cart.total')}</Text>
@@ -420,7 +440,7 @@ export default function CheckoutScreen() {
           <PillButton
             title={t('mobile.checkout.send')}
             loading={sending}
-            disabled={issues.length > 0 || quote.isLoading}
+            disabled={issues.length > 0 || (quote.isLoading && !noServer)}
             onPress={() => void submit()}
             style={styles.send}
           />
@@ -485,6 +505,40 @@ export default function CheckoutScreen() {
                 style={styles.sentButton}
                 onPress={() => {
                   setSent(null);
+                  router.dismissTo('/shop');
+                }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* No answer: the order is on the phone and goes by itself (owner 2026-11-19). */}
+      <Modal visible={saved} transparent animationType="fade" statusBarTranslucent>
+        <View style={styles.sentBackdrop}>
+          <View style={styles.sentCard} accessibilityRole="alert">
+            <View style={[styles.sentIcon, styles.savedIcon]}>
+              <Smartphone size={28} strokeWidth={2.4} color={colors.primaryForeground} />
+            </View>
+            <Text style={styles.sentTitle}>{t('mobile.outbox.savedTitle')}</Text>
+            <Text style={[type.row, styles.sentLine]}>{t('mobile.outbox.savedHint')}</Text>
+            <View style={styles.sentActions}>
+              <PillButton
+                title={t('mobile.outbox.myOrders')}
+                variant="soft"
+                height={48}
+                style={styles.sentButton}
+                onPress={() => {
+                  setSaved(false);
+                  router.dismissTo('/orders');
+                }}
+              />
+              <PillButton
+                title={t('mobile.checkout.newOrder')}
+                height={48}
+                style={styles.sentButton}
+                onPress={() => {
+                  setSaved(false);
                   router.dismissTo('/shop');
                 }}
               />
@@ -713,7 +767,6 @@ function DateSheet({
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
   body: { ...PAGE },
-  pending: { marginTop: -spacing.lg },
   // A label sits 8 px over its block inside the page's 16 px rhythm.
   section: { marginTop: 0, marginBottom: -spacing.sm },
   customer: {
@@ -862,7 +915,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sentTitle: { ...type.title3 },
+  savedIcon: { backgroundColor: colors.warning },
+  sentTitle: { ...type.title3, textAlign: 'center' },
   sentLine: { color: colors.label2, textAlign: 'center', ...tabular },
   sentActions: { flexDirection: 'row', gap: 10, alignSelf: 'stretch', marginTop: spacing.md },
   sentButton: { flex: 1, paddingHorizontal: spacing.sm },

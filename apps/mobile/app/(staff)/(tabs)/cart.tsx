@@ -26,7 +26,6 @@ import { PillButton } from '../../../src/ui/controls';
 import { Separator } from '../../../src/ui/grouped';
 import { EmptyState } from '../../../src/ui/kit';
 import { Page, SectionHeader } from '../../../src/ui/layout';
-import { PendingSendCard } from '../../../src/ui/pending-send';
 import { Card, FooterBar, Notice, PAGE } from '../../../src/ui/staff-kit';
 import { HeaderTextButton, StoreHeader } from '../../../src/ui/store-header';
 import { useStoreTabBarHeight, useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
@@ -43,15 +42,13 @@ export default function CartScreen() {
   const inset = useStoreTabBarInset();
   const barHeight = useStoreTabBarHeight();
   const { server } = useSignedIn();
-  const { cart, dispatch, pending } = useShop();
+  const { cart, dispatch } = useShop();
   const [editing, setEditing] = useState(false);
   const quote = useQuote(linesOf(cart));
   const ids = useMemo(() => [...new Set(cart.lines.map((line) => line.productId))], [cart.lines]);
   const products = useProductsOf(ids);
   const productOf = (id: number) => products.data?.find((product) => product.id === id);
-  const locked = pending !== null;
-
-  if (cart.lines.length === 0 && !locked) {
+  if (cart.lines.length === 0) {
     return (
       <Page edges={[]}>
         <StoreHeader title={t('mobile.tabs.cart')} right={null} />
@@ -96,28 +93,16 @@ export default function CartScreen() {
         title={t('mobile.tabs.cart')}
         subtitle={t('mobile.cart.count', { n: cart.lines.length })}
         right={
-          locked ? null : (
-            <HeaderTextButton
-              title={editing ? t('mobile.cart.done') : t('common.edit')}
-              onPress={() => setEditing(!editing)}
-            />
-          )
+          <HeaderTextButton
+            title={editing ? t('mobile.cart.done') : t('common.edit')}
+            onPress={() => setEditing(!editing)}
+          />
         }
       />
       <ScrollView
         style={styles.grow}
-        contentContainerStyle={[
-          styles.body,
-          { paddingBottom: locked ? inset + spacing.lg : spacing.lg },
-        ]}
+        contentContainerStyle={[styles.body, { paddingBottom: spacing.lg }]}
       >
-        {locked ? (
-          // The shared card brings its own 16 px on top; the page's gap already gives it.
-          <View style={styles.pending}>
-            <PendingSendCard />
-          </View>
-        ) : null}
-
         <SectionHeader style={styles.section}>{t('mobile.cart.lines')}</SectionHeader>
         <Card flush>
           {cart.lines.map((line, index) => (
@@ -128,26 +113,22 @@ export default function CartScreen() {
                 product={productOf(line.productId)}
                 priced={quote.data?.lines[index]}
                 server={server}
-                editing={editing && !locked}
-                locked={locked}
+                editing={editing}
+                locked={false}
                 onOpen={() => router.push(`/product/${line.productId}`)}
                 onRemove={() => dispatch({ type: 'remove', productUnitId: line.productUnitId })}
               />
             </View>
           ))}
-          {locked ? null : (
-            <>
-              <Separator />
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.navigate('/shop')}
-                style={({ pressed }) => [styles.addRow, pressed && styles.pressed]}
-              >
-                <Plus size={20} strokeWidth={2.2} color={colors.link} />
-                <Text style={styles.addText}>{t('mobile.cart.addMore')}</Text>
-              </Pressable>
-            </>
-          )}
+          <Separator />
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.navigate('/shop')}
+            style={({ pressed }) => [styles.addRow, pressed && styles.pressed]}
+          >
+            <Plus size={20} strokeWidth={2.2} color={colors.link} />
+            <Text style={styles.addText}>{t('mobile.cart.addMore')}</Text>
+          </Pressable>
         </Card>
 
         {bonuses.length > 0 ? (
@@ -196,26 +177,24 @@ export default function CartScreen() {
           </Notice>
         ) : null}
       </ScrollView>
-      {locked ? null : (
-        // The page's main button, right above the tab bar, with the total beside it.
-        <View style={{ marginBottom: barHeight }}>
-          <FooterBar style={styles.footer}>
-            <View style={styles.footerTotal}>
-              <Text style={type.secondary}>{t('mobile.cart.total')}</Text>
-              <Text style={styles.footerAmount} numberOfLines={1}>
-                {totalText}
-              </Text>
-            </View>
-            <PillButton
-              title={t('mobile.cart.next')}
-              trailing={<ArrowRight size={20} strokeWidth={2.2} color={colors.primaryForeground} />}
-              disabled={quote.isLoading || unpriced}
-              onPress={() => router.push('/checkout')}
-              style={styles.grow}
-            />
-          </FooterBar>
-        </View>
-      )}
+      {/* The page's main button, right above the tab bar, with the total beside it. */}
+      <View style={{ marginBottom: barHeight }}>
+        <FooterBar style={styles.footer}>
+          <View style={styles.footerTotal}>
+            <Text style={type.secondary}>{t('mobile.cart.total')}</Text>
+            <Text style={styles.footerAmount} numberOfLines={1}>
+              {totalText}
+            </Text>
+          </View>
+          <PillButton
+            title={t('mobile.cart.next')}
+            trailing={<ArrowRight size={20} strokeWidth={2.2} color={colors.primaryForeground} />}
+            disabled={quote.isLoading || unpriced}
+            onPress={() => router.push('/checkout')}
+            style={styles.grow}
+          />
+        </FooterBar>
+      </View>
     </Page>
   );
 }
@@ -392,7 +371,6 @@ function BonusRow({
 const styles = StyleSheet.create({
   grow: { flex: 1 },
   body: { ...PAGE },
-  pending: { marginTop: -spacing.lg },
   // A label sits 8 px over its card inside the page's 16 px rhythm.
   section: { marginTop: 0, marginBottom: -spacing.sm },
   row: {

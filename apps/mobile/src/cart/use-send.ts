@@ -1,31 +1,27 @@
-import { useQueryClient } from '@tanstack/react-query';
-import type { RepOrder } from '../api/rep';
-import { useSignedIn } from '../state/session';
+import { useState } from 'react';
+import { type SubmitResult, useOutbox } from '../state/outbox';
 import { useShop } from '../state/shop';
-import { type OrderRequest, orderRequestOf } from './cart';
-import { type SendResult as AnySendResult, useIdempotentSend } from './use-idempotent-send';
 
-export type SendResult = AnySendResult<RepOrder>;
+export type SendResult = SubmitResult;
 
-/** The rep's send (ADR-0061 #8): POST /sales-rep/orders on the stage chosen in the settings. */
+/**
+ * The rep's «Захиалга илгээх» (ADR-0061 #8, the outbox of 2026-11-19): the cart becomes an entry of
+ * the outbox on the phone, the cart is emptied, and the send is tried at once on the stage chosen
+ * in the settings. Online nothing changes for the rep; without an answer the order waits on the
+ * phone and goes by itself.
+ */
 export function useSendOrder() {
-  const { session } = useSignedIn();
-  const { cart, stageId } = useShop();
-  const queryClient = useQueryClient();
-  return useIdempotentSend<OrderRequest, RepOrder>({
-    bodyOf: () => (stageId === null ? null : orderRequestOf(cart, stageId)),
-    post: (body, key) =>
-      session.client.POST('/api/v1/sales-rep/orders', {
-        body,
-        params: { header: { 'Idempotency-Key': key } },
-      }),
-    afterSent: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['rep', 'orders'] });
-      await queryClient.invalidateQueries({ queryKey: ['rep', 'products'] });
-      // The store map's red and green: the store just ordered from turns green.
-      await queryClient.invalidateQueries({ queryKey: ['rep', 'map'] });
-      // And its order history on the store card.
-      await queryClient.invalidateQueries({ queryKey: ['rep', 'store-orders'] });
-    },
-  });
+  const { submit } = useOutbox();
+  const { stageId } = useShop();
+  const [sending, setSending] = useState(false);
+  const send = async (stageName: string | null): Promise<SendResult | null> => {
+    if (stageId === null || sending) return null;
+    setSending(true);
+    try {
+      return await submit(stageId, stageName);
+    } finally {
+      setSending(false);
+    }
+  };
+  return { send, sending };
 }

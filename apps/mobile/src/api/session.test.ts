@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  type IdentityStore,
   REQUEST_TIMEOUT_MS,
   SLOW_REQUEST_TIMEOUT_MS,
   StaffSession,
@@ -252,5 +253,140 @@ describe('the staff app session (ADR-0061 #4)', () => {
     await session.logout();
     expect(store.value).toBeNull();
     expect(session.getSnapshot()).toEqual({ status: 'anonymous', reason: 'logout' });
+  });
+});
+
+class MemoryIdentity implements IdentityStore {
+  values = new Map<string, unknown>();
+  load = (server: string, userId: number) =>
+    Promise.resolve(this.values.get(`${server}:${userId}`) ?? null);
+  save = (server: string, userId: number, me: unknown) => {
+    this.values.set(`${server}:${userId}`, me);
+    return Promise.resolve();
+  };
+  clear = (server: string, userId: number) => {
+    this.values.delete(`${server}:${userId}`);
+    return Promise.resolve();
+  };
+}
+
+/** Timers the test fires by hand: the delays asked for, and the one waiting. */
+class ManualTimers {
+  delays: number[] = [];
+  waiting: (() => void) | null = null;
+  set = (run: () => void, ms: number) => {
+    this.delays.push(ms);
+    this.waiting = run;
+    return this.delays.length;
+  };
+  clear = () => {
+    this.waiting = null;
+  };
+  async fire() {
+    const run = this.waiting;
+    this.waiting = null;
+    run?.();
+    // Let the try again settle.
+    for (let i = 0; i < 20; i += 1) await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+}
+
+describe('opening without the server (staff app, owner 2026-11-19)', () => {
+  function withIdentity() {
+    const base = setup();
+    const identity = new MemoryIdentity();
+    const timers = new ManualTimers();
+    const make = () =>
+      new StaffSession({
+        server: SERVER,
+        store: base.store,
+        fetch: base.server.fetch,
+        randomUUID,
+        now: () => base.server.now,
+        identity,
+        setTimer: timers.set,
+        clearTimer: timers.clear,
+      });
+    return { ...base, identity, timers, make };
+  }
+
+  it('keeps who signed in, opens from it without an answer and goes online once answered', async () => {
+    const { server, identity, timers, make } = withIdentity();
+    const first = make();
+    await first.login('rep', 'secret');
+    expect(identity.values.get(`${SERVER}:7`)).toMatchObject({ id: 7 });
+
+    server.offline = true;
+    const offline = make();
+    await offline.restore();
+    expect(offline.getSnapshot()).toMatchObject({
+      status: 'signedIn',
+      userId: 7,
+      offline: true,
+      me: { id: 7, permissions: ['sales.orders.rep'] },
+    });
+    expect(timers.delays).toEqual([30_000]);
+
+    // Still nothing: the waits grow, to two minutes at most.
+    await timers.fire();
+    await timers.fire();
+    await timers.fire();
+    expect(timers.delays).toEqual([30_000, 60_000, 120_000, 120_000]);
+    expect(offline.getSnapshot()).toMatchObject({ offline: true });
+
+    server.offline = false;
+    await timers.fire();
+    expect(offline.getSnapshot()).toEqual({ status: 'signedIn', me: expect.anything(), userId: 7 });
+    expect(timers.waiting).toBeNull();
+  });
+
+  it('shows the offline page without a stored identity, as before', async () => {
+    const { server, identity, make } = withIdentity();
+    await make().login('rep', 'secret');
+    identity.values.clear();
+    server.offline = true;
+    const offline = make();
+    await offline.restore();
+    expect(offline.getSnapshot()).toEqual({ status: 'offline' });
+  });
+
+  it('goes to the sign-in when the server answers that the session is over', async () => {
+    const { server, store, identity, timers, make } = withIdentity();
+    await make().login('rep', 'secret');
+    server.offline = true;
+    const offline = make();
+    await offline.restore();
+    server.offline = false;
+    server.rejectRefresh = true;
+    await timers.fire();
+    expect(offline.getSnapshot()).toEqual({ status: 'anonymous', reason: 'expired' });
+    expect(store.value).toBeNull();
+    expect(identity.values.size).toBe(0);
+  });
+
+  it('turns offline when a call finds no connection, and back once any call is answered', async () => {
+    const { server, timers, make } = withIdentity();
+    const session = make();
+    await session.login('rep', 'secret');
+    server.offline = true;
+    await expect(session.client.GET('/api/v1/auth/me')).rejects.toThrow();
+    expect(session.getSnapshot()).toMatchObject({ status: 'signedIn', offline: true });
+    expect(timers.delays).toEqual([30_000]);
+
+    server.offline = false;
+    await session.client.GET('/api/v1/auth/me');
+    await session.reconnect();
+    expect(session.getSnapshot()).toEqual({ status: 'signedIn', me: expect.anything(), userId: 7 });
+  });
+
+  it('stops trying once disposed (another server chosen)', async () => {
+    const { server, timers, make } = withIdentity();
+    await make().login('rep', 'secret');
+    server.offline = true;
+    const offline = make();
+    await offline.restore();
+    offline.dispose();
+    expect(timers.waiting).toBeNull();
   });
 });

@@ -9,6 +9,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
+import { AppState } from 'react-native';
 import {
   type AnySession,
   type CustomerPrincipal,
@@ -20,7 +21,13 @@ import {
 } from '../api/session';
 import { APP } from '../config/app';
 import { clientUserAgent } from '../device/install';
-import { readJson, SERVER_KEY, secureTokenStore, writeJson } from '../device/storage';
+import {
+  identityStore,
+  readJson,
+  SERVER_KEY,
+  secureTokenStore,
+  writeJson,
+} from '../device/storage';
 import { secureOrigin } from '../server/server-url';
 
 interface SessionValue {
@@ -51,7 +58,11 @@ function sessionOn(server: string): AnySession {
     },
     randomUUID: Crypto.randomUUID,
   };
-  return APP.variant === 'customer' ? new CustomerSession(options) : new StaffSession(options);
+  // The staff app opens without the server from the stored identity (owner 2026-11-19); «Bto300»
+  // keeps its offline page.
+  return APP.variant === 'customer'
+    ? new CustomerSession(options)
+    : new StaffSession({ ...options, identity: identityStore });
 }
 
 /** The server address and the session on it; a new address starts a new session. */
@@ -77,7 +88,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const session = useMemo(() => (server ? sessionOn(server) : null), [server]);
 
   useEffect(() => {
-    if (session) void session.restore();
+    if (!session) return;
+    void session.restore();
+    // Back in the foreground: a session opened without the server asks it again at once.
+    const watch = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void session.reconnect();
+    });
+    return () => {
+      watch.remove();
+      session.dispose();
+    };
   }, [session]);
 
   const state = useSyncExternalStore<SessionState<Me | CustomerPrincipal>>(
@@ -107,14 +127,17 @@ export function useSession(): SessionValue {
   return value;
 }
 
-/** The rep's signed-in session; screens under (staff) only render once there is one. */
+/**
+ * The rep's signed-in session; screens under (staff) only render once there is one. `offline`:
+ * opened or kept without the server (the note shows; the session tries again by itself).
+ */
 export function useSignedIn() {
   const { session, server } = useSession();
   const state = session?.kind === 'staff' ? session.getSnapshot() : null;
   if (session?.kind !== 'staff' || state?.status !== 'signedIn' || !server) {
     throw new Error('a staff screen rendered without a staff session');
   }
-  return { session, me: state.me, server };
+  return { session, me: state.me, server, offline: state.offline === true };
 }
 
 /** The store's signed-in session in «Bto300»; screens under (customer) only render once there is one. */

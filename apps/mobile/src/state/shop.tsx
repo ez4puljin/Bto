@@ -12,7 +12,7 @@ import {
 } from 'react';
 import { type Cart, type CartAction, cartFrom, cartReducer, EMPTY_CART } from '../cart/cart';
 import type { PendingSend } from '../cart/send';
-import { readJson, userKey, writeJson } from '../device/storage';
+import { readJson, setJson, userKey, writeJson } from '../device/storage';
 
 interface ShopValue {
   /** False until the stored cart, stage and pending send are read. */
@@ -22,10 +22,20 @@ interface ShopValue {
   /** The stage new orders land on, chosen in the settings (ADR-0061 #6); null until chosen. */
   stageId: number | null;
   setStageId: (stageId: number | null) => void;
-  /** A send whose answer has not come back: its key and body (ADR-0061 #8). */
+  /**
+   * A send whose answer has not come back: its key and body (ADR-0061 #8). «Bto300» only: the
+   * staff app's orders wait in the outbox (owner 2026-11-19) and this stays null there.
+   */
   pending: PendingSend | null;
   /** Resolves once stored: a send waits for it before the request leaves. */
   setPending: (pending: PendingSend | null) => Promise<void>;
+  /**
+   * Replaces the cart once it is on the phone (no 300 ms wait); rejects, leaving the cart as it
+   * was, when it cannot be written. «Засах» stores the order's cart before its entry goes.
+   */
+  saveCart: (cart: Cart) => Promise<void>;
+  /** Where the cart is stored: the outbox writes the emptied cart in the same write as an entry. */
+  cartKey: string;
 }
 
 const ShopContext = createContext<ShopValue | null>(null);
@@ -40,14 +50,20 @@ function isPending(value: unknown): value is PendingSend {
   );
 }
 
-/** The rep's cart, chosen stage and pending send, kept on the phone per server and user. */
+/**
+ * The rep's cart, chosen stage and pending send, kept on the phone per server and user. The staff
+ * app passes `keepsPending={false}`: its orders go through the outbox (`src/state/outbox.tsx`),
+ * which takes over a pending send left in the old store, and nothing here locks the cart.
+ */
 export function ShopProvider({
   server,
   userId,
+  keepsPending = true,
   children,
 }: {
   server: string;
   userId: number;
+  keepsPending?: boolean;
   children: ReactNode;
 }) {
   const [cart, dispatch] = useReducer(cartReducer, EMPTY_CART);
@@ -65,25 +81,32 @@ export function ShopProvider({
 
   useEffect(() => {
     let live = true;
-    void Promise.all([readJson(keys.cart), readJson(keys.stage), readJson(keys.send)]).then(
-      ([storedCart, storedStage, storedSend]) => {
-        if (!live) return;
-        dispatch({ type: 'load', cart: cartFrom(storedCart) });
-        setStage(typeof storedStage === 'number' ? storedStage : null);
-        setPendingState(isPending(storedSend) ? storedSend : null);
-        setReady(true);
-      },
-    );
+    void Promise.all([
+      readJson(keys.cart),
+      readJson(keys.stage),
+      keepsPending ? readJson(keys.send) : Promise.resolve(null),
+    ]).then(([storedCart, storedStage, storedSend]) => {
+      if (!live) return;
+      dispatch({ type: 'load', cart: cartFrom(storedCart) });
+      setStage(typeof storedStage === 'number' ? storedStage : null);
+      setPendingState(isPending(storedSend) ? storedSend : null);
+      setReady(true);
+    });
     return () => {
       live = false;
     };
-  }, [keys]);
+  }, [keys, keepsPending]);
 
   // The cart is written a moment after each change: typing a note does not write every letter.
+  // An emptied cart (an order handed to the outbox) is written at once: it must never come back.
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!ready) return;
     if (timer.current) clearTimeout(timer.current);
+    if (cart.lines.length === 0) {
+      void writeJson(keys.cart, cart);
+      return;
+    }
     timer.current = setTimeout(() => void writeJson(keys.cart, cart), 300);
     return () => {
       if (timer.current) clearTimeout(timer.current);
@@ -106,9 +129,27 @@ export function ShopProvider({
     [keys],
   );
 
+  const saveCart = useCallback(
+    async (next: Cart) => {
+      await setJson(keys.cart, next);
+      dispatch({ type: 'load', cart: next });
+    },
+    [keys],
+  );
+
   const value = useMemo(
-    () => ({ ready, cart, dispatch, stageId, setStageId, pending, setPending }),
-    [ready, cart, stageId, setStageId, pending, setPending],
+    () => ({
+      ready,
+      cart,
+      dispatch,
+      stageId,
+      setStageId,
+      pending,
+      setPending,
+      saveCart,
+      cartKey: keys.cart,
+    }),
+    [ready, cart, stageId, setStageId, pending, setPending, saveCart, keys.cart],
   );
   return <ShopContext.Provider value={value}>{children}</ShopContext.Provider>;
 }

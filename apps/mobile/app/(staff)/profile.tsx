@@ -19,6 +19,7 @@ import { useRepContext } from '../../src/api/rep';
 import { initialsOf } from '../../src/format/format';
 import { useRoleName } from '../../src/state/role';
 import { MyPhoto } from '../../src/staff/my-photo';
+import { useOutbox } from '../../src/state/outbox';
 import { useSignedIn } from '../../src/state/session';
 import { useShop } from '../../src/state/shop';
 import { colors, fonts, spacing, tabular, type } from '../../src/theme/tokens';
@@ -42,7 +43,13 @@ export default function ProfileScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { session, me, server } = useSignedIn();
-  const { cart, pending, stageId } = useShop();
+  const { cart, stageId } = useShop();
+  // Unsent orders stay in the outbox on the phone and go after the next sign-in (owner 2026-11-19).
+  const unsent = useOutbox().unsent.length;
+  const leavingWords = [
+    unsent > 0 ? t('mobile.outbox.logoutHint', { n: unsent }) : null,
+    cart.lines.length > 0 ? t('mobile.profile.logoutKeepsCart') : null,
+  ].filter((part) => part !== null);
   const context = useRepContext();
   const unread = useNotificationSummary().data?.unread ?? 0;
   const community = feedCount(useFeed().data);
@@ -179,9 +186,7 @@ export default function ProfileScreen() {
       <ActionSheet
         visible={leaving}
         title={t('mobile.profile.logoutTitle')}
-        {...(cart.lines.length > 0 || pending
-          ? { message: t('mobile.profile.logoutKeepsCart') }
-          : {})}
+        {...(leavingWords.length > 0 ? { message: leavingWords.join(' ') } : {})}
         actions={[
           {
             label: t('mobile.profile.logout'),

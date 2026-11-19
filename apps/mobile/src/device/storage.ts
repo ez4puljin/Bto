@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from './secure-store';
-import type { StoredSession, TokenStore } from '../api/session';
+import type { IdentityStore, StoredSession, TokenStore } from '../api/session';
 import { type RecentServer, recentServersFrom } from '../server/server-url';
+import { type OutboxStore, outboxStoreOn } from '../outbox/storage';
+import { userKey } from './keys';
 
 // What the phone keeps (ADR-0061 #8): the refresh token in secure storage; the server address,
 // the recent servers, the chosen stage and the unsent cart in app storage. A read that fails is
@@ -25,7 +27,7 @@ export async function writeJson(key: string, value: unknown): Promise<void> {
   }
 }
 
-export { userKey } from './keys';
+export { userKey };
 
 export const SERVER_KEY = 'bto.server.v1';
 
@@ -70,3 +72,27 @@ export const secureTokenStore: TokenStore = {
     await SecureStore.deleteItemAsync(SESSION_KEY);
   },
 };
+
+/**
+ * Who signed in, as `GET /auth/me` last answered (`bto.identity.v1:<server>:<userId>`): the staff
+ * app opens from it when the server does not answer (owner 2026-11-19). The user and the rights,
+ * no token; cleared when the session ends.
+ */
+export const identityStore: IdentityStore = {
+  load: (server, userId) => readJson(userKey('identity', server, userId)),
+  save: (server, userId, me) => writeJson(userKey('identity', server, userId), me),
+  clear: (server, userId) => writeJson(userKey('identity', server, userId), null),
+};
+
+/**
+ * Writes a value and rejects when the storage fails (unlike `writeJson`): for what must be on the
+ * phone before the next step (the cart before an outbox entry is removed).
+ */
+export async function setJson(key: string, value: unknown): Promise<void> {
+  await AsyncStorage.setItem(key, JSON.stringify(value));
+}
+
+/** The rep's outbox on the phone, one key per entry (`src/outbox/storage.ts`). */
+export function outboxStore(server: string, userId: number): OutboxStore {
+  return outboxStoreOn(AsyncStorage, server, userId);
+}

@@ -7,6 +7,7 @@ import { feedCount, useFeed } from '../../src/api/community';
 import { initialsOf } from '../../src/format/format';
 import { useRoleName } from '../../src/state/role';
 import { MyPhoto } from '../../src/staff/my-photo';
+import { useOutbox } from '../../src/state/outbox';
 import { useSignedIn } from '../../src/state/session';
 import { colors, fonts, spacing, tabular, type } from '../../src/theme/tokens';
 import { CountBadge, PillButton } from '../../src/ui/controls';
@@ -28,6 +29,8 @@ export default function StoreProfileScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { session, me, server } = useSignedIn();
+  // Unsent orders stay in the outbox on the phone and go after the next sign-in (owner 2026-11-19).
+  const unsent = useOutbox().unsent.length;
   const community = feedCount(useFeed().data);
   const roleName = useRoleName();
   const [leaving, setLeaving] = useState(false);
@@ -125,6 +128,7 @@ export default function StoreProfileScreen() {
       <ActionSheet
         visible={leaving}
         title={t('mobile.profile.logoutTitle')}
+        {...(unsent > 0 ? { message: t('mobile.outbox.logoutHint', { n: unsent }) } : {})}
         actions={[
           {
             label: t('mobile.profile.logout'),
