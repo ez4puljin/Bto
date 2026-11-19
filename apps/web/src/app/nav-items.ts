@@ -1,5 +1,7 @@
 import type mn from '@tugeel/shared/i18n/mn.json';
 import type { Permission } from '@tugeel/shared/auth';
+import type { ComponentType } from 'react';
+import { ChatNavBadge } from '@/features/chat/nav-badge';
 import {
   Activity,
   ArrowLeftRight,
@@ -48,6 +50,7 @@ import {
   MapPinned,
   Megaphone,
   MessageSquareText,
+  MessagesSquare,
   Monitor,
   MousePointerClick,
   Move,
@@ -110,6 +113,8 @@ export interface NavItem {
   also?: readonly string[];
   /** Shown in development builds only (the supermarket's test till, ADR-0063 #8). */
   devOnly?: boolean;
+  /** A small component drawn at the end of the entry (the chat's waiting count). */
+  badge?: ComponentType;
 }
 
 export interface NavGroup {
@@ -144,6 +149,15 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: SquareKanban,
         permission: 'sales.orders.read',
         also: ['/sales/orders'],
+      },
+      {
+        // The stores' conversations of the customer app (ADR-0224); the badge counts the waiting ones.
+        to: '/chat',
+        label: 'nav.chat',
+        icon: MessagesSquare,
+        permission: ['chat.answer', 'chat.answer_own'],
+        also: ['/chat/settings'],
+        badge: ChatNavBadge,
       },
       {
         to: '/sales/visits',

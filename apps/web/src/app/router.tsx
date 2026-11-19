@@ -4,6 +4,8 @@ import { AppShell } from '@/app/app-shell';
 import { NotFoundPage } from '@/app/not-found-page';
 import { RequireAuth, RequirePermission } from '@/app/require-auth';
 import { RouteErrorBoundary } from '@/app/route-error-boundary';
+import { ChatPage } from '@/features/chat/chat-page';
+import { ChatSettingsPage } from '@/features/chat/settings-page';
 import { AccountPage } from '@/features/auth/account-page';
 import { LoginPage } from '@/features/auth/login-page';
 import { SetPasswordPage } from '@/features/auth/set-password-page';
@@ -657,6 +659,24 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission="sales.boards.manage">
                 <DocumentTemplateEditorPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: 'chat',
+            handle: { width: 'full' },
+            element: (
+              <RequirePermission permission={['chat.answer', 'chat.answer_own']}>
+                <ChatPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: 'chat/settings',
+            handle: { width: 'reading' },
+            element: (
+              <RequirePermission permission="chat.settings.manage">
+                <ChatSettingsPage />
               </RequirePermission>
             ),
           },

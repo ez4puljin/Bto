@@ -126,6 +126,7 @@ export function Sidebar(props: {
                     >
                       <item.icon aria-hidden className="size-4 shrink-0 text-primary" />
                       {t(item.label)}
+                      {item.badge ? <item.badge /> : null}
                     </Link>
                   </li>
                 ))}
