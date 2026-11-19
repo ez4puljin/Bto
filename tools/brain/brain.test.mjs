@@ -1,4 +1,4 @@
-// The brain's tools (ADR-0213): mn.json merged by key, the key scan, the scripts' syntax.
+// The brain's tools (ADR-0213): mn.json merged by key, the key scan, the scripts' syntax, the guard.
 //   node --test tools/brain/brain.test.mjs
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -6,6 +6,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { check } from './guard.mjs';
 import { merge, parse, print } from './merge-json.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -77,4 +78,71 @@ test('the shell tools parse', () => {
     const run = spawnSync('bash', ['-n', join(here, name)], { encoding: 'utf8' });
     assert.equal(run.status, 0, `${name}: ${run.stderr}`);
   }
+});
+
+const home = '/home/u';
+const dev = `${home}/bto-dev`;
+const port = '15433'; // the real system's database
+
+test('the guard blocks what Bto forbids', () => {
+  const blocked = [
+    ['git commit --no-verify -m x', dev],
+    ['git commit -n -m x', dev],
+    ['git commit -anm x', dev],
+    ['git push --no-verify origin task/x', `${home}/bto-work/x`],
+    ['git merge --no-verify task/x', dev],
+    ['git rebase --no-verify origin/main', dev],
+    ['git add -A', dev],
+    ['git add --all', dev],
+    ['git add .', dev],
+    ['git add :/', dev],
+    ['cd apps && git add .', dev],
+    ['bash -c "git add -A"', dev],
+    ['git -C ~/bto-work/x add -A', home],
+    ['docker compose down -v', dev],
+    ['docker compose -f docker-compose.yml down --volumes', home],
+    ['docker-compose down -v', `${home}/bto`],
+    ['git push --force origin main', dev],
+    ['git push -f origin main', dev],
+    ['git push --force-with-lease origin HEAD:main', dev],
+    ['git push origin +main', dev],
+    [`psql -h 127.0.0.1 -p ${port} bto`, dev],
+    [`DATABASE_URL=postgres://x@127.0.0.1:${port}/bto pnpm db:migrate`, `${home}/bto-work/x`],
+  ];
+  for (const [command, cwd] of blocked) {
+    assert.ok(check(command, cwd, home), `${command} (in ${cwd}) should be blocked`);
+  }
+});
+
+test('the guard lets the ordinary commands run', () => {
+  const allowed = [
+    ['git add apps/web/src/x.tsx', dev],
+    ['git commit -m "add -A flag docs"', dev],
+    ['docker compose up -d --wait', dev],
+    ['docker compose down', dev],
+    ['git push origin main', dev],
+    ['git push --force origin task/x', dev],
+    [`psql -h 127.0.0.1 -p ${port} bto`, `${home}/bto`],
+    ['git log --oneline', dev],
+    ['git add .', `${home}/bto`],
+    ['git push -n origin main', dev],
+    ['git commit -C HEAD --amend', dev],
+    ["git commit -m \"$(cat <<'EOF'\nfix: don't (ever) git add . or down -v\nEOF\n)\"", dev],
+    ['cat > notes.txt <<EOF\ngit add -A\nEOF', dev],
+    ['echo "git add ." # docker compose down -v', dev],
+    ['', dev],
+  ];
+  for (const [command, cwd] of allowed) {
+    assert.equal(check(command, cwd, home), null, `${command} (in ${cwd})`);
+  }
+});
+
+test('the guard as a hook: exit 2 with a reason, 0 otherwise, 0 on input it cannot read', () => {
+  const hook = (input) =>
+    spawnSync(process.execPath, [join(here, 'guard.mjs')], { input, encoding: 'utf8' });
+  const blocked = hook(JSON.stringify({ tool_input: { command: 'git add -A' }, cwd: dev }));
+  assert.equal(blocked.status, 2);
+  assert.match(blocked.stderr, /^guard: .*by name/);
+  assert.equal(hook(JSON.stringify({ tool_input: { command: 'ls' }, cwd: dev })).status, 0);
+  assert.equal(hook('not json').status, 0);
 });

@@ -4,9 +4,10 @@ The owner tells one session, the brain, what to change. The brain writes no code
 to a worker of the right model in the task's own copy of the code, lands the finished tasks through
 one gate, and reports in Mongolian. The brain's own rules are the skill `tarhi`
 (`skill/SKILL.md`); the workers are `agents/bto-ui.md` (Sonnet: screens and texts),
-`agents/bto-core.md` (Opus: the api, stock, money, migrations) and `agents/bto-scout.md` (Haiku:
-finds things, changes nothing). `bash tools/brain/install.sh` copies them to `~/.claude/` where
-every session on this PC finds them; run it again after changing them.
+`agents/bto-core.md` (Opus: the api, stock, money, migrations), `agents/bto-scout.md` (Haiku:
+finds things, changes nothing) and `agents/bto-review.md` (Sonnet: reviews a finished task, changes
+nothing). `bash tools/brain/install.sh` copies them to `~/.claude/` where every session on this PC
+finds them, and registers the guard; run it again after changing them.
 
 ## Why two tasks never collide
 
@@ -44,6 +45,27 @@ system takes a minute (pages only) or five, and names a landed migration.
 The books are in `~/bto-work/.brain/`: `lanes/<slug>` (the paths a task holds), `numbers`, `log`
 (every landing), `land-check.log` (the last check). The gate is `~/bto-work/_gate`, a worktree that
 stands at `origin/main` between landings.
+
+## The reviewer and the guard
+
+Two ideas borrowed from the open-source Claude Code toolkit ECC (github.com/affaan-m/ECC, MIT),
+rewritten for Bto; no file or dependency of it is used.
+
+- **`bto-review`** reads a finished task's diff (`git diff origin/main...HEAD` in its copy) and the
+  code around it before the brain lands it: every guarded (`bto-core`) task and any diff over about
+  300 lines. It looks for Bto's own faults (money not through `Decimal`, the ledger or the books
+  written outside one transaction or not append-only, a migration that does more than add, a route
+  without its right, a swallowed error, a guard loosened to pass a check, port 15433 or `~/bto`
+  named, a text outside `mn.json`) and reports only what it is more than 80% sure of, each finding
+  with its line and the failure it causes; zero findings is a normal answer. Its last line is
+  `APPROVE` or `BLOCK: <n> finding(s)`; the brain sends a block back to the task's worker.
+- **`guard.mjs`** is a PreToolUse hook on every Bash command of every session on this PC. It
+  blocks, with one line naming the rule: `--no-verify` on commit, push, merge or rebase (and
+  `commit -n`); `git add -A`, `--all`, `.` or `:/`; `docker compose … down -v`; a force push to
+  `main`; and any command naming 15433 run from `~/bto-dev` or `~/bto-work`. In `~/bto` only
+  `down -v` is blocked. Only clear cases: quoted text, heredocs and comments are not commands, and
+  any input it cannot read lets the command run. A blocked command is fixed, never worked around.
+  The tests are in `brain.test.mjs`.
 
 ## The check a task runs: `pnpm check:fast`
 

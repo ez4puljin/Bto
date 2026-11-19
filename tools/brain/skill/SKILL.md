@@ -14,6 +14,9 @@ words. You direct the work; workers do it. Decided in ADR-0213; the tools are in
 - Write or edit code yourself, in any checkout. Your own edits are only the two shared documents
   (`docs/STATUS.md`, `docs/decisions/README.md`), through a task of their own (see «Documents»).
 - Give one file to two running tasks. `task.sh` refuses it; never work around the refusal.
+- Work around the guard. A hook (`guard.mjs`) stops any session's `--no-verify`, `git add -A`/`.`,
+  `down -v`, force push to main and port 15433 in development; a blocked command is fixed, never
+  rephrased to slip past it.
 - Run `deploy/store/setup.sh`, watch CI, or ask the owner before an update: a landed task goes
   onto the real system by itself in one to five minutes (ADR-0204).
 - Guess a business rule. One short question to the owner, with the options, then go on.
@@ -42,6 +45,7 @@ words. You direct the work; workers do it. Decided in ADR-0213; the tools are in
    | a screen, list, dialog, print, text, menu in the web or the staff app | `bto-ui` | Sonnet |
    | the api, stock, money, rights, a migration, shared packages, deploy scripts, or the api and a client together | `bto-core` | Opus |
    | where is it, how does it work now | `bto-scout` | Haiku |
+   | review a finished task's diff before it lands (step 7) | `bto-review` | Sonnet |
 
    A session that started before the workers were installed does not know these worker names
    (the Agent tool answers «Agent type 'bto-ui' not found»). Then use `general-purpose` with
@@ -52,8 +56,12 @@ words. You direct the work; workers do it. Decided in ADR-0213; the tools are in
    module, a change of the books). Never give a guarded task to `bto-ui`.
 6. **Stay free.** While workers run, answer the owner's next message and open the next tasks.
 7. **When a worker reports:**
-   - `DONE`: look at what it did, `git -C ~/bto-work/<slug> show --stat HEAD`, and read the diff
-     when it is guarded or larger than the brief. Then land it (below).
+   - `DONE`: look at what it did, `git -C ~/bto-work/<slug> show --stat HEAD`. A guarded task
+     (`bto-core`) or a diff over about 300 lines first gets `bto-review` (Agent, `subagent_type:
+     "bto-review"`, `model: "sonnet"`, the slug and the brief's module document and ADRs). Its last
+     line is `APPROVE`: land it (below). `BLOCK: <n> finding(s)`: send the findings to the task's
+     worker (`SendMessage`) and land after it reports again. A light `bto-ui` task lands without
+     review unless you see a reason.
    - `NEED: <path>`: `bash ~/bto-dev/tools/brain/task.sh claim <slug> <path>` and tell the worker
      to go on (`SendMessage`). Refused: wait for the holder to land, then claim again.
    - `BLOCKED: <question>`: ask the owner, send the answer to the worker.
