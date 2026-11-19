@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, desc, eq, inArray, isNotNull, lt, ne, type SQL, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gt, inArray, isNotNull, lt, ne, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -184,18 +184,24 @@ export class ChatService {
     return (await this.rowOf(ctx.customerId))?.customerUnread ?? 0;
   }
 
-  /** The store has seen everything: its unread count goes to 0. */
+  /** The store has seen everything that was there when it asked: its unread count goes to 0. */
   async readByCustomer(ctx: CustomerContext): Promise<ConversationRow> {
     const row = await this.ensure(ctx.customerId);
     if (row.customerUnread === 0) return row;
     return inTransaction(this.db, async (tx) => {
+      const locked = await this.lock(tx, row.id);
+      const left = await this.unreadSince(tx, row, locked, locked.customerUnread, 'CUSTOMER');
       const [updated] = await tx
         .update(chatConversations)
-        .set({ customerUnread: 0, updatedAt: sql`now()` })
-        .where(eq(chatConversations.id, row.id))
+        .set({ customerUnread: left, updatedAt: sql`now()` })
+        .where(eq(chatConversations.id, locked.id))
         .returning();
-      await notifyChat(tx, { conversationId: row.id, customerId: row.customerId, messageId: null });
-      return updated ?? row;
+      await notifyChat(tx, {
+        conversationId: locked.id,
+        customerId: locked.customerId,
+        messageId: null,
+      });
+      return updated ?? locked;
     });
   }
 
@@ -386,22 +392,24 @@ export class ChatService {
     return { chat: await this.staffChat(written.row), message };
   }
 
-  /** The staff have seen the store's messages: the conversation's unread count goes to 0. */
+  /** The staff have seen the store's messages that were there: the unread count goes to 0. */
   async readByStaff(ctx: AuthContext, id: number): Promise<StaffChat> {
     const before = await this.visible(ctx, id);
     if (before.staffUnread === 0) return this.staffChat(before);
     const row = await inTransaction(this.db, async (tx) => {
+      const locked = await this.lock(tx, before.id);
+      const left = await this.unreadSince(tx, before, locked, locked.staffUnread, 'STAFF');
       const [updated] = await tx
         .update(chatConversations)
-        .set({ staffUnread: 0, updatedAt: sql`now()` })
-        .where(eq(chatConversations.id, before.id))
+        .set({ staffUnread: left, updatedAt: sql`now()` })
+        .where(eq(chatConversations.id, locked.id))
         .returning();
       await notifyChat(tx, {
-        conversationId: before.id,
-        customerId: before.customerId,
+        conversationId: locked.id,
+        customerId: locked.customerId,
         messageId: null,
       });
-      return updated ?? before;
+      return updated ?? locked;
     });
     return this.staffChat(row);
   }
@@ -537,6 +545,37 @@ export class ChatService {
       .for('update');
     if (!row) throw notFound('chat conversation', id);
     return row;
+  }
+
+  /**
+   * What a read leaves of a counter (`unread`, read from the locked row): a read clears only what
+   * existed when it began (`before`). When a message came meanwhile — a staff answer or a close
+   * while the store's read waited on the lock, a store's message while the staff's did — the
+   * messages the other side wrote since stay unread, never more than the counter holds.
+   * `reader` is the side that reads: the store's read keeps what staff and the bot wrote, the
+   * staff's read keeps what the store wrote.
+   */
+  private async unreadSince(
+    tx: Tx,
+    before: ConversationRow,
+    locked: ConversationRow,
+    unread: number,
+    reader: 'CUSTOMER' | 'STAFF',
+  ): Promise<number> {
+    if (locked.lastMessageId === before.lastMessageId || unread === 0) return 0;
+    const [since] = await tx
+      .select({ n: count() })
+      .from(chatMessages)
+      .where(
+        and(
+          eq(chatMessages.conversationId, locked.id),
+          gt(chatMessages.id, before.lastMessageId ?? 0),
+          reader === 'CUSTOMER'
+            ? ne(chatMessages.sender, 'CUSTOMER')
+            : eq(chatMessages.sender, 'CUSTOMER'),
+        ),
+      );
+    return Math.min(unread, since?.n ?? 0);
   }
 
   private async write(

@@ -1,6 +1,7 @@
 import { get, type IncomingMessage } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { Pool, type PoolClient } from 'pg';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { businessDate } from '@tugeel/shared/time';
 import request from 'supertest';
@@ -576,5 +577,104 @@ describe('customer chat (ADR-0224)', () => {
     const refused = await send(busy, { text: 'Дахиад нэг' }).expect(429);
     expect((refused.body as { code: string }).code).toBe('TOO_MANY_REQUESTS');
     expect((await open(busy)).messages).toHaveLength(CHAT_LIMITS.sendsPerMinute + 2);
+  });
+
+  it('never lets a read clear a message that came while the read waited on the conversation', async () => {
+    const racer = await appStore(app, office);
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
+    /**
+     * Holds the conversation's row lock in a transaction of its own, starts `read`, and once the
+     * read waits on that lock commits `meanwhile` (what a reply or a send writes) under it.
+     */
+    const raced = async <T>(
+      id: number,
+      read: () => Promise<T>,
+      meanwhile: (client: PoolClient) => Promise<void>,
+    ): Promise<T> => {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SELECT id FROM chat_conversations WHERE id = $1 FOR UPDATE', [id]);
+        await meanwhile(client);
+        const pending = read();
+        const deadline = Date.now() + 5_000;
+        for (;;) {
+          const { rows } = await pool.query<{ n: number }>(
+            `SELECT count(*)::int AS n FROM pg_stat_activity
+              WHERE datname = current_database() AND wait_event_type = 'Lock'
+                AND query ILIKE '%chat_conversations%'`,
+          );
+          if ((rows[0]?.n ?? 0) > 0) break;
+          if (Date.now() > deadline) throw new Error('the read never waited on the lock');
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        await client.query('COMMIT');
+        return await pending;
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    };
+    try {
+      const chat = await open(racer);
+      const id = chat.conversation.id;
+      await reply(office, id, 'Эхний хариу').expect(201);
+      expect((await racer.api.get('/chat/unread').expect(200)).body).toEqual({ unread: 1 });
+
+      // A staff answer commits while the store's read waits: the read clears only the first one.
+      const storeRead = await raced(
+        id,
+        async () => (await racer.api.post('/chat/read').expect(200)).body as ConversationJson,
+        async (client) => {
+          const { rows } = await client.query<{ id: string }>(
+            `INSERT INTO chat_messages (conversation_id, sender, staff_user_id, body)
+             VALUES ($1, 'STAFF', $2, 'Хоёр дахь хариу') RETURNING id`,
+            [id, officeId],
+          );
+          await client.query(
+            `UPDATE chat_conversations SET customer_unread = customer_unread + 1,
+                    last_message_id = $2, last_message_at = now() WHERE id = $1`,
+            [id, rows[0]?.id],
+          );
+        },
+      );
+      expect(storeRead.unread).toBe(1);
+      expect((await racer.api.get('/chat/unread').expect(200)).body).toEqual({ unread: 1 });
+      expect((await racer.api.post('/chat/read').expect(200)).body).toMatchObject({ unread: 0 });
+
+      // The mirror: a store's message commits while the staff's read waits.
+      await sent(racer, { text: 'Асуулт байна' });
+      const staffRead = await raced(
+        id,
+        async () =>
+          (
+            await http()
+              .post(`/api/v1/chat/conversations/${id}/read`)
+              .set(bearer(office))
+              .expect(200)
+          ).body as StaffChatJson,
+        async (client) => {
+          const { rows } = await client.query<{ id: string }>(
+            `INSERT INTO chat_messages (conversation_id, sender, customer_user_id, body)
+             SELECT conversation_id, 'CUSTOMER', customer_user_id, 'Дахиад нэг асуулт'
+               FROM chat_messages WHERE conversation_id = $1 AND sender = 'CUSTOMER' LIMIT 1
+             RETURNING id`,
+            [id],
+          );
+          await client.query(
+            `UPDATE chat_conversations SET staff_unread = staff_unread + 1, awaiting_staff = true,
+                    last_message_id = $2, last_message_at = now() WHERE id = $1`,
+            [id, rows[0]?.id],
+          );
+        },
+      );
+      expect(staffRead.unread).toBe(1);
+      expect((await staffGet<StaffChatJson>(`/conversations/${id}`, office)).unread).toBe(1);
+      await close(office, id).expect(200);
+    } finally {
+      await pool.end();
+    }
   });
 });
