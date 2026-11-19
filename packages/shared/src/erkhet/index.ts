@@ -57,13 +57,31 @@ export const ERKHET_ISSUES_OF: Readonly<Record<ErkhetSyncKind, readonly ErkhetSy
 };
 
 /**
- * What «Bto-д тааруулах» can do, Erkhet → Bto only (owner 2026-11-16): add a missing customer,
- * take Erkhet's name for a customer, take Erkhet's unit price as the warehouse price. Everything
+ * What «Bto-д тааруулах» can do, Erkhet → Bto only (owner 2026-11-16, 2026-11-19): add a missing
+ * customer, take Erkhet's name for a customer, take Erkhet's unit price as the warehouse price, add
+ * a missing product (ADR-0222) and price a product that has no price today (ADR-0222). Everything
  * else is shown for a person to settle; nothing is ever written to Erkhet.
  */
 export function erkhetIssueAppliable(kind: ErkhetSyncKind, issue: ErkhetSyncIssue): boolean {
   if (kind === 'CUSTOMER') return issue === 'MISSING_IN_BTO' || issue === 'NAME_DIFFERS';
-  return issue === 'PRICE_DIFFERS';
+  return issue === 'PRICE_DIFFERS' || issue === 'MISSING_IN_BTO' || issue === 'NO_BTO_PRICE';
+}
+
+/** What a person chooses before «Bto-д тааруулах» acts on rows of an issue (ADR-0222). */
+export type ErkhetApplyChoice = 'categoryId' | 'profileId';
+
+/**
+ * The choices an issue's rows need: a new product takes the category and the price profile chosen
+ * in the dialog, a product priced from Erkhet the profile. The other issues need none.
+ */
+export function erkhetApplyChoices(
+  kind: ErkhetSyncKind,
+  issue: ErkhetSyncIssue,
+): readonly ErkhetApplyChoice[] {
+  if (kind !== 'PRODUCT') return [];
+  if (issue === 'MISSING_IN_BTO') return ['categoryId', 'profileId'];
+  if (issue === 'NO_BTO_PRICE') return ['profileId'];
+  return [];
 }
 
 export const ERKHET_RUN_STATUSES = ['QUEUED', 'RUNNING', 'DONE', 'FAILED'] as const;
@@ -115,6 +133,13 @@ export const ERKHET_ITEM_COLUMNS = {
   category: 'Ангилал нэр',
   barcodes: 'Баркод',
   price: 'Нэгж үнэ',
+  // Read when present, never required (ADR-0222): what a product added from Erkhet takes.
+  unitCode: 'Хэмжих нэгж код',
+  unitName: 'Хэмжих нэгж нэр',
+  /** One base unit in the pack unit («Задрах нэгж»): 1/12 for a box of 12, or 12 written the other way. */
+  packRatio: 'Задрах харьцаа',
+  /** Kilograms per base unit. */
+  weight: 'Жин',
 } as const;
 
 export const ERKHET_CUSTOMER_COLUMNS = {

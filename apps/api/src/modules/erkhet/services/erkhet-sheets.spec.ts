@@ -41,6 +41,21 @@ describe("Erkhet's lists (ADR-0203)", () => {
     expect(items[2]?.price).toBeNull();
   });
 
+  it('reads the unit, the pack ratio and the weight when the list has them (ADR-0222)', async () => {
+    const data = await workbook([
+      [...ITEM_HEAD, 'Хэмжих нэгж код', 'Хэмжих нэгж нэр', 'Задрах харьцаа', 'Жин'],
+      ['100001', 'Ус', '101', 'Ус ундаа', '', '4006381333931', 1500, 'ш', 'ширхэг', 1 / 12, 0.5],
+      ['100002', 'Гурил', '102', 'Гурил', '', '5901234123457', 2500, 'кг', 'Килограмм', '', '-'],
+    ]);
+    const items = await readErkhetItems(data);
+    expect(items[0]).toMatchObject({ unitCode: 'ш', unitName: 'ширхэг', weight: '0.5' });
+    expect(items[0]?.packRatio).toMatch(/^0\.08333/);
+    expect(items[1]).toMatchObject({ unitCode: 'кг', packRatio: null, weight: null });
+    // A list without those columns is still read: the rows carry nothing of them.
+    const plain = await readErkhetItems(await workbook([ITEM_HEAD, ['1', 'a', '', '', '', '', 5]]));
+    expect(plain[0]).toMatchObject({ unitCode: '', unitName: '', packRatio: null, weight: null });
+  });
+
   it('reads the customer list', async () => {
     const data = await workbook([
       CUSTOMER_HEAD,

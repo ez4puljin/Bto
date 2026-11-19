@@ -9,7 +9,7 @@ import type { Decimal } from '@tugeel/shared/money';
 import { normalizeMnPhone } from '@tugeel/shared/phone';
 import type { CustomerKind } from '@tugeel/shared/taxpayer';
 import { normalizeName } from '@tugeel/shared/text';
-import type { ErkhetCustomerPlan, ErkhetListSummary } from '../schema';
+import type { ErkhetItemPlan, ErkhetListSummary } from '../schema';
 import type { ErkhetCustomerRow, ErkhetItemRow } from './erkhet-sheets';
 
 /** A row a check found to differ, before it is stored. */
@@ -25,7 +25,7 @@ export interface FoundItem {
   btoCode: string | null;
   btoName: string | null;
   btoPrice: Decimal | null;
-  plan: ErkhetCustomerPlan | null;
+  plan: ErkhetItemPlan | null;
 }
 
 export interface Compared {
@@ -236,7 +236,14 @@ export function compareProducts(
         }
       }
       if (owners.size === 0) {
-        items.push({ kind: 'PRODUCT', issue: 'MISSING_IN_BTO', ...side });
+        // What «Bto-д нэмэх» needs of Erkhet's list beyond the row's columns (ADR-0222).
+        const plan = {
+          unitCode: row.unitCode || null,
+          unitName: row.unitName || null,
+          packRatio: row.packRatio,
+          weight: row.weight,
+        };
+        items.push({ kind: 'PRODUCT', issue: 'MISSING_IN_BTO', ...side, plan });
         continue;
       }
       if (owners.size > 1) {

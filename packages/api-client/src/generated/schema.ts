@@ -25435,6 +25435,16 @@ export interface components {
             kind: "COMPANY" | "INDIVIDUAL";
             phone: string | null;
         };
+        ErkhetProductPlan: {
+            /** @description «Хэмжих нэгж код» */
+            unitCode: string | null;
+            /** @description «Хэмжих нэгж нэр» */
+            unitName: string | null;
+            /** @description «Задрах харьцаа» as Erkhet gives it */
+            packRatio: string | null;
+            /** @description «Жин», kilograms per base unit */
+            weight: string | null;
+        };
         ErkhetItem: {
             id: number;
             /** @enum {string} */
@@ -25454,6 +25464,8 @@ export interface components {
             /** @description MNT */
             btoPrice: string | null;
             plan: components["schemas"]["ErkhetCustomerPlan"] | null;
+            /** @description What a product missing in Bto takes from Erkhet's list (ADR-0222) */
+            productPlan: components["schemas"]["ErkhetProductPlan"] | null;
             /** @enum {string|null} */
             resolution: "APPLIED" | "STALE" | "REFUSED" | null;
             /** Format: date-time */
@@ -25473,6 +25485,10 @@ export interface components {
              * @enum {string}
              */
             issue?: "MISSING_IN_BTO" | "GROUP_NOT_TAKEN" | "NAME_DIFFERS" | "PRICE_DIFFERS" | "NO_BTO_PRICE" | "INACTIVE_IN_BTO" | "AMBIGUOUS" | "NO_BARCODE" | "MISSING_IN_ERKHET";
+            /** @description The category of the products added from Erkhet; required for those rows */
+            categoryId?: number;
+            /** @description The price profile of the prices taken from Erkhet; required for new and unpriced products */
+            profileId?: number;
         };
         ErkhetApplyResult: {
             /** @description Bto now says what Erkhet says */
@@ -53192,7 +53208,7 @@ export interface operations {
                 limit?: number;
                 kind: "CUSTOMER" | "PRODUCT";
                 issue?: "MISSING_IN_BTO" | "GROUP_NOT_TAKEN" | "NAME_DIFFERS" | "PRICE_DIFFERS" | "NO_BTO_PRICE" | "INACTIVE_IN_BTO" | "AMBIGUOUS" | "NO_BARCODE" | "MISSING_IN_ERKHET";
-                /** @description A code, a name or a barcode of either side */
+                /** @description A code, a name or a barcode of either side, or Erkhet's group or category */
                 q?: string;
                 /** @description true: only rows not settled yet */
                 open?: boolean;

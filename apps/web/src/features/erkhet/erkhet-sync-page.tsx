@@ -31,6 +31,7 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbMinute } from '@/lib/dayjs';
@@ -46,6 +47,7 @@ import {
   useErkhetItems,
   useErkhetOverview,
 } from './api';
+import { ErkhetApplyDialog, type ErkhetApplyChosen } from './erkhet-apply-dialog';
 import { ErkhetLedgerPanel } from './erkhet-ledger-panel';
 import { ErkhetSettingsDialog } from './erkhet-settings-dialog';
 
@@ -62,6 +64,7 @@ const CUSTOMER_COLUMNS: readonly ColumnSpec[] = [
 const PRODUCT_COLUMNS: readonly ColumnSpec[] = [
   { key: 'erkhetCode', kind: 'code' },
   { key: 'erkhetName', kind: 'text', weight: 3, min: 12 },
+  { key: 'erkhetGroup', kind: 'text', weight: 2, min: 9 },
   { key: 'erkhetBarcodes', kind: 'text', weight: 2, min: 9 },
   { key: 'erkhetPrice', kind: 'money' },
   { key: 'btoCode', kind: 'code' },
@@ -70,6 +73,9 @@ const PRODUCT_COLUMNS: readonly ColumnSpec[] = [
   { key: 'status', kind: 'status' },
   { key: 'spacer', kind: 'spacer' },
 ];
+
+/** The tick column, before the others while rows can be ticked. */
+const CHECK_COLUMN: ColumnSpec = { key: 'check', kind: 'check' };
 
 /** The page's two parts: the check of customers and items, and the copy of the ledgers (ADR-0219). */
 const PARTS = ['check', 'ledger'] as const;
@@ -83,15 +89,22 @@ const summaryOf = (run: ErkhetRun | null, kind: ErkhetSyncKind): ErkhetListSumma
 const countOf = (summary: ErkhetListSummary | null, issue: ErkhetSyncIssue): number =>
   summary?.issues[issue] ?? 0;
 
+type ApplyAction =
+  'addCustomers' | 'renameCustomers' | 'setPrices' | 'addProducts' | 'priceProducts';
+
 /** What «Bto-д тааруулах» does for an issue; null where a person has to settle it. */
-function applyAction(
-  kind: ErkhetSyncKind,
-  issue: ErkhetSyncIssue,
-): 'addCustomers' | 'renameCustomers' | 'setPrices' | null {
+function applyAction(kind: ErkhetSyncKind, issue: ErkhetSyncIssue): ApplyAction | null {
   if (!erkhetIssueAppliable(kind, issue)) return null;
-  if (kind === 'PRODUCT') return 'setPrices';
+  if (kind === 'PRODUCT') {
+    if (issue === 'MISSING_IN_BTO') return 'addProducts';
+    return issue === 'NO_BTO_PRICE' ? 'priceProducts' : 'setPrices';
+  }
   return issue === 'MISSING_IN_BTO' ? 'addCustomers' : 'renameCustomers';
 }
+
+/** The actions that ask for a category or a price profile first (ADR-0222). */
+const withChoices = (action: ApplyAction | null): action is 'addProducts' | 'priceProducts' =>
+  action === 'addProducts' || action === 'priceProducts';
 
 type FailureKey =
   | 'loginFailed'
@@ -156,9 +169,34 @@ export function ErkhetSyncPage() {
   const summary = summaryOf(latest, kind);
   const items = useErkhetItems({ runId: latest?.id ?? null, kind, issue, q, open });
   const rows = items.data?.pages.flatMap((page) => page.data) ?? [];
-  const openRows = rows.filter((row) => row.resolution === null).length;
+  const openRows = rows.filter((row) => row.resolution === null);
   const applying = canManage ? applyAction(kind, issue) : null;
-  const columns = kind === 'CUSTOMER' ? CUSTOMER_COLUMNS : PRODUCT_COLUMNS;
+  // Ticks belong to one list: another check, kind or issue starts with none.
+  const scope = `${latest?.id ?? 0}:${kind}:${issue}`;
+  const [ticks, setTicks] = useState<{ scope: string; ids: ReadonlySet<number> }>({
+    scope,
+    ids: new Set(),
+  });
+  const ticked = ticks.scope === scope ? ticks.ids : new Set<number>();
+  const chosen = openRows.filter((row) => ticked.has(row.id));
+  const allChosen = openRows.length > 0 && chosen.length === openRows.length;
+  const setTicked = (ids: ReadonlySet<number>) => setTicks({ scope, ids });
+  const toggle = (id: number, on: boolean) => {
+    const next = new Set(ticked);
+    if (on) next.add(id);
+    else next.delete(id);
+    setTicked(next);
+  };
+  // With nothing ticked the button takes every open row of the issue, as many as one request takes.
+  const targetCount =
+    chosen.length > 0
+      ? chosen.length
+      : Math.min(
+          items.hasNextPage ? countOf(summary, issue) : openRows.length,
+          ERKHET_LIMITS.maxApply,
+        );
+  const baseColumns = kind === 'CUSTOMER' ? CUSTOMER_COLUMNS : PRODUCT_COLUMNS;
+  const columns = applying ? [CHECK_COLUMN, ...baseColumns] : baseColumns;
   const running = Boolean(state?.active) || actions.start.isPending;
 
   const start = () =>
@@ -166,15 +204,19 @@ export function ErkhetSyncPage() {
       await actions.start.mutateAsync();
       toast.success(t('erkhet.started'));
     });
-  const apply = async () => {
+  const apply = async (chosenValues?: ErkhetApplyChosen) => {
+    const target = chosen.length > 0 ? { itemIds: chosen.map((row) => row.id) } : { kind, issue };
     const done = await action.run(async () => {
-      const result = await actions.apply.mutateAsync({ kind, issue });
+      const result = await actions.apply.mutateAsync({ ...target, ...chosenValues });
       toast.success(t('erkhet.apply.done', { count: result.applied }));
       if (result.stale + result.refused > 0) {
         toast.warning(t('erkhet.apply.left', { stale: result.stale, refused: result.refused }));
       }
     });
-    if (done) setConfirming(false);
+    if (done) {
+      setConfirming(false);
+      setTicked(new Set());
+    }
   };
 
   return (
@@ -280,7 +322,7 @@ export function ErkhetSyncPage() {
               applying && latest ? (
                 <Button
                   variant="secondary"
-                  disabled={openRows === 0 || running}
+                  disabled={openRows.length === 0 || running}
                   onClick={() => setConfirming(true)}
                 >
                   <ArrowLeftRight />
@@ -319,11 +361,24 @@ export function ErkhetSyncPage() {
             <ListTable columns={columns}>
               <TableHeader>
                 <TableRow>
+                  {applying ? (
+                    <TableHead>
+                      <Checkbox
+                        aria-label={t('common.selectAll')}
+                        checked={allChosen ? true : chosen.length > 0 ? 'indeterminate' : false}
+                        disabled={openRows.length === 0}
+                        onCheckedChange={(checked) =>
+                          setTicked(
+                            checked === true ? new Set(openRows.map((row) => row.id)) : new Set(),
+                          )
+                        }
+                      />
+                    </TableHead>
+                  ) : null}
                   <TableHead>{t('erkhet.column.erkhetCode')}</TableHead>
                   <TableHead>{t('erkhet.column.erkhetName')}</TableHead>
-                  <TableHead>
-                    {t(kind === 'CUSTOMER' ? 'erkhet.column.group' : 'erkhet.column.barcodes')}
-                  </TableHead>
+                  <TableHead>{t('erkhet.column.group')}</TableHead>
+                  {kind === 'PRODUCT' ? <TableHead>{t('erkhet.column.barcodes')}</TableHead> : null}
                   {kind === 'PRODUCT' ? (
                     <TableHead className="text-right">{t('erkhet.column.erkhetPrice')}</TableHead>
                   ) : null}
@@ -339,7 +394,19 @@ export function ErkhetSyncPage() {
               <TableBody>
                 {items.isPending && latest ? <SkeletonRows columns={columns.length} /> : null}
                 {rows.map((row) => (
-                  <ItemRow key={row.id} item={row} />
+                  <ItemRow
+                    key={row.id}
+                    item={row}
+                    tick={
+                      applying
+                        ? {
+                            enabled: row.resolution === null,
+                            checked: ticked.has(row.id),
+                            onChange: (on) => toggle(row.id, on),
+                          }
+                        : null
+                    }
+                  />
                 ))}
               </TableBody>
             </ListTable>
@@ -355,7 +422,17 @@ export function ErkhetSyncPage() {
             <LoadMore query={items} />
           </ListCard>
 
-          {applying ? (
+          {withChoices(applying) && confirming ? (
+            <ErkhetApplyDialog
+              action={applying}
+              count={targetCount}
+              pending={actions.apply.isPending}
+              problem={action.problem}
+              onSubmit={(values) => void apply(values)}
+              onClose={() => setConfirming(false)}
+            />
+          ) : null}
+          {applying && !withChoices(applying) ? (
             <ConfirmDialog
               open={confirming}
               title={t(`erkhet.apply.button.${applying}`)}
@@ -418,18 +495,38 @@ function Stat(props: { label: string; value: number; tone?: 'success' | 'warning
   );
 }
 
-function ItemRow({ item }: { item: ErkhetItem }) {
+/** A row's tick: only open rows of an issue «Bto-д тааруулах» acts on can be ticked. */
+interface RowTick {
+  enabled: boolean;
+  checked: boolean;
+  onChange: (on: boolean) => void;
+}
+
+function ItemRow({ item, tick }: { item: ErkhetItem; tick: RowTick | null }) {
   const { t } = useTranslation();
   const link = btoLink(item);
   const product = item.kind === 'PRODUCT';
   return (
-    <TableRow>
+    <TableRow data-state={tick?.checked ? 'selected' : undefined}>
+      {tick ? (
+        <TableCell className="p-0 first:pl-0">
+          {/* The whole cell ticks the row (docs/ui.md), in line with the header box. */}
+          <label className="flex cursor-pointer items-center py-2.5 pr-3 pl-4">
+            <Checkbox
+              aria-label={t('common.selectRow', { name: item.erkhetName ?? item.erkhetCode ?? '' })}
+              checked={tick.checked}
+              disabled={!tick.enabled}
+              onCheckedChange={(checked) => tick.onChange(checked === true)}
+            />
+          </label>
+        </TableCell>
+      ) : null}
       <TableCell className="tabular-nums">{item.erkhetCode ?? ''}</TableCell>
       <TruncateCell text={item.erkhetName ?? ''} className="font-medium" />
-      <TruncateCell
-        text={(product ? item.erkhetBarcodes : item.erkhetGroup) ?? ''}
-        className="text-muted-foreground"
-      />
+      <TruncateCell text={item.erkhetGroup ?? ''} className="text-muted-foreground" />
+      {product ? (
+        <TruncateCell text={item.erkhetBarcodes ?? ''} className="text-muted-foreground" />
+      ) : null}
       {product ? (
         <TableCell className="text-right tabular-nums">
           {item.erkhetPrice === null ? '' : formatMnt(item.erkhetPrice)}

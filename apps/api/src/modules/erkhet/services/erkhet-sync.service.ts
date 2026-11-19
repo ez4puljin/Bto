@@ -25,7 +25,7 @@ import {
 } from '../../../common/pagination/page';
 import { type Actor, actorUserId, UserNamesService } from '../../identity';
 import {
-  type ErkhetCustomerPlan,
+  type ErkhetItemPlan,
   type ErkhetRunSummary,
   type ErkhetRunTrigger,
   erkhetSyncItems,
@@ -74,7 +74,8 @@ export interface ErkhetItem {
   btoCode: string | null;
   btoName: string | null;
   btoPrice: Decimal | null;
-  plan: ErkhetCustomerPlan | null;
+  /** A customer's plan on a CUSTOMER row, Erkhet's units on a PRODUCT row (ADR-0222). */
+  plan: ErkhetItemPlan | null;
   resolution: ErkhetResolution | null;
   resolvedAt: Date | null;
 }
@@ -227,6 +228,7 @@ export class ErkhetSyncService {
         or(
           ilike(erkhetSyncItems.erkhetCode, pattern),
           ilike(erkhetSyncItems.erkhetName, pattern),
+          ilike(erkhetSyncItems.erkhetGroup, pattern),
           ilike(erkhetSyncItems.erkhetBarcodes, pattern),
           ilike(erkhetSyncItems.btoCode, pattern),
           ilike(erkhetSyncItems.btoName, pattern),

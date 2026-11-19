@@ -153,6 +153,10 @@ const item = (code: string, barcodes: string[], price: string | null): ErkhetIte
   category: 'Ундаа',
   barcodes,
   price: price === null ? null : new Decimal(price),
+  unitCode: 'ш',
+  unitName: 'ширхэг',
+  packRatio: '0.0833333333333',
+  weight: '0.5',
 });
 
 // Valid EAN-13 codes, stored in Bto under their GTIN-14.
@@ -220,6 +224,14 @@ describe('Erkhet items against Bto products (ADR-0203 #4)', () => {
       'NO_BARCODE:777777',
       'NO_BTO_PRICE:900013',
     ]);
+    // A missing product keeps what «Bto-д нэмэх» needs of Erkhet's list (ADR-0222); others none.
+    expect(items.find((one) => one.issue === 'MISSING_IN_BTO')?.plan).toEqual({
+      unitCode: 'ш',
+      unitName: 'ширхэг',
+      packRatio: '0.0833333333333',
+      weight: '0.5',
+    });
+    expect(items.filter((one) => one.issue !== 'MISSING_IN_BTO' && one.plan !== null)).toEqual([]);
     // A code alone settles nothing when the Bto product of that code has barcodes of its own.
     expect(items.find((one) => one.erkhetCode === '100001')?.btoId).toBe(1);
     expect(items.find((one) => one.issue === 'AMBIGUOUS')?.btoCode).toBe('100001, 100002');

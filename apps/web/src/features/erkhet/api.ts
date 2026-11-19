@@ -14,6 +14,7 @@ export type ErkhetRun = Schemas['ErkhetRun'];
 export type ErkhetListSummary = Schemas['ErkhetListSummary'];
 export type ErkhetItem = Schemas['ErkhetItem'];
 export type ErkhetApplyResult = Schemas['ErkhetApplyResult'];
+export type ErkhetApplyRequest = Schemas['ErkhetApplyRequest'];
 
 const KEYS = {
   settings: ['erkhet', 'settings'] as const,
@@ -106,9 +107,12 @@ export function useErkhetActions() {
       mutationFn: async () => unwrap(await api.POST('/api/v1/erkhet/sync/runs')),
       onSettled: () => queryClient.invalidateQueries({ queryKey: KEYS.overview }),
     }),
-    /** Every open row of one issue, as many as one request takes. */
+    /**
+     * The ticked rows, or every open row of one issue as many as one request takes; with the
+     * category and the price profile chosen for new and unpriced products (ADR-0222).
+     */
     apply: useMutation({
-      mutationFn: async (body: { kind: ErkhetSyncKind; issue: ErkhetSyncIssue }) =>
+      mutationFn: async (body: ErkhetApplyRequest) =>
         unwrap(await api.POST('/api/v1/erkhet/sync/apply', { body })),
       onSettled: () => queryClient.invalidateQueries({ queryKey: KEYS.items }),
     }),

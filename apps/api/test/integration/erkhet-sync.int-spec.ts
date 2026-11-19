@@ -43,6 +43,48 @@ const itemSheet = (rows: [string, string, string, number][]) =>
     ]),
   ]);
 
+/** An Erkhet item with the columns a product added from Erkhet takes (ADR-0222). */
+interface FullItem {
+  code: string;
+  name: string;
+  category: string;
+  barcodes: string;
+  price: number | null;
+  unit?: [string, string];
+  ratio?: number | null;
+  weight?: number | null;
+}
+
+const fullItemSheet = (rows: FullItem[]) =>
+  workbook([
+    [
+      'Код',
+      'Нэр',
+      'Ангилал код',
+      'Ангилал нэр',
+      'Баркод',
+      'Нэгж үнэ',
+      'Хэмжих нэгж код',
+      'Хэмжих нэгж нэр',
+      'Задрах нэгж нэр',
+      'Задрах харьцаа',
+      'Жин',
+    ],
+    ...rows.map((row) => [
+      row.code,
+      row.name,
+      '',
+      row.category,
+      row.barcodes,
+      row.price,
+      row.unit?.[0] ?? 'ш',
+      row.unit?.[1] ?? 'ширхэг',
+      'Хайрцаг',
+      row.ratio ?? null,
+      row.weight ?? null,
+    ]),
+  ]);
+
 const customerSheet = (rows: [string, string, string, string, string][]) =>
   workbook([
     ['Код', 'Нэр', 'Бүлэг код', 'Бүлэг нэр', 'мэйл', 'Хаяг', 'Утас'],
@@ -151,6 +193,7 @@ describe('Erkhet sync check', () => {
         btoPrice: string | null;
         resolution: string | null;
         plan: Record<string, unknown> | null;
+        productPlan: Record<string, unknown> | null;
       }[];
       nextCursor: string | null;
     };
@@ -474,6 +517,260 @@ describe('Erkhet sync check', () => {
     expect(superseded.body).toMatchObject({ code: 'ERKHET_RUN_SUPERSEDED' });
     await apply({ itemIds: [999_999_999] }).expect(422);
     await apply({}).expect(422);
+  });
+
+  it('adds products missing in Bto from what Erkhet says, in the chosen category (ADR-0222)', async () => {
+    const catalog = catalogApi(app, admin);
+    const chinese = (
+      (
+        await http()
+          .post('/api/v1/categories')
+          .set(bearer(admin))
+          .send({ name: 'Хятад бараа', skuFrom: '300000', skuTo: '399999' })
+          .expect(201)
+      ).body as { id: number }
+    ).id;
+    const kharkhorin = 'Хархорин Боломж';
+    erkhet.items = await fullItemSheet([
+      { code: '900001', name: 'Кола 0.5л', category: 'Ундаа', barcodes: EAN_A, price: 1700 },
+      { code: '900002', name: 'Жүүс 1л', category: 'Ундаа', barcodes: EAN_B, price: 2100 },
+      {
+        code: '700001',
+        name: 'Хятад аяга',
+        category: 'Хятад бараа',
+        barcodes: '8690000000012, 8690000000029',
+        price: 990,
+        ratio: 1 / 12,
+        weight: 0.25,
+      },
+      // A code Bto cannot take and a price with a fraction: the next code, no price.
+      {
+        code: 'A-77',
+        name: 'Хятад сав',
+        category: 'Хятад бараа',
+        barcodes: '8690000000036',
+        price: 1200.5,
+        unit: ['кг', 'Килограмм'],
+      },
+      {
+        code: '700003',
+        name: 'Боломжийн бараа',
+        category: kharkhorin,
+        barcodes: '8690000000043',
+        price: 500,
+      },
+      {
+        code: '700004',
+        name: 'Дараа бүртгэсэн',
+        category: 'Хятад бараа',
+        barcodes: '8690000000050',
+        price: 700,
+      },
+      {
+        code: '700005',
+        name: 'Хуучин мөр',
+        category: 'Хятад бараа',
+        barcodes: '8690000000067',
+        price: 800,
+      },
+    ]);
+    expect(await check()).toMatchObject({ status: 'DONE' });
+    const missing = (await items({ kind: 'PRODUCT', issue: 'MISSING_IN_BTO' })).data;
+    const row = (code: string) => missing.find((one) => one.erkhetCode === code);
+    expect(missing).toHaveLength(5);
+    // Erkhet's unit, box and weight are kept with the row for «Bto-д нэмэх».
+    expect(row('700001')?.plan).toBeNull();
+    expect(row('700001')?.productPlan).toMatchObject({
+      unitCode: 'ш',
+      unitName: 'ширхэг',
+      weight: '0.25',
+    });
+    expect(row('700001')?.productPlan?.packRatio).toMatch(/^0\.08333/);
+    // Erkhet's category is searched too: the owner leaves «Хархорин Боломж» out by it.
+    expect(
+      (await items({ kind: 'PRODUCT', q: 'хархорин' })).data.map((one) => one.erkhetCode),
+    ).toEqual(['700003']);
+
+    // Someone registers one of them by hand after the check; another row is of an older check.
+    const pcs = await catalog.uomId('PCS');
+    await catalog.product({
+      sku: '100090',
+      name: 'Гараар бүртгэсэн',
+      categoryId: await catalog.category('Гараар'),
+      baseUomId: pcs,
+      baseBarcodes: ['8690000000050'],
+    });
+    await sql.query('UPDATE erkhet_sync_items SET plan = NULL WHERE id = $1', [row('700005')?.id]);
+
+    const ticked = ['700001', 'A-77', '700004', '700005'].map((code) => row(code)?.id);
+    for (const token of [reader, outsider]) {
+      await apply({ itemIds: ticked, categoryId: chinese, profileId: profile }, token).expect(403);
+    }
+    // Both choices are asked for, and only usable ones taken.
+    await apply({ itemIds: ticked, profileId: profile }).expect(422);
+    await apply({ itemIds: ticked, categoryId: chinese }).expect(422);
+    await apply({ itemIds: ticked, categoryId: 999_999, profileId: profile }).expect(422);
+    await apply({ itemIds: ticked, categoryId: chinese, profileId: 999_999 }).expect(422);
+    expect(
+      (await items({ kind: 'PRODUCT', issue: 'MISSING_IN_BTO', open: 'true' })).data,
+    ).toHaveLength(5);
+
+    const added = await apply({ itemIds: ticked, categoryId: chinese, profileId: profile }).expect(
+      200,
+    );
+    expect(added.body).toEqual({ applied: 2, stale: 1, refused: 1, skipped: 0 });
+
+    const products = await sql.query<{
+      id: string;
+      sku: string;
+      name: string;
+      category_id: string;
+      weight_kg: string | null;
+      ready: boolean;
+    }>(
+      `SELECT id, sku, name, category_id, weight_kg::text, sale_ready_at IS NOT NULL AS ready
+       FROM products WHERE name IN ('Хятад аяга', 'Хятад сав') ORDER BY name`,
+    );
+    const [cup, jar] = products.rows;
+    expect(cup).toMatchObject({
+      sku: '700001',
+      name: 'Хятад аяга',
+      category_id: String(chinese),
+      weight_kg: '0.2500',
+      ready: true,
+    });
+    expect(jar).toMatchObject({ sku: '300000', name: 'Хятад сав', weight_kg: null, ready: false });
+    const units = await sql.query<{ product: string; uom: string; factor: string; codes: string }>(
+      `SELECT u.product_id::text AS product, m.code AS uom, u.factor_to_base::text AS factor,
+              coalesce(string_agg(b.code, ',' ORDER BY b.code), '') AS codes
+       FROM product_units u JOIN uoms m ON m.id = u.uom_id
+       LEFT JOIN product_barcodes b ON b.product_unit_id = u.id
+       WHERE u.product_id IN ($1, $2)
+       GROUP BY u.product_id, m.code, u.factor_to_base ORDER BY u.product_id, u.factor_to_base`,
+      [cup?.id, jar?.id],
+    );
+    expect(units.rows).toEqual([
+      { product: cup?.id, uom: 'PCS', factor: '1.000000', codes: '8690000000012,8690000000029' },
+      { product: cup?.id, uom: 'BOX', factor: '12.000000', codes: '' },
+      { product: jar?.id, uom: 'KG', factor: '1.000000', codes: '8690000000036' },
+    ]);
+    // Erkhet's price from today with the chosen profile, the box counted whole.
+    const terms = await sql.query<{ price: string; profile: string; whole: string | null }>(
+      `SELECT p.warehouse_price::text AS price, p.profile_id::text AS profile, m.code AS whole
+       FROM product_prices p LEFT JOIN uoms m ON m.id = p.whole_uom_id
+       WHERE p.product_id = $1 AND p.valid_to IS NULL`,
+      [cup?.id],
+    );
+    expect(terms.rows).toEqual([{ price: '990.00', profile: String(profile), whole: 'BOX' }]);
+    expect(await priceOf(Number(jar?.id))).toBeUndefined();
+
+    const settled = (await items({ kind: 'PRODUCT', issue: 'MISSING_IN_BTO' })).data;
+    expect(Object.fromEntries(settled.map((one) => [one.erkhetCode, one.resolution]))).toEqual({
+      '700001': 'APPLIED',
+      'A-77': 'APPLIED',
+      '700003': null,
+      '700004': 'STALE',
+      '700005': 'REFUSED',
+    });
+    // Audited as the person's: the products, the price and the completion.
+    const audited = await sql.query<{ entity: string; action: string }>(
+      `SELECT entity, action FROM audit_log
+       WHERE entity_id::text = $1 AND entity IN ('products', 'product_prices') ORDER BY id`,
+      [cup?.id],
+    );
+    expect(audited.rows.map((one) => `${one.entity}:${one.action}`)).toEqual([
+      'products:CREATE',
+      'product_prices:UPDATE',
+      'products:COMPLETE',
+    ]);
+  });
+
+  it("prices products Bto has without a price from Erkhet's price, and completes them (ADR-0222)", async () => {
+    const catalog = catalogApi(app, admin);
+    const drinks = await catalog.category('Ундаа 2');
+    const pcs = await catalog.uomId('PCS');
+    const boxUom = await catalog.uomId('BOX');
+    const blockUom = await catalog.uomId('BLOCK');
+    const unpriced = await catalog.product({
+      sku: '100101',
+      name: 'Үнэгүй ус',
+      categoryId: drinks,
+      baseUomId: pcs,
+      baseBarcodes: ['8690000000074'],
+      units: [
+        { uomId: blockUom, factorToBase: '6' },
+        { uomId: boxUom, factorToBase: '24' },
+      ],
+    });
+    const noErkhetPrice = await catalog.product({
+      sku: '100102',
+      name: 'Эрхэтэд үнэгүй',
+      categoryId: drinks,
+      baseUomId: pcs,
+      baseBarcodes: ['4600000000008'],
+    });
+    const pricedSince = await catalog.product({
+      sku: '100103',
+      name: 'Дараа үнэлсэн',
+      categoryId: drinks,
+      baseUomId: pcs,
+      baseBarcodes: ['4600000000015'],
+    });
+    erkhet.items = await fullItemSheet([
+      { code: '900001', name: 'Кола 0.5л', category: 'Ундаа', barcodes: EAN_A, price: 1700 },
+      { code: '900002', name: 'Жүүс 1л', category: 'Ундаа', barcodes: EAN_B, price: 2100 },
+      {
+        code: '900010',
+        name: 'Үнэгүй ус',
+        category: 'Ундаа',
+        barcodes: '8690000000074',
+        price: 3000,
+      },
+      {
+        code: '900011',
+        name: 'Эрхэтэд үнэгүй',
+        category: 'Ундаа',
+        barcodes: '4600000000008',
+        price: null,
+      },
+      {
+        code: '900012',
+        name: 'Дараа үнэлсэн',
+        category: 'Ундаа',
+        barcodes: '4600000000015',
+        price: 800,
+      },
+    ]);
+    expect(await check()).toMatchObject({ status: 'DONE' });
+    expect((await overview()).latest?.summary.products.issues).toMatchObject({ NO_BTO_PRICE: 3 });
+
+    await pricingApi(app, admin).terms(pricedSince.id, '750', profile, null);
+    await apply({ kind: 'PRODUCT', issue: 'NO_BTO_PRICE' }).expect(422);
+    await apply({ kind: 'PRODUCT', issue: 'NO_BTO_PRICE', profileId: profile }, reader).expect(403);
+    const priced = await apply({
+      kind: 'PRODUCT',
+      issue: 'NO_BTO_PRICE',
+      profileId: profile,
+    }).expect(200);
+    expect(priced.body).toEqual({ applied: 1, stale: 1, refused: 1, skipped: 0 });
+
+    // The largest pack is counted whole; the product is complete.
+    const terms = await sql.query<{ price: string; whole: string | null; ready: boolean }>(
+      `SELECT p.warehouse_price::text AS price, m.code AS whole, d.sale_ready_at IS NOT NULL AS ready
+       FROM product_prices p LEFT JOIN uoms m ON m.id = p.whole_uom_id
+       JOIN products d ON d.id = p.product_id
+       WHERE p.product_id = $1 AND p.valid_to IS NULL`,
+      [unpriced.id],
+    );
+    expect(terms.rows).toEqual([{ price: '3000.00', whole: 'BOX', ready: true }]);
+    expect(await priceOf(noErkhetPrice.id)).toBeUndefined();
+    expect(await priceOf(pricedSince.id)).toBe('750.00');
+    const rows = (await items({ kind: 'PRODUCT', issue: 'NO_BTO_PRICE' })).data;
+    expect(Object.fromEntries(rows.map((one) => [one.erkhetCode, one.resolution]))).toEqual({
+      '900010': 'APPLIED',
+      '900011': 'REFUSED',
+      '900012': 'STALE',
+    });
   });
 
   it('says why a check failed and keeps the last good one on the page', async () => {

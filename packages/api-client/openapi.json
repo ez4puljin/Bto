@@ -46191,7 +46191,7 @@
             "name": "q",
             "required": false,
             "in": "query",
-            "description": "A code, a name or a barcode of either side",
+            "description": "A code, a name or a barcode of either side, or Erkhet's group or category",
             "schema": {
               "maxLength": 100,
               "type": "string"
@@ -95770,6 +95770,37 @@
           "phone"
         ]
       },
+      "ErkhetProductPlan": {
+        "type": "object",
+        "properties": {
+          "unitCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "«Хэмжих нэгж код»"
+          },
+          "unitName": {
+            "type": "string",
+            "nullable": true,
+            "description": "«Хэмжих нэгж нэр»"
+          },
+          "packRatio": {
+            "type": "string",
+            "nullable": true,
+            "description": "«Задрах харьцаа» as Erkhet gives it"
+          },
+          "weight": {
+            "type": "string",
+            "nullable": true,
+            "description": "«Жин», kilograms per base unit"
+          }
+        },
+        "required": [
+          "unitCode",
+          "unitName",
+          "packRatio",
+          "weight"
+        ]
+      },
       "ErkhetItem": {
         "type": "object",
         "properties": {
@@ -95845,6 +95876,16 @@
               }
             ]
           },
+          "productPlan": {
+            "nullable": true,
+            "description": "What a product missing in Bto takes from Erkhet's list (ADR-0222)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErkhetProductPlan"
+              }
+            ]
+          },
           "resolution": {
             "nullable": true,
             "enum": [
@@ -95874,6 +95915,7 @@
           "btoName",
           "btoPrice",
           "plan",
+          "productPlan",
           "resolution",
           "resolvedAt"
         ]
@@ -95930,6 +95972,16 @@
             ],
             "type": "string",
             "description": "Every open row of this issue, 500 at a time"
+          },
+          "categoryId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The category of the products added from Erkhet; required for those rows"
+          },
+          "profileId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The price profile of the prices taken from Erkhet; required for new and unpriced products"
           }
         }
       },

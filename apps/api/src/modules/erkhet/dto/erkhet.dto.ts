@@ -30,7 +30,12 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { PageQueryDto } from '../../../common/pagination/page';
-import { ERKHET_RUN_TRIGGERS, type ErkhetRunTrigger } from '../schema';
+import {
+  customerPlanOf,
+  ERKHET_RUN_TRIGGERS,
+  type ErkhetRunTrigger,
+  productPlanOf,
+} from '../schema';
 import {
   ERKHET_CHECK_REASONS,
   type ErkhetCheck,
@@ -223,7 +228,9 @@ export class ErkhetItemsQueryDto extends PageQueryDto {
   @IsIn(ERKHET_SYNC_ISSUES)
   issue?: ErkhetSyncIssue;
 
-  @ApiPropertyOptional({ description: 'A code, a name or a barcode of either side' })
+  @ApiPropertyOptional({
+    description: "A code, a name or a barcode of either side, or Erkhet's group or category",
+  })
   @IsOptional()
   @IsString()
   @MaxLength(100)
@@ -244,6 +251,21 @@ export class ErkhetCustomerPlanDto {
   @ApiProperty({ type: String, nullable: true }) phone: string | null;
 }
 
+@ApiSchema({ name: 'ErkhetProductPlan' })
+export class ErkhetProductPlanDto {
+  @ApiProperty({ type: String, nullable: true, description: '«Хэмжих нэгж код»' })
+  unitCode: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: '«Хэмжих нэгж нэр»' })
+  unitName: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: '«Задрах харьцаа» as Erkhet gives it' })
+  packRatio: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: '«Жин», kilograms per base unit' })
+  weight: string | null;
+}
+
 @ApiSchema({ name: 'ErkhetItem' })
 export class ErkhetItemDto {
   @ApiProperty() id: number;
@@ -262,6 +284,13 @@ export class ErkhetItemDto {
   @ApiProperty({ type: String, nullable: true, description: 'MNT' }) btoPrice: string | null;
   @ApiProperty({ type: ErkhetCustomerPlanDto, nullable: true })
   plan: ErkhetCustomerPlanDto | null;
+
+  @ApiProperty({
+    type: ErkhetProductPlanDto,
+    nullable: true,
+    description: "What a product missing in Bto takes from Erkhet's list (ADR-0222)",
+  })
+  productPlan: ErkhetProductPlanDto | null;
 
   @ApiProperty({ enum: ERKHET_RESOLUTIONS, nullable: true }) resolution: ErkhetResolution | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) resolvedAt: string | null;
@@ -300,6 +329,23 @@ export class ErkhetApplyDto {
   @ValidateIf((body: ErkhetApplyDto) => body.itemIds === undefined)
   @IsIn(ERKHET_SYNC_ISSUES)
   issue?: ErkhetSyncIssue;
+
+  @ApiPropertyOptional({
+    description: 'The category of the products added from Erkhet; required for those rows',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  categoryId?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'The price profile of the prices taken from Erkhet; required for new and unpriced products',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  profileId?: number;
 }
 
 @ApiSchema({ name: 'ErkhetApplyResult' })
@@ -333,6 +379,8 @@ export function toOverviewDto(overview: ErkhetOverview): ErkhetOverviewDto {
 export function toItemDto(item: ErkhetItem): ErkhetItemDto {
   return {
     ...item,
+    plan: customerPlanOf(item),
+    productPlan: productPlanOf(item),
     erkhetPrice: item.erkhetPrice?.toFixed(2) ?? null,
     btoPrice: item.btoPrice?.toFixed(2) ?? null,
     resolvedAt: item.resolvedAt?.toISOString() ?? null,

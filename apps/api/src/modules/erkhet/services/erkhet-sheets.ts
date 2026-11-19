@@ -12,6 +12,13 @@ export interface ErkhetItemRow {
   barcodes: string[];
   /** «Нэгж үнэ»; null when the cell is empty or not a price. */
   price: Decimal | null;
+  /** «Хэмжих нэгж код», «Хэмжих нэгж нэр»; empty when the list has no such column. */
+  unitCode: string;
+  unitName: string;
+  /** «Задрах харьцаа» as digits; null when empty or not a number. */
+  packRatio: string | null;
+  /** «Жин» as digits; null when empty or not a number. */
+  weight: string | null;
 }
 
 /** A row of Erkhet's customer list. */
@@ -47,9 +54,15 @@ function cellText(value: ExcelJS.CellValue): string {
   return String(value).trim();
 }
 
-function priceOf(value: ExcelJS.CellValue): Decimal | null {
+/** A number cell as plain digits (a sheet's float or a typed text); null when it is not one. */
+function digitsOf(value: ExcelJS.CellValue): string | null {
   const text = typeof value === 'number' ? String(value) : cellText(value).replace(/,/g, '');
-  if (!TEXT_PRICE.test(text)) return null;
+  return TEXT_PRICE.test(text) ? text : null;
+}
+
+function priceOf(value: ExcelJS.CellValue): Decimal | null {
+  const text = digitsOf(value);
+  if (text === null) return null;
   const price = new Decimal(text);
   return price.isFinite() && price.lt(PRICE_LIMIT) ? price : null;
 }
@@ -116,6 +129,10 @@ export async function readErkhetItems(data: Buffer): Promise<ErkhetItemRow[]> {
       category: normalizeName(cellText(row.category)),
       barcodes: splitBarcodes(cellText(row.barcodes)),
       price: priceOf(row.price),
+      unitCode: cellText(row.unitCode),
+      unitName: normalizeName(cellText(row.unitName)),
+      packRatio: digitsOf(row.packRatio),
+      weight: digitsOf(row.weight),
     });
   }
   if (items.length === 0) throw new ErkhetFileError('the item list is empty');

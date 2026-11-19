@@ -71,6 +71,39 @@ export interface ErkhetCustomerPlan {
 }
 
 /**
+ * What a product missing in Bto carries from Erkhet's list beside the row's own columns, kept when
+ * the check ran (ADR-0222): the cells as Erkhet gave them; «Bto-д нэмэх» reads them into Bto's units.
+ */
+export interface ErkhetProductPlan {
+  /** «Хэмжих нэгж код», «Хэмжих нэгж нэр»: the base unit. */
+  unitCode: string | null;
+  unitName: string | null;
+  /** «Задрах харьцаа», digits as Erkhet gave them. */
+  packRatio: string | null;
+  /** «Жин», kilograms per base unit, digits as Erkhet gave them. */
+  weight: string | null;
+}
+
+/** A row's plan: a customer's on CUSTOMER rows, a product's on PRODUCT rows (by the row's kind). */
+export type ErkhetItemPlan = ErkhetCustomerPlan | ErkhetProductPlan;
+
+/** The customer's plan of a row, or null. */
+export function customerPlanOf(row: {
+  kind: string;
+  plan: ErkhetItemPlan | null;
+}): ErkhetCustomerPlan | null {
+  return row.kind === 'CUSTOMER' && row.plan !== null && 'categoryId' in row.plan ? row.plan : null;
+}
+
+/** The product's plan of a row, or null (rows of a check before ADR-0222 have none). */
+export function productPlanOf(row: {
+  kind: string;
+  plan: ErkhetItemPlan | null;
+}): ErkhetProductPlan | null {
+  return row.kind === 'PRODUCT' && row.plan !== null && 'packRatio' in row.plan ? row.plan : null;
+}
+
+/**
  * Erkhet's sign-in, one row (ADR-0203 #2). The password is sealed under ERKHET_KEY_SECRET and
  * leaves this table only to reach the address beside it; no response, audit row or log carries it.
  */
@@ -166,7 +199,7 @@ export const erkhetSyncItems = pgTable(
     btoCode: text('bto_code'),
     btoName: text('bto_name'),
     btoPrice: money('bto_price'),
-    plan: jsonb('plan').$type<ErkhetCustomerPlan>(),
+    plan: jsonb('plan').$type<ErkhetItemPlan>(),
     resolution: text('resolution', { enum: ERKHET_RESOLUTIONS }),
     resolvedBy: userRef('resolved_by'),
     resolvedAt: at('resolved_at'),

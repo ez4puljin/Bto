@@ -1,6 +1,6 @@
-# Module: erkhet («Эрхэт тулгалт», ADR-0203; «Авлага, өглөгийн гүйлгээ», ADR-0219)
+# Module: erkhet («Эрхэт тулгалт», ADR-0203, ADR-0222; «Авлага, өглөгийн гүйлгээ», ADR-0219)
 
-Erkhet's customers and items checked against Bto's while Erkhet is still the company's books, and Bto brought to Erkhet for the differences that close safely. Web: `/finance/erkhet`. It never writes to Erkhet. It reads partners, catalog and pricing through their public services and changes customers and prices only through them; nobody imports it. Since ADR-0219 it also copies Erkhet's receivable and payable transactions into Bto's books (the second half of this document). It ends with Erkhet on the go-live day (ADR-0077).
+Erkhet's customers and items checked against Bto's while Erkhet is still the company's books, and Bto brought to Erkhet for the differences that close safely. Web: `/finance/erkhet`. It never writes to Erkhet. It reads partners, catalog and pricing through their public services and changes customers, products and prices only through them; nobody imports it. Since ADR-0219 it also copies Erkhet's receivable and payable transactions into Bto's books (the second half of this document). It ends with Erkhet on the go-live day (ADR-0077).
 
 ## Owned tables (`modules/erkhet/schema.ts`, migration `0104_erkhet_sync`)
 
@@ -8,7 +8,7 @@ Erkhet's customers and items checked against Bto's while Erkhet is still the com
 |---|---|
 | `erkhet_settings` | One row: the address (`https://host`), the company's number inside Erkhet, the name, the password sealed under `ERKHET_KEY_SECRET`, the nightly switch |
 | `erkhet_sync_runs` | A check: `QUEUED` → `RUNNING` → `DONE` or `FAILED` with its `failure`; `MANUAL` or `NIGHTLY`; the counts in `summary`. `active_slot` is 1 while it waits or runs (unique: one at a time); a `NIGHTLY` run is unique per `business_day` |
-| `erkhet_sync_items` | The rows of a check that differ: Erkhet's side as it stood in the list, Bto's side as it was, a new customer's `plan`, and `resolution` (`APPLIED`, `STALE`, `REFUSED`). Only the last five finished checks keep their rows |
+| `erkhet_sync_items` | The rows of a check that differ: Erkhet's side as it stood in the list, Bto's side as it was, the `plan` (a new customer's category, settlement group, kind and phone; for an item missing in Bto, Erkhet's unit code and name, «Задрах харьцаа» and «Жин» as given, ADR-0222), and `resolution` (`APPLIED`, `STALE`, `REFUSED`). Only the last five finished checks keep their rows |
 
 Erkhet's customer and item lists themselves are never stored.
 
@@ -20,15 +20,16 @@ Erkhet has no API. `ErkhetClient` signs in as a browser would (the form's token 
 
 - **Customers by code.** `NAME_DIFFERS` (names compared as Bto stores them), `INACTIVE_IN_BTO`, `MISSING_IN_BTO` (its Erkhet group is an active customer category in Bto; the row carries the plan: that category, and the settlement group and kind most of its customers have, the first phone that reads), `GROUP_NOT_TAKEN` (no such category: Kharkhorin and the suppliers of ADR-0107), `MISSING_IN_ERKHET` (active in Bto only).
 - **Items by barcode**, through `lookupCandidates`; without a barcode by code, only to a Bto product without barcodes. `PRICE_DIFFERS` (Erkhet's «Нэгж үнэ» against the warehouse price in force today, more than 0.5 apart; an empty or zero Erkhet price is not compared), `MISSING_IN_BTO`, `NO_BTO_PRICE`, `INACTIVE_IN_BTO`, `AMBIGUOUS`, `NO_BARCODE`, `MISSING_IN_ERKHET`.
-- A code repeated in a list is read once. A list without its columns («Код», «Нэр», «Баркод», «Нэгж үнэ»; «Код», «Нэр», «Бүлэг нэр») or without rows fails the check with `UNEXPECTED_FILE`.
+- A code repeated in a list is read once. A list without its columns («Код», «Нэр», «Баркод», «Нэгж үнэ»; «Код», «Нэр», «Бүлэг нэр») or without rows fails the check with `UNEXPECTED_FILE`. «Ангилал нэр», «Хэмжих нэгж код», «Хэмжих нэгж нэр», «Задрах харьцаа» and «Жин» are read when present.
+- **A new product** (ADR-0222, `services/erkhet-new-product.ts`): the base unit by Erkhet's unit name, else its code, among Bto's units (else `PCS`); a `BOX` of n base units when «Задрах харьцаа» is 1/n or n with n whole and ≥ 2 (none when the base unit is the box); the weight from «Жин» above nothing, to four places; Erkhet's code when digits only and no product has that number, else the next free code of the chosen category (the shared code-range rules, as `SkuRangesService.suggest`).
 
 ## Reads and writes in other modules
 
 The ledger copy adds: `fin-bridge` `FinErkhetBooks` (posting, the copied open items, Bto's own documents), `finance` `PaymentsService.voidInTx`, `JournalService.reverseManualInTx`, `ArLedgerService.heldByBankStatement`, and `partners` `SuppliersService.findByCodes`.
 
 - `partners`: `CustomersService.directory()`, `findByCodes`, `findByIds`, `createInTx`, `updateInTx`; `CustomerCategoriesService.findByNames`.
-- `catalog`: `CatalogImportService.directory()` (every product with its barcode count), `barcodeOwners(lookupKeys)`.
-- `pricing`: `ProductPricesService.inForce(ids, day)`, `setInTx`.
+- `catalog`: `CatalogImportService.directory()` (every product with its barcode count), `barcodeOwners(lookupKeys)`, `reference()`, `productsByIds`, `createManyInTx` (ADR-0222); `CategoriesService.list()` (the chosen category, the code ranges).
+- `pricing`: `ProductPricesService.inForce(ids, day)`, `setInTx`; `PriceProfilesService.forImport()` (the chosen profile); `SaleReadinessService.completeManyInTx` (ADR-0222).
 - `identity`: `AuditService`, `UserNamesService`.
 
 ## Jobs
@@ -46,19 +47,23 @@ The ledger copy adds: `fin-bridge` `FinErkhetBooks` (posting, the copied open it
 | `POST settings/test` | `erkhet.settings.manage` | signs in with what is typed (the saved values fill the rest; the saved password only for the saved address), saves nothing: `{ ok, reason, status }` |
 | `GET sync` | `erkhet.sync.read` | `{ configured, nightly, active, latest, failed }`: the check under way, the latest finished one with its counts, and a later failed one |
 | `POST sync/runs` | `erkhet.sync.manage` | 202 with the queued run; 409 `ERKHET_NOT_CONFIGURED`, `ERKHET_SYNC_RUNNING` |
-| `GET sync/items?kind&issue&q&open&cursor&limit` | `erkhet.sync.read` | rows of the latest finished check, keyset by id |
-| `POST sync/apply` `{ itemIds }` or `{ kind, issue }` | `erkhet.sync.manage` | brings Bto to Erkhet, up to 500 rows: `{ applied, stale, refused, skipped }`; 409 `ERKHET_RUN_SUPERSEDED` for rows of an older check |
+| `GET sync/items?kind&issue&q&open&cursor&limit` | `erkhet.sync.read` | rows of the latest finished check, keyset by id; `q` matches either side's code, name and barcodes and Erkhet's group or category; a row carries `plan` (a customer's) and `productPlan` (Erkhet's units of a missing product) |
+| `POST sync/apply` `{ itemIds }` or `{ kind, issue }`, with `categoryId`, `profileId` | `erkhet.sync.manage` | brings Bto to Erkhet, up to 500 rows: `{ applied, stale, refused, skipped }`; 409 `ERKHET_RUN_SUPERSEDED` for rows of an older check; 422 when a row needs a choice (`erkhetApplyChoices`: a category and a profile for new products, a profile for unpriced ones) that is missing, unknown, archived or without values today |
 
 ## Invariants
 
 - No route, job or client method writes to Erkhet.
 - The password is never returned, audited or logged; it reaches only the saved address.
-- A check changes nothing in Bto but its own three tables; only `sync/apply` changes customers and prices, one row and one transaction at a time, each audited as the acting person's.
+- A check changes nothing in Bto but its own three tables; only `sync/apply` changes customers, products and prices, one row and one transaction at a time, each audited as the acting person's.
 - A row is settled once: applied, stale or refused, by whoever claimed it first.
 
 ## Tests
 
-`integrations/erkhet/erkhet.client.spec.ts`, `services/erkhet-compare.spec.ts`, `services/erkhet-sheets.spec.ts` (synthetic rows only) and `test/integration/erkhet-sync.int-spec.ts` (rights, the sign-in's secrecy, a check end to end against a scripted Erkhet, the three changes, stale and superseded rows, failures, the nightly start).
+`integrations/erkhet/erkhet.client.spec.ts`, `services/erkhet-compare.spec.ts`, `services/erkhet-sheets.spec.ts`, `services/erkhet-new-product.spec.ts` (the box either way round, the weight, the unit, the code; synthetic rows only) and `test/integration/erkhet-sync.int-spec.ts` (rights, the sign-in's secrecy, a check end to end against a scripted Erkhet, the three changes of ADR-0203, products added from ticked rows with their code, barcodes, box, weight, price and completion, a stale and a refused row, the choices refused, unpriced products priced and completed with the largest pack whole, stale and superseded rows, failures, the nightly start).
+
+## The page («Тулгалт», ADR-0203, ADR-0222)
+
+The issue's list; on an issue «Bto-д тааруулах» acts on, a tick on each open row and «Бүгдийг сонгох» in the head. The button acts on the ticked rows, or on every open row of the issue: «Bto-д нэмэх» and «Нэрийг тааруулах» for customers and «Үнийг тааруулах» for price differences after a confirmation; «Bto-д нэмэх» for products (`erkhet-apply-dialog.tsx`: the Bto category and the price profile, «Үндсэн» proposed) and «Үнийг тааруулах» for products without a price (the profile) after a dialog. Products show Erkhet's category beside the barcodes.
 
 ---
 
