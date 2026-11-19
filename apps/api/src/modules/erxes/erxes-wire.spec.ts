@@ -1,7 +1,11 @@
 import { ErxesClient, ErxesError, type ErxesFetch } from './erxes.client';
 import {
   attachmentUrl,
+  BOARDS,
   DEAL_DETAIL,
+  DEAL_PAGE,
+  DEAL_RANGE,
+  dealTotal,
   dealUrl,
   fieldLabelsOf,
   isBlockedBoard,
@@ -244,10 +248,13 @@ describe('the erxes client', () => {
     expect(client.cuts).toEqual([
       'dealDetail.unUsedAmount',
       'dealDetail.customers.registrationNumber',
-      'dealDetail.companies.registrationNumber',
     ]);
     expect(calls[calls.length - 1]?.document).not.toContain('registrationNumber');
     expect(calls[calls.length - 1]?.document).toContain('taxNumber');
+    // The next query of the shape goes without them at once.
+    const sent = calls.length;
+    await client.read(DEAL_DETAIL, { id: 'd-1' });
+    expect(calls.length).toBe(sent + 1);
   });
 
   it('signs in again when the session ended, and says when the sign-in is refused', async () => {
@@ -294,5 +301,97 @@ describe('the erxes client', () => {
         { root: 'boards', selection: { _id: true } },
       ]),
     ).resolves.toEqual([{ _id: 'b1' }]);
+  });
+
+  it('fails with what erxes said when every shape is refused, never with an empty answer', async () => {
+    const fetchFn: ErxesFetch = (_url, init) => {
+      const { query } = JSON.parse(typeof init.body === 'string' ? init.body : '{}') as {
+        query: string;
+      };
+      if (query.startsWith('mutation')) {
+        return Promise.resolve(
+          json(
+            { data: { login: 'loggedIn' } },
+            { headers: { 'set-cookie': 'auth-token=t; Path=/' } },
+          ),
+        );
+      }
+      const root = /\n(\w+)/.exec(query)?.[1] ?? '';
+      return Promise.resolve(
+        json(
+          {
+            errors: [
+              {
+                message: `Field "${root}" argument "type" of type "String!" is required, but it was not provided.`,
+              },
+            ],
+          },
+          { status: 400 },
+        ),
+      );
+    };
+    const client = new ErxesClient(account, fetchFn);
+    const refused = client.read([
+      { root: 'salesBoards', selection: { _id: true } },
+      { root: 'boards', selection: { _id: true } },
+    ]);
+    await expect(refused).rejects.toMatchObject({ reason: 'UNEXPECTED_ANSWER' });
+    await expect(refused).rejects.toThrow(/salesBoards.*argument "type".*\|.*boards/);
+  });
+
+  it('cuts a field the gateway calls missing in its type', async () => {
+    const fetchFn: ErxesFetch = (_url, init) => {
+      const { query } = JSON.parse(typeof init.body === 'string' ? init.body : '{}') as {
+        query: string;
+      };
+      if (query.startsWith('mutation')) {
+        return Promise.resolve(
+          json(
+            { data: { login: 'loggedIn' } },
+            { headers: { 'set-cookie': 'auth-token=t; Path=/' } },
+          ),
+        );
+      }
+      return Promise.resolve(
+        query.includes('primaryEmail')
+          ? json({ errors: [{ message: 'no field `primaryEmail` in type `Company`' }] })
+          : json({ data: { dealDetail: { _id: 'd-1' } } }),
+      );
+    };
+    const client = new ErxesClient(account, fetchFn);
+    await expect(client.read(DEAL_DETAIL, { id: 'd-1' })).resolves.toEqual({ _id: 'd-1' });
+    expect(client.cuts).toContain('dealDetail.companies.primaryEmail');
+  });
+});
+
+describe('the queries as erxes takes them', () => {
+  it('asks for the deal boards by type', () => {
+    expect(renderQuery(BOARDS[0] as QueryShape).document).toContain('salesBoards(type: "deal")');
+  });
+
+  it('never skips archived deals', () => {
+    for (const shape of [...DEAL_PAGE, ...DEAL_RANGE]) {
+      expect(renderQuery(shape).document).toContain('noSkipArchive: true');
+    }
+  });
+
+  it('filters a range by creation, with dates typed Date', () => {
+    const { document } = renderQuery(DEAL_RANGE[0] as QueryShape);
+    expect(document).toContain('$createdStartDate: Date, $createdEndDate: Date');
+    expect(document).toContain(
+      'createdStartDate: $createdStartDate, createdEndDate: $createdEndDate',
+    );
+  });
+
+  it('asks no register number of a company', () => {
+    const companies = (DEAL_DETAIL[0] as QueryShape).selection.companies;
+    expect(companies).not.toHaveProperty('registrationNumber');
+    expect(companies).toHaveProperty('taxNumber');
+  });
+
+  it("counts a deal's total as erxes does", () => {
+    expect(dealTotal({ amount: { MNT: 36400 } })).toBe('36400');
+    expect(dealTotal({ productsData: [{ amount: 1500 }, { amount: '2500.5' }] })).toBe('4000.5');
+    expect(dealTotal({ productsData: [] })).toBeNull();
   });
 });

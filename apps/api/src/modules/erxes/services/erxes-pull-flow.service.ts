@@ -8,6 +8,7 @@ import {
   DEAL_FIELDS,
   DEAL_PAGE,
   dateOf,
+  type ErxesDealFacts,
   type ErxesPerson,
   fieldLabelsOf,
   personName,
@@ -35,6 +36,16 @@ export interface ErxesPullSummary {
   copied: number;
   /** Deals still waiting after it. */
   waiting: number;
+  /** What erxes said when it failed, in English; never a secret. */
+  detail: string | null;
+}
+
+/** A deal as erxes holds it: the answer, its products, what Bto reads of it, its field labels. */
+export interface WholeDeal {
+  raw: unknown;
+  products: unknown[];
+  facts: ErxesDealFacts;
+  fieldLabels: Record<string, string>;
 }
 
 const PAGE = 50;
@@ -81,6 +92,7 @@ export class ErxesPullFlowService {
       seen: 0,
       copied: 0,
       waiting: 0,
+      detail: null,
     };
     let detail: string | null = null;
     const tried = new Set<number>();
@@ -125,6 +137,7 @@ export class ErxesPullFlowService {
       .from(erxesDeals)
       .where(eq(erxesDeals.status, 'WAITING'));
     summary.waiting = count?.waiting ?? 0;
+    summary.detail = detail === null ? null : detail.slice(0, 500);
     await this.settings.recordPull(summary.failure, detail);
     return summary;
   }
@@ -195,46 +208,16 @@ export class ErxesPullFlowService {
     for (const deal of fresh.filter((entry) => !seen.has(entry.erxesId)).reverse()) {
       if (seen.has(deal.erxesId)) continue;
       seen.add(deal.erxesId);
-      const raw = await client.read(DEAL_DETAIL, { id: deal.erxesId });
-      const productIds = productIdsOf(raw);
-      const products =
-        productIds.length === 0
-          ? []
-          : await client
-              .read(PRODUCTS, { ids: productIds, perPage: productIds.length })
-              .catch((error: unknown) => {
-                // Some erxes versions carry the product inside the line: the deal says enough.
-                if (error instanceof ErxesError && error.reason === 'UNEXPECTED_ANSWER') return [];
-                throw error;
-              });
-      const productList = Array.isArray(products) ? (products as unknown[]) : [];
-      const facts = readDeal(raw, productList);
-      if (!facts) {
-        throw new ErxesError('UNEXPECTED_ANSWER', `deal ${deal.erxesId} came without an _id`);
-      }
-      firstDetail ??= { deal: raw, products: productList };
-      const people = [facts.creator, ...facts.assigned].filter(
-        (person): person is ErxesPerson => person !== null,
+      const kept = await this.keepDeal(
+        client,
+        deal.erxesId,
+        pipeline.erxesId,
+        labels,
+        deal.createdAt,
       );
-      await this.directory.rememberUsers(this.db, people);
-      const [row] = await this.db
-        .insert(erxesDeals)
-        .values({
-          erxesId: facts.erxesId,
-          pipelineErxesId: pipeline.erxesId,
-          name: facts.name,
-          number: facts.number,
-          erxesCreatedAt: facts.createdAt ?? deal.createdAt,
-          creatorErxesId: facts.creatorId,
-          creatorName: personName(facts.creator),
-          raw,
-          products: productList,
-          fieldLabels: facts.customFields.length > 0 ? await labels.get() : {},
-        })
-        .onConflictDoNothing({ target: erxesDeals.erxesId })
-        .returning({ id: erxesDeals.id });
+      firstDetail ??= kept.answer;
       // No row: another pull kept it a moment ago, and tries it itself.
-      if (row) dealIds.push(row.id);
+      if (kept.dealId !== null) dealIds.push(kept.dealId);
     }
     await this.db
       .update(erxesPipelines)
@@ -245,6 +228,82 @@ export class ErxesPullFlowService {
       })
       .where(eq(erxesPipelines.id, pipeline.id));
     return { dealIds };
+  }
+
+  /**
+   * Reads one deal whole (`dealDetail`, its products, and the labels of its custom fields when it
+   * has some), remembers its people and keeps it as a waiting row, as it came. `dealId` is null
+   * when the deal was kept already. erxes is called before the insert, never inside a transaction.
+   */
+  async keepDeal(
+    client: ErxesClient,
+    erxesId: string,
+    pipelineErxesId: string,
+    labels: FieldLabels,
+    listedCreatedAt: Date | null,
+  ): Promise<{ dealId: number | null; answer: unknown }> {
+    const whole = await this.fetchDeal(client, erxesId, labels);
+    return {
+      dealId: await this.storeDeal(whole, pipelineErxesId, listedCreatedAt),
+      answer: { deal: whole.raw, products: whole.products },
+    };
+  }
+
+  /**
+   * One deal as erxes holds it, read whole; nothing is written. The minute pull and the range copy
+   * (ADR-0220) read a deal only this way; an answer without a deal is `UNEXPECTED_ANSWER`.
+   */
+  async fetchDeal(client: ErxesClient, erxesId: string, labels: FieldLabels): Promise<WholeDeal> {
+    const raw = await client.read(DEAL_DETAIL, { id: erxesId });
+    const productIds = productIdsOf(raw);
+    const products =
+      productIds.length === 0
+        ? []
+        : await client
+            .read(PRODUCTS, { ids: productIds, perPage: productIds.length })
+            .catch((error: unknown) => {
+              // Some erxes versions carry the product inside the line: the deal says enough.
+              if (error instanceof ErxesError && error.reason === 'UNEXPECTED_ANSWER') return [];
+              throw error;
+            });
+    const productList = Array.isArray(products) ? (products as unknown[]) : [];
+    const facts = readDeal(raw, productList);
+    if (!facts) throw new ErxesError('UNEXPECTED_ANSWER', `erxes gave no deal ${erxesId}`);
+    const fieldLabels = facts.customFields.length > 0 ? await labels.get() : {};
+    return { raw, products: productList, facts, fieldLabels };
+  }
+
+  /**
+   * Keeps a deal read whole as a waiting row and remembers its people; null when the deal was
+   * kept already (by an earlier pull or one running now, which then tries it itself).
+   */
+  async storeDeal(
+    whole: WholeDeal,
+    pipelineErxesId: string,
+    listedCreatedAt: Date | null,
+  ): Promise<number | null> {
+    const { facts } = whole;
+    const people = [facts.creator, ...facts.assigned].filter(
+      (person): person is ErxesPerson => person !== null,
+    );
+    await this.directory.rememberUsers(this.db, people);
+    const [row] = await this.db
+      .insert(erxesDeals)
+      .values({
+        erxesId: facts.erxesId,
+        pipelineErxesId,
+        name: facts.name,
+        number: facts.number,
+        erxesCreatedAt: facts.createdAt ?? listedCreatedAt,
+        creatorErxesId: facts.creatorId,
+        creatorName: personName(facts.creator),
+        raw: whole.raw,
+        products: whole.products,
+        fieldLabels: whole.fieldLabels,
+      })
+      .onConflictDoNothing({ target: erxesDeals.erxesId })
+      .returning({ id: erxesDeals.id });
+    return row?.id ?? null;
   }
 
   /**
@@ -283,7 +342,7 @@ export class ErxesPullFlowService {
 }
 
 /** The labels of the deals' custom fields, asked once in a pull and only when a deal has some. */
-class FieldLabels {
+export class FieldLabels {
   private labels: Promise<Record<string, string>> | null = null;
 
   constructor(private readonly client: ErxesClient) {}

@@ -89,7 +89,9 @@ export class ErxesDirectoryFlowService {
    */
   async refresh(ctx: AuthContext): Promise<ErxesCheck> {
     const opened = await this.settings.client();
-    if (opened.client === null) return { ok: false, reason: opened.failure, status: null };
+    if (opened.client === null) {
+      return { ok: false, reason: opened.failure, status: null, detail: null };
+    }
     let boards: unknown;
     let users: unknown;
     try {
@@ -102,7 +104,7 @@ export class ErxesDirectoryFlowService {
       opened.keep();
     } catch (error: unknown) {
       if (!(error instanceof ErxesError)) throw error;
-      return { ok: false, reason: error.reason, status: error.status ?? null };
+      return this.failed(error.reason, error.message, error.status);
     }
     const listed: {
       erxesId: string;
@@ -121,6 +123,14 @@ export class ErxesDirectoryFlowService {
           listed.push({ erxesId, name, boardErxesId: textOf(board._id), boardName });
         }
       }
+    }
+    // An answer without a single pipeline is never taken as «erxes has none» (ADR-0220): the
+    // erxes user sees no board, or erxes answered something else than boards.
+    if (listed.length === 0) {
+      return this.failed(
+        'UNEXPECTED_ANSWER',
+        `erxes listed no pipeline (${Array.isArray(boards) ? `${boards.length} boards` : 'no list'}): is the erxes user a member of the boards?`,
+      );
     }
     const people = (Array.isArray(users) ? users : [])
       .map(readUser)
@@ -166,7 +176,17 @@ export class ErxesDirectoryFlowService {
         after: { pipelines: listed.length, users: people.length },
       });
     });
-    return { ok: true, reason: null, status: null };
+    return { ok: true, reason: null, status: null, detail: null };
+  }
+
+  /** A refresh that failed: written where the page shows the last failure, and answered. */
+  private async failed(
+    reason: ErxesError['reason'],
+    detail: string,
+    status?: number,
+  ): Promise<ErxesCheck> {
+    await this.settings.recordPull(reason, detail);
+    return { ok: false, reason, status: status ?? null, detail: detail.slice(0, 500) };
   }
 
   /** Keeps what erxes says of its users; a person's choice of the Bto user stays. */

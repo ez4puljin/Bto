@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsEmail,
@@ -25,6 +26,13 @@ import {
   type ErxesPullFailure,
   type ErxesWaitReason,
 } from '../schema';
+import {
+  RANGE_COPY_MAX,
+  RANGE_OUTCOMES,
+  RANGE_SKIPS,
+  type ErxesRangeOutcome,
+  type ErxesRangeSkip,
+} from '../services/erxes-range-flow.service';
 import {
   ERXES_CHECK_REASONS,
   type ErxesCheck,
@@ -138,6 +146,9 @@ export class ErxesCheckDto implements ErxesCheck {
 
   @ApiProperty({ ...NULL_ID, description: "erxes's HTTP status, when it gave one" })
   status: number | null;
+
+  @ApiProperty({ ...NULL_TEXT, description: 'What erxes said when it failed, in English' })
+  detail: string | null;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -218,6 +229,8 @@ export class ErxesPullResultDto {
   @ApiProperty({ description: 'Deals seen for the first time' }) seen: number;
   @ApiProperty({ description: 'Deals that became orders' }) copied: number;
   @ApiProperty({ description: 'Deals still waiting' }) waiting: number;
+  @ApiProperty({ ...NULL_TEXT, description: 'What erxes said when it failed, in English' })
+  detail: string | null;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -386,4 +399,128 @@ export class ErxesDealChoiceDto {
   @ValidateNested({ each: true })
   @Type(() => ErxesUnitChoiceInputDto)
   units?: ErxesUnitChoiceInputDto[];
+}
+
+// ------------------------------------------------------------------------------------------------
+// The range copy (ADR-0220)
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+@ApiSchema({ name: 'ErxesRangePipeline' })
+export class ErxesRangePipelineDto {
+  @ApiProperty() id: number;
+  @ApiProperty() erxesId: string;
+  @ApiProperty() name: string;
+  @ApiProperty(NULL_TEXT) boardName: string | null;
+  @ApiProperty({ description: 'Ticked for the minute pull: chosen by default' }) enabled: boolean;
+}
+
+@ApiSchema({ name: 'ErxesRangeRequest' })
+export class ErxesRangeRequestDto {
+  @ApiProperty({ format: 'date', description: 'The first day, in Ulaanbaatar' })
+  @IsString()
+  @Matches(DAY)
+  from: string;
+
+  @ApiProperty({
+    format: 'date',
+    description: 'The last day, whole, in Ulaanbaatar; 31 days at most',
+  })
+  @IsString()
+  @Matches(DAY)
+  to: string;
+
+  @ApiProperty({ type: [Number], description: 'The erxes pipelines to read (their Bto ids)' })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  pipelineIds: number[];
+}
+
+@ApiSchema({ name: 'ErxesRangeDealRef' })
+export class ErxesRangeDealRefDto {
+  @ApiProperty() @IsString() @Length(1, 100) erxesId: string;
+  @ApiProperty({ description: 'The erxes pipeline it was listed in (its Bto id)' })
+  @IsInt()
+  @Min(1)
+  pipelineId: number;
+}
+
+@ApiSchema({ name: 'ErxesRangeCopyRequest' })
+export class ErxesRangeCopyRequestDto extends ErxesRangeRequestDto {
+  @ApiProperty({
+    type: [ErxesRangeDealRefDto],
+    description: `The ticked deals, ${RANGE_COPY_MAX} at most a request`,
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(RANGE_COPY_MAX)
+  @ValidateNested({ each: true })
+  @Type(() => ErxesRangeDealRefDto)
+  deals: ErxesRangeDealRefDto[];
+}
+
+@ApiSchema({ name: 'ErxesRangeKnown' })
+export class ErxesRangeKnownDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ enum: ERXES_DEAL_STATUSES }) status: ErxesDealStatus;
+  @ApiProperty(NULL_ID) orderId: number | null;
+}
+
+@ApiSchema({ name: 'ErxesRangeDeal' })
+export class ErxesRangeDealDto {
+  @ApiProperty() erxesId: string;
+  @ApiProperty() pipelineId: number;
+  @ApiProperty() pipelineName: string;
+  @ApiProperty(NULL_TEXT) number: string | null;
+  @ApiProperty(NULL_TEXT) name: string | null;
+  @ApiProperty(NULL_DATE) createdAt: Date | null;
+  @ApiProperty(NULL_TEXT) creatorName: string | null;
+  @ApiProperty(NULL_TEXT) stageName: string | null;
+  @ApiProperty(NULL_TEXT) customerName: string | null;
+  @ApiProperty({ ...NULL_ID, description: 'Lines; null when erxes did not list them' })
+  lines: number | null;
+
+  @ApiProperty({ ...NULL_TEXT, description: "erxes's total" }) total: string | null;
+  @ApiProperty({
+    type: ErxesRangeKnownDto,
+    nullable: true,
+    description: 'The row Bto holds of it; null: new to Bto',
+  })
+  known: ErxesRangeKnownDto | null;
+}
+
+@ApiSchema({ name: 'ErxesRangePreview' })
+export class ErxesRangePreviewDto {
+  @ApiProperty() ok: boolean;
+  @ApiProperty({ enum: ERXES_PULL_FAILURES, nullable: true }) failure: ErxesPullFailure | null;
+  @ApiProperty(NULL_TEXT) detail: string | null;
+  @ApiProperty({ description: 'More deals than a range may read: narrow it' }) tooMany: boolean;
+  @ApiProperty({ type: [ErxesRangeDealDto] }) deals: ErxesRangeDealDto[];
+}
+
+@ApiSchema({ name: 'ErxesRangeResult' })
+export class ErxesRangeResultDto {
+  @ApiProperty() erxesId: string;
+  @ApiProperty({ enum: RANGE_OUTCOMES }) outcome: ErxesRangeOutcome;
+  @ApiProperty(NULL_ID) dealId: number | null;
+  @ApiProperty(NULL_ID) orderId: number | null;
+  @ApiProperty({ type: [ErxesWaitIssueDto] }) issues: ErxesWaitIssueDto[];
+  @ApiProperty({ enum: RANGE_SKIPS, nullable: true }) skip: ErxesRangeSkip | null;
+  @ApiProperty({ enum: ERXES_PULL_FAILURES, nullable: true }) failure: ErxesPullFailure | null;
+  @ApiProperty(NULL_TEXT) detail: string | null;
+}
+
+@ApiSchema({ name: 'ErxesRangeCopy' })
+export class ErxesRangeCopyDto {
+  @ApiProperty({ description: 'erxes answered every deal it was asked for' }) ok: boolean;
+  @ApiProperty({ enum: ERXES_PULL_FAILURES, nullable: true }) failure: ErxesPullFailure | null;
+  @ApiProperty(NULL_TEXT) detail: string | null;
+  @ApiProperty() copied: number;
+  @ApiProperty() waiting: number;
+  @ApiProperty() skipped: number;
+  @ApiProperty() failed: number;
+  @ApiProperty({ type: [ErxesRangeResultDto] }) results: ErxesRangeResultDto[];
 }

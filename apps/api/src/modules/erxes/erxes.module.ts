@@ -12,6 +12,7 @@ import { ErxesCopyService } from './services/erxes-copy.service';
 import { ErxesDealsService } from './services/erxes-deals.service';
 import { ErxesDirectoryFlowService } from './services/erxes-directory-flow.service';
 import { ErxesPullFlowService } from './services/erxes-pull-flow.service';
+import { ErxesRangeFlowService } from './services/erxes-range-flow.service';
 import { ErxesSettingsFlowService } from './services/erxes-settings-flow.service';
 
 const IMPORTS = [IdentityModule, PartnersModule, CatalogModule, SalesModule];
@@ -24,6 +25,7 @@ const PROVIDERS = [
   ErxesCopyService,
   ErxesDealsService,
   ErxesPullFlowService,
+  ErxesRangeFlowService,
 ];
 
 /**

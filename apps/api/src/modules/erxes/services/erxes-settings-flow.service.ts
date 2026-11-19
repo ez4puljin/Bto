@@ -73,6 +73,8 @@ export interface ErxesCheck {
   ok: boolean;
   reason: (typeof ERXES_CHECK_REASONS)[number] | null;
   status: number | null;
+  /** What erxes said, in English, for the person who looks into a failure; never a secret. */
+  detail: string | null;
 }
 
 type OpenedAccount =
@@ -192,6 +194,7 @@ export class ErxesSettingsFlowService {
       ok: false,
       reason,
       status: status ?? null,
+      detail: null,
     });
     const row = await this.row();
     const saved = row?.baseUrl ?? ERXES_DEFAULT_URL;
@@ -207,7 +210,7 @@ export class ErxesSettingsFlowService {
     if (!email || !password) return failed('NOT_CONFIGURED');
     try {
       await new ErxesClient({ baseUrl, email, password }, this.fetchFn).signIn();
-      return { ok: true, reason: null, status: null };
+      return { ok: true, reason: null, status: null, detail: null };
     } catch (error: unknown) {
       if (!(error instanceof ErxesError)) throw error;
       return failed(error.reason, error.status);
@@ -254,7 +257,11 @@ export class ErxesSettingsFlowService {
     };
   }
 
-  /** What the last pull came to, for the settings page. */
+  /**
+   * What the last pull came to, for the settings page. A refresh or a range read that fails is
+   * written here too (ADR-0220), so a refused query is seen on the page and never passes as an
+   * empty answer.
+   */
   async recordPull(failure: ErxesPullFailure | null, detail: string | null): Promise<void> {
     await this.db
       .update(erxesSettings)

@@ -1,4 +1,4 @@
-import { Download, Inbox, Settings2 } from 'lucide-react';
+import { CalendarRange, Download, Inbox, Settings2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
@@ -32,6 +32,7 @@ import {
   useErxesSettings,
 } from './api';
 import { ErxesDealDialog } from './erxes-deal-dialog';
+import { ErxesRangeDialog } from './erxes-range-dialog';
 import { ErxesSettingsDialog } from './erxes-settings-dialog';
 import { FAILURE_KEYS, useIssueText } from './erxes-texts';
 
@@ -63,6 +64,7 @@ export function ErxesPage() {
   const status: ErxesDealStatus = isStatus(statusParam) ? statusParam : 'WAITING';
   const dealId = Number.parseInt(params.get('deal') ?? '', 10);
   const settingsOpen = params.get('settings') === '1' && canSet;
+  const rangeOpen = params.get('range') === '1';
   const settings = useErxesSettings(canSet);
   const deals = useErxesDeals(status);
   const actions = useErxesDealActions();
@@ -116,6 +118,10 @@ export function ErxesPage() {
                 {t('erxes.settings.open')}
               </Button>
             ) : null}
+            <Button variant="outline" onClick={() => patch({ range: '1' })}>
+              <CalendarRange />
+              {t('erxes.range.open')}
+            </Button>
             <Button pending={actions.pull.isPending} onClick={pull}>
               <Download />
               {actions.pull.isPending ? t('erxes.pulling') : t('erxes.pullNow')}
@@ -143,6 +149,11 @@ export function ErxesPage() {
               at: state.lastPullAt ? formatUbMinute(state.lastPullAt) : '',
               reason: t(`erxes.failure.${FAILURE_KEYS[state.lastFailure]}`),
             })}
+            {state.lastFailureDetail ? (
+              <p className="mt-1 text-xs break-words">
+                {t('erxes.failureDetail', { detail: state.lastFailureDetail })}
+              </p>
+            ) : null}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -204,6 +215,7 @@ export function ErxesPage() {
         <ErxesDealDialog id={dealId} onClose={() => patch({ deal: null })} />
       ) : null}
       {settingsOpen ? <ErxesSettingsDialog onClose={() => patch({ settings: null })} /> : null}
+      {rangeOpen ? <ErxesRangeDialog onClose={() => patch({ range: null })} /> : null}
     </div>
   );
 }

@@ -18,12 +18,20 @@ export type ErxesDealLine = Schemas['ErxesDealLine'];
 export type ErxesWaitIssue = Schemas['ErxesWaitIssue'];
 export type ErxesDealChoice = Schemas['ErxesDealChoiceRequest'];
 export type ErxesDealStatus = ErxesDealRow['status'];
+export type ErxesRangePipeline = Schemas['ErxesRangePipeline'];
+export type ErxesRangeRequest = Schemas['ErxesRangeRequest'];
+export type ErxesRangeCopyRequest = Schemas['ErxesRangeCopyRequest'];
+export type ErxesRangeDeal = Schemas['ErxesRangeDeal'];
+export type ErxesRangePreview = Schemas['ErxesRangePreview'];
+export type ErxesRangeCopy = Schemas['ErxesRangeCopy'];
+export type ErxesRangeResult = Schemas['ErxesRangeResult'];
 
 const KEYS = {
   settings: ['erxes', 'settings'] as const,
   pipelines: ['erxes', 'pipelines'] as const,
   users: ['erxes', 'users'] as const,
   deals: ['erxes', 'deals'] as const,
+  rangePipelines: ['erxes', 'range', 'pipelines'] as const,
   deal: (id: number) => ['erxes', 'deal', id] as const,
   orderDeal: (orderId: number) => ['erxes', 'order', orderId] as const,
 };
@@ -87,12 +95,18 @@ export function useErxesDirectoryMutations() {
         Promise.all([
           queryClient.invalidateQueries({ queryKey: KEYS.pipelines }),
           queryClient.invalidateQueries({ queryKey: KEYS.users }),
+          // A refused refresh is written as the last failure.
+          queryClient.invalidateQueries({ queryKey: KEYS.settings }),
+          queryClient.invalidateQueries({ queryKey: KEYS.rangePipelines }),
         ]),
     }),
     pipeline: useMutation({
       mutationFn: async ({ id, body }: { id: number; body: ErxesPipelineUpdate }) =>
         unwrap(await api.PATCH('/api/v1/erxes/pipelines/{id}', { params: { path: { id } }, body })),
-      onSuccess: (list) => queryClient.setQueryData(KEYS.pipelines, list),
+      onSuccess: (list) => {
+        queryClient.setQueryData(KEYS.pipelines, list);
+        return queryClient.invalidateQueries({ queryKey: KEYS.rangePipelines });
+      },
     }),
     user: useMutation({
       mutationFn: async ({ id, btoUserId }: { id: number; btoUserId: number | null }) =>
@@ -195,5 +209,39 @@ export function useErxesDealActions() {
         unwrap(await api.POST('/api/v1/erxes/deals/{id}/restore', { params: { path: { id } } })),
       onSuccess: done,
     }),
+  };
+}
+
+/** The pipelines a range may read (ADR-0220): not blocked, with their Bto place chosen. */
+export function useErxesRangePipelines() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: KEYS.rangePipelines,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/erxes/range/pipelines', { signal })),
+  });
+}
+
+/** «Харах» and «Bto руу хуулах» of a range of days (ADR-0220). */
+export function useErxesRangeActions() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return {
+    preview: useMutation({
+      mutationFn: async (body: ErxesRangeRequest) =>
+        unwrap(await api.POST('/api/v1/erxes/range/preview', { body })),
+      onSettled: () => queryClient.invalidateQueries({ queryKey: KEYS.settings }),
+    }),
+    /** One part of the ticked deals; the dialog sends the parts one after another. */
+    copy: useMutation({
+      mutationFn: async (body: ErxesRangeCopyRequest) =>
+        unwrap(await api.POST('/api/v1/erxes/range/copy', { body })),
+    }),
+    /** After the last part: the lists and the waiting count are asked again. */
+    settle: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: KEYS.deals }),
+        queryClient.invalidateQueries({ queryKey: KEYS.settings }),
+      ]),
   };
 }

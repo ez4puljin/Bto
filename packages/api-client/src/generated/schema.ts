@@ -11562,6 +11562,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/erxes/range/pipelines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The pipelines a range may read (ADR-0220): not blocked, with their Bto place chosen. */
+        get: operations["Erxes_rangePipelines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/erxes/range/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** «Харах»: the deals created in the range, newest first, with what Bto holds of each. */
+        post: operations["Erxes_rangePreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/erxes/range/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * «Bto руу хуулах» of a range: the ticked deals, a part at a time, by the minute pull's rules.
+         *     A deal Bto holds already is skipped, so sending a part again makes nothing twice.
+         */
+        post: operations["Erxes_rangeCopy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/erxes/deals": {
         parameters: {
             query?: never;
@@ -25281,6 +25335,8 @@ export interface components {
             reason: "LOGIN_FAILED" | "UNREACHABLE" | "TIMEOUT" | "UNEXPECTED_ANSWER" | "NOT_CONFIGURED" | "KEY_UNREADABLE" | null;
             /** @description erxes's HTTP status, when it gave one */
             status: number | null;
+            /** @description What erxes said when it failed, in English */
+            detail: string | null;
         };
         ErxesPipeline: {
             id: number;
@@ -25344,6 +25400,84 @@ export interface components {
             copied: number;
             /** @description Deals still waiting */
             waiting: number;
+            /** @description What erxes said when it failed, in English */
+            detail: string | null;
+        };
+        ErxesRangePipeline: {
+            id: number;
+            erxesId: string;
+            name: string;
+            boardName: string | null;
+            /** @description Ticked for the minute pull: chosen by default */
+            enabled: boolean;
+        };
+        ErxesRangeRequest: {
+            /**
+             * Format: date
+             * @description The first day, in Ulaanbaatar
+             */
+            from: string;
+            /**
+             * Format: date
+             * @description The last day, whole, in Ulaanbaatar; 31 days at most
+             */
+            to: string;
+            /** @description The erxes pipelines to read (their Bto ids) */
+            pipelineIds: number[];
+        };
+        ErxesRangeKnown: {
+            id: number;
+            /** @enum {string} */
+            status: "WAITING" | "COPIED" | "DISMISSED";
+            orderId: number | null;
+        };
+        ErxesRangeDeal: {
+            erxesId: string;
+            pipelineId: number;
+            pipelineName: string;
+            number: string | null;
+            name: string | null;
+            /** Format: date-time */
+            createdAt: string | null;
+            creatorName: string | null;
+            stageName: string | null;
+            customerName: string | null;
+            /** @description Lines; null when erxes did not list them */
+            lines: number | null;
+            /** @description erxes's total */
+            total: string | null;
+            /** @description The row Bto holds of it; null: new to Bto */
+            known: components["schemas"]["ErxesRangeKnown"] | null;
+        };
+        ErxesRangePreview: {
+            ok: boolean;
+            /** @enum {string|null} */
+            failure: "NOT_CONFIGURED" | "KEY_UNREADABLE" | "LOGIN_FAILED" | "UNREACHABLE" | "TIMEOUT" | "UNEXPECTED_ANSWER" | "INTERNAL" | null;
+            detail: string | null;
+            /** @description More deals than a range may read: narrow it */
+            tooMany: boolean;
+            deals: components["schemas"]["ErxesRangeDeal"][];
+        };
+        ErxesRangeDealRef: {
+            erxesId: string;
+            /** @description The erxes pipeline it was listed in (its Bto id) */
+            pipelineId: number;
+        };
+        ErxesRangeCopyRequest: {
+            /**
+             * Format: date
+             * @description The first day, in Ulaanbaatar
+             */
+            from: string;
+            /**
+             * Format: date
+             * @description The last day, whole, in Ulaanbaatar; 31 days at most
+             */
+            to: string;
+            /** @description The erxes pipelines to read (their Bto ids) */
+            pipelineIds: number[];
+            /** @description The ticked deals, 50 at most a request */
+            deals: components["schemas"]["ErxesRangeDealRef"][];
         };
         ErxesWaitIssue: {
             /** @enum {string} */
@@ -25354,6 +25488,31 @@ export interface components {
             name?: string;
             /** @description ORDER_REFUSED: Bto's error code */
             errorCode?: string;
+        };
+        ErxesRangeResult: {
+            erxesId: string;
+            /** @enum {string} */
+            outcome: "COPIED" | "WAITING" | "SKIPPED" | "FAILED";
+            dealId: number | null;
+            orderId: number | null;
+            issues: components["schemas"]["ErxesWaitIssue"][];
+            /** @enum {string|null} */
+            skip: "KNOWN" | "OTHER_PIPELINE" | "OUT_OF_RANGE" | null;
+            /** @enum {string|null} */
+            failure: "NOT_CONFIGURED" | "KEY_UNREADABLE" | "LOGIN_FAILED" | "UNREACHABLE" | "TIMEOUT" | "UNEXPECTED_ANSWER" | "INTERNAL" | null;
+            detail: string | null;
+        };
+        ErxesRangeCopy: {
+            /** @description erxes answered every deal it was asked for */
+            ok: boolean;
+            /** @enum {string|null} */
+            failure: "NOT_CONFIGURED" | "KEY_UNREADABLE" | "LOGIN_FAILED" | "UNREACHABLE" | "TIMEOUT" | "UNEXPECTED_ANSWER" | "INTERNAL" | null;
+            detail: string | null;
+            copied: number;
+            waiting: number;
+            skipped: number;
+            failed: number;
+            results: components["schemas"]["ErxesRangeResult"][];
         };
         ErxesDealRow: {
             id: number;
@@ -52862,6 +53021,98 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErxesPullResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_rangePipelines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesRangePipeline"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_rangePreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ErxesRangeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesRangePreview"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_rangeCopy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ErxesRangeCopyRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesRangeCopy"];
                 };
             };
             /** @description RFC 9457 problem details */

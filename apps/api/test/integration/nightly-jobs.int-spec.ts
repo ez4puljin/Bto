@@ -471,6 +471,12 @@ describe('nightly jobs', () => {
           missed: 'once',
         },
         {
+          name: 'erxes.pull',
+          cron: '* * * * *',
+          timezone: 'Asia/Ulaanbaatar',
+          missed: 'once',
+        },
+        {
           name: 'finance.reconcile',
           cron: '15 3 * * *',
           timezone: 'Asia/Ulaanbaatar',

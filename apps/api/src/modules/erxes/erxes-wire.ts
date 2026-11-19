@@ -1,8 +1,8 @@
 /**
- * Everything Bto knows of erxes's GraphQL (ADR-0218 #8): the queries it sends and how a deal's
- * answer is read. erxes has introspection switched off, so the field lists below come from the
- * owner's description of a deal and from erxes's open source, not from the live schema. Two things
- * keep a wrong guess from stopping the copy:
+ * Everything Bto knows of erxes's GraphQL (ADR-0218 #8, ADR-0220): the queries it sends and how a
+ * deal's answer is read. erxes has introspection switched off; the shapes marked «checked» were
+ * tried against the company's erxes on 2026-11-19 (ADR-0220), the rest come from erxes's open
+ * source. Two things keep a wrong guess from stopping the copy:
  *
  * - a query is a tree of fields, and a field erxes refuses («Cannot query field») is cut off and
  *   the query sent again (`ErxesClient.read`), so an unknown field costs that field only;
@@ -12,6 +12,8 @@
  * The first answers of every pipeline are logged and kept (`erxes_pipelines.first_pull`) to compare
  * with `erxes-wire.fixture.ts`. When erxes's shape differs, this is the only file to change.
  */
+
+import { Decimal } from '@tugeel/shared/money';
 
 /** A GraphQL selection: a leaf field, or a field with its own selection. */
 export interface Selection {
@@ -36,10 +38,14 @@ const USER: Selection = {
   details: { fullName: true, firstName: true, lastName: true, operatorPhone: true },
 };
 
-/** The boards with their pipelines: the sales plugin's name first, the older «cards» one after. */
+/**
+ * The boards with their pipelines: the sales plugin's name first, the older «cards» one after.
+ * Checked: `salesBoards` requires `type: "deal"` and answers nothing without it.
+ */
 export const BOARDS: readonly QueryShape[] = [
   {
     root: 'salesBoards',
+    args: 'type: "deal"',
     selection: { _id: true, name: true, pipelines: { _id: true, name: true } },
   },
   {
@@ -53,13 +59,49 @@ export const USERS: readonly QueryShape[] = [
   { root: 'users', declare: '$perPage: Int', args: 'perPage: $perPage', selection: USER },
 ];
 
+/**
+ * Checked: `deals` leaves out archived deals unless it is told not to, and this company moves its
+ * deals to the archive within hours. Every `deals` query carries this.
+ */
+const DEALS_ARGS =
+  'pipelineId: $pipelineId, limit: $limit, skip: $skip, sortField: "createdAt", sortDirection: -1, noSkipArchive: true';
+
 /** A page of a pipeline's deals, newest first: only what tells a new deal from a seen one. */
 export const DEAL_PAGE: readonly QueryShape[] = [
   {
     root: 'deals',
     declare: '$pipelineId: String, $limit: Int, $skip: Int',
-    args: 'pipelineId: $pipelineId, limit: $limit, skip: $skip, sortField: "createdAt", sortDirection: -1',
+    args: DEALS_ARGS,
     selection: { _id: true, name: true, createdAt: true },
+  },
+];
+
+/**
+ * A page of the deals of a pipeline created between two moments, newest first (ADR-0220). Checked:
+ * `createdStartDate` and `createdEndDate` filter by creation and are of type `Date` (a `String`
+ * is refused); `startDate`/`endDate` filter something else. `_id`, `name` and `createdAt` are
+ * checked; the rest is what the list shows and is cut when erxes does not give it on a list.
+ */
+export const DEAL_RANGE: readonly QueryShape[] = [
+  {
+    root: 'deals',
+    declare:
+      '$pipelineId: String, $limit: Int, $skip: Int, $createdStartDate: Date, $createdEndDate: Date',
+    args: `${DEALS_ARGS}, createdStartDate: $createdStartDate, createdEndDate: $createdEndDate`,
+    selection: {
+      _id: true,
+      name: true,
+      number: true,
+      createdAt: true,
+      stageId: true,
+      stage: { _id: true, name: true, pipelineId: true },
+      userId: true,
+      createdUser: USER,
+      customers: { _id: true, code: true, firstName: true, lastName: true },
+      companies: { _id: true, code: true, primaryName: true },
+      productsData: true,
+      amount: true,
+    },
   },
 ];
 
@@ -117,7 +159,7 @@ export const DEAL_DETAIL: readonly QueryShape[] = [
         primaryName: true,
         names: true,
         primaryEmail: true,
-        registrationNumber: true,
+        // Checked: erxes's Company has no `registrationNumber`; `taxNumber` holds the register.
         taxNumber: true,
         ...PARTY_PHONES,
       },
@@ -126,21 +168,13 @@ export const DEAL_DETAIL: readonly QueryShape[] = [
   },
 ];
 
-/** The products of a deal's lines, for their codes, barcodes and base unit. */
+/** The products of a deal's lines, for their codes, barcodes and base unit. Checked as it is. */
 export const PRODUCTS: readonly QueryShape[] = [
   {
     root: 'products',
     declare: '$ids: [String], $perPage: Int',
     args: 'ids: $ids, perPage: $perPage',
-    selection: {
-      _id: true,
-      name: true,
-      code: true,
-      barcodes: true,
-      uom: true,
-      unitPrice: true,
-      subUoms: true,
-    },
+    selection: { _id: true, name: true, code: true, barcodes: true, uom: true },
   },
 ];
 
@@ -497,6 +531,21 @@ export function readDeal(raw: unknown, products: readonly unknown[] = []): Erxes
       return url === null ? [] : [{ name: textOf(file.name), url, type: textOf(file.type) }];
     }),
   };
+}
+
+/**
+ * A deal's total as erxes counts it: its `amount` (`{ MNT: 36400 }`, or a plain number) when it
+ * says one, else the sum of its lines' `amount`; null when neither is there.
+ */
+export function dealTotal(raw: unknown): string | null {
+  if (!isObject(raw)) return null;
+  const said = isObject(raw.amount)
+    ? (numberText(raw.amount.MNT) ?? numberText(Object.values(raw.amount)[0]))
+    : numberText(raw.amount);
+  if (said !== null) return said;
+  const amounts = objects(raw.productsData).map((line) => numberText(line.amount));
+  if (amounts.length === 0 || amounts.some((amount) => amount === null)) return null;
+  return amounts.reduce((sum, amount) => sum.plus(amount ?? '0'), new Decimal(0)).toString();
 }
 
 /** The ids of the products a deal's lines name. */

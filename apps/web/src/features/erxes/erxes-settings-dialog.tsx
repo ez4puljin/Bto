@@ -232,11 +232,22 @@ function Pipelines({ usable }: { usable: boolean }) {
   );
   const rows = pipelines.data ?? [];
 
+  // A refresh erxes refused is said aloud, with erxes's own words (ADR-0220).
+  const [refused, setRefused] = useState<ErxesCheck | null>(null);
   const refresh = () =>
     void action.run(async () => {
+      setRefused(null);
       const check = await mutations.refresh.mutateAsync();
-      if (check.ok) toast.success(t('erxes.settings.refreshed'));
-      else toast.warning(t(`erxes.failure.${failureText(check)}`));
+      if (check.ok) {
+        toast.success(t('erxes.settings.refreshed'));
+      } else {
+        setRefused(check);
+        toast.warning(
+          t('erxes.settings.refreshFailed', {
+            reason: t(`erxes.failure.${failureText(check)}`),
+          }),
+        );
+      }
     });
   const update = (id: number, body: Parameters<typeof mutations.pipeline.mutateAsync>[0]['body']) =>
     void action.run(() => mutations.pipeline.mutateAsync({ id, body }));
@@ -258,6 +269,22 @@ function Pipelines({ usable }: { usable: boolean }) {
         </Button>
       </div>
       <ProblemAlert problem={problemFromError(pipelines.error) ?? action.problem} />
+      {refused ? (
+        <Alert variant="destructive">
+          <AlertDescription>
+            <p>
+              {t('erxes.settings.refreshFailed', {
+                reason: t(`erxes.failure.${failureText(refused)}`),
+              })}
+            </p>
+            {refused.detail ? (
+              <p className="mt-1 text-xs break-words">
+                {t('erxes.failureDetail', { detail: refused.detail })}
+              </p>
+            ) : null}
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {rows.length === 0 && !pipelines.isPending ? (
         <p className="text-sm text-muted-foreground">{t('erxes.settings.noPipelines')}</p>
       ) : (

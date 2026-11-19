@@ -46681,6 +46681,140 @@
         ]
       }
     },
+    "/api/v1/erxes/range/pipelines": {
+      "get": {
+        "operationId": "Erxes_rangePipelines",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ErxesRangePipeline"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The pipelines a range may read (ADR-0220): not blocked, with their Bto place chosen.",
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/range/preview": {
+      "post": {
+        "operationId": "Erxes_rangePreview",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErxesRangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErxesRangePreview"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Харах»: the deals created in the range, newest first, with what Bto holds of each.",
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/range/copy": {
+      "post": {
+        "operationId": "Erxes_rangeCopy",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErxesRangeCopyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErxesRangeCopy"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Bto руу хуулах» of a range: the ticked deals, a part at a time, by the minute pull's rules.\nA deal Bto holds already is skipped, so sending a part again makes nothing twice.",
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
     "/api/v1/erxes/deals": {
       "get": {
         "operationId": "Erxes_list",
@@ -95360,12 +95494,18 @@
             "type": "number",
             "nullable": true,
             "description": "erxes's HTTP status, when it gave one"
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true,
+            "description": "What erxes said when it failed, in English"
           }
         },
         "required": [
           "ok",
           "reason",
-          "status"
+          "status",
+          "detail"
         ]
       },
       "ErxesPipeline": {
@@ -95566,6 +95706,11 @@
           "waiting": {
             "type": "number",
             "description": "Deals still waiting"
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true,
+            "description": "What erxes said when it failed, in English"
           }
         },
         "required": [
@@ -95574,7 +95719,265 @@
           "pipelines",
           "seen",
           "copied",
-          "waiting"
+          "waiting",
+          "detail"
+        ]
+      },
+      "ErxesRangePipeline": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "erxesId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "boardName": {
+            "type": "string",
+            "nullable": true
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Ticked for the minute pull: chosen by default"
+          }
+        },
+        "required": [
+          "id",
+          "erxesId",
+          "name",
+          "boardName",
+          "enabled"
+        ]
+      },
+      "ErxesRangeRequest": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date",
+            "description": "The first day, in Ulaanbaatar"
+          },
+          "to": {
+            "type": "string",
+            "format": "date",
+            "description": "The last day, whole, in Ulaanbaatar; 31 days at most"
+          },
+          "pipelineIds": {
+            "minItems": 1,
+            "maxItems": 50,
+            "description": "The erxes pipelines to read (their Bto ids)",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "pipelineIds"
+        ]
+      },
+      "ErxesRangeKnown": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "WAITING",
+              "COPIED",
+              "DISMISSED"
+            ],
+            "type": "string"
+          },
+          "orderId": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "orderId"
+        ]
+      },
+      "ErxesRangeDeal": {
+        "type": "object",
+        "properties": {
+          "erxesId": {
+            "type": "string"
+          },
+          "pipelineId": {
+            "type": "number"
+          },
+          "pipelineName": {
+            "type": "string"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "creatorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "stageName": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lines": {
+            "type": "number",
+            "nullable": true,
+            "description": "Lines; null when erxes did not list them"
+          },
+          "total": {
+            "type": "string",
+            "nullable": true,
+            "description": "erxes's total"
+          },
+          "known": {
+            "nullable": true,
+            "description": "The row Bto holds of it; null: new to Bto",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErxesRangeKnown"
+              }
+            ]
+          }
+        },
+        "required": [
+          "erxesId",
+          "pipelineId",
+          "pipelineName",
+          "number",
+          "name",
+          "createdAt",
+          "creatorName",
+          "stageName",
+          "customerName",
+          "lines",
+          "total",
+          "known"
+        ]
+      },
+      "ErxesRangePreview": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "failure": {
+            "nullable": true,
+            "enum": [
+              "NOT_CONFIGURED",
+              "KEY_UNREADABLE",
+              "LOGIN_FAILED",
+              "UNREACHABLE",
+              "TIMEOUT",
+              "UNEXPECTED_ANSWER",
+              "INTERNAL"
+            ],
+            "type": "string"
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "tooMany": {
+            "type": "boolean",
+            "description": "More deals than a range may read: narrow it"
+          },
+          "deals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErxesRangeDeal"
+            }
+          }
+        },
+        "required": [
+          "ok",
+          "failure",
+          "detail",
+          "tooMany",
+          "deals"
+        ]
+      },
+      "ErxesRangeDealRef": {
+        "type": "object",
+        "properties": {
+          "erxesId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "pipelineId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The erxes pipeline it was listed in (its Bto id)"
+          }
+        },
+        "required": [
+          "erxesId",
+          "pipelineId"
+        ]
+      },
+      "ErxesRangeCopyRequest": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date",
+            "description": "The first day, in Ulaanbaatar"
+          },
+          "to": {
+            "type": "string",
+            "format": "date",
+            "description": "The last day, whole, in Ulaanbaatar; 31 days at most"
+          },
+          "pipelineIds": {
+            "minItems": 1,
+            "maxItems": 50,
+            "description": "The erxes pipelines to read (their Bto ids)",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "deals": {
+            "minItems": 1,
+            "description": "The ticked deals, 50 at most a request",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErxesRangeDealRef"
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "pipelineIds",
+          "deals"
         ]
       },
       "ErxesWaitIssue": {
@@ -95611,6 +96014,127 @@
         },
         "required": [
           "reason"
+        ]
+      },
+      "ErxesRangeResult": {
+        "type": "object",
+        "properties": {
+          "erxesId": {
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "COPIED",
+              "WAITING",
+              "SKIPPED",
+              "FAILED"
+            ],
+            "type": "string"
+          },
+          "dealId": {
+            "type": "number",
+            "nullable": true
+          },
+          "orderId": {
+            "type": "number",
+            "nullable": true
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErxesWaitIssue"
+            }
+          },
+          "skip": {
+            "nullable": true,
+            "enum": [
+              "KNOWN",
+              "OTHER_PIPELINE",
+              "OUT_OF_RANGE"
+            ],
+            "type": "string"
+          },
+          "failure": {
+            "nullable": true,
+            "enum": [
+              "NOT_CONFIGURED",
+              "KEY_UNREADABLE",
+              "LOGIN_FAILED",
+              "UNREACHABLE",
+              "TIMEOUT",
+              "UNEXPECTED_ANSWER",
+              "INTERNAL"
+            ],
+            "type": "string"
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "erxesId",
+          "outcome",
+          "dealId",
+          "orderId",
+          "issues",
+          "skip",
+          "failure",
+          "detail"
+        ]
+      },
+      "ErxesRangeCopy": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "erxes answered every deal it was asked for"
+          },
+          "failure": {
+            "nullable": true,
+            "enum": [
+              "NOT_CONFIGURED",
+              "KEY_UNREADABLE",
+              "LOGIN_FAILED",
+              "UNREACHABLE",
+              "TIMEOUT",
+              "UNEXPECTED_ANSWER",
+              "INTERNAL"
+            ],
+            "type": "string"
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "copied": {
+            "type": "number"
+          },
+          "waiting": {
+            "type": "number"
+          },
+          "skipped": {
+            "type": "number"
+          },
+          "failed": {
+            "type": "number"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErxesRangeResult"
+            }
+          }
+        },
+        "required": [
+          "ok",
+          "failure",
+          "detail",
+          "copied",
+          "waiting",
+          "skipped",
+          "failed",
+          "results"
         ]
       },
       "ErxesDealRow": {

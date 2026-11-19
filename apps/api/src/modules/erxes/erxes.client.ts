@@ -59,7 +59,19 @@ interface Answer {
 const messageOf = (error: GraphqlError): string =>
   typeof error.message === 'string' ? error.message : '';
 
-const UNKNOWN_FIELD = /Cannot query field ["“]?([A-Za-z0-9_]+)["”]? on type ["“]?([A-Za-z0-9_]+)/;
+/** «Cannot query field "x" on type "T"», or the gateway's «no field `x` in type `T`». */
+const UNKNOWN_FIELD = [
+  /Cannot query field ["“`]?([A-Za-z0-9_]+)["”`]? on type ["“`]?([A-Za-z0-9_]+)/,
+  /[Nn]o field ["“`]?([A-Za-z0-9_]+)["”`]? (?:in|on) type ["“`]?([A-Za-z0-9_]+)/,
+];
+
+function unknownField(error: GraphqlError): RegExpExecArray | null {
+  for (const pattern of UNKNOWN_FIELD) {
+    const found = pattern.exec(messageOf(error));
+    if (found) return found;
+  }
+  return null;
+}
 
 function needsSignIn(errors: readonly GraphqlError[], status: number): boolean {
   if (status === 401) return true;
@@ -93,6 +105,8 @@ export class ErxesClient {
   private token: string | null;
   /** Fields erxes refused, as `root.path.to.field`. */
   readonly cuts: string[] = [];
+  /** A shape as erxes took it after its refused fields were cut, for the next query of it. */
+  private readonly learned = new Map<QueryShape, QueryShape>();
 
   constructor(
     private readonly account: ErxesAccount,
@@ -135,23 +149,40 @@ export class ErxesClient {
   }
 
   /**
-   * The answer of the first shape erxes knows. A refused field is cut and the query sent again;
-   * a refused root field moves on to the next shape; an expired session signs in once more.
+   * The answer of the first shape erxes takes. A refused field is cut and the query sent again;
+   * a shape erxes refuses otherwise (an unknown root, a missing argument) moves on to the next
+   * one; an expired session signs in once more. When every shape is refused the error says what
+   * erxes said of each, so the failure is seen and never read as an empty answer (ADR-0220).
    */
   async read(shapes: readonly QueryShape[], variables: Record<string, unknown> = {}) {
-    let last: ErxesError | null = null;
+    const refusals: string[] = [];
+    let status: number | undefined;
     for (const shape of shapes) {
       try {
-        return await this.readShape(shape, variables);
+        return await this.readShape(this.learned.get(shape) ?? shape, variables, shape);
       } catch (error: unknown) {
-        if (!(error instanceof UnknownRoot)) throw error;
-        last = new ErxesError('UNEXPECTED_ANSWER', `erxes does not know «${shape.root}»`);
+        if (error instanceof UnknownRoot) {
+          refusals.push(`erxes does not know «${shape.root}»`);
+        } else if (error instanceof ErxesError && error.reason === 'UNEXPECTED_ANSWER') {
+          refusals.push(error.message);
+          status = error.status ?? status;
+        } else {
+          throw error;
+        }
       }
     }
-    throw last ?? new ErxesError('UNEXPECTED_ANSWER', 'no query to send');
+    throw new ErxesError(
+      'UNEXPECTED_ANSWER',
+      refusals.length > 0 ? refusals.join(' | ') : 'no query to send',
+      status,
+    );
   }
 
-  private async readShape(start: QueryShape, variables: Record<string, unknown>): Promise<unknown> {
+  private async readShape(
+    start: QueryShape,
+    variables: Record<string, unknown>,
+    asked: QueryShape,
+  ): Promise<unknown> {
     let shape = start;
     let signedInAgain = false;
     for (let attempt = 0; attempt <= MAX_CUTS; attempt += 1) {
@@ -162,6 +193,8 @@ export class ErxesClient {
         if (!answer.data || !(shape.root in answer.data)) {
           throw new ErxesError('UNEXPECTED_ANSWER', `no «${shape.root}» in the answer`);
         }
+        // The next query of this shape goes without the fields erxes refused.
+        if (shape !== asked) this.learned.set(asked, shape);
         return answer.data[shape.root];
       }
       if (needsSignIn(answer.errors, answer.status)) {
@@ -172,7 +205,7 @@ export class ErxesClient {
       }
       const refused: string[][] = [];
       for (const error of answer.errors) {
-        const unknown = UNKNOWN_FIELD.exec(messageOf(error));
+        const unknown = unknownField(error);
         if (!unknown?.[1]) continue;
         if (unknown[1] === shape.root && unknown[2] === 'Query') throw new UnknownRoot();
         const line = lineOf(error);
@@ -183,7 +216,7 @@ export class ErxesClient {
       if (refused.length === 0) {
         throw new ErxesError(
           'UNEXPECTED_ANSWER',
-          `erxes refused «${shape.root}»: ${messageOf(answer.errors[0] ?? {}).slice(0, 300)}`,
+          `erxes refused «${shape.root}»: ${answer.errors.map(messageOf).join('; ').slice(0, 300)}`,
           answer.status,
         );
       }

@@ -20,6 +20,11 @@ import {
   ErxesOrderDealDto,
   ErxesPipelineDto,
   ErxesPullResultDto,
+  ErxesRangeCopyDto,
+  ErxesRangeCopyRequestDto,
+  ErxesRangePipelineDto,
+  ErxesRangePreviewDto,
+  ErxesRangeRequestDto,
   ErxesSettingsDto,
   ErxesUserDto,
   TestErxesSettingsDto,
@@ -31,6 +36,7 @@ import { ErxesCopyService } from '../services/erxes-copy.service';
 import { ErxesDealsService } from '../services/erxes-deals.service';
 import { ErxesDirectoryFlowService } from '../services/erxes-directory-flow.service';
 import { ErxesPullFlowService } from '../services/erxes-pull-flow.service';
+import { ErxesRangeFlowService } from '../services/erxes-range-flow.service';
 import { ErxesSettingsFlowService } from '../services/erxes-settings-flow.service';
 
 /** Switching the copy on, the pipelines and the users (ADR-0218 #9): who configures the boards. */
@@ -53,6 +59,7 @@ export class ErxesController {
     private readonly puller: ErxesPullFlowService,
     private readonly deals: ErxesDealsService,
     private readonly copier: ErxesCopyService,
+    private readonly range: ErxesRangeFlowService,
   ) {}
 
   @Get('settings')
@@ -135,6 +142,38 @@ export class ErxesController {
   @ApiOkResponse({ type: ErxesPullResultDto })
   pull(): Promise<ErxesPullResultDto> {
     return this.puller.pull();
+  }
+
+  /** The pipelines a range may read (ADR-0220): not blocked, with their Bto place chosen. */
+  @Get('range/pipelines')
+  @RequirePermission(DEALS)
+  @ApiOkResponse({ type: [ErxesRangePipelineDto] })
+  rangePipelines(): Promise<ErxesRangePipelineDto[]> {
+    return this.range.pipelines();
+  }
+
+  /** «Харах»: the deals created in the range, newest first, with what Bto holds of each. */
+  @Post('range/preview')
+  @HttpCode(200)
+  @RequirePermission(DEALS)
+  @ApiOkResponse({ type: ErxesRangePreviewDto })
+  rangePreview(@Body() body: ErxesRangeRequestDto): Promise<ErxesRangePreviewDto> {
+    return this.range.preview(body);
+  }
+
+  /**
+   * «Bto руу хуулах» of a range: the ticked deals, a part at a time, by the minute pull's rules.
+   * A deal Bto holds already is skipped, so sending a part again makes nothing twice.
+   */
+  @Post('range/copy')
+  @HttpCode(200)
+  @RequirePermission(DEALS)
+  @ApiOkResponse({ type: ErxesRangeCopyDto })
+  rangeCopy(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: ErxesRangeCopyRequestDto,
+  ): Promise<ErxesRangeCopyDto> {
+    return this.range.copy(ctx, body);
   }
 
   @Get('deals')

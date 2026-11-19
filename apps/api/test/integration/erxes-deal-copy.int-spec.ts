@@ -119,6 +119,8 @@ describe('erxes deal copy', () => {
     logins: 0,
     writes: 0,
     details: 0,
+    /** Every query of a root erxes refuses, as the real one refuses a missing argument. */
+    refuse: new Set<string>(),
   };
   const http = () => request(app.getHttpServer());
 
@@ -145,8 +147,24 @@ describe('erxes deal copy', () => {
       return answer({ errors: [{ message: 'Login required' }] });
     }
     const root = /^query bto(?:\([^)]*\))? \{\n(\w+)/.exec(query)?.[1];
+    if (root && erxes.refuse.has(root)) {
+      return answer({
+        errors: [{ message: `Field "${root}" argument "x" of type "String!" is required` }],
+      });
+    }
     switch (root) {
       case 'salesBoards':
+        // The real erxes answers nothing without the type (ADR-0220).
+        if (!query.includes('salesBoards(type: "deal")')) {
+          return answer({
+            errors: [
+              {
+                message:
+                  'Field "salesBoards" argument "type" of type "String!" is required, but it was not provided.',
+              },
+            ],
+          });
+        }
         return answer({
           data: {
             salesBoards: [
@@ -183,8 +201,11 @@ describe('erxes deal copy', () => {
       case 'deals': {
         const skip = typeof variables.skip === 'number' ? variables.skip : 0;
         const limit = typeof variables.limit === 'number' ? variables.limit : 50;
+        // erxes leaves archived deals out unless it is told not to.
+        const archivedToo = query.includes('noSkipArchive: true');
         const rows = erxes.deals
           .filter((deal) => (deal.pipeline as { _id: string })._id === variables.pipelineId)
+          .filter((deal) => archivedToo || deal.status !== 'archived')
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
           .slice(skip, skip + limit)
           .map(({ _id, name, createdAt }) => ({ _id, name, createdAt }));
@@ -395,7 +416,7 @@ describe('erxes deal copy', () => {
       .set(bearer(admin))
       .send({})
       .expect(200);
-    expect(ok.body).toEqual({ ok: true, reason: null, status: null });
+    expect(ok.body).toEqual({ ok: true, reason: null, status: null, detail: null });
   });
 
   it('lists the pipelines of erxes, pairs them by name and never ticks Kharkhorin', async () => {
@@ -465,6 +486,8 @@ describe('erxes deal copy', () => {
     expect(await orderCount()).toBe(orders);
 
     addDeal('d-1001', {
+      // Moved to «Архивлах» in erxes within hours: still a new deal for Bto.
+      status: 'archived',
       productsData: [
         { ...line('p-cola', 24, 1500), discountPercent: 10, discount: 3600, amount: 32400 },
         // Its erxes code is no Bto code: the barcode erxes holds finds the product.
@@ -784,5 +807,43 @@ describe('erxes deal copy', () => {
     const failed = (await http().get('/api/v1/erxes/settings').set(bearer(admin)).expect(200))
       .body as { lastFailure: string | null };
     expect(failed.lastFailure).toBe('LOGIN_FAILED');
+  });
+
+  it('fails visibly when erxes refuses a query, and says what erxes said', async () => {
+    await http()
+      .patch('/api/v1/erxes/settings')
+      .set(bearer(admin))
+      .send({ password: PASSWORD, enabled: true })
+      .expect(200);
+    erxes.refuse.add('salesBoards');
+    const pipelinesBefore = (await http().get('/api/v1/erxes/pipelines').set(bearer(admin)))
+      .body as PipelineJson[];
+    const refreshed = (
+      await http().post('/api/v1/erxes/pipelines/refresh').set(bearer(admin)).expect(200)
+    ).body as { ok: boolean; reason: string | null; detail: string | null };
+    expect(refreshed).toMatchObject({ ok: false, reason: 'UNEXPECTED_ANSWER' });
+    expect(refreshed.detail).toContain('argument "x"');
+    const shown = (await http().get('/api/v1/erxes/settings').set(bearer(admin)).expect(200))
+      .body as { lastFailure: string | null; lastFailureDetail: string | null };
+    expect(shown.lastFailure).toBe('UNEXPECTED_ANSWER');
+    expect(shown.lastFailureDetail).toContain('salesBoards');
+    // Nothing of what Bto knew is lost or marked gone by an answer it could not read.
+    const pipelinesAfter = (await http().get('/api/v1/erxes/pipelines').set(bearer(admin)))
+      .body as (PipelineJson & { gone: boolean })[];
+    expect(pipelinesAfter).toHaveLength(pipelinesBefore.length);
+    expect(pipelinesAfter.some((row) => row.gone)).toBe(false);
+    erxes.refuse.delete('salesBoards');
+
+    // The same for the deals of a pull.
+    erxes.refuse.add('deals');
+    const pulled = await pull();
+    expect(pulled).toMatchObject({ ok: false, failure: 'UNEXPECTED_ANSWER' });
+    expect((pulled as PullJson & { detail: string | null }).detail).toContain('deals');
+    const after = (await http().get('/api/v1/erxes/settings').set(bearer(admin)).expect(200))
+      .body as { lastFailure: string | null; lastFailureDetail: string | null };
+    expect(after).toMatchObject({ lastFailure: 'UNEXPECTED_ANSWER' });
+    expect(after.lastFailureDetail).toContain('argument "x"');
+    erxes.refuse.delete('deals');
+    expect(await pull()).toMatchObject({ ok: true, failure: null });
   });
 });
