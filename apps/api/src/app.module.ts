@@ -6,6 +6,7 @@ import { JobsModule } from './common/jobs/jobs.module';
 import { CoreModule } from './core.module';
 import { FinanceCoreModule } from './finance-core';
 import { HealthModule } from './health/health.module';
+import { EbarimtIntegrationModule } from './integrations/ebarimt';
 import { ErkhetIntegrationModule } from './integrations/erkhet';
 import { SmsIntegrationModule } from './integrations/sms';
 import { LlmModule } from './integrations/llm';
@@ -49,6 +50,7 @@ import { SegmentsHttpModule } from './modules/segments';
     PictureModule,
     ScannerModule,
     ErkhetIntegrationModule,
+    EbarimtIntegrationModule,
     SmsIntegrationModule,
     FinanceCoreModule,
     FinBridgeHttpModule,

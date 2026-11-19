@@ -15,6 +15,9 @@ export type EbarimtUnregistered = components['schemas']['EbarimtUnregisteredRowD
 export type EbarimtLink = components['schemas']['EbarimtLinkViewDto'];
 export type EbarimtEntry = components['schemas']['EbarimtEntryViewDto'];
 export type EbarimtMonth = components['schemas']['EbarimtMonthDto'];
+export type EbarimtConnection = components['schemas']['EbarimtConnectionDto'];
+export type EbarimtConnectionInput = components['schemas']['EbarimtConnectionRequestDto'];
+export type EbarimtPullResult = components['schemas']['EbarimtPullResultDto'];
 
 const KEYS = {
   all: ['ebarimt-check'] as const,
@@ -26,6 +29,7 @@ const KEYS = {
     ['ebarimt-check', 'entries', periods.join(','), target] as const,
   files: (year: number) => ['ebarimt-check', 'files', year] as const,
   settings: ['ebarimt-check', 'settings'] as const,
+  connection: ['ebarimt-check', 'connection'] as const,
 };
 
 export interface EntriesTarget {
@@ -133,6 +137,16 @@ export function useEbarimtSettings() {
   });
 }
 
+/** The connection to e-Barimt's purchases service (ADR-0228); the password and key never come. */
+export function useEbarimtConnection() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: KEYS.connection,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/ebarimt-check/connection', { signal })),
+  });
+}
+
 /** Everything the page shows, read again; a query that is switched off sends nothing. */
 export function useEbarimtRefresh() {
   const queryClient = useQueryClient();
@@ -235,6 +249,22 @@ export function useEbarimtMutations() {
       mutationFn: async (accountCodes: string[]) =>
         unwrap(await api.PUT('/api/v1/ebarimt-check/settings', { body: { accountCodes } })),
       onSuccess: changed,
+    }),
+    saveConnection: useMutation({
+      mutationFn: async (body: EbarimtConnectionInput) =>
+        unwrap(await api.PUT('/api/v1/ebarimt-check/connection', { body })),
+      onSuccess: (data) => queryClient.setQueryData(KEYS.connection, data),
+    }),
+    /** «Одоо татах»: a refusal is an answer with its reason, not an error. */
+    pull: useMutation({
+      mutationFn: async ({ period, key }: { period: number; key: string }) =>
+        unwrap(
+          await api.POST('/api/v1/ebarimt-check/pull', {
+            params: { header: idempotencyKey(key) },
+            body: { period },
+          }),
+        ),
+      onSettled: changed,
     }),
     saveMonthValue: useMutation({
       mutationFn: async (body: {

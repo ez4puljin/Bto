@@ -27,6 +27,8 @@ import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '..
 import {
   EbarimtAssignRequestDto,
   EbarimtAssignResultDto,
+  EbarimtConnectionDto,
+  EbarimtConnectionRequestDto,
   EbarimtEntriesDto,
   EbarimtEntriesQueryDto,
   EbarimtFileOverviewDto,
@@ -40,6 +42,8 @@ import {
   EbarimtMonthValueRequestDto,
   EbarimtPeriodsQueryDto,
   EbarimtProfileRequestDto,
+  EbarimtPullRequestDto,
+  EbarimtPullResultDto,
   EbarimtReceiptListDto,
   EbarimtReceiptsQueryDto,
   EbarimtReportDto,
@@ -47,8 +51,13 @@ import {
   EbarimtSettingsDto,
   EbarimtSettingsRequestDto,
 } from '../dto/ebarimt-check.dto';
+import {
+  EbarimtConnectionService,
+  type EbarimtConnectionView,
+} from '../services/ebarimt-connection.service';
 import { EbarimtEditsService } from '../services/ebarimt-edits.service';
 import { EbarimtFilesService, type EbarimtMonthFile } from '../services/ebarimt-files.service';
+import { EbarimtPullFlowService } from '../services/ebarimt-pull-flow.service';
 import { EbarimtReportService } from '../services/ebarimt-report.service';
 import { EbarimtSettingsService } from '../services/ebarimt-settings.service';
 
@@ -66,6 +75,12 @@ const toFileDto = (file: EbarimtMonthFile): EbarimtMonthFileDto => ({
   uploadedAt: file.uploadedAt.toISOString(),
 });
 
+const toConnectionDto = (view: EbarimtConnectionView): EbarimtConnectionDto => ({
+  ...view,
+  updatedAt: view.updatedAt?.toISOString() ?? null,
+  lastPull: view.lastPull ? { ...view.lastPull, at: view.lastPull.at.toISOString() } : null,
+});
+
 /**
  * «Ebarimt» (ADR-0168): a month's purchases from the goods receipts against e-Barimt's file, by
  * supplier. Read as a whole and filtered in the browser, like the old list.
@@ -78,6 +93,8 @@ export class EbarimtCheckController {
     private readonly files: EbarimtFilesService,
     private readonly edits: EbarimtEditsService,
     private readonly settings: EbarimtSettingsService,
+    private readonly connection: EbarimtConnectionService,
+    private readonly pulls: EbarimtPullFlowService,
   ) {}
 
   @Get('report')
@@ -232,6 +249,40 @@ export class EbarimtCheckController {
     @Body() body: EbarimtSettingsRequestDto,
   ): Promise<EbarimtSettingsDto> {
     return { accounts: await this.settings.save(ctx, body.accountCodes) };
+  }
+
+  /** The connection to e-Barimt's purchases service (ADR-0228); the password and key never return. */
+  @Get('connection')
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: EbarimtConnectionDto })
+  async getConnection(): Promise<EbarimtConnectionDto> {
+    return toConnectionDto(await this.connection.view());
+  }
+
+  @Put('connection')
+  @RequirePermission(SETTINGS)
+  @ApiOkResponse({ type: EbarimtConnectionDto })
+  async saveConnection(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: EbarimtConnectionRequestDto,
+  ): Promise<EbarimtConnectionDto> {
+    return toConnectionDto(await this.connection.update(ctx, body));
+  }
+
+  /**
+   * «Одоо татах»: the month's purchase receipts from e-Barimt's API at once. A refusal is an answer
+   * with its reason, not an error: the page shows the service's own words.
+   */
+  @Post('pull')
+  @HttpCode(200)
+  @RequirePermission(EDIT)
+  @Idempotent()
+  @ApiOkResponse({ type: EbarimtPullResultDto })
+  pull(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: EbarimtPullRequestDto,
+  ): Promise<EbarimtPullResultDto> {
+    return this.pulls.pullMonth(ctx, body.period);
   }
 
   @Put('month-values')

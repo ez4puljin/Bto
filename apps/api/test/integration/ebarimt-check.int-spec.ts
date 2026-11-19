@@ -1125,9 +1125,16 @@ describe('ebarimt check', () => {
         .query({ year: 2026 })
         .set(bearer(admin))
         .expect(200)
-    ).body as { months: { period: number; file: { id: number } | null }[] };
+    ).body as {
+      months: {
+        period: number;
+        file: { id: number; source: string; maskedCount: number } | null;
+      }[];
+    };
     const april = overview.months.find((month) => month.period === 202604)?.file;
     if (!april) throw new Error('April has its file');
+    // An upload says so (ADR-0228: a pull from the API says «API»).
+    expect(april).toMatchObject({ source: 'FILE', maskedCount: 0 });
     const bytes = await http()
       .get(`/api/v1/ebarimt-check/files/${april.id}/download`)
       .set(bearer(admin))

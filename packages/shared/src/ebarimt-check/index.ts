@@ -121,3 +121,35 @@ export function splitRegisters(value: string | null | undefined): string[] {
     .filter((part) => part !== '' && part !== '0');
   return [...new Set(registers)];
 }
+
+/** Where a month's file came from: an Excel export uploaded by hand, or e-Barimt's API (ADR-0228). */
+export const EBARIMT_FILE_SOURCES = ['FILE', 'API'] as const;
+export type EbarimtFileSource = (typeof EBARIMT_FILE_SOURCES)[number];
+
+/** The tax authority's environment a connection talks to: its test system or the real one. */
+export const EBARIMT_API_ENVIRONMENTS = ['STAGING', 'PRODUCTION'] as const;
+export type EbarimtApiEnvironment = (typeof EBARIMT_API_ENVIRONMENTS)[number];
+
+/**
+ * Why a pull from e-Barimt's API brought nothing (ADR-0228): nothing saved, a sealed value the
+ * server cannot open, the sign-in or the service refused, no answer, an answer that cannot be read,
+ * or a month with no day yet to pull.
+ */
+export const EBARIMT_PULL_REASONS = [
+  'NOT_CONFIGURED',
+  'KEY_UNREADABLE',
+  'SIGN_IN_REFUSED',
+  'REFUSED',
+  'UNREACHABLE',
+  'BAD_RESPONSE',
+  'NO_DAYS',
+] as const;
+export type EbarimtPullReason = (typeof EBARIMT_PULL_REASONS)[number];
+
+/** e-Barimt hides part of a seller's register with stars on some answers: kept as it came. */
+export function isMaskedTaxId(value: string): boolean {
+  return value.includes('*');
+}
+
+/** A company's register as e-Barimt's API takes it: 7 digits, or a citizen's 2 letters and 8 digits. */
+export const EBARIMT_PIN_PATTERN = /^(\d{7}|\d{11}|[А-ЯЁӨҮ]{2}\d{8})$/;

@@ -84,11 +84,28 @@ const FILES = {
   ],
 };
 
+const CONNECTION = {
+  environment: 'STAGING',
+  username: null,
+  hasPassword: false,
+  passwordUnreadable: false,
+  hasApiKey: false,
+  apiKeyUnreadable: false,
+  companyRegister: null,
+  nightly: false,
+  secretReady: true,
+  complete: false,
+  updatedAt: null,
+  updatedBy: null,
+  lastPull: null,
+};
+
 const PAGE = '/finance/ebarimt?period=202610';
 const REPORT_ROUTES = {
   'GET /api/v1/ebarimt-check/report': () => json(REPORT),
   'GET /api/v1/ebarimt-check/files': () => json(FILES),
   'GET /api/v1/ebarimt-check/version': () => json({ stamp: 'a' }),
+  'GET /api/v1/ebarimt-check/connection': () => json(CONNECTION),
 };
 
 describe('EbarimtPage', () => {
@@ -350,7 +367,11 @@ describe('EbarimtPage', () => {
       JSON.stringify({ period: 202610, ids: [1] }),
     );
     const { router } = renderApp('/finance/ebarimt', signedIn(ADMIN_ME, REPORT_ROUTES));
-    expect(await screen.findByRole('checkbox', { name: 'Альфа: сонгох' })).toBeChecked();
+    // The month the address settles on is rendered in a transition. A role query walks the whole
+    // page every 50 ms and leaves React no time to finish it (it then lands only when the
+    // transition expires, after about 5 s), so the row is first waited for by a cheap selector.
+    await waitFor(() => expect(document.querySelector('[data-supplier="1"]')).not.toBeNull());
+    expect(screen.getByRole('checkbox', { name: 'Альфа: сонгох' })).toBeChecked();
     expect(router.state.location.search).toContain('period=202610');
   });
 
@@ -629,5 +650,74 @@ describe('EbarimtPage', () => {
     expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/ebarimt-check/settings')[0])).toEqual({
       accountCodes: ['310101', '313011'],
     });
+  });
+  it('pulls the month from e-Barimt’s API at once and says where its file came from', async () => {
+    let pulled = false;
+    const file = {
+      id: 9,
+      period: 202610,
+      source: 'API',
+      fileName: 'e-Barimt API 2026-10-01 – 2026-10-31',
+      rowCount: 2,
+      vatAmount: '100.00',
+      totalAmount: '1100.00',
+      uploadedAt: '2026-11-01T00:00:00.000Z',
+      uploadedByName: null,
+      maskedCount: 1,
+    };
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...REPORT_ROUTES,
+      'GET /api/v1/ebarimt-check/files': () =>
+        json({
+          ...FILES,
+          months: [
+            { period: 202512, file: null },
+            { period: 202610, file: pulled ? file : null },
+          ],
+        }),
+      'GET /api/v1/ebarimt-check/connection': () =>
+        json({
+          ...CONNECTION,
+          complete: true,
+          lastPull: pulled
+            ? {
+                at: '2026-11-01T00:00:00.000Z',
+                ok: false,
+                reason: 'REFUSED',
+                message: 'Зөвхөн шөнө',
+                receipts: null,
+                masked: null,
+              }
+            : null,
+        }),
+      'POST /api/v1/ebarimt-check/pull': () => {
+        pulled = true;
+        return json({
+          ok: true,
+          reason: null,
+          message: null,
+          receipts: 2,
+          masked: 1,
+          months: [{ period: 202610, changed: true, fileId: 9 }],
+        });
+      },
+    });
+    renderApp(PAGE, fetchMock);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: mn.ebarimtCheck.pull.now }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'POST', '/api/v1/ebarimt-check/pull')).toHaveLength(1),
+    );
+    expect(await bodyOf(calls(fetchMock, 'POST', '/api/v1/ebarimt-check/pull')[0])).toEqual({
+      period: 202610,
+    });
+    expect(
+      await screen.findByText(mn.ebarimtCheck.pull.source.replace('{{source}}', 'API')),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(mn.ebarimtCheck.pull.masked.replace('{{count}}', '1')),
+    ).toBeInTheDocument();
+    // The last pull's refusal stands in the month bar.
+    expect(await screen.findByText(mn.ebarimtCheck.pull.failedShort)).toBeInTheDocument();
   });
 });

@@ -44939,6 +44939,144 @@
         ]
       }
     },
+    "/api/v1/ebarimt-check/connection": {
+      "get": {
+        "operationId": "EbarimtCheck_getConnection",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtConnectionDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The connection to e-Barimt's purchases service (ADR-0228); the password and key never return.",
+        "tags": [
+          "ebarimt-check"
+        ]
+      },
+      "put": {
+        "operationId": "EbarimtCheck_saveConnection",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbarimtConnectionRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtConnectionDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
+    "/api/v1/ebarimt-check/pull": {
+      "post": {
+        "operationId": "EbarimtCheck_pull",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbarimtPullRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EbarimtPullResultDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Одоо татах»: the month's purchase receipts from e-Barimt's API at once. A refusal is an answer\nwith its reason, not an error: the page shows the service's own words.",
+        "tags": [
+          "ebarimt-check"
+        ]
+      }
+    },
     "/api/v1/ebarimt-check/month-values": {
       "put": {
         "operationId": "EbarimtCheck_saveMonthValue",
@@ -95748,6 +95886,14 @@
           "period": {
             "type": "number"
           },
+          "source": {
+            "enum": [
+              "FILE",
+              "API"
+            ],
+            "type": "string",
+            "description": "An Excel upload, or a pull from the API"
+          },
           "fileName": {
             "type": "string"
           },
@@ -95768,17 +95914,23 @@
           "uploadedByName": {
             "type": "string",
             "nullable": true
+          },
+          "maskedCount": {
+            "type": "number",
+            "description": "Lines whose seller's register came hidden by stars"
           }
         },
         "required": [
           "id",
           "period",
+          "source",
           "fileName",
           "rowCount",
           "vatAmount",
           "totalAmount",
           "uploadedAt",
-          "uploadedByName"
+          "uploadedByName",
+          "maskedCount"
         ]
       },
       "EbarimtMonthDto": {
@@ -95850,6 +96002,14 @@
           "period": {
             "type": "number"
           },
+          "source": {
+            "enum": [
+              "FILE",
+              "API"
+            ],
+            "type": "string",
+            "description": "An Excel upload, or a pull from the API"
+          },
           "fileName": {
             "type": "string"
           },
@@ -95871,6 +96031,10 @@
             "type": "string",
             "nullable": true
           },
+          "maskedCount": {
+            "type": "number",
+            "description": "Lines whose seller's register came hidden by stars"
+          },
           "replacedRowCount": {
             "type": "number",
             "nullable": true
@@ -95879,12 +96043,14 @@
         "required": [
           "id",
           "period",
+          "source",
           "fileName",
           "rowCount",
           "vatAmount",
           "totalAmount",
           "uploadedAt",
           "uploadedByName",
+          "maskedCount",
           "replacedRowCount"
         ]
       },
@@ -95940,6 +96106,254 @@
         },
         "required": [
           "accountCodes"
+        ]
+      },
+      "EbarimtLastPullDto": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "reason": {
+            "nullable": true,
+            "enum": [
+              "NOT_CONFIGURED",
+              "KEY_UNREADABLE",
+              "SIGN_IN_REFUSED",
+              "REFUSED",
+              "UNREACHABLE",
+              "BAD_RESPONSE",
+              "NO_DAYS"
+            ],
+            "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true,
+            "description": "The service's own words"
+          },
+          "receipts": {
+            "type": "number",
+            "nullable": true
+          },
+          "masked": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "at",
+          "ok",
+          "reason",
+          "message",
+          "receipts",
+          "masked"
+        ]
+      },
+      "EbarimtConnectionDto": {
+        "type": "object",
+        "properties": {
+          "environment": {
+            "enum": [
+              "STAGING",
+              "PRODUCTION"
+            ],
+            "type": "string"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasPassword": {
+            "type": "boolean",
+            "description": "A password is saved; it is never returned"
+          },
+          "passwordUnreadable": {
+            "type": "boolean",
+            "description": "A saved password ERKHET_KEY_SECRET no longer opens"
+          },
+          "hasApiKey": {
+            "type": "boolean",
+            "description": "A key is saved; it is never returned"
+          },
+          "apiKeyUnreadable": {
+            "type": "boolean",
+            "description": "A saved key ERKHET_KEY_SECRET no longer opens"
+          },
+          "companyRegister": {
+            "type": "string",
+            "nullable": true
+          },
+          "nightly": {
+            "type": "boolean"
+          },
+          "secretReady": {
+            "type": "boolean",
+            "description": "ERKHET_KEY_SECRET is set, so a password and a key can be saved"
+          },
+          "complete": {
+            "type": "boolean",
+            "description": "Everything a pull needs is saved"
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastPull": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EbarimtLastPullDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "environment",
+          "username",
+          "hasPassword",
+          "passwordUnreadable",
+          "hasApiKey",
+          "apiKeyUnreadable",
+          "companyRegister",
+          "nightly",
+          "secretReady",
+          "complete",
+          "updatedAt",
+          "updatedBy",
+          "lastPull"
+        ]
+      },
+      "EbarimtConnectionRequestDto": {
+        "type": "object",
+        "properties": {
+          "environment": {
+            "enum": [
+              "STAGING",
+              "PRODUCTION"
+            ],
+            "type": "string"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "password": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "maxLength": 200,
+            "writeOnly": true,
+            "description": "null removes the saved password. Never returned"
+          },
+          "apiKey": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "maxLength": 300,
+            "writeOnly": true,
+            "description": "X-API-KEY; null removes the saved key. Never returned"
+          },
+          "companyRegister": {
+            "type": "string",
+            "nullable": true,
+            "example": "1234567"
+          },
+          "nightly": {
+            "type": "boolean",
+            "description": "A pull every night at 01:30"
+          }
+        }
+      },
+      "EbarimtPullRequestDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "number",
+            "example": 202610
+          }
+        },
+        "required": [
+          "period"
+        ]
+      },
+      "EbarimtPulledMonthDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "number"
+          },
+          "changed": {
+            "type": "boolean",
+            "description": "A new file now stands for the month"
+          },
+          "fileId": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "period",
+          "changed",
+          "fileId"
+        ]
+      },
+      "EbarimtPullResultDto": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "reason": {
+            "nullable": true,
+            "enum": [
+              "NOT_CONFIGURED",
+              "KEY_UNREADABLE",
+              "SIGN_IN_REFUSED",
+              "REFUSED",
+              "UNREACHABLE",
+              "BAD_RESPONSE",
+              "NO_DAYS"
+            ],
+            "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true,
+            "description": "The service's own words"
+          },
+          "receipts": {
+            "type": "number",
+            "nullable": true
+          },
+          "masked": {
+            "type": "number",
+            "nullable": true
+          },
+          "months": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbarimtPulledMonthDto"
+            }
+          }
+        },
+        "required": [
+          "ok",
+          "reason",
+          "message",
+          "receipts",
+          "masked",
+          "months"
         ]
       },
       "EbarimtMonthValueRequestDto": {

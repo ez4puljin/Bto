@@ -1,18 +1,19 @@
-# Module: ebarimt-check («Ebarimt», ADR-0168, ADR-0170)
+# Module: ebarimt-check («Ebarimt», ADR-0168, ADR-0170, ADR-0228)
 
-A month's purchases from the posted goods receipts against e-Barimt's file, per supplier: what staff chase suppliers about. Web: `/finance/ebarimt`. It posts nothing and moves no stock or money. It only reads other modules, attaches its own file through `StorageService.confirm`, and nobody imports it.
+A month's purchases from the posted goods receipts against e-Barimt's file, per supplier: what staff chase suppliers about. Web: `/finance/ebarimt`. It posts nothing and moves no stock or money. It only reads other modules, attaches its own file through `StorageService.confirm`, and nobody imports it but the composition roots. A month's file is an Excel export uploaded, or a pull from e-Barimt's purchases API (ADR-0228: `integrations/ebarimt`, nightly and «Одоо татах»).
 
-## Owned tables (`modules/ebarimt-check/schema.ts`, migrations `0084_ebarimt_check`, `0086_ebarimt_review`, `0087_ebarimt_history_guard`)
+## Owned tables (`modules/ebarimt-check/schema.ts`, migrations `0084_ebarimt_check`, `0086_ebarimt_review`, `0087_ebarimt_history_guard`, `0116_ebarimt_pull`)
 
 | Table | Holds |
 |---|---|
 | `ebarimt_check_accounts` | The account codes whose receipts count. No row: the key AP's account |
-| `ebarimt_check_files` | A month's file: one `ACTIVE` per period (partial unique index), older ones `REPLACED` or `REMOVED`, never deleted |
+| `ebarimt_check_files` | A month's file: one `ACTIVE` per period (partial unique index), older ones `REPLACED` or `REMOVED`, never deleted. `source` `FILE` (an upload, `file_id` its object) or `API` (a pull, `file_id` NULL) |
 | `ebarimt_check_entries` | A file's lines. `receipt_key` is ДДТД, else delivery note, date, TTD and total; `ttd` normalized |
 | `ebarimt_check_month_values` | A supplier's month: exempt amount and note |
 | `ebarimt_check_assignments` | A supplier given to an employee from a period on; NULL returns to the orderer |
 | `ebarimt_check_supplier_profiles` | Registers, phone and remark typed on this page; NULL means the supplier's record |
 | `ebarimt_check_receipt_links` | A receipt counted for a chosen supplier; undone by `removed_at`, one live per period and key |
+| `ebarimt_check_connection` | One row: e-Barimt's API connection (environment, user, password and key sealed under `ERKHET_KEY_SECRET`, company register, nightly switch) and the last pull's outcome |
 | `ebarimt_check_history` | Append-only (role app holds no UPDATE or DELETE). Employee, e-Barimt total and exempt amount as they changed; kinds `INIT`, `FILE`, `MANUAL`, `REVERT`, `EDIT`, `LINK`, `UNLINK`, `REMOVE` |
 
 A **period** is year × 100 + month (202610). Helpers in `@tugeel/shared/ebarimt-check`.
@@ -37,6 +38,8 @@ A **period** is year × 100 + month (202610). Helpers in `@tugeel/shared/ebarimt
 | `DELETE files/:period?fileId` | settings | Takes the month's file out of force, if it is still the file named |
 | `GET files/:id/download` | read | The file as uploaded |
 | `GET settings`, `PUT settings` | read, settings | The accounts and which count |
+| `GET connection`, `PUT connection` | read, settings | e-Barimt's API connection; the password and key are write-only (`hasPassword`, `hasApiKey`); a new environment forgets both |
+| `POST pull` (idempotent) | edit | «Одоо татах»: the month (`period`) up to today from the API; a refusal answers 200 with `ok: false`, `reason` and the service's `message` |
 | `PUT month-values` | edit | Exempt amount and/or note of a supplier's month, each with the value its cell showed |
 | `PUT assignments` | assign | Suppliers given to an employee from a period on |
 | `PUT suppliers/:id/profile` | edit | Registers, phone, remark, each with the value its cell showed; null returns to the record's |
@@ -56,6 +59,10 @@ Rights: `ebarimt.check.read`, `.edit`, `.assign`, `.settings` (ADMIN all; ACCOUN
 - A value written names what its cell showed; a difference under the row's lock answers 409 `EBARIMT_CELL_CONFLICT` (`value`) and writes nothing (ADR-0170 #8).
 - Nothing is deleted but the rows of `ebarimt_check_accounts` when the setting is saved (audited).
 
+## Pull from e-Barimt's API (ADR-0228)
+
+`EbarimtPullFlowService` (a flow: the calls are made between transactions) asks `getSaleListERP` a week at a time (`pullWindows`), maps the lines (`sheetOfPurchases`: prPosRno → ДДТД, regNo → ТТД, name, the day of `date`, amountVat / amountNet / amountTotal rounded half up to 2 decimals, receiptType else fromType → «Төрөл», no delivery note; another month's line or one with no register left out, a repeated key once) and hands the month to `EbarimtFilesService.storePulled`, which, under the month's advisory lock, writes a new `API` file only when its lines differ from the file in force and writes nothing for an empty answer. A register holding `*` is kept as it came and counted (`maskedCount` on the month's file). The last outcome goes to the connection row. The job `ebarimtcheck.pull` (01:30 Ulaanbaatar) runs when the switch is on: this month up to yesterday, and the month before while today is the 1st to the 10th. Reasons: `NOT_CONFIGURED`, `KEY_UNREADABLE`, `SIGN_IN_REFUSED`, `REFUSED`, `UNREACHABLE`, `BAD_RESPONSE`, `NO_DAYS`. Hosts by environment come from `EBARIMT_HOSTS` (tests: a fake server); the real service answers only 01:00–07:00.
+
 ## File format
 
 e-Barimt's export «EBARIMT Падаан (Худалдан авалт)»: heads «Падаан №, ДДТД, Огноо, Харилцагчийн нэр, Харилцагчийн ТТД, НӨАТ, Цэвэр дүн, Нийт дүн, Төрөл», found by their words within the first ten rows; «ТТД», «Огноо» and «Нийт дүн» are required. A line with no TTD is skipped. Dates may be text or date cells, and only a real day counts. A blank total, an error cell (a register's too), a formula never worked out, an amount of 1,000,000,000,000 or more, or a text amount in any notation but digits, commas grouping thousands and at most two decimals refuses the file, naming the row. `.xlsx` only, at most 5 MiB and 20,000 lines; read in the API request before any transaction (ADR-0170 #5); `ebarimt-sheet.ts`.
@@ -68,8 +75,8 @@ The month, mode, chosen months, employee, «Дутуутай», filters and the 
 
 ## Tests
 
-`test/integration/ebarimt-check.int-spec.ts`, `services/ebarimt-sheet.spec.ts`, `packages/shared/src/ebarimt-check/ebarimt-check.test.ts`, `apps/web/src/features/ebarimt-check/ebarimt-page.test.tsx`.
+`test/integration/ebarimt-check.int-spec.ts`, `test/integration/ebarimt-pull.int-spec.ts` (a fake e-Barimt on the loopback), `services/ebarimt-sheet.spec.ts`, `services/ebarimt-api-lines.spec.ts`, `integrations/ebarimt/ebarimt-api.client.spec.ts`, `packages/shared/src/ebarimt-check/ebarimt-check.test.ts`, `apps/web/src/features/ebarimt-check/ebarimt-page.test.tsx`.
 
 ## Status
 
-Built 2026-11-07. `bto_main` holds the old system's eleven months (2025-12 … 2026-10) carried over through this API by `tools/ebarimt-carry` (safe to run again; once more at cut-over if the old page stays in use): Orgil's e-Barimt files, registers, phones, remarks, exempt amounts, notes, links, and employees for the three whose names plainly match staff. Real data stays out of the repository.
+Built 2026-11-07. The API pull built 2026-11-20 against the tax authority's staging (ADR-0228); the production key and sign-in wait for the authority's answer to the owner's letter. `bto_main` holds the old system's eleven months (2025-12 … 2026-10) carried over through this API by `tools/ebarimt-carry` (safe to run again; once more at cut-over if the old page stays in use): Orgil's e-Barimt files, registers, phones, remarks, exempt amounts, notes, links, and employees for the three whose names plainly match staff. Real data stays out of the repository.

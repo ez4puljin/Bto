@@ -11069,6 +11069,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ebarimt-check/connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The connection to e-Barimt's purchases service (ADR-0228); the password and key never return. */
+        get: operations["EbarimtCheck_getConnection"];
+        put: operations["EbarimtCheck_saveConnection"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ebarimt-check/pull": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * «Одоо татах»: the month's purchase receipts from e-Barimt's API at once. A refusal is an answer
+         *     with its reason, not an error: the page shows the service's own words.
+         */
+        post: operations["EbarimtCheck_pull"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ebarimt-check/month-values": {
         parameters: {
             query?: never;
@@ -25505,6 +25542,11 @@ export interface components {
         EbarimtMonthFileDto: {
             id: number;
             period: number;
+            /**
+             * @description An Excel upload, or a pull from the API
+             * @enum {string}
+             */
+            source: "FILE" | "API";
             fileName: string;
             rowCount: number;
             /** @example 90909.09 */
@@ -25513,6 +25555,8 @@ export interface components {
             totalAmount: string;
             uploadedAt: string;
             uploadedByName: string | null;
+            /** @description Lines whose seller's register came hidden by stars */
+            maskedCount: number;
         };
         EbarimtMonthDto: {
             period: number;
@@ -25531,6 +25575,11 @@ export interface components {
         EbarimtImportResultDto: {
             id: number;
             period: number;
+            /**
+             * @description An Excel upload, or a pull from the API
+             * @enum {string}
+             */
+            source: "FILE" | "API";
             fileName: string;
             rowCount: number;
             /** @example 90909.09 */
@@ -25539,6 +25588,8 @@ export interface components {
             totalAmount: string;
             uploadedAt: string;
             uploadedByName: string | null;
+            /** @description Lines whose seller's register came hidden by stars */
+            maskedCount: number;
             replacedRowCount: number | null;
         };
         EbarimtAccountOptionDto: {
@@ -25552,6 +25603,71 @@ export interface components {
         };
         EbarimtSettingsRequestDto: {
             accountCodes: string[];
+        };
+        EbarimtLastPullDto: {
+            at: string;
+            ok: boolean;
+            /** @enum {string|null} */
+            reason: "NOT_CONFIGURED" | "KEY_UNREADABLE" | "SIGN_IN_REFUSED" | "REFUSED" | "UNREACHABLE" | "BAD_RESPONSE" | "NO_DAYS" | null;
+            /** @description The service's own words */
+            message: string | null;
+            receipts: number | null;
+            masked: number | null;
+        };
+        EbarimtConnectionDto: {
+            /** @enum {string} */
+            environment: "STAGING" | "PRODUCTION";
+            username: string | null;
+            /** @description A password is saved; it is never returned */
+            hasPassword: boolean;
+            /** @description A saved password ERKHET_KEY_SECRET no longer opens */
+            passwordUnreadable: boolean;
+            /** @description A key is saved; it is never returned */
+            hasApiKey: boolean;
+            /** @description A saved key ERKHET_KEY_SECRET no longer opens */
+            apiKeyUnreadable: boolean;
+            companyRegister: string | null;
+            nightly: boolean;
+            /** @description ERKHET_KEY_SECRET is set, so a password and a key can be saved */
+            secretReady: boolean;
+            /** @description Everything a pull needs is saved */
+            complete: boolean;
+            updatedAt: string | null;
+            updatedBy: string | null;
+            lastPull: components["schemas"]["EbarimtLastPullDto"] | null;
+        };
+        EbarimtConnectionRequestDto: {
+            /** @enum {string} */
+            environment?: "STAGING" | "PRODUCTION";
+            username?: string | null;
+            /** @description null removes the saved password. Never returned */
+            password?: string | null;
+            /** @description X-API-KEY; null removes the saved key. Never returned */
+            apiKey?: string | null;
+            /** @example 1234567 */
+            companyRegister?: string | null;
+            /** @description A pull every night at 01:30 */
+            nightly?: boolean;
+        };
+        EbarimtPullRequestDto: {
+            /** @example 202610 */
+            period: number;
+        };
+        EbarimtPulledMonthDto: {
+            period: number;
+            /** @description A new file now stands for the month */
+            changed: boolean;
+            fileId: number | null;
+        };
+        EbarimtPullResultDto: {
+            ok: boolean;
+            /** @enum {string|null} */
+            reason: "NOT_CONFIGURED" | "KEY_UNREADABLE" | "SIGN_IN_REFUSED" | "REFUSED" | "UNREACHABLE" | "BAD_RESPONSE" | "NO_DAYS" | null;
+            /** @description The service's own words */
+            message: string | null;
+            receipts: number | null;
+            masked: number | null;
+            months: components["schemas"]["EbarimtPulledMonthDto"][];
         };
         EbarimtMonthValueRequestDto: {
             period: number;
@@ -53329,6 +53445,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EbarimtSettingsDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtCheck_getConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtConnectionDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtCheck_saveConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EbarimtConnectionRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtConnectionDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EbarimtCheck_pull: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EbarimtPullRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EbarimtPullResultDto"];
                 };
             };
             /** @description RFC 9457 problem details */

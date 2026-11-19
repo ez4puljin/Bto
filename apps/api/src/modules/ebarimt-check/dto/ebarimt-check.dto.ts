@@ -1,6 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   EBARIMT_AMOUNT_PATTERN,
+  EBARIMT_API_ENVIRONMENTS,
+  EBARIMT_FILE_SOURCES,
+  EBARIMT_PIN_PATTERN,
+  EBARIMT_PULL_REASONS,
+  type EbarimtApiEnvironment,
+  type EbarimtFileSource,
+  type EbarimtPullReason,
   EBARIMT_HISTORY_FIELDS,
   EBARIMT_HISTORY_KINDS,
   EBARIMT_LIMITS,
@@ -9,14 +16,18 @@ import {
   isPeriod,
 } from '@tugeel/shared/ebarimt-check';
 import { Transform, Type } from 'class-transformer';
+import { normalizeRegNo } from '@tugeel/shared/taxpayer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
   IsPositive,
   IsString,
+  Length,
   Matches,
   Max,
   MaxLength,
@@ -110,12 +121,19 @@ export class EbarimtImportRequestDto {
 export class EbarimtMonthFileDto {
   @ApiProperty() id!: number;
   @ApiProperty() period!: number;
+  @ApiProperty({
+    enum: EBARIMT_FILE_SOURCES,
+    description: 'An Excel upload, or a pull from the API',
+  })
+  source!: EbarimtFileSource;
   @ApiProperty() fileName!: string;
   @ApiProperty() rowCount!: number;
   @ApiProperty({ example: '90909.09' }) vatAmount!: string;
   @ApiProperty({ example: '1000000.00' }) totalAmount!: string;
   @ApiProperty() uploadedAt!: string;
   @ApiProperty({ type: String, nullable: true }) uploadedByName!: string | null;
+  @ApiProperty({ description: "Lines whose seller's register came hidden by stars" })
+  maskedCount!: number;
 }
 
 export class EbarimtImportResultDto extends EbarimtMonthFileDto {
@@ -423,4 +441,112 @@ export class EbarimtLinkResultDto {
   @ApiProperty() linked!: number;
   @ApiProperty() unlinked!: number;
   @ApiProperty() skipped!: number;
+}
+
+// ------------------------------------------------------------------------------------------------
+// The connection to e-Barimt's purchases service (ADR-0228)
+
+const trimmed = ({ value }: { value: unknown }): unknown =>
+  typeof value === 'string' ? value.trim() : value;
+
+/** A register as e-Barimt takes it: no spaces, upper case, Latin look-alikes as Cyrillic. */
+const register = ({ value }: { value: unknown }): unknown =>
+  typeof value === 'string' ? normalizeRegNo(value) : value;
+
+export class EbarimtLastPullDto {
+  @ApiProperty() at!: string;
+  @ApiProperty() ok!: boolean;
+  @ApiProperty({ enum: EBARIMT_PULL_REASONS, nullable: true }) reason!: EbarimtPullReason | null;
+  @ApiProperty({ type: String, nullable: true, description: "The service's own words" })
+  message!: string | null;
+  @ApiProperty({ type: Number, nullable: true }) receipts!: number | null;
+  @ApiProperty({ type: Number, nullable: true }) masked!: number | null;
+}
+
+export class EbarimtConnectionDto {
+  @ApiProperty({ enum: EBARIMT_API_ENVIRONMENTS }) environment!: EbarimtApiEnvironment;
+  @ApiProperty({ type: String, nullable: true }) username!: string | null;
+  @ApiProperty({ description: 'A password is saved; it is never returned' }) hasPassword!: boolean;
+  @ApiProperty({ description: 'A saved password ERKHET_KEY_SECRET no longer opens' })
+  passwordUnreadable!: boolean;
+  @ApiProperty({ description: 'A key is saved; it is never returned' }) hasApiKey!: boolean;
+  @ApiProperty({ description: 'A saved key ERKHET_KEY_SECRET no longer opens' })
+  apiKeyUnreadable!: boolean;
+  @ApiProperty({ type: String, nullable: true }) companyRegister!: string | null;
+  @ApiProperty() nightly!: boolean;
+  @ApiProperty({ description: 'ERKHET_KEY_SECRET is set, so a password and a key can be saved' })
+  secretReady!: boolean;
+  @ApiProperty({ description: 'Everything a pull needs is saved' }) complete!: boolean;
+  @ApiProperty({ type: String, nullable: true }) updatedAt!: string | null;
+  @ApiProperty({ type: String, nullable: true }) updatedBy!: string | null;
+  @ApiProperty({ type: EbarimtLastPullDto, nullable: true }) lastPull!: EbarimtLastPullDto | null;
+}
+
+export class EbarimtConnectionRequestDto {
+  @ApiPropertyOptional({ enum: EBARIMT_API_ENVIRONMENTS })
+  @IsOptional()
+  @IsIn(EBARIMT_API_ENVIRONMENTS)
+  environment?: EbarimtApiEnvironment;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @Length(1, 100)
+  username?: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    writeOnly: true,
+    description: 'null removes the saved password. Never returned',
+  })
+  @IsOptional()
+  @IsString()
+  @Length(1, 200)
+  password?: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    writeOnly: true,
+    description: 'X-API-KEY; null removes the saved key. Never returned',
+  })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @Length(1, 300)
+  apiKey?: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, example: '1234567' })
+  @IsOptional()
+  @Transform(register)
+  @IsString()
+  @Matches(EBARIMT_PIN_PATTERN)
+  companyRegister?: string | null;
+
+  @ApiPropertyOptional({ description: 'A pull every night at 01:30' })
+  @IsOptional()
+  @IsBoolean()
+  nightly?: boolean;
+}
+
+export class EbarimtPullRequestDto {
+  @ApiProperty({ example: 202610 }) @IsPeriod() period!: number;
+}
+
+export class EbarimtPulledMonthDto {
+  @ApiProperty() period!: number;
+  @ApiProperty({ description: 'A new file now stands for the month' }) changed!: boolean;
+  @ApiProperty({ type: Number, nullable: true }) fileId!: number | null;
+}
+
+export class EbarimtPullResultDto {
+  @ApiProperty() ok!: boolean;
+  @ApiProperty({ enum: EBARIMT_PULL_REASONS, nullable: true }) reason!: EbarimtPullReason | null;
+  @ApiProperty({ type: String, nullable: true, description: "The service's own words" })
+  message!: string | null;
+  @ApiProperty({ type: Number, nullable: true }) receipts!: number | null;
+  @ApiProperty({ type: Number, nullable: true }) masked!: number | null;
+  @ApiProperty({ type: [EbarimtPulledMonthDto] }) months!: EbarimtPulledMonthDto[];
 }

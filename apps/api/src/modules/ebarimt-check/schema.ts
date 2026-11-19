@@ -1,14 +1,21 @@
-import { EBARIMT_FILE_STATUSES } from '@tugeel/shared/ebarimt-check';
+import {
+  EBARIMT_API_ENVIRONMENTS,
+  EBARIMT_FILE_SOURCES,
+  EBARIMT_FILE_STATUSES,
+  EBARIMT_PULL_REASONS,
+} from '@tugeel/shared/ebarimt-check';
 import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
   bigint,
+  boolean,
   check,
   date,
   index,
   integer,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -41,15 +48,18 @@ export const ebarimtCheckAccounts = pgTable('ebarimt_check_accounts', {
   addedAt: at('added_at').notNull().defaultNow(),
 });
 
-/** A month's e-Barimt export as it was uploaded: one ACTIVE per month, every older one kept. */
+/**
+ * A month's e-Barimt receipts: an export as it was uploaded, or a pull from e-Barimt's API (ADR-0228,
+ * no stored object then). One ACTIVE per month, every older one kept.
+ */
 export const ebarimtCheckFiles = pgTable(
   'ebarimt_check_files',
   {
     id: id(),
     period: period(),
-    fileId: ref('file_id')
-      .notNull()
-      .references(() => files.id),
+    /** The uploaded export; NULL for a pull from the API. */
+    fileId: ref('file_id').references(() => files.id),
+    source: text('source', { enum: EBARIMT_FILE_SOURCES }).notNull().default('FILE'),
     fileName: text('file_name').notNull(),
     rowCount: integer('row_count').notNull(),
     vatAmount: money('vat_amount').notNull(),
@@ -71,6 +81,8 @@ export const ebarimtCheckFiles = pgTable(
     check('ebarimt_check_files_rows', sql`${t.rowCount} >= 0`),
     check('ebarimt_check_files_status', sql`${t.status} IN ('ACTIVE', 'REPLACED', 'REMOVED')`),
     check('ebarimt_check_files_closed', sql`(${t.status} = 'ACTIVE') = (${t.closedAt} IS NULL)`),
+    check('ebarimt_check_files_source', sql`${t.source} IN ('FILE', 'API')`),
+    check('ebarimt_check_files_object', sql`(${t.source} = 'FILE') = (${t.fileId} IS NOT NULL)`),
   ],
 );
 
@@ -227,6 +239,56 @@ export const ebarimtCheckHistory = pgTable(
     check(
       'ebarimt_check_history_kind',
       sql`${t.kind} IN ('INIT', 'FILE', 'MANUAL', 'REVERT', 'LINK', 'UNLINK', 'EDIT', 'REMOVE')`,
+    ),
+  ],
+);
+
+/**
+ * The connection to e-Barimt's purchases service (ADR-0228), one row: typed on the Ebarimt page.
+ * The password and the key are sealed under ERKHET_KEY_SECRET, each with its own context, and never
+ * leave the server. The last pull's outcome is kept beside it for the page.
+ */
+export const ebarimtCheckConnection = pgTable(
+  'ebarimt_check_connection',
+  {
+    id: smallint('id').primaryKey(),
+    environment: text('environment', { enum: EBARIMT_API_ENVIRONMENTS })
+      .notNull()
+      .default('STAGING'),
+    username: text('username'),
+    passwordSealed: text('password_sealed'),
+    apiKeySealed: text('api_key_sealed'),
+    /** The company's register, `pin` of the request. */
+    companyRegister: text('company_register'),
+    /** A pull every night at 01:30, when the connection is complete. */
+    nightly: boolean('nightly').notNull().default(false),
+    updatedBy: userRef('updated_by'),
+    updatedAt: at('updated_at').notNull().defaultNow(),
+    lastPullAt: at('last_pull_at'),
+    lastPullOk: boolean('last_pull_ok'),
+    lastPullReason: text('last_pull_reason', { enum: EBARIMT_PULL_REASONS }),
+    /** The service's own words on a refusal, cut short. */
+    lastPullMessage: text('last_pull_message'),
+    lastPullReceipts: integer('last_pull_receipts'),
+    /** Of them, how many came with the seller's register hidden by stars. */
+    lastPullMasked: integer('last_pull_masked'),
+  },
+  (t) => [
+    check('ebarimt_check_connection_single', sql`${t.id} = 1`),
+    check(
+      'ebarimt_check_connection_environment',
+      sql`${t.environment} IN ('STAGING', 'PRODUCTION')`,
+    ),
+    check(
+      'ebarimt_check_connection_lengths',
+      sql`(${t.username} IS NULL OR length(${t.username}) BETWEEN 1 AND 100)
+        AND (${t.companyRegister} IS NULL OR length(${t.companyRegister}) BETWEEN 1 AND 20)
+        AND (${t.lastPullMessage} IS NULL OR length(${t.lastPullMessage}) <= 300)`,
+    ),
+    check(
+      'ebarimt_check_connection_pull',
+      sql`${t.lastPullAt} IS NULL OR (${t.lastPullOk} IS NOT NULL
+        AND (${t.lastPullOk} = (${t.lastPullReason} IS NULL)))`,
     ),
   ],
 );

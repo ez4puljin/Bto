@@ -70,6 +70,7 @@ import {
 import { type ColumnSpec, columnLayout } from '@/lib/column-layout';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
+import { useAction } from '@/lib/use-action';
 import { useDebounced } from '@/lib/use-debounced';
 import { cn } from '@/lib/utils';
 import {
@@ -93,6 +94,7 @@ import {
 } from './helpers';
 import { AssignDialog, FilesDialog, SettingsDialog, UnregisteredDialog } from './manage-dialogs';
 import { DiffValue, InlineAmount, InlineText } from './parts';
+import { PullBar } from './pull-parts';
 
 interface CellRefusal {
   key: string;
@@ -280,6 +282,7 @@ export function EbarimtPage() {
   const period = hasPeriod ? asked : thisPeriod;
   const year = periodYear(period);
   const overview = useEbarimtFiles(year);
+  const pullAction = useAction();
   const refresh = useEbarimtRefresh();
   const labels = usePeriodLabels(year);
 
@@ -787,6 +790,14 @@ export function EbarimtPage() {
             <ChevronRight />
           </Button>
         </div>
+        {monthMode ? (
+          <PullBar
+            period={period}
+            monthName={labels.name(period)}
+            month={overview.data?.months.find((month) => month.period === period) ?? null}
+            action={pullAction}
+          />
+        ) : null}
         {othersChanged ? (
           <Button
             // Beside the no-file mark the row has room for its icon alone: a second row would
@@ -898,6 +909,7 @@ export function EbarimtPage() {
       </FilterBar>
 
       <ProblemAlert problem={problemFromError(overview.error)} onRetry={overview.refetch} />
+      <ProblemAlert problem={pullAction.problem} />
       <ProblemAlert problem={problemFromError(report.error)} onRetry={report.refetch} />
 
       <ListCard scroll className={cn(lagging && 'opacity-60')}>

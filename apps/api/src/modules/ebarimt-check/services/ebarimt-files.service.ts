@@ -1,13 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { periodOf } from '@tugeel/shared/ebarimt-check';
+import { type EbarimtFileSource, periodOf } from '@tugeel/shared/ebarimt-check';
 import type { Decimal } from '@tugeel/shared/money';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Readable } from 'node:stream';
 import { DB } from '../../../common/db/db.tokens';
-import type { Db } from '../../../common/db/db.types';
+import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, notFound } from '../../../common/errors/app-error';
 import {
+  type Actor,
   actorUserId,
   type AuthContext,
   AuditService,
@@ -17,8 +18,8 @@ import {
 } from '../../identity';
 import { ebarimtCheckEntries, ebarimtCheckFiles } from '../schema';
 import { EbarimtDataService, type EbarimtFileRow } from './ebarimt-data.service';
-import { EbarimtHistoryService } from './ebarimt-history.service';
-import { readEbarimtSheet } from './ebarimt-sheet';
+import { EBARIMT_SYNC_LOCK, EbarimtHistoryService } from './ebarimt-history.service';
+import { type EbarimtSheet, type EbarimtSheetRow, readEbarimtSheet } from './ebarimt-sheet';
 
 const KIND = 'ebarimt.source';
 const CHUNK = 500;
@@ -26,12 +27,16 @@ const CHUNK = 500;
 export interface EbarimtMonthFile {
   id: number;
   period: number;
+  /** An Excel export uploaded, or a pull from e-Barimt's API (ADR-0228). */
+  source: EbarimtFileSource;
   fileName: string;
   rowCount: number;
   vatAmount: Decimal;
   totalAmount: Decimal;
   uploadedAt: Date;
   uploadedByName: string | null;
+  /** Lines whose seller's register came hidden by stars. */
+  maskedCount: number;
 }
 
 export interface EbarimtFileOverview {
@@ -44,6 +49,40 @@ export interface EbarimtFileOverview {
 export interface EbarimtImportResult extends EbarimtMonthFile {
   /** The rows of the file it replaced; null when the month had none. */
   replacedRowCount: number | null;
+}
+
+/** What a pull did to its month: a new file, or none because nothing differed (ADR-0228). */
+export interface EbarimtPulledMonth {
+  period: number;
+  changed: boolean;
+  /** The month's file now; null when the pull found nothing and the month had none. */
+  fileId: number | null;
+}
+
+/** A line as two versions of a month are compared: everything but its place in the list. */
+function lineSignature(row: Omit<EbarimtSheetRow, 'rowNo'>): string {
+  return [
+    row.receiptKey,
+    row.ddtd ?? '',
+    row.deliveryNoteNo ?? '',
+    row.docDate,
+    row.partnerName ?? '',
+    row.ttd,
+    row.vatAmount.toFixed(2),
+    row.netAmount.toFixed(2),
+    row.totalAmount.toFixed(2),
+    row.kind ?? '',
+  ].join('\u0001');
+}
+
+function sameLines(
+  a: readonly Omit<EbarimtSheetRow, 'rowNo'>[],
+  b: readonly Omit<EbarimtSheetRow, 'rowNo'>[],
+): boolean {
+  if (a.length !== b.length) return false;
+  const left = a.map(lineSignature).sort();
+  const right = b.map(lineSignature).sort();
+  return left.every((signature, index) => signature === right[index]);
 }
 
 /**
@@ -70,11 +109,12 @@ export class EbarimtFilesService {
     const names = await this.userNames.namesOf(
       [...files.values()].flatMap((file) => (file.uploadedBy === null ? [] : [file.uploadedBy])),
     );
+    const masked = await this.maskedCounts([...files.values()].map((file) => file.id));
     const latest = await this.data.allActivePeriods();
     return {
       months: periods.map((period) => {
         const file = files.get(period);
-        return { period, file: file ? this.toMonthFile(file, names) : null };
+        return { period, file: file ? this.toMonthFile(file, names, masked) : null };
       }),
       latestPeriod: latest[0] ?? null,
     };
@@ -89,70 +129,131 @@ export class EbarimtFilesService {
     const sheet = await readEbarimtSheet(body);
     const result = await inTransaction(this.db, async (tx) => {
       await this.storage.confirm(tx, input.fileId, KIND);
-      // A month that ever held a file has had its first reading, even if it matched nobody.
-      const [earlier] = await tx
-        .select({ id: ebarimtCheckFiles.id })
-        .from(ebarimtCheckFiles)
-        .where(eq(ebarimtCheckFiles.period, sheet.period))
-        .limit(1);
-      const [previous] = await tx
+      return this.storeMonth(tx, ctx, sheet, {
+        source: 'FILE',
+        fileId: input.fileId,
+        fileName: input.fileName,
+      });
+    });
+    const names = await this.userNames.namesOf([actorUserId(ctx)].flatMap((id) => id ?? []));
+    const masked = await this.maskedCounts([result.file.id]);
+    return {
+      ...this.toMonthFile(result.file, names, masked),
+      replacedRowCount: result.replacedRowCount,
+    };
+  }
+
+  /**
+   * A month pulled from e-Barimt's API (ADR-0228): written as an upload is, as a file of source API
+   * with no stored object, and only when its lines differ from the month's file in force, so an
+   * unchanged night adds no file and no history. A pull that found nothing writes nothing: an empty
+   * answer never takes a month's receipts away.
+   */
+  async storePulled(
+    actor: Actor,
+    sheet: EbarimtSheet,
+    fileName: string,
+  ): Promise<EbarimtPulledMonth> {
+    return inTransaction(this.db, async (tx) => {
+      // A pull and an upload of one month take their turns, so neither replaces a file it never saw.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${EBARIMT_SYNC_LOCK}, ${sheet.period})`);
+      const [active] = await tx
         .select()
         .from(ebarimtCheckFiles)
         .where(
           and(eq(ebarimtCheckFiles.period, sheet.period), eq(ebarimtCheckFiles.status, 'ACTIVE')),
-        )
-        .for('update');
-      if (previous) {
-        await tx
-          .update(ebarimtCheckFiles)
-          .set({ status: 'REPLACED', closedBy: actorUserId(ctx), closedAt: new Date() })
-          .where(eq(ebarimtCheckFiles.id, previous.id));
+        );
+      if (sheet.rows.length === 0) {
+        return { period: sheet.period, changed: false, fileId: active?.id ?? null };
       }
-      const [file] = await tx
-        .insert(ebarimtCheckFiles)
-        .values({
-          period: sheet.period,
-          fileId: input.fileId,
-          fileName: input.fileName,
-          rowCount: sheet.rows.length,
-          vatAmount: sheet.vatAmount,
-          totalAmount: sheet.totalAmount,
-          uploadedBy: actorUserId(ctx),
-        })
-        .returning();
-      if (!file) throw new Error('the file row did not return');
-      for (let start = 0; start < sheet.rows.length; start += CHUNK) {
-        await tx
-          .insert(ebarimtCheckEntries)
-          .values(
-            sheet.rows
-              .slice(start, start + CHUNK)
-              .map((row) => ({ ...row, ebarimtFileId: file.id })),
-          );
+      if (active) {
+        const lines = await this.data.entriesOf([active.id], tx);
+        if (sameLines(lines, sheet.rows)) {
+          return { period: sheet.period, changed: false, fileId: active.id };
+        }
       }
-      await this.history.syncEbarimt(
-        tx,
-        ctx,
-        sheet.period,
-        earlier ? 'FILE' : 'INIT',
-        input.fileName,
-      );
-      await this.audit.record(tx, ctx, {
-        action: previous ? 'UPDATE' : 'CREATE',
-        entity: 'ebarimt_check_files',
-        entityId: file.id,
-        before: previous
-          ? { id: previous.id, fileName: previous.fileName, rowCount: previous.rowCount }
-          : null,
-        after: { period: file.period, fileName: file.fileName, rowCount: file.rowCount },
+      const stored = await this.storeMonth(tx, actor, sheet, {
+        source: 'API',
+        fileId: null,
+        fileName,
       });
-      return { file, replacedRowCount: previous?.rowCount ?? null };
+      return { period: sheet.period, changed: true, fileId: stored.file.id };
     });
-    const names = await this.userNames.namesOf([actorUserId(ctx)].flatMap((id) => id ?? []));
-    return {
-      ...this.toMonthFile(result.file, names),
-      replacedRowCount: result.replacedRowCount,
-    };
+  }
+
+  /**
+   * Puts a month's lines in force as its new file, the one before it REPLACED, and notes what moved
+   * in each supplier's e-Barimt total. In the caller's transaction.
+   */
+  private async storeMonth(
+    tx: Tx,
+    actor: Actor,
+    sheet: EbarimtSheet,
+    origin: { source: EbarimtFileSource; fileId: number | null; fileName: string },
+  ): Promise<{ file: EbarimtFileRow; replacedRowCount: number | null }> {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${EBARIMT_SYNC_LOCK}, ${sheet.period})`);
+    // A month that ever held a file has had its first reading, even if it matched nobody.
+    const [earlier] = await tx
+      .select({ id: ebarimtCheckFiles.id })
+      .from(ebarimtCheckFiles)
+      .where(eq(ebarimtCheckFiles.period, sheet.period))
+      .limit(1);
+    const [previous] = await tx
+      .select()
+      .from(ebarimtCheckFiles)
+      .where(
+        and(eq(ebarimtCheckFiles.period, sheet.period), eq(ebarimtCheckFiles.status, 'ACTIVE')),
+      )
+      .for('update');
+    if (previous) {
+      await tx
+        .update(ebarimtCheckFiles)
+        .set({ status: 'REPLACED', closedBy: actorUserId(actor), closedAt: new Date() })
+        .where(eq(ebarimtCheckFiles.id, previous.id));
+    }
+    const [file] = await tx
+      .insert(ebarimtCheckFiles)
+      .values({
+        period: sheet.period,
+        fileId: origin.fileId,
+        source: origin.source,
+        fileName: origin.fileName,
+        rowCount: sheet.rows.length,
+        vatAmount: sheet.vatAmount,
+        totalAmount: sheet.totalAmount,
+        uploadedBy: actorUserId(actor),
+      })
+      .returning();
+    if (!file) throw new Error('the file row did not return');
+    for (let start = 0; start < sheet.rows.length; start += CHUNK) {
+      await tx
+        .insert(ebarimtCheckEntries)
+        .values(
+          sheet.rows.slice(start, start + CHUNK).map((row) => ({ ...row, ebarimtFileId: file.id })),
+        );
+    }
+    await this.history.syncEbarimt(
+      tx,
+      actor,
+      sheet.period,
+      earlier ? 'FILE' : 'INIT',
+      origin.fileName,
+    );
+    await this.audit.record(tx, actor, {
+      action: previous ? 'UPDATE' : 'CREATE',
+      entity: 'ebarimt_check_files',
+      entityId: file.id,
+      before: previous
+        ? { id: previous.id, fileName: previous.fileName, rowCount: previous.rowCount }
+        : null,
+      after: {
+        period: file.period,
+        source: file.source,
+        fileName: file.fileName,
+        rowCount: file.rowCount,
+      },
+    });
+    return { file, replacedRowCount: previous?.rowCount ?? null };
   }
 
   /**
@@ -193,21 +294,47 @@ export class EbarimtFilesService {
       .select()
       .from(ebarimtCheckFiles)
       .where(eq(ebarimtCheckFiles.id, id));
-    if (!row) throw notFound('ebarimt file', id);
+    // A pull from the API has no file to give back.
+    if (!row || row.fileId === null) throw notFound('ebarimt file', id);
     const opened = await this.storage.openPrivate(row.fileId, KIND);
     return { ...opened, fileName: row.fileName };
   }
 
-  private toMonthFile(file: EbarimtFileRow, names: Map<number, string>): EbarimtMonthFile {
+  /** Per file, its lines whose seller's register came hidden by stars. */
+  private async maskedCounts(fileIds: readonly number[]): Promise<Map<number, number>> {
+    if (fileIds.length === 0) return new Map();
+    const rows = await this.db
+      .select({
+        fileId: ebarimtCheckEntries.ebarimtFileId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(ebarimtCheckEntries)
+      .where(
+        and(
+          inArray(ebarimtCheckEntries.ebarimtFileId, [...fileIds]),
+          sql`strpos(${ebarimtCheckEntries.ttd}, '*') > 0`,
+        ),
+      )
+      .groupBy(ebarimtCheckEntries.ebarimtFileId);
+    return new Map(rows.map((row) => [row.fileId, row.count]));
+  }
+
+  private toMonthFile(
+    file: EbarimtFileRow,
+    names: Map<number, string>,
+    masked: Map<number, number>,
+  ): EbarimtMonthFile {
     return {
       id: file.id,
       period: file.period,
+      source: file.source,
       fileName: file.fileName,
       rowCount: file.rowCount,
       vatAmount: file.vatAmount,
       totalAmount: file.totalAmount,
       uploadedAt: file.uploadedAt,
       uploadedByName: file.uploadedBy === null ? null : (names.get(file.uploadedBy) ?? null),
+      maskedCount: masked.get(file.id) ?? 0,
     };
   }
 }

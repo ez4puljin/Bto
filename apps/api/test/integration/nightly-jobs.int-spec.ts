@@ -464,6 +464,13 @@ describe('nightly jobs', () => {
           }))
           .sort((a, b) => a.name.localeCompare(b.name)),
       ).toEqual([
+        // e-Barimt's purchase receipts (ADR-0228): inside the tax authority's 01:00–07:00 window.
+        {
+          name: 'ebarimtcheck.pull',
+          cron: '30 1 * * *',
+          timezone: 'Asia/Ulaanbaatar',
+          missed: 'once',
+        },
         {
           name: 'erkhet.ledgerNightly',
           cron: '10 3 * * *',

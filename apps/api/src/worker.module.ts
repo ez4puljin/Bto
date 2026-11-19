@@ -5,8 +5,10 @@ import { JobsWorkerModule } from './common/jobs/worker/jobs-worker.module';
 import { CoreModule } from './core.module';
 import { HealthCoreModule } from './health/health.module';
 import { WorkerHealthServer } from './health/worker-health.server';
+import { EbarimtIntegrationModule } from './integrations/ebarimt';
 import { ErkhetIntegrationModule } from './integrations/erkhet';
 import { SmsIntegrationModule } from './integrations/sms';
+import { EbarimtCheckWorkerModule } from './modules/ebarimt-check';
 import { ErkhetWorkerModule } from './modules/erkhet';
 import { ErxesWorkerModule } from './modules/erxes';
 import { FinBridgeModule } from './modules/fin-bridge';
@@ -40,6 +42,9 @@ import { ReportingWorkerModule } from './modules/reporting';
     ErxesWorkerModule,
     // Settlement SMS (ADR-0216): the worker sends the batches through WeSend.
     SmsIntegrationModule,
+    // e-Barimt's purchase receipts (ADR-0228): the worker pulls them every night at 01:30.
+    EbarimtIntegrationModule,
+    EbarimtCheckWorkerModule,
   ],
   providers: [WorkerHealthServer],
 })

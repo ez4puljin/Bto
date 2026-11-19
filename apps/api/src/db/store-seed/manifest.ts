@@ -306,6 +306,9 @@ export const STORE_SEED_TABLES: Record<string, SeedRule> = {
   'public.ebarimt_check_month_values': undecided('as ebarimt_check_files'),
   'public.ebarimt_check_history': undecided('as ebarimt_check_files'),
   'public.ebarimt_check_receipt_links': empty('links to test receipts'),
+  'public.ebarimt_check_connection': empty(
+    "e-Barimt's password and key are sealed with ERKHET_KEY_SECRET, which is new on the store PC: typed again on «Ebarimt → Тохиргоо»",
+  ),
   'public.expiry_items': undecided(
     'the register carried from the old system (tools/expiry-carry carries it again, as ADR-0172 plans for the cut-over)',
   ),

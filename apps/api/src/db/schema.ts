@@ -256,6 +256,7 @@ export {
 export {
   ebarimtCheckAccounts,
   ebarimtCheckAssignments,
+  ebarimtCheckConnection,
   ebarimtCheckEntries,
   ebarimtCheckFiles,
   ebarimtCheckHistory,

@@ -47,6 +47,7 @@ import {
   useEbarimtMutations,
   useEbarimtSettings,
 } from './api';
+import { ConnectionPanel } from './connection-form';
 import { FOCUS_RING, usePeriodLabels } from './helpers';
 
 /** Each month's file: uploaded here to the month its dates fall in; a new one replaces the old. */
@@ -178,15 +179,17 @@ export function FilesDialog(props: { year: number; onClose: () => void }) {
                             .join(' · ')}
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-right">
-                          <Button
-                            size="icon-sm"
-                            variant="ghost"
-                            aria-label={t('ebarimtCheck.files.download', { month: name })}
-                            title={t('ebarimtCheck.files.download', { month: name })}
-                            onClick={() => download(month)}
-                          >
-                            <Download />
-                          </Button>
+                          {month.file.source === 'FILE' ? (
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              aria-label={t('ebarimtCheck.files.download', { month: name })}
+                              title={t('ebarimtCheck.files.download', { month: name })}
+                              onClick={() => download(month)}
+                            >
+                              <Download />
+                            </Button>
+                          ) : null}
                           {canRemove ? (
                             <Button
                               size="icon-sm"
@@ -245,9 +248,17 @@ export function FilesDialog(props: { year: number; onClose: () => void }) {
   );
 }
 
-/** Which accounts' receipts count as the month's purchases. */
-export function SettingsDialog(props: { onClose: () => void }) {
+const SETTINGS_TABS = ['accounts', 'connection'] as const;
+type SettingsTab = (typeof SETTINGS_TABS)[number];
+
+/**
+ * The page's settings: which accounts' receipts count as the month's purchases, and the connection
+ * to e-Barimt's API (ADR-0228), each saved on its own.
+ */
+export function SettingsDialog(props: { onClose: () => void; tab?: SettingsTab }) {
   const { t } = useTranslation();
+  const [tab, setTab] = useState<SettingsTab>(props.tab ?? 'accounts');
+  const [connectionDirty, setConnectionDirty] = useState(false);
   const canSave = useHasPermission('ebarimt.check.settings');
   const settings = useEbarimtSettings();
   const mutations = useEbarimtMutations();
@@ -278,68 +289,89 @@ export function SettingsDialog(props: { onClose: () => void }) {
       });
   return (
     <Dialog open onOpenChange={(open) => !open && props.onClose()}>
-      <DialogContent size="md" dirty={changed} className="flex max-h-[85vh] flex-col">
+      <DialogContent
+        size="lg"
+        dirty={changed || connectionDirty}
+        className="flex max-h-[85vh] flex-col"
+      >
         <DialogHeader>
           <DialogTitle>{t('ebarimtCheck.settings.title')}</DialogTitle>
-          <DialogDescription>{t('ebarimtCheck.settings.accountsHint')}</DialogDescription>
+          <DialogDescription>
+            {tab === 'accounts'
+              ? t('ebarimtCheck.settings.accountsHint')
+              : t('ebarimtCheck.connection.title')}
+          </DialogDescription>
         </DialogHeader>
-        <ProblemAlert problem={action.problem} />
-        <ProblemAlert problem={problemFromError(settings.error)} onRetry={settings.refetch} />
-        {settings.isPending ? (
-          <p className="py-4 text-sm text-muted-foreground">{t('common.loading')}</p>
-        ) : null}
-        {settings.isSuccess ? (
-          <div
-            role="group"
-            aria-label={t('ebarimtCheck.settings.accounts')}
-            className="min-h-0 flex-1 overflow-auto rounded-lg border border-border"
-          >
-            {accounts.map((account) => (
-              <label
-                key={account.code}
-                className={cn(
-                  'flex cursor-pointer items-center gap-3 border-b border-border px-3 py-2 text-sm last:border-b-0 hover:bg-accent',
-                  !canSave && 'cursor-default',
-                )}
-              >
-                <Checkbox
-                  disabled={!canSave}
-                  checked={current.has(account.code)}
-                  onCheckedChange={(checked) => toggle(account.code, checked === true)}
-                />
-                <span className="font-mono">{account.code}</span>
-                <span className="min-w-0 flex-1 truncate">{account.name}</span>
-                {account.isDefault ? (
-                  <Badge variant="secondary">{t('ebarimtCheck.settings.default')}</Badge>
-                ) : null}
-              </label>
-            ))}
-          </div>
-        ) : null}
-        {canSave ? (
-          <>
-            {settings.isSuccess && current.size === 0 ? (
-              <p className="text-[0.8125rem] text-destructive">
-                {t('ebarimtCheck.settings.atLeastOne')}
-              </p>
-            ) : null}
-            <DialogFooter>
-              <Button variant="ghost" onClick={props.onClose}>
-                {t('common.cancel')}
-              </Button>
-              <Button
-                disabled={!settings.isSuccess || current.size === 0}
-                pending={mutations.saveSettings.isPending}
-                onClick={save}
-              >
-                {t('common.save')}
-              </Button>
-            </DialogFooter>
-          </>
+        <SegmentedControl
+          name={t('ebarimtCheck.settings.title')}
+          options={SETTINGS_TABS}
+          value={tab}
+          onChange={setTab}
+          label={(value) => t(`ebarimtCheck.settings.tabs.${value}`)}
+        />
+        {tab === 'connection' ? (
+          <ConnectionPanel onClose={props.onClose} onDirty={setConnectionDirty} />
         ) : (
-          <p className="text-[0.8125rem] text-muted-foreground">
-            {t('ebarimtCheck.settings.readOnly')}
-          </p>
+          <>
+            <ProblemAlert problem={action.problem} />
+            <ProblemAlert problem={problemFromError(settings.error)} onRetry={settings.refetch} />
+            {settings.isPending ? (
+              <p className="py-4 text-sm text-muted-foreground">{t('common.loading')}</p>
+            ) : null}
+            {settings.isSuccess ? (
+              <div
+                role="group"
+                aria-label={t('ebarimtCheck.settings.accounts')}
+                className="min-h-0 flex-1 overflow-auto rounded-lg border border-border"
+              >
+                {accounts.map((account) => (
+                  <label
+                    key={account.code}
+                    className={cn(
+                      'flex cursor-pointer items-center gap-3 border-b border-border px-3 py-2 text-sm last:border-b-0 hover:bg-accent',
+                      !canSave && 'cursor-default',
+                    )}
+                  >
+                    <Checkbox
+                      disabled={!canSave}
+                      checked={current.has(account.code)}
+                      onCheckedChange={(checked) => toggle(account.code, checked === true)}
+                    />
+                    <span className="font-mono">{account.code}</span>
+                    <span className="min-w-0 flex-1 truncate">{account.name}</span>
+                    {account.isDefault ? (
+                      <Badge variant="secondary">{t('ebarimtCheck.settings.default')}</Badge>
+                    ) : null}
+                  </label>
+                ))}
+              </div>
+            ) : null}
+            {canSave ? (
+              <>
+                {settings.isSuccess && current.size === 0 ? (
+                  <p className="text-[0.8125rem] text-destructive">
+                    {t('ebarimtCheck.settings.atLeastOne')}
+                  </p>
+                ) : null}
+                <DialogFooter>
+                  <Button variant="ghost" onClick={props.onClose}>
+                    {t('common.cancel')}
+                  </Button>
+                  <Button
+                    disabled={!settings.isSuccess || current.size === 0}
+                    pending={mutations.saveSettings.isPending}
+                    onClick={save}
+                  >
+                    {t('common.save')}
+                  </Button>
+                </DialogFooter>
+              </>
+            ) : (
+              <p className="text-[0.8125rem] text-muted-foreground">
+                {t('ebarimtCheck.settings.readOnly')}
+              </p>
+            )}
+          </>
         )}
       </DialogContent>
     </Dialog>

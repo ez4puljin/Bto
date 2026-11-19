@@ -53,6 +53,8 @@ declare module './job-catalog' {
     'erxes.pull': ScheduledPayload;
     /** One read of Erkhet's balances by location through erxes (ADR-0221). */
     'erxes.stockRead': { runId: number };
+    /** Nights at 01:30: a month's purchase receipts from e-Barimt's API, when switched on (ADR-0228). */
+    'ebarimtcheck.pull': ScheduledPayload;
     /** Sends one settlement SMS batch through WeSend, message by message (ADR-0216). */
     'notifications.sendSms': { batchId: number };
   }
@@ -126,6 +128,7 @@ const BTO_JOB_QUEUES = {
     retentionSeconds: 7 * 86_400,
     deleteAfterSeconds: 7 * 86_400,
   },
+  'ebarimtcheck.pull': scheduledQueue(),
   // One job per batch (singletonKey = the batch id). A retry skips what is no longer QUEUED and
   // resends with each message's own Idempotency-Key, so WeSend never sends a text twice.
   'notifications.sendSms': {
