@@ -1,11 +1,12 @@
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { Bell, LockKeyhole } from 'lucide-react-native';
+import { Bell, LockKeyhole, MessageCircle } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useContacts, useStoreMe } from '../../src/api/customer';
 import { useStoreNotificationSummary } from '../../src/api/customer-notifications';
+import { useChatUnread } from '../../src/chat/customer-chat';
 import { Contacts } from '../../src/customer/contacts';
 import { phoneShown } from '../../src/customer/home';
 import { StoreHeader } from '../../src/ui/store-header';
@@ -30,6 +31,7 @@ export default function CustomerProfileScreen() {
   const { session, me } = useCustomer();
   const store = useStoreMe().data ?? me.store;
   const unread = useStoreNotificationSummary().data?.unread ?? 0;
+  const chatUnread = useChatUnread();
   const contacts = useContacts();
   const [leaving, setLeaving] = useState(false);
   const address = store.defaultAddress?.address ?? store.defaultAddress?.label ?? null;
@@ -82,6 +84,22 @@ export default function CustomerProfileScreen() {
             }
             title={t('mobile.password.title')}
             onPress={() => router.push('/password')}
+          />
+          <Row
+            minHeight={52}
+            icon={
+              <IconTile color={colors.tint.green}>
+                <MessageCircle size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+              </IconTile>
+            }
+            title={t('mobile.customer.chat.title')}
+            accessibilityLabel={
+              chatUnread > 0
+                ? t('mobile.customer.chat.unreadLabel', { n: chatUnread })
+                : t('mobile.customer.chat.title')
+            }
+            right={<CountBadge count={chatUnread} ring={colors.card} />}
+            onPress={() => router.push('/chat')}
           />
           <Row
             minHeight={52}

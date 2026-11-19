@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { unwrap } from '../../src/api/problem';
+import { useCustomerChatLive } from '../../src/chat/customer-chat';
 import {
   STORE_SUMMARY_KEY,
   useStoreNotificationSummary,
@@ -40,6 +41,8 @@ export default function CustomerLayout() {
   const { session, server, accountId } = useCustomer();
   // The shop's live stock (ADR-0173 #4): words, or numbers when the office shows them.
   useLiveStock(session, 'CUSTOMER');
+  // The store's chat (ADR-0224): new messages and the unread badge, while the app is in front.
+  useCustomerChatLive(session);
   return (
     <ShopProvider server={server} userId={accountId}>
       <ToastProvider>
@@ -83,6 +86,7 @@ export default function CustomerLayout() {
           <Stack.Screen name="order/[id]" />
           <Stack.Screen name="invoice/[id]" />
           <Stack.Screen name="notifications" />
+          <Stack.Screen name="chat" />
           <Stack.Screen name="notice/[id]" />
           <Stack.Screen name="profile" />
           <Stack.Screen name="password" />

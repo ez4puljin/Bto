@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Bell, PackageSearch, ScanLine } from 'lucide-react-native';
+import { Bell, MessageCircle, PackageSearch, ScanLine } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -13,6 +13,7 @@ import {
 import { type StoreHomeCategory, useStoreHome, useStoreMe } from '../../../src/api/customer';
 import { useStoreNotificationSummary } from '../../../src/api/customer-notifications';
 import { problemFrom } from '../../../src/api/problem';
+import { useChatUnread } from '../../../src/chat/customer-chat';
 import {
   BannerCarousel,
   CategoryTile,
@@ -51,6 +52,7 @@ export default function CustomerHomeScreen() {
   const store = storeMe.data ?? me.store;
   const summary = useStoreNotificationSummary();
   const update = useAppUpdate();
+  const chatUnread = useChatUnread();
   const unread = (summary.data?.unread ?? 0) + (update ? 1 : 0);
   const home = useStoreHome();
   const actions = useCardActions();
@@ -114,6 +116,16 @@ export default function CustomerHomeScreen() {
               <ScanLine size={19} strokeWidth={1.8} color={colors.label2} />
             </Pressable>
           </View>
+          <HeaderIconButton
+            icon={<MessageCircle size={22} strokeWidth={1.9} color={colors.primaryForeground} />}
+            label={
+              chatUnread > 0
+                ? t('mobile.customer.chat.unreadLabel', { n: chatUnread })
+                : t('mobile.customer.chat.title')
+            }
+            badge={chatUnread}
+            onPress={() => router.push('/chat')}
+          />
           <HeaderIconButton
             icon={<Bell size={22} strokeWidth={1.9} color={colors.primaryForeground} />}
             label={
