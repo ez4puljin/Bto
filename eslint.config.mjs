@@ -98,6 +98,10 @@ const MODULE_DEPS = {
   // Price labels (ADR-0226): a till's prices (catalog, pricing) for the staff a till names (pos);
   // it writes only its own stations and jobs; nobody imports it.
   printing: ['identity', 'catalog', 'pricing', 'pos'],
+  // «Асуудалтай бараа» (ADR-0230): the tills' shortfalls (pos), goods issues, adjustments and
+  // on-hand (inventory), the warehouses' fixed customers (partners), product names (catalog); it
+  // moves stock only through inventory's services; nobody imports it.
+  'stock-problems': ['identity', 'catalog', 'partners', 'inventory', 'pos'],
   // ADR-0062: sales only for the SALE_LISTENER token, its payload type and the order's foreign key.
   // ADR-0082: sales' ORDER_LISTENER, finance's PAYMENT_LISTENER, the invoice and payment foreign
   // keys and the open invoices the reminders read.

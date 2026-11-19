@@ -49505,6 +49505,666 @@
           "printing"
         ]
       }
+    },
+    "/api/v1/stock-problems/warehouses": {
+      "get": {
+        "operationId": "StockProblems_warehouses",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StockProblemWarehouseDto"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The caller's warehouses with how many products each has on its list.",
+        "tags": [
+          "stock-problems"
+        ]
+      }
+    },
+    "/api/v1/stock-problems": {
+      "get": {
+        "operationId": "StockProblems_list",
+        "parameters": [
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockProblemListDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One warehouse's problem products, newest first, each with its events and on-hand.",
+        "tags": [
+          "stock-problems"
+        ]
+      }
+    },
+    "/api/v1/stock-problems/legitimate": {
+      "post": {
+        "operationId": "StockProblems_legitimate",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkLegitimateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockProblemResolutionDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Зүй ёсны»: the product leaves this warehouse's list at once.",
+        "tags": [
+          "stock-problems"
+        ]
+      }
+    },
+    "/api/v1/stock-problems/zero-out": {
+      "post": {
+        "operationId": "StockProblems_zeroOut",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ZeroOutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockProblemResolutionDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Үлдэгдэл тэглэх»: a goods issue for the balance, sent to the keeper.",
+        "tags": [
+          "stock-problems"
+        ]
+      }
+    },
+    "/api/v1/stock-problems/settings": {
+      "get": {
+        "operationId": "StockProblems_settings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StockProblemSettingsDto"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Each warehouse's fixed customer and expense type.",
+        "tags": [
+          "stock-problems"
+        ]
+      }
+    },
+    "/api/v1/stock-problems/settings/{warehouseId}": {
+      "put": {
+        "operationId": "StockProblems_setSettings",
+        "parameters": [
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockProblemSettingsRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockProblemSettingsDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "stock-problems"
+        ]
+      }
+    },
+    "/api/v1/stock-problems/sheets/build": {
+      "post": {
+        "operationId": "StockProblems_build",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuildSheetsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StockProblemSheetDto"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Builds (or tops up) today's sheets now, as the 07:00 job does.",
+        "tags": [
+          "stock-problems"
+        ]
+      }
+    },
+    "/api/v1/stock-problems/sheets/mine": {
+      "get": {
+        "operationId": "StockProblems_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StockProblemSheetDetailDto"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The staff app: today's open sheets of my warehouses, with their lines.",
+        "tags": [
+          "stock-problems"
+        ]
+      }
+    },
+    "/api/v1/stock-problems/sheets": {
+      "get": {
+        "operationId": "StockProblems_listSheets",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "APPROVED",
+                "CLOSED"
+              ]
+            }
+          },
+          {
+            "name": "sheetDate",
+            "required": false,
+            "in": "query",
+            "description": "YYYY-MM-DD",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockProblemSheetPageDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "stock-problems"
+        ]
+      }
+    },
+    "/api/v1/stock-problems/sheets/{id}": {
+      "get": {
+        "operationId": "StockProblems_sheet",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockProblemSheetDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A sheet with its lines in shelf order: what the web prints per warehouse.",
+        "tags": [
+          "stock-problems"
+        ]
+      }
+    },
+    "/api/v1/stock-problems/sheet-lines/{id}/count": {
+      "post": {
+        "operationId": "StockProblems_count",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CountSheetLineDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockProblemSheetLineDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The counter's quantity of a line; may be sent again until the sheet is approved.",
+        "tags": [
+          "stock-problems"
+        ]
+      }
+    },
+    "/api/v1/stock-problems/sheets/{id}/approve": {
+      "post": {
+        "operationId": "StockProblems_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveSheetDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockProblemSheetDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approves a counted sheet: shortages to one goods issue, surpluses to one adjustment.",
+        "tags": [
+          "stock-problems"
+        ]
+      }
     }
   },
   "info": {
@@ -50118,7 +50778,10 @@
           "expiry.items.carry",
           "chat.answer",
           "chat.answer_own",
-          "chat.settings.manage"
+          "chat.settings.manage",
+          "stockProblems.read",
+          "stockProblems.count",
+          "stockProblems.manage"
         ]
       },
       "RoleRef": {
@@ -101686,6 +102349,743 @@
         "required": [
           "ok"
         ]
+      },
+      "StockProblemWarehouseDto": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseCode": {
+            "type": "string"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "productCount": {
+            "type": "number"
+          },
+          "redCount": {
+            "type": "number",
+            "description": "Products with a till shortfall"
+          },
+          "cutCount": {
+            "type": "number",
+            "description": "Products with an order cut"
+          },
+          "settingsReady": {
+            "type": "boolean",
+            "description": "The fixed customer and the expense type are both chosen"
+          }
+        },
+        "required": [
+          "warehouseId",
+          "warehouseCode",
+          "warehouseName",
+          "productCount",
+          "redCount",
+          "cutCount",
+          "settingsReady"
+        ]
+      },
+      "StockProblemProductDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string",
+            "description": "The product code"
+          },
+          "name": {
+            "type": "string"
+          },
+          "baseUomName": {
+            "type": "string",
+            "description": "The unit every quantity here is in"
+          }
+        },
+        "required": [
+          "id",
+          "sku",
+          "name",
+          "baseUomName"
+        ]
+      },
+      "StockProblemEventDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "POS_SHORTFALL",
+              "BACKORDER",
+              "SHORT_PICK"
+            ],
+            "type": "string",
+            "description": "POS_SHORTFALL = «Улайсан» (a till sold what the shelf lacked); BACKORDER and SHORT_PICK = «Дарагдсан» (cut at the order’s confirmation, or by the picker)"
+          },
+          "qtyBase": {
+            "type": "string",
+            "description": "Base units: sold beyond the shelf, or cut from the order"
+          },
+          "at": {
+            "type": "string",
+            "description": "When the till sold, the order was confirmed or the part picked"
+          },
+          "shortfallId": {
+            "type": "number",
+            "nullable": true,
+            "description": "pos_shortfalls id (POS_SHORTFALL)"
+          },
+          "saleId": {
+            "type": "number",
+            "nullable": true
+          },
+          "saleNumber": {
+            "type": "string",
+            "nullable": true,
+            "description": "The till sale’s number"
+          },
+          "orderId": {
+            "type": "number",
+            "nullable": true
+          },
+          "orderNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "orderLineId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "repName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Who entered the order (the rep)"
+          },
+          "orderedQtyBase": {
+            "type": "string",
+            "nullable": true,
+            "description": "Ordered, base units"
+          }
+        },
+        "required": [
+          "kind",
+          "qtyBase",
+          "at",
+          "shortfallId",
+          "saleId",
+          "saleNumber",
+          "orderId",
+          "orderNumber",
+          "orderLineId",
+          "customerId",
+          "customerName",
+          "repName",
+          "orderedQtyBase"
+        ]
+      },
+      "StockProblemPendingDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "description": "The resolution’s id"
+          },
+          "kind": {
+            "enum": [
+              "LEGIT",
+              "ZERO_OUT",
+              "COUNT"
+            ],
+            "type": "string"
+          },
+          "qtyBase": {
+            "type": "string",
+            "nullable": true
+          },
+          "issueId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The goods issue it waits for"
+          },
+          "adjustmentId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The adjustment it waits for"
+          },
+          "sheetId": {
+            "type": "number",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "qtyBase",
+          "issueId",
+          "adjustmentId",
+          "sheetId",
+          "createdAt"
+        ]
+      },
+      "StockProblemDto": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number"
+          },
+          "product": {
+            "$ref": "#/components/schemas/StockProblemProductDto"
+          },
+          "onHand": {
+            "type": "string",
+            "description": "The warehouse’s on-hand now, base units"
+          },
+          "redQty": {
+            "type": "string",
+            "description": "Σ «Улайсан», base units"
+          },
+          "cutQty": {
+            "type": "string",
+            "description": "Σ «Дарагдсан», base units"
+          },
+          "lastEventAt": {
+            "type": "string"
+          },
+          "events": {
+            "description": "Newest first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockProblemEventDto"
+            }
+          },
+          "pending": {
+            "nullable": true,
+            "description": "A decision that waits for its document; no other decision is taken meanwhile",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StockProblemPendingDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "warehouseId",
+          "product",
+          "onHand",
+          "redQty",
+          "cutQty",
+          "lastEventAt",
+          "events",
+          "pending"
+        ]
+      },
+      "StockProblemListDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockProblemDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "MarkLegitimateDto": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "productId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "warehouseId",
+          "productId"
+        ]
+      },
+      "StockProblemResolutionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "kind": {
+            "enum": [
+              "LEGIT",
+              "ZERO_OUT",
+              "COUNT"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "DONE",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "qtyBase": {
+            "type": "string",
+            "nullable": true
+          },
+          "onHand": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "issueId": {
+            "type": "number",
+            "nullable": true
+          },
+          "issueStatus": {
+            "type": "string",
+            "nullable": true,
+            "description": "The issue’s status after the action"
+          },
+          "adjustmentId": {
+            "type": "number",
+            "nullable": true
+          },
+          "sheetId": {
+            "type": "number",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "warehouseId",
+          "productId",
+          "kind",
+          "status",
+          "qtyBase",
+          "onHand",
+          "note",
+          "issueId",
+          "issueStatus",
+          "adjustmentId",
+          "sheetId",
+          "createdAt"
+        ]
+      },
+      "ZeroOutDto": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "productId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "qty": {
+            "type": "string",
+            "nullable": true,
+            "description": "Base units to issue; omitted: the whole on-hand of the warehouse"
+          }
+        },
+        "required": [
+          "warehouseId",
+          "productId"
+        ]
+      },
+      "StockProblemSettingsDto": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseCode": {
+            "type": "string"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "expenseTypeId": {
+            "type": "number",
+            "nullable": true
+          },
+          "expenseTypeName": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "warehouseId",
+          "warehouseCode",
+          "warehouseName",
+          "customerId",
+          "customerName",
+          "expenseTypeId",
+          "expenseTypeName",
+          "updatedAt"
+        ]
+      },
+      "StockProblemSettingsRequestDto": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The warehouse’s fixed customer"
+          },
+          "expenseTypeId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "A goods issue expense type"
+          }
+        },
+        "required": [
+          "customerId",
+          "expenseTypeId"
+        ]
+      },
+      "BuildSheetsDto": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Omitted: every warehouse of the caller’s scope"
+          }
+        }
+      },
+      "StockProblemSheetDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseCode": {
+            "type": "string"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "sheetDate": {
+            "type": "string",
+            "description": "YYYY-MM-DD, Ulaanbaatar"
+          },
+          "status": {
+            "enum": [
+              "OPEN",
+              "APPROVED",
+              "CLOSED"
+            ],
+            "type": "string"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "countedCount": {
+            "type": "number"
+          },
+          "builtAt": {
+            "type": "string"
+          },
+          "builtByName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null: built by the 07:00 job"
+          },
+          "approvedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "issueId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The shortages’ goods issue"
+          },
+          "adjustmentId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The surpluses’ adjustment"
+          }
+        },
+        "required": [
+          "id",
+          "warehouseId",
+          "warehouseCode",
+          "warehouseName",
+          "sheetDate",
+          "status",
+          "lineCount",
+          "countedCount",
+          "builtAt",
+          "builtByName",
+          "approvedAt",
+          "approvedByName",
+          "issueId",
+          "adjustmentId"
+        ]
+      },
+      "StockProblemSheetLineDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "sheetId": {
+            "type": "number"
+          },
+          "product": {
+            "$ref": "#/components/schemas/StockProblemProductDto"
+          },
+          "binCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "The product’s fixed shelf"
+          },
+          "systemQty": {
+            "type": "string",
+            "description": "The system’s on-hand when the sheet was built"
+          },
+          "redQty": {
+            "type": "string"
+          },
+          "cutQty": {
+            "type": "string"
+          },
+          "countedQty": {
+            "type": "string",
+            "nullable": true
+          },
+          "onHandAtCount": {
+            "type": "string",
+            "nullable": true,
+            "description": "The on-hand when it was counted"
+          },
+          "difference": {
+            "type": "string",
+            "nullable": true,
+            "description": "counted − on-hand at the count"
+          },
+          "countedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "countedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "outcome": {
+            "nullable": true,
+            "enum": [
+              "EQUAL",
+              "SHORTAGE",
+              "SURPLUS"
+            ],
+            "type": "string",
+            "description": "Set by the approval"
+          },
+          "resolutionId": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "sheetId",
+          "product",
+          "binCode",
+          "systemQty",
+          "redQty",
+          "cutQty",
+          "countedQty",
+          "onHandAtCount",
+          "difference",
+          "countedAt",
+          "countedByName",
+          "outcome",
+          "resolutionId"
+        ]
+      },
+      "StockProblemSheetDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseCode": {
+            "type": "string"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "sheetDate": {
+            "type": "string",
+            "description": "YYYY-MM-DD, Ulaanbaatar"
+          },
+          "status": {
+            "enum": [
+              "OPEN",
+              "APPROVED",
+              "CLOSED"
+            ],
+            "type": "string"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "countedCount": {
+            "type": "number"
+          },
+          "builtAt": {
+            "type": "string"
+          },
+          "builtByName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null: built by the 07:00 job"
+          },
+          "approvedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "issueId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The shortages’ goods issue"
+          },
+          "adjustmentId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The surpluses’ adjustment"
+          },
+          "lines": {
+            "description": "In shelf order",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockProblemSheetLineDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "warehouseId",
+          "warehouseCode",
+          "warehouseName",
+          "sheetDate",
+          "status",
+          "lineCount",
+          "countedCount",
+          "builtAt",
+          "builtByName",
+          "approvedAt",
+          "approvedByName",
+          "issueId",
+          "adjustmentId",
+          "lines"
+        ]
+      },
+      "StockProblemSheetPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockProblemSheetDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "CountSheetLineDto": {
+        "type": "object",
+        "properties": {
+          "countedQty": {
+            "type": "string",
+            "description": "Counted, base units; zero or more, up to 3 decimals"
+          }
+        },
+        "required": [
+          "countedQty"
+        ]
+      },
+      "ApproveSheetDto": {
+        "type": "object",
+        "properties": {
+          "countedOnly": {
+            "type": "boolean",
+            "description": "true: approve the counted lines and leave the rest on the list; default false refuses a sheet with uncounted lines"
+          }
+        }
       },
       "ErrorCode": {
         "type": "string",

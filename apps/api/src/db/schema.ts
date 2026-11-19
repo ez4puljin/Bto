@@ -296,3 +296,9 @@ export {
   expiryItems,
 } from '../modules/expiry/schema';
 export { printJobs, printStations } from '../modules/printing/schema';
+export {
+  stockProblemResolutions,
+  stockProblemSettings,
+  stockProblemSheetLines,
+  stockProblemSheets,
+} from '../modules/stock-problems/schema';

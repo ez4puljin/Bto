@@ -533,6 +533,13 @@ describe('nightly jobs', () => {
           timezone: 'Asia/Ulaanbaatar',
           missed: 'once',
         },
+        // The morning sheets of «Асуудалтай бараа» (ADR-0230 #6).
+        {
+          name: 'stockproblems.morningSheets',
+          cron: '0 7 * * *',
+          timezone: 'Asia/Ulaanbaatar',
+          missed: 'once',
+        },
       ]);
     });
 

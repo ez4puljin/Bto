@@ -18,6 +18,7 @@ import { ImportsWorkerModule } from './modules/imports';
 import { InventoryWorkerModule } from './modules/inventory';
 import { NotificationsWorkerModule } from './modules/notifications';
 import { ReportingWorkerModule } from './modules/reporting';
+import { StockProblemsWorkerModule } from './modules/stock-problems';
 
 /** The pg-boss worker (ROLE=worker): job handlers and their schedules (ADR-0040), no public HTTP. */
 @Module({
@@ -45,6 +46,8 @@ import { ReportingWorkerModule } from './modules/reporting';
     // e-Barimt's purchase receipts (ADR-0228): the worker pulls them every night at 01:30.
     EbarimtIntegrationModule,
     EbarimtCheckWorkerModule,
+    // «Асуудалтай бараа» (ADR-0230): the worker builds the morning sheets at 07:00.
+    StockProblemsWorkerModule,
   ],
   providers: [WorkerHealthServer],
 })

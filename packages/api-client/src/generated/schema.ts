@@ -12464,6 +12464,208 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stock-problems/warehouses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's warehouses with how many products each has on its list. */
+        get: operations["StockProblems_warehouses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock-problems": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One warehouse's problem products, newest first, each with its events and on-hand. */
+        get: operations["StockProblems_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock-problems/legitimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** «Зүй ёсны»: the product leaves this warehouse's list at once. */
+        post: operations["StockProblems_legitimate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock-problems/zero-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** «Үлдэгдэл тэглэх»: a goods issue for the balance, sent to the keeper. */
+        post: operations["StockProblems_zeroOut"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock-problems/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Each warehouse's fixed customer and expense type. */
+        get: operations["StockProblems_settings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock-problems/settings/{warehouseId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["StockProblems_setSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock-problems/sheets/build": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Builds (or tops up) today's sheets now, as the 07:00 job does. */
+        post: operations["StockProblems_build"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock-problems/sheets/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The staff app: today's open sheets of my warehouses, with their lines. */
+        get: operations["StockProblems_mine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock-problems/sheets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockProblems_listSheets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock-problems/sheets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A sheet with its lines in shelf order: what the web prints per warehouse. */
+        get: operations["StockProblems_sheet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock-problems/sheet-lines/{id}/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The counter's quantity of a line; may be sent again until the sheet is approved. */
+        post: operations["StockProblems_count"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock-problems/sheets/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approves a counted sheet: shortages to one goods issue, surpluses to one adjustment. */
+        post: operations["StockProblems_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -12631,7 +12833,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "inventory.issues.confirm" | "procurement.orders.read" | "procurement.orders.edit" | "procurement.orders.manage" | "procurement.prices.read" | "ebarimt.check.read" | "ebarimt.check.edit" | "ebarimt.check.assign" | "ebarimt.check.settings" | "erkhet.sync.read" | "erkhet.sync.manage" | "erkhet.settings.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "ai.settings.manage" | "ai.data.catalog" | "ai.data.stock" | "ai.data.customers" | "ai.data.suppliers" | "ai.data.pricing" | "ai.data.sales" | "ai.data.finance" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.pickLead" | "sales.orders.moveAny" | "sales.orders.party" | "sales.orders.rep" | "sales.orders.load" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "finance.sms.send" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "pos.loyalty.manage" | "notifications.send" | "customer.home.manage" | "hr.attendance.view" | "hr.attendance.manage" | "reports.view" | "reports.margins.view" | "expiry.items.manage" | "expiry.liability.manage" | "expiry.items.carry" | "chat.answer" | "chat.answer_own" | "chat.settings.manage";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "inventory.issues.confirm" | "procurement.orders.read" | "procurement.orders.edit" | "procurement.orders.manage" | "procurement.prices.read" | "ebarimt.check.read" | "ebarimt.check.edit" | "ebarimt.check.assign" | "ebarimt.check.settings" | "erkhet.sync.read" | "erkhet.sync.manage" | "erkhet.settings.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "ai.settings.manage" | "ai.data.catalog" | "ai.data.stock" | "ai.data.customers" | "ai.data.suppliers" | "ai.data.pricing" | "ai.data.sales" | "ai.data.finance" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.pickLead" | "sales.orders.moveAny" | "sales.orders.party" | "sales.orders.rep" | "sales.orders.load" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "finance.sms.send" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "pos.loyalty.manage" | "notifications.send" | "customer.home.manage" | "hr.attendance.view" | "hr.attendance.manage" | "reports.view" | "reports.margins.view" | "expiry.items.manage" | "expiry.liability.manage" | "expiry.items.carry" | "chat.answer" | "chat.answer_own" | "chat.settings.manage" | "stockProblems.read" | "stockProblems.count" | "stockProblems.manage";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -27162,6 +27364,211 @@ export interface components {
             ok: boolean;
             /** @description Windows’ error, when not ok */
             message?: string | null;
+        };
+        StockProblemWarehouseDto: {
+            warehouseId: number;
+            warehouseCode: string;
+            warehouseName: string;
+            productCount: number;
+            /** @description Products with a till shortfall */
+            redCount: number;
+            /** @description Products with an order cut */
+            cutCount: number;
+            /** @description The fixed customer and the expense type are both chosen */
+            settingsReady: boolean;
+        };
+        StockProblemProductDto: {
+            id: number;
+            /** @description The product code */
+            sku: string;
+            name: string;
+            /** @description The unit every quantity here is in */
+            baseUomName: string;
+        };
+        StockProblemEventDto: {
+            /**
+             * @description POS_SHORTFALL = «Улайсан» (a till sold what the shelf lacked); BACKORDER and SHORT_PICK = «Дарагдсан» (cut at the order’s confirmation, or by the picker)
+             * @enum {string}
+             */
+            kind: "POS_SHORTFALL" | "BACKORDER" | "SHORT_PICK";
+            /** @description Base units: sold beyond the shelf, or cut from the order */
+            qtyBase: string;
+            /** @description When the till sold, the order was confirmed or the part picked */
+            at: string;
+            /** @description pos_shortfalls id (POS_SHORTFALL) */
+            shortfallId: number | null;
+            saleId: number | null;
+            /** @description The till sale’s number */
+            saleNumber: string | null;
+            orderId: number | null;
+            orderNumber: string | null;
+            orderLineId: number | null;
+            customerId: number | null;
+            customerName: string | null;
+            /** @description Who entered the order (the rep) */
+            repName: string | null;
+            /** @description Ordered, base units */
+            orderedQtyBase: string | null;
+        };
+        StockProblemPendingDto: {
+            /** @description The resolution’s id */
+            id: number;
+            /** @enum {string} */
+            kind: "LEGIT" | "ZERO_OUT" | "COUNT";
+            qtyBase: string | null;
+            /** @description The goods issue it waits for */
+            issueId: number | null;
+            /** @description The adjustment it waits for */
+            adjustmentId: number | null;
+            sheetId: number | null;
+            createdAt: string;
+        };
+        StockProblemDto: {
+            warehouseId: number;
+            product: components["schemas"]["StockProblemProductDto"];
+            /** @description The warehouse’s on-hand now, base units */
+            onHand: string;
+            /** @description Σ «Улайсан», base units */
+            redQty: string;
+            /** @description Σ «Дарагдсан», base units */
+            cutQty: string;
+            lastEventAt: string;
+            /** @description Newest first */
+            events: components["schemas"]["StockProblemEventDto"][];
+            /** @description A decision that waits for its document; no other decision is taken meanwhile */
+            pending: components["schemas"]["StockProblemPendingDto"] | null;
+        };
+        StockProblemListDto: {
+            data: components["schemas"]["StockProblemDto"][];
+        };
+        MarkLegitimateDto: {
+            warehouseId: number;
+            productId: number;
+            note?: string | null;
+        };
+        StockProblemResolutionDto: {
+            id: number;
+            warehouseId: number;
+            productId: number;
+            /** @enum {string} */
+            kind: "LEGIT" | "ZERO_OUT" | "COUNT";
+            /** @enum {string} */
+            status: "PENDING" | "DONE" | "CANCELLED";
+            qtyBase: string | null;
+            onHand: string | null;
+            note: string | null;
+            issueId: number | null;
+            /** @description The issue’s status after the action */
+            issueStatus: string | null;
+            adjustmentId: number | null;
+            sheetId: number | null;
+            createdAt: string;
+        };
+        ZeroOutDto: {
+            warehouseId: number;
+            productId: number;
+            /** @description Base units to issue; omitted: the whole on-hand of the warehouse */
+            qty?: string | null;
+        };
+        StockProblemSettingsDto: {
+            warehouseId: number;
+            warehouseCode: string;
+            warehouseName: string;
+            customerId: number | null;
+            customerName: string | null;
+            expenseTypeId: number | null;
+            expenseTypeName: string | null;
+            updatedAt: string | null;
+        };
+        StockProblemSettingsRequestDto: {
+            /** @description The warehouse’s fixed customer */
+            customerId: number | null;
+            /** @description A goods issue expense type */
+            expenseTypeId: number | null;
+        };
+        BuildSheetsDto: {
+            /** @description Omitted: every warehouse of the caller’s scope */
+            warehouseId?: number;
+        };
+        StockProblemSheetDto: {
+            id: number;
+            warehouseId: number;
+            warehouseCode: string;
+            warehouseName: string;
+            /** @description YYYY-MM-DD, Ulaanbaatar */
+            sheetDate: string;
+            /** @enum {string} */
+            status: "OPEN" | "APPROVED" | "CLOSED";
+            lineCount: number;
+            countedCount: number;
+            builtAt: string;
+            /** @description Null: built by the 07:00 job */
+            builtByName: string | null;
+            approvedAt: string | null;
+            approvedByName: string | null;
+            /** @description The shortages’ goods issue */
+            issueId: number | null;
+            /** @description The surpluses’ adjustment */
+            adjustmentId: number | null;
+        };
+        StockProblemSheetLineDto: {
+            id: number;
+            sheetId: number;
+            product: components["schemas"]["StockProblemProductDto"];
+            /** @description The product’s fixed shelf */
+            binCode: string | null;
+            /** @description The system’s on-hand when the sheet was built */
+            systemQty: string;
+            redQty: string;
+            cutQty: string;
+            countedQty: string | null;
+            /** @description The on-hand when it was counted */
+            onHandAtCount: string | null;
+            /** @description counted − on-hand at the count */
+            difference: string | null;
+            countedAt: string | null;
+            countedByName: string | null;
+            /**
+             * @description Set by the approval
+             * @enum {string|null}
+             */
+            outcome: "EQUAL" | "SHORTAGE" | "SURPLUS" | null;
+            resolutionId: number | null;
+        };
+        StockProblemSheetDetailDto: {
+            id: number;
+            warehouseId: number;
+            warehouseCode: string;
+            warehouseName: string;
+            /** @description YYYY-MM-DD, Ulaanbaatar */
+            sheetDate: string;
+            /** @enum {string} */
+            status: "OPEN" | "APPROVED" | "CLOSED";
+            lineCount: number;
+            countedCount: number;
+            builtAt: string;
+            /** @description Null: built by the 07:00 job */
+            builtByName: string | null;
+            approvedAt: string | null;
+            approvedByName: string | null;
+            /** @description The shortages’ goods issue */
+            issueId: number | null;
+            /** @description The surpluses’ adjustment */
+            adjustmentId: number | null;
+            /** @description In shelf order */
+            lines: components["schemas"]["StockProblemSheetLineDto"][];
+        };
+        StockProblemSheetPageDto: {
+            data: components["schemas"]["StockProblemSheetDto"][];
+            nextCursor: string | null;
+        };
+        CountSheetLineDto: {
+            /** @description Counted, base units; zero or more, up to 3 decimals */
+            countedQty: string;
+        };
+        ApproveSheetDto: {
+            /** @description true: approve the counted lines and leave the rest on the list; default false refuses a sheet with uncounted lines */
+            countedOnly?: boolean;
         };
         /** @enum {string} */
         ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "QUERY_TIMEOUT" | "REPORTS_BUSY" | "REPORT_VIEW_LIMIT" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "ROLE_NAMED_ON_RECORDS" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "SUPPLIER_CATEGORY_INACTIVE" | "SUPPLIER_CATEGORY_HAS_CHILDREN" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "PRODUCT_NOT_IN_APP" | "ORDER_BELOW_MINIMUM" | "PRODUCT_OUT_OF_APP_STOCK" | "ATTENDANCE_NO_SITE" | "ATTENDANCE_OUT_OF_RANGE" | "ATTENDANCE_LOCATION_IMPRECISE" | "ATTENDANCE_ALREADY_IN" | "ATTENDANCE_NOT_IN" | "ATTENDANCE_EVENT_ORDER" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "ISSUE_LINES_UNCHECKED" | "ISSUE_WAREHOUSE_CONFIRMED" | "ISSUE_PARTLY_POSTED" | "ISSUE_RECIPIENT_KIND" | "ISSUE_CORRECTION_OPEN" | "ISSUE_NOT_SENT" | "PO_NOT_ARCHIVABLE" | "PO_NOT_EDITABLE" | "PO_LOAD_OVER" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "TRANSFER_LINES_UNCOUNTED" | "TRANSFER_REQUEST_EMPTY" | "HR_POLL_CLOSED" | "HR_POLL_ANSWERED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "AI_DATA_FORBIDDEN" | "AI_BUDGET_REACHED" | "AI_USER_LIMIT_REACHED" | "AI_KEY_SECRET_MISSING" | "AI_PRICE_REQUIRED" | "PICTURE_NOT_CONFIGURED" | "PICTURE_PROVIDER_FAILED" | "NOTE_READING_STATE" | "SCANNER_NOT_FOUND" | "SCANNER_FAILED" | "ERKHET_NOT_CONFIGURED" | "ERKHET_KEY_SECRET_MISSING" | "ERKHET_SYNC_RUNNING" | "ERKHET_RUN_SUPERSEDED" | "SMS_NOT_CONFIGURED" | "SMS_KEY_SECRET_MISSING" | "SMS_TEMPLATE_INVALID" | "SMS_TOO_LONG" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "STAGE_SKIP" | "ORDER_CHANGED" | "ORDER_ALREADY_LOADED" | "ORDER_NOT_LOADABLE" | "LOAD_UNDO_FORBIDDEN" | "EBARIMT_FILE_UNREADABLE" | "EBARIMT_FILE_COLUMNS" | "EBARIMT_FILE_EMPTY" | "EBARIMT_FILE_ROW" | "EBARIMT_FILE_MONTHS" | "EBARIMT_FILE_LIMIT" | "EBARIMT_CELL_CONFLICT" | "EBARIMT_FILE_CHANGED" | "PICK_INCOMPLETE" | "COUNT_SESSIONS_OPEN" | "COUNT_SESSION_REQUIRED" | "PICK_TAKEN" | "LINE_EDIT_PART_DONE" | "PICK_STATE_INVALID" | "PICKER_INVALID" | "PIPELINE_KIND_STAGE" | "PIPELINE_KIND_CHANNEL" | "PIPELINE_NO_TRANSFER_WAREHOUSE" | "PIPELINE_TRANSFER_STAGE_NEEDS_STORE" | "PIPELINE_TRANSFER_WAREHOUSE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "BANK_STATEMENT_UNREADABLE" | "BANK_STATEMENT_NO_ACCOUNT" | "BANK_STATEMENT_EMPTY" | "BANK_STATEMENT_POSTED" | "BANK_STATEMENT_UNLINKED" | "BANK_STATEMENT_CURRENCY" | "BANK_LINE_LOCKED" | "BANK_LINE_POSTED" | "BANK_LINE_INCOMPLETE" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_CASHIER_NOT_ON_TILL" | "POS_SUPERVISOR_NOT_ON_TILL" | "POS_PRODUCT_NOT_ON_TILL" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "EDGE_LINK_INVALID" | "EDGE_LINK_PEPPER_MISSING" | "EDGE_ALREADY_LINKED" | "EDGE_LINK_UNREACHABLE" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_CARD_PENDING" | "POS_CARD_NOT_CHARGED" | "POS_CARD_ATTEMPT_STATE" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE" | "EXPIRY_ITEM_EXISTS" | "EXPIRY_ITEM_CHANGED" | "EXPIRY_ITEM_ARCHIVED";
@@ -56334,6 +56741,399 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PrintJob"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StockProblems_warehouses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockProblemWarehouseDto"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StockProblems_list: {
+        parameters: {
+            query: {
+                warehouseId: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockProblemListDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StockProblems_legitimate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkLegitimateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockProblemResolutionDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StockProblems_zeroOut: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZeroOutDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockProblemResolutionDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StockProblems_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockProblemSettingsDto"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StockProblems_setSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                warehouseId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockProblemSettingsRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockProblemSettingsDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StockProblems_build: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BuildSheetsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockProblemSheetDto"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StockProblems_mine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockProblemSheetDetailDto"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StockProblems_listSheets: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                warehouseId?: number;
+                status?: "OPEN" | "APPROVED" | "CLOSED";
+                /** @description YYYY-MM-DD */
+                sheetDate?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockProblemSheetPageDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StockProblems_sheet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockProblemSheetDetailDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StockProblems_count: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CountSheetLineDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockProblemSheetLineDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StockProblems_approve: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveSheetDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockProblemSheetDetailDto"];
                 };
             };
             /** @description RFC 9457 problem details */

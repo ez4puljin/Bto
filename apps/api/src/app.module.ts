@@ -36,6 +36,7 @@ import { ProcurementHttpModule } from './modules/procurement';
 import { ReportingHttpModule } from './modules/reporting';
 import { SalesHttpModule } from './modules/sales';
 import { SegmentsHttpModule } from './modules/segments';
+import { StockProblemsHttpModule } from './modules/stock-problems';
 
 /** The HTTP API (ROLE=api). Business modules are added here, one per session. */
 @Module({
@@ -77,6 +78,7 @@ import { SegmentsHttpModule } from './modules/segments';
     ErxesHttpModule,
     ChatHttpModule,
     PrintingHttpModule,
+    StockProblemsHttpModule,
   ],
 })
 export class AppModule {}
