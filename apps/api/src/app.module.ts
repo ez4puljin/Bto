@@ -30,6 +30,7 @@ import { NotificationsHttpModule } from './modules/notifications';
 import { PartnersHttpModule } from './modules/partners';
 import { PosHttpModule } from './modules/pos';
 import { PricingHttpModule } from './modules/pricing';
+import { PrintingHttpModule } from './modules/printing';
 import { ProcurementHttpModule } from './modules/procurement';
 import { ReportingHttpModule } from './modules/reporting';
 import { SalesHttpModule } from './modules/sales';
@@ -73,6 +74,7 @@ import { SegmentsHttpModule } from './modules/segments';
     ErkhetHttpModule,
     ErxesHttpModule,
     ChatHttpModule,
+    PrintingHttpModule,
   ],
 })
 export class AppModule {}

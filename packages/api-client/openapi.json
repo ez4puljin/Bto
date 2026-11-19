@@ -48661,6 +48661,712 @@
           "chat"
         ]
       }
+    },
+    "/api/v1/price-labels/tills": {
+      "get": {
+        "operationId": "PriceLabels_tills",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PriceLabelTill"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The caller's tills; PRINT_NO_TILL (403) without one.",
+        "tags": [
+          "printing"
+        ]
+      }
+    },
+    "/api/v1/price-labels/products": {
+      "get": {
+        "operationId": "PriceLabels_products",
+        "parameters": [
+          {
+            "name": "tillId",
+            "required": true,
+            "in": "query",
+            "description": "One of the caller’s tills (GET /price-labels/tills)",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Name (any case, Cyrillic or Latin), code or barcode",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PriceLabelItem"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Up to 30 products the till sells, at its prices today; `q` empty answers nothing.",
+        "tags": [
+          "printing"
+        ]
+      }
+    },
+    "/api/v1/price-labels/barcode/{code}": {
+      "get": {
+        "operationId": "PriceLabels_barcode",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tillId",
+            "required": true,
+            "in": "query",
+            "description": "One of the caller’s tills (GET /price-labels/tills)",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceLabelItem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One product by a barcode (or its code); PRINT_PRODUCT_NOT_FOUND (404) if not sold there.",
+        "tags": [
+          "printing"
+        ]
+      }
+    },
+    "/api/v1/price-labels/escpos": {
+      "post": {
+        "operationId": "PriceLabels_escPos",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceLabelEscPosRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceLabelEscPos"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The labels' ESC/POS bytes for the phone's Bluetooth printer; nothing is stored.",
+        "tags": [
+          "printing"
+        ]
+      }
+    },
+    "/api/v1/print-stations": {
+      "get": {
+        "operationId": "PriceLabels_stations",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PrintStationChoice"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The printers a staff member with a till may send labels to.",
+        "tags": [
+          "printing"
+        ]
+      }
+    },
+    "/api/v1/price-labels/print": {
+      "post": {
+        "operationId": "PriceLabels_print",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceLabelPrintRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceLabelPrintResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Queues the labels on a printer; poll GET /print-jobs/{jobId}.",
+        "tags": [
+          "printing"
+        ]
+      }
+    },
+    "/api/v1/print-jobs/{id}": {
+      "get": {
+        "operationId": "PriceLabels_job",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintJob"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A job the caller made (or any, with `pos.manage`).",
+        "tags": [
+          "printing"
+        ]
+      }
+    },
+    "/api/v1/printing/stations": {
+      "get": {
+        "operationId": "PrintStations_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PrintStation"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "printing"
+        ]
+      },
+      "post": {
+        "operationId": "PrintStations_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrintStationCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintStationCreated"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A BRIDGE station's key comes back this once and is never stored in the replay.",
+        "tags": [
+          "printing"
+        ]
+      }
+    },
+    "/api/v1/printing/stations/{id}": {
+      "put": {
+        "operationId": "PrintStations_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrintStationUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintStation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "printing"
+        ]
+      }
+    },
+    "/api/v1/printing/stations/{id}/key": {
+      "post": {
+        "operationId": "PrintStations_newKey",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintStationCreated"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A BRIDGE station's new key (the old one stops); shown this once.",
+        "tags": [
+          "printing"
+        ]
+      }
+    },
+    "/api/v1/printing/stations/{id}/test": {
+      "post": {
+        "operationId": "PrintStations_test",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintJob"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Туршилтын шошго»: one sample label; poll GET /print-jobs/{id}.",
+        "tags": [
+          "printing"
+        ]
+      }
+    },
+    "/api/v1/print-bridge/next": {
+      "get": {
+        "operationId": "PrintBridge_next",
+        "parameters": [
+          {
+            "name": "X-Printer-Name",
+            "in": "header",
+            "description": "The Windows printer the bridge writes to (shown in the office)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer bps_<station>_<secret>",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintBridgeNext"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The station's next job, waiting up to about 25 s for one; `job: null` when none came.",
+        "tags": [
+          "printing"
+        ]
+      }
+    },
+    "/api/v1/print-bridge/jobs/{id}/done": {
+      "post": {
+        "operationId": "PrintBridge_done",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer bps_<station>_<secret>",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrintBridgeDoneRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintJob"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The bridge's report on a job it took.",
+        "tags": [
+          "printing"
+        ]
+      }
     }
   },
   "info": {
@@ -100087,6 +100793,485 @@
             "description": "Characters, trimmed; null or empty = back to the default"
           }
         }
+      },
+      "PriceLabelTill": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "description": "The till’s short code, e.g. К1"
+          },
+          "name": {
+            "type": "string"
+          },
+          "storeName": {
+            "type": "string",
+            "description": "The store (warehouse) it sells from"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "storeName"
+        ]
+      },
+      "PriceLabelItem": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "The product code (SKU) the label prints"
+          },
+          "barcodes": {
+            "description": "Every barcode of every current unit",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "unit": {
+            "type": "string",
+            "description": "The base unit’s name"
+          },
+          "price": {
+            "type": "number",
+            "description": "One base unit at the till today, whole MNT"
+          },
+          "bulkQty": {
+            "type": "number",
+            "nullable": true,
+            "description": "From how many base units the till charges the bulk price; null = none"
+          },
+          "bulkPrice": {
+            "type": "number",
+            "nullable": true,
+            "description": "One base unit at the bulk price"
+          }
+        },
+        "required": [
+          "productId",
+          "name",
+          "code",
+          "barcodes",
+          "unit",
+          "price",
+          "bulkQty",
+          "bulkPrice"
+        ]
+      },
+      "PriceLabelLine": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "copies": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 20
+          }
+        },
+        "required": [
+          "productId",
+          "copies"
+        ]
+      },
+      "PriceLabelEscPosRequest": {
+        "type": "object",
+        "properties": {
+          "tillId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "items": {
+            "minItems": 1,
+            "description": "1 to 100 products; at most 100 labels in all",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceLabelLine"
+            }
+          },
+          "widthDots": {
+            "enum": [
+              576,
+              384
+            ],
+            "type": "number",
+            "description": "Dots across: 576 for 80 mm paper (default), 384 for 58 mm"
+          }
+        },
+        "required": [
+          "tillId",
+          "items"
+        ]
+      },
+      "PriceLabelEscPos": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "string",
+            "description": "Base64 of the ESC/POS bytes: per label ESC @, GS v 0 raster, GS V 66 0 (cut)"
+          },
+          "labels": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "labels"
+        ]
+      },
+      "PrintStationKind": {
+        "type": "string",
+        "enum": [
+          "bridge",
+          "network"
+        ]
+      },
+      "PrintStationChoice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PrintStationKind"
+              }
+            ]
+          },
+          "online": {
+            "type": "boolean",
+            "description": "Its bridge called, or the api reached it, within a minute"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "online"
+        ]
+      },
+      "PriceLabelPrintRequest": {
+        "type": "object",
+        "properties": {
+          "tillId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "items": {
+            "minItems": 1,
+            "description": "1 to 100 products; at most 100 labels in all",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceLabelLine"
+            }
+          },
+          "stationId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "A printer of GET /print-stations"
+          }
+        },
+        "required": [
+          "tillId",
+          "items",
+          "stationId"
+        ]
+      },
+      "PriceLabelPrintResult": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "number"
+          },
+          "labels": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "jobId",
+          "labels"
+        ]
+      },
+      "PrintJobStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "printing",
+          "done",
+          "failed"
+        ]
+      },
+      "PrintJob": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PrintJobStatus"
+              }
+            ]
+          },
+          "error": {
+            "type": "string",
+            "nullable": true,
+            "description": "A failed job’s code (mn.json errors.<code>): PRINTER_OFFLINE, PRINTER_UNREACHABLE or PRINTER_REFUSED"
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true,
+            "description": "What the printer side said"
+          },
+          "labels": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "error",
+          "detail",
+          "labels"
+        ]
+      },
+      "PrintStation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PrintStationKind"
+              }
+            ]
+          },
+          "online": {
+            "type": "boolean",
+            "description": "Its bridge called, or the api reached it, within a minute"
+          },
+          "host": {
+            "type": "string",
+            "nullable": true,
+            "description": "NETWORK: the printer’s address"
+          },
+          "port": {
+            "type": "number",
+            "nullable": true
+          },
+          "printerName": {
+            "type": "string",
+            "nullable": true,
+            "description": "BRIDGE: the Windows printer the bridge writes to"
+          },
+          "widthDots": {
+            "type": "number",
+            "enum": [
+              576,
+              384
+            ]
+          },
+          "status": {
+            "enum": [
+              "active",
+              "disabled"
+            ],
+            "type": "string"
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "online",
+          "host",
+          "port",
+          "printerName",
+          "widthDots",
+          "status",
+          "lastSeenAt",
+          "createdAt"
+        ]
+      },
+      "PrintStationCreateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "kind": {
+            "enum": [
+              "bridge",
+              "network"
+            ],
+            "type": "string"
+          },
+          "host": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 253
+          },
+          "port": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 65535,
+            "default": 9100
+          },
+          "widthDots": {
+            "enum": [
+              576,
+              384
+            ],
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "kind"
+        ]
+      },
+      "PrintStationCreated": {
+        "type": "object",
+        "properties": {
+          "station": {
+            "$ref": "#/components/schemas/PrintStation"
+          },
+          "key": {
+            "type": "string",
+            "nullable": true,
+            "description": "BRIDGE: the key, shown this once; null for NETWORK"
+          }
+        },
+        "required": [
+          "station",
+          "key"
+        ]
+      },
+      "PrintStationUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "host": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 253
+          },
+          "port": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "widthDots": {
+            "enum": [
+              576,
+              384
+            ],
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "disabled"
+            ],
+            "type": "string"
+          }
+        }
+      },
+      "PrintBridgeJob": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "labels": {
+            "type": "number"
+          },
+          "data": {
+            "type": "string",
+            "description": "Base64 of the ESC/POS bytes, written RAW to the printer"
+          }
+        },
+        "required": [
+          "id",
+          "labels",
+          "data"
+        ]
+      },
+      "PrintBridgeNext": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "nullable": true,
+            "description": "null: no job came",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PrintBridgeJob"
+              }
+            ]
+          }
+        },
+        "required": [
+          "job"
+        ]
+      },
+      "PrintBridgeDoneRequest": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "true: the printer took the bytes"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000,
+            "description": "Windows’ error, when not ok"
+          }
+        },
+        "required": [
+          "ok"
+        ]
       },
       "ErrorCode": {
         "type": "string",

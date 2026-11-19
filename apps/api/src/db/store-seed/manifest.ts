@@ -341,6 +341,10 @@ export const STORE_SEED_TABLES: Record<string, SeedRule> = {
   'public.chat_settings': copy("the chat bot's greeting and two texts (ADR-0224)"),
   'public.chat_conversations': empty(HISTORY),
   'public.chat_messages': empty(HISTORY),
+  'public.print_stations': empty(
+    'a bridge key is shown once and its PC is installed anew; added again on «Систем → Принтер» (ADR-0226)',
+  ),
+  'public.print_jobs': empty(HISTORY),
   'public.report_views': empty('saved report views are made again'),
   'public.screen_usage': empty(HISTORY),
   'public.screen_usage_seen': empty(HISTORY),

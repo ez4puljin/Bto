@@ -160,6 +160,7 @@ import { PosVoidsPage } from '@/features/pos/voids-page';
 import { PosVoucherPrintPage } from '@/features/pos/voucher-print-page';
 import { PosVouchersPage } from '@/features/pos/vouchers-page';
 import { GuideArticlePage, GuidePage } from '@/features/guide/guide-pages';
+import { PrintersPage } from '@/features/printing/printers-page';
 import { SystemStatusPage } from '@/features/system/system-status-page';
 import { UsagePage } from '@/features/system/usage-page';
 
@@ -376,6 +377,15 @@ export const routes: RouteObject[] = [
             path: 'guide/:category/:article',
             handle: { width: 'reading' },
             element: <GuideArticlePage />,
+          },
+          {
+            path: 'system/printers',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="pos.manage">
+                <PrintersPage />
+              </RequirePermission>
+            ),
           },
           { path: 'system/status', handle: { width: 'wide' }, element: <SystemStatusPage /> },
           {

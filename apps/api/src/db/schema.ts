@@ -294,3 +294,4 @@ export {
   expiryItemUsers,
   expiryItems,
 } from '../modules/expiry/schema';
+export { printJobs, printStations } from '../modules/printing/schema';

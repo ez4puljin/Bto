@@ -65,6 +65,7 @@ import {
   Palette,
   Percent,
   Phone,
+  Printer,
   ReceiptText,
   Ruler,
   Scale,
@@ -764,6 +765,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: FileSpreadsheet,
         permission: 'imports.manage',
       },
+      // ADR-0226: the printers price labels go to (a LAN printer or a PC's bridge).
+      { to: '/system/printers', label: 'nav.printers', icon: Printer, permission: 'pos.manage' },
       { to: '/system/status', label: 'nav.systemStatus', icon: Activity },
       // ADR-0197: which screens are opened, and which nobody opens.
       {

@@ -95,6 +95,9 @@ const MODULE_DEPS = {
   // The customer chat (ADR-0224): the store's orders and the reps' rounds (sales), its balance
   // (finance) and credit terms (partners), read only; nobody imports it.
   chat: ['identity', 'partners', 'sales', 'finance'],
+  // Price labels (ADR-0226): a till's prices (catalog, pricing) for the staff a till names (pos);
+  // it writes only its own stations and jobs; nobody imports it.
+  printing: ['identity', 'catalog', 'pricing', 'pos'],
   // ADR-0062: sales only for the SALE_LISTENER token, its payload type and the order's foreign key.
   // ADR-0082: sales' ORDER_LISTENER, finance's PAYMENT_LISTENER, the invoice and payment foreign
   // keys and the open invoices the reminders read.

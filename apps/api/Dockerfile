@@ -30,6 +30,10 @@ COPY --chmod=0755 apps/api/docker/entrypoint.sh /usr/local/bin/tugeel-entrypoint
 COPY apps/api/docker/healthcheck.mjs /usr/local/lib/tugeel/healthcheck.mjs
 # Guards against CRLF if the file was ever checked out with Windows line endings.
 RUN sed -i 's/\r$//' /usr/local/bin/tugeel-entrypoint
+# Price labels (ADR-0226) are drawn with Pango through sharp: a font with Cyrillic and Arial's metrics.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends fontconfig fonts-liberation \
+ && rm -rf /var/lib/apt/lists/*
 # File storage (STORAGE_LOCAL_DIR): the named volume shared by api and worker is mounted here and
 # takes this owner when Docker creates it.
 RUN mkdir -p /data/storage && chown node:node /data/storage
