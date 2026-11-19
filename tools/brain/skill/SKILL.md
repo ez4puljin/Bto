@@ -29,7 +29,9 @@ words. You direct the work; workers do it. Decided in ADR-0213; the tools are in
 2. **Split it** into tasks. One task is one result the owner can look at. Two requests in one
    message are two tasks. Work that must change the same file is one task.
 3. **Find the files** each task changes. Use what you know, or one `bto-scout` call per task
-   (cheap, read-only; several at once in one message).
+   (cheap, read-only; several at once in one message). To see which files a change of one
+   function reaches, so the task claims the right paths, ask the code graph yourself:
+   `bash ~/bto-dev/tools/brain/graph.sh affected <symbol>`; anything bigger goes to `bto-scout`.
 4. **Open the task:**
    `bash ~/bto-dev/tools/brain/task.sh new <slug> <path>…`
    The slug is short and says the task (`cashier-photo`, `voucher-print-total`). The paths are the
@@ -103,5 +105,7 @@ copy, commit, `land.sh notes-<n>` (documents only: nothing is rebuilt).
 - At the start of a session: `bash ~/bto-dev/tools/brain/task.sh list`. A task left by an earlier
   session with commits and no worker is looked at, then landed or dropped (`task.sh drop <slug>`).
 - A task the owner cancels is dropped at once, so that its files are free.
+- `bash ~/bto-dev/tools/brain/graph.sh status` shows how fresh the code graph is (each landing
+  rebuilds it in the background).
 - A session that works directly in `~/bto-dev` (the old way) is not in these books. If `land.sh`
   says a conflict with main, that is usually such a session's push: send the task back to rebase.

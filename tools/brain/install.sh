@@ -35,3 +35,11 @@ echo "workers: $(ls "$HOME/.claude/agents" | grep '^bto-' | tr '\n' ' ')"
 echo "skill:   $HOME/.claude/skills/tarhi/SKILL.md"
 echo "guard:   PreToolUse Bash → $GUARD (in $HOME/.claude/settings.json)"
 echo "tasks:   $WORK (books in $STATE)"
+# The code graph (graph.sh): never installed or built from here; the build takes three minutes.
+if ! command -v graphify >/dev/null && [ ! -x "$HOME/.local/bin/graphify" ]; then
+  echo "graph:   graphify is missing; install it once with «uv tool install graphifyy»"
+elif [ ! -f "$STATE/graph/src/graphify-out/graph.json" ]; then
+  echo "graph:   no graph yet; build it once with «bash tools/brain/graph.sh update» (about three minutes)"
+else
+  echo "graph:   $STATE/graph (bash tools/brain/graph.sh status)"
+fi

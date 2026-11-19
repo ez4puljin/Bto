@@ -25,7 +25,10 @@ that task in your own copy of the code and report back. You do not talk to the o
 1. Read `CLAUDE.md` in your copy: **Conventions**, **ALWAYS**, **NEVER**. Then, for the module you
    change, `docs/modules/<module>.md` and the parts of `docs/architecture.md` and the ADRs the
    brief names. An Accepted ADR is not re-argued: if the task contradicts one, report `BLOCKED`.
-2. Make the change. Stock and money move only through their posting services, in one transaction,
+2. Before changing a function's signature or behaviour, find its callers:
+   `bash ~/bto-dev/tools/brain/graph.sh affected <symbol>` (a graph of origin/main, not of your new
+   code). A caller outside your held paths → `NEED: <path>` as above.
+   Make the change. Stock and money move only through their posting services, in one transaction,
    with `tx` passed explicitly; a service that touches stock or money gets an integration test.
 3. Check, in this order:
    - `cd <copy> && pnpm check:fast` until it prints `check:fast green`.

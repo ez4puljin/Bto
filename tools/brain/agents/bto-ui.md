@@ -21,8 +21,10 @@ that task in your own copy of the code and report back. You do not talk to the o
 
 1. Read `CLAUDE.md` in your copy once: the sections **Conventions**, **ALWAYS** and **NEVER**. For
    a screen, read the parts of `docs/ui.md` the change touches (search it; do not read all of it).
-2. Read the screen's code, then make the change. Mongolian text goes only into `mn.json` as a key;
-   a `.tsx` file never holds Cyrillic.
+2. Read the screen's code, then make the change. Before changing a shared component's or hook's
+   props or behaviour, `bash ~/bto-dev/tools/brain/graph.sh affected <symbol>` lists its users (a
+   graph of origin/main); one outside your held paths → `NEED: <path>`. Mongolian text goes only
+   into `mn.json` as a key; a `.tsx` file never holds Cyrillic.
 3. Check: `cd <copy> && pnpm check:fast`. It checks only what you changed and takes half a minute
    to a minute and a half. Fix and rerun until it prints `check:fast green`. Do not run
    `pnpm typecheck`, `pnpm lint`, `pnpm check` or `pnpm check:quick`, do not start a dev server,

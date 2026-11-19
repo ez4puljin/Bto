@@ -90,6 +90,10 @@ for attempt in 1 2 3; do
     changed=$(git -C "$GATE" diff --name-only "$base" "$head")
     echo "LANDED ${head:0:8} on main ($(printf '%s\n' "$changed" | wc -l) file(s)): $*"
     printf '%s %s %s\n' "$(date '+%F %T')" "${head:0:8}" "$*" >>"$STATE/log"
+    # The code graph follows main in the background; it never delays or fails a landing (and does
+    # not keep the landing's lock, fd 9).
+    nohup bash "$BRAIN_DIR/graph.sh" update --if-idle &>/dev/null 9>&- &
+    echo "The code graph is being rebuilt in the background (about three minutes; graph.sh status)."
     # The shared checkout follows when nothing of its own stands in the way; else it stays as it is.
     if [ "$(git -C "$MAIN" branch --show-current)" = main ] &&
       git -C "$MAIN" merge -q --ff-only origin/main 2>/dev/null; then

@@ -35,6 +35,7 @@ bash tools/brain/task.sh number adr|migration <slug>
 bash tools/brain/land.sh <slug>…                   land finished tasks: one commit each on main, one check, one push
 bash tools/brain/land.sh --no-push <slug>…         merge and check only
 bash tools/brain/int.sh <pattern>… | --integrity   the api's suites from a copy, one run at a time
+bash tools/brain/graph.sh explain|affected|path …  the code graph of origin/main (below)
 ```
 
 `land.sh` exits 0 when landed, 3 on a conflict, 4 when the check is red, 5 when a task is not
@@ -66,6 +67,43 @@ rewritten for Bto; no file or dependency of it is used.
   `down -v` is blocked. Only clear cases: quoted text, heredocs and comments are not commands, and
   any input it cannot read lets the command run. A blocked command is fixed, never worked around.
   The tests are in `brain.test.mjs`.
+
+## The code graph: who calls this, what a change reaches
+
+`graph.sh` keeps a code graph of `origin/main`, built on this PC by the open-source Graphify
+(github.com/Graphify-Labs/graphify, Apache-2.0; the CLI `graphify`, installed once with
+`uv tool install graphifyy`). It answers «who calls this, what breaks if this changes, how are these
+two connected» in a few hundred tokens instead of a grep and a read of every hit.
+
+```
+bash tools/brain/graph.sh explain "<symbol>"     the node, its file:line, callers and callees with file:line
+bash tools/brain/graph.sh affected "<symbol>"    what depends on it (reverse impact), with file:line
+bash tools/brain/graph.sh path "<A>" "<B>"       how two symbols connect
+bash tools/brain/graph.sh status                 the graph's commit, age, how far behind origin/main, size
+bash tools/brain/graph.sh update [--if-idle]     rebuild it now
+```
+
+- **Where it lives:** `~/bto-work/.brain/graph/`: `src/` is a snapshot of `origin/main`
+  (`git archive`, rsynced so that unchanged files keep their times and graphify's cache knows them),
+  `src/graphify-out/graph.json` the graph, `commit` the commit it was built from, `update.log`. No
+  checkout ever gets a `graphify-out` folder. The paths it prints are the repository's
+  (`apps/api/src/…`), so they hold in any copy.
+- **How it stays current:** `land.sh` starts `graph.sh update --if-idle` in the background after
+  every push (one update at a time; a landing never waits for it). When the graph is older than
+  `origin/main`, every answer begins with one line on stderr, `graph of <sha> (<n> commits behind
+  origin/main)`: the newest code may be missing, so read the current file. The graph never knows a
+  task's own new code.
+- **Ambiguous names:** exit 3 lists the candidate ids and their `path::symbol` forms; retry with
+  one (`graph.sh explain "apps/api/src/modules/finance/services/fin-posting.ts::.submitInTx()"`).
+  Exit 4: no such node.
+- **No `query`:** graphify's free-text `query` answers noisily (fixtures and the web's test data
+  first), so `graph.sh` does not offer it. Grep stays right for texts, translation keys, config
+  values and SQL.
+- **Nothing leaves the PC:** `graph.sh` always sets `GRAPHIFY_BACKEND=none` (code only,
+  tree-sitter, never an LLM backend) and `GRAPHIFY_QUERY_LOG_DISABLE=1` (no log of the questions).
+- **Measured 2026-11-19** on `origin/main`: 32 972 nodes, 132 079 edges, `graph.json` 57 MB and
+  the whole folder 65 MB; a full build 167 s, a rebuild after one changed file still about 150 s,
+  about 570 MB of memory. An answer of `explain` is about 3 KB.
 
 ## The check a task runs: `pnpm check:fast`
 
