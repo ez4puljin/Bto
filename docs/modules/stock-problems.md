@@ -1,6 +1,6 @@
 # stock-problems — «Асуудалтай бараа» (ADR-0230)
 
-**Status:** api built 2026-11-20 (the web pages and the staff app's screen are later tasks). **Depends on:** identity, catalog, partners, inventory, pos (public `index.ts` only), and reads three sales tables read-only (§4). **Imported by:** nobody. It never writes the stock ledger: goods leave through a goods issue (ADR-0117) and come in through an adjustment.
+**Status:** api built 2026-11-20 (the web pages and the staff app's screen are later tasks). **Depends on:** identity, catalog, partners, inventory, pos (public `index.ts` only, api side only), and reads three sales tables and two pos tables read-only (§4). **Imported by:** nobody. It never writes the stock ledger: goods leave through a goods issue (ADR-0117) and come in through an adjustment.
 
 ## 1. Owned tables (migration `0117_stock_problems`)
 
@@ -48,7 +48,7 @@ Every route answers only for the warehouses of the caller's write scope (no scop
 
 ## 4. The list
 
-- **Events** (`ProblemSourcesService`): the tills' open shortfalls through `PosQueryService.listShortfalls`; order lines with `qty_backordered > 0` of non-draft orders (`BACKORDER`, at `confirmed_at`) and picked lines with `qty_picked < qty_approved` (`SHORT_PICK`, at the part's `done_at`), read with plain SQL from `sales_order_lines`, `sales_orders`, `sales_order_picks` (+ the customer's and the creator's names). Only this file names another module's tables, read only (ADR-0230 #2). Events older than 30 days are not read.
+- **Events** (`ProblemSourcesService`): the tills' open shortfalls read with plain SQL from `pos_shortfalls` + `pos_sales` (`resolved_at IS NULL`); order lines with `qty_backordered > 0` of non-draft orders (`BACKORDER`, at `confirmed_at`) and picked lines with `qty_picked < qty_approved` (`SHORT_PICK`, at the part's `done_at`), read with plain SQL from `sales_order_lines`, `sales_orders`, `sales_order_picks` (+ the customer's and the creator's names). Only this file names another module's tables, read only (ADR-0230 #2). Events older than 30 days are not read. The worker's `StockProblemsWorkerModule` does not import pos (its `PinHasher` needs `AUTH_PEPPER`, which the worker is not given): it provides the same services with `WorkerShortfallResolver`, and only the api binds `ShortfallResolver` to `PosQueryService.resolveShortfall` (2026-11-20).
 - **A product is on a warehouse's list** while it has an event later than the latest `covers_until` of its DONE resolutions there. `pending` names a decision that waits for its document.
 - **`sync`** (before every read, and in the morning job): a PENDING resolution whose goods issue or adjustment is `POSTED` becomes DONE, `CANCELLED` becomes CANCELLED. With a manager's context it also sends or submits a draft that a failed request left, and marks the answered till shortfalls checked in pos (`pos_resolved_at`), so «Супермаркет → Дутагдал» agrees.
 

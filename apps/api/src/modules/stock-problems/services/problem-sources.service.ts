@@ -4,8 +4,6 @@ import { Decimal } from '@tugeel/shared/money';
 import { sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
-import { MAX_PAGE_LIMIT } from '../../../common/pagination/page';
-import { PosQueryService } from '../../pos';
 
 /** One thing the system got wrong about a product in a warehouse. */
 export interface ProblemEvent {
@@ -46,6 +44,16 @@ interface CutRow extends Record<string, unknown> {
   ordered_qty_base: string;
 }
 
+interface ShortfallRow extends Record<string, unknown> {
+  id: string;
+  warehouse_id: string;
+  product_id: string;
+  qty_base: string;
+  created_at: Date;
+  sale_id: string;
+  sale_number: string;
+}
+
 const toId = (value: string): number => Number.parseInt(value, 10);
 
 /** The first moment the list looks back to: older events leave by themselves. */
@@ -54,18 +62,15 @@ export function problemWindowStart(now: Date = new Date()): Date {
 }
 
 /**
- * Where the problem events are read (ADR-0230 #2). The tills' open shortfalls come from the pos
- * module's own list. The orders' cut lines have no reader in the sales module, so this one file
- * reads `sales_order_lines`, `sales_orders` and `sales_order_picks` with plain SQL, read only, as
- * the reports do (architecture §3.1 rule 4); nothing else in the module names another module's
- * table, and nothing here writes one.
+ * Where the problem events are read (ADR-0230 #2). This one file reads the tills' open shortfalls
+ * (`pos_shortfalls`, `pos_sales`) and the orders' cut lines (`sales_order_lines`, `sales_orders`,
+ * `sales_order_picks`) with plain SQL, read only, as the reports do (architecture §3.1 rule 4), so
+ * the worker's 07:00 job needs neither the pos nor the sales module; nothing else in the module
+ * names another module's table, and nothing here writes one.
  */
 @Injectable()
 export class ProblemSourcesService {
-  constructor(
-    @Inject(DB) private readonly db: Db,
-    private readonly pos: PosQueryService,
-  ) {}
+  constructor(@Inject(DB) private readonly db: Db) {}
 
   /**
    * The events of these warehouses inside the window, newest first. `productId` narrows the read
@@ -91,45 +96,40 @@ export class ProblemSourcesService {
     since: Date,
     productId?: number,
   ): Promise<ProblemEvent[]> {
-    const events: ProblemEvent[] = [];
-    let cursor: string | undefined;
-    for (;;) {
-      const page = await this.pos.listShortfalls({
-        resolved: false,
-        limit: MAX_PAGE_LIMIT,
-        ...(productId === undefined ? {} : { productId }),
-        ...(cursor === undefined ? {} : { cursor }),
-      });
-      let older = false;
-      for (const row of page.data) {
-        if (row.createdAt < since) {
-          older = true;
-          continue;
-        }
-        if (!warehouseIds.has(row.warehouseId)) continue;
-        events.push({
-          kind: 'POS_SHORTFALL',
-          warehouseId: row.warehouseId,
-          productId: row.productId,
-          qtyBase: row.qtyBase,
-          at: row.createdAt,
-          shortfallId: row.id,
-          saleId: row.saleId,
-          saleNumber: row.saleNumber,
-          orderId: null,
-          orderNumber: null,
-          orderLineId: null,
-          customerId: null,
-          customerName: null,
-          repName: null,
-          orderedQtyBase: null,
-        });
-      }
-      // The list is newest first by id: once a page reaches the window's start, the rest is older.
-      if (older || page.nextCursor === null) break;
-      cursor = page.nextCursor;
-    }
-    return events;
+    if (warehouseIds.size === 0) return [];
+    const warehouses = sql.join(
+      [...warehouseIds].map((id) => sql`${id}`),
+      sql`, `,
+    );
+    const product = productId === undefined ? sql`` : sql`AND f.product_id = ${productId}`;
+    const { rows } = await this.db.execute<ShortfallRow>(sql`
+      SELECT f.id, f.warehouse_id, f.product_id, f.qty_base, f.created_at, f.sale_id,
+             s.number AS sale_number
+        FROM pos_shortfalls f
+        JOIN pos_sales s ON s.id = f.sale_id
+       WHERE f.resolved_at IS NULL
+         AND f.warehouse_id IN (${warehouses})
+         AND f.created_at >= ${since.toISOString()}::timestamptz
+         ${product}
+       ORDER BY f.id DESC
+    `);
+    return rows.map((row) => ({
+      kind: 'POS_SHORTFALL',
+      warehouseId: toId(row.warehouse_id),
+      productId: toId(row.product_id),
+      qtyBase: new Decimal(row.qty_base),
+      at: new Date(row.created_at),
+      shortfallId: toId(row.id),
+      saleId: toId(row.sale_id),
+      saleNumber: row.sale_number,
+      orderId: null,
+      orderNumber: null,
+      orderLineId: null,
+      customerId: null,
+      customerName: null,
+      repName: null,
+      orderedQtyBase: null,
+    }));
   }
 
   /**

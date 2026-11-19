@@ -30,13 +30,13 @@ import {
   StockQueryService,
 } from '../../inventory';
 import { CustomersService } from '../../partners';
-import { PosQueryService } from '../../pos';
 import { stockProblemResolutions, stockProblemSettings } from '../schema';
 import {
   type ProblemEvent,
   ProblemSourcesService,
   problemWindowStart,
 } from './problem-sources.service';
+import { ShortfallResolver } from './shortfall-resolver';
 
 const MANAGE = 'stockProblems.manage';
 const ZERO = new Decimal(0);
@@ -146,7 +146,7 @@ export class StockProblemsService {
     private readonly adjustments: AdjustmentsService,
     private readonly expenseTypes: IssueExpenseTypesService,
     private readonly customers: CustomersService,
-    private readonly pos: PosQueryService,
+    private readonly pos: ShortfallResolver,
   ) {}
 
   // ------------------------------------------------------------------------------ the warehouses
