@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Bto дуудлага</string>
+    <string name="dialpad_title">Залгах</string>
+    <string name="incall_title">Дуудлага</string>
+
+    <string name="role_held">Үндсэн утасны апп: ТИЙМ</string>
+    <string name="role_not_held">Үндсэн утасны апп: ҮГҮЙ</string>
+    <string name="role_unavailable">Энэ утас үндсэн утасны апп сонгохыг дэмжихгүй</string>
+    <string name="btn_request_role">Үндсэн утасны апп болгох</string>
+    <string name="btn_default_apps">Үндсэн аппуудын тохиргоо</string>
+    <string name="btn_dialpad">Дугаар залгах</string>
+
+    <string name="settings_title">Тохиргоо</string>
+    <string name="ai_answer">AI хариулах</string>
+    <string name="answer_delay">Хариулах хүртэл, секунд</string>
+    <string name="hangup_after">Хариулснаас хойш таслах, секунд</string>
+    <string name="btn_save">Хадгалах</string>
+    <string name="saved">Хадгаллаа</string>
+
+    <string name="log_title">Сүүлийн 20 дуудлага</string>
+    <string name="log_empty">Дуудлага алга</string>
+    <string name="btn_share">Илгээх</string>
+    <string name="btn_clear">Цэвэрлэх</string>
+    <string name="share_title">Дуудлагын жагсаалт илгээх</string>
+
+    <string name="btn_answer">Хариулах</string>
+    <string name="btn_reject">Татгалзах</string>
+    <string name="btn_hangup">Таслах</string>
+    <string name="btn_speaker">Чанга яригч</string>
+    <string name="btn_call">Залгах</string>
+    <string name="btn_backspace">⌫</string>
+    <string name="no_number">Дугаар оруулна уу</string>
+    <string name="need_call_permission">Залгах зөвшөөрөл хэрэгтэй</string>
+    <string name="call_failed">Залгаж чадсангүй: %1$s</string>
+    <string name="choose_sim">SIM сонгоно уу</string>
+    <string name="no_calls">Дуудлага алга</string>
+
+    <string name="state_ringing">Дуугарч байна</string>
+    <string name="state_dialing">Залгаж байна</string>
+    <string name="state_active">Холбогдсон</string>
+    <string name="state_holding">Хүлээлгэд</string>
+    <string name="state_disconnected">Тасарсан</string>
+    <string name="state_select_sim">SIM сонгох</string>
+    <string name="state_other">Төлөв %1$d</string>
+    <string name="ai_will_answer">AI %1$d секундэд хариулна</string>
+    <string name="ai_answered">AI хариулсан, %1$d секундэд таслана</string>
+
+    <string name="notif_channel">Дуудлага</string>
+    <string name="notif_incoming">Ирж буй дуудлага</string>
+    <string name="notif_ongoing">Дуудлага явагдаж байна</string>
+    <string name="notif_ai">AI дуудлага авч байна</string>
+    <string name="unknown_number">Нууц дугаар</string>
+</resources>

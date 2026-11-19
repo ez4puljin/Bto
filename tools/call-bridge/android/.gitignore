@@ -1,0 +1,10 @@
+# Gradle and build output, the SDK path, keys: never committed.
+.gradle/
+.kotlin/
+build/
+local.properties
+out/
+*.apk
+*.aab
+*.jks
+*.keystore
