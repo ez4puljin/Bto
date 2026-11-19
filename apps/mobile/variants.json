@@ -2,7 +2,7 @@
   "staff": {
     "name": "Bto",
     "slug": "bto-staff",
-    "version": "0.26.0",
+    "version": "0.27.0",
     "package": "mn.butenorgil.bto.staff",
     "assets": "./assets",
     "apkPrefix": "bto-staff",
@@ -12,7 +12,7 @@
   "customer": {
     "name": "Bto300",
     "slug": "bto300",
-    "version": "0.7.0",
+    "version": "0.8.0",
     "package": "mn.butenorgil.bto300",
     "assets": "./assets/customer",
     "apkPrefix": "bto300",
