@@ -32,6 +32,13 @@ export interface OutboxSummary {
   paymentMethod: PaymentMethod;
   /** The stage the order lands on, as the phone knew it; null when it did not. */
   stageName: string | null;
+  /**
+   * The cart's amount when it was sent: the server's quote, or the phone's estimate without the
+   * server (ADR-0225 #4); always shown as «≈». Absent on entries written before it existed.
+   */
+  estimate?: string | null;
+  /** Lines the estimate could not price (counted as 0 in it): «N барааны үнэ тооцогдоогүй». */
+  unpricedLines?: number;
 }
 
 export interface OutboxEntry {
@@ -64,6 +71,10 @@ export interface OutboxEntry {
   /** How many requests this entry has made, and the last one's time. */
   tries: number;
   triedAt: string | null;
+  /** The server answered «still running» (409 IDEMPOTENCY_KEY_IN_PROGRESS) to the last request. */
+  inProgress?: true;
+  /** A sent order the server no longer held (a restore): sent again with its key and body. */
+  resent?: true;
   /**
    * Stored but unreadable: the raw text stays in storage untouched; it is shown as «Шалгах
    * шаардлагатай», never sent, never rewritten and never dropped by the app.
@@ -105,6 +116,8 @@ export function entryOf(
   stageName: string | null,
   key: string,
   now: Date,
+  estimate: string | null = null,
+  unpricedLines = 0,
 ): OutboxEntry {
   const at = now.toISOString();
   return {
@@ -114,7 +127,7 @@ export function entryOf(
     writtenAt: at,
     keyAt: at,
     reached: false,
-    summary: summaryOf(cart, stageName),
+    summary: { ...summaryOf(cart, stageName), estimate, unpricedLines },
     cart,
     status: 'waiting',
     problem: null,
@@ -236,12 +249,14 @@ export function afterAttempt<O>(
   now: Date,
   orderRef: (order: O) => { id: number; number: string | null },
 ): { entry: OutboxEntry; go: Go } {
-  const tried = { ...entry, tries: entry.tries + 1, triedAt: now.toISOString() };
+  const { inProgress: _was, ...rest } = entry;
+  const tried: OutboxEntry = { ...rest, tries: entry.tries + 1, triedAt: now.toISOString() };
   const { status, problem } = attempt;
   if ((status === 200 || status === 201) && attempt.order !== null) {
+    const { resent: _resent, ...sentOne } = tried;
     return {
       entry: {
-        ...tried,
+        ...sentOne,
         status: 'sent',
         problem: null,
         // On the server now: the cart is not needed any more (and keeps the stored entry small).
@@ -260,7 +275,7 @@ export function afterAttempt<O>(
   if (status === 401) return { entry: { ...tried, status: 'waiting' }, go: 'stop' };
   // The first request with this key is still running on the server: the next run asks again.
   if (status === 409 && problem.code === 'IDEMPOTENCY_KEY_IN_PROGRESS') {
-    return { entry: { ...tried, status: 'waiting', reached: true }, go: 'next' };
+    return { entry: { ...tried, status: 'waiting', reached: true, inProgress: true }, go: 'next' };
   }
   // Cannot happen for an unchanged body; if it does, the rep checks.
   if (status === 409 && problem.code === 'IDEMPOTENCY_KEY_REUSED') {

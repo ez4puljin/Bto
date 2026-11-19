@@ -7,7 +7,9 @@ import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-n
 import { Text } from '../../src/ui/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type AppProblem, NETWORK, problemOf } from '../../src/api/problem';
+import { keptBarcode } from '../../src/offline/query';
 import { ScanGate } from '../../src/scan/scan-gate';
+import { useKept } from '../../src/state/kept';
 import { useSignedIn } from '../../src/state/session';
 import { colors, radii, spacing, storeType, TOUCH, type } from '../../src/theme/tokens';
 import { PillButton } from '../../src/ui/controls';
@@ -27,7 +29,8 @@ export default function ScanScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { session } = useSignedIn();
+  const { session, offline } = useSignedIn();
+  const { store } = useKept();
   const [permission, requestPermission] = useCameraPermissions();
   const gate = useRef(new ScanGate());
   const [looking, setLooking] = useState(false);
@@ -39,17 +42,32 @@ export default function ScanScreen() {
     const code = gate.current.accept(raw, Date.now());
     if (!code) return;
     setLooking(true);
+    const open = (productId: number, unitId: number) =>
+      router.replace(`/product/${productId}?unit=${unitId}&from=scan`);
+    // Without the server: the kept products' barcodes (ADR-0225 #2), by the same lookup keys.
+    const fromKept = async (): Promise<boolean> => {
+      const data = store ? await store.data() : null;
+      if (!data) return false;
+      const hit = keptBarcode(data, code);
+      if (hit) open(hit.productId, hit.unitId);
+      else setProblem({ code: 'NOT_FOUND', status: 404 });
+      return true;
+    };
     try {
+      if (offline && store) {
+        if (!(await fromKept())) setProblem(NETWORK);
+        return;
+      }
       const result = await session.client.GET('/api/v1/barcodes/{code}', {
         params: { path: { code } },
       });
       if (result.data) {
-        router.replace(`/product/${result.data.product.id}?unit=${result.data.unit.id}&from=scan`);
+        open(result.data.product.id, result.data.unit.id);
         return;
       }
       setProblem(problemOf(result.error, result.response.status));
     } catch {
-      setProblem(NETWORK);
+      if (!(await fromKept().catch(() => false))) setProblem(NETWORK);
     } finally {
       setLooking(false);
     }

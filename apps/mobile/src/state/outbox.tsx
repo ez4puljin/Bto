@@ -12,6 +12,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { AppState } from 'react-native';
+import { unwrap } from '../api/problem';
 import type { RepOrder } from '../api/rep';
 import type { Cart, OrderRequest } from '../cart/cart';
 import type { PendingSend } from '../cart/send';
@@ -43,7 +44,12 @@ interface OutboxValue {
   /** A run is going on. */
   running: boolean;
   /** Stores the cart as an entry, empties the cart and tries to send at once. */
-  submit: (stageId: number, stageName: string | null) => Promise<SubmitResult | null>;
+  submit: (
+    stageId: number,
+    stageName: string | null,
+    estimate: string | null,
+    unpricedLines: number,
+  ) => Promise<SubmitResult | null>;
   /** «Одоо илгээх». */
   sendNow: () => Promise<void>;
   /** «Устгах»: false when it did not go (its request is out, or the storage failed). */
@@ -63,6 +69,9 @@ function isPending(value: unknown): value is PendingSend {
     typeof (value as PendingSend).startedAt === 'string'
   );
 }
+
+/** The known-keys check runs at most this often outside a return to online. */
+const CHECK_EVERY_MS = 3600 * 1000;
 
 const EMPTY: OutboxState = { entries: [], readFailed: false, writeFailed: false };
 
@@ -153,6 +162,28 @@ export function OutboxProvider({ children }: { children: ReactNode }) {
   );
   runRef.current = run;
 
+  /**
+   * Which keys the server knows (ADR-0225 #5): after each return to online, at start when online,
+   * otherwise at most once an hour. An order the server lost goes back to waiting.
+   */
+  const lastCheck = useRef(0);
+  const check = useCallback(async () => {
+    if (disposed.current || offlineRef.current) return;
+    lastCheck.current = Date.now();
+    const result = await outbox.reconcile(
+      async (keys) =>
+        unwrap(await session.client.POST('/api/v1/sales-rep/orders/known', { body: { keys } }))
+          .data,
+      async (orderId) =>
+        unwrap(
+          await session.client.GET('/api/v1/sales-rep/orders/{id}', {
+            params: { path: { id: orderId } },
+          }),
+        ).number,
+    );
+    if (result.waiting > 0) await refresh();
+  }, [outbox, session, refresh]);
+
   /** The old store's pending send, once the outbox is read (until it is stored). */
   const takeOver = useCallback(async () => {
     const old = await readJson(sendKey);
@@ -190,14 +221,32 @@ export function OutboxProvider({ children }: { children: ReactNode }) {
           await outbox.retryRead();
           await takeOver();
         }
+        if (Date.now() - lastCheck.current >= CHECK_EVERY_MS) await check();
         await run(false);
       })();
     });
     return () => watch.remove();
-  }, [settled, outbox, takeOver, run]);
+  }, [settled, outbox, takeOver, check, run]);
+  // At start when online, and each return from offline: ask about the keys, then send.
   useEffect(() => {
-    if (settled && !offline) void run(false);
-  }, [settled, offline, run]);
+    if (!settled || offline) return;
+    void (async () => {
+      await check();
+      await run(false);
+    })();
+  }, [settled, offline, check, run]);
+  // And at most once an hour while the app is open.
+  useEffect(() => {
+    if (!settled) return;
+    const every = setInterval(() => {
+      if (Date.now() - lastCheck.current < CHECK_EVERY_MS) return;
+      void (async () => {
+        await check();
+        await run(false);
+      })();
+    }, CHECK_EVERY_MS);
+    return () => clearInterval(every);
+  }, [settled, check, run]);
 
   useEffect(() => {
     disposed.current = false;
@@ -211,7 +260,12 @@ export function OutboxProvider({ children }: { children: ReactNode }) {
 
   const submitting = useRef(false);
   const submit = useCallback(
-    async (stageId: number, stageName: string | null): Promise<SubmitResult | null> => {
+    async (
+      stageId: number,
+      stageName: string | null,
+      estimate: string | null,
+      unpricedLines: number,
+    ): Promise<SubmitResult | null> => {
       if (submitting.current) return null;
       submitting.current = true;
       try {
@@ -220,6 +274,8 @@ export function OutboxProvider({ children }: { children: ReactNode }) {
           cart: cartRef.current,
           stageId,
           stageName,
+          estimate,
+          unpricedLines,
           cartKey,
           key: Crypto.randomUUID(),
           now: new Date(),

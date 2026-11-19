@@ -6,12 +6,29 @@ import {
   type QueryClient,
   useInfiniteQuery,
   useQuery,
+  useQueryClient,
 } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { canonical } from '../cart/send';
+import { ubDate } from '../dates/dates';
+import { estimateQuote, type MaybeEstimated } from '../offline/estimate';
+import {
+  keptCategoryPage,
+  keptCategoryTiles,
+  keptCustomer,
+  type KeptCustomerDetail,
+  keptCustomerPage,
+  keptProductPage,
+  keptProducts,
+  keptProductsOf,
+} from '../offline/query';
+import type { KeptStore } from '../offline/store';
+import type { KeptData } from '../offline/walk';
 import type { OrderFilterParams } from '../orders/order-filters';
 import type { ShopQuery } from '../shop/filters';
+import { useKept } from '../state/kept';
 import { useSignedIn } from '../state/session';
-import { ApiProblem, unwrap } from './problem';
+import { ApiProblem, NETWORK, unwrap } from './problem';
 
 export type RepContext = components['schemas']['SalesRepContext'];
 export type RepWarehouse = components['schemas']['SalesRepWarehouse'];
@@ -33,6 +50,31 @@ export type RepCategoryPage = components['schemas']['SalesRepCategoryPage'];
 const PAGE = 30;
 
 /**
+ * Without the server (ADR-0225 #2): a rep's session that has no connection reads the kept copy
+ * instead of the server, under its own query key (`…, 'kept'`), so nothing kept is ever shown
+ * under an online key and the screens ask the server again as soon as it is back. A call that
+ * finds no connection sets the session offline (session.ts), which switches these keys. Online
+ * every hook below is exactly what it was.
+ */
+function useKeptMode(): { kept: boolean; store: KeptStore | null } {
+  const { offline } = useSignedIn();
+  const { store } = useKept();
+  return { kept: offline && store !== null, store };
+}
+
+const keyFor = (key: readonly unknown[], kept: boolean) => (kept ? [...key, 'kept'] : [...key]);
+
+/** Reads the kept copy; no copy is no connection (the screens say what to do). */
+async function fromKept<T>(store: KeptStore | null, read: (data: KeptData) => T): Promise<T> {
+  const data = store ? await store.data() : null;
+  if (!data) throw new ApiProblem(NETWORK);
+  return read(data);
+}
+
+/** «Today» without the server: the phone's clock in Ulaanbaatar. */
+export const phoneToday = () => ubDate(new Date().toISOString());
+
+/**
  * Days of the rep's orders (ADR-0068) and their filters (the owner, 2026-10-18: customer,
  * product, payment, delivery, state); `q` searches a number or a customer.
  */
@@ -45,18 +87,24 @@ export interface OrderRange extends OrderFilterParams {
 /** Today, the stages the rep may place on, the warehouses and branches (ADR-0061 #5, ADR-0068). */
 export function useRepContext() {
   const { session } = useSignedIn();
+  const { kept, store } = useKeptMode();
   return useQuery({
-    queryKey: ['rep', 'context'],
-    queryFn: async () => unwrap(await session.client.GET('/api/v1/sales-rep/context')),
+    queryKey: keyFor(['rep', 'context'], kept),
+    queryFn: kept
+      ? () => fromKept(store, (data) => ({ ...data.context, today: phoneToday() }))
+      : async () => unwrap(await session.client.GET('/api/v1/sales-rep/context')),
     staleTime: 60_000,
   });
 }
 
 export function useCategories() {
   const { session } = useSignedIn();
+  const { kept, store } = useKeptMode();
   return useQuery({
-    queryKey: ['rep', 'categories'],
-    queryFn: async () => unwrap(await session.client.GET('/api/v1/categories')).data,
+    queryKey: keyFor(['rep', 'categories'], kept),
+    queryFn: kept
+      ? () => fromKept(store, (data) => data.categories)
+      : async () => unwrap(await session.client.GET('/api/v1/categories')).data,
     staleTime: 10 * 60_000,
   });
 }
@@ -79,21 +127,24 @@ function productParams(query: ShopQuery) {
  */
 export function useProducts(query: ShopQuery, enabled = true) {
   const { session } = useSignedIn();
+  const { kept, store } = useKeptMode();
   return useInfiniteQuery({
-    queryKey: ['rep', 'products', productParams(query)],
+    queryKey: keyFor(['rep', 'products', productParams(query)], kept),
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam }) =>
-      unwrap(
-        await session.client.GET('/api/v1/sales-rep/products', {
-          params: {
-            query: {
-              ...productParams(query),
-              ...(pageParam ? { cursor: pageParam } : {}),
-              limit: PAGE,
-            },
-          },
-        }),
-      ),
+      kept
+        ? fromKept(store, (data) => keptProductPage(data, query, pageParam ?? null, PAGE))
+        : unwrap(
+            await session.client.GET('/api/v1/sales-rep/products', {
+              params: {
+                query: {
+                  ...productParams(query),
+                  ...(pageParam ? { cursor: pageParam } : {}),
+                  limit: PAGE,
+                },
+              },
+            }),
+          ),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     placeholderData: keepPreviousData,
     enabled,
@@ -103,14 +154,17 @@ export function useProducts(query: ShopQuery, enabled = true) {
 /** How many products a filter would show (the filter sheet's «N бараа харуулах»). */
 export function useProductCount(query: ShopQuery, enabled: boolean) {
   const { session } = useSignedIn();
+  const { kept, store } = useKeptMode();
   return useQuery({
-    queryKey: ['rep', 'products', 'count', productParams(query)],
+    queryKey: keyFor(['rep', 'products', 'count', productParams(query)], kept),
     queryFn: async () =>
-      unwrap(
-        await session.client.GET('/api/v1/sales-rep/products', {
-          params: { query: { ...productParams(query), limit: 1 } },
-        }),
-      ).total,
+      kept
+        ? fromKept(store, (data) => keptProducts(data, query).length)
+        : unwrap(
+            await session.client.GET('/api/v1/sales-rep/products', {
+              params: { query: { ...productParams(query), limit: 1 } },
+            }),
+          ).total,
     enabled,
     placeholderData: keepPreviousData,
   });
@@ -127,16 +181,22 @@ export function useProductsOf(
   seed?: readonly RepProduct[],
 ) {
   const { session } = useSignedIn();
+  const { kept, store } = useKeptMode();
   return useQuery({
-    queryKey: ['rep', 'products', 'of', [...ids].sort((a, b) => a - b).join(','), priceBefore],
+    queryKey: keyFor(
+      ['rep', 'products', 'of', [...ids].sort((a, b) => a - b).join(','), priceBefore],
+      kept,
+    ),
     queryFn: async () =>
-      unwrap(
-        await session.client.GET('/api/v1/sales-rep/products/batch', {
-          params: {
-            query: { productIds: ids.join(','), ...(priceBefore ? { priceBefore } : {}) },
-          },
-        }),
-      ),
+      kept
+        ? fromKept(store, (data) => keptProductsOf(data, ids))
+        : unwrap(
+            await session.client.GET('/api/v1/sales-rep/products/batch', {
+              params: {
+                query: { productIds: ids.join(','), ...(priceBefore ? { priceBefore } : {}) },
+              },
+            }),
+          ),
     enabled: ids.length > 0,
     ...(seed && seed.length > 0 ? { placeholderData: [...seed] } : {}),
   });
@@ -254,14 +314,21 @@ export function useRepSectionCount(key: string, query: RepSectionQuery, enabled:
 /** A category's page (as «Bto300»'s, ADR-0092 #6): its banners, subcategories, new and deals. */
 export function useRepCategoryPage(id: number | null) {
   const { session } = useSignedIn();
+  const { kept, store } = useKeptMode();
   return useQuery({
-    queryKey: ['rep', 'products', 'category', id],
+    queryKey: keyFor(['rep', 'products', 'category', id], kept),
     queryFn: async () =>
-      unwrap(
-        await session.client.GET('/api/v1/sales-rep/categories/{id}/page', {
-          params: { path: { id: id ?? 0 } },
-        }),
-      ),
+      kept
+        ? fromKept(store, (data) => {
+            const page = keptCategoryPage(data, id ?? 0);
+            if (!page) throw new ApiProblem({ code: 'NOT_FOUND', status: 404 });
+            return page;
+          })
+        : unwrap(
+            await session.client.GET('/api/v1/sales-rep/categories/{id}/page', {
+              params: { path: { id: id ?? 0 } },
+            }),
+          ),
     enabled: id !== null,
   });
 }
@@ -269,9 +336,12 @@ export function useRepCategoryPage(id: number | null) {
 /** The main suppliers of the shop's products, the most products first. */
 export function useSuppliers(enabled = true) {
   const { session } = useSignedIn();
+  const { kept, store } = useKeptMode();
   return useQuery({
-    queryKey: ['rep', 'suppliers'],
-    queryFn: async () => unwrap(await session.client.GET('/api/v1/sales-rep/suppliers')),
+    queryKey: keyFor(['rep', 'suppliers'], kept),
+    queryFn: kept
+      ? () => fromKept(store, (data) => data.suppliers)
+      : async () => unwrap(await session.client.GET('/api/v1/sales-rep/suppliers')),
     enabled,
     staleTime: 5 * 60_000,
   });
@@ -279,37 +349,86 @@ export function useSuppliers(enabled = true) {
 
 export function useCustomers(q: string) {
   const { session } = useSignedIn();
+  const { kept, store } = useKeptMode();
   return useInfiniteQuery({
-    queryKey: ['rep', 'customers', q],
+    queryKey: keyFor(['rep', 'customers', q], kept),
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam }) =>
-      unwrap(
-        await session.client.GET('/api/v1/sales-rep/customers', {
-          params: {
-            query: {
-              ...(q ? { q } : {}),
-              ...(pageParam ? { cursor: pageParam } : {}),
-              limit: PAGE,
-            },
-          },
-        }),
-      ),
+      kept
+        ? fromKept(store, (data) => keptCustomerPage(data, q, pageParam ?? null, PAGE))
+        : unwrap(
+            await session.client.GET('/api/v1/sales-rep/customers', {
+              params: {
+                query: {
+                  ...(q ? { q } : {}),
+                  ...(pageParam ? { cursor: pageParam } : {}),
+                  limit: PAGE,
+                },
+              },
+            }),
+          ),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     placeholderData: keepPreviousData,
   });
 }
 
+/** A kept customer by id; 404 when it is not kept. */
+function keptCustomerOrGone(data: KeptData, id: number): KeptCustomerDetail {
+  const found = keptCustomer(data, id);
+  if (!found) throw new ApiProblem({ code: 'NOT_FOUND', status: 404 });
+  return found;
+}
+
+/**
+ * A customer with its addresses and contacts. Without the server the kept one, which also carries
+ * `creditHold` (the checkout's warning); online it has none.
+ */
 export function useCustomer(id: number | null) {
   const { session } = useSignedIn();
-  return useQuery({
-    queryKey: ['rep', 'customer', id],
-    queryFn: async () =>
-      unwrap(
-        await session.client.GET('/api/v1/sales-rep/customers/{id}', {
-          params: { path: { id: id ?? 0 } },
-        }),
-      ),
+  const { kept, store } = useKeptMode();
+  return useQuery<RepCustomerDetail | KeptCustomerDetail>({
+    queryKey: keyFor(['rep', 'customer', id], kept),
+    queryFn: kept
+      ? () => fromKept(store, (data) => keptCustomerOrGone(data, id ?? 0))
+      : async () =>
+          unwrap(
+            await session.client.GET('/api/v1/sales-rep/customers/{id}', {
+              params: { path: { id: id ?? 0 } },
+            }),
+          ),
     enabled: id !== null,
+  });
+}
+
+/** The store picker's pick: the customer with its addresses, from the server or the kept copy. */
+export function useFetchCustomer() {
+  const { session } = useSignedIn();
+  const { kept, store } = useKeptMode();
+  const queryClient = useQueryClient();
+  return useCallback(
+    (id: number): Promise<RepCustomerDetail> =>
+      queryClient.fetchQuery<RepCustomerDetail>({
+        queryKey: keyFor(['rep', 'customer', id], kept),
+        queryFn: kept
+          ? () => fromKept(store, (data) => keptCustomerOrGone(data, id))
+          : async () =>
+              unwrap(
+                await session.client.GET('/api/v1/sales-rep/customers/{id}', {
+                  params: { path: { id } },
+                }),
+              ),
+      }),
+    [queryClient, session, kept, store],
+  );
+}
+
+/** «Бүх ангилал» without the server: the kept top categories (null while online). */
+export function useKeptCategoryTiles() {
+  const { kept, store } = useKeptMode();
+  return useQuery({
+    queryKey: ['rep', 'kept-categories'],
+    queryFn: () => fromKept(store, keptCategoryTiles),
+    enabled: kept,
   });
 }
 
@@ -406,16 +525,23 @@ export function useStoreOrders(customerId: number | null) {
 }
 
 /** The whole cart priced by the server (discounts stack over the cart, ADR-0041). */
+/**
+ * The whole cart priced by the server (discounts stack over the cart, ADR-0041). Without the
+ * server an estimate from the kept prices (`estimated: true`, ADR-0225 #4): shown only with «≈».
+ */
 export function useQuote(lines: readonly { productUnitId: number; qty: string }[]) {
   const { session } = useSignedIn();
-  return useQuery({
-    queryKey: ['rep', 'quote', canonical(lines)],
-    queryFn: async () =>
-      unwrap(
-        await session.client.POST('/api/v1/pricing/quote', {
-          body: { list: 'WHOLESALE', lines: [...lines] },
-        }),
-      ),
+  const { kept, store } = useKeptMode();
+  return useQuery<MaybeEstimated>({
+    queryKey: keyFor(['rep', 'quote', canonical(lines)], kept),
+    queryFn: kept
+      ? () => fromKept(store, (data) => estimateQuote(data.products, lines, phoneToday()))
+      : async () =>
+          unwrap(
+            await session.client.POST('/api/v1/pricing/quote', {
+              body: { list: 'WHOLESALE', lines: [...lines] },
+            }),
+          ),
     enabled: lines.length > 0,
     placeholderData: keepPreviousData,
     staleTime: 30_000,

@@ -29,6 +29,8 @@ import { useSendOrder } from '../../src/cart/use-send';
 import { monthDay } from '../../src/dates/calendar';
 import { monthOf, ubDate, weekdayOf } from '../../src/dates/dates';
 import { formatMnt } from '../../src/format/format';
+import { unpricedCount } from '../../src/offline/estimate';
+import { EstimateNote, KeptNote } from '../../src/offline/kept-note';
 import { placeOf } from '../../src/state/placement';
 import { useSignedIn } from '../../src/state/session';
 import { useShop } from '../../src/state/shop';
@@ -82,7 +84,9 @@ export default function CheckoutScreen() {
   const [frozen, setFrozen] = useState<Cart | null>(null);
   const cart = frozen ?? liveCart;
   const context = useRepContext();
-  // Without the server: today in Ulaanbaatar by the phone's clock, and the stage chosen before.
+  // Without the server the context is the kept one with today from the phone's clock in
+  // Ulaanbaatar (ADR-0225 #2, `useRepContext`). With no kept copy either: that date and the stage
+  // chosen before, so an order written before the copy was taken can still be sent.
   const noServer = !context.data && (offline || context.isError);
   const today = context.data?.today ?? (noServer ? ubDate(new Date().toISOString()) : null);
   const quote = useQuote(linesOf(cart));
@@ -181,15 +185,25 @@ export default function CheckoutScreen() {
     cart.deliveryDate && !quickDays.some((day) => day.date === cart.deliveryDate)
       ? cart.deliveryDate
       : null;
+  // Without the server an estimate from the kept prices (ADR-0225 #4): «≈», never a block.
+  const estimated = quote.data?.estimated === true;
+  const unpricedLines = unpricedCount(quote.data);
   const totalText = quote.data
-    ? t('pricing.money', { amount: formatMnt(quote.data.total) })
+    ? estimated
+      ? t('mobile.orders.approx', {
+          amount: t('pricing.money', { amount: formatMnt(quote.data.total) }),
+        })
+      : t('pricing.money', { amount: formatMnt(quote.data.total) })
     : t('common.none');
+  // A kept customer the office had put on hold or with an overdue debt: the server decides.
+  const kept = customer.data && 'creditHold' in customer.data ? customer.data : null;
+  const creditWarning = kept !== null && (kept.creditHold || kept.overdue !== null);
 
   const submit = async () => {
     Keyboard.dismiss();
     setFrozen(liveCart);
     try {
-      const result = await send(place?.stageName ?? null);
+      const result = await send(place?.stageName ?? null, quote.data?.total ?? null, unpricedLines);
       if (!result) return;
       if (result.kind === 'notSaved') {
         // Nothing stored: the cart is exactly as it was.
@@ -251,6 +265,7 @@ export default function CheckoutScreen() {
           },
         ]}
       >
+        <KeptNote />
         <SectionHeader style={styles.section}>{t('mobile.checkout.customer')}</SectionHeader>
         <Pressable
           accessibilityRole="button"
@@ -406,6 +421,12 @@ export default function CheckoutScreen() {
           />
         </Group>
 
+        {estimated ? <EstimateNote unpriced={unpricedLines} /> : null}
+        {creditWarning ? (
+          <Notice tone="warn" icon={CircleAlert}>
+            {t('mobile.offlineData.creditWarning')}
+          </Notice>
+        ) : null}
         <ProblemText problem={problem} style={styles.problem} />
         {refusedKept ? (
           <Notice tone="bad" icon={CircleAlert}>
@@ -440,7 +461,7 @@ export default function CheckoutScreen() {
           <PillButton
             title={t('mobile.checkout.send')}
             loading={sending}
-            disabled={issues.length > 0 || (quote.isLoading && !noServer)}
+            disabled={issues.length > 0 || (quote.isLoading && !noServer && !estimated)}
             onPress={() => void submit()}
             style={styles.send}
           />

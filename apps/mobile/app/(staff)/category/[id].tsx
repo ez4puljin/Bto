@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { problemFrom } from '../../../src/api/problem';
+import { KeptNote, useKeptView } from '../../../src/offline/kept-note';
 import { useRepCategoryPage } from '../../../src/api/rep';
 import { lineOf } from '../../../src/cart/cart';
 import { BannerCarousel, SectionRow, SubcategoryTile } from '../../../src/customer/home-parts';
@@ -36,6 +37,7 @@ export default function RepCategoryScreen() {
   const { server } = useSignedIn();
   const { cart, pending } = useShop();
   const host = useCartHost(server);
+  const keptView = useKeptView();
   const [refreshing, setRefreshing] = useState(false);
   const data = page.data;
   const problem = page.error ? problemFrom(page.error) : null;
@@ -66,6 +68,7 @@ export default function RepCategoryScreen() {
         contentContainerStyle={styles.body}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
       >
+        <KeptNote style={styles.side} />
         {data ? (
           <>
             {data.banners.length > 0 ? (
@@ -126,7 +129,7 @@ export default function RepCategoryScreen() {
             icon={<PackageSearch size={44} strokeWidth={1.5} color={colors.input} />}
             title={t('mobile.customer.category.gone')}
           />
-        ) : problem ? (
+        ) : problem && !keptView.missing ? (
           <ProblemText problem={problem} style={styles.problem} />
         ) : null}
       </ScrollView>

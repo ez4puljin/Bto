@@ -49,6 +49,7 @@ import { ubTime } from '../../../src/dates/dates';
 import { formatMillions, formatMnt } from '../../../src/format/format';
 import { allOrdered, countsOf } from '../../../src/map/stores';
 import { shortMoney } from '../../../src/orders/amounts';
+import { KeptNote } from '../../../src/offline/kept-note';
 import { UnsentLine } from '../../../src/outbox/unsent-list';
 import { SectionHeading, SIDE } from '../../../src/shop/section-heading';
 import { useCartHost } from '../../../src/shop/list-qty-sheet';
@@ -402,6 +403,9 @@ export default function HomeScreen() {
         ) : null}
 
         {/* The orders not sent yet (the outbox, owner 2026-11-19): one line to «Миний захиалгууд». */}
+        {/* Without the server: «Бараа», «Сагс», the store picker and «Миний захиалгууд» work from
+            the kept copy (ADR-0225 #2); the sections below stay the server's. */}
+        <KeptNote style={styles.side} />
         <UnsentLine onPress={() => router.navigate('/orders')} style={styles.side} />
 
         {shopWindow && shopWindow.banners.length > 0 ? (

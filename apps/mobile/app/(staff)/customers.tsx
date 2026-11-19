@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { Check, Search, Store } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
@@ -6,9 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, TextInput } from '../../src/ui/text';
-import { problemFrom, unwrap } from '../../src/api/problem';
-import { type RepCustomer, useCustomers } from '../../src/api/rep';
-import { useSignedIn } from '../../src/state/session';
+import { problemFrom } from '../../src/api/problem';
+import { type RepCustomer, useCustomers, useFetchCustomer } from '../../src/api/rep';
+import { KeptNote, useKeptView } from '../../src/offline/kept-note';
 import { useShop } from '../../src/state/shop';
 import { useDebounced } from '../../src/state/use-debounced';
 import { colors, radii, spacing, storeType, TOUCH, type } from '../../src/theme/tokens';
@@ -27,8 +26,9 @@ export default function CustomersScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const queryClient = useQueryClient();
-  const { session } = useSignedIn();
+  // The server's customer, or the kept one without the server (ADR-0225 #2).
+  const fetchCustomer = useFetchCustomer();
+  const keptView = useKeptView();
   const { cart, dispatch } = useShop();
   const [text, setText] = useState('');
   const q = useDebounced(text.trim(), 350);
@@ -42,15 +42,7 @@ export default function CustomersScreen() {
   const pick = async (customer: RepCustomer) => {
     setPicking(customer.id);
     try {
-      const detail = await queryClient.fetchQuery({
-        queryKey: ['rep', 'customer', customer.id],
-        queryFn: async () =>
-          unwrap(
-            await session.client.GET('/api/v1/sales-rep/customers/{id}', {
-              params: { path: { id: customer.id } },
-            }),
-          ),
-      });
+      const detail = await fetchCustomer(customer.id);
       const preferred =
         detail.addresses.find((address) => address.isDefault) ?? detail.addresses[0];
       dispatch({
@@ -141,7 +133,12 @@ export default function CustomersScreen() {
             void customers.fetchNextPage();
         }}
         ListHeaderComponent={
-          customers.error ? <ProblemText problem={problemFrom(customers.error)} /> : null
+          <>
+            <KeptNote style={styles.note} />
+            {customers.error && !keptView.missing ? (
+              <ProblemText problem={problemFrom(customers.error)} />
+            ) : null}
+          </>
         }
         ListEmptyComponent={
           customers.isLoading ? (
@@ -156,6 +153,7 @@ export default function CustomersScreen() {
 }
 
 const styles = StyleSheet.create({
+  note: { marginBottom: spacing.sm },
   // The white 40 px search field in the blue band.
   search: {
     height: 40,

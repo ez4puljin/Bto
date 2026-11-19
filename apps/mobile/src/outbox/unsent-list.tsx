@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { monthDay } from '../dates/calendar';
 import { ubDate, ubTime } from '../dates/dates';
+import { formatMnt } from '../format/format';
 import { useOutbox } from '../state/outbox';
 import { useShop } from '../state/shop';
 import { colors, spacing, tabular, type } from '../theme/tokens';
@@ -31,6 +32,7 @@ import {
   type OutboxEntry,
   type OutboxStatus,
 } from './entry';
+import { STUCK } from './known';
 
 const TONES: Record<Exclude<OutboxStatus, 'sent'>, Tone> = {
   waiting: 'neutral',
@@ -67,9 +69,24 @@ function UnsentRow({ entry, onPress }: { entry: OutboxEntry; onPress: () => void
         <Text style={[type.caption, tabular]} numberOfLines={1}>
           {[
             t('mobile.cart.count', { n: entry.summary.lineCount }),
+            entry.summary.estimate
+              ? t('mobile.orders.approx', {
+                  amount: t('pricing.money', { amount: formatMnt(entry.summary.estimate) }),
+                })
+              : null,
+            entry.summary.unpricedLines
+              ? t('mobile.offlineData.unpriced', { n: entry.summary.unpricedLines })
+              : null,
             writtenText(entry.writtenAt),
-          ].join(' · ')}
+          ]
+            .filter(Boolean)
+            .join(' · ')}
         </Text>
+        {entry.resent ? (
+          <Text style={[type.caption, styles.resent]} numberOfLines={2}>
+            {t('mobile.outbox.resent')}
+          </Text>
+        ) : null}
       </View>
       <Pill label={t(`mobile.outbox.status.${status}`)} tone={TONES[status]} />
     </Pressable>
@@ -190,15 +207,19 @@ function EntrySheet({ entry, onClose: close }: { entry: OutboxEntry | null; onCl
               <Notice tone="warn" icon={CircleAlert}>
                 {shown.problem?.code === DAMAGED
                   ? t('mobile.outbox.damagedHint')
-                  : shown.problem?.code === KEY_TOO_OLD
-                    ? t('mobile.outbox.checkOldHint')
-                    : t('mobile.outbox.checkHint')}
+                  : shown.problem?.code === STUCK
+                    ? t('mobile.outbox.stuckHint')
+                    : shown.problem?.code === KEY_TOO_OLD
+                      ? t('mobile.outbox.checkOldHint')
+                      : t('mobile.outbox.checkHint')}
               </Notice>
             ) : (
               <Notice tone="info" icon={Clock}>
                 {shown.status === 'sending'
                   ? t('mobile.outbox.sendingHint')
-                  : t('mobile.outbox.waitingHint')}
+                  : shown.resent
+                    ? t('mobile.outbox.resent')
+                    : t('mobile.outbox.waitingHint')}
               </Notice>
             )}
             <Group>
@@ -324,6 +345,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   refused: { color: colors.destructive },
+  resent: { color: colors.warningText },
   problem: { marginTop: 0 },
   line: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   grow: { flex: 1, minWidth: 0 },

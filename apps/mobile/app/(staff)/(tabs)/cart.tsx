@@ -18,6 +18,8 @@ import { Text } from '../../../src/ui/text';
 import { type Quote, type RepProduct, useProductsOf, useQuote } from '../../../src/api/rep';
 import { type CartLine, linesOf } from '../../../src/cart/cart';
 import { formatMnt } from '../../../src/format/format';
+import { unpricedCount } from '../../../src/offline/estimate';
+import { EstimateNote, KeptNote } from '../../../src/offline/kept-note';
 import { useUnitWords } from '../../../src/shop/unit-words';
 import { useSignedIn } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
@@ -68,7 +70,9 @@ export default function CartScreen() {
     );
   }
 
-  const unpriced = quote.data?.lines.some((line) => !line.priced) === true;
+  // Without the server an estimate from the kept prices (ADR-0225 #4): «≈», and never a block.
+  const estimated = quote.data?.estimated === true;
+  const unpriced = !estimated && quote.data?.lines.some((line) => !line.priced) === true;
   // The N+M's free goods stand apart under «Бонус» (ADR-0217): their value is not a discount too.
   const bonuses = cart.lines.flatMap((line, index) => {
     const bonus = quote.data?.lines[index]?.bonus;
@@ -84,7 +88,11 @@ export default function CartScreen() {
     : new Decimal(0);
 
   const totalText = quote.data
-    ? t('pricing.money', { amount: formatMnt(quote.data.total) })
+    ? estimated
+      ? t('mobile.orders.approx', {
+          amount: t('pricing.money', { amount: formatMnt(quote.data.total) }),
+        })
+      : t('pricing.money', { amount: formatMnt(quote.data.total) })
     : t('common.none');
 
   return (
@@ -103,6 +111,7 @@ export default function CartScreen() {
         style={styles.grow}
         contentContainerStyle={[styles.body, { paddingBottom: spacing.lg }]}
       >
+        <KeptNote />
         <SectionHeader style={styles.section}>{t('mobile.cart.lines')}</SectionHeader>
         <Card flush>
           {cart.lines.map((line, index) => (
@@ -112,6 +121,7 @@ export default function CartScreen() {
                 line={line}
                 product={productOf(line.productId)}
                 priced={quote.data?.lines[index]}
+                estimated={estimated}
                 server={server}
                 editing={editing}
                 locked={false}
@@ -165,7 +175,11 @@ export default function CartScreen() {
           <View style={styles.totalRow}>
             <View style={styles.text}>
               <Text style={type.row}>{t('mobile.cart.total')}</Text>
-              <Text style={type.caption}>{t('mobile.cart.priceNote')}</Text>
+              {estimated ? (
+                <EstimateNote unpriced={unpricedCount(quote.data)} />
+              ) : (
+                <Text style={type.caption}>{t('mobile.cart.priceNote')}</Text>
+              )}
             </View>
             <Text style={styles.total}>{totalText}</Text>
           </View>
@@ -189,7 +203,7 @@ export default function CartScreen() {
           <PillButton
             title={t('mobile.cart.next')}
             trailing={<ArrowRight size={20} strokeWidth={2.2} color={colors.primaryForeground} />}
-            disabled={quote.isLoading || unpriced}
+            disabled={(quote.isLoading && !estimated) || unpriced}
             onPress={() => router.push('/checkout')}
             style={styles.grow}
           />
@@ -204,6 +218,7 @@ function CartRow({
   line,
   product,
   priced,
+  estimated,
   server,
   editing,
   locked,
@@ -213,6 +228,8 @@ function CartRow({
   line: CartLine;
   product: RepProduct | undefined;
   priced: Quote['lines'][number] | undefined;
+  /** The phone's estimate without the server: the line's amount carries «≈». */
+  estimated: boolean;
   server: string;
   editing: boolean;
   locked: boolean;
@@ -314,7 +331,11 @@ function CartRow({
       <View style={styles.right}>
         <Text style={[styles.lineTotal, priced && !priced.priced && styles.red]}>
           {priced?.priced
-            ? t('pricing.money', { amount: formatMnt(priced.total ?? '0') })
+            ? estimated
+              ? t('mobile.orders.approx', {
+                  amount: t('pricing.money', { amount: formatMnt(priced.total ?? '0') }),
+                })
+              : t('pricing.money', { amount: formatMnt(priced.total ?? '0') })
             : priced
               ? t('mobile.cart.noPrice')
               : t('common.none')}

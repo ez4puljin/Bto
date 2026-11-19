@@ -22,6 +22,7 @@ import {
 } from 'react-native';
 import { Text, TextInput } from '../../../src/ui/text';
 import { problemFrom } from '../../../src/api/problem';
+import { KeptNote, useKeptView } from '../../../src/offline/kept-note';
 import {
   type RepProduct,
   useCategories,
@@ -66,6 +67,7 @@ export default function ShopScreen() {
   const params = useLocalSearchParams<{ categoryIds?: string; search?: string }>();
   const { server } = useSignedIn();
   const { cart, pending } = useShop();
+  const keptView = useKeptView();
   const { width } = useWindowDimensions();
   const inset = useStoreTabBarInset();
   const context = useRepContext();
@@ -134,6 +136,8 @@ export default function ShopScreen() {
   const active = activeCount(shown);
   const header = (
     <View style={styles.head}>
+      {/* Without the server: the kept products, and since when (ADR-0225 #2). */}
+      <KeptNote />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -231,7 +235,7 @@ export default function ShopScreen() {
           <Text style={styles.sortText}>{sortLabel}</Text>
         </Pressable>
       </View>
-      {products.error ? (
+      {products.error && !keptView.missing ? (
         <ProblemText problem={problemFrom(products.error)} style={styles.problem} />
       ) : null}
     </View>

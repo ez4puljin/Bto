@@ -8,6 +8,7 @@ import {
   prepare,
   prune,
 } from './entry';
+import { applyKnown, askable, batchesOf, type KnownKey } from './known';
 import type { OutboxStore } from './storage';
 
 /** The stored canonical body as the request sends it (an unreadable one goes as null). */
@@ -148,6 +149,48 @@ export class Outbox<O> {
    * Sends the waiting entries, oldest first. One run at a time: a call during a run gets a run
    * that starts after it (an entry added meanwhile is never left out).
    */
+  /**
+   * Asks the server which of the sent and unsettled keys it holds (ADR-0225 #5) and moves each
+   * entry as the answer says. A call that fails changes nothing for its keys; an entry that
+   * changed while the call was out (it is being sent, the rep deleted it) is left alone. Resolves
+   * how many went back to waiting (to be sent).
+   */
+  async reconcile(
+    known: (keys: string[]) => Promise<KnownKey[]>,
+    numberOf: (orderId: number) => Promise<string | null>,
+  ): Promise<{ waiting: number }> {
+    await this.ready;
+    if (!this.loaded || this.disposed) return { waiting: 0 };
+    let waiting = 0;
+    for (const batch of batchesOf(askable(this.state.entries))) {
+      let answers: KnownKey[];
+      try {
+        answers = await known(batch.map((entry) => entry.key));
+      } catch {
+        // No answer is not «absent»: nothing changes for these keys.
+        continue;
+      }
+      const byKey = new Map(answers.map((answer) => [answer.key, answer]));
+      for (const asked of batch) {
+        const now = this.get(asked.id);
+        // Only the entry as it was asked about.
+        if (!now || now.status !== asked.status || now.key !== asked.key) continue;
+        const next = applyKnown(now, byKey.get(asked.key), this.io.now());
+        if (!next) continue;
+        await this.save(next.entry);
+        if (next.entry.status === 'waiting') waiting += 1;
+        if (next.orderId !== null) {
+          const number = await numberOf(next.orderId).catch(() => null);
+          const sent = this.get(asked.id);
+          if (number !== null && sent?.status === 'sent' && sent.order) {
+            await this.save({ ...sent, order: { ...sent.order, number } });
+          }
+        }
+      }
+    }
+    return { waiting };
+  }
+
   run(): Promise<RunReport> {
     if (!this.running) {
       this.running = this.runOnce().finally(() => {

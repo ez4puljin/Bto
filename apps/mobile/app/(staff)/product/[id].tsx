@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { Text } from '../../../src/ui/text';
 import { problemFrom } from '../../../src/api/problem';
+import { EstimateNote, KeptNote, useKeptView } from '../../../src/offline/kept-note';
 import { cachedProduct, useCategories, useProductsOf, useRepContext } from '../../../src/api/rep';
 import { lineOf } from '../../../src/cart/cart';
 import { DealNote } from '../../../src/customer/deal-note';
@@ -58,6 +59,7 @@ export default function ProductScreen() {
   const { server } = useSignedIn();
   const { cart, dispatch, pending } = useShop();
   const toast = useToast();
+  const keptView = useKeptView();
   const words = useUnitWords();
   const unitOptions = useUnitOptions();
   const context = useRepContext();
@@ -99,7 +101,10 @@ export default function ProductScreen() {
         <StoreHeader title="" onBack={() => router.back()} right={<HeaderCart />} />
         <View style={styles.missing}>
           {query.isLoading ? <ActivityIndicator color={colors.primary} /> : null}
-          {query.error ? <ProblemText problem={problemFrom(query.error)} /> : null}
+          <KeptNote />
+          {query.error && !keptView.missing ? (
+            <ProblemText problem={problemFrom(query.error)} />
+          ) : null}
           {query.isSuccess && !product ? (
             <EmptyState
               icon={<Package size={44} strokeWidth={1.5} color={colors.input} />}
@@ -167,8 +172,11 @@ export default function ProductScreen() {
   };
 
   const heroWidth = width - spacing.lg * 2;
+  const money = (amount: string) => t('pricing.money', { amount: formatMnt(amount) });
   const totalText = quote.total
-    ? t('pricing.money', { amount: formatMnt(quote.total) })
+    ? quote.estimated
+      ? t('mobile.orders.approx', { amount: money(quote.total) })
+      : money(quote.total)
     : quote.loading
       ? t('mobile.product.pricing')
       : t('common.none');
@@ -182,6 +190,7 @@ export default function ProductScreen() {
         right={<HeaderCart />}
       />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <KeptNote />
         <Card flush>
           <View style={styles.hero}>
             {images.length > 0 ? (
@@ -359,6 +368,7 @@ export default function ProductScreen() {
               {quote.breakdown}
             </Text>
           ) : null}
+          {quote.estimated ? <EstimateNote /> : null}
         </View>
         <PillButton
           title={
@@ -369,7 +379,9 @@ export default function ProductScreen() {
                 : t('mobile.product.add')
           }
           icon={<ShoppingCart size={20} strokeWidth={2} color={colors.primaryForeground} />}
-          disabled={(!canSell && !removing) || (qty === 0 && !line) || quote.unpriced}
+          disabled={
+            (!canSell && !removing) || (qty === 0 && !line) || (quote.unpriced && !quote.estimated)
+          }
           onPress={save}
           height={50}
           style={styles.addButton}

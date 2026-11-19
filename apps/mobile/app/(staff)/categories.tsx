@@ -2,7 +2,8 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { problemFrom } from '../../src/api/problem';
-import { useRepHome } from '../../src/api/rep';
+import { useKeptCategoryTiles, useRepHome } from '../../src/api/rep';
+import { KeptNote, useKeptView } from '../../src/offline/kept-note';
 import { CategoryTile } from '../../src/customer/home-parts';
 import { useSignedIn } from '../../src/state/session';
 import { colors, spacing } from '../../src/theme/tokens';
@@ -20,7 +21,10 @@ export default function RepCategoriesScreen() {
   const router = useRouter();
   const { server } = useSignedIn();
   const home = useRepHome();
-  const categories = home.data?.categories ?? [];
+  // Without the server the kept categories stand in (ADR-0225 #2); online the home's, as before.
+  const keptTiles = useKeptCategoryTiles();
+  const keptView = useKeptView();
+  const categories = keptView.kept ? (keptTiles.data ?? []) : (home.data?.categories ?? []);
   // Four tiles a row; the last row keeps its tiles at their place.
   const rows: ((typeof categories)[number] | null)[][] = [];
   for (let at = 0; at < categories.length; at += 4) {
@@ -36,7 +40,8 @@ export default function RepCategoriesScreen() {
         right={<HeaderCart />}
       />
       <ScrollView contentContainerStyle={styles.body}>
-        {home.error ? (
+        <KeptNote />
+        {home.error && !keptView.kept && !keptView.missing ? (
           <ProblemText problem={problemFrom(home.error)} style={styles.problem} />
         ) : null}
         {rows.length > 0 ? (
@@ -58,7 +63,7 @@ export default function RepCategoriesScreen() {
               </View>
             ))}
           </Card>
-        ) : home.isLoading ? (
+        ) : home.isLoading || keptTiles.isLoading ? (
           <ActivityIndicator style={styles.loading} color={colors.primary} />
         ) : null}
       </ScrollView>

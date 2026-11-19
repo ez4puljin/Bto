@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from 'react';
@@ -28,6 +29,7 @@ import {
   secureTokenStore,
   writeJson,
 } from '../device/storage';
+import { forgetKept } from '../offline/files';
 import { secureOrigin } from '../server/server-url';
 
 interface SessionValue {
@@ -104,6 +106,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     session?.subscribe ?? never,
     session?.getSnapshot ?? (() => (server === undefined ? LOADING : ANONYMOUS)),
   );
+
+  // The staff app's kept copy (ADR-0225 #2) goes with the session: at «Гарах» and when the server
+  // ended it, the store list and the prices are removed from the phone. The outbox stays.
+  const signedInAs = useRef<number | null>(null);
+  // A stored session refused at start: its user is the one in the token store.
+  useEffect(() => {
+    if (APP.variant !== 'staff' || !server) return;
+    void secureTokenStore.load().then((stored) => {
+      if (stored && stored.server === server && signedInAs.current === null) {
+        signedInAs.current = stored.userId;
+      }
+    });
+  }, [server]);
+  useEffect(() => {
+    if (APP.variant !== 'staff' || !server) return;
+    if (state.status === 'signedIn') {
+      signedInAs.current = state.userId;
+      return;
+    }
+    if (state.status === 'anonymous' && state.reason && signedInAs.current !== null) {
+      const userId = signedInAs.current;
+      signedInAs.current = null;
+      void forgetKept(server, userId);
+    }
+  }, [state, server]);
 
   const setServer = useCallback(
     async (value: string | null) => {

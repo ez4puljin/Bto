@@ -14,11 +14,15 @@ export function useSendOrder() {
   const { submit } = useOutbox();
   const { stageId } = useShop();
   const [sending, setSending] = useState(false);
-  const send = async (stageName: string | null): Promise<SendResult | null> => {
+  const send = async (
+    stageName: string | null,
+    estimate: string | null = null,
+    unpricedLines = 0,
+  ): Promise<SendResult | null> => {
     if (stageId === null || sending) return null;
     setSending(true);
     try {
-      return await submit(stageId, stageName);
+      return await submit(stageId, stageName, estimate, unpricedLines);
     } finally {
       setSending(false);
     }

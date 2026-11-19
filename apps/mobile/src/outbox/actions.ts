@@ -23,6 +23,10 @@ export interface SubmitDeps<O> {
   cart: Cart;
   stageId: number;
   stageName: string | null;
+  /** The cart's amount as the phone knew it (the quote, or the estimate): shown «≈» in the list. */
+  estimate?: string | null;
+  /** Lines the estimate could not price. */
+  unpricedLines?: number;
   /** Where the cart is stored: the emptied cart goes in the same write as the entry. */
   cartKey: string;
   key: string;
@@ -43,7 +47,15 @@ export interface SubmitDeps<O> {
  */
 export async function submitOrder<O>(deps: SubmitDeps<O>): Promise<SubmitResult<O>> {
   const { outbox, cart } = deps;
-  const entry = entryOf(cart, deps.stageId, deps.stageName, deps.key, deps.now);
+  const entry = entryOf(
+    cart,
+    deps.stageId,
+    deps.stageName,
+    deps.key,
+    deps.now,
+    deps.estimate ?? null,
+    deps.unpricedLines ?? 0,
+  );
   const emptied = cartReducer(cart, { type: 'sent' });
   try {
     await outbox.add(entry, [[deps.cartKey, JSON.stringify(emptied)]]);

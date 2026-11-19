@@ -19,6 +19,7 @@ import { useRepContext } from '../../src/api/rep';
 import { initialsOf } from '../../src/format/format';
 import { useRoleName } from '../../src/state/role';
 import { MyPhoto } from '../../src/staff/my-photo';
+import { KeptRow } from '../../src/offline/kept-row';
 import { useOutbox } from '../../src/state/outbox';
 import { useSignedIn } from '../../src/state/session';
 import { useShop } from '../../src/state/shop';
@@ -171,6 +172,9 @@ export default function ProfileScreen() {
             />
           </Group>
         </View>
+
+        {/* What the rep's order needs without the server (ADR-0225 #2). */}
+        <KeptRow />
 
         {/* The app's version and «Шалгах» (ADR-0174 #10). */}
         <UpdateCheck />

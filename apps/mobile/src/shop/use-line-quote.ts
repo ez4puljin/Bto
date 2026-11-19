@@ -7,6 +7,7 @@ import { useUnitWords } from './unit-words';
 /**
  * One product line priced by the server (the app never computes a price, ADR-0061 #5): the total
  * of `qty` of a unit and its parts as «2 хайрцаг × 174,600₮», asked again once typing pauses.
+ * Without the server an estimate from the kept prices stands in (`estimated`, ADR-0225 #4).
  */
 export function useLineQuote(units: readonly RepUnit[], unitId: number | null, qty: number) {
   const { t } = useTranslation();
@@ -37,6 +38,11 @@ export function useLineQuote(units: readonly RepUnit[], unitId: number | null, q
     breakdown,
     /** The server answered for this quantity and has no price for it. */
     unpriced: fresh && line?.priced === false,
+    /**
+     * Without the server: the phone's estimate from the kept prices (ADR-0225 #4), shown with «≈»;
+     * a line it cannot price never blocks adding it.
+     */
+    estimated: quote.data?.estimated === true,
     loading: qty > 0 && !fresh,
   };
 }
