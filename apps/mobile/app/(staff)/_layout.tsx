@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { mayAnswerChat } from '../../src/chat/staff-logic';
+import { useStaffChatLive } from '../../src/chat/staff-chat';
 import { CommunityPopupGate } from '../../src/community/popup-gate';
 import { ThumbKeeper } from '../../src/images/thumb-keeper';
 import { NoticePopupGate } from '../../src/notifications/popup-gate';
@@ -22,6 +24,9 @@ export default function StaffLayout() {
   const rep = isRep(me);
   // The shop's live stock (ADR-0173 #4): only a rep has a shop, and only a rep may open the stream.
   useLiveStock(session, 'STAFF', rep);
+  // «Харилцагчийн чат» (ADR-0224): one stream for a user with a chat right, beside the stock's.
+  const chatter = mayAnswerChat(me);
+  useStaffChatLive(session, chatter);
   const picker = mayPick(me);
   const seller = mayRequestTransfers(me);
   const driver = mayLoad(me);
@@ -67,6 +72,11 @@ export default function StaffLayout() {
             <Stack.Screen name="transfers/new" />
             <Stack.Screen name="transfers/[id]/index" />
             <Stack.Screen name="transfers/[id]/receive" />
+          </Stack.Protected>
+          {/* «Харилцагчийн чат» (ADR-0224): who has `chat.answer` or `chat.answer_own`. */}
+          <Stack.Protected guard={chatter}>
+            <Stack.Screen name="chat/index" />
+            <Stack.Screen name="chat/[id]" />
           </Stack.Protected>
           {/* «Ирц» (ADR-0131): everyone's. */}
           <Stack.Screen name="attendance/index" />

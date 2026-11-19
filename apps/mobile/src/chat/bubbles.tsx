@@ -38,7 +38,16 @@ export function DaySeparator({ title }: { title: string }) {
 }
 
 /** A message of the server: the sender's name above (a staff member's name, «Бот»), the time under. */
-export function MessageBubble({ message, mine }: { message: ChatMessage; mine: boolean }) {
+export function MessageBubble({
+  message,
+  mine,
+  staffView = false,
+}: {
+  message: ChatMessage;
+  mine: boolean;
+  /** The staff app's view: the sender's name shows on the viewer's side too, and a bot message's buttons are shown as inert chips. */
+  staffView?: boolean;
+}) {
   const { t } = useTranslation();
   const who =
     message.sender === 'STAFF'
@@ -49,14 +58,25 @@ export function MessageBubble({ message, mine }: { message: ChatMessage; mine: b
   return (
     <View style={[styles.line, mine ? styles.lineMine : styles.lineTheirs]}>
       <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
-        {!mine && who ? (
-          <Text style={[type.secondary, styles.who]} numberOfLines={1}>
+        {(!mine || staffView) && who ? (
+          <Text style={[type.secondary, styles.who, mine && styles.timeMine]} numberOfLines={1}>
             {who}
           </Text>
         ) : null}
         <Text selectable style={[type.body, mine && styles.textMine]}>
           {message.body}
         </Text>
+        {staffView && message.buttons && message.buttons.length > 0 ? (
+          <View style={styles.inertChips}>
+            {message.buttons.map((button) => (
+              <View key={button.id} style={styles.inertChip}>
+                <Text style={[type.caption, styles.inertText]} numberOfLines={1}>
+                  {button.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
         <Text style={[type.caption, styles.time, mine && styles.timeMine]}>
           {ubTime(message.createdAt)}
         </Text>
@@ -151,6 +171,15 @@ const styles = StyleSheet.create({
   time: { alignSelf: 'flex-end', marginTop: 2 },
   timeMine: { color: 'rgba(255,255,255,0.8)' },
   sending: { opacity: 0.6 },
+  inertChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
+  inertChip: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  inertText: { color: 'rgba(255,255,255,0.9)' },
   outgoing: { maxWidth: '82%', alignItems: 'flex-end' },
   failed: { marginTop: 2, alignItems: 'flex-end', gap: 2 },
   failedText: { color: colors.destructive },

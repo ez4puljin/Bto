@@ -71,9 +71,10 @@ export function useCustomerChatLive(session: CustomerSession): void {
   useChatStream<CustomerChatConversation>(session, CHAT_LIVE_PATH, (event: CustomerChatEvent) => {
     if (event.type === 'ready' || event.type === 'resync') {
       // The badge refetches (a read-only GET). The conversation (`POST open`, which marks it read)
-      // is only marked stale: it refetches while the screen is in front, and when it comes back.
+      // is `enabled` only while the screen is in front: invalidating refetches it then, and a screen
+      // behind (disabled, so not active) is only marked stale and refetches when it comes back.
       void queryClient.invalidateQueries({ queryKey: CHAT_UNREAD_KEY });
-      void queryClient.invalidateQueries({ queryKey: CHAT_OPEN_KEY, refetchType: 'none' });
+      void queryClient.invalidateQueries({ queryKey: CHAT_OPEN_KEY });
     } else if (event.type === 'message' || event.type === 'conversation') {
       setUnread(queryClient, event.conversation.unread);
       queryClient.setQueryData<CustomerChatState>(CHAT_OPEN_KEY, (held) =>

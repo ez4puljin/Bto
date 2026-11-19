@@ -6,6 +6,7 @@ import {
   CalendarCheck,
   ChevronRight,
   MapPin,
+  MessageCircle,
   ScanLine,
   Search,
   Send,
@@ -34,6 +35,8 @@ import {
   useRepMap,
 } from '../../../src/api/rep';
 import { lineOf } from '../../../src/cart/cart';
+import { mayAnswerChat } from '../../../src/chat/staff-logic';
+import { useStaffChatBadge } from '../../../src/chat/staff-chat';
 import {
   BannerCarousel,
   CategoryTile,
@@ -63,7 +66,7 @@ import {
   TOUCH,
   type,
 } from '../../../src/theme/tokens';
-import { PillButton } from '../../../src/ui/controls';
+import { CountBadge, PillButton } from '../../../src/ui/controls';
 import { Group, ICON_INSET, ICON_TILE, IconTile, Row } from '../../../src/ui/grouped';
 import { ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
@@ -96,6 +99,9 @@ export default function HomeScreen() {
   const attendance = useMyAttendance();
   const unread = notifications.data?.unread ?? 0;
   const context = useRepContext();
+  // «Харилцагчийн чат» (ADR-0224): only for a user with a chat right; the badge is the waiting count.
+  const chatter = mayAnswerChat(me);
+  const chatBadge = useStaffChatBadge(chatter).badge;
   const today = context.data?.today ?? null;
   const orders = useOrders(today ? { ...presetRange('month', today), q: '' } : null);
   const home = useRepHome();
@@ -502,6 +508,24 @@ export default function HomeScreen() {
 
         {/* The store map's line, and «Ирц» (ADR-0131): today's state in one row; the page punches. */}
         <Group inset={ICON_INSET} style={styles.side}>
+          {chatter ? (
+            <Row
+              minHeight={56}
+              icon={
+                <IconTile color={colors.tint.blue}>
+                  <MessageCircle size={18} strokeWidth={2.2} color={colors.primaryForeground} />
+                </IconTile>
+              }
+              title={t('mobile.staffChat.title')}
+              accessibilityLabel={
+                chatBadge > 0
+                  ? t('mobile.staffChat.entry', { n: chatBadge })
+                  : t('mobile.staffChat.title')
+              }
+              right={<CountBadge count={chatBadge} tone="red" ring={colors.card} />}
+              onPress={() => router.push('/chat')}
+            />
+          ) : null}
           <Row
             minHeight={56}
             icon={

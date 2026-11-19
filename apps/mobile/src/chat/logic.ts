@@ -125,6 +125,8 @@ export function newestId(messages: readonly ChatMessage[]): number {
 export function pendingOutgoing(
   messages: readonly ChatMessage[],
   outgoing: readonly Outgoing[],
+  /** Whose messages the viewer writes: the store's (default), or a staff member's own. */
+  writer: { sender: ChatMessage['sender']; staffUserId?: number } = { sender: 'CUSTOMER' },
 ): Outgoing[] {
   const used = new Set<number>();
   return outgoing.filter((pending) => {
@@ -134,7 +136,8 @@ export function pendingOutgoing(
       (message) =>
         !used.has(message.id) &&
         message.id > pending.sinceId &&
-        message.sender === 'CUSTOMER' &&
+        message.sender === writer.sender &&
+        (writer.staffUserId === undefined || message.staffUserId === writer.staffUserId) &&
         message.buttonId === buttonId &&
         message.body === pending.label,
     );
