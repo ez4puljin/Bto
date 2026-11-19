@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Decimal } from '@tugeel/shared/money';
 import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
@@ -8,7 +8,13 @@ import {
   SalesRepCustomerDetailDto,
   SalesRepCustomerPageDto,
   SalesRepCustomerQueryDto,
+  SalesRepKnownOrdersDto,
+  SalesRepKnownOrdersRequestDto,
   SalesRepMapDto,
+  SalesRepOfflineCustomerPageDto,
+  SalesRepOfflineCustomerQueryDto,
+  SalesRepOfflineProductPageDto,
+  SalesRepOfflineProductQueryDto,
   SalesRepOrderDto,
   SalesRepOrderListQueryDto,
   SalesRepOrderPageDto,
@@ -23,6 +29,7 @@ import {
   SalesRepThumbsDto,
 } from '../dto/sales-rep.dto';
 import { REP } from '../services/rep-access';
+import { SalesRepOfflineService } from '../services/sales-rep-offline.service';
 import { type RepOrderDetail, SalesRepOrdersService } from '../services/sales-rep-orders.service';
 import { SalesRepShopService } from '../services/sales-rep-shop.service';
 import { repMoney as money, toRepProductDto } from './rep-mappers';
@@ -97,6 +104,7 @@ export class SalesRepController {
   constructor(
     private readonly orders: SalesRepOrdersService,
     private readonly shop: SalesRepShopService,
+    private readonly offline: SalesRepOfflineService,
   ) {}
 
   @Get('context')
@@ -130,6 +138,30 @@ export class SalesRepController {
       })),
     });
     return toRepOrder(order);
+  }
+
+  /**
+   * Which of the caller's Idempotency-Keys the server holds (ADR-0225 #5): a phone asks about the
+   * orders it sent in the last three days and sends again the ones a restore from a backup lost.
+   * Reads only; not @Idempotent.
+   */
+  @Post('orders/known')
+  @RequirePermission(REP)
+  @HttpCode(200)
+  @ApiOkResponse({ type: SalesRepKnownOrdersDto })
+  async knownOrders(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: SalesRepKnownOrdersRequestDto,
+  ): Promise<SalesRepKnownOrdersDto> {
+    const rows = await this.offline.knownOrders(ctx, body.keys);
+    return {
+      data: rows.map((row) => ({
+        key: row.key,
+        status: row.status,
+        createdAt: row.createdAt.toISOString(),
+        orderId: row.orderId,
+      })),
+    };
   }
 
   @Get('orders')
@@ -240,6 +272,41 @@ export class SalesRepController {
     return (
       await this.shop.withDeals(await this.shop.productsOf(scope, ids, query.priceBefore))
     ).map(toRepProductDto);
+  }
+
+  /**
+   * The shop for the phone's disk (ADR-0225 #2): every product `GET /products` shows the caller, by
+   * id, `limit` at a time, with its main supplier. No search, no filter, no count.
+   */
+  @Get('offline/products')
+  @RequirePermission(REP)
+  @ApiOkResponse({ type: SalesRepOfflineProductPageDto })
+  async offlineProducts(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: SalesRepOfflineProductQueryDto,
+  ): Promise<SalesRepOfflineProductPageDto> {
+    const page = await this.offline.products(ctx, query);
+    return {
+      data: page.data.map((product) => ({
+        ...toRepProductDto(product),
+        mainSupplierId: product.mainSupplierId,
+      })),
+      nextCursor: page.nextCursor,
+    };
+  }
+
+  /**
+   * The customers for the phone's disk (ADR-0225 #2): every ACTIVE customer the caller may see, by
+   * id, with addresses, contacts, the overdue receivable and the credit hold.
+   */
+  @Get('offline/customers')
+  @RequirePermission(REP)
+  @ApiOkResponse({ type: SalesRepOfflineCustomerPageDto })
+  offlineCustomers(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: SalesRepOfflineCustomerQueryDto,
+  ): Promise<SalesRepOfflineCustomerPageDto> {
+    return this.offline.customerPage(ctx, query);
   }
 
   @Get('suppliers')

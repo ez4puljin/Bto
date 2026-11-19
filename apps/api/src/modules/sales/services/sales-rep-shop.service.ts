@@ -534,6 +534,28 @@ export class SalesRepShopService {
   }
 
   /**
+   * The shop for a phone to keep (ADR-0225 #2): every product `productPage` lists to this scope
+   * without a filter (`shopIds`: ACTIVE, sale-ready, within the segments), by id after `afterId`,
+   * `limit` at a time, each row as the list enriches it. No search, no count; the id list is one
+   * indexed read of ids, the rows are read only for the page.
+   */
+  async walkPage(
+    scope: ShopScope,
+    afterId: number,
+    limit: number,
+  ): Promise<{ data: RepProduct[]; lastId: number | null }> {
+    const ids = (await this.shopIds(scope)).filter((id) => id > afterId).sort((a, b) => a - b);
+    const pageIds = ids.slice(0, limit);
+    const rows = await this.products.listItemsOf(pageIds);
+    // A product that left the shop between the two reads is left out, as `productsOf` does.
+    const kept = rows.filter((row) => row.status === 'ACTIVE' && row.saleReadyAt !== null);
+    return {
+      data: await this.enrich(scope, kept, businessDate()),
+      lastId: ids.length > limit ? (pageIds[pageIds.length - 1] ?? null) : null,
+    };
+  }
+
+  /**
    * Every product the shop can list: active and sale-ready (the ACTIVE stage), within the scope.
    */
   private async shopIds(scope: ShopScope): Promise<number[]> {

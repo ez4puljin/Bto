@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Deferred (idempotency and document-based mutations in delivery 1; an offline queue is a later session if ever) |
+| Status | Deferred (idempotency and document-based mutations in delivery 1; an offline queue is a later session if ever); partly superseded by ADR-0225 (the sales rep's order works without the server, #1 for that order only, built on #6) |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
 

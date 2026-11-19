@@ -32,6 +32,11 @@ import {
   Min,
 } from 'class-validator';
 import { MAX_PAGE_LIMIT, PageQueryDto, queryIds } from '../../../common/pagination/page';
+import { KNOWN_KEYS_MAX } from '../../identity';
+import {
+  OFFLINE_CUSTOMER_LIMIT,
+  OFFLINE_PRODUCT_LIMIT,
+} from '../services/sales-rep-offline.service';
 import { SalesCustomerOverdueDto } from './sales-boards.dto';
 import { SalesOrderRequestDto } from './sales-orders.dto';
 
@@ -716,4 +721,137 @@ export class SalesRepCustomerDetailDto {
     description: 'The overdue receivable: a red reminder, never a block (ADR-0101); null when none',
   })
   overdue: SalesCustomerOverdueDto | null;
+}
+
+// The order without the server (ADR-0225): what the phone keeps, and the keys it asks about.
+
+/** A UUID as the Idempotency-Key interceptor accepts one (any version). */
+const KEY_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+@ApiSchema({ name: 'SalesRepOfflineProductQuery' })
+export class SalesRepOfflineProductQueryDto {
+  @ApiPropertyOptional({ description: 'nextCursor of the previous page' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  cursor?: string;
+
+  @ApiPropertyOptional({
+    minimum: 1,
+    maximum: OFFLINE_PRODUCT_LIMIT.max,
+    default: OFFLINE_PRODUCT_LIMIT.default,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(OFFLINE_PRODUCT_LIMIT.max)
+  limit?: number;
+}
+
+@ApiSchema({ name: 'SalesRepOfflineCustomerQuery' })
+export class SalesRepOfflineCustomerQueryDto {
+  @ApiPropertyOptional({ description: 'nextCursor of the previous page' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  cursor?: string;
+
+  @ApiPropertyOptional({
+    minimum: 1,
+    maximum: OFFLINE_CUSTOMER_LIMIT.max,
+    default: OFFLINE_CUSTOMER_LIMIT.default,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(OFFLINE_CUSTOMER_LIMIT.max)
+  limit?: number;
+}
+
+@ApiSchema({ name: 'SalesRepOfflineProduct' })
+export class SalesRepOfflineProductDto extends SalesRepProductDto {
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'The main supplier (the shop’s supplier filter); null without one',
+  })
+  mainSupplierId: number | null;
+}
+
+@ApiSchema({ name: 'SalesRepOfflineProductPage' })
+export class SalesRepOfflineProductPageDto {
+  @ApiProperty({
+    type: [SalesRepOfflineProductDto],
+    description:
+      'Every product GET /sales-rep/products shows the caller, by id ascending; basePriceBefore is always null',
+  })
+  data: SalesRepOfflineProductDto[];
+  @ApiProperty({ type: String, nullable: true, description: 'Null on the last page' })
+  nextCursor: string | null;
+}
+
+@ApiSchema({ name: 'SalesRepOfflineCustomer' })
+export class SalesRepOfflineCustomerDto extends SalesRepCustomerDetailDto {
+  @ApiProperty({ type: String, nullable: true, description: 'The default address' })
+  address: string | null;
+  @ApiProperty({
+    description: "The customer's manual credit hold (partners): the server refuses its new orders",
+  })
+  creditHold: boolean;
+}
+
+@ApiSchema({ name: 'SalesRepOfflineCustomerPage' })
+export class SalesRepOfflineCustomerPageDto {
+  @ApiProperty({
+    type: [SalesRepOfflineCustomerDto],
+    description: 'Every ACTIVE customer the caller may see, by id ascending',
+  })
+  data: SalesRepOfflineCustomerDto[];
+  @ApiProperty({ type: String, nullable: true, description: 'Null on the last page' })
+  nextCursor: string | null;
+}
+
+@ApiSchema({ name: 'SalesRepKnownOrdersRequest' })
+export class SalesRepKnownOrdersRequestDto {
+  @ApiProperty({
+    type: [String],
+    minItems: 1,
+    maxItems: KNOWN_KEYS_MAX,
+    description: 'Idempotency-Keys (UUIDs) the phone sent orders with',
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(KNOWN_KEYS_MAX)
+  @IsString({ each: true })
+  @Matches(KEY_UUID, { each: true })
+  keys: string[];
+}
+
+@ApiSchema({ name: 'SalesRepKnownKey' })
+export class SalesRepKnownKeyDto {
+  @ApiProperty({ description: 'As the request spelled it' }) key: string;
+  @ApiProperty({
+    enum: ['COMPLETED', 'IN_PROGRESS'],
+    description: 'IN_PROGRESS: the first request has not finished (or died before it was stored)',
+  })
+  status: 'COMPLETED' | 'IN_PROGRESS';
+  @ApiProperty({ format: 'date-time', description: 'When the server first took the key' })
+  createdAt: string;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'The order POST /sales-rep/orders created with the key; null for anything else',
+  })
+  orderId: number | null;
+}
+
+@ApiSchema({ name: 'SalesRepKnownOrders' })
+export class SalesRepKnownOrdersDto {
+  @ApiProperty({
+    type: [SalesRepKnownKeyDto],
+    description: 'One entry per key the server holds for the caller; unknown keys are absent',
+  })
+  data: SalesRepKnownKeyDto[];
 }

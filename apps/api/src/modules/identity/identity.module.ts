@@ -33,6 +33,7 @@ import { CustomerAccessService } from './services/customer-access.service';
 import { CustomerAccountsService } from './services/customer-accounts.service';
 import { CustomerAuthService } from './services/customer-auth.service';
 import { HousekeepingService } from './services/housekeeping.service';
+import { IdempotencyKeysService } from './services/idempotency-keys.service';
 import {
   CustomerLoginLimiter,
   DEFAULT_LOGIN_LIMITS,
@@ -58,6 +59,7 @@ const CORE_SERVICES = [
   AuditService,
   CustomerAccountsService,
   CustomerLoginLimiter,
+  IdempotencyKeysService,
   LoginLimiter,
   NumberingService,
   OrgService,

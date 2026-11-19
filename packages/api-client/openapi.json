@@ -25736,6 +25736,53 @@
         ]
       }
     },
+    "/api/v1/sales-rep/orders/known": {
+      "post": {
+        "operationId": "SalesRep_knownOrders",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesRepKnownOrdersRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepKnownOrders"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Which of the caller's Idempotency-Keys the server holds (ADR-0225 #5): a phone asks about the\norders it sent in the last three days and sends again the ones a restore from a backup lost.\nReads only; not @Idempotent.",
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
     "/api/v1/sales-rep/map": {
       "get": {
         "operationId": "SalesRep_map",
@@ -26010,6 +26057,124 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/offline/products": {
+      "get": {
+        "operationId": "SalesRep_offlineProducts",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 500,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepOfflineProductPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The shop for the phone's disk (ADR-0225 #2): every product `GET /products` shows the caller, by\nid, `limit` at a time, with its main supplier. No search, no filter, no count.",
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/offline/customers": {
+      "get": {
+        "operationId": "SalesRep_offlineCustomers",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 1000,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepOfflineCustomerPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The customers for the phone's disk (ADR-0225 #2): every ACTIVE customer the caller may see, by\nid, with addresses, contacts, the overdue receivable and the credit hold.",
         "tags": [
           "sales-rep"
         ]
@@ -73123,6 +73288,71 @@
           "events"
         ]
       },
+      "SalesRepKnownOrdersRequest": {
+        "type": "object",
+        "properties": {
+          "keys": {
+            "minItems": 1,
+            "maxItems": 200,
+            "description": "Idempotency-Keys (UUIDs) the phone sent orders with",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "keys"
+        ]
+      },
+      "SalesRepKnownKey": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "As the request spelled it"
+          },
+          "status": {
+            "enum": [
+              "COMPLETED",
+              "IN_PROGRESS"
+            ],
+            "type": "string",
+            "description": "IN_PROGRESS: the first request has not finished (or died before it was stored)"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the server first took the key"
+          },
+          "orderId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The order POST /sales-rep/orders created with the key; null for anything else"
+          }
+        },
+        "required": [
+          "key",
+          "status",
+          "createdAt",
+          "orderId"
+        ]
+      },
+      "SalesRepKnownOrders": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "One entry per key the server holds for the caller; unknown keys are absent",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepKnownKey"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "SalesRepOrderSummary": {
         "type": "object",
         "properties": {
@@ -73692,6 +73922,256 @@
           "total"
         ]
       },
+      "SalesRepOfflineProduct": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "number"
+          },
+          "thumbUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Relative to the server"
+          },
+          "images": {
+            "description": "The primary first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepProductImage"
+            }
+          },
+          "isNew": {
+            "type": "boolean",
+            "description": "Became sale-ready within the last 14 days"
+          },
+          "sellable": {
+            "type": "boolean",
+            "description": "An order accepts it (active, complete, with a home warehouse)"
+          },
+          "homeWarehouseId": {
+            "type": "number",
+            "nullable": true
+          },
+          "available": {
+            "type": "string",
+            "description": "Base units free in the home warehouse; \"0\" when stockBlocked"
+          },
+          "stockBlocked": {
+            "type": "boolean",
+            "description": "The staff app does not count the home warehouse (ADR-0173 #1): «Дууссан», an app order refuses it"
+          },
+          "basePrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "MNT, one base unit in whole packs (the warehouse price); null without terms"
+          },
+          "basePriceBefore": {
+            "type": "string",
+            "nullable": true,
+            "description": "The base price on `priceBefore`; null without it"
+          },
+          "dealPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "MNT, one base unit in whole packs after an unconditional discount, when lower than basePrice; the card strikes basePrice through"
+          },
+          "deal": {
+            "nullable": true,
+            "description": "The badge of its WHOLESALE discount program; null when none marks it",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesRepDeal"
+              }
+            ]
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepProductUnit"
+            }
+          },
+          "mainSupplierId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The main supplier (the shop’s supplier filter); null without one"
+          }
+        },
+        "required": [
+          "id",
+          "sku",
+          "name",
+          "categoryId",
+          "thumbUrl",
+          "images",
+          "isNew",
+          "sellable",
+          "homeWarehouseId",
+          "available",
+          "stockBlocked",
+          "basePrice",
+          "basePriceBefore",
+          "dealPrice",
+          "deal",
+          "units",
+          "mainSupplierId"
+        ]
+      },
+      "SalesRepOfflineProductPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "Every product GET /sales-rep/products shows the caller, by id ascending; basePriceBefore is always null",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepOfflineProduct"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null on the last page"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "SalesRepCustomerAddress": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null for a point without text"
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "address",
+          "isDefault"
+        ]
+      },
+      "SalesRepCustomerContact": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "phone"
+        ]
+      },
+      "SalesRepOfflineCustomer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "addresses": {
+            "description": "Active, the default first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepCustomerAddress"
+            }
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepCustomerContact"
+            }
+          },
+          "overdue": {
+            "nullable": true,
+            "description": "The overdue receivable: a red reminder, never a block (ADR-0101); null when none",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesCustomerOverdue"
+              }
+            ]
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "description": "The default address"
+          },
+          "creditHold": {
+            "type": "boolean",
+            "description": "The customer's manual credit hold (partners): the server refuses its new orders"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "phone",
+          "addresses",
+          "contacts",
+          "overdue",
+          "address",
+          "creditHold"
+        ]
+      },
+      "SalesRepOfflineCustomerPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "Every ACTIVE customer the caller may see, by id ascending",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepOfflineCustomer"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null on the last page"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
       "SalesRepSupplier": {
         "type": "object",
         "properties": {
@@ -73894,49 +74374,6 @@
         "required": [
           "data",
           "nextCursor"
-        ]
-      },
-      "SalesRepCustomerAddress": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "number"
-          },
-          "label": {
-            "type": "string",
-            "nullable": true
-          },
-          "address": {
-            "type": "string",
-            "nullable": true,
-            "description": "Null for a point without text"
-          },
-          "isDefault": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "id",
-          "label",
-          "address",
-          "isDefault"
-        ]
-      },
-      "SalesRepCustomerContact": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "nullable": true
-          },
-          "phone": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "name",
-          "phone"
         ]
       },
       "SalesRepCustomerDetail": {

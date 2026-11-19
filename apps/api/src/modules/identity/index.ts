@@ -19,6 +19,11 @@ export {
 } from './decorators/access.decorators';
 export { IdentityHttpModule, IdentityModule, IdentityWorkerModule } from './identity.module';
 export { IdempotencyKey, Idempotent } from './interceptors/idempotency.interceptor';
+export {
+  IdempotencyKeysService,
+  KNOWN_KEYS_MAX,
+  type KnownIdempotencyKey,
+} from './services/idempotency-keys.service';
 export type { CustomerUserStatus } from './schema';
 export { type AuditEntry, AuditService } from './services/audit.service';
 export {

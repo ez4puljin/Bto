@@ -6375,6 +6375,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales-rep/orders/known": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Which of the caller's Idempotency-Keys the server holds (ADR-0225 #5): a phone asks about the
+         *     orders it sent in the last three days and sends again the ones a restore from a backup lost.
+         *     Reads only; not @Idempotent.
+         */
+        post: operations["SalesRep_knownOrders"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sales-rep/map": {
         parameters: {
             query?: never;
@@ -6431,6 +6452,46 @@ export interface paths {
             cookie?: never;
         };
         get: operations["SalesRep_productBatch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/offline/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The shop for the phone's disk (ADR-0225 #2): every product `GET /products` shows the caller, by
+         *     id, `limit` at a time, with its main supplier. No search, no filter, no count.
+         */
+        get: operations["SalesRep_offlineProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/offline/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The customers for the phone's disk (ADR-0225 #2): every ACTIVE customer the caller may see, by
+         *     id, with addresses, contacts, the overdue receivable and the credit hold.
+         */
+        get: operations["SalesRep_offlineCustomers"];
         put?: never;
         post?: never;
         delete?: never;
@@ -19128,6 +19189,30 @@ export interface components {
             lines: components["schemas"]["SalesRepOrderLine"][];
             events: components["schemas"]["SalesRepOrderEvent"][];
         };
+        SalesRepKnownOrdersRequest: {
+            /** @description Idempotency-Keys (UUIDs) the phone sent orders with */
+            keys: string[];
+        };
+        SalesRepKnownKey: {
+            /** @description As the request spelled it */
+            key: string;
+            /**
+             * @description IN_PROGRESS: the first request has not finished (or died before it was stored)
+             * @enum {string}
+             */
+            status: "COMPLETED" | "IN_PROGRESS";
+            /**
+             * Format: date-time
+             * @description When the server first took the key
+             */
+            createdAt: string;
+            /** @description The order POST /sales-rep/orders created with the key; null for anything else */
+            orderId: number | null;
+        };
+        SalesRepKnownOrders: {
+            /** @description One entry per key the server holds for the caller; unknown keys are absent */
+            data: components["schemas"]["SalesRepKnownKey"][];
+        };
         SalesRepOrderSummary: {
             id: number;
             number: string | null;
@@ -19302,6 +19387,74 @@ export interface components {
             /** @description First page only: how many products the filters keep */
             total: number | null;
         };
+        SalesRepOfflineProduct: {
+            id: number;
+            sku: string;
+            name: string;
+            categoryId: number;
+            /** @description Relative to the server */
+            thumbUrl: string | null;
+            /** @description The primary first */
+            images: components["schemas"]["SalesRepProductImage"][];
+            /** @description Became sale-ready within the last 14 days */
+            isNew: boolean;
+            /** @description An order accepts it (active, complete, with a home warehouse) */
+            sellable: boolean;
+            homeWarehouseId: number | null;
+            /** @description Base units free in the home warehouse; "0" when stockBlocked */
+            available: string;
+            /** @description The staff app does not count the home warehouse (ADR-0173 #1): «Дууссан», an app order refuses it */
+            stockBlocked: boolean;
+            /** @description MNT, one base unit in whole packs (the warehouse price); null without terms */
+            basePrice: string | null;
+            /** @description The base price on `priceBefore`; null without it */
+            basePriceBefore: string | null;
+            /** @description MNT, one base unit in whole packs after an unconditional discount, when lower than basePrice; the card strikes basePrice through */
+            dealPrice: string | null;
+            /** @description The badge of its WHOLESALE discount program; null when none marks it */
+            deal: components["schemas"]["SalesRepDeal"] | null;
+            units: components["schemas"]["SalesRepProductUnit"][];
+            /** @description The main supplier (the shop’s supplier filter); null without one */
+            mainSupplierId: number | null;
+        };
+        SalesRepOfflineProductPage: {
+            /** @description Every product GET /sales-rep/products shows the caller, by id ascending; basePriceBefore is always null */
+            data: components["schemas"]["SalesRepOfflineProduct"][];
+            /** @description Null on the last page */
+            nextCursor: string | null;
+        };
+        SalesRepCustomerAddress: {
+            id: number;
+            label: string | null;
+            /** @description Null for a point without text */
+            address: string | null;
+            isDefault: boolean;
+        };
+        SalesRepCustomerContact: {
+            name: string | null;
+            phone: string | null;
+        };
+        SalesRepOfflineCustomer: {
+            id: number;
+            code: string;
+            name: string;
+            phone: string | null;
+            /** @description Active, the default first */
+            addresses: components["schemas"]["SalesRepCustomerAddress"][];
+            contacts: components["schemas"]["SalesRepCustomerContact"][];
+            /** @description The overdue receivable: a red reminder, never a block (ADR-0101); null when none */
+            overdue: components["schemas"]["SalesCustomerOverdue"] | null;
+            /** @description The default address */
+            address: string | null;
+            /** @description The customer's manual credit hold (partners): the server refuses its new orders */
+            creditHold: boolean;
+        };
+        SalesRepOfflineCustomerPage: {
+            /** @description Every ACTIVE customer the caller may see, by id ascending */
+            data: components["schemas"]["SalesRepOfflineCustomer"][];
+            /** @description Null on the last page */
+            nextCursor: string | null;
+        };
         SalesRepSupplier: {
             id: number;
             name: string;
@@ -19362,17 +19515,6 @@ export interface components {
             /** @description Every order of the store, anyone's, any status, newest first */
             data: components["schemas"]["SalesRepStoreOrder"][];
             nextCursor: string | null;
-        };
-        SalesRepCustomerAddress: {
-            id: number;
-            label: string | null;
-            /** @description Null for a point without text */
-            address: string | null;
-            isDefault: boolean;
-        };
-        SalesRepCustomerContact: {
-            name: string | null;
-            phone: string | null;
         };
         SalesRepCustomerDetail: {
             id: number;
@@ -42256,6 +42398,38 @@ export interface operations {
             };
         };
     };
+    SalesRep_knownOrders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesRepKnownOrdersRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepKnownOrders"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     SalesRep_map: {
         parameters: {
             query?: never;
@@ -42380,6 +42554,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesRepProduct"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_offlineProducts: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepOfflineProductPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_offlineCustomers: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepOfflineCustomerPage"];
                 };
             };
             /** @description RFC 9457 problem details */

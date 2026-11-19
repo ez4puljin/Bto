@@ -26,6 +26,7 @@ import { SalesOrdersService } from './services/sales-orders.service';
 import { SalesPicksService } from './services/sales-picks.service';
 import { SalesDocumentTemplatesService } from './services/sales-document-templates.service';
 import { SalesPipelinesService } from './services/sales-pipelines.service';
+import { SalesRepOfflineService } from './services/sales-rep-offline.service';
 import { SalesRepOrdersService } from './services/sales-rep-orders.service';
 import { SalesRepShopService } from './services/sales-rep-shop.service';
 import { StaffAppAssortmentsController } from './controllers/staff-app-assortments.controller';
@@ -60,6 +61,7 @@ import { LiveStockHub } from './services/live-stock.hub';
     RepVisitsService,
     SalesRepOrdersService,
     SalesRepShopService,
+    SalesRepOfflineService,
     CustomerOrdersService,
   ],
   exports: [
@@ -78,6 +80,7 @@ import { LiveStockHub } from './services/live-stock.hub';
     RepVisitsService,
     SalesRepOrdersService,
     SalesRepShopService,
+    SalesRepOfflineService,
     CustomerOrdersService,
   ],
 })
