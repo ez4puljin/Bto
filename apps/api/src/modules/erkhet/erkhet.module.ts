@@ -2,18 +2,33 @@ import { Injectable, Module, type OnApplicationBootstrap } from '@nestjs/common'
 import { JobWorkerService } from '../../common/jobs/worker/job-worker.service';
 import { JobsWorkerModule } from '../../common/jobs/worker/jobs-worker.module';
 import { CatalogModule } from '../catalog';
+import { FinBridgeModule } from '../fin-bridge';
+import { FinanceModule } from '../finance';
 import { IdentityModule } from '../identity';
 import { PartnersModule } from '../partners';
 import { PricingModule } from '../pricing';
 import { ErkhetController } from './controllers/erkhet.controller';
+import { ErkhetLedgerController } from './controllers/erkhet-ledger.controller';
+import { ErkhetLedgerJob, ErkhetLedgerNightlyJob } from './jobs/erkhet-ledger.job';
 import { ErkhetNightlyJob } from './jobs/erkhet-nightly.job';
 import { ErkhetSyncJob } from './jobs/erkhet-sync.job';
 import { ErkhetApplyService } from './services/erkhet-apply.service';
+import { ErkhetLedgerFlowService } from './services/erkhet-ledger-flow.service';
+import { ErkhetLedgerService } from './services/erkhet-ledger.service';
 import { ErkhetRunFlowService } from './services/erkhet-run-flow.service';
 import { ErkhetSettingsFlowService } from './services/erkhet-settings-flow.service';
 import { ErkhetSyncService } from './services/erkhet-sync.service';
 
-const IMPORTS = [IdentityModule, PartnersModule, CatalogModule, PricingModule];
+// fin-bridge posts the copies of Erkhet's transactions; finance reverses Bto's own documents that
+// would count twice beside them (ADR-0219).
+const IMPORTS = [
+  IdentityModule,
+  PartnersModule,
+  CatalogModule,
+  PricingModule,
+  FinBridgeModule,
+  FinanceModule,
+];
 
 /**
  * «Эрхэт тулгалт» in the api (docs/modules/erkhet.md, ADR-0203): the sign-in, starting a check,
@@ -22,8 +37,13 @@ const IMPORTS = [IdentityModule, PartnersModule, CatalogModule, PricingModule];
  */
 @Module({
   imports: IMPORTS,
-  providers: [ErkhetSettingsFlowService, ErkhetSyncService, ErkhetApplyService],
-  controllers: [ErkhetController],
+  providers: [
+    ErkhetSettingsFlowService,
+    ErkhetSyncService,
+    ErkhetApplyService,
+    ErkhetLedgerService,
+  ],
+  controllers: [ErkhetController, ErkhetLedgerController],
 })
 export class ErkhetHttpModule {}
 
@@ -34,11 +54,15 @@ export class ErkhetJobsBootstrap implements OnApplicationBootstrap {
     private readonly worker: JobWorkerService,
     private readonly sync: ErkhetSyncJob,
     private readonly nightly: ErkhetNightlyJob,
+    private readonly ledger: ErkhetLedgerJob,
+    private readonly ledgerNightly: ErkhetLedgerNightlyJob,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
     await this.worker.register(this.sync);
     await this.worker.register(this.nightly);
+    await this.worker.register(this.ledger);
+    await this.worker.register(this.ledgerNightly);
   }
 }
 
@@ -49,8 +73,12 @@ export class ErkhetJobsBootstrap implements OnApplicationBootstrap {
     ErkhetSettingsFlowService,
     ErkhetSyncService,
     ErkhetRunFlowService,
+    ErkhetLedgerService,
+    ErkhetLedgerFlowService,
     ErkhetSyncJob,
     ErkhetNightlyJob,
+    ErkhetLedgerJob,
+    ErkhetLedgerNightlyJob,
     ErkhetJobsBootstrap,
   ],
 })

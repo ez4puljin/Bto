@@ -82,7 +82,9 @@ const MODULE_DEPS = {
   expiry: ['identity', 'catalog', 'partners', 'inventory'],
   // Erkhet's lists against Bto's (ADR-0203): reads the three, changes customers and prices through
   // their own services; nobody imports it.
-  erkhet: ['identity', 'partners', 'catalog', 'pricing'],
+  // ADR-0219: the copies of Erkhet's receivable and payable transactions post through fin-bridge
+  // (`FinErkhetBooks`), and Bto's own vouchers and entries are reversed through finance.
+  erkhet: ['identity', 'partners', 'catalog', 'pricing', 'fin-bridge', 'finance'],
   // erxes's deals as draft orders (ADR-0218): reads the three, makes orders only through sales'
   // own draft path; nobody imports it.
   erxes: ['identity', 'catalog', 'partners', 'sales'],

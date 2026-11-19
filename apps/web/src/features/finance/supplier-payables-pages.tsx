@@ -32,6 +32,8 @@ import {
   useSupplierBalances,
   useSupplierLedger,
 } from './api';
+import { erkhetKeysOf, useErkhetLinks } from '@/features/erkhet/api';
+import { ErkhetDocument, ErkhetKind } from '@/features/erkhet/erkhet-entry';
 import { DateRangeFilter } from './date-range-filter';
 
 /** The balances' columns (ADR-0119): the supplier, what is owed, the oldest bill's date. */
@@ -138,6 +140,7 @@ export function SupplierLedgerPage() {
   const balance = useSupplierBalance(supplierId);
   const ledger = useSupplierLedger(supplierId, { from, to });
   const rows = ledger.data?.pages.flatMap((page) => page.data) ?? [];
+  const erkhetLinks = useErkhetLinks(erkhetKeysOf(rows));
   const summary = balance.data;
 
   const crumbs = [{ label: t('finance.payables.title'), to: '/finance/suppliers' }];
@@ -217,9 +220,23 @@ export function SupplierLedgerPage() {
               {rows.map((entry) => (
                 <TableRow key={entry.id}>
                   <TableCell className="font-mono">{entry.entryDate}</TableCell>
-                  <TableCell>{t(`finance.apKinds.${entry.kind}`)}</TableCell>
+                  <TableCell>
+                    {entry.erkhet ? (
+                      <ErkhetKind erkhet={entry.erkhet} reversal={entry.kind === 'VOID'} />
+                    ) : (
+                      t(`finance.apKinds.${entry.kind}`)
+                    )}
+                  </TableCell>
                   <TableCell className="font-mono">
-                    <DocumentLink entry={entry} />
+                    {entry.erkhet ? (
+                      <ErkhetDocument
+                        erkhet={entry.erkhet}
+                        number={entry.docNumber}
+                        link={entry.erkhet.key ? erkhetLinks.get(entry.erkhet.key) : undefined}
+                      />
+                    ) : (
+                      <DocumentLink entry={entry} />
+                    )}
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {entry.debit === '0.00' ? '' : formatMnt(entry.debit)}

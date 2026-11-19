@@ -11431,6 +11431,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/erkhet/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ErkhetLedger_overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/erkhet/ledger/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ErkhetLedger_updateSettings"];
+        trace?: never;
+    };
+    "/api/v1/erkhet/ledger/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Starts a check, a post or a revert; the worker runs it and `GET erkhet/ledger` says when it
+         *     ended. A refusal is an answer (`started: false`), so the page can say what is missing.
+         */
+        post: operations["ErkhetLedger_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/erkhet/ledger/parties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The parties as Erkhet shows them, to hold against Erkhet's own receivable and payable report. */
+        get: operations["ErkhetLedger_parties"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/erkhet/ledger/own-documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bto's own documents on the copied accounts: with the copies they count twice. */
+        get: operations["ErkhetLedger_ownDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/erkhet/ledger/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where copied transactions open in Erkhet: an address, nothing of Erkhet's. The customer and
+         *     supplier ledgers show it, so it asks their right.
+         */
+        get: operations["ErkhetLedger_links"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/erxes/settings": {
         parameters: {
             query?: never;
@@ -20119,6 +20225,19 @@ export interface components {
             data: components["schemas"]["CustomerBalance"][];
             nextCursor: string | null;
         };
+        LedgerErkhetEntry: {
+            /**
+             * @description A transaction or an opening balance
+             * @enum {string}
+             */
+            kind: "TR" | "OPENING";
+            /** @description «account:transaction» for `GET erkhet/ledger/links`; null for an opening balance */
+            key: string | null;
+            /** @description Erkhet's «Баримтын дугаар» */
+            billNumber: string | null;
+            /** @description Erkhet's «Гүйлгээний утга» */
+            text: string | null;
+        };
         LedgerEntry: {
             id: number;
             /** @example 2026-10-16 */
@@ -20138,6 +20257,8 @@ export interface components {
             balanceAfter: string;
             /** Format: date-time */
             createdAt: string;
+            /** @description Set when the line is a copy of Erkhet's books (ADR-0219); always sent */
+            erkhet?: components["schemas"]["LedgerErkhetEntry"] | null;
         };
         CustomerLedgerPage: {
             data: components["schemas"]["LedgerEntry"][];
@@ -20508,6 +20629,8 @@ export interface components {
             balanceAfter: string;
             /** Format: date-time */
             createdAt: string;
+            /** @description Set when the line is a copy of Erkhet's books (ADR-0219); always sent */
+            erkhet?: components["schemas"]["LedgerErkhetEntry"] | null;
         };
         SupplierLedgerPage: {
             data: components["schemas"]["PayableEntry"][];
@@ -25279,6 +25402,189 @@ export interface components {
             refused: number;
             /** @description Already settled, or nothing to do */
             skipped: number;
+        };
+        ErkhetLedgerAccountSummary: {
+            /** @description Erkhet's account code */
+            account: string;
+            /** @enum {string} */
+            side: "RECEIVABLE" | "PAYABLE";
+            trs: number;
+            lines: number;
+            /** @description MNT, debit − credit before the start date */
+            opening: string;
+            /** @description MNT */
+            debit: string;
+            /** @description MNT */
+            credit: string;
+            /** @description MNT, opening + debit − credit */
+            closing: string;
+            openingParties: number;
+        };
+        ErkhetLedgerCounts: {
+            post: number;
+            revise: number;
+            reverse: number;
+            unmatched: number;
+        };
+        ErkhetLedgerOwnTotal: {
+            count: number;
+            /** @description MNT, debit − credit */
+            total: string;
+        };
+        ErkhetLedgerDone: {
+            posted: number;
+            reversed: number;
+            /** @description Left as they were: Bto's own allocation holds their item */
+            blocked: number;
+            /** @description Bto's own documents reversed with the run */
+            ownReversed: number;
+            /** @description Transaction addresses found in the run */
+            links: number;
+        };
+        ErkhetLedgerSummary: {
+            accounts: components["schemas"]["ErkhetLedgerAccountSummary"][];
+            trs: components["schemas"]["ErkhetLedgerCounts"];
+            openings: components["schemas"]["ErkhetLedgerCounts"];
+            unmatchedParties: number;
+            ownDocuments: components["schemas"]["ErkhetLedgerOwnTotal"];
+            done: components["schemas"]["ErkhetLedgerDone"] | null;
+        };
+        ErkhetLedgerRun: {
+            id: number;
+            /** @enum {string} */
+            kind: "CHECK" | "POST" | "REVERT";
+            /** @enum {string} */
+            status: "QUEUED" | "RUNNING" | "DONE" | "FAILED";
+            /** @enum {string} */
+            trigger: "MANUAL" | "NIGHTLY";
+            startedBy: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            finishedAt: string | null;
+            /** @enum {string|null} */
+            failure: "NOT_CONFIGURED" | "KEY_UNREADABLE" | "LOGIN_FAILED" | "COMPANY_UNREACHABLE" | "UNREACHABLE" | "TIMEOUT" | "UNEXPECTED_ANSWER" | "UNEXPECTED_FILE" | "INTERRUPTED" | "INTERNAL" | "ACCOUNT_NOT_FOUND" | "UNEXPECTED_PAGE" | "PERIOD_CLOSED" | "CLEARING_MISSING" | "POSTING_REFUSED" | null;
+            /** @description What the failure names: a month, an account code, an error code of the books */
+            failureDetail: {
+                [key: string]: string;
+            } | null;
+            /** @enum {string|null} */
+            ownChoice: "REVERSE" | "KEEP" | null;
+            ownReversed: number;
+            summary: components["schemas"]["ErkhetLedgerSummary"] | null;
+        };
+        ErkhetLedgerOverview: {
+            /** @description A complete sign-in is saved */
+            configured: boolean;
+            receivableAccount: string;
+            payableAccount: string;
+            /** Format: date */
+            startDate: string;
+            /** @description «Bto-д оруулах» ran: the night keeps up */
+            posting: boolean;
+            nightly: boolean;
+            active: components["schemas"]["ErkhetLedgerRun"] | null;
+            latest: components["schemas"]["ErkhetLedgerRun"] | null;
+            failed: components["schemas"]["ErkhetLedgerRun"] | null;
+            /** @description A fresh check stands: the first post may start */
+            checked: boolean;
+            /** @description Copies in the books */
+            posted: number;
+            /** @description Copies a person has to look at */
+            blocked: number;
+        };
+        ErkhetLedgerSettingsUpdateRequest: {
+            /** @description Erkhet's account of the customers' receivables */
+            receivableAccount?: string;
+            /** @description Erkhet's account of the suppliers' payables */
+            payableAccount?: string;
+            /**
+             * Format: date
+             * @description The first day copied line by line
+             */
+            startDate?: string;
+        };
+        ErkhetLedgerSettings: {
+            receivableAccount: string;
+            payableAccount: string;
+            /** Format: date */
+            startDate: string;
+            /** @description The night keeps the books up with Erkhet */
+            posting: boolean;
+        };
+        ErkhetLedgerStartRequest: {
+            /** @enum {string} */
+            kind: "CHECK" | "POST" | "REVERT";
+            /**
+             * @description A post only: what to do with Bto's own documents on the copied accounts
+             * @enum {string}
+             */
+            ownDocuments?: "REVERSE" | "KEEP";
+            /** @description The reason written on each reversal of them */
+            reason?: string;
+        };
+        ErkhetLedgerStartResult: {
+            started: boolean;
+            /** @enum {string|null} */
+            refusal: "NOT_CONFIGURED" | "RUNNING" | "NOT_CHECKED" | "CHOICE_REQUIRED" | "NOT_REVERSIBLE" | "NOTHING_POSTED" | null;
+            run: components["schemas"]["ErkhetLedgerRun"] | null;
+        };
+        ErkhetLedgerParty: {
+            account: string;
+            /** @enum {string} */
+            side: "RECEIVABLE" | "PAYABLE";
+            /** @description Empty for lines Erkhet shows without a party */
+            code: string;
+            /** @description As Erkhet names it */
+            name: string;
+            /** @description The customer or supplier in Bto */
+            btoId: number | null;
+            lines: number;
+            /** @description MNT */
+            opening: string;
+            /** @description MNT */
+            debit: string;
+            /** @description MNT */
+            credit: string;
+            /** @description MNT */
+            closing: string;
+        };
+        ErkhetLedgerPartyPage: {
+            data: components["schemas"]["ErkhetLedgerParty"][];
+            nextCursor: string | null;
+        };
+        ErkhetLedgerOwnDocument: {
+            documentId: number | null;
+            entryId: number;
+            number: string;
+            /** Format: date */
+            date: string;
+            /** @enum {string} */
+            side: "RECEIVABLE" | "PAYABLE";
+            /** @enum {string} */
+            kind: "VOUCHER" | "JOURNAL" | "OTHER";
+            /**
+             * @description Why it cannot be reversed from this page; null when it can
+             * @enum {string|null}
+             */
+            blocker: "KIND" | "BANK_STATEMENT" | null;
+            partyName: string | null;
+            /** @description MNT, debit − credit on the account */
+            amount: string;
+        };
+        ErkhetLedgerOwnDocuments: {
+            data: components["schemas"]["ErkhetLedgerOwnDocument"][];
+            /** @description MNT, of every such document */
+            total: string;
+            /** @description More exist than the list holds */
+            truncated: boolean;
+        };
+        ErkhetLedgerLink: {
+            key: string;
+            /** @description The address to open in Erkhet */
+            url: string;
+            /** @description false: the journal list of that day, not the transaction itself */
+            exact: boolean;
         };
         ErxesSettings: {
             baseUrl: string;
@@ -52749,6 +53055,195 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErkhetApplyResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ErkhetLedger_overview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErkhetLedgerOverview"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ErkhetLedger_updateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ErkhetLedgerSettingsUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErkhetLedgerSettings"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ErkhetLedger_start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ErkhetLedgerStartRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErkhetLedgerStartResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ErkhetLedger_parties: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description One of the two copied Erkhet account codes */
+                account?: string;
+                /** @description true: only parties Bto does not have */
+                unmatched?: boolean;
+                /** @description A code or a part of a name */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErkhetLedgerPartyPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ErkhetLedger_ownDocuments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErkhetLedgerOwnDocuments"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ErkhetLedger_links: {
+        parameters: {
+            query: {
+                /** @description Copied transactions as «account:transaction», comma separated, at most 200 */
+                keys: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErkhetLedgerLink"][];
                 };
             };
             /** @description RFC 9457 problem details */

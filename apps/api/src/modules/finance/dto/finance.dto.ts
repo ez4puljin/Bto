@@ -1130,6 +1130,25 @@ export class CustomerBalancesPageDto {
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
 }
 
+@ApiSchema({ name: 'LedgerErkhetEntry' })
+export class LedgerErkhetEntryDto {
+  @ApiProperty({ enum: ['TR', 'OPENING'], description: 'A transaction or an opening balance' })
+  kind: 'TR' | 'OPENING';
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: '«account:transaction» for `GET erkhet/ledger/links`; null for an opening balance',
+  })
+  key: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: "Erkhet's «Баримтын дугаар»" })
+  billNumber: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: "Erkhet's «Гүйлгээний утга»" })
+  text: string | null;
+}
+
 @ApiSchema({ name: 'LedgerEntry' })
 export class LedgerEntryDto {
   @ApiProperty() id: number;
@@ -1142,6 +1161,12 @@ export class LedgerEntryDto {
   @ApiProperty({ example: '0.00' }) credit: string;
   @ApiProperty({ example: '150000.00' }) balanceAfter: string;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
+  @ApiPropertyOptional({
+    type: LedgerErkhetEntryDto,
+    nullable: true,
+    description: "Set when the line is a copy of Erkhet's books (ADR-0219); always sent",
+  })
+  erkhet: LedgerErkhetEntryDto | null;
 }
 
 @ApiSchema({ name: 'CustomerLedgerPage' })
@@ -1291,6 +1316,12 @@ export class PayableEntryDto {
   @ApiProperty({ example: '150000.00', description: 'What is owed after this line' })
   balanceAfter: string;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
+  @ApiPropertyOptional({
+    type: LedgerErkhetEntryDto,
+    nullable: true,
+    description: "Set when the line is a copy of Erkhet's books (ADR-0219); always sent",
+  })
+  erkhet: LedgerErkhetEntryDto | null;
 }
 
 @ApiSchema({ name: 'SupplierLedgerPage' })

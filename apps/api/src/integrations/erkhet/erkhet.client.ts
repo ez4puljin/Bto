@@ -1,3 +1,5 @@
+import { ERKHET_LEDGER_PATHS } from '@tugeel/shared/erkhet';
+import { ErkhetPageError, readAccountOptions, readUpdateUrl } from './erkhet.journal';
 import {
   type ErkhetAccount,
   ErkhetError,
@@ -10,7 +12,11 @@ export const ERKHET_PAGE_TIMEOUT_MS = 60_000;
 export const ERKHET_LIST_TIMEOUT_MS = 300_000;
 /** A list larger than this is not one of ours (the item list is under 2 MiB). */
 const MAX_LIST_BYTES = 30 * 1024 * 1024;
+/** A page of the journal holds 100 lines; one far larger is not that page. */
+const MAX_PAGE_BYTES = 8 * 1024 * 1024;
 const MAX_REDIRECTS = 6;
+/** What Erkhet's own pages send with a background request; its JSON answers need it. */
+const XHR = { 'X-Requested-With': 'XMLHttpRequest' } as const;
 /** Erkhet refuses clients that do not look like a browser. */
 const USER_AGENT =
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
@@ -113,6 +119,97 @@ export class ErkhetClient {
     return { data, size: data.length };
   }
 
+  /**
+   * One page of the general journal filtered to an account (ADR-0219): `account` is Erkhet's
+   * internal id of it (`accountIds`), the dates are inclusive, pages count from 1. The page's HTML;
+   * a page past the end answers 200 without lines.
+   */
+  async journalPage(query: {
+    from: string;
+    to: string;
+    account: string;
+    page: number;
+  }): Promise<string> {
+    const params = new URLSearchParams({
+      date1: query.from,
+      date2: query.to,
+      account: query.account,
+      page: String(query.page),
+    });
+    return this.text(`${this.companyUrl(ERKHET_LEDGER_PATHS.journal)}?${params.toString()}`);
+  }
+
+  /** Erkhet's internal account ids by account code, from the journal's filter form. */
+  async accountIds(): Promise<Map<string, string>> {
+    const params = new URLSearchParams({ main_text: 'Ерөнхий журнал' });
+    const answer = await this.json(
+      `${this.companyUrl(ERKHET_LEDGER_PATHS.filterForm)}?${params.toString()}`,
+    );
+    const content = (answer as { content?: unknown } | null)?.content;
+    if (typeof content !== 'string') {
+      throw new ErkhetError('UNEXPECTED_ANSWER', 'the filter form came without its content');
+    }
+    try {
+      return readAccountOptions(content);
+    } catch (error: unknown) {
+      if (error instanceof ErkhetPageError)
+        throw new ErkhetError('UNEXPECTED_ANSWER', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * The path that opens a transaction in Erkhet (`/{company}/inventory/sale/update/…`), or null
+   * when Erkhet gives none. Only `update_url` of the answer is read: its `delete_url` is never
+   * kept, and this client never requests it.
+   */
+  async transactionPath(trId: number): Promise<string | null> {
+    const params = new URLSearchParams({ tr_id: String(trId) });
+    const answer = await this.json(
+      `${this.companyUrl(ERKHET_LEDGER_PATHS.actions)}?${params.toString()}`,
+    );
+    return readUpdateUrl(answer, this.account.companyId);
+  }
+
+  /** Erkhet's address, for the links the screens show. */
+  get address(): string {
+    return this.origin;
+  }
+
+  private async text(url: string, headers: Record<string, string> = {}): Promise<string> {
+    if (!this.signedIn) await this.signIn();
+    const answer = await this.request('GET', url, this.timeouts.page, undefined, headers);
+    if (isLoginPage(answer.url)) {
+      throw new ErkhetError('LOGIN_FAILED', 'the session ended before the page came');
+    }
+    if (!answer.response.ok) {
+      throw new ErkhetError(
+        'UNEXPECTED_ANSWER',
+        `the page answered HTTP ${answer.response.status}`,
+        answer.response.status,
+      );
+    }
+    let body: string;
+    try {
+      body = await answer.response.text();
+    } catch (error: unknown) {
+      throw transportError(error, this.timeouts.page);
+    }
+    if (body.length > MAX_PAGE_BYTES) {
+      throw new ErkhetError('UNEXPECTED_ANSWER', 'the page is larger than a page of the journal');
+    }
+    return body;
+  }
+
+  private async json(url: string): Promise<unknown> {
+    const body = await this.text(url, XHR);
+    try {
+      return JSON.parse(body) as unknown;
+    } catch {
+      throw new ErkhetError('UNEXPECTED_ANSWER', 'Erkhet did not answer in JSON');
+    }
+  }
+
   private companyUrl(path: string): string {
     return `${this.origin}/${this.account.companyId}/${path}`;
   }
@@ -135,6 +232,7 @@ export class ErkhetClient {
     start: string,
     timeoutMs: number,
     form?: URLSearchParams,
+    extra: Record<string, string> = {},
   ): Promise<Answer> {
     let url = new URL(start);
     let verb = method;
@@ -147,6 +245,7 @@ export class ErkhetClient {
       const headers: Record<string, string> = {
         'User-Agent': USER_AGENT,
         Accept: '*/*',
+        ...extra,
       };
       if (this.cookies.size > 0) {
         headers.Cookie = [...this.cookies].map(([name, value]) => `${name}=${value}`).join('; ');

@@ -465,6 +465,12 @@ describe('nightly jobs', () => {
           .sort((a, b) => a.name.localeCompare(b.name)),
       ).toEqual([
         {
+          name: 'erkhet.ledgerNightly',
+          cron: '10 3 * * *',
+          timezone: 'Asia/Ulaanbaatar',
+          missed: 'once',
+        },
+        {
           name: 'erkhet.nightly',
           cron: '40 4 * * *',
           timezone: 'Asia/Ulaanbaatar',

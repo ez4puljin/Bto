@@ -12,6 +12,7 @@ export {
   supplierIdOfRef,
   supplierRef,
   ALLOCATION_NUMBER_DEFAULT,
+  ERKHET_DOC_TYPES,
   FIN_DOC_TYPES,
   FIN_SOURCE,
   LEGACY_PARTY_REF,
@@ -21,5 +22,13 @@ export {
   STOCK_NUMBER_DEFAULT,
 } from './installation';
 export { type CompanyEdit, FinCompanyBridge } from './services/company-bridge.service';
+export {
+  ErkhetBooksRefusal,
+  type ErkhetCopyCommand,
+  type ErkhetCopyItem,
+  FinErkhetBooks,
+  type OwnDocument,
+  type OwnDocumentKind,
+} from './services/erkhet-books.service';
 export { FinContexts } from './services/contexts.service';
 export { FinPartiesBridge } from './services/parties-bridge.service';

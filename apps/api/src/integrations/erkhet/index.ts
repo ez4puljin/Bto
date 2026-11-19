@@ -2,6 +2,15 @@
 // docs/modules/erkhet.md).
 export { ERKHET_LIST_TIMEOUT_MS, ERKHET_PAGE_TIMEOUT_MS, ErkhetClient } from './erkhet.client';
 export { ErkhetGateway } from './erkhet.gateway';
+export {
+  type ErkhetJournalLine,
+  ErkhetPageError,
+  joinJournalPages,
+  readAccountOptions,
+  readAmount,
+  readJournalPage,
+  readUpdateUrl,
+} from './erkhet.journal';
 export { ERKHET_FETCH, ErkhetIntegrationModule } from './erkhet.module';
 export {
   type ErkhetAccount,

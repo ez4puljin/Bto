@@ -34,6 +34,8 @@ import {
   useCustomerLedger,
   useCustomerStatementTotals,
 } from './api';
+import { erkhetKeysOf, useErkhetLinks } from '@/features/erkhet/api';
+import { ErkhetDocument, ErkhetKind } from '@/features/erkhet/erkhet-entry';
 import { PaymentDialog } from './payment-dialog';
 import { PeekLink, type RecordPeek } from '@/features/reports/books/record-peek';
 import { usePeek } from '@/features/reports/books/use-peek';
@@ -71,6 +73,7 @@ export function CustomerLedgerPage() {
   // The range's totals (ADR-0216), only when both ends are chosen: the page without them is as before.
   const totals = useCustomerStatementTotals(customerId, { from, to });
   const rows = ledger.data?.pages.flatMap((page) => page.data) ?? [];
+  const erkhetLinks = useErkhetLinks(erkhetKeysOf(rows));
   const summary = balance.data;
 
   const crumbs = [{ label: t('finance.balances.title'), to: '/finance/customers' }];
@@ -167,9 +170,23 @@ export function CustomerLedgerPage() {
               {rows.map((entry) => (
                 <TableRow key={entry.id}>
                   <TableCell className="font-mono">{entry.entryDate}</TableCell>
-                  <TableCell>{t(`finance.arKinds.${entry.kind}`)}</TableCell>
+                  <TableCell>
+                    {entry.erkhet ? (
+                      <ErkhetKind erkhet={entry.erkhet} reversal={entry.kind === 'VOID'} />
+                    ) : (
+                      t(`finance.arKinds.${entry.kind}`)
+                    )}
+                  </TableCell>
                   <TableCell className="font-mono">
-                    <DocumentLink entry={entry} onOpen={peek.open} />
+                    {entry.erkhet ? (
+                      <ErkhetDocument
+                        erkhet={entry.erkhet}
+                        number={entry.docNumber}
+                        link={entry.erkhet.key ? erkhetLinks.get(entry.erkhet.key) : undefined}
+                      />
+                    ) : (
+                      <DocumentLink entry={entry} onOpen={peek.open} />
+                    )}
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {entry.debit === '0.00' ? '' : formatMnt(entry.debit)}

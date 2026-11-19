@@ -6,7 +6,7 @@ import { DEFAULT_PAGE_LIMIT, decodeCursor, encodeCursor } from '../../../common/
 import { type FinOpenItemRow, type FinPartyLedgerRow, FinReader } from '../../../finance-core';
 import { BTO_SOURCE, FIN_DOC_TYPES, FinPartiesBridge } from '../../fin-bridge';
 import { SuppliersService } from '../../partners';
-import type { LedgerQuery } from './ar-ledger.service';
+import { type ErkhetEntry, erkhetOf, type LedgerQuery } from './ar-ledger.service';
 import { FinBooks } from './fin-books';
 
 /** A supplier's payable: what the company owes it (open bills less its open debits). */
@@ -38,6 +38,8 @@ export interface PayableEntry {
   /** What the company owes after this line, oldest first. */
   balanceAfter: Decimal;
   createdAt: Date;
+  /** Set when the line is a copy of Erkhet's books (ADR-0219); null for Bto's own documents. */
+  erkhet: ErkhetEntry | null;
 }
 
 export interface PayableLedgerPage {
@@ -202,6 +204,7 @@ export class ApLedgerService {
         credit: row.credit,
         balanceAfter: row.balanceAfter.negated(),
         createdAt: row.postedAt,
+        erkhet: erkhetOf(row),
       })),
       nextCursor: rows.length > limit && last ? encodeCursor({ id: last.lineId }) : null,
       opening: opening.negated(),

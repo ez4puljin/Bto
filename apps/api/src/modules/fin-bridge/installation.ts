@@ -1,3 +1,4 @@
+import { ERKHET_BOOKS } from '@tugeel/shared/erkhet';
 import { DEFAULT_GL_ACCOUNTS, FINANCE_NUMBER_DEFAULTS, type GlRole } from '@tugeel/shared/finance';
 import mn from '@tugeel/shared/i18n/mn.json';
 import type {
@@ -49,6 +50,26 @@ export const FIN_DOC_TYPES = {
   // F4 (ADR-0097): a stock posting's value and a receipt's revaluation, numbered by the core.
   STOCK_VALUE: { code: 'BTO.STOCK_VALUE', system: BTO_SOURCE, docType: 'STOCK' },
   STOCK_REVALUE: { code: 'BTO.STOCK_VALUE', system: BTO_SOURCE, docType: 'STOCK_REVALUE' },
+} as const;
+
+/**
+ * The copies of Erkhet's receivable and payable transactions (ADR-0219): posted by source BTO so a
+ * party's balance combines with Bto's own, under document types of their own. A transaction and an
+ * opening balance carry Erkhet's number; the pairing of a party's copied items is numbered by the
+ * core.
+ */
+export const ERKHET_DOC_TYPES = {
+  TR: { code: ERKHET_BOOKS.trType, system: BTO_SOURCE, docType: ERKHET_BOOKS.trDocType },
+  OPENING: {
+    code: ERKHET_BOOKS.openingType,
+    system: BTO_SOURCE,
+    docType: ERKHET_BOOKS.openingDocType,
+  },
+  ALLOCATION: {
+    code: ERKHET_BOOKS.allocationType,
+    system: BTO_SOURCE,
+    docType: ERKHET_BOOKS.allocationDocType,
+  },
 } as const;
 
 /** The stock value documents' first number format until the accountant chooses one (TODO-VERIFY, ADR-0097). */
@@ -158,7 +179,7 @@ export const ROLE_OF_POSTING_KEY: ReadonlyMap<string, GlRole> = new Map(
  */
 export function btoChartTemplate(): FinChartTemplateAccount[] {
   const names: Record<string, string> = mn.finance.seedAccounts;
-  return DEFAULT_GL_ACCOUNTS.map((account) => ({
+  const chart: FinChartTemplateAccount[] = DEFAULT_GL_ACCOUNTS.map((account) => ({
     code: account.code,
     name: names[account.code] ?? account.code,
     kind: account.kind,
@@ -171,6 +192,17 @@ export function btoChartTemplate(): FinChartTemplateAccount[] {
     control: account.role === null ? 'NONE' : POSTING_KEY_OF_ROLE[account.role].requiredControl,
     key: account.role === null ? null : POSTING_KEY_OF_ROLE[account.role].code,
   }));
+  // The other side of every copy of Erkhet's transactions (ADR-0219); it holds no chart role, and
+  // migration 0112 added the same account to charts that were not empty.
+  chart.push({
+    code: ERKHET_BOOKS.clearingAccount,
+    name: names[ERKHET_BOOKS.clearingAccount] ?? ERKHET_BOOKS.clearingAccount,
+    kind: 'EQUITY',
+    normalSide: 'CREDIT',
+    control: 'NONE',
+    key: ERKHET_BOOKS.clearingKey,
+  });
+  return chart;
 }
 
 /**
@@ -194,7 +226,11 @@ export function btoInstallationSpec(input: {
       { code: BTO_SOURCE, linkTemplate: null },
       { code: FIN_SOURCE, linkTemplate: null },
     ],
-    postingKeys: [...Object.values(POSTING_KEY_OF_ROLE), key(MANUAL_KEY)],
+    postingKeys: [
+      ...Object.values(POSTING_KEY_OF_ROLE),
+      key(MANUAL_KEY),
+      key(ERKHET_BOOKS.clearingKey),
+    ],
     legacyParty: { system: FIN_SOURCE, ref: LEGACY_PARTY_REF, name: LEGACY_PARTY_REF },
     numberSeries: [
       { code: 'PAYMENT', ...FINANCE_NUMBER_DEFAULTS.PAYMENT },
@@ -294,6 +330,27 @@ export function btoInstallationSpec(input: {
         class: 'JOURNAL',
         numberMode: 'CORE',
         numberSeries: 'STOCK',
+      },
+      {
+        code: ERKHET_DOC_TYPES.TR.code,
+        system: BTO_SOURCE,
+        class: 'JOURNAL',
+        numberMode: 'SOURCE',
+        numberSeries: null,
+      },
+      {
+        code: ERKHET_DOC_TYPES.OPENING.code,
+        system: BTO_SOURCE,
+        class: 'OPENING',
+        numberMode: 'SOURCE',
+        numberSeries: null,
+      },
+      {
+        code: ERKHET_DOC_TYPES.ALLOCATION.code,
+        system: BTO_SOURCE,
+        class: 'ALLOCATION',
+        numberMode: 'CORE',
+        numberSeries: 'ALLOCATION',
       },
     ],
     branches: input.branches.map((branch) => ({

@@ -45,6 +45,10 @@ declare module './job-catalog' {
     'erkhet.sync': { runId: number };
     /** Nights: starts the day's Erkhet check when its sign-in is saved (ADR-0203 #5). */
     'erkhet.nightly': ScheduledPayload;
+    /** One run of the copy of Erkhet's receivable and payable transactions (ADR-0219). */
+    'erkhet.ledger': { runId: number };
+    /** Nights: keeps Bto's books up with Erkhet once the copy was posted (ADR-0219 #7). */
+    'erkhet.ledgerNightly': ScheduledPayload;
     /** Every minute: the new deals of erxes's ticked pipelines as draft orders (ADR-0218 #8). */
     'erxes.pull': ScheduledPayload;
     /** Sends one settlement SMS batch through WeSend, message by message (ADR-0216). */
@@ -88,6 +92,18 @@ const BTO_JOB_QUEUES = {
     deleteAfterSeconds: 7 * 86_400,
   },
   'erkhet.nightly': scheduledQueue(),
+  // One job per run of the ledger copy (singletonKey = the run id). No retry: a failed run says why
+  // on its row, and the next one goes on where it stopped. The first check reads Erkhet's whole
+  // history and the addresses follow a run, so it may take long.
+  'erkhet.ledger': {
+    policy: 'exclusive',
+    retryLimit: 0,
+    expireInSeconds: 7_200,
+    heartbeatSeconds: 60,
+    retentionSeconds: 7 * 86_400,
+    deleteAfterSeconds: 7 * 86_400,
+  },
+  'erkhet.ledgerNightly': scheduledQueue(),
   // Every minute, one run at a time. No retry: the next minute reads what this one missed, and a
   // run not started within ten minutes is dropped.
   'erxes.pull': {

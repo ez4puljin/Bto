@@ -9,6 +9,7 @@ import { CompanyController } from './controllers/company.controller';
 import { btoChartTemplate, btoInstallationSpec } from './installation';
 import { FinCompanyBridge } from './services/company-bridge.service';
 import { FinContexts } from './services/contexts.service';
+import { FinErkhetBooks } from './services/erkhet-books.service';
 import { FinPartiesBridge } from './services/parties-bridge.service';
 
 /**
@@ -38,7 +39,7 @@ export class FinBridgeBootstrap implements OnApplicationBootstrap {
   }
 }
 
-const SERVICES = [FinContexts, FinPartiesBridge, FinCompanyBridge];
+const SERVICES = [FinContexts, FinPartiesBridge, FinCompanyBridge, FinErkhetBooks];
 
 /**
  * Bto's side of the Finance Core (ADR-0084, docs/modules/fin-bridge.md): the call contexts, the

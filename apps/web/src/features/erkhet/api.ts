@@ -114,3 +114,113 @@ export function useErkhetActions() {
     }),
   };
 }
+
+// ------------------------------------------------------------------------------------------------
+// «Авлага, өглөгийн гүйлгээ» (ADR-0219)
+
+export type ErkhetLedgerOverview = Schemas['ErkhetLedgerOverview'];
+export type ErkhetLedgerRun = Schemas['ErkhetLedgerRun'];
+export type ErkhetLedgerStart = Schemas['ErkhetLedgerStartRequest'];
+export type ErkhetLedgerParty = Schemas['ErkhetLedgerParty'];
+export type ErkhetLedgerOwnDocument = Schemas['ErkhetLedgerOwnDocument'];
+export type ErkhetLedgerLink = Schemas['ErkhetLedgerLink'];
+
+const LEDGER_KEYS = {
+  overview: ['erkhet', 'ledger', 'overview'] as const,
+  parties: ['erkhet', 'ledger', 'parties'] as const,
+  own: ['erkhet', 'ledger', 'own'] as const,
+  links: ['erkhet', 'ledger', 'links'] as const,
+};
+
+/** The copy's state; asked again every few seconds while a run is under way. */
+export function useErkhetLedger(enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: LEDGER_KEYS.overview,
+    enabled,
+    queryFn: async ({ signal }) => unwrap(await api.GET('/api/v1/erkhet/ledger', { signal })),
+    refetchInterval: (query) => (query.state.data?.active ? RUNNING_POLL_MS : false),
+  });
+}
+
+/** Starts a check, a post or a revert; a refusal comes back as an answer, not an error. */
+export function useErkhetLedgerStart() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: ErkhetLedgerStart) =>
+      unwrap(await api.POST('/api/v1/erkhet/ledger/runs', { body })),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['erkhet', 'ledger'] }),
+  });
+}
+
+export interface ErkhetLedgerPartyFilter {
+  /** The run the totals belong to: a new run is a new list. */
+  runId: number | null;
+  unmatched: boolean;
+  q: string;
+}
+
+export function useErkhetLedgerParties(filter: ErkhetLedgerPartyFilter) {
+  const api = useApiClient();
+  return useInfiniteQuery({
+    queryKey: [...LEDGER_KEYS.parties, filter],
+    enabled: filter.runId !== null,
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam, signal }) =>
+      unwrap(
+        await api.GET('/api/v1/erkhet/ledger/parties', {
+          params: {
+            query: {
+              unmatched: filter.unmatched || undefined,
+              q: filter.q || undefined,
+              cursor: pageParam,
+              limit: 100,
+            },
+          },
+          signal,
+        }),
+      ),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
+}
+
+/** Bto's own documents on the copied accounts: with the copies they count twice. */
+export function useErkhetOwnDocuments(enabled: boolean, runId: number | null) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...LEDGER_KEYS.own, runId],
+    enabled,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/erkhet/ledger/own-documents', { signal })),
+  });
+}
+
+/**
+ * Where the copied transactions of a ledger page open in Erkhet, by their key. Asked only when the
+ * page holds such rows; a failure leaves the rows without a link.
+ */
+export function useErkhetLinks(keys: readonly string[]): ReadonlyMap<string, ErkhetLedgerLink> {
+  const api = useApiClient();
+  const sorted = [...new Set(keys)].sort().slice(0, 200);
+  const links = useQuery({
+    queryKey: [...LEDGER_KEYS.links, sorted],
+    enabled: sorted.length > 0,
+    staleTime: 60_000,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/erkhet/ledger/links', {
+          params: { query: { keys: sorted.join(',') } },
+          signal,
+        }),
+      ),
+  });
+  return new Map((links.data ?? []).map((link) => [link.key, link]));
+}
+
+/** The keys of the copied transactions among a ledger page's rows, for `useErkhetLinks`. */
+export function erkhetKeysOf(
+  rows: readonly { erkhet?: Schemas['LedgerErkhetEntry'] | null }[],
+): string[] {
+  return rows.flatMap((row) => (row.erkhet?.key ? [row.erkhet.key] : []));
+}

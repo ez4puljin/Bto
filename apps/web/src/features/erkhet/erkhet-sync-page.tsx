@@ -46,6 +46,7 @@ import {
   useErkhetItems,
   useErkhetOverview,
 } from './api';
+import { ErkhetLedgerPanel } from './erkhet-ledger-panel';
 import { ErkhetSettingsDialog } from './erkhet-settings-dialog';
 
 const CUSTOMER_COLUMNS: readonly ColumnSpec[] = [
@@ -69,6 +70,9 @@ const PRODUCT_COLUMNS: readonly ColumnSpec[] = [
   { key: 'status', kind: 'status' },
   { key: 'spacer', kind: 'spacer' },
 ];
+
+/** The page's two parts: the check of customers and items, and the copy of the ledgers (ADR-0219). */
+const PARTS = ['check', 'ledger'] as const;
 
 const isKind = (value: string | null): value is ErkhetSyncKind =>
   (ERKHET_SYNC_KINDS as readonly string[]).includes(value ?? '');
@@ -125,6 +129,7 @@ export function ErkhetSyncPage() {
   const action = useAction();
   const [confirming, setConfirming] = useState(false);
   const settingsOpen = params.get('settings') === '1' && canSet;
+  const part = params.get('part') === 'ledger' ? 'ledger' : 'check';
 
   const kindParam = params.get('kind');
   const kind: ErkhetSyncKind = isKind(kindParam) ? kindParam : 'CUSTOMER';
@@ -185,7 +190,7 @@ export function ErkhetSyncPage() {
                 {t('erkhet.settings.open')}
               </Button>
             ) : null}
-            {canManage ? (
+            {canManage && part === 'check' ? (
               <Button pending={running} disabled={!state?.configured} onClick={start}>
                 <RefreshCw />
                 {running ? t('erkhet.running') : t('erkhet.start')}
@@ -194,10 +199,21 @@ export function ErkhetSyncPage() {
           </>
         }
       />
-      <ProblemAlert
-        problem={problemFromError(overview.error ?? items.error) ?? action.problem}
-        onRetry={overview.error ? overview.refetch : undefined}
-      />
+      <div className="mb-4">
+        <SegmentedControl
+          name={t('erkhet.partLabel')}
+          options={PARTS}
+          value={part}
+          label={(value) => t(`erkhet.part.${value}`)}
+          onChange={(value) => patch({ part: value === 'ledger' ? value : null })}
+        />
+      </div>
+      {part === 'check' ? (
+        <ProblemAlert
+          problem={problemFromError(overview.error ?? items.error) ?? action.problem}
+          onRetry={overview.error ? overview.refetch : undefined}
+        />
+      ) : null}
       {state && !state.configured ? (
         <Alert className="mb-4">
           <AlertDescription>
@@ -205,148 +221,153 @@ export function ErkhetSyncPage() {
           </AlertDescription>
         </Alert>
       ) : null}
-      {state?.failed ? (
-        <Alert variant="destructive" className="mb-4">
-          <AlertDescription>
-            {t('erkhet.failed', {
-              at: formatUbMinute(state.failed.finishedAt ?? state.failed.createdAt),
-              reason: t(`erkhet.failure.${failureKey(state.failed.failure)}`),
-            })}
-          </AlertDescription>
-        </Alert>
-      ) : null}
+      {part === 'ledger' ? <ErkhetLedgerPanel /> : null}
+      {part === 'check' ? (
+        <>
+          {state?.failed ? (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>
+                {t('erkhet.failed', {
+                  at: formatUbMinute(state.failed.finishedAt ?? state.failed.createdAt),
+                  reason: t(`erkhet.failure.${failureKey(state.failed.failure)}`),
+                })}
+              </AlertDescription>
+            </Alert>
+          ) : null}
 
-      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <SegmentedControl
-          name={t('erkhet.kindLabel')}
-          options={ERKHET_SYNC_KINDS}
-          value={kind}
-          label={(value) => t(`erkhet.kind.${value}`)}
-          onChange={(value) => patch({ kind: value, issue: null, q: null })}
-        />
-        <p className="text-sm text-muted-foreground">
-          {latest
-            ? t(
-                latest.trigger === 'NIGHTLY'
-                  ? 'erkhet.checkedNightly'
-                  : latest.startedBy
-                    ? 'erkhet.checkedBy'
-                    : 'erkhet.checkedAt',
-                {
-                  at: formatUbMinute(latest.finishedAt ?? latest.createdAt),
-                  name: latest.startedBy ?? '',
-                },
-              )
-            : state
-              ? t('erkhet.neverChecked')
-              : null}
-        </p>
-      </div>
+          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <SegmentedControl
+              name={t('erkhet.kindLabel')}
+              options={ERKHET_SYNC_KINDS}
+              value={kind}
+              label={(value) => t(`erkhet.kind.${value}`)}
+              onChange={(value) => patch({ kind: value, issue: null, q: null })}
+            />
+            <p className="text-sm text-muted-foreground">
+              {latest
+                ? t(
+                    latest.trigger === 'NIGHTLY'
+                      ? 'erkhet.checkedNightly'
+                      : latest.startedBy
+                        ? 'erkhet.checkedBy'
+                        : 'erkhet.checkedAt',
+                    {
+                      at: formatUbMinute(latest.finishedAt ?? latest.createdAt),
+                      name: latest.startedBy ?? '',
+                    },
+                  )
+                : state
+                  ? t('erkhet.neverChecked')
+                  : null}
+            </p>
+          </div>
 
-      {summary ? (
-        <dl className="mb-3 grid grid-cols-2 gap-2 @container sm:grid-cols-4">
-          <Stat label={t('erkhet.stat.erkhet')} value={summary.erkhet} />
-          <Stat label={t(`erkhet.stat.bto.${kind}`)} value={summary.bto} />
-          <Stat label={t('erkhet.stat.agreed')} value={summary.agreed} tone="success" />
-          <Stat
-            label={t('erkhet.stat.differ')}
-            value={Object.values(summary.issues).reduce((sum, count) => sum + (count ?? 0), 0)}
-            tone="warning"
-          />
-        </dl>
-      ) : null}
+          {summary ? (
+            <dl className="mb-3 grid grid-cols-2 gap-2 @container sm:grid-cols-4">
+              <Stat label={t('erkhet.stat.erkhet')} value={summary.erkhet} />
+              <Stat label={t(`erkhet.stat.bto.${kind}`)} value={summary.bto} />
+              <Stat label={t('erkhet.stat.agreed')} value={summary.agreed} tone="success" />
+              <Stat
+                label={t('erkhet.stat.differ')}
+                value={Object.values(summary.issues).reduce((sum, count) => sum + (count ?? 0), 0)}
+                tone="warning"
+              />
+            </dl>
+          ) : null}
 
-      <FilterBar
-        end={
-          applying && latest ? (
-            <Button
-              variant="secondary"
-              disabled={openRows === 0 || running}
-              onClick={() => setConfirming(true)}
-            >
-              <ArrowLeftRight />
-              {t(`erkhet.apply.button.${applying}`)}
-            </Button>
-          ) : null
-        }
-      >
-        <SegmentedControl
-          name={t('erkhet.issueLabel')}
-          options={issues}
-          value={issue}
-          label={(value) =>
-            t('erkhet.issueCount', {
-              issue: t(`erkhet.issue.${value}`),
-              count: formatCount(countOf(summary, value)),
-            })
-          }
-          onChange={(value) => patch({ issue: value })}
-        />
-        <SearchField
-          aria-label={t('common.search')}
-          placeholder={t(`erkhet.search.${kind}`)}
-          value={q}
-          onChange={(event) => patch({ q: event.target.value })}
-        />
-        <FilterToggle
-          label={t('erkhet.openOnly')}
-          checked={open}
-          onCheckedChange={(checked) => patch({ open: checked ? '1' : null })}
-        />
-      </FilterBar>
-      <p className="mb-2 text-sm text-muted-foreground">{t(`erkhet.issueHelp.${issue}`)}</p>
+          <FilterBar
+            end={
+              applying && latest ? (
+                <Button
+                  variant="secondary"
+                  disabled={openRows === 0 || running}
+                  onClick={() => setConfirming(true)}
+                >
+                  <ArrowLeftRight />
+                  {t(`erkhet.apply.button.${applying}`)}
+                </Button>
+              ) : null
+            }
+          >
+            <SegmentedControl
+              name={t('erkhet.issueLabel')}
+              options={issues}
+              value={issue}
+              label={(value) =>
+                t('erkhet.issueCount', {
+                  issue: t(`erkhet.issue.${value}`),
+                  count: formatCount(countOf(summary, value)),
+                })
+              }
+              onChange={(value) => patch({ issue: value })}
+            />
+            <SearchField
+              aria-label={t('common.search')}
+              placeholder={t(`erkhet.search.${kind}`)}
+              value={q}
+              onChange={(event) => patch({ q: event.target.value })}
+            />
+            <FilterToggle
+              label={t('erkhet.openOnly')}
+              checked={open}
+              onCheckedChange={(checked) => patch({ open: checked ? '1' : null })}
+            />
+          </FilterBar>
+          <p className="mb-2 text-sm text-muted-foreground">{t(`erkhet.issueHelp.${issue}`)}</p>
 
-      <ListCard scroll>
-        <ListTable columns={columns}>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('erkhet.column.erkhetCode')}</TableHead>
-              <TableHead>{t('erkhet.column.erkhetName')}</TableHead>
-              <TableHead>
-                {t(kind === 'CUSTOMER' ? 'erkhet.column.group' : 'erkhet.column.barcodes')}
-              </TableHead>
-              {kind === 'PRODUCT' ? (
-                <TableHead className="text-right">{t('erkhet.column.erkhetPrice')}</TableHead>
-              ) : null}
-              <TableHead>{t('erkhet.column.btoCode')}</TableHead>
-              <TableHead>{t('erkhet.column.btoName')}</TableHead>
-              {kind === 'PRODUCT' ? (
-                <TableHead className="text-right">{t('erkhet.column.btoPrice')}</TableHead>
-              ) : null}
-              <TableHead>{t('erkhet.column.status')}</TableHead>
-              <SpacerHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.isPending && latest ? <SkeletonRows columns={columns.length} /> : null}
-            {rows.map((row) => (
-              <ItemRow key={row.id} item={row} />
-            ))}
-          </TableBody>
-        </ListTable>
-        {!latest && state ? (
-          <EmptyState icon={ArrowLeftRight} title={t('erkhet.emptyNoCheck')} />
-        ) : !items.isPending && rows.length === 0 ? (
-          <EmptyState
-            icon={ArrowLeftRight}
-            title={t(q || open ? 'erkhet.emptyFiltered' : 'erkhet.emptyIssue')}
-            onClearFilters={q || open ? () => patch({ q: null, open: null }) : undefined}
-          />
-        ) : null}
-        <LoadMore query={items} />
-      </ListCard>
+          <ListCard scroll>
+            <ListTable columns={columns}>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('erkhet.column.erkhetCode')}</TableHead>
+                  <TableHead>{t('erkhet.column.erkhetName')}</TableHead>
+                  <TableHead>
+                    {t(kind === 'CUSTOMER' ? 'erkhet.column.group' : 'erkhet.column.barcodes')}
+                  </TableHead>
+                  {kind === 'PRODUCT' ? (
+                    <TableHead className="text-right">{t('erkhet.column.erkhetPrice')}</TableHead>
+                  ) : null}
+                  <TableHead>{t('erkhet.column.btoCode')}</TableHead>
+                  <TableHead>{t('erkhet.column.btoName')}</TableHead>
+                  {kind === 'PRODUCT' ? (
+                    <TableHead className="text-right">{t('erkhet.column.btoPrice')}</TableHead>
+                  ) : null}
+                  <TableHead>{t('erkhet.column.status')}</TableHead>
+                  <SpacerHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.isPending && latest ? <SkeletonRows columns={columns.length} /> : null}
+                {rows.map((row) => (
+                  <ItemRow key={row.id} item={row} />
+                ))}
+              </TableBody>
+            </ListTable>
+            {!latest && state ? (
+              <EmptyState icon={ArrowLeftRight} title={t('erkhet.emptyNoCheck')} />
+            ) : !items.isPending && rows.length === 0 ? (
+              <EmptyState
+                icon={ArrowLeftRight}
+                title={t(q || open ? 'erkhet.emptyFiltered' : 'erkhet.emptyIssue')}
+                onClearFilters={q || open ? () => patch({ q: null, open: null }) : undefined}
+              />
+            ) : null}
+            <LoadMore query={items} />
+          </ListCard>
 
-      {applying ? (
-        <ConfirmDialog
-          open={confirming}
-          title={t(`erkhet.apply.button.${applying}`)}
-          description={t(`erkhet.apply.confirm.${applying}`, { max: ERKHET_LIMITS.maxApply })}
-          confirmLabel={t('erkhet.apply.confirmLabel')}
-          pending={actions.apply.isPending}
-          problem={action.problem}
-          onConfirm={() => void apply()}
-          onClose={() => setConfirming(false)}
-        />
+          {applying ? (
+            <ConfirmDialog
+              open={confirming}
+              title={t(`erkhet.apply.button.${applying}`)}
+              description={t(`erkhet.apply.confirm.${applying}`, { max: ERKHET_LIMITS.maxApply })}
+              confirmLabel={t('erkhet.apply.confirmLabel')}
+              pending={actions.apply.isPending}
+              problem={action.problem}
+              onConfirm={() => void apply()}
+              onClose={() => setConfirming(false)}
+            />
+          ) : null}
+        </>
       ) : null}
       {settingsOpen ? <ErkhetSettingsDialog onClose={() => patch({ settings: null })} /> : null}
     </div>

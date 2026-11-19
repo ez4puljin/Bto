@@ -6,6 +6,7 @@ import {
   type FinanceDocKind,
   type SettlementGroup,
 } from '@tugeel/shared/finance';
+import { ERKHET_BOOKS, isErkhetDocumentType, parseErkhetTrKey } from '@tugeel/shared/erkhet';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
 import { and, eq, gt, inArray, lt, sql, type SQL } from 'drizzle-orm';
@@ -24,7 +25,7 @@ import {
 import { BTO_SOURCE, FIN_DOC_TYPES, FinPartiesBridge } from '../../fin-bridge';
 import type { AuthContext } from '../../identity';
 import { CustomersService } from '../../partners';
-import { financeReconcileRuns, invoices } from '../schema';
+import { bankStatementLines, financeReconcileRuns, invoices } from '../schema';
 import { FinBooks, VOUCHER_MEMO } from './fin-books';
 
 export interface CustomerBalance {
@@ -42,6 +43,20 @@ export interface Overdue {
   oldestDueDate: string | null;
 }
 
+/**
+ * A ledger line that is a copy of Erkhet's books (ADR-0219): a transaction, or a party's opening
+ * balance. The screens show it as «Эрхэт» and open the transaction in Erkhet; it is never one of
+ * Bto's own invoices or vouchers.
+ */
+export interface ErkhetEntry {
+  kind: 'TR' | 'OPENING';
+  /** «account:transaction», the key the erkhet module gives an address for; null for an opening. */
+  key: string | null;
+  /** Erkhet's «Баримтын дугаар» and «Гүйлгээний утга». */
+  billNumber: string | null;
+  text: string | null;
+}
+
 export interface LedgerEntry {
   id: number;
   entryDate: string;
@@ -54,6 +69,8 @@ export interface LedgerEntry {
   /** The balance after this entry, oldest first. */
   balanceAfter: Decimal;
   createdAt: Date;
+  /** Set when the line is a copy of Erkhet's books; null for Bto's own documents. */
+  erkhet: ErkhetEntry | null;
 }
 
 export interface LedgerQuery {
@@ -313,6 +330,7 @@ export class ArLedgerService {
         credit: row.credit,
         balanceAfter: row.balanceAfter,
         createdAt: row.postedAt,
+        erkhet: erkhetOf(row),
       })),
       nextCursor: rows.length > limit && last ? encodeCursor({ id: last.lineId }) : null,
       opening,
@@ -465,6 +483,36 @@ export class ArLedgerService {
     };
   }
 
+  /**
+   * Which of these vouchers and journal entries a bank statement line holds (ADR-0169): such a
+   * document is taken back from its statement («Банкны хуулга хаах»), which also opens the line
+   * again; reversed anywhere else it would leave the line pointing at a void document (ADR-0219 #9).
+   */
+  async heldByBankStatement(
+    paymentIds: readonly number[],
+    journalEntryIds: readonly number[],
+  ): Promise<{ payments: Set<number>; journalEntries: Set<number> }> {
+    const payments = new Set<number>();
+    const journalEntries = new Set<number>();
+    if (paymentIds.length > 0) {
+      for (const row of await this.db
+        .select({ id: bankStatementLines.paymentId })
+        .from(bankStatementLines)
+        .where(inArray(bankStatementLines.paymentId, [...paymentIds]))) {
+        if (row.id !== null) payments.add(row.id);
+      }
+    }
+    if (journalEntryIds.length > 0) {
+      for (const row of await this.db
+        .select({ id: bankStatementLines.journalEntryId })
+        .from(bankStatementLines)
+        .where(inArray(bankStatementLines.journalEntryId, [...journalEntryIds]))) {
+        if (row.id !== null) journalEntries.add(row.id);
+      }
+    }
+    return { payments, journalEntries };
+  }
+
   /** The nightly job's and the CLI's check (`reconcileReceivables`). */
   reconcile(kind: 'NIGHTLY' | 'MANUAL'): Promise<FinanceReconcileRun> {
     return reconcileReceivables(this.db, kind);
@@ -526,6 +574,19 @@ function openInvoiceSql(customerIds: readonly number[]): SQL {
     eq(invoices.status, 'ISSUED'),
     gt(invoices.openAmount, new Decimal(0)),
   ) as SQL;
+}
+
+/** What a ledger line carries of Erkhet when its document (or the one it reverses) is a copy. */
+export function erkhetOf(row: FinPartyLedgerRow): ErkhetEntry | null {
+  const target = row.reverses ?? row.document;
+  if (target === null || !isErkhetDocumentType(target.typeCode)) return null;
+  const opening = target.typeCode === ERKHET_BOOKS.openingType;
+  return {
+    kind: opening ? 'OPENING' : 'TR',
+    key: opening || parseErkhetTrKey(target.sourceDocId) === null ? null : target.sourceDocId,
+    billNumber: target.attributes.billNumber ?? null,
+    text: target.attributes.text ?? null,
+  };
 }
 
 /** A receivable line's document as today's ledger names it: kind, type, id and number. */

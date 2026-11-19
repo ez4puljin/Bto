@@ -46286,6 +46286,311 @@
         ]
       }
     },
+    "/api/v1/erkhet/ledger": {
+      "get": {
+        "operationId": "ErkhetLedger_overview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErkhetLedgerOverview"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erkhet"
+        ]
+      }
+    },
+    "/api/v1/erkhet/ledger/settings": {
+      "patch": {
+        "operationId": "ErkhetLedger_updateSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErkhetLedgerSettingsUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErkhetLedgerSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erkhet"
+        ]
+      }
+    },
+    "/api/v1/erkhet/ledger/runs": {
+      "post": {
+        "operationId": "ErkhetLedger_start",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErkhetLedgerStartRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErkhetLedgerStartResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Starts a check, a post or a revert; the worker runs it and `GET erkhet/ledger` says when it\nended. A refusal is an answer (`started: false`), so the page can say what is missing.",
+        "tags": [
+          "erkhet"
+        ]
+      }
+    },
+    "/api/v1/erkhet/ledger/parties": {
+      "get": {
+        "operationId": "ErkhetLedger_parties",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "account",
+            "required": false,
+            "in": "query",
+            "description": "One of the two copied Erkhet account codes",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unmatched",
+            "required": false,
+            "in": "query",
+            "description": "true: only parties Bto does not have",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "A code or a part of a name",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErkhetLedgerPartyPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The parties as Erkhet shows them, to hold against Erkhet's own receivable and payable report.",
+        "tags": [
+          "erkhet"
+        ]
+      }
+    },
+    "/api/v1/erkhet/ledger/own-documents": {
+      "get": {
+        "operationId": "ErkhetLedger_ownDocuments",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErkhetLedgerOwnDocuments"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Bto's own documents on the copied accounts: with the copies they count twice.",
+        "tags": [
+          "erkhet"
+        ]
+      }
+    },
+    "/api/v1/erkhet/ledger/links": {
+      "get": {
+        "operationId": "ErkhetLedger_links",
+        "parameters": [
+          {
+            "name": "keys",
+            "required": true,
+            "in": "query",
+            "description": "Copied transactions as «account:transaction», comma separated, at most 200",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 8000,
+              "pattern": "^\\d{1,20}:\\d{1,18}(,\\d{1,20}:\\d{1,18})*$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ErkhetLedgerLink"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Where copied transactions open in Erkhet: an address, nothing of Erkhet's. The customer and\nsupplier ledgers show it, so it asks their right.",
+        "tags": [
+          "erkhet"
+        ]
+      }
+    },
     "/api/v1/erxes/settings": {
       "get": {
         "operationId": "Erxes_viewSettings",
@@ -76918,6 +77223,40 @@
           "nextCursor"
         ]
       },
+      "LedgerErkhetEntry": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "TR",
+              "OPENING"
+            ],
+            "type": "string",
+            "description": "A transaction or an opening balance"
+          },
+          "key": {
+            "type": "string",
+            "nullable": true,
+            "description": "«account:transaction» for `GET erkhet/ledger/links`; null for an opening balance"
+          },
+          "billNumber": {
+            "type": "string",
+            "nullable": true,
+            "description": "Erkhet's «Баримтын дугаар»"
+          },
+          "text": {
+            "type": "string",
+            "nullable": true,
+            "description": "Erkhet's «Гүйлгээний утга»"
+          }
+        },
+        "required": [
+          "kind",
+          "key",
+          "billNumber",
+          "text"
+        ]
+      },
       "LedgerEntry": {
         "type": "object",
         "properties": {
@@ -76972,6 +77311,16 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "erkhet": {
+            "nullable": true,
+            "description": "Set when the line is a copy of Erkhet's books (ADR-0219); always sent",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LedgerErkhetEntry"
+              }
+            ]
           }
         },
         "required": [
@@ -78304,6 +78653,16 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "erkhet": {
+            "nullable": true,
+            "description": "Set when the line is a copy of Erkhet's books (ADR-0219); always sent",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LedgerErkhetEntry"
+              }
+            ]
           }
         },
         "required": [
@@ -95330,6 +95689,647 @@
           "stale",
           "refused",
           "skipped"
+        ]
+      },
+      "ErkhetLedgerAccountSummary": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "string",
+            "description": "Erkhet's account code"
+          },
+          "side": {
+            "enum": [
+              "RECEIVABLE",
+              "PAYABLE"
+            ],
+            "type": "string"
+          },
+          "trs": {
+            "type": "number"
+          },
+          "lines": {
+            "type": "number"
+          },
+          "opening": {
+            "type": "string",
+            "description": "MNT, debit − credit before the start date"
+          },
+          "debit": {
+            "type": "string",
+            "description": "MNT"
+          },
+          "credit": {
+            "type": "string",
+            "description": "MNT"
+          },
+          "closing": {
+            "type": "string",
+            "description": "MNT, opening + debit − credit"
+          },
+          "openingParties": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "account",
+          "side",
+          "trs",
+          "lines",
+          "opening",
+          "debit",
+          "credit",
+          "closing",
+          "openingParties"
+        ]
+      },
+      "ErkhetLedgerCounts": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "type": "number"
+          },
+          "revise": {
+            "type": "number"
+          },
+          "reverse": {
+            "type": "number"
+          },
+          "unmatched": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "post",
+          "revise",
+          "reverse",
+          "unmatched"
+        ]
+      },
+      "ErkhetLedgerOwnTotal": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number"
+          },
+          "total": {
+            "type": "string",
+            "description": "MNT, debit − credit"
+          }
+        },
+        "required": [
+          "count",
+          "total"
+        ]
+      },
+      "ErkhetLedgerDone": {
+        "type": "object",
+        "properties": {
+          "posted": {
+            "type": "number"
+          },
+          "reversed": {
+            "type": "number"
+          },
+          "blocked": {
+            "type": "number",
+            "description": "Left as they were: Bto's own allocation holds their item"
+          },
+          "ownReversed": {
+            "type": "number",
+            "description": "Bto's own documents reversed with the run"
+          },
+          "links": {
+            "type": "number",
+            "description": "Transaction addresses found in the run"
+          }
+        },
+        "required": [
+          "posted",
+          "reversed",
+          "blocked",
+          "ownReversed",
+          "links"
+        ]
+      },
+      "ErkhetLedgerSummary": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErkhetLedgerAccountSummary"
+            }
+          },
+          "trs": {
+            "$ref": "#/components/schemas/ErkhetLedgerCounts"
+          },
+          "openings": {
+            "$ref": "#/components/schemas/ErkhetLedgerCounts"
+          },
+          "unmatchedParties": {
+            "type": "number"
+          },
+          "ownDocuments": {
+            "$ref": "#/components/schemas/ErkhetLedgerOwnTotal"
+          },
+          "done": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErkhetLedgerDone"
+              }
+            ]
+          }
+        },
+        "required": [
+          "accounts",
+          "trs",
+          "openings",
+          "unmatchedParties",
+          "ownDocuments",
+          "done"
+        ]
+      },
+      "ErkhetLedgerRun": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "enum": [
+              "CHECK",
+              "POST",
+              "REVERT"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "DONE",
+              "FAILED"
+            ],
+            "type": "string"
+          },
+          "trigger": {
+            "enum": [
+              "MANUAL",
+              "NIGHTLY"
+            ],
+            "type": "string"
+          },
+          "startedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "failure": {
+            "nullable": true,
+            "enum": [
+              "NOT_CONFIGURED",
+              "KEY_UNREADABLE",
+              "LOGIN_FAILED",
+              "COMPANY_UNREACHABLE",
+              "UNREACHABLE",
+              "TIMEOUT",
+              "UNEXPECTED_ANSWER",
+              "UNEXPECTED_FILE",
+              "INTERRUPTED",
+              "INTERNAL",
+              "ACCOUNT_NOT_FOUND",
+              "UNEXPECTED_PAGE",
+              "PERIOD_CLOSED",
+              "CLEARING_MISSING",
+              "POSTING_REFUSED"
+            ],
+            "type": "string"
+          },
+          "failureDetail": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "nullable": true,
+            "description": "What the failure names: a month, an account code, an error code of the books"
+          },
+          "ownChoice": {
+            "nullable": true,
+            "enum": [
+              "REVERSE",
+              "KEEP"
+            ],
+            "type": "string"
+          },
+          "ownReversed": {
+            "type": "number"
+          },
+          "summary": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErkhetLedgerSummary"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "trigger",
+          "startedBy",
+          "createdAt",
+          "finishedAt",
+          "failure",
+          "failureDetail",
+          "ownChoice",
+          "ownReversed",
+          "summary"
+        ]
+      },
+      "ErkhetLedgerOverview": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "description": "A complete sign-in is saved"
+          },
+          "receivableAccount": {
+            "type": "string"
+          },
+          "payableAccount": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "posting": {
+            "type": "boolean",
+            "description": "«Bto-д оруулах» ran: the night keeps up"
+          },
+          "nightly": {
+            "type": "boolean"
+          },
+          "active": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErkhetLedgerRun"
+              }
+            ]
+          },
+          "latest": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErkhetLedgerRun"
+              }
+            ]
+          },
+          "failed": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErkhetLedgerRun"
+              }
+            ]
+          },
+          "checked": {
+            "type": "boolean",
+            "description": "A fresh check stands: the first post may start"
+          },
+          "posted": {
+            "type": "number",
+            "description": "Copies in the books"
+          },
+          "blocked": {
+            "type": "number",
+            "description": "Copies a person has to look at"
+          }
+        },
+        "required": [
+          "configured",
+          "receivableAccount",
+          "payableAccount",
+          "startDate",
+          "posting",
+          "nightly",
+          "active",
+          "latest",
+          "failed",
+          "checked",
+          "posted",
+          "blocked"
+        ]
+      },
+      "ErkhetLedgerSettingsUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "receivableAccount": {
+            "type": "string",
+            "description": "Erkhet's account of the customers' receivables"
+          },
+          "payableAccount": {
+            "type": "string",
+            "description": "Erkhet's account of the suppliers' payables"
+          },
+          "startDate": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 10,
+            "format": "date",
+            "description": "The first day copied line by line"
+          }
+        }
+      },
+      "ErkhetLedgerSettings": {
+        "type": "object",
+        "properties": {
+          "receivableAccount": {
+            "type": "string"
+          },
+          "payableAccount": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "posting": {
+            "type": "boolean",
+            "description": "The night keeps the books up with Erkhet"
+          }
+        },
+        "required": [
+          "receivableAccount",
+          "payableAccount",
+          "startDate",
+          "posting"
+        ]
+      },
+      "ErkhetLedgerStartRequest": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "CHECK",
+              "POST",
+              "REVERT"
+            ],
+            "type": "string"
+          },
+          "ownDocuments": {
+            "enum": [
+              "REVERSE",
+              "KEEP"
+            ],
+            "type": "string",
+            "description": "A post only: what to do with Bto's own documents on the copied accounts"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "The reason written on each reversal of them"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "ErkhetLedgerStartResult": {
+        "type": "object",
+        "properties": {
+          "started": {
+            "type": "boolean"
+          },
+          "refusal": {
+            "nullable": true,
+            "enum": [
+              "NOT_CONFIGURED",
+              "RUNNING",
+              "NOT_CHECKED",
+              "CHOICE_REQUIRED",
+              "NOT_REVERSIBLE",
+              "NOTHING_POSTED"
+            ],
+            "type": "string"
+          },
+          "run": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErkhetLedgerRun"
+              }
+            ]
+          }
+        },
+        "required": [
+          "started",
+          "refusal",
+          "run"
+        ]
+      },
+      "ErkhetLedgerParty": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "RECEIVABLE",
+              "PAYABLE"
+            ],
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "Empty for lines Erkhet shows without a party"
+          },
+          "name": {
+            "type": "string",
+            "description": "As Erkhet names it"
+          },
+          "btoId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The customer or supplier in Bto"
+          },
+          "lines": {
+            "type": "number"
+          },
+          "opening": {
+            "type": "string",
+            "description": "MNT"
+          },
+          "debit": {
+            "type": "string",
+            "description": "MNT"
+          },
+          "credit": {
+            "type": "string",
+            "description": "MNT"
+          },
+          "closing": {
+            "type": "string",
+            "description": "MNT"
+          }
+        },
+        "required": [
+          "account",
+          "side",
+          "code",
+          "name",
+          "btoId",
+          "lines",
+          "opening",
+          "debit",
+          "credit",
+          "closing"
+        ]
+      },
+      "ErkhetLedgerPartyPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErkhetLedgerParty"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "ErkhetLedgerOwnDocument": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "number",
+            "nullable": true
+          },
+          "entryId": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "side": {
+            "enum": [
+              "RECEIVABLE",
+              "PAYABLE"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "VOUCHER",
+              "JOURNAL",
+              "OTHER"
+            ],
+            "type": "string"
+          },
+          "blocker": {
+            "nullable": true,
+            "enum": [
+              "KIND",
+              "BANK_STATEMENT"
+            ],
+            "type": "string",
+            "description": "Why it cannot be reversed from this page; null when it can"
+          },
+          "partyName": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "string",
+            "description": "MNT, debit − credit on the account"
+          }
+        },
+        "required": [
+          "documentId",
+          "entryId",
+          "number",
+          "date",
+          "side",
+          "kind",
+          "blocker",
+          "partyName",
+          "amount"
+        ]
+      },
+      "ErkhetLedgerOwnDocuments": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErkhetLedgerOwnDocument"
+            }
+          },
+          "total": {
+            "type": "string",
+            "description": "MNT, of every such document"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "More exist than the list holds"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "truncated"
+        ]
+      },
+      "ErkhetLedgerLink": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "description": "The address to open in Erkhet"
+          },
+          "exact": {
+            "type": "boolean",
+            "description": "false: the journal list of that day, not the transaction itself"
+          }
+        },
+        "required": [
+          "key",
+          "url",
+          "exact"
         ]
       },
       "ErxesSettings": {

@@ -127,3 +127,165 @@ export const ERKHET_CUSTOMER_COLUMNS = {
 
 /** An Erkhet company id as it stands in its addresses. */
 export const ERKHET_COMPANY_ID_PATTERN = /^\d{4,20}$/;
+
+// ------------------------------------------------------------------------------------------------
+// «Авлага, өглөгийн гүйлгээ» (ADR-0219): Erkhet's receivable and payable transactions copied into
+// Bto's books under each party, every night until the go-live day.
+
+/** The feature's settings as they start; the owner changes them on the page, never in code. */
+export const ERKHET_LEDGER_DEFAULTS = {
+  /** Erkhet's account of the customers' receivables. */
+  receivableAccount: '120101',
+  /** Erkhet's account of the suppliers' payables. */
+  payableAccount: '310101',
+  /** The first day copied line by line; the day before it carries the opening balance. */
+  startDate: '2026-10-01',
+} as const;
+
+/** Which side of the books an Erkhet account is copied to. */
+export const ERKHET_LEDGER_SIDES = ['RECEIVABLE', 'PAYABLE'] as const;
+export type ErkhetLedgerSide = (typeof ERKHET_LEDGER_SIDES)[number];
+
+/**
+ * A run of the copy.
+ * - `CHECK`: downloads and shows what would be posted; posts nothing.
+ * - `POST`: posts what the latest download holds, and keeps up afterwards.
+ * - `REVERT`: reverses every copied document.
+ */
+export const ERKHET_LEDGER_RUN_KINDS = ['CHECK', 'POST', 'REVERT'] as const;
+export type ErkhetLedgerRunKind = (typeof ERKHET_LEDGER_RUN_KINDS)[number];
+
+/**
+ * Why a run of the copy failed, besides the reasons of a check (`ERKHET_FAILURES`).
+ * - `ACCOUNT_NOT_FOUND`: Erkhet's filter does not list one of the account codes.
+ * - `UNEXPECTED_PAGE`: a journal page did not hold its rows in a form Bto reads.
+ * - `PERIOD_CLOSED`: a transaction is dated in a month Bto's books have closed.
+ * - `CLEARING_MISSING`: the clearing account of the copies has no rule in Bto's chart.
+ * - `POSTING_REFUSED`: the books refused a document for another reason (its code is kept).
+ */
+export const ERKHET_LEDGER_FAILURES = [
+  ...ERKHET_FAILURES,
+  'ACCOUNT_NOT_FOUND',
+  'UNEXPECTED_PAGE',
+  'PERIOD_CLOSED',
+  'CLEARING_MISSING',
+  'POSTING_REFUSED',
+] as const;
+export type ErkhetLedgerFailure = (typeof ERKHET_LEDGER_FAILURES)[number];
+
+/**
+ * Where a copied transaction (or a party's opening balance) stands in Bto's books.
+ * - `PENDING`: downloaded, not posted yet.
+ * - `POSTED`: in the books as Erkhet shows it.
+ * - `UNMATCHED`: a party code of it is not in Bto; left out until the party exists.
+ * - `REVERSED`: taken back (it vanished from Erkhet, or «Хуулсныг буцаах»).
+ * - `BLOCKED`: it changed or vanished in Erkhet, but Bto's own allocation holds its item; a person
+ *   releases that allocation first.
+ */
+export const ERKHET_LEDGER_STATES = [
+  'PENDING',
+  'POSTED',
+  'UNMATCHED',
+  'REVERSED',
+  'BLOCKED',
+] as const;
+export type ErkhetLedgerState = (typeof ERKHET_LEDGER_STATES)[number];
+
+/**
+ * What «Bto-д оруулах» does with Bto's own documents on the copied accounts dated from the start
+ * date (they are in Erkhet too, so they would count twice): never chosen silently.
+ */
+export const ERKHET_OWN_DOCUMENT_CHOICES = ['REVERSE', 'KEEP'] as const;
+export type ErkhetOwnDocumentChoice = (typeof ERKHET_OWN_DOCUMENT_CHOICES)[number];
+
+/** Why «Bto-д оруулах» or «Хуулсныг буцаах» did not start. */
+export const ERKHET_LEDGER_REFUSALS = [
+  'NOT_CONFIGURED',
+  'RUNNING',
+  'NOT_CHECKED',
+  'CHOICE_REQUIRED',
+  'NOT_REVERSIBLE',
+  'NOTHING_POSTED',
+] as const;
+export type ErkhetLedgerRefusal = (typeof ERKHET_LEDGER_REFUSALS)[number];
+
+export const ERKHET_LEDGER_LIMITS = {
+  /** Lines on one page of Erkhet's general journal. */
+  pageSize: 100,
+  /** Pages read of one account in one run; more means the page never ends. */
+  maxPages: 2_000,
+  /** A pause between two requests to Erkhet, in milliseconds. */
+  pauseMs: 150,
+  /** Transactions whose own address is asked for in one run. */
+  maxLinksPerRun: 1_500,
+  /** A check older than this many hours is not posted from: «Шалгах» first. */
+  checkFreshHours: 24,
+  /** A run still under way after this many minutes was interrupted. */
+  staleMinutes: 120,
+  /** Unmatched parties and own documents listed on the page. */
+  maxListed: 500,
+  /** Transaction keys one request for addresses may carry. */
+  maxLinkKeys: 200,
+} as const;
+
+/** Erkhet's general journal, its filter form and a transaction's actions: read-only requests. */
+export const ERKHET_LEDGER_PATHS = {
+  journal: 'transactions/',
+  filterForm: 'transactions/get-filter-form/',
+  actions: 'transactions/get-ptr-actions/',
+} as const;
+
+/** The first day Erkhet can hold a transaction; the opening balance is summed from it. */
+export const ERKHET_HISTORY_START = '2000-01-01';
+
+/** A copied transaction's key in Bto: Erkhet's account code and its transaction number. */
+export const erkhetTrKey = (account: string, trId: number | string): string => `${account}:${trId}`;
+
+/** The account and transaction of a key, or null when it is not one. */
+export function parseErkhetTrKey(key: string): { account: string; trId: string } | null {
+  const match = /^([0-9]{1,20}):([0-9]{1,18})$/.exec(key);
+  return match?.[1] && match[2] ? { account: match[1], trId: match[2] } : null;
+}
+
+/** The party code of Erkhet's «код - нэр» customer text: the part before the first " - ". */
+export function erkhetPartyOf(text: string): { code: string; name: string } | null {
+  const value = text.trim();
+  if (value === '') return null;
+  const at = value.indexOf(' - ');
+  const code = (at < 0 ? value : value.slice(0, at)).trim();
+  if (code === '') return null;
+  return { code, name: at < 0 ? '' : value.slice(at + 3).trim() };
+}
+
+/**
+ * The copies in the Finance Core. They post as source BTO, because a party is known to the core by
+ * its source's ref and the balances must combine with Bto's own; their document types and source
+ * document types are their own, so no screen takes a copy for one of Bto's invoices or vouchers.
+ */
+export const ERKHET_BOOKS = {
+  trType: 'ERKHET.TR',
+  openingType: 'ERKHET.OPENING',
+  allocationType: 'ERKHET.ALLOCATION',
+  trDocType: 'ERKHET_TR',
+  openingDocType: 'ERKHET_OPENING',
+  allocationDocType: 'ERKHET_ALLOCATION',
+  /** The posting key of every copy's other side: the journal list names no counter account. */
+  clearingKey: 'ERKHET_CLEARING',
+  /** The account that key starts on (its rule can be moved on «Данс»). */
+  clearingAccount: '390102',
+} as const;
+
+/** A document type code of the copies. */
+export const isErkhetDocumentType = (typeCode: string): boolean => typeCode.startsWith('ERKHET.');
+/** A source document type of the copies. */
+export const isErkhetSourceDocType = (docType: string | null): boolean =>
+  docType !== null && docType.startsWith('ERKHET_');
+
+/**
+ * Why one of Bto's own documents cannot be reversed from «Авлага, өглөгийн гүйлгээ».
+ * - `KIND`: an invoice, a supplier bill, an opening: it is voided on its own screen.
+ * - `BANK_STATEMENT`: a bank statement line holds it; it is taken back from the statement, which
+ *   opens the line again.
+ */
+export const ERKHET_OWN_DOCUMENT_BLOCKERS = ['KIND', 'BANK_STATEMENT'] as const;
+export type ErkhetOwnDocumentBlocker = (typeof ERKHET_OWN_DOCUMENT_BLOCKERS)[number];

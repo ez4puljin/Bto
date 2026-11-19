@@ -93,7 +93,7 @@ describe('fin-bridge', () => {
       required_control: string;
       requires_tax_code: boolean;
     }>('SELECT code, required_control, requires_tax_code FROM fin.posting_keys ORDER BY code');
-    expect(keys).toHaveLength(36);
+    expect(keys).toHaveLength(37);
     expect(keys.filter((k) => k.requires_tax_code).map((k) => k.code)).toEqual([
       'CITY_TAX_OUTPUT',
       'VAT_INPUT',
@@ -315,7 +315,8 @@ describe('fin-bridge', () => {
       await admin.query(
         `DELETE FROM fin.document_types WHERE code IN ('BTO.SUPPLIER_BILL',
            'BTO.SUPPLIER_BILL_CREDIT', 'BTO.RECEIPT_RECOST', 'BTO.SUPPLIER_RETURN',
-           'BTO.STOCK_VALUE', 'FIN.OPENING', 'FIN.YEAR_CLOSE', 'BTO.DAMAGE_CHARGE')`,
+           'BTO.STOCK_VALUE', 'FIN.OPENING', 'FIN.YEAR_CLOSE', 'BTO.DAMAGE_CHARGE',
+           'ERKHET.TR', 'ERKHET.OPENING', 'ERKHET.ALLOCATION')`,
       );
       await admin.query('SET LOCAL session_replication_role = origin');
       for (const statement of statements) await admin.query(statement);
@@ -367,7 +368,7 @@ describe('fin-bridge', () => {
       );
       await admin.query(
         `DELETE FROM fin.document_types WHERE code IN ('BTO.STOCK_VALUE', 'FIN.OPENING', 'FIN.YEAR_CLOSE',
-           'BTO.DAMAGE_CHARGE')`,
+           'BTO.DAMAGE_CHARGE', 'ERKHET.TR', 'ERKHET.OPENING', 'ERKHET.ALLOCATION')`,
       );
       await admin.query(`DELETE FROM fin.number_series WHERE code = 'STOCK'`);
       await admin.query('SET LOCAL session_replication_role = origin');
@@ -396,7 +397,8 @@ describe('fin-bridge', () => {
     try {
       // A database of before F5: no opening (nor year close) document type.
       await admin.query(
-        `DELETE FROM fin.document_types WHERE code IN ('FIN.OPENING', 'FIN.YEAR_CLOSE')`,
+        `DELETE FROM fin.document_types WHERE code IN ('FIN.OPENING', 'FIN.YEAR_CLOSE',
+           'ERKHET.TR', 'ERKHET.OPENING', 'ERKHET.ALLOCATION')`,
       );
       expect(await count('fin.document_types')).toBe(14);
       for (const statement of statements) await admin.query(statement);
