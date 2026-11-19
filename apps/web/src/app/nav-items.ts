@@ -89,6 +89,7 @@ import {
   Timer,
   TrendingUp,
   Truck,
+  TriangleAlert,
   type LucideIcon,
   Undo2,
   UserCheck,
@@ -226,6 +227,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { to: '/inventory/low-stock', label: 'nav.lowStock', icon: PackageMinus },
       // Open to everyone: the person at the shelf finds the goods (ADR-0172 #4).
       { to: '/inventory/expiry', label: 'nav.expiry', icon: CalendarX2 },
+      {
+        to: '/inventory/stock-problems',
+        label: 'nav.stockProblems',
+        icon: TriangleAlert,
+        permission: 'stockProblems.read',
+      },
       { to: '/inventory/movements', label: 'nav.movements', icon: History },
       {
         // Erkhet's balances by location beside Bto's (ADR-0221): the people who count stock.

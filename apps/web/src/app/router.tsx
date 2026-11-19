@@ -25,6 +25,9 @@ import { AdjustmentPage, AdjustmentsPage } from '@/features/inventory/adjustment
 import { BinsPage } from '@/features/inventory/bins-page';
 import { ExpiryPage } from '@/features/expiry/expiry-page';
 import { ExpiryPrintPage } from '@/features/expiry/expiry-print-page';
+import { StockProblemSheetPage } from '@/features/stock-problems/sheet-page';
+import { StockProblemSheetPrintPage } from '@/features/stock-problems/sheet-print-page';
+import { StockProblemsPage } from '@/features/stock-problems/stock-problems-page';
 import { StockCountPrintPage } from '@/features/inventory/stock-count-print-page';
 import { LowStockPage } from '@/features/inventory/low-stock-page';
 import { BinMovesPage } from '@/features/inventory/moves-page';
@@ -271,6 +274,18 @@ export const routes: RouteObject[] = [
     errorElement: <RouteErrorBoundary />,
   },
   {
+    // A morning sheet of «Асуудалтай бараа» on paper (ADR-0230).
+    path: '/inventory/stock-problems/sheets/:id/print',
+    element: (
+      <RequireAuth>
+        <RequirePermission permission="stockProblems.read">
+          <StockProblemSheetPrintPage />
+        </RequirePermission>
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
     // The count sheet as its window's view shows it, on paper or as a PDF (ADR-0177).
     path: '/inventory/counts/:id/print',
     element: (
@@ -488,6 +503,24 @@ export const routes: RouteObject[] = [
           { path: 'inventory/low-stock', handle: { width: 'wide' }, element: <LowStockPage /> },
           // The register of expiry dates: open to every signed-in person (ADR-0172 #4, #8).
           { path: 'inventory/expiry', handle: { width: 'wide' }, element: <ExpiryPage /> },
+          {
+            path: 'inventory/stock-problems',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="stockProblems.read">
+                <StockProblemsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: 'inventory/stock-problems/sheets/:id',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="stockProblems.read">
+                <StockProblemSheetPage />
+              </RequirePermission>
+            ),
+          },
           { path: 'inventory/receipts', handle: { width: 'wide' }, element: <ReceiptsPage /> },
           // One page for a new receipt (`new`) and an existing one, so the page that creates a
           // draft stays mounted when it takes the draft's address; `?new=1` on the list redirects
