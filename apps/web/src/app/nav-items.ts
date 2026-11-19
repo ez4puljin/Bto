@@ -213,6 +213,13 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { to: '/inventory/expiry', label: 'nav.expiry', icon: CalendarX2 },
       { to: '/inventory/movements', label: 'nav.movements', icon: History },
       {
+        // Erkhet's balances by location beside Bto's (ADR-0221): the people who count stock.
+        to: '/inventory/erkhet-stock',
+        label: 'nav.erkhetStock',
+        icon: GitCompareArrows,
+        permission: 'inventory.stocktakes.manage',
+      },
+      {
         to: '/inventory/bins',
         label: 'nav.bins',
         icon: LayoutGrid,

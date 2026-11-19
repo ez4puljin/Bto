@@ -277,7 +277,16 @@ export {
   erkhetSyncItems,
   erkhetSyncRuns,
 } from '../modules/erkhet/schema';
-export { erxesDeals, erxesPipelines, erxesSettings, erxesUsers } from '../modules/erxes/schema';
+export {
+  erxesDeals,
+  erxesPipelines,
+  erxesSettings,
+  erxesStockBalances,
+  erxesStockLocations,
+  erxesStockProducts,
+  erxesStockRuns,
+  erxesUsers,
+} from '../modules/erxes/schema';
 export {
   expiryItemChanges,
   expiryItemRoles,

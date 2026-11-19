@@ -94,6 +94,7 @@ import {
 } from '@/features/finance/supplier-payables-pages';
 import { EbarimtPage } from '@/features/ebarimt-check/ebarimt-page';
 import { ErkhetSyncPage } from '@/features/erkhet/erkhet-sync-page';
+import { ErkhetStockPage } from '@/features/erkhet-stock/erkhet-stock-page';
 import { ErxesPage } from '@/features/erxes/erxes-page';
 import { FinanceSettingsPage } from '@/features/finance/finance-settings-page';
 import { InvoicesPage } from '@/features/finance/invoices-page';
@@ -782,6 +783,15 @@ export const routes: RouteObject[] = [
             path: 'inventory/stocktakes/:id',
             handle: { width: 'wide' },
             element: <StocktakePage />,
+          },
+          {
+            path: 'inventory/erkhet-stock',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="inventory.stocktakes.manage">
+                <ErkhetStockPage />
+              </RequirePermission>
+            ),
           },
           {
             path: 'inventory/bins',

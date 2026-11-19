@@ -51,6 +51,8 @@ declare module './job-catalog' {
     'erkhet.ledgerNightly': ScheduledPayload;
     /** Every minute: the new deals of erxes's ticked pipelines as draft orders (ADR-0218 #8). */
     'erxes.pull': ScheduledPayload;
+    /** One read of Erkhet's balances by location through erxes (ADR-0221). */
+    'erxes.stockRead': { runId: number };
     /** Sends one settlement SMS batch through WeSend, message by message (ADR-0216). */
     'notifications.sendSms': { batchId: number };
   }
@@ -113,6 +115,16 @@ const BTO_JOB_QUEUES = {
     heartbeatSeconds: 60,
     retentionSeconds: 3_600,
     deleteAfterSeconds: 86_400,
+  },
+  // One job per read (singletonKey = the run id). No retry: a refused call is counted on the run,
+  // and a run stopped by a restart is closed INTERRUPTED by the next start (ADR-0221).
+  'erxes.stockRead': {
+    policy: 'exclusive',
+    retryLimit: 0,
+    expireInSeconds: 3_600,
+    heartbeatSeconds: 60,
+    retentionSeconds: 7 * 86_400,
+    deleteAfterSeconds: 7 * 86_400,
   },
   // One job per batch (singletonKey = the batch id). A retry skips what is no longer QUEUED and
   // resends with each message's own Idempotency-Key, so WeSend never sends a text twice.

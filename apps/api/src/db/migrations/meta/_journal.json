@@ -778,6 +778,13 @@
       "when": 1795064059264,
       "tag": "0112_erkhet_ledger_copy",
       "breakpoints": true
+    },
+    {
+      "idx": 111,
+      "version": "7",
+      "when": 1795067681896,
+      "tag": "0113_erkhet_stock_by_location",
+      "breakpoints": true
     }
   ]
 }

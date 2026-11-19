@@ -222,9 +222,15 @@ export function renderQuery(shape: QueryShape): { document: string; paths: (stri
     }
   };
   push(`query bto${shape.declare ? `(${shape.declare})` : ''} {`, null);
-  push(`${shape.root}${shape.args ? `(${shape.args})` : ''} {`, null);
-  walk(shape.selection, []);
-  push('}', null);
+  const root = `${shape.root}${shape.args ? `(${shape.args})` : ''}`;
+  if (Object.keys(shape.selection).length === 0) {
+    // A root of a scalar type (erxes's JSON) takes no selection.
+    push(root, null);
+  } else {
+    push(`${root} {`, null);
+    walk(shape.selection, []);
+    push('}', null);
+  }
   push('}', null);
   return { document: lines.join('\n'), paths };
 }
@@ -587,4 +593,183 @@ export function attachmentUrl(baseUrl: string, url: string): string {
 export function isBlockedBoard(name: string | null): boolean {
   const key = (name ?? '').toLowerCase().replace(/\s+/g, '');
   return key.includes('хархорин') || key.includes('kharkhorin') || key.includes('harhorin');
+}
+
+// -------------------------------------------------------------------------------------------------
+// Erkhet's stock through erxes (ADR-0221)
+//
+// erxes's «syncerkhet» plugin answers `erkhetRemainders` by asking Erkhet once for a list of
+// products, at the locations the pipeline's `remainderConfig` entry names. These shapes come from
+// the old ERP's working code (2026-10-22), not from a check of Bto's: what erxes refuses is seen.
+
+/** The account of goods in Erkhet: only `remainderConfig` entries of this account are stock. */
+export const STOCK_ACCOUNT = '150101';
+
+/** Products a `erkhetRemainders` call asks for at most: 200 got no answer from Erkhet. */
+export const REMAINDER_BATCH = 50;
+
+/**
+ * `configsGetValue` answers erxes's JSON; an erxes whose config is an object type takes the second
+ * shape.
+ */
+export const REMAINDER_CONFIG: readonly QueryShape[] = [
+  { root: 'configsGetValue', args: 'code: "remainderConfig"', selection: {} },
+  {
+    root: 'configsGetValue',
+    args: 'code: "remainderConfig"',
+    selection: { _id: true, code: true, value: true },
+  },
+];
+
+/** A page of erxes's active products: the old ERP read pages of 1000. */
+export const PRODUCT_PAGE: readonly QueryShape[] = [
+  {
+    root: 'products',
+    declare: '$perPage: Int, $page: Int',
+    args: 'status: "active", perPage: $perPage, page: $page',
+    selection: { _id: true, code: true, name: true, barcodes: true, uom: true },
+  },
+];
+
+/** Erkhet's balances of a list of products at the locations of one pipeline's config. */
+export const ERKHET_REMAINDERS: readonly QueryShape[] = [
+  {
+    root: 'erkhetRemainders',
+    declare: '$productIds: [String], $pipelineId: String',
+    args: 'productIds: $productIds, stageId: "", pipelineId: $pipelineId',
+    selection: { _id: true, remainder: true, remainders: true },
+  },
+  {
+    root: 'erkhetRemainders',
+    declare: '$productIds: [String], $pipelineId: String',
+    args: 'productIds: $productIds, stageId: "", pipelineId: $pipelineId',
+    selection: { _id: true, remainder: true, remainders: { location: true, remainder: true } },
+  },
+];
+
+/**
+ * Erkhet's location names as its stock report listed them on 2026-10-22: a label for a code only
+ * while Bto knows no other; the owner links each location to a warehouse by hand.
+ */
+export const ERKHET_LOCATION_NAMES: Readonly<Record<string, string>> = {
+  '01': 'Бөөний агуулах',
+  '02': 'Ус ундаа архи пиво',
+  '03': 'Заал',
+  '04': 'Хархорин заал',
+  '05': 'Хархорин агуулах',
+  '08': 'Заалны архи',
+  '10': 'Агуулахын хөргүүр',
+  '11': 'Жижиглэн барааны агуулах',
+  '12': 'Гэрээт компаний агуулах',
+  '13': 'Гэр ахуйн барааны агуулах',
+  '14': 'Discrepancy Control',
+  '17': 'Аяны барааны гадна лангуу',
+};
+
+/** One entry of `remainderConfig`: a pipeline, its Erkhet account and the locations it reads. */
+export interface RemainderConfig {
+  pipelineId: string;
+  account: string | null;
+  locations: string[];
+}
+
+/** One call of a run: this pipeline is asked, and these locations are taken from its answer. */
+export interface RemainderStep {
+  pipelineId: string;
+  locations: string[];
+}
+
+/** A location code as Erkhet writes it: «01», never «1» or « 01 ». */
+export function locationOf(value: unknown): string | null {
+  const text = textOf(value);
+  return text !== null && /^[0-9A-Za-z_-]{1,16}$/.test(text) ? text : null;
+}
+
+/** JSON erxes may send as text. */
+function parsed(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The entries of `remainderConfig`: pipeline id → `{ account, location: "01,02" }`, as erxes's JSON,
+ * inside `value`, or as text of either.
+ */
+export function readRemainderConfig(raw: unknown): RemainderConfig[] {
+  let value = parsed(raw);
+  if (isObject(value) && 'value' in value) value = parsed(value.value);
+  if (!isObject(value)) return [];
+  const found: RemainderConfig[] = [];
+  for (const [pipelineId, entry] of Object.entries(value)) {
+    const config = parsed(entry);
+    if (!isObject(config)) continue;
+    const said = Array.isArray(config.location)
+      ? config.location
+      : (textOf(config.location) ?? '').split(',');
+    const locations = [
+      ...new Set(said.map(locationOf).filter((code): code is string => code !== null)),
+    ].sort();
+    found.push({ pipelineId, account: textOf(config.account), locations });
+  }
+  return found;
+}
+
+/**
+ * The fewest pipelines that cover every stock location (the old ERP's greedy plan): no one pipeline
+ * reads them all. Each location is taken from the first step that covers it, so it is read once.
+ */
+export function planRemainders(configs: readonly RemainderConfig[]): RemainderStep[] {
+  const stock = configs.filter(
+    (config) => config.account === STOCK_ACCOUNT && config.locations.length > 0,
+  );
+  const need = new Set(stock.flatMap((config) => config.locations));
+  const steps: RemainderStep[] = [];
+  while (need.size > 0) {
+    let best: { config: RemainderConfig; takes: string[] } | null = null;
+    for (const config of stock) {
+      const takes = config.locations.filter((code) => need.has(code));
+      if (takes.length > (best?.takes.length ?? 0)) best = { config, takes };
+    }
+    if (!best) break;
+    steps.push({ pipelineId: best.config.pipelineId, locations: best.takes });
+    for (const code of best.takes) need.delete(code);
+  }
+  return steps;
+}
+
+/** One product's balances at Erkhet's locations, as `erkhetRemainders` answered. */
+export interface ErkhetRemainder {
+  erxesId: string;
+  /** location code → the quantity as Erkhet wrote it, in erxes's unit of the product. */
+  byLocation: Map<string, string>;
+}
+
+/**
+ * An `erkhetRemainders` answer: per product `remainders`, a list of `{ location, remainder }` (or
+ * the same as JSON text). A row without a usable location or number is left out; a location named
+ * twice is summed.
+ */
+export function readRemainders(raw: unknown): ErkhetRemainder[] {
+  const found: ErkhetRemainder[] = [];
+  for (const row of objects(raw)) {
+    const erxesId = textOf(row._id);
+    if (erxesId === null) continue;
+    const byLocation = new Map<string, string>();
+    for (const entry of objects(parsed(row.remainders))) {
+      const location = locationOf(entry.location ?? entry.locationCode ?? entry.code);
+      const quantity = numberText(entry.remainder ?? entry.quantity);
+      if (location === null || quantity === null) continue;
+      const before = byLocation.get(location);
+      byLocation.set(
+        location,
+        before === undefined ? quantity : new Decimal(before).plus(quantity).toString(),
+      );
+    }
+    found.push({ erxesId, byLocation });
+  }
+  return found;
 }

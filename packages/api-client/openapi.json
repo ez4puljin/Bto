@@ -47471,6 +47471,275 @@
           "erxes"
         ]
       }
+    },
+    "/api/v1/erxes/stock": {
+      "get": {
+        "operationId": "ErxesStock_overview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErxesStockOverview"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/stock/runs": {
+      "post": {
+        "operationId": "ErxesStock_start",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErxesStockOverview"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Үлдэгдэл татах»: starts a read in the worker, or answers the one under way.",
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/stock/locations": {
+      "get": {
+        "operationId": "ErxesStock_locations",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ErxesStockLocation"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/stock/locations/{code}": {
+      "patch": {
+        "operationId": "ErxesStock_link",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErxesStockLocationUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ErxesStockLocation"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/stock/compare": {
+      "get": {
+        "operationId": "ErxesStock_compare",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "group",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "MATCHED",
+              "type": "string",
+              "enum": [
+                "MATCHED",
+                "NOT_IN_BTO",
+                "NOT_IN_ERKHET"
+              ]
+            }
+          },
+          {
+            "name": "onlyDifferent",
+            "required": false,
+            "in": "query",
+            "description": "Only rows whose quantities differ (or are unknown)",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "A part of a code or a name",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErxesStockComparison"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erxes"
+        ]
+      }
     }
   },
   "info": {
@@ -97648,6 +97917,358 @@
         },
         "required": [
           "deal"
+        ]
+      },
+      "ErxesStockRun": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "DONE",
+              "FAILED"
+            ],
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "startedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "products": {
+            "type": "number",
+            "description": "erxes's active products read"
+          },
+          "batchesTotal": {
+            "type": "number",
+            "description": "Calls of erkhetRemainders planned"
+          },
+          "batchesDone": {
+            "type": "number",
+            "description": "Calls answered or refused"
+          },
+          "batchesFailed": {
+            "type": "number",
+            "description": "Calls refused"
+          },
+          "productsUnread": {
+            "type": "number",
+            "description": "Products whose Erkhet quantity is unknown"
+          },
+          "estimatedFinishAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "While it runs: when it should end"
+          },
+          "failure": {
+            "nullable": true,
+            "enum": [
+              "NOT_CONFIGURED",
+              "KEY_UNREADABLE",
+              "LOGIN_FAILED",
+              "UNREACHABLE",
+              "TIMEOUT",
+              "UNEXPECTED_ANSWER",
+              "NO_PLAN",
+              "INTERRUPTED",
+              "INTERNAL"
+            ],
+            "type": "string"
+          },
+          "failureDetail": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "createdAt",
+          "startedAt",
+          "finishedAt",
+          "startedBy",
+          "products",
+          "batchesTotal",
+          "batchesDone",
+          "batchesFailed",
+          "productsUnread",
+          "estimatedFinishAt",
+          "failure",
+          "failureDetail"
+        ]
+      },
+      "ErxesStockOverview": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "description": "erxes's sign-in is saved"
+          },
+          "active": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErxesStockRun"
+              }
+            ]
+          },
+          "latest": {
+            "nullable": true,
+            "description": "The run compared",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErxesStockRun"
+              }
+            ]
+          },
+          "failed": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErxesStockRun"
+              }
+            ]
+          }
+        },
+        "required": [
+          "configured",
+          "active",
+          "latest",
+          "failed"
+        ]
+      },
+      "ErxesStockLocation": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "01"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "warehouseId": {
+            "type": "number",
+            "nullable": true
+          },
+          "warehouseName": {
+            "type": "string",
+            "nullable": true
+          },
+          "read": {
+            "type": "boolean",
+            "description": "The newest finished run read this location"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "warehouseId",
+          "warehouseName",
+          "read"
+        ]
+      },
+      "ErxesStockLocationUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The Bto warehouse; null unlinks"
+          }
+        },
+        "required": [
+          "warehouseId"
+        ]
+      },
+      "ErxesStockLinkedLocation": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ]
+      },
+      "ErxesStockCounts": {
+        "type": "object",
+        "properties": {
+          "matched": {
+            "type": "number"
+          },
+          "different": {
+            "type": "number"
+          },
+          "notInBto": {
+            "type": "number"
+          },
+          "notInErkhet": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "matched",
+          "different",
+          "notInBto",
+          "notInErkhet"
+        ]
+      },
+      "ErxesStockRow": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "productId": {
+            "type": "number",
+            "nullable": true
+          },
+          "erxesId": {
+            "type": "string",
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "nullable": true,
+            "description": "Bto's code, else erxes's"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "erxesCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "erxesUom": {
+            "type": "string",
+            "nullable": true,
+            "description": "erxes's unit: Erkhet's quantity is in it"
+          },
+          "btoUnit": {
+            "type": "string",
+            "nullable": true,
+            "description": "Bto's base unit"
+          },
+          "erkhet": {
+            "type": "string",
+            "nullable": true,
+            "example": "12.5",
+            "description": "Erkhet's quantity; null when unknown"
+          },
+          "bto": {
+            "type": "string",
+            "nullable": true,
+            "example": "12.5",
+            "description": "Bto's on-hand in its base unit"
+          },
+          "difference": {
+            "type": "string",
+            "nullable": true,
+            "example": "12.5",
+            "description": "Erkhet − Bto"
+          },
+          "unitDiffers": {
+            "type": "boolean",
+            "description": "erxes's unit is not Bto's base unit"
+          },
+          "reason": {
+            "nullable": true,
+            "enum": [
+              "PRODUCT_NOT_FOUND",
+              "PRODUCT_AMBIGUOUS"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "productId",
+          "erxesId",
+          "code",
+          "name",
+          "erxesCodes",
+          "erxesUom",
+          "btoUnit",
+          "erkhet",
+          "bto",
+          "difference",
+          "unitDiffers",
+          "reason"
+        ]
+      },
+      "ErxesStockComparison": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "number",
+            "nullable": true
+          },
+          "readAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When Erkhet's side was read"
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErxesStockLinkedLocation"
+            }
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ErxesStockCounts"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErxesStockRow"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "runId",
+          "readAt",
+          "locations",
+          "counts",
+          "data",
+          "nextCursor"
         ]
       },
       "ErrorCode": {

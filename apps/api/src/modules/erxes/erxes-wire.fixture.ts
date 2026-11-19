@@ -126,3 +126,29 @@ export const FIXTURE_DEAL = {
     { name: 'zahialga.jpg', url: 'uploads/zahialga.jpg', type: 'image/jpeg', size: 20480 },
   ],
 };
+
+/**
+ * `configsGetValue(code: "remainderConfig")` as the old ERP read it (ADR-0221): pipeline id →
+ * the Erkhet account and the locations the pipeline's `erkhetRemainders` covers. The pipelines
+ * and locations are those of 2026-10-22; an entry of another account is not stock.
+ */
+export const FIXTURE_REMAINDER_CONFIG = {
+  'pl-hall': { title: 'Заалны хөдөлгөөн', account: '150101', location: '01,02,11,12,10' },
+  'pl-drinks': { title: 'Архины заалны хөдөлгөөн', account: '150101', location: '02,08' },
+  'pl-kharkhorin': { title: 'Хархорин', account: '150101', location: '05' },
+  'pl-other': { title: 'Өөр данс', account: '120101', location: '01,03' },
+};
+
+/** `erkhetRemainders` of two products asked through `pl-hall`. */
+export const FIXTURE_REMAINDERS = [
+  {
+    _id: 'p-cola',
+    remainder: 130,
+    remainders: [
+      { location: '01', remainder: 120 },
+      { location: '11', remainder: 10.5 },
+      { location: '02', remainder: 0 },
+    ],
+  },
+  { _id: 'p-old', remainder: 0, remainders: [] },
+];

@@ -10,7 +10,7 @@ import type { Db } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { invalid, notFound } from '../../../common/errors/app-error';
 import { isCodedError } from '../../../common/errors/coded-error';
-import { BarcodeService, CatalogImportService, UnitConversionService } from '../../catalog';
+import { UnitConversionService } from '../../catalog';
 import { AuditService, type AuthContext, UserNamesService } from '../../identity';
 import { CustomersService } from '../../partners';
 import {
@@ -37,6 +37,7 @@ import {
   erxesUsers,
   type ErxesWaitIssue,
 } from '../schema';
+import { ErxesProductMatchService } from './erxes-product-match.service';
 
 type DealRow = typeof erxesDeals.$inferSelect;
 
@@ -130,8 +131,7 @@ export class ErxesCopyService {
     private readonly audit: AuditService,
     private readonly names: UserNamesService,
     private readonly customers: CustomersService,
-    private readonly products: CatalogImportService,
-    private readonly barcodes: BarcodeService,
+    private readonly matcher: ErxesProductMatchService,
     private readonly units: UnitConversionService,
     private readonly access: SalesAccessService,
     private readonly pipelines: SalesPipelinesService,
@@ -339,25 +339,9 @@ export class ErxesCopyService {
       const unit = (await this.units.describe([chosen])).get(chosen);
       if (unit?.current) return { line: { productUnitId: chosen, qty } };
     }
-    let productId: number | null = null;
-    if (line.code) {
-      const [bySku] = await this.products.productsBySku([line.code]);
-      productId = bySku?.id ?? null;
-    }
-    if (productId === null) {
-      // The erxes code first (the old codes live on as barcodes), then erxes's own barcodes.
-      for (const code of [line.code, ...line.barcodes]) {
-        if (!code) continue;
-        const owners = new Set((await this.barcodes.lookup(code)).map((hit) => hit.productId));
-        if (owners.size > 1) return { issue: { reason: 'PRODUCT_AMBIGUOUS', ...named } };
-        const [only] = owners;
-        if (only !== undefined) {
-          productId = only;
-          break;
-        }
-      }
-    }
-    if (productId === null) return { issue: { reason: 'PRODUCT_NOT_FOUND', ...named } };
+    const matched = await this.matcher.match({ code: line.code, barcodes: line.barcodes });
+    if (matched.reason !== null) return { issue: { reason: matched.reason, ...named } };
+    const { productId } = matched;
     const units = (await this.units.currentUnits([productId])).get(productId) ?? [];
     const namedUnit = units.find(
       (unit) => same(unit.uomName, line.uom) || same(unit.uomCode, line.uom),

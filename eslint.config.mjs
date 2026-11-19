@@ -86,8 +86,9 @@ const MODULE_DEPS = {
   // (`FinErkhetBooks`), and Bto's own vouchers and entries are reversed through finance.
   erkhet: ['identity', 'partners', 'catalog', 'pricing', 'fin-bridge', 'finance'],
   // erxes's deals as draft orders (ADR-0218): reads the three, makes orders only through sales'
-  // own draft path; nobody imports it.
-  erxes: ['identity', 'catalog', 'partners', 'sales'],
+  // own draft path; nobody imports it. ADR-0221: reads inventory's on-hand (StockQueryService)
+  // beside Erkhet's stock, never writes it.
+  erxes: ['identity', 'catalog', 'partners', 'sales', 'inventory'],
   // ADR-0062: sales only for the SALE_LISTENER token, its payload type and the order's foreign key.
   // ADR-0082: sales' ORDER_LISTENER, finance's PAYMENT_LISTENER, the invoice and payment foreign
   // keys and the open invoices the reminders read.

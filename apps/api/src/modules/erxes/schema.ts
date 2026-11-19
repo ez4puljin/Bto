@@ -12,8 +12,9 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
+import { qty } from '../../common/db/types';
 import { customers } from '../partners/schema';
-import { users } from '../identity/schema';
+import { users, warehouses } from '../identity/schema';
 import { salesOrders } from '../sales/schema';
 
 // Tables owned by the erxes module (ADR-0218, docs/modules/erxes.md): the sign-in to the company's
@@ -230,4 +231,146 @@ export const erxesDeals = pgTable(
       sql`(${t.status} = 'DISMISSED') = (${t.dismissedAt} IS NOT NULL)`,
     ),
   ],
+);
+
+// -------------------------------------------------------------------------------------------------
+// Erkhet's stock by location, read through erxes (ADR-0221). Read-only for Bto's stock: nothing
+// here moves a quantity; the comparison is made when the page asks.
+
+export const ERXES_STOCK_RUN_STATUSES = ['QUEUED', 'RUNNING', 'DONE', 'FAILED'] as const;
+export type ErxesStockRunStatus = (typeof ERXES_STOCK_RUN_STATUSES)[number];
+
+/** Why a run ended without its rows (a batch erxes refuses is counted, not a failure). */
+export const ERXES_STOCK_FAILURES = [
+  'NOT_CONFIGURED',
+  'KEY_UNREADABLE',
+  'LOGIN_FAILED',
+  'UNREACHABLE',
+  'TIMEOUT',
+  'UNEXPECTED_ANSWER',
+  /** `remainderConfig` names no pipeline of the stock account. */
+  'NO_PLAN',
+  /** The worker stopped (a restart) before the run ended. */
+  'INTERRUPTED',
+  'INTERNAL',
+] as const;
+export type ErxesStockFailure = (typeof ERXES_STOCK_FAILURES)[number];
+
+/** Why an erxes product is not a Bto product (ADR-0218 #6 rule). */
+export const ERXES_STOCK_MATCH_REASONS = ['PRODUCT_NOT_FOUND', 'PRODUCT_AMBIGUOUS'] as const;
+export type ErxesStockMatchReason = (typeof ERXES_STOCK_MATCH_REASONS)[number];
+
+/** One call of a run: the pipeline asked and the locations taken from its answer. */
+export interface ErxesStockStep {
+  pipelineId: string;
+  locations: string[];
+}
+
+/**
+ * An Erkhet location and the Bto warehouse a person linked it to, once, by hand. Several
+ * locations may be linked to one warehouse: their balances add up. An unlinked location is not
+ * compared. A run adds the locations it meets; the name is Erkhet's last known label.
+ */
+export const erxesStockLocations = pgTable(
+  'erxes_stock_locations',
+  {
+    code: text('code').primaryKey(),
+    name: text('name'),
+    warehouseId: ref('warehouse_id').references(() => warehouses.id),
+    linkedBy: userRef('linked_by'),
+    linkedAt: at('linked_at'),
+    updatedAt: at('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    check('erxes_stock_locations_code', sql`${t.code} ~ '^[0-9A-Za-z_-]{1,16}$'`),
+    index('erxes_stock_locations_warehouse_idx').on(t.warehouseId),
+  ],
+);
+
+/**
+ * A read of Erkhet's balances, started by a person («Үлдэгдэл татах») and done by the worker.
+ * One waits or runs at a time (`active_slot`). `heartbeat_at` moves with every batch: a run whose
+ * heartbeat stopped was interrupted.
+ */
+export const erxesStockRuns = pgTable(
+  'erxes_stock_runs',
+  {
+    id: id(),
+    status: text('status', { enum: ERXES_STOCK_RUN_STATUSES }).notNull().default('QUEUED'),
+    activeSlot: smallint('active_slot'),
+    startedBy: userRef('started_by'),
+    createdAt: at('created_at').notNull().defaultNow(),
+    startedAt: at('started_at'),
+    heartbeatAt: at('heartbeat_at'),
+    finishedAt: at('finished_at'),
+    /** The calls planned: the pipelines and the locations each one is read for. */
+    plan: jsonb('plan').$type<ErxesStockStep[]>(),
+    /** erxes's active products read. */
+    products: integer('products').notNull().default(0),
+    /** Calls of `erkhetRemainders`: planned, answered or refused, and refused. */
+    batchesTotal: integer('batches_total').notNull().default(0),
+    batchesDone: integer('batches_done').notNull().default(0),
+    batchesFailed: integer('batches_failed').notNull().default(0),
+    failure: text('failure', { enum: ERXES_STOCK_FAILURES }),
+    /** English detail for the person who looks into it; never a password or a token. */
+    failureDetail: text('failure_detail'),
+  },
+  (t) => [
+    check('erxes_stock_runs_status', sql`${t.status} IN (${inList(ERXES_STOCK_RUN_STATUSES)})`),
+    check(
+      'erxes_stock_runs_failure',
+      sql`${t.failure} IS NULL OR ${t.failure} IN (${inList(ERXES_STOCK_FAILURES)})`,
+    ),
+    check(
+      'erxes_stock_runs_active',
+      sql`(${t.activeSlot} IS NOT NULL) = (${t.status} IN ('QUEUED', 'RUNNING')) AND coalesce(${t.activeSlot}, 1) = 1`,
+    ),
+    uniqueIndex('erxes_stock_runs_one_active').on(t.activeSlot),
+  ],
+);
+
+/**
+ * An active erxes product as a run read it, and the Bto product it is (or why none). `read_ok` is
+ * false when a call that should have brought its balances was refused: its Erkhet quantity is
+ * unknown, never zero. Only the newest finished run keeps its rows.
+ */
+export const erxesStockProducts = pgTable(
+  'erxes_stock_products',
+  {
+    id: id(),
+    runId: ref('run_id')
+      .notNull()
+      .references(() => erxesStockRuns.id, { onDelete: 'cascade' }),
+    erxesId: text('erxes_id').notNull(),
+    code: text('code'),
+    name: text('name'),
+    /** erxes's unit of the product: Erkhet's quantity is in it. */
+    uom: text('uom'),
+    /** products.id; no foreign key: a product is read again at each comparison. */
+    productId: ref('product_id'),
+    matchReason: text('match_reason', { enum: ERXES_STOCK_MATCH_REASONS }),
+    readOk: boolean('read_ok').notNull().default(true),
+  },
+  (t) => [
+    uniqueIndex('erxes_stock_products_run_erxes').on(t.runId, t.erxesId),
+    index('erxes_stock_products_run_product_idx').on(t.runId, t.productId),
+    check(
+      'erxes_stock_products_match',
+      sql`(${t.productId} IS NULL) = (${t.matchReason} IS NOT NULL) AND (${t.matchReason} IS NULL OR ${t.matchReason} IN (${inList(ERXES_STOCK_MATCH_REASONS)}))`,
+    ),
+  ],
+);
+
+/** Erkhet's balance of one product at one location, in erxes's unit, as the run read it. */
+export const erxesStockBalances = pgTable(
+  'erxes_stock_balances',
+  {
+    runId: ref('run_id')
+      .notNull()
+      .references(() => erxesStockRuns.id, { onDelete: 'cascade' }),
+    erxesId: text('erxes_id').notNull(),
+    location: text('location').notNull(),
+    quantity: qty('quantity').notNull(),
+  },
+  (t) => [uniqueIndex('erxes_stock_balances_key').on(t.runId, t.location, t.erxesId)],
 );
