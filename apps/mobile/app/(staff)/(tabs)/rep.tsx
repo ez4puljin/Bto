@@ -523,7 +523,7 @@ export default function HomeScreen() {
                   : t('mobile.staffChat.title')
               }
               right={<CountBadge count={chatBadge} tone="red" ring={colors.card} />}
-              onPress={() => router.push('/chat')}
+              onPress={() => router.push('/chats')}
             />
           ) : null}
           <Row

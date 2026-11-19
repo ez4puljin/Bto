@@ -75,8 +75,8 @@ export default function StaffLayout() {
           </Stack.Protected>
           {/* «Харилцагчийн чат» (ADR-0224): who has `chat.answer` or `chat.answer_own`. */}
           <Stack.Protected guard={chatter}>
-            <Stack.Screen name="chat/index" />
-            <Stack.Screen name="chat/[id]" />
+            <Stack.Screen name="chats/index" />
+            <Stack.Screen name="chats/[id]" />
           </Stack.Protected>
           {/* «Ирц» (ADR-0131): everyone's. */}
           <Stack.Screen name="attendance/index" />

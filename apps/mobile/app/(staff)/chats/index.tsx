@@ -72,7 +72,7 @@ export default function StaffChatListScreen() {
     return (
       <Pressable
         accessibilityRole="button"
-        onPress={() => router.push(`/chat/${item.id}`)}
+        onPress={() => router.push(`/chats/${item.id}`)}
         style={({ pressed }) => [styles.row, pressed && styles.pressed]}
       >
         <View style={styles.grow}>

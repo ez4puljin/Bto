@@ -1,10 +1,9 @@
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { MessageCircle } from 'lucide-react-native';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -26,6 +25,7 @@ import { ubDate } from '../../../src/dates/dates';
 import { colors, fonts, spacing, type } from '../../../src/theme/tokens';
 import { EmptyState } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
+import { ActionSheet } from '../../../src/ui/sheet';
 import { HeaderTextButton, StoreHeader } from '../../../src/ui/store-header';
 import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
@@ -54,24 +54,18 @@ export default function StaffChatScreen() {
     if (focused && unread > 0) markRead();
   }, [focused, unread, markRead]);
 
-  const askClose = () =>
-    Alert.alert(t('mobile.staffChat.closeTitle'), undefined, [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('mobile.staffChat.closeConfirm'),
-        style: 'destructive',
-        onPress: () => {
-          void chat.close().then((done) => {
-            if (done) {
-              toast.show({ message: t('mobile.staffChat.closed') });
-              router.back();
-            } else {
-              toast.show({ message: t('mobile.staffChat.closeFailed') });
-            }
-          });
-        },
-      },
-    ]);
+  const [asking, setAsking] = useState(false);
+  const closeNow = () => {
+    setAsking(false);
+    void chat.close().then((done) => {
+      if (done) {
+        toast.show({ message: t('mobile.staffChat.closed') });
+        router.back();
+      } else {
+        toast.show({ message: t('mobile.staffChat.closeFailed') });
+      }
+    });
+  };
 
   const conversation = state?.conversation;
   const rows = state ? invertedRowsOf(state.messages, chat.outgoing) : [];
@@ -108,7 +102,7 @@ export default function StaffChatScreen() {
         onBack={() => router.back()}
         right={
           conversation && conversation.mode === 'STAFF' ? (
-            <HeaderTextButton title={t('mobile.staffChat.close')} onPress={askClose} />
+            <HeaderTextButton title={t('mobile.staffChat.close')} onPress={() => setAsking(true)} />
           ) : null
         }
       />
@@ -158,6 +152,15 @@ export default function StaffChatScreen() {
           <Composer onSend={(text) => chat.send(text)} />
         </KeyboardAvoidingView>
       )}
+      <ActionSheet
+        visible={asking}
+        title={t('mobile.staffChat.closeTitle')}
+        actions={[
+          { label: t('mobile.staffChat.closeConfirm'), onPress: closeNow, destructive: true },
+        ]}
+        cancelLabel={t('common.cancel')}
+        onCancel={() => setAsking(false)}
+      />
     </Page>
   );
 }
