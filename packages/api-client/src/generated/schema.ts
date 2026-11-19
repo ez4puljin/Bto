@@ -2772,6 +2772,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stock/similar/{productId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Products of the same kind and pack size as this one, chosen by the model among the pre-filter's
+         *     candidates, or by the pre-filter alone without a model (ADR-0231), with their stock.
+         */
+        get: operations["Stock_similarTo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stock/bins/{id}": {
         parameters: {
             query?: never;
@@ -15632,6 +15652,16 @@ export interface components {
             value?: string;
             warehouses: components["schemas"]["WarehouseBalance"][];
             bins: components["schemas"]["BinBalance"][];
+        };
+        SimilarProducts: {
+            /**
+             * @description AI: chosen by the model; NAME: by the pre-filter
+             * @enum {string}
+             */
+            method: "AI" | "NAME";
+            /** @description The product asked about: the first row */
+            productId: number;
+            data: components["schemas"]["ProductStock"][];
         };
         BinContentLine: {
             product: components["schemas"]["StockProduct"];
@@ -34489,6 +34519,36 @@ export interface operations {
             };
         };
     };
+    Stock_similarTo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimilarProducts"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Stock_bin: {
         parameters: {
             query?: never;
@@ -51945,6 +52005,8 @@ export interface operations {
                 warehouseIds?: number[];
                 categoryId?: number;
                 productId?: number;
+                /** @description Several products at once (ADR-0231), together with `productId`. */
+                productIds?: number[];
             };
             header?: never;
             path?: never;
@@ -51980,6 +52042,8 @@ export interface operations {
                 warehouseIds?: number[];
                 categoryId?: number;
                 productId?: number;
+                /** @description Several products at once (ADR-0231), together with `productId`. */
+                productIds?: number[];
             };
             header?: never;
             path?: never;

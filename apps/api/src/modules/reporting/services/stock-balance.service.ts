@@ -22,6 +22,8 @@ export interface StockBalanceFilter {
   /** A category and everything under it. */
   categoryId?: number;
   productId?: number;
+  /** Several products at once («Бүгдийн тайлан» of similar products, ADR-0231); with `productId`. */
+  productIds?: readonly number[];
 }
 
 /** Quantities in the base unit; values at cost, null without `reports.margins.view`. */
@@ -104,7 +106,7 @@ export class StockBalanceService {
     const byWarehouse = filter.by === 'warehouse';
     const where = allOf([
       idsIn(sql`m.warehouse_id`, filter.warehouseIds),
-      filter.productId ? sql`m.product_id = ${filter.productId}` : null,
+      idsIn(sql`m.product_id`, productsOf(filter)),
       inCategory(sql`m.product_id`, filter.categoryId),
     ]);
     const rows = await rowsOf(
@@ -268,4 +270,11 @@ function sums(from: string): SQL {
     coalesce(sum(-m.qty) FILTER (WHERE m.day >= ${from}::date AND m.qty < 0), 0) AS out_qty,
     coalesce(sum(-m.value) FILTER (WHERE m.day >= ${from}::date
       AND (m.qty < 0 OR (m.qty = 0 AND m.value < 0))), 0) AS out_value`;
+}
+
+/** The products a filter names: `productId` and `productIds` together, each once. */
+function productsOf(filter: StockBalanceFilter): number[] {
+  return [
+    ...new Set([...(filter.productId ? [filter.productId] : []), ...(filter.productIds ?? [])]),
+  ];
 }

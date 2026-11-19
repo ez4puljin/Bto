@@ -646,3 +646,20 @@ export const DAMAGE_CHARGE_TYPE = 'DAMAGE_CHARGE';
 /** A goods issue's statuses (ADR-0117): the accountant sends, each keeper confirms their part. */
 export const ISSUE_STATUSES = ['DRAFT', 'SENT', 'RETURNED', 'POSTED', 'CANCELLED'] as const;
 export type IssueStatus = (typeof ISSUE_STATUSES)[number];
+
+// ---------------------------------------------------------------------------------------------
+// «Төстэй бараа» (ADR-0231): the pre-filter of similar products and its answer without the model
+
+export {
+  fallbackSimilar,
+  kindWords,
+  likenessOf,
+  type PackSize,
+  packSizeOf,
+  prefilterSimilar,
+  type RankedCandidate,
+  sameSizeOf,
+  searchWordsOf,
+  SIMILAR_MAX_CANDIDATES,
+  type SimilarCandidate,
+} from './similar';

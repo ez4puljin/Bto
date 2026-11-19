@@ -7,10 +7,12 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { type components, idempotencyKey, type paths } from '@tugeel/api-client';
-import { useCallback } from 'react';
+import { Decimal } from '@tugeel/shared/money';
+import { useCallback, useMemo } from 'react';
 import { useApiClient } from '@/app/api-client-context';
 import { ATTENTION_KEY } from '@/features/home/api';
 import { unwrap } from '@/lib/problem';
+import { useWarehouseOptions } from './helpers';
 
 type Schemas = components['schemas'];
 export type Bin = Schemas['Bin'];
@@ -132,6 +134,57 @@ export function useProductStock(productId: number, enabled = true) {
         }),
       ),
   });
+}
+
+export type SimilarProducts = Schemas['SimilarProducts'];
+
+/**
+ * «Төстэй бараа (AI)» (ADR-0231): the product and those of its kind and size with their stock,
+ * asked only when the panel opens (a model call each time; kept a few minutes).
+ */
+export function useSimilarProducts(productId: number | undefined) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.stock, 'similar', productId],
+    enabled: productId !== undefined,
+    staleTime: 5 * 60_000,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/stock/similar/{productId}', {
+          params: { path: { productId: productId ?? 0 } },
+          signal,
+        }),
+      ),
+  });
+}
+
+/** The warehouses whose stock the stock list shows (its warehouse filter's kinds). */
+export const STOCK_KINDS = ['WHOLESALE', 'STORE', 'VEHICLE', 'TRANSIT'] as const;
+
+/**
+ * The warehouses with stock on hand in any of these rows (owner 2026-11-20: «бүх бараа нэг
+ * байршил дээр үлдэгдэл 0 байвал тухайн байршлыг харуулдаггүй»), in the warehouse list's order;
+ * a warehouse outside it (archived, say) that still holds stock comes last.
+ */
+export function useStockWarehouses(rows: readonly ProductStock[]): number[] {
+  const { options } = useWarehouseOptions(STOCK_KINDS);
+  return useMemo(() => {
+    const holding = new Set<number>();
+    for (const row of rows) {
+      for (const balance of row.warehouses) {
+        if (!new Decimal(balance.onHand).isZero()) holding.add(balance.warehouseId);
+      }
+    }
+    const ordered = options.map((warehouse) => warehouse.id).filter((id) => holding.has(id));
+    const rest = [...holding].filter((id) => !ordered.includes(id)).sort((a, b) => a - b);
+    return [...ordered, ...rest];
+  }, [rows, options]);
+}
+
+/** One warehouse's on hand of a stock row; null when it has none there. */
+export function onHandIn(row: ProductStock, warehouseId: number): string | null {
+  const balance = row.warehouses.find((entry) => entry.warehouseId === warehouseId);
+  return balance && !new Decimal(balance.onHand).isZero() ? balance.onHand : null;
 }
 
 /** The last reconciliation run, for the admins' banner. */

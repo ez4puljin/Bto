@@ -11014,6 +11014,52 @@
         ]
       }
     },
+    "/api/v1/stock/similar/{productId}": {
+      "get": {
+        "operationId": "Stock_similarTo",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimilarProducts"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Products of the same kind and pack size as this one, chosen by the model among the pre-filter's\ncandidates, or by the pre-filter alone without a model (ADR-0231), with their stock.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/stock/bins/{id}": {
       "get": {
         "operationId": "Stock_bin",
@@ -41044,6 +41090,18 @@
             "schema": {
               "type": "number"
             }
+          },
+          {
+            "name": "productIds",
+            "required": false,
+            "in": "query",
+            "description": "Several products at once (ADR-0231), together with `productId`.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
           }
         ],
         "responses": {
@@ -41138,6 +41196,18 @@
             "in": "query",
             "schema": {
               "type": "number"
+            }
+          },
+          {
+            "name": "productIds",
+            "required": false,
+            "in": "query",
+            "description": "Several products at once (ADR-0231), together with `productId`.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
             }
           }
         ],
@@ -60471,6 +60541,34 @@
           "available",
           "warehouses",
           "bins"
+        ]
+      },
+      "SimilarProducts": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "AI",
+              "NAME"
+            ],
+            "description": "AI: chosen by the model; NAME: by the pre-filter"
+          },
+          "productId": {
+            "type": "number",
+            "description": "The product asked about: the first row"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductStock"
+            }
+          }
+        },
+        "required": [
+          "method",
+          "productId",
+          "data"
         ]
       },
       "BinContentLine": {

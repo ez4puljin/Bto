@@ -97,6 +97,8 @@ export class StockBalanceQueryDto extends RangeQueryDto {
   @optionalIds() warehouseIds?: number[];
   @optionalId() categoryId?: number;
   @optionalId() productId?: number;
+  /** Several products at once (ADR-0231), together with `productId`. */
+  @optionalIds() productIds?: number[];
 }
 
 @ApiSchema({ name: 'StockBalanceRow' })

@@ -1,6 +1,7 @@
 import { ComingSoonNote } from '@/components/coming-soon';
 import { BINS_SOON } from '@/lib/features';
-import { Boxes, History } from 'lucide-react';
+import { Decimal } from '@tugeel/shared/money';
+import { Boxes, History, Sparkles } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router';
@@ -14,6 +15,7 @@ import {
   ListCard,
   ListTable,
   LoadMore,
+  RowActions,
   SearchField,
   SkeletonRows,
   TruncateCell,
@@ -53,26 +55,36 @@ import { formatCount, formatQty, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
 import { cn } from '@/lib/utils';
-import { useProductStock, useReconciliation, useStock } from './api';
+import {
+  onHandIn,
+  STOCK_KINDS,
+  useProductStock,
+  useReconciliation,
+  useStock,
+  useStockWarehouses,
+} from './api';
 import { useWarehouseName, useWarehouseOptions } from './helpers';
 import { WarehouseSelect } from './shared';
-
-const STOCK_KINDS = ['WHOLESALE', 'STORE', 'VEHICLE', 'TRANSIT'] as const;
+import { SimilarProductsDialog, StockReportMenu } from './similar-products-panel';
 
 /**
  * The stock list's columns (ADR-0119); the value only for cost holders. «Боломжит үлдэгдэл» needs
- * 9rem for its head. 47.25rem with the value, 38.75 without: a tablet upright (about 40.5) lets
- * the value go, which the product's own stock page shows (ADR-0201).
+ * 9rem for its head. A column per warehouse holding stock among the rows stands before the total
+ * (owner 2026-11-20); a tablet upright lets the value go first, which the product's own stock page
+ * shows (ADR-0201), and a long row of warehouses scrolls in its card.
  */
-const STOCK_COLUMNS: readonly ColumnSpec[] = [
-  { key: 'sku', kind: 'code' },
-  { key: 'product', kind: 'text', weight: 3, min: 12 },
-  { key: 'onHand', kind: 'qty', width: 8.5 },
-  { key: 'available', kind: 'qty', width: 9 },
-  { key: 'value', kind: 'money', drop: 1 },
-  { key: 'chevron', kind: 'chevron' },
-];
-const STOCK_COLUMNS_NO_COSTS = STOCK_COLUMNS.filter((column) => column.key !== 'value');
+function stockColumns(warehouseIds: readonly number[], withCosts: boolean): ColumnSpec[] {
+  return [
+    { key: 'sku', kind: 'code' },
+    { key: 'product', kind: 'text', weight: 3, min: 11 },
+    ...warehouseIds.map((id): ColumnSpec => ({ key: `w${id}`, kind: 'qty' })),
+    { key: 'onHand', kind: 'qty', width: 8.5 },
+    { key: 'available', kind: 'qty', width: 9 },
+    ...(withCosts ? [{ key: 'value', kind: 'money', drop: 1 } as const] : []),
+    { key: 'actions', kind: 'actions', actions: 1 },
+    { key: 'chevron', kind: 'chevron' },
+  ];
+}
 
 /**
  * One product's stock by warehouse: 53rem with the costs, which a till PC's card holds (about 54).
@@ -154,8 +166,15 @@ export function StockPage() {
     ...(where ? { where } : {}),
     ...(filters.segment ? { segmentId: filters.segment } : {}),
   });
-  const rows = stock.data?.pages.flatMap((page) => page.data) ?? [];
+  const rows = useMemo(() => stock.data?.pages.flatMap((page) => page.data) ?? [], [stock.data]);
   const total = stock.data?.pages[0]?.total;
+  const stockWarehouses = useStockWarehouses(rows);
+  const warehouseName = useWarehouseName();
+  const columns = useMemo(
+    () => stockColumns(stockWarehouses, canSeeCosts),
+    [stockWarehouses, canSeeCosts],
+  );
+  const [similarFor, setSimilarFor] = useState<number | undefined>();
   const filtered = Boolean(q || categoryId || stage || activeFilterFields(filters).length > 0);
 
   const applyFilters = (next: ProductFilters) =>
@@ -266,21 +285,29 @@ export function StockPage() {
           </FilterBar>
           <ProblemAlert problem={problemFromError(stock.error)} onRetry={stock.refetch} />
           <ListCard scroll beside>
-            <ListTable columns={canSeeCosts ? STOCK_COLUMNS : STOCK_COLUMNS_NO_COSTS}>
+            <ListTable columns={columns}>
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('inventory.sku')}</TableHead>
                   <TableHead>{t('inventory.product')}</TableHead>
+                  {stockWarehouses.map((id) => (
+                    <TableHead key={id} className="truncate text-right" title={warehouseName(id)}>
+                      {warehouseName(id)}
+                    </TableHead>
+                  ))}
                   <TableHead className="text-right">{t('inventory.stock.onHand')}</TableHead>
                   <TableHead className="text-right">{t('inventory.stock.available')}</TableHead>
                   {canSeeCosts ? (
                     <TableHead className="text-right">{t('inventory.stock.value')}</TableHead>
                   ) : null}
+                  <TableHead>
+                    <span className="sr-only">{t('common.actions')}</span>
+                  </TableHead>
                   <ChevronHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {stock.isPending ? <SkeletonRows columns={canSeeCosts ? 6 : 5} /> : null}
+                {stock.isPending ? <SkeletonRows columns={columns.length} /> : null}
                 {rows.map((row) => (
                   <LinkRow key={row.product.id} to={`/inventory/stock/${row.product.id}`}>
                     <TableCell className="font-mono">{row.product.sku}</TableCell>
@@ -292,6 +319,14 @@ export function StockPage() {
                         {row.product.name}
                       </Link>
                     </TruncateCell>
+                    {stockWarehouses.map((id) => {
+                      const qty = onHandIn(row, id);
+                      return (
+                        <TableCell key={id} className="text-right font-mono">
+                          {qty === null ? '' : formatQty(qty)}
+                        </TableCell>
+                      );
+                    })}
                     <TableCell className="text-right font-mono">
                       {t('inventory.qtyWithUnit', {
                         qty: formatQty(row.onHand),
@@ -306,6 +341,14 @@ export function StockPage() {
                         {row.value === undefined ? t('common.none') : formatTugrik(row.value)}
                       </TableCell>
                     ) : null}
+                    <RowActions>
+                      <StockReportMenu
+                        productIds={[row.product.id]}
+                        label={`${row.product.sku} - ${row.product.name}`}
+                        trigger="icon"
+                        onSimilar={() => setSimilarFor(row.product.id)}
+                      />
+                    </RowActions>
                   </LinkRow>
                 ))}
               </TableBody>
@@ -321,6 +364,7 @@ export function StockPage() {
           </ListCard>
         </div>
       </div>
+      <SimilarProductsDialog productId={similarFor} onClose={() => setSimilarFor(undefined)} />
     </div>
   );
 }
@@ -349,12 +393,17 @@ export function StockProductPage() {
   const canSeeCosts = useHasPermission('inventory.costs.manage');
   const stock = useProductStock(id);
   const warehouseName = useWarehouseName();
+  const [similarOpen, setSimilarOpen] = useState(false);
 
   const loadProblem = problemFromError(stock.error);
   if (loadProblem) return <ProblemAlert problem={loadProblem} />;
   if (!stock.data) return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>;
   const detail = stock.data;
   const unit = detail.product.baseUnitName;
+  // A warehouse where the product has nothing, on hand or reserved, is left out (owner 2026-11-20).
+  const held = detail.warehouses.filter(
+    (row) => !new Decimal(row.onHand).isZero() || !new Decimal(row.reserved).isZero(),
+  );
 
   return (
     <div className="space-y-4">
@@ -363,6 +412,15 @@ export function StockProductPage() {
         meta={<span className="font-mono">{detail.product.sku}</span>}
         actions={
           <>
+            <StockReportMenu
+              productIds={[detail.product.id]}
+              label={`${detail.product.sku} - ${detail.product.name}`}
+              trigger="button"
+            />
+            <Button variant="outline" onClick={() => setSimilarOpen(true)}>
+              <Sparkles />
+              {t('inventory.stock.similar.action')}
+            </Button>
             <Button variant="outline" asChild>
               <Link to={`/inventory/movements?product=${detail.product.id}`}>
                 <History />
@@ -387,7 +445,7 @@ export function StockProductPage() {
             <CardTitle>{t('inventory.stock.byWarehouse')}</CardTitle>
           </CardHeader>
           <CardContent>
-            {detail.warehouses.length === 0 ? (
+            {held.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t('inventory.stock.noStock')}</p>
             ) : (
               <ListTable columns={canSeeCosts ? WAREHOUSE_COLUMNS : WAREHOUSE_COLUMNS_NO_COSTS}>
@@ -407,7 +465,7 @@ export function StockProductPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {detail.warehouses.map((row) => (
+                  {held.map((row) => (
                     <TableRow key={row.warehouseId}>
                       <TruncateCell text={warehouseName(row.warehouseId)} />
                       <TableCell className="text-right font-mono">
@@ -489,6 +547,10 @@ export function StockProductPage() {
           </CardContent>
         </Card>
       </div>
+      <SimilarProductsDialog
+        productId={similarOpen ? detail.product.id : undefined}
+        onClose={() => setSimilarOpen(false)}
+      />
     </div>
   );
 }

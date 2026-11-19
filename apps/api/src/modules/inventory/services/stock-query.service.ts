@@ -589,6 +589,23 @@ export class StockQueryService {
     return this.posting.outflowByMonth(productIds, from, to);
   }
 
+  /**
+   * These products with their totals and per-warehouse balances, in the order given (unknown ids
+   * left out): one read of the products and one of the balances, whatever the count.
+   */
+  async stockOf(productIds: readonly number[]): Promise<ProductStock[]> {
+    const ids = [...new Set(productIds)];
+    if (ids.length === 0) return [];
+    const products = new Map(
+      (await this.catalog.getMany(ids)).map((product) => [product.id, product]),
+    );
+    const balances = await this.balances(ids);
+    return ids.flatMap((id) => {
+      const product = products.get(id);
+      return product ? [withTotals(product, balances.get(id) ?? [])] : [];
+    });
+  }
+
   /** Warehouse balances per product (warehouses holding or reserving none left out). */
   balancesOf(productIds: readonly number[]): Promise<Map<number, WarehouseBalance[]>> {
     return this.balances(productIds);

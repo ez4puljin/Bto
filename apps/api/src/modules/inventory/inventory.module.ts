@@ -33,6 +33,8 @@ import { PurchaseBooksService } from './services/purchase-books.service';
 import { ReceiptNoteFlowService } from './services/receipt-note-flow.service';
 import { ReceiptsService } from './services/receipts.service';
 import { ReservationService } from './services/reservation.service';
+import { SimilarProductsFlowService } from './services/similar-products-flow.service';
+import { SimilarProductsService } from './services/similar-products.service';
 import { StockPostingService } from './services/stock-posting.service';
 import { GoodsIssuesService } from './services/goods-issues.service';
 import { IssueExpenseTypesService } from './services/issue-expense-types.service';
@@ -56,6 +58,7 @@ const CORE_SERVICES = [
   PurchaseBooksService,
   ReservationService,
   ReceiptsService,
+  SimilarProductsService,
   StockPostingService,
   StockQueryService,
   StocktakesService,
@@ -97,9 +100,9 @@ export class InventoryBootstrap implements OnApplicationBootstrap {
 }
 
 /**
- * The HTTP side of inventory (api only). ProductAiFlowService and ReceiptNoteFlowService live
- * here and not in InventoryModule: they need the model, picture and scanner gateways, which only
- * the api's root provides.
+ * The HTTP side of inventory (api only). ProductAiFlowService, ReceiptNoteFlowService and
+ * SimilarProductsFlowService live here and not in InventoryModule: they need the model, picture
+ * and scanner gateways, which only the api's root provides.
  */
 @Module({
   imports: [InventoryModule, IdentityModule, CatalogModule, PartnersModule],
@@ -123,7 +126,12 @@ export class InventoryBootstrap implements OnApplicationBootstrap {
     TransferLinesController,
     InventoryAttentionController,
   ],
-  providers: [InventoryBootstrap, ProductAiFlowService, ReceiptNoteFlowService],
+  providers: [
+    InventoryBootstrap,
+    ProductAiFlowService,
+    ReceiptNoteFlowService,
+    SimilarProductsFlowService,
+  ],
 })
 export class InventoryHttpModule {}
 

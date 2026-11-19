@@ -1,11 +1,12 @@
 import { Body, Controller, Get, HttpCode, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
-import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiProperty, ApiSchema, ApiTags } from '@nestjs/swagger';
 import { type AuthContext, Authenticated, CurrentUser, RequirePermission } from '../../identity';
 import {
   BinContentDto,
   LowStockPageDto,
   LowStockQueryDto,
   ProductStockDetailDto,
+  ProductStockDto,
   ProductStockPageDto,
   ReconciliationStatusDto,
   StockMovementPageDto,
@@ -14,6 +15,10 @@ import {
   StockQueryPageDto,
   StockQueryRequestDto,
 } from '../dto/stock.dto';
+import {
+  type SimilarMethod,
+  SimilarProductsFlowService,
+} from '../services/similar-products-flow.service';
 import { StockQueryService } from '../services/stock-query.service';
 import {
   toBinContentDto,
@@ -25,12 +30,28 @@ import {
 } from './mappers';
 
 const COSTS = 'inventory.costs.manage';
+const SIMILAR_METHODS: readonly SimilarMethod[] = ['AI', 'NAME'];
+
+/** «Төстэй бараа (AI)» (ADR-0231): the product and those of its kind and size, with their stock. */
+@ApiSchema({ name: 'SimilarProducts' })
+class SimilarProductsDto {
+  @ApiProperty({
+    enum: SIMILAR_METHODS,
+    description: 'AI: chosen by the model; NAME: by the pre-filter',
+  })
+  method: SimilarMethod;
+  @ApiProperty({ description: 'The product asked about: the first row' }) productId: number;
+  @ApiProperty({ type: [ProductStockDto] }) data: ProductStockDto[];
+}
 
 /** Stock balances for every signed-in user; costs only reach holders of inventory.costs.manage. */
 @ApiTags('inventory')
 @Controller('stock')
 export class StockController {
-  constructor(private readonly stock: StockQueryService) {}
+  constructor(
+    private readonly stock: StockQueryService,
+    private readonly similar: SimilarProductsFlowService,
+  ) {}
 
   @Get()
   @Authenticated()
@@ -101,6 +122,26 @@ export class StockController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ProductStockDetailDto> {
     return toProductStockDetailDto(await this.stock.ofProduct(id), ctx.permissions.has(COSTS));
+  }
+
+  /**
+   * Products of the same kind and pack size as this one, chosen by the model among the pre-filter's
+   * candidates, or by the pre-filter alone without a model (ADR-0231), with their stock.
+   */
+  @Get('similar/:productId')
+  @Authenticated()
+  @ApiOkResponse({ type: SimilarProductsDto })
+  async similarTo(
+    @CurrentUser() ctx: AuthContext,
+    @Param('productId', ParseIntPipe) productId: number,
+  ): Promise<SimilarProductsDto> {
+    const result = await this.similar.of(ctx, productId);
+    const withCosts = ctx.permissions.has(COSTS);
+    return {
+      method: result.method,
+      productId: result.productId,
+      data: result.data.map((row) => toProductStockDto(row, withCosts)),
+    };
   }
 
   @Get('bins/:id')

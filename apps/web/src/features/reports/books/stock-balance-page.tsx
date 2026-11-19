@@ -1,8 +1,10 @@
-import { Boxes } from 'lucide-react';
+import { Boxes, X } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FormField } from '@/components/form';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
+import { Button } from '@/components/ui/button';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ProductSearch } from '@/features/inventory/shared';
 import { saveBlob } from '@/lib/download';
@@ -48,7 +50,6 @@ import {
   GroupRow,
   MultiPick,
   NoteRow,
-  PickedField,
   PrecisionField,
   PromptDialog,
   SelectField,
@@ -76,14 +77,16 @@ function useStockBalanceQuery() {
     if (!params.ready) return null;
     const warehouseIds = idsParam(search, 'w');
     const categoryId = idParamOf(search, 'cat');
-    const productId = idParamOf(search, 'pr');
+    // One product as before (the product page's link); several from «Төстэй бараа» (ADR-0231).
+    const productIds = [...new Set(idsParam(search, 'pr'))];
+    const [productId] = productIds;
     return {
       from: params.from,
       to: params.to,
       by: grouping === 'warehouse' ? 'warehouse' : 'product',
       ...(warehouseIds.length ? { warehouseIds } : {}),
       ...(categoryId ? { categoryId } : {}),
-      ...(productId ? { productId } : {}),
+      ...(productIds.length > 1 ? { productIds } : productId ? { productId } : {}),
     };
   }, [params.ready, params.from, params.to, search, grouping]);
   return { ...params, query, grouping };
@@ -104,7 +107,7 @@ export function StockBalancePage() {
       (id) => options.data?.warehouses.find((w) => w.id === id)?.name ?? String(id),
     ),
     ...(state.search.get('catn') ? [state.search.get('catn') ?? ''] : []),
-    ...(state.search.get('prn') ? [state.search.get('prn') ?? ''] : []),
+    ...state.search.getAll('prn').filter((name) => name !== ''),
   ];
   const values = report.data ? report.data.totals.closingValue !== null : true;
   const openPrompt = () => setPrompting(true);
@@ -174,6 +177,23 @@ function stockBalanceColumns(values: boolean): BookColumn[] {
   return [COL.code, textColumn(18.5, 10), COL.unit, ...pair, ...pair, ...pair, ...pair];
 }
 
+interface PickedProduct {
+  id: number;
+  label: string;
+}
+
+/** The products of the address: `pr` once per product, its `prn` (the label) in the same place. */
+function pickedProducts(search: URLSearchParams): PickedProduct[] {
+  const ids = idsParam(search, 'pr');
+  const labels = search.getAll('pr').length === ids.length ? search.getAll('prn') : [];
+  const seen = new Set<number>();
+  return ids.flatMap((id, at) => {
+    if (seen.has(id)) return [];
+    seen.add(id);
+    return [{ id, label: labels[at] || String(id) }];
+  });
+}
+
 function StockBalancePrompt(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -186,15 +206,14 @@ function StockBalancePrompt(props: {
   const dates = usePromptDates(props.state.from, props.state.to);
   const [warehouses, setWarehouses] = useState<string[]>(search.getAll('w'));
   const [categoryId, setCategoryId] = useState(search.get('cat') ?? '');
-  const [product, setProduct] = useState<{ id: number; label: string } | null>(null);
+  const [products, setProducts] = useState<PickedProduct[]>([]);
   const [grouping, setGrouping] = useState<Grouping>(props.state.grouping);
   const [precision, setPrecision] = useState<Precision>(props.state.precision);
   useEffect(() => {
     if (!props.open) return;
     setWarehouses(search.getAll('w'));
     setCategoryId(search.get('cat') ?? '');
-    const id = idParamOf(search, 'pr');
-    setProduct(id ? { id, label: search.get('prn') ?? String(id) } : null);
+    setProducts(pickedProducts(search));
   }, [props.open, search]);
   const categories = useMemo(
     () => categoryOptions(props.options?.categories ?? []),
@@ -208,8 +227,8 @@ function StockBalancePrompt(props: {
       w: warehouses,
       cat: categoryId,
       catn: categories.find((c) => c.value === categoryId)?.label,
-      pr: product?.id,
-      prn: product?.label,
+      pr: products.map((product) => String(product.id)),
+      prn: products.map((product) => product.label),
       by: grouping === 'product' ? null : grouping,
     });
     props.onOpenChange(false);
@@ -241,21 +260,49 @@ function StockBalancePrompt(props: {
             options={categories}
             onChange={setCategoryId}
           />
-          <PickedField
-            label={t('reports.books.prompt.product')}
-            htmlFor="book-product"
-            picked={product?.label ?? null}
-            onClear={() => setProduct(null)}
-          >
-            <ProductSearch
-              id="book-product"
-              className="max-w-none"
-              pickLabel={t('reports.prompt.choose')}
-              onPick={(picked) =>
-                setProduct({ id: picked.id, label: `${picked.sku} - ${picked.name}` })
-              }
-            />
-          </PickedField>
+          <FormField label={t('reports.books.prompt.product')} htmlFor="book-product">
+            <div className="space-y-2">
+              {products.length > 0 ? (
+                <ul className="flex flex-wrap gap-1.5">
+                  {products.map((product) => (
+                    <li
+                      key={product.id}
+                      className="inline-flex max-w-full items-center gap-1 rounded-full bg-secondary py-0.5 pr-0.5 pl-2.5 text-xs text-secondary-foreground"
+                    >
+                      <span className="truncate">{product.label}</span>
+                      <Button
+                        type="button"
+                        size="icon-xs"
+                        variant="ghost"
+                        aria-label={t('reports.books.prompt.removeProduct', {
+                          name: product.label,
+                        })}
+                        onClick={() =>
+                          setProducts((current) =>
+                            current.filter((entry) => entry.id !== product.id),
+                          )
+                        }
+                      >
+                        <X />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <ProductSearch
+                id="book-product"
+                className="max-w-none"
+                pickLabel={t('reports.prompt.choose')}
+                onPick={(picked) =>
+                  setProducts((current) =>
+                    current.some((entry) => entry.id === picked.id)
+                      ? current
+                      : [...current, { id: picked.id, label: `${picked.sku} - ${picked.name}` }],
+                  )
+                }
+              />
+            </div>
+          </FormField>
         </>
       }
       view={
